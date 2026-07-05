@@ -10,6 +10,28 @@
 2. **Fix front qa**: el site qa tenía `VITE_API_URL` sin `/api` → el front no cargaba nada. RESUELTO (borré esa env del site Netlify qa `d437d5af-…`, rebuild). qa funciona.
 3. **Consolidación Tesorería**: análisis exhaustivo hecho (doc completo abajo). **F0a HECHO** (fix del `/merge`, commit `1b75149`, probado con dato real de SPN). Resto = por hacer.
 
+## Cómo trabajar acá — mantener la performance (LEER PRIMERO)
+Se inyectan solos en contexto y hay que respetarlos: **`CLAUDE.md`** (reglas duras del repo), **`BUILD_GUIDE.md`** (patrones UI/backend, componentes canónicos), y las memorias del proyecto (recall automático). Lo que hizo que esta sesión saliera con rigor:
+
+**Reglas que NO se negocian:**
+- **Multi-tenant:** TODA query filtra `municipio_id == current_user.municipio_id`. Sin excepción = leak de tenants.
+- **UN modelo universal, cero `if muni==X`** (el flag es solo de superficie). Una excepción per-tenant en el modelo = Frankenstein; el user lo rechaza fuerte (pasó con el gate de OT: se sacó).
+- **No tocar módulos centrales sin "dale" explícito.** Proponer (qué archivo, qué cambio, por qué) → esperar OK → recién editar. "Aplicá lo que consideres" NO es carta blanca.
+- **Sos el especialista técnico:** tomá las decisiones técnicas y planteá la ESTRATEGIA; solo preguntá lo crítico que arriesgue integridad, con argumento FUNCIONAL. No tirar 3 fixes y preguntar "¿cuál?" (`feedback_tomar_decisiones_tecnicas`).
+- **Respuestas cortas** tema por tema (el user consulta por voz/mobile). EXCEPCIÓN: el análisis técnico va con TODO el detalle a la vista + balance final acotado (`feedback_estrategia_ejecucion_fases`).
+- **Emojis prohibidos** (iconos SVG/lucide). Controles nativos vetados (usar los de `components/ui`). Ver CLAUDE.md.
+
+**El ciclo — el esfuerzo va en VERIFICAR, no en re-pensar lo ya especificado:**
+1. Spec clara → ejecución liviana.
+2. **Gates antes de pushear:** front `cd frontend && npm run build` (tsc+eslint, sino Netlify falla silencioso); backend `python -m py_compile` + `python -m pyflakes` (atrapa NameError de imports que `ast.parse` no ve).
+3. **Verificar con DATO REAL en qa, no asumir** (regla 13). Patrón usado: probar la lógica en una transacción con `rollback` (no ensucia qa); o queries reales. Nunca declarar algo hecho sin verificar.
+4. **Hot path / multi-tenant / migración → pase adversarial:** lanzar agentes `code-reviewer` + `security-reviewer` en paralelo sobre el diff antes de commitear.
+5. **Probar el FRONT REAL con navegador** (Playwright headless), no solo curl (`feedback_probar_front_real`). Un backend 200 no garantiza que el front cargue (caso VITE_API_URL).
+6. **Migraciones:** seguir `base-compartida/12-MIGRACION-PROBADA-DE-UN-CLICK.md` — probar el click DESDE CERO revirtiendo qa (snapshot+revert+aplicar+verify), no solo dry-run.
+7. **Análisis exhaustivo → usar Workflow** (multi-agente mapear→diseñar→verificar). Avisar antes de disparar; qa es descartable (se restaura de backup), sin miedo a explorar.
+
+**Deploy (NO negociar):** Claude desarrolla → commit → push a `qa`. **NUNCA** preguntar "¿lo pusheo?" (sí, a qa, por defecto). **NUNCA** deployar ni preguntar "¿lo deployo?" — el deploy a Cloud Run y la promoción `qa`→`master` los dispara **Infra**. **Heroku está MUERTO.** Verificar qué está live contra el OpenAPI/revisión, no asumir desde el commit.
+
 ## Cómo conectarse a qa (patrón)
 ```bash
 cd backend
@@ -17,6 +39,19 @@ PROD_URL=$(grep -E "^DATABASE_URL=" .env | head -1 | sed -E 's/^DATABASE_URL=//'
 export DATABASE_URL="${PROD_URL%/sugerenciasmun}/sugerenciasmun-qa"   # mismo cluster Aiven, DB -qa
 ```
 Login demo qa: `admin@general-san-martin.demo.com` / `demo123` (o super admin `superadmin@test.com`/`demo123`, sin municipio_id). SPN productivo = muni **80**.
+
+**Probar un endpoint con auth (via el proxy del front = mismo camino que el navegador):**
+```bash
+FQA="https://munify-qa.netlify.app"
+TOKEN=$(curl -s -X POST "$FQA/api/auth/login" -d "username=admin@general-san-martin.demo.com&password=demo123" | python -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))")
+curl -s -H "Authorization: Bearer $TOKEN" "$FQA/api/reclamos" | head -c 300
+```
+**Probar el front real (Playwright headless, script `.cjs` porque frontend tiene `type:module`):**
+```bash
+cd frontend   # playwright vive en node_modules
+cp /ruta/probe.cjs ./_p.cjs; node _p.cjs; rm _p.cjs   # captura console errors + requests 4xx + screenshot
+```
+**Probar lógica de datos sin ensuciar qa:** script python con `create_async_engine`, `assert DATABASE()...endswith('-qa')`, hacer el cambio y `await conn.rollback()` (no persiste). Ver el patrón en el fix del `/merge` de esta sesión.
 
 ## 1. F6 OT universal — QUÉ QUEDA
 Código en qa (`2ce6111`). La OT implícita corre para TODOS los munis (D11, sin gate). Migración `backend/scripts/migrate_add_ot_origen.py --aplicar` probada desde cero en qa. **Pendiente: Infra promueve `qa`→`master` + corre esa línea en prod.** Detalle: `base-compartida/munify/PROMOCION-F6-OT-UNIVERSAL.md`. Memoria: `project_ot_universal_modelo_unico`.
