@@ -50,12 +50,15 @@ verify:
 # modulo aborta cualquier op que muta si el marcador no coincide con el nombre real de la DB.
 
 # Tablas que Infra PUEDE refrescar prod->qa (bulk SQL one-way, target siempre *-qa). Operatoria RECURRENTE
-# (traer datos reales a qa para probar lotes). AFINAR con Infra. NO incluir tablas que aun no existen en
-# prod (ej. poi_tipos, puntos_interes) — esas se llenan con seed, no con refresh.
+# (traer datos reales a qa para probar lotes). NO incluir tablas que aun no existen en prod (ej. poi_tipos,
+# puntos_interes) — esas se llenan con seed, no con refresh.
+# Formato por tabla: { table, tenant } donde `tenant` es el WHERE para el modo "bajame municipio X" (:muni lo
+# reemplaza Infra; en modo bulk se ignora). Verificado contra los modelos: reclamos/ordenes_trabajo/
+# tesoreria_cajas tienen municipio_id propio; reclamo_personas es hija de reclamos (sin municipio_id) -> subquery.
 data_refresh:
-  - reclamos
-  - reclamo_personas
-  - ordenes_trabajo
-  - tesoreria_contactos
-  - tesoreria_gastos
-  - tesoreria_cajas
+  - { table: reclamos,         tenant: "municipio_id = :muni" }
+  - { table: reclamo_personas, tenant: "reclamo_id IN (SELECT id FROM reclamos WHERE municipio_id = :muni)" }
+  - { table: ordenes_trabajo,  tenant: "municipio_id = :muni" }
+  - { table: tesoreria_cajas,  tenant: "municipio_id = :muni" }
+# Sacadas tesoreria_contactos / tesoreria_gastos: Infra midio que NO existen en prod (16-refresh dry-run,
+# MSG-20260706-0450) -> no hay nada que traer; en qa se llenan por seed.
