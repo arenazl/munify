@@ -5,28 +5,12 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Proxy same-origin al backend (Cloud Run). El front pega a /api, /static y
-# /uploads relativos → sin URL absoluta en el bundle (sin secrets scanning) y
-# sin CORS. DEBEN ir ANTES del catch-all /* del SPA.
-[[redirects]]
-  from = "/api/*"
-  to = "https://munify-api-1060106389361.us-east4.run.app/api/:splat"
-  status = 200
-  force = true
+# Proxy al backend: se GENERA en el build (scripts/gen-redirects.mjs) en dist/_redirects
+# desde BACKEND_ORIGIN, por ambiente. NADA de host hardcodeado aca — eso causaba el leak
+# qa->prod. Netlify procesa _redirects ANTES que netlify.toml, asi que el proxy vive en
+# el archivo generado (junto con su propio catch-all SPA).
 
-[[redirects]]
-  from = "/static/*"
-  to = "https://munify-api-1060106389361.us-east4.run.app/static/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/uploads/*"
-  to = "https://munify-api-1060106389361.us-east4.run.app/uploads/:splat"
-  status = 200
-  force = true
-
-# Redirects para SPA (React Router)
+# SPA fallback (React Router) — respaldo; el _redirects generado ya trae su catch-all.
 [[redirects]]
   from = "/*"
   to = "/index.html"

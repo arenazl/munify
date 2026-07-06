@@ -74,6 +74,7 @@ from .inventario import router as inventario_router
 from .contaduria_retenciones import router as contaduria_retenciones_router
 from .tesoreria_parajes import router as tesoreria_parajes_router
 from .tesoreria_import import router as tesoreria_import_router
+from .admin_ops import router as admin_ops_router
 
 api_router = APIRouter()
 
@@ -153,6 +154,9 @@ api_router.include_router(ordenes_pago_router, prefix="/contaduria/ordenes-pago"
 api_router.include_router(contaduria_retenciones_router, prefix="/contaduria/retenciones", tags=["Contaduria - Retenciones"])
 api_router.include_router(tesoreria_parajes_router, prefix="/tesoreria/parajes", tags=["Tesoreria - Parajes"])
 api_router.include_router(tesoreria_import_router, prefix="/tesoreria/import", tags=["Tesoreria - Importadores"])
+
+# Admin Ops — circuito de operaciones de datos por HTTP (migraciones/diagnosticos). Ver api/admin_ops.py.
+api_router.include_router(admin_ops_router)  # ya tiene prefix /admin
 
 # WebSockets
 from .ws import router as ws_router
