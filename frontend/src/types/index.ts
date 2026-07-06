@@ -154,7 +154,7 @@ export type CanalIngreso = 'app' | 'ventanilla_asistida' | 'whatsapp' | 'web_pub
 // ÓRDENES DE TRABAJO (unidad formal de trabajo de campo, N:M con reclamos)
 // =====================================================================
 
-export type EstadoOrdenTrabajo = 'pendiente' | 'asignada' | 'en_curso' | 'completada' | 'cancelada';
+export type EstadoOrdenTrabajo = 'pendiente' | 'asignada' | 'en_curso' | 'bloqueada' | 'completada' | 'cancelada';
 
 export interface OTMaterial {
   descripcion: string;

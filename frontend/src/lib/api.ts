@@ -1410,8 +1410,15 @@ export const ordenesTrabajoApi = {
   update: (id: number, data: Record<string, unknown>) => api.put(`/ordenes-trabajo/${id}`, data),
   asignar: (id: number, data: Record<string, unknown>) => api.post(`/ordenes-trabajo/${id}/asignar`, data),
   iniciar: (id: number) => api.post(`/ordenes-trabajo/${id}/iniciar`),
-  completar: (id: number, data: { notas_cierre: string; horas_reales?: number; finalizar_reclamos?: boolean }) =>
-    api.post(`/ordenes-trabajo/${id}/completar`, data),
+  completar: (id: number, data: {
+    notas_cierre: string;
+    horas_reales?: number;
+    finalizar_reclamos?: boolean;
+    consumos_reales?: { recurso_id: number; cantidad_real: number }[];
+  }) => api.post(`/ordenes-trabajo/${id}/completar`, data),
+  // T6: el empleado en campo marca la OT como BLOQUEADA (frenada, estado no final).
+  bloquear: (id: number, data: { motivo_tipo: string; motivo?: string }) =>
+    api.post(`/ordenes-trabajo/${id}/bloquear`, data),
   cancelar: (id: number, motivo: string) => api.post(`/ordenes-trabajo/${id}/cancelar`, { motivo }),
 };
 

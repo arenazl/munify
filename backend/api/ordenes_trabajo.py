@@ -10,7 +10,7 @@ necesitan OTs. Frontend gated por municipio_modulos 'ordenes_trabajo' (opt-in).
 """
 import logging
 from datetime import datetime, date, time, timezone
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -34,6 +34,15 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ESTADOS_FINALES = (EstadoOrdenTrabajo.COMPLETADA, EstadoOrdenTrabajo.CANCELADA)
+
+# T6 · etiquetas legibles del motivo de bloqueo (map resiliente, regla dura #3:
+# .get con fallback, nunca switch). El detalle libre lo agrega OTBloquear.motivo.
+MOTIVO_BLOQUEO_LABELS = {
+    "falta_material": "Falta de material",
+    "clima": "Clima",
+    "vecino_ausente": "Vecino ausente",
+    "otro": "Otro",
+}
 
 
 # ============================== Schemas ==============================
@@ -106,11 +115,28 @@ class OTAsignar(BaseModel):
     hora_fin: Optional[time] = None
 
 
+class ConsumoReal(BaseModel):
+    """Cantidad realmente consumida de un recurso al cerrar la OT.
+
+    `recurso_id` = OrdenTrabajoRecurso.id (la fila de recurso de la OT, tal como
+    la expone RecursoResponse.id), NO el item de inventario."""
+    recurso_id: int
+    cantidad_real: float
+
+
 class OTCompletar(BaseModel):
     notas_cierre: str
     horas_reales: Optional[float] = None
     # D4: opt-in para finalizar también los reclamos vinculados al cerrar la OT.
     finalizar_reclamos: bool = False
+    # T6: consumo REAL por consumible (lo que de verdad se usó en campo). Si no
+    # viene un recurso, se descuenta la cantidad PLANEADA (compat).
+    consumos_reales: Optional[List[ConsumoReal]] = None
+
+
+class OTBloquear(BaseModel):
+    motivo_tipo: Literal["falta_material", "clima", "vecino_ausente", "otro"]
+    motivo: Optional[str] = None
 
 
 class OTCancelar(BaseModel):
@@ -480,9 +506,14 @@ async def _liberar_activo(db: AsyncSession, item_id: int, ot_id: int, municipio_
 
 
 async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int,
-                           descontar_consumos: bool):
+                           descontar_consumos: bool, consumos_reales: Optional[dict] = None):
     """Al cerrar la OT: libera activos siempre; descuenta stock de
-    consumibles sólo si `descontar_consumos` (completar sí, cancelar no)."""
+    consumibles sólo si `descontar_consumos` (completar sí, cancelar no).
+
+    T6 · `consumos_reales` = {OrdenTrabajoRecurso.id: cantidad_real}. Para cada
+    consumible con cantidad real informada se descuenta ESA (y el registro pasa a
+    reflejarla); si no viene, cae a la PLANEADA (compat con el flujo previo)."""
+    consumos_reales = consumos_reales or {}
     for rec in ot.recursos:
         item = (await db.execute(select(InventarioItem).where(
             InventarioItem.id == rec.item_id, InventarioItem.municipio_id == municipio_id,
@@ -493,10 +524,15 @@ async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int
             if item.ocupado_por_ot_id in (ot.id, None):
                 item.estado_activo = EstadoActivo.DISPONIBLE
                 item.ocupado_por_ot_id = None
-        elif (rec.tipo == TipoRecursoOT.CONSUMO and descontar_consumos
-              and not rec.aplicado and rec.cantidad):
-            if item.stock_actual is not None:
-                item.stock_actual = max(0.0, (item.stock_actual or 0) - rec.cantidad)
+        elif rec.tipo == TipoRecursoOT.CONSUMO and descontar_consumos and not rec.aplicado:
+            real = consumos_reales.get(rec.id)
+            cant = real if real is not None else rec.cantidad
+            if cant is None or cant < 0:
+                continue  # sin cantidad válida: no descuenta ni marca (compat planeada None)
+            if real is not None:
+                rec.cantidad = cant  # el registro refleja el consumo real informado
+            if item.stock_actual is not None and cant:
+                item.stock_actual = max(0.0, (item.stock_actual or 0) - cant)
             rec.aplicado = True
 
 
@@ -1022,6 +1058,64 @@ async def iniciar_orden(
     return _to_response(ot)
 
 
+@router.post("/{ot_id}/bloquear", response_model=OTResponse)
+async def bloquear_orden(
+    ot_id: int,
+    data: OTBloquear,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"])),
+):
+    """T6 · el empleado en campo marca la OT como BLOQUEADA (frenada: falta
+    material, clima, vecino ausente, otro). Estado NO final — luego se completa o
+    se cancela. Operable por _puede_operar_en_campo (responsable/miembro de
+    cuadrilla + admin/supervisor). Avisa a los supervisores del muni (una
+    notificación)."""
+    municipio_id = get_effective_municipio_id(request, current_user)
+    ot = await _get_ot(db, ot_id, municipio_id)
+    if ot.estado not in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO):
+        raise HTTPException(status_code=400, detail="Solo se puede bloquear una OT asignada o en curso")
+
+    cuadrillas = await _cuadrillas_del_user(db, current_user)
+    if not _puede_operar_en_campo(ot, current_user, cuadrillas):
+        raise HTTPException(status_code=403, detail="No sos responsable de esta OT")
+
+    label = MOTIVO_BLOQUEO_LABELS.get(data.motivo_tipo, data.motivo_tipo)
+    detalle = f"Bloqueada · {label}"
+    if data.motivo and data.motivo.strip():
+        detalle += f": {data.motivo.strip()}"
+
+    ot.estado = EstadoOrdenTrabajo.BLOQUEADA
+    # Reusa motivo_cancelacion como campo de motivo del bloqueo (no hay columna
+    # dedicada; si luego se cancela/completa, ese flujo lo sobrescribe).
+    ot.motivo_cancelacion = detalle
+
+    numero = ot.numero
+    reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+    primer_reclamo_id = reclamos[0].id if reclamos else None
+
+    _historial_reclamos(
+        db, reclamos, current_user.id,
+        accion="ot_bloqueada",
+        comentario=f"Orden de trabajo {numero} bloqueada: {detalle}",
+    )
+
+    # Avisar a supervisores del muni (matriz: OT bloqueada → supervisores).
+    titulo = f"OT {numero} bloqueada"
+    mensaje = f"La orden {numero} quedó bloqueada: {detalle}"
+    notificados = await NotificacionService.notificar_supervisores(
+        db=db, municipio_id=municipio_id, titulo=titulo, mensaje=mensaje,
+        tipo="warning", reclamo_id=primer_reclamo_id, enviar_whatsapp=False,
+    )
+
+    await db.commit()
+
+    await _push_a_users(db, notificados, titulo, mensaje, "/gestion/ordenes-trabajo")
+
+    ot = await _get_ot(db, ot_id, municipio_id)
+    return _to_response(ot)
+
+
 @router.post("/{ot_id}/completar", response_model=OTResponse)
 async def completar_orden(
     ot_id: int,
@@ -1032,8 +1126,10 @@ async def completar_orden(
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     ot = await _get_ot(db, ot_id, municipio_id)
-    # Se permite completar desde asignada (en campo no siempre marcan "iniciar")
-    if ot.estado not in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO):
+    # Se permite completar desde asignada (en campo no siempre marcan "iniciar") y
+    # desde bloqueada (T6: el bloqueo se resolvió y el trabajo terminó).
+    if ot.estado not in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO,
+                         EstadoOrdenTrabajo.BLOQUEADA):
         raise HTTPException(status_code=400, detail="La OT no está en un estado completable")
 
     cuadrillas = await _cuadrillas_del_user(db, current_user)
@@ -1045,8 +1141,14 @@ async def completar_orden(
     ot.horas_reales = data.horas_reales
     ot.fecha_completada = datetime.utcnow()
 
-    # Libera activos y descuenta el stock de los consumibles usados.
-    await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=True)
+    # Libera activos y descuenta el stock de los consumibles usados. T6: si el
+    # cierre trae consumo real por recurso, se descuenta ese; si no, el planeado.
+    consumos_map = (
+        {c.recurso_id: c.cantidad_real for c in data.consumos_reales}
+        if data.consumos_reales else None
+    )
+    await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=True,
+                           consumos_reales=consumos_map)
 
     numero = ot.numero
     creador_id = ot.creador_id

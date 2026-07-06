@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes, Printer } from 'lucide-react';
+import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes, Printer, OctagonAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +10,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi, otTiposTrabajoApi } from '../lib/api';
-import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels } from '../lib/enums/ordenTrabajo';
+import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels, OT_MOTIVO_BLOQUEO_OPTIONS, type MotivoBloqueoOT } from '../lib/enums/ordenTrabajo';
 import { naturalezaColors, naturalezaIcons } from '../lib/enums/inventario';
 import { prioridadLabels, prioridadColor, prioridadIcons, PRIORIDAD_OPTIONS } from '../lib/enums/prioridadOT';
 import { getEstadoInfo } from '../lib/estadoConfig';
@@ -76,6 +76,13 @@ export default function OrdenesTrabajo() {
   const [finalizarReclamos, setFinalizarReclamos] = useState(false); // D4: opt-in al completar
   const [confirmCancelar, setConfirmCancelar] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState('');
+  // T6: consumo real por consumible al completar (keyed por OTRecurso.id).
+  const [consumosReales, setConsumosReales] = useState<Record<number, number>>({});
+  // T6: bloqueo en campo (frenar la OT — estado no final).
+  const [confirmBloquear, setConfirmBloquear] = useState(false);
+  const [motivoBloqueoTipo, setMotivoBloqueoTipo] = useState<MotivoBloqueoOT>('falta_material');
+  const [motivoBloqueoNota, setMotivoBloqueoNota] = useState('');
+  const [bloqueando, setBloqueando] = useState(false);
 
   // Catálogos para el form
   const [cuadrillas, setCuadrillas] = useState<CuadrillaMini[]>([]);
@@ -156,6 +163,9 @@ export default function OrdenesTrabajo() {
     setNotasCierre('');
     setHorasReales('');
     setFinalizarReclamos(false);
+    setConsumosReales({});
+    setMotivoBloqueoTipo('falta_material');
+    setMotivoBloqueoNota('');
     setSheetOpen(true);
   }, []);
 
@@ -207,6 +217,14 @@ export default function OrdenesTrabajo() {
     setNotasCierre('');
     setHorasReales('');
     setFinalizarReclamos(false);
+    // T6: precargar el consumo real de cada consumible con la cantidad planeada.
+    const consumosInit: Record<number, number> = {};
+    (ot.recursos || []).forEach(r => {
+      if (r.tipo === 'consumo') consumosInit[r.id] = r.cantidad ?? 1;
+    });
+    setConsumosReales(consumosInit);
+    setMotivoBloqueoTipo('falta_material');
+    setMotivoBloqueoNota('');
     setSheetOpen(true);
   };
 
@@ -261,14 +279,30 @@ export default function OrdenesTrabajo() {
     }
   };
 
+  // Consumibles de la OT seleccionada (para editar el consumo REAL al completar).
+  const consumiblesOT = useMemo(
+    () => (selected?.recursos || []).filter(r => r.tipo === 'consumo'),
+    [selected],
+  );
+
+  const setConsumoReal = (recursoId: number, cantidad: number) =>
+    setConsumosReales(prev => ({ ...prev, [recursoId]: cantidad }));
+
   const completar = async () => {
     if (!selected) return;
     if (!notasCierre.trim()) { toast.error('Contá qué se hizo (notas de cierre)'); return; }
     try {
+      // T6: mandar la cantidad REAL usada de cada consumible. Si no se editó,
+      // viaja la planeada (mismo default). El backend descuenta ese valor.
+      const consumos_reales = consumiblesOT.map(r => ({
+        recurso_id: r.id,
+        cantidad_real: consumosReales[r.id] ?? r.cantidad ?? 1,
+      }));
       await ordenesTrabajoApi.completar(selected.id, {
         notas_cierre: notasCierre.trim(),
         horas_reales: horasReales ? Number(horasReales) : undefined,
         finalizar_reclamos: finalizarReclamos,
+        consumos_reales: consumos_reales.length ? consumos_reales : undefined,
       });
       toast.success('Orden completada');
       setSheetOpen(false);
@@ -276,6 +310,27 @@ export default function OrdenesTrabajo() {
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(detail || 'No se pudo completar');
+    }
+  };
+
+  const bloquear = async () => {
+    if (!selected) return;
+    try {
+      setBloqueando(true);
+      await ordenesTrabajoApi.bloquear(selected.id, {
+        motivo_tipo: motivoBloqueoTipo,
+        motivo: motivoBloqueoNota.trim() || undefined,
+      });
+      toast.success('Orden bloqueada');
+      setConfirmBloquear(false);
+      setMotivoBloqueoNota('');
+      setSheetOpen(false);
+      await fetchOrdenes();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'No se pudo bloquear');
+    } finally {
+      setBloqueando(false);
     }
   };
 
@@ -612,6 +667,20 @@ export default function OrdenesTrabajo() {
               <p className="text-sm" style={{ color: theme.text }}>{selected.motivo_cancelacion}</p>
             </div>
           )}
+          {/* T6: OT frenada en campo (estado no final). El motivo viaja en motivo_cancelacion. */}
+          {selected && selected.estado === 'bloqueada' && (
+            <div className="rounded-xl p-3" style={{ backgroundColor: `${otEstadoColor('bloqueada')}15`, border: `1px solid ${otEstadoColor('bloqueada')}40` }}>
+              <p className="text-xs font-semibold uppercase mb-1 flex items-center gap-1.5" style={{ color: otEstadoColor('bloqueada') }}>
+                <OctagonAlert className="h-3.5 w-3.5" /> Orden bloqueada
+              </p>
+              {selected.motivo_cancelacion && (
+                <p className="text-sm" style={{ color: theme.text }}>{selected.motivo_cancelacion}</p>
+              )}
+              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                El trabajo está frenado. Cuando se resuelva, completá la orden desde abajo.
+              </p>
+            </div>
+          )}
 
           <div>
             <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Título</p>
@@ -856,8 +925,8 @@ export default function OrdenesTrabajo() {
             )}
           </div>
 
-          {/* Completar (asignada / en_curso) */}
-          {selected && (selected.estado === 'asignada' || selected.estado === 'en_curso') && (
+          {/* Completar (asignada / en_curso / bloqueada — T6: se puede cerrar tras destrabar) */}
+          {selected && (selected.estado === 'asignada' || selected.estado === 'en_curso' || selected.estado === 'bloqueada') && (
             <div className="rounded-xl p-3 space-y-2" style={{ border: `1px dashed ${otEstadoColor('completada')}60` }}>
               <p className="text-xs font-semibold uppercase" style={{ color: otEstadoColor('completada') }}>Completar orden</p>
               <textarea
@@ -868,6 +937,34 @@ export default function OrdenesTrabajo() {
                 className="w-full px-3 py-2 rounded-lg text-sm resize-none"
                 style={inputStyle}
               />
+              {/* T6: consumo REAL usado por consumible (editable por el empleado). */}
+              {consumiblesOT.length > 0 && (
+                <div className="rounded-lg p-2" style={{ backgroundColor: theme.backgroundSecondary }}>
+                  <p className="text-[11px] font-semibold uppercase mb-1.5 flex items-center gap-1.5" style={{ color: theme.textSecondary }}>
+                    <Boxes className="h-3.5 w-3.5" /> Consumo real usado
+                  </p>
+                  <div className="space-y-1.5">
+                    {consumiblesOT.map(r => (
+                      <div key={r.id} className="flex items-center gap-2">
+                        <span className="text-sm flex-1 truncate" style={{ color: theme.text }}>{r.item_nombre || `#${r.item_id}`}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          value={consumosReales[r.id] ?? r.cantidad ?? 1}
+                          onChange={e => setConsumoReal(r.id, Number(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 rounded text-sm text-right"
+                          style={inputStyle}
+                        />
+                        <span className="text-[11px] w-10" style={{ color: theme.textSecondary }}>{r.unidad || 'u'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
+                    Ajustá lo que realmente se usó: se descuenta esa cantidad del stock al completar.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -909,6 +1006,18 @@ export default function OrdenesTrabajo() {
               </p>
             </div>
           )}
+
+          {/* T6: bloquear en campo — frenar la OT sin cerrarla (falta material, clima, etc.).
+              Operable por el responsable de la OT; el backend valida quién puede. */}
+          {selected && (selected.estado === 'asignada' || selected.estado === 'en_curso') && (
+            <button
+              onClick={() => setConfirmBloquear(true)}
+              className="w-full py-2.5 rounded-lg font-medium flex items-center justify-center gap-1.5"
+              style={{ color: otEstadoColor('bloqueada'), border: `1px solid ${otEstadoColor('bloqueada')}60` }}
+            >
+              <OctagonAlert className="h-4 w-4" /> No puedo terminar — bloquear
+            </button>
+          )}
         </div>
       </Sheet>
 
@@ -932,6 +1041,45 @@ export default function OrdenesTrabajo() {
         confirmText="Cancelar OT"
         cancelText="Volver"
         variant="danger"
+      />
+
+      {/* T6: bloquear OT en campo — elegir motivo + nota opcional. */}
+      <ConfirmModal
+        isOpen={confirmBloquear}
+        onClose={() => setConfirmBloquear(false)}
+        onConfirm={bloquear}
+        title="Bloquear orden de trabajo"
+        icon={<OctagonAlert className="h-8 w-8" />}
+        message={
+          <div className="space-y-3 text-left">
+            <p style={{ color: theme.textSecondary }}>
+              La orden queda frenada (no es un cierre). Se avisa a los supervisores. Después podés completarla o cancelarla.
+            </p>
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Motivo</p>
+              <ModernSelect
+                value={motivoBloqueoTipo}
+                onChange={(v) => setMotivoBloqueoTipo(v as MotivoBloqueoOT)}
+                options={OT_MOTIVO_BLOQUEO_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+              />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Nota (opcional)</p>
+              <textarea
+                value={motivoBloqueoNota}
+                onChange={e => setMotivoBloqueoNota(e.target.value)}
+                rows={2}
+                placeholder="Detalle de por qué se frenó..."
+                className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+        }
+        confirmText="Bloquear"
+        cancelText="Volver"
+        variant="warning"
+        loading={bloqueando}
       />
     </>
   );

@@ -31,6 +31,7 @@ import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
 import { prioridadColor, prioridadLabel, prioridadIcon, PRIORIDAD_OPTIONS } from '../lib/enums/prioridad';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
+import { CandidatosAsignacion, type SugerenciaAsignacion, type CandidatoDisponibilidad } from '../components/reclamos/CandidatosAsignacion';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType, OrdenTrabajo, PoiConsolidarResponse } from '../types';
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
@@ -364,31 +365,20 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
   const [disponibilidad, setDisponibilidad] = useState<{
     fecha: string;
-    bloques_ocupados: { reclamo_id: number; titulo: string; hora_inicio: string; hora_fin: string }[];
+    bloques_ocupados: { inicio: string; fin: string; titulo: string }[];
     proximo_disponible: string;
     hora_fin_jornada: string;
     dia_lleno: boolean;
   } | null>(null);
 
-  // Sugerencias de asignación automática
-  const [sugerencias, setSugerencias] = useState<{
-    empleado_id: number;
-    empleado_nombre: string;
-    categoria_principal: string | null;
-    zona: string | null;
-    score: number;
-    score_porcentaje: number;
-    detalles: {
-      categoria_match: boolean;
-      zona_match: boolean;
-      carga_trabajo: number;
-      disponibilidad_horas: number;
-      proximo_disponible: string | null;
-    };
-    razon_principal: string;
-  }[]>([]);
+  // Sugerencias de asignación automática (backend F4: score real con carga+ausencia)
+  const [sugerencias, setSugerencias] = useState<SugerenciaAsignacion[]>([]);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
   const [sugerenciasColapsadas, setSugerenciasColapsadas] = useState(false);
+  // Preview de disponibilidad del candidato elegido en el widget (F4). Estado
+  // propio para NO pisar `disponibilidad` (que usa el flujo de aceptar reclamo).
+  const [candDisp, setCandDisp] = useState<CandidatoDisponibilidad | null>(null);
+  const [candDispLoading, setCandDispLoading] = useState(false);
 
   // Búsqueda de usuarios para datos de contacto
   const [userSearchResults, setUserSearchResults] = useState<UserType[]>([]);
@@ -1411,8 +1401,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       }
     }
 
-    // Si el reclamo es nuevo, cargar sugerencias de asignación
-    if (reclamo.estado === 'nuevo') {
+    // Candidatos sugeridos (F4): cargar para admin/supervisor en cualquier estado
+    // asignable que el endpoint acepta (nuevo/recibido/en_curso/asignado). El
+    // widget de asignación vive en recibido/en_curso, no solo en 'nuevo'.
+    setCandDisp(null);
+    const esGestor = user?.rol === 'admin' || user?.rol === 'supervisor';
+    const estadosSugerencia = ['nuevo', 'recibido', 'en_curso', 'asignado'];
+    if (esGestor && estadosSugerencia.includes(reclamo.estado)) {
       setLoadingSugerencias(true);
       try {
         const res = await reclamosApi.getSugerenciaAsignacion(reclamo.id);
@@ -1437,6 +1432,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setHoraInicio('09:00');
     setDuracion('1');
     setDisponibilidad(null);
+    setCandDisp(null);
+    setSugerencias([]);
     setComentarioAsignacion('');
     setFotoCierre(null);
   };
@@ -1627,6 +1624,50 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleAsignarResponsable = (valor: string) => {
     setEmpleadoSeleccionadoId(valor);
     setOtSeleccionadaId('');
+  };
+
+  // ── Widget de candidatos (T5) ─────────────────────────────────────────────
+  // Disponibilidad REAL del candidato elegido para un día (F4). Estado propio
+  // (candDisp) para no interferir con el flujo de aceptación (disponibilidad).
+  const fetchCandDisp = async (empleadoId: number, fecha: string) => {
+    if (!empleadoId || !fecha) { setCandDisp(null); return; }
+    setCandDispLoading(true);
+    try {
+      const res = await reclamosApi.getDisponibilidadEmpleado(empleadoId, fecha, true);
+      const data = res.data as CandidatoDisponibilidad;
+      setCandDisp(data);
+      // El backend puede saltar al siguiente día si el elegido estaba lleno →
+      // sincronizamos la fecha/hora que usará la asignación (mismo resultado).
+      if (data.fecha && data.fecha !== fecha) setFechaProgramada(data.fecha);
+      if (data.proximo_disponible) setHoraInicio(data.proximo_disponible.slice(0, 5));
+    } catch (error) {
+      console.error('Error al obtener disponibilidad del candidato:', error);
+      setCandDisp(null);
+    } finally {
+      setCandDispLoading(false);
+    }
+  };
+
+  // Elegir un candidato del widget: fija el responsable con el MISMO valor
+  // polimórfico que el combo ("empleado:<id>") y precarga su disponibilidad.
+  const handleSelectCandidato = (empleadoId: number) => {
+    handleAsignarResponsable(`empleado:${empleadoId}`);
+    const dia = fechaProgramada || new Date().toISOString().split('T')[0];
+    if (!fechaProgramada) setFechaProgramada(dia);
+    fetchCandDisp(empleadoId, dia);
+  };
+
+  const handleCandFechaChange = (iso: string) => {
+    setFechaProgramada(iso);
+    const [tipo, idStr] = empleadoSeleccionadoId.split(':');
+    if (tipo === 'empleado' && idStr && iso) fetchCandDisp(Number(idStr), iso);
+  };
+
+  // Asignación directa desde el widget (mismo resultado que el combo: PUT
+  // /reclamos/{id}/empleado). Solo se ofrece cuando NO se usa el circuito de OT.
+  const handleAsignarCandidato = () => {
+    const [tipo, idStr] = empleadoSeleccionadoId.split(':');
+    if (tipo === 'empleado' && idStr) handleAsignarEmpleadoManual(idStr);
   };
 
   const handleVincularOT = async (otValor: string) => {
@@ -3503,6 +3544,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               })),
             ];
             const tipoResp = empleadoSeleccionadoId.split(':')[0];
+            const selectedEmpId = tipoResp === 'empleado' ? Number(empleadoSeleccionadoId.split(':')[1]) : null;
+            const haySugerencias = sugerencias.length > 0;
+            const hayAlgo = hayCandidatos || haySugerencias || loadingSugerencias;
             const otOptions = [
               ...(tipoResp === 'empleado' ? [{ value: '', label: 'Asignación simple (sin orden de trabajo)' }] : []),
               ...otsVigentesDependencia.map(ot => ({
@@ -3513,38 +3557,49 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             ];
             return (
               <ABMCollapsible
-                key={`resp-${selectedReclamo.id}-${hayCandidatos ? 'o' : 'c'}`}
-                title={hayCandidatos ? 'Asignar trabajo (opcional)' : 'Asignar trabajo — sin candidatos'}
+                key={`resp-${selectedReclamo.id}-${hayAlgo ? 'o' : 'c'}`}
+                title={hayAlgo ? 'Asignar trabajo (opcional)' : 'Asignar trabajo — sin candidatos'}
                 icon={<UserPlus className="h-4 w-4" />}
-                defaultOpen={hayCandidatos}
+                defaultOpen={hayAlgo}
               >
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleAutoAsignar}
-                    disabled={asignandoEmpleado || empleadosDependencia.length === 0}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
-                    style={{
-                      backgroundColor: `${theme.primary}15`,
-                      color: theme.primary,
-                      border: `1px solid ${theme.primary}40`,
-                    }}
-                    title="Asigna el empleado con mejor match (especialidad + zona + carga)"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {asignandoEmpleado ? 'Asignando…' : 'Auto-asignar'}
-                  </button>
-                  <div className="flex-1 min-w-0">
+                {/* Selector de candidatos (F4): tarjetas con score/razón/carga
+                    reales + ausencia + preview de disponibilidad del día. Reemplaza
+                    al combo plano de empleados; la lista completa queda de fallback. */}
+                <CandidatosAsignacion
+                  sugerencias={sugerencias}
+                  loading={loadingSugerencias}
+                  selectedEmpleadoId={selectedEmpId}
+                  onSelect={handleSelectCandidato}
+                  onAutoAsignar={handleAutoAsignar}
+                  autoAsignando={asignandoEmpleado}
+                  disp={candDisp}
+                  dispLoading={candDispLoading}
+                  fecha={fechaProgramada}
+                  onFechaChange={handleCandFechaChange}
+                  mostrarBotonAsignar={!moduloOTActivo}
+                  onAsignar={handleAsignarCandidato}
+                  asignando={asignandoEmpleado}
+                />
+
+                {/* Lista completa (fallback): cuadrillas + todos los operarios de la
+                    categoría. Preserva cuadrillas y operarios fuera del top de
+                    candidatos; mismo estado/flujo polimórfico de siempre. */}
+                {hayCandidatos && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>
+                      {hayCuadrillas ? 'O elegí cuadrilla / lista completa' : 'O elegí de la lista completa'}
+                    </p>
                     <ModernSelect
                       value={empleadoSeleccionadoId}
                       onChange={handleAsignarResponsable}
                       options={responsableOptions}
-                      placeholder={hayCandidatos ? (hayCuadrillas ? 'Seleccionar cuadrilla o empleado…' : 'Seleccionar empleado…') : 'Sin cuadrillas ni empleados asignables'}
-                      disabled={asignandoEmpleado || !hayCandidatos}
+                      placeholder={hayCuadrillas ? 'Seleccionar cuadrilla o empleado…' : 'Seleccionar empleado…'}
+                      disabled={asignandoEmpleado}
                       searchable
                     />
                   </div>
-                </div>
-                {!hayCandidatos && (
+                )}
+                {!hayAlgo && (
                   <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
                     Esta dependencia no tiene cuadrillas ni empleados cargados para la categoría del reclamo. La asignación es opcional — podés avanzar sin ella.
                   </p>
@@ -3990,7 +4045,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                           </p>
                           {disponibilidad.bloques_ocupados.map((bloque, idx) => (
                             <div key={idx} className="text-xs pl-5 py-0.5" style={{ color: theme.textSecondary }}>
-                              • {bloque.hora_inicio.slice(0, 5)} - {bloque.hora_fin.slice(0, 5)}: {bloque.titulo}
+                              • {bloque.inicio.slice(0, 5)} - {bloque.fin.slice(0, 5)}: {bloque.titulo}
                             </div>
                           ))}
                         </div>

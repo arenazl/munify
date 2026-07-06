@@ -31,10 +31,16 @@ class MotivoRechazo(str, enum.Enum):
 
 
 class EstadoOrdenTrabajo(str, enum.Enum):
-    """Ciclo de vida de una orden de trabajo (OT) de campo."""
+    """Ciclo de vida de una orden de trabajo (OT) de campo.
+
+    Circuito: pendiente → asignada → en_curso → (bloqueada) → completada/cancelada.
+    BLOQUEADA es un estado NO final: la OT está frenada en campo (falta material,
+    clima, vecino ausente) pero se retoma para completarse o se cancela.
+    """
     PENDIENTE = "pendiente"      # Creada, sin cuadrilla/empleado asignado
     ASIGNADA = "asignada"        # Con cuadrilla y/o empleado responsable
     EN_CURSO = "en_curso"        # Trabajo iniciado en campo
+    BLOQUEADA = "bloqueada"      # Frenada en campo (falta material/clima/vecino ausente)
     COMPLETADA = "completada"    # Trabajo terminado (no cierra los reclamos)
     CANCELADA = "cancelada"
 
