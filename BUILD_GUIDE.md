@@ -679,6 +679,7 @@ sus inputs (todos del inventario UI). El step de dirección **siempre** usa
 - Stats en grid responsive (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4`).
 - Gráficos con `recharts`, colores desde `theme.*`.
 - Cards con bordes y sombras desde theme, no hex.
+- **KPIs SIEMPRE con `<KpiCard>`/`<KpiRow>` (`components/ui/KpiCard.tsx`), nunca cards de métrica a mano.** Estándar de tamaño (regla dura): card **compacta**, ~76-88px de alto — número mediano (`clamp` con tope ~1.5rem/24px, NO 1.75rem+), padding vertical chico (`py-2`, NO `p-4`), icon-tile 24px. Una fila de 4 KPIs no puede comerse ~25% de la pantalla. Si ves un KPI "gigante" (número enorme, card alta), es un bug de regresión — volver a estos valores.
 
 ### 7.4 Detalle expandible / modal
 

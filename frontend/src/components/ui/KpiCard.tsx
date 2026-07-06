@@ -19,7 +19,11 @@ const BORDER_W_HI = '2px';
 
 // KpiCard — card de metrica unificada para ABM pages.
 // Look outlined: bg theme.card + border 1px del color del KPI + icon-tile
-// pastel del mismo color a la izquierda + numero grande + label + footnote.
+// pastel del mismo color a la izquierda + numero mediano + label + footnote.
+// Estandar de ALTURA (regla del proyecto, no agrandar): card compacta
+// ~76-88px de alto (icon-tile 24px, numero clamp hasta 1.5rem/24px, padding
+// vertical 8px). Nunca volver a un numero "gigante" ni padding p-4 completo:
+// una fila de 4 KPIs no puede comerse 25% de la pantalla.
 //
 // El KPI principal (highlighted=true) usa el mismo estilo outlined pero con
 // border mas grueso (2px) y border-color del color del KPI. NO usa fill
@@ -82,15 +86,15 @@ export function KpiCard({
   };
   return (
     <div
-      className={`rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${className}`}
+      className={`rounded-2xl px-3.5 py-2 transition-all hover:-translate-y-0.5 hover:shadow-md ${className}`}
       style={cardStyle}
     >
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-1.5">
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${color}18` }}
         >
-          <Icon className="h-4 w-4" style={{ color }} />
+          <Icon className="h-3.5 w-3.5" style={{ color }} />
         </div>
         <div
           className="text-[10px] uppercase font-bold tracking-wider truncate flex-1"
@@ -103,7 +107,7 @@ export function KpiCard({
         className="font-bold tabular-nums leading-none truncate"
         style={{
           color: theme.text,
-          fontSize: 'clamp(1.05rem, 4.6vw, 1.75rem)',
+          fontSize: 'clamp(1.05rem, 3.4vw, 1.5rem)',
           letterSpacing: '-0.02em',
         }}
         title={value}
@@ -111,11 +115,11 @@ export function KpiCard({
         {value}
       </div>
       {(footnote || pct != null) && (
-        <div className="flex items-center gap-2 mt-2 text-[11px]" style={{ color: theme.textSecondary }}>
+        <div className="flex items-center gap-2 mt-1 text-[10px]" style={{ color: theme.textSecondary }}>
           {footnote && <span className="truncate">{footnote}</span>}
           {pct != null && (
             <div
-              className="ml-auto w-12 h-1 rounded-full overflow-hidden flex-shrink-0"
+              className="ml-auto w-10 h-1 rounded-full overflow-hidden flex-shrink-0"
               style={{ backgroundColor: theme.backgroundSecondary }}
             >
               <div className="h-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: color }} />
