@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -7,13 +7,16 @@ import {
   Marker,
   Tooltip,
   useMap,
+  useMapEvents,
   Polygon,
   Rectangle,
+  Circle,
   CircleMarker,
 } from 'react-leaflet';
 import {
   X,
   MapPin,
+  MapPinned,
   Calendar,
   User,
   Tag,
@@ -28,15 +31,31 @@ import {
   CheckCircle,
   Flame,
   Pencil,
+  Trash2,
+  Loader2,
   Settings,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { estadoColor, estadoLabel, estadoColors, estadoLabels } from '../lib/enums/reclamo';
-import { reclamosApi } from '../lib/api';
+import { reclamosApi, poiApi, modulosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
 import PageHint from '../components/ui/PageHint';
-import { Reclamo } from '../types';
+import { Sheet } from '../components/ui/Sheet';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { Slider } from '../components/ui/Slider';
+import { ModernSelect } from '../components/ui/ModernSelect';
+import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
+import {
+  Reclamo,
+  type PuntoInteres,
+  type PoiTipo,
+  type PoiReclamosEnZonaResponse,
+  type PoiConsolidarResponse,
+  type PoiRecalcularResponse,
+} from '../types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
@@ -105,6 +124,20 @@ const createPinIcon = (color: string) =>
     iconAnchor: [15, 42],
     popupAnchor: [0, -42],
   });
+
+// =====================================================================
+// Marker de POI (modo Puntos): círculo relleno con el color del tipo.
+// Se diferencia del pin de reclamo (gota) para no confundir capas.
+// =====================================================================
+const createPoiIcon = (color: string, selected = false) => {
+  const size = selected ? 30 : 24;
+  return L.divIcon({
+    className: 'custom-poi-marker',
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+};
 
 // Estados: color/label canónicos vienen del SSoT `lib/enums/reclamo.ts`.
 // Para los combos/leyendas hijos (MapaFiltrosPanel, MapaStats) se pasa el mapa
@@ -325,12 +358,52 @@ function MapController({ target }: { target: { lat: number; lng: number; zoom?: 
   return null;
 }
 
+// Click en el mapa (modo Puntos) -> crear POI en esas coords.
+function PoiClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click: (e) => {
+      // Ignorar el click que precede a un doble-click (zoom): sin esto, hacer
+      // doble-click para acercar abriría el Sheet de "nuevo punto".
+      if ((e.originalEvent?.detail ?? 1) > 1) return;
+      onPick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+// Fit-bounds genérico sobre una lista de coords (modo Puntos). Mismo patrón que
+// FitBoundsToMarkers pero desacoplado del tipo Reclamo.
+function FitBoundsToLatLngs({ points, signal }: { points: Array<[number, number]>; signal: number }) {
+  const map = useMap();
+  const lastSignal = useRef(-1);
+  useEffect(() => {
+    if (signal === lastSignal.current) return;
+    lastSignal.current = signal;
+    if (points.length === 0) return;
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+      if (points.length === 1) {
+        map.setView(points[0], 15);
+      } else {
+        const latlngs = points.map((p) => L.latLng(p[0], p[1]));
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [60, 60], maxZoom: 15 });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [points, map, signal]);
+  return null;
+}
+
 // =====================================================================
 // Componente principal
 // =====================================================================
 // ViewMode y TimePreset se importan desde MapaFiltrosPanel
 
-const FILTROS_STORAGE_KEY = 'mapa_filtros_v1';
+// v2: se agregó `mapMode` (Reclamos | Puntos). Versionar la key resetea los
+// filtros viejos (aceptable) y evita parsear un shape sin mapMode.
+const FILTROS_STORAGE_KEY = 'mapa_filtros_v2';
+
+type MapMode = 'reclamos' | 'puntos';
 
 interface FiltrosPersistidos {
   filtroEstado: string | null;
@@ -339,6 +412,7 @@ interface FiltrosPersistidos {
   viewMode: ViewMode;
   showHotspots: boolean;
   showCoverage: boolean;
+  mapMode: MapMode;
 }
 
 const DEFAULT_FILTROS: FiltrosPersistidos = {
@@ -348,6 +422,7 @@ const DEFAULT_FILTROS: FiltrosPersistidos = {
   viewMode: 'pins',
   showHotspots: true,
   showCoverage: true,
+  mapMode: 'reclamos',
 };
 
 function loadFiltrosFromStorage(): FiltrosPersistidos {
@@ -379,6 +454,9 @@ function loadFiltrosFromStorage(): FiltrosPersistidos {
         typeof parsed.showCoverage === 'boolean'
           ? parsed.showCoverage
           : DEFAULT_FILTROS.showCoverage,
+      mapMode: ['reclamos', 'puntos'].includes(parsed.mapMode)
+        ? (parsed.mapMode as MapMode)
+        : DEFAULT_FILTROS.mapMode,
     };
   } catch {
     return DEFAULT_FILTROS;
@@ -393,8 +471,35 @@ function saveFiltrosToStorage(f: FiltrosPersistidos) {
   }
 }
 
+// Estado del form de POI (Sheet crear/editar). lat/long se editan por drag/click
+// en el mapa, no a mano — acá se guardan para el payload y para mostrarlas.
+interface PoiFormState {
+  nombre: string;
+  tipo_id: number | null;
+  direccion: string;
+  radio_metros: number;
+  activo: boolean;
+  notas: string;
+  latitud: number;
+  longitud: number;
+}
+
+const POI_RADIO_DEFAULT = 2000;
+
+const POI_FORM_VACIO: PoiFormState = {
+  nombre: '',
+  tipo_id: null,
+  direccion: '',
+  radio_metros: POI_RADIO_DEFAULT,
+  activo: true,
+  notas: '',
+  latitud: 0,
+  longitud: 0,
+};
+
 export default function Mapa() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -425,6 +530,9 @@ export default function Mapa() {
   const [showHotspots, setShowHotspots] = useState(initialFiltros.showHotspots);
   const [showCoverage, setShowCoverage] = useState(initialFiltros.showCoverage);
 
+  // Modo del mapa: Reclamos (default) | Puntos (POI). Persistido en la misma key.
+  const [mapMode, setMapMode] = useState<MapMode>(initialFiltros.mapMode);
+
   // Persistir filtros cuando cambian
   useEffect(() => {
     saveFiltrosToStorage({
@@ -434,8 +542,103 @@ export default function Mapa() {
       viewMode,
       showHotspots,
       showCoverage,
+      mapMode,
     });
-  }, [filtroEstado, filtroDependencia, timePreset, viewMode, showHotspots, showCoverage]);
+  }, [filtroEstado, filtroDependencia, timePreset, viewMode, showHotspots, showCoverage, mapMode]);
+
+  // =================================================================
+  // MODO PUNTOS (POI) — gate por módulo activo + rol admin/supervisor
+  // =================================================================
+  const [poiEnabled, setPoiEnabled] = useState(false);
+  useEffect(() => {
+    if (!user) {
+      setPoiEnabled(false);
+      return;
+    }
+    modulosApi
+      .list()
+      .then((r) => {
+        const rows = (r.data || []) as Array<{ modulo: string; activo: boolean }>;
+        setPoiEnabled(rows.some((m) => m.modulo === 'poi' && m.activo));
+      })
+      .catch(() => setPoiEnabled(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.municipio_id]);
+
+  const canUsePoi = poiEnabled && (user?.rol === 'admin' || user?.rol === 'supervisor');
+  const isPuntos = canUsePoi && mapMode === 'puntos';
+
+  // Estado del modo Puntos
+  const [pois, setPois] = useState<PuntoInteres[]>([]);
+  const [tipos, setTipos] = useState<PoiTipo[]>([]);
+  const [poiLoading, setPoiLoading] = useState(false);
+  const [poiSearch, setPoiSearch] = useState('');
+  const [poiCounts, setPoiCounts] = useState<Record<number, number>>({});
+  const [poiCountsLoading, setPoiCountsLoading] = useState(false);
+  const [poiFitSignal, setPoiFitSignal] = useState(0);
+  // Bump para remontar los markers (snap-back tras cancelar un drag).
+  const [poiRevision, setPoiRevision] = useState(0);
+  const [recalculando, setRecalculando] = useState(false);
+  const [consolidatingId, setConsolidatingId] = useState<number | null>(null);
+  const [poiSelectedId, setPoiSelectedId] = useState<number | null>(null);
+
+  // Sheet de POI (crear/editar)
+  const [poiSheetOpen, setPoiSheetOpen] = useState(false);
+  const [poiEditing, setPoiEditing] = useState<PuntoInteres | null>(null);
+  const [poiSaving, setPoiSaving] = useState(false);
+  const [poiForm, setPoiForm] = useState<PoiFormState>(POI_FORM_VACIO);
+  const [poiToDelete, setPoiToDelete] = useState<PuntoInteres | null>(null);
+  const [poiDragPending, setPoiDragPending] = useState<{ poi: PuntoInteres; lat: number; lng: number } | null>(null);
+
+  // Cargar counts de reclamos-en-zona por POI (una request por punto).
+  const loadPoiCounts = useCallback(async (list: PuntoInteres[]) => {
+    if (list.length === 0) {
+      setPoiCounts({});
+      return;
+    }
+    setPoiCountsLoading(true);
+    try {
+      const results = await Promise.all(
+        list.map((p) =>
+          poiApi
+            .reclamosEnZona(p.id)
+            .then((r) => [p.id, (r.data as PoiReclamosEnZonaResponse).total] as const)
+            .catch(() => [p.id, 0] as const),
+        ),
+      );
+      const map: Record<number, number> = {};
+      for (const [id, c] of results) map[id] = c;
+      setPoiCounts(map);
+    } finally {
+      setPoiCountsLoading(false);
+    }
+  }, []);
+
+  const cargarPois = useCallback(async () => {
+    setPoiLoading(true);
+    try {
+      const [tRes, pRes] = await Promise.all([
+        poiApi.listTipos({ activo: true }),
+        poiApi.listPuntos(),
+      ]);
+      setTipos((tRes.data || []) as PoiTipo[]);
+      const list = (pRes.data || []) as PuntoInteres[];
+      setPois(list);
+      setPoiRevision((r) => r + 1);
+      setPoiFitSignal((s) => s + 1);
+      loadPoiCounts(list);
+    } catch {
+      toast.error('Error cargando los puntos de interés');
+    } finally {
+      setPoiLoading(false);
+    }
+  }, [loadPoiCounts]);
+
+  // Cargar POIs al habilitarse el modo (una vez que el gate resuelve).
+  useEffect(() => {
+    if (canUsePoi) cargarPois();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canUsePoi]);
 
   // Time-lapse
   const [isPlaying, setIsPlaying] = useState(false);
@@ -711,6 +914,192 @@ export default function Mapa() {
   };
 
   // =================================================================
+  // Handlers del modo Puntos
+  // =================================================================
+  const poiPoints = useMemo<Array<[number, number]>>(
+    () => pois.map((p) => [p.latitud, p.longitud]),
+    [pois],
+  );
+
+  const getPoiCenter = (): [number, number] => {
+    if (pois.length === 0) return getMapCenter();
+    const lat = pois.reduce((s, p) => s + p.latitud, 0) / pois.length;
+    const lng = pois.reduce((s, p) => s + p.longitud, 0) / pois.length;
+    return [lat, lng];
+  };
+
+  const abrirNuevoPoi = (lat: number, lng: number) => {
+    const defTipo = tipos[0];
+    setPoiEditing(null);
+    setPoiSelectedId(null);
+    setPoiForm({
+      nombre: '',
+      tipo_id: defTipo ? defTipo.id : null,
+      direccion: '',
+      radio_metros: defTipo?.radio_default_metros ?? POI_RADIO_DEFAULT,
+      activo: true,
+      notas: '',
+      latitud: lat,
+      longitud: lng,
+    });
+    setPoiSheetOpen(true);
+  };
+
+  const abrirEditPoi = (poi: PuntoInteres) => {
+    setPoiEditing(poi);
+    setPoiSelectedId(poi.id);
+    setPoiForm({
+      nombre: poi.nombre,
+      tipo_id: poi.tipo_id,
+      direccion: poi.direccion || '',
+      radio_metros: poi.radio_metros,
+      activo: poi.activo,
+      notas: poi.notas || '',
+      latitud: poi.latitud,
+      longitud: poi.longitud,
+    });
+    setPoiSheetOpen(true);
+  };
+
+  // Click en una fila del panel: recentra el mapa y abre el Sheet en edición.
+  const seleccionarPoi = (poi: PuntoInteres) => {
+    setMapTarget({ lat: poi.latitud, lng: poi.longitud, zoom: 15 });
+    abrirEditPoi(poi);
+  };
+
+  // Al elegir un tipo en el Sheet: si estamos CREANDO, autocompletar el radio
+  // con el default del tipo (en edición se respeta el radio ya guardado).
+  const handlePoiTipoChange = (tipoIdStr: string) => {
+    const tipoId = tipoIdStr === '' ? null : Number(tipoIdStr);
+    setPoiForm((f) => {
+      const t = tipos.find((x) => x.id === tipoId);
+      const radio = !poiEditing && t?.radio_default_metros ? t.radio_default_metros : f.radio_metros;
+      return { ...f, tipo_id: tipoId, radio_metros: radio };
+    });
+  };
+
+  const guardarPoi = async () => {
+    if (!poiForm.nombre.trim()) {
+      toast.error('El nombre es obligatorio');
+      return;
+    }
+    if (poiForm.tipo_id == null) {
+      toast.error('Elegí un tipo de punto');
+      return;
+    }
+    setPoiSaving(true);
+    try {
+      const payload = {
+        tipo_id: poiForm.tipo_id,
+        nombre: poiForm.nombre.trim(),
+        direccion: poiForm.direccion.trim() || null,
+        latitud: poiForm.latitud,
+        longitud: poiForm.longitud,
+        radio_metros: poiForm.radio_metros,
+        activo: poiForm.activo,
+        notas: poiForm.notas.trim() || null,
+      };
+      if (poiEditing) {
+        await poiApi.updatePunto(poiEditing.id, payload);
+        toast.success('Punto actualizado');
+      } else {
+        await poiApi.createPunto(payload);
+        toast.success('Punto creado');
+      }
+      setPoiSheetOpen(false);
+      await cargarPois();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'Error guardando el punto');
+    } finally {
+      setPoiSaving(false);
+    }
+  };
+
+  const eliminarPoi = async () => {
+    if (!poiToDelete) return;
+    const id = poiToDelete.id;
+    try {
+      await poiApi.deletePunto(id);
+      toast.success('Punto eliminado');
+      setPoiToDelete(null);
+      if (poiEditing?.id === id) {
+        setPoiSheetOpen(false);
+        setPoiEditing(null);
+      }
+      await cargarPois();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'Error eliminando el punto');
+      setPoiToDelete(null);
+    }
+  };
+
+  // Drag del marker -> confirmar y persistir la nueva ubicación.
+  const confirmarMovimiento = async () => {
+    if (!poiDragPending) return;
+    const { poi, lat, lng } = poiDragPending;
+    setPoiDragPending(null);
+    try {
+      await poiApi.updatePunto(poi.id, {
+        tipo_id: poi.tipo_id,
+        nombre: poi.nombre,
+        direccion: poi.direccion ?? null,
+        latitud: lat,
+        longitud: lng,
+        radio_metros: poi.radio_metros,
+        activo: poi.activo,
+        notas: poi.notas ?? null,
+      });
+      toast.success('Punto reubicado');
+      await cargarPois();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'Error moviendo el punto');
+      setPoiRevision((r) => r + 1); // snap-back al lugar original
+    }
+  };
+
+  const cancelarMovimiento = () => {
+    setPoiDragPending(null);
+    setPoiRevision((r) => r + 1); // remonta el marker en su posición guardada
+  };
+
+  const recalcularZonas = async () => {
+    setRecalculando(true);
+    try {
+      const r = await poiApi.recalcular();
+      const n = (r.data as PoiRecalcularResponse)?.reclamos_en_zona ?? 0;
+      toast.success(`Zonas recalculadas: ${n} reclamos en zona`);
+      await loadPoiCounts(pois);
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'Error recalculando las zonas');
+    } finally {
+      setRecalculando(false);
+    }
+  };
+
+  const consolidarPoi = async (poi: PuntoInteres) => {
+    setConsolidatingId(poi.id);
+    try {
+      const r = await poiApi.consolidar(poi.id);
+      const data = r.data as PoiConsolidarResponse;
+      toast.success(
+        data.creada
+          ? `OT ${data.numero} creada con ${data.reclamos_count} reclamos`
+          : `OT ${data.numero} actualizada (${data.reclamos_count} reclamos)`,
+      );
+      await loadPoiCounts(pois);
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'Error consolidando en OT');
+    } finally {
+      setConsolidatingId(null);
+    }
+  };
+
+  // =================================================================
   // Export PDF de zona dibujada
   // =================================================================
   const exportZonaPdf = () => {
@@ -811,7 +1200,9 @@ export default function Mapa() {
     setFitSignal(s => s + 1);
   }, [filtroCategoria, filtroDependencia, filtroEstado, timePreset]);
 
-  if (loading) {
+  // En modo Puntos no bloqueamos por la carga de reclamos (el panel de POIs
+  // tiene su propio loading). El spinner global es solo para el modo Reclamos.
+  if (loading && !isPuntos) {
     return (
       <div className="flex items-center justify-center h-64">
         <div
@@ -829,7 +1220,7 @@ export default function Mapa() {
     ? Math.ceil((dateRange.max - dateRange.min) / 86400000)
     : 0;
 
-  const filterPanel = (
+  const reclamosFilterPanel = (
     <MapaFiltrosPanel
       categoriasDisponibles={categoriasDisponibles}
       dependenciasDisponibles={dependenciasDisponibles}
@@ -871,6 +1262,10 @@ export default function Mapa() {
     />
   );
 
+  // En modo Puntos el header no lleva el panel de filtros de reclamos: la
+  // búsqueda/acciones de POIs viven en el panel lateral (MapaPuntosPanel).
+  const filterPanel = isPuntos ? undefined : reclamosFilterPanel;
+
   return (
     <div className="space-y-6">
       {/* CSS para animación de hotspots */}
@@ -888,7 +1283,40 @@ export default function Mapa() {
       <StickyPageHeader filterPanel={filterPanel}>
         <PageTitleIcon icon={<MapIcon className="h-4 w-4" />} />
         <PageTitle>Mapa</PageTitle>
-        {loadingMore && (
+
+        {/* Toggle de modo — solo con módulo POI activo + rol admin/supervisor */}
+        {canUsePoi && (
+          <>
+            <HeaderSeparator />
+            <div
+              className="inline-flex items-center gap-0.5 p-0.5 rounded-lg flex-shrink-0"
+              style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}
+            >
+              {([
+                { key: 'reclamos' as MapMode, label: 'Reclamos', icon: <FileText className="h-3.5 w-3.5" /> },
+                { key: 'puntos' as MapMode, label: 'Puntos', icon: <MapPinned className="h-3.5 w-3.5" /> },
+              ]).map((opt) => {
+                const active = mapMode === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setMapMode(opt.key)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all active:scale-95"
+                    style={{
+                      backgroundColor: active ? theme.primary : 'transparent',
+                      color: active ? '#fff' : theme.textSecondary,
+                    }}
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {loadingMore && !isPuntos && (
           <>
             <HeaderSeparator />
             <div
@@ -902,8 +1330,11 @@ export default function Mapa() {
         )}
       </StickyPageHeader>
 
-      <PageHint pageId="mapa-reclamos" />
+      <PageHint pageId={isPuntos ? 'mapa-puntos' : 'mapa-reclamos'} />
 
+      {/* ============================ MODO RECLAMOS ============================ */}
+      {!isPuntos && (
+        <>
       {/* KPIs canónicos arriba (mismo patrón que Reclamos/Trámites/Tesorería) */}
       {(() => {
         const c = conteosPorEstado;
@@ -1087,6 +1518,96 @@ export default function Mapa() {
         statusLabels={estadoLabels}
         onZonaClick={c => focusOnZona(c.centerLat, c.centerLng)}
       />
+        </>
+      )}
+
+      {/* ============================= MODO PUNTOS ============================= */}
+      {isPuntos && (
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div
+            className="relative rounded-lg shadow overflow-hidden flex-1 min-w-0"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div style={{ height: '600px' }}>
+              <MapContainer
+                center={getPoiCenter()}
+                zoom={13}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer attribution="&copy; OSM &copy; CARTO" url={tileUrl} />
+
+                <FitBoundsToLatLngs points={poiPoints} signal={poiFitSignal} />
+                <MapController target={mapTarget} />
+                <PoiClickHandler onPick={abrirNuevoPoi} />
+
+                {pois.map((poi) => {
+                  const color = poi.tipo_color || theme.primary;
+                  return (
+                    <Fragment key={`poi-${poi.id}-${poiRevision}`}>
+                      <Circle
+                        center={[poi.latitud, poi.longitud]}
+                        radius={poi.radio_metros}
+                        interactive={false}
+                        pathOptions={{
+                          color,
+                          weight: 2,
+                          opacity: 0.7,
+                          fillColor: color,
+                          fillOpacity: poi.activo ? 0.12 : 0.05,
+                          dashArray: poi.activo ? undefined : '6 4',
+                        }}
+                      />
+                      <Marker
+                        position={[poi.latitud, poi.longitud]}
+                        draggable
+                        icon={createPoiIcon(color, poiSelectedId === poi.id)}
+                        eventHandlers={{
+                          click: () => abrirEditPoi(poi),
+                          dragend: (e) => {
+                            const ll = (e.target as L.Marker).getLatLng();
+                            setPoiDragPending({ poi, lat: ll.lat, lng: ll.lng });
+                          },
+                        }}
+                      >
+                        <Tooltip direction="top" offset={[0, -14]} permanent={false}>
+                          <div className="font-medium text-sm">{poi.nombre}</div>
+                          <div className="text-xs text-gray-500">
+                            {poi.tipo_nombre || 'Sin tipo'} · {poi.radio_metros} m
+                          </div>
+                        </Tooltip>
+                      </Marker>
+                    </Fragment>
+                  );
+                })}
+              </MapContainer>
+            </div>
+
+            {/* Hint flotante para crear */}
+            <div
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] px-4 py-2 rounded-full text-xs font-medium shadow-lg pointer-events-none flex items-center gap-1.5"
+              style={{ backgroundColor: theme.primary, color: '#fff' }}
+            >
+              <MapPin size={12} /> Click en el mapa para crear un punto · arrastrá para mover
+            </div>
+          </div>
+
+          <MapaPuntosPanel
+            pois={pois}
+            loading={poiLoading}
+            search={poiSearch}
+            onSearchChange={setPoiSearch}
+            counts={poiCounts}
+            countsLoading={poiCountsLoading}
+            selectedId={poiSelectedId}
+            onSelect={seleccionarPoi}
+            onConsolidar={consolidarPoi}
+            consolidatingId={consolidatingId}
+            onDelete={(poi) => setPoiToDelete(poi)}
+            onRecalcular={recalcularZonas}
+            recalculando={recalculando}
+          />
+        </div>
+      )}
 
       {/* Side Drawer */}
       {createPortal(
@@ -1281,6 +1802,201 @@ export default function Mapa() {
         </>,
         document.body,
       )}
+
+      {/* Sheet de POI (crear / editar) */}
+      <Sheet
+        open={poiSheetOpen}
+        onClose={() => setPoiSheetOpen(false)}
+        title={poiEditing ? 'Editar punto de interés' : 'Nuevo punto de interés'}
+        description={
+          poiEditing
+            ? poiEditing.tipo_nombre || undefined
+            : 'Definí su zona de influencia (radio)'
+        }
+        stickyFooter={
+          <div className="flex items-center justify-between gap-2">
+            {poiEditing ? (
+              <button
+                onClick={() => {
+                  const target = poiEditing;
+                  setPoiSheetOpen(false);
+                  setPoiToDelete(target);
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium inline-flex items-center gap-1.5"
+                style={{ backgroundColor: '#ef444415', color: '#ef4444' }}
+              >
+                <Trash2 className="h-4 w-4" /> Eliminar
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPoiSheetOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarPoi}
+                disabled={poiSaving}
+                className="px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-50 text-white"
+                style={{ backgroundColor: theme.primary }}
+              >
+                {poiSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Guardar
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Nombre */}
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
+              Nombre <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={poiForm.nombre}
+              onChange={(e) => setPoiForm({ ...poiForm, nombre: e.target.value })}
+              placeholder="Ej: Hospital Central, Escuela N°3, Plaza San Martín..."
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            />
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
+              Tipo <span className="text-red-500">*</span>
+            </label>
+            <ModernSelect
+              value={poiForm.tipo_id == null ? '' : String(poiForm.tipo_id)}
+              onChange={handlePoiTipoChange}
+              placeholder="Elegí un tipo"
+              searchable={tipos.length > 6}
+              options={tipos.map((t) => ({
+                value: String(t.id),
+                label: t.nombre,
+                color: t.color || undefined,
+              }))}
+            />
+            {tipos.length === 0 && (
+              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                No hay tipos de punto. Creálos en Configuración → Tipos de Punto.
+              </p>
+            )}
+          </div>
+
+          {/* Dirección */}
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
+              Dirección <span style={{ color: theme.textSecondary }}>(opcional)</span>
+            </label>
+            <input
+              type="text"
+              value={poiForm.direccion}
+              onChange={(e) => setPoiForm({ ...poiForm, direccion: e.target.value })}
+              placeholder="Ej: Av. Siempre Viva 742"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            />
+          </div>
+
+          {/* Radio */}
+          <div>
+            <Slider
+              label="Radio de zona (m)"
+              value={poiForm.radio_metros}
+              onChange={(v) => setPoiForm({ ...poiForm, radio_metros: v })}
+              min={100}
+              max={10000}
+              step={100}
+            />
+          </div>
+
+          {/* Coordenadas (read-only; se mueven por drag) */}
+          <div
+            className="flex items-center gap-3 p-3 rounded-lg"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <Navigation className="h-5 w-5 flex-shrink-0" style={{ color: theme.primary }} />
+            <div className="min-w-0">
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Coordenadas {poiEditing ? '(arrastrá el marker en el mapa para mover)' : ''}
+              </p>
+              <p className="text-sm font-mono" style={{ color: theme.text }}>
+                {poiForm.latitud.toFixed(6)}, {poiForm.longitud.toFixed(6)}
+              </p>
+            </div>
+          </div>
+
+          {/* Activo */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium" style={{ color: theme.text }}>
+              Activo
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={poiForm.activo}
+              onClick={() => setPoiForm({ ...poiForm, activo: !poiForm.activo })}
+              className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+              style={{ backgroundColor: poiForm.activo ? theme.primary : theme.border }}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+                style={{ transform: poiForm.activo ? 'translateX(20px)' : 'translateX(0)' }}
+              />
+            </button>
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
+              Notas <span style={{ color: theme.textSecondary }}>(opcional)</span>
+            </label>
+            <textarea
+              rows={3}
+              value={poiForm.notas}
+              onChange={(e) => setPoiForm({ ...poiForm, notas: e.target.value })}
+              placeholder="Contexto de la zona, referencias, etc."
+              className="w-full px-3 py-2 rounded-xl text-sm resize-none"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            />
+          </div>
+        </div>
+      </Sheet>
+
+      {/* Confirmar borrado de POI */}
+      <ConfirmModal
+        isOpen={!!poiToDelete}
+        onClose={() => setPoiToDelete(null)}
+        onConfirm={eliminarPoi}
+        title="Eliminar punto de interés"
+        message={`¿Eliminar "${poiToDelete?.nombre}"? Los reclamos dejarán de asociarse a esta zona.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirmar movimiento (drag del marker) */}
+      <ConfirmModal
+        isOpen={!!poiDragPending}
+        onClose={cancelarMovimiento}
+        onConfirm={confirmarMovimiento}
+        title="Mover punto"
+        message={
+          poiDragPending
+            ? `¿Reubicar "${poiDragPending.poi.nombre}" a las nuevas coordenadas?`
+            : ''
+        }
+        confirmText="Mover"
+        cancelText="Cancelar"
+        variant="warning"
+      />
     </div>
   );
 }

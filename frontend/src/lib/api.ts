@@ -1424,6 +1424,32 @@ export const otTiposTrabajoApi = {
   delete: (id: number) => api.delete(`/ot-tipos-trabajo/${id}`),
 };
 
+// Puntos de Interés (POI) — F6. Tipos (catálogo) + puntos (mapa) + consolidación.
+// Endpoints con prefijo /poi (OJO: /poi/tipos y /poi/puntos, NO /poi-tipos).
+export const poiApi = {
+  // ----- Tipos (catálogo; ABM en Configuración) -----
+  listTipos: (params?: { activo?: boolean }) =>
+    api.get('/poi/tipos', { params }),
+  createTipo: (data: Record<string, unknown>) => api.post('/poi/tipos', data),
+  updateTipo: (id: number, data: Record<string, unknown>) =>
+    api.put(`/poi/tipos/${id}`, data),
+  deleteTipo: (id: number) => api.delete(`/poi/tipos/${id}`),
+
+  // ----- Puntos (se gestionan en el mapa) -----
+  listPuntos: (params?: { activo?: boolean }) =>
+    api.get('/poi/puntos', { params }),
+  createPunto: (data: Record<string, unknown>) => api.post('/poi/puntos', data),
+  updatePunto: (id: number, data: Record<string, unknown>) =>
+    api.put(`/poi/puntos/${id}`, data),
+  deletePunto: (id: number) => api.delete(`/poi/puntos/${id}`),
+
+  // ----- Zona: reclamos + consolidación en OT + recálculo batch -----
+  reclamosEnZona: (id: number) => api.get(`/poi/puntos/${id}/reclamos-en-zona`),
+  consolidar: (id: number, reclamoIds?: number[]) =>
+    api.post(`/poi/puntos/${id}/consolidar`, { reclamo_ids: reclamoIds ?? null }),
+  recalcular: () => api.post('/poi/puntos/recalcular'),
+};
+
 // Inventario — categorías (template) + ítems (activos/consumibles)
 export const inventarioApi = {
   // Categorías

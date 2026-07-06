@@ -180,6 +180,73 @@ export interface OTTipoTrabajo {
   orden: number;
 }
 
+// ============ Puntos de Interés (POI) ============
+
+// Catálogo de tipos de POI (Hospital, Escuela, ...). ABM en Configuración.
+// Matchea TipoResponse del backend (api/poi.py).
+export interface PoiTipo {
+  id: number;
+  nombre: string;
+  icono?: string | null;
+  color?: string | null;
+  radio_default_metros?: number | null;
+  activo: boolean;
+  orden: number;
+}
+
+// POI concreto (lat/long + radio). Se gestiona en el mapa.
+// Matchea PuntoResponse del backend: los campos `tipo_*` vienen enriquecidos
+// desde el tipo (tipo embebido, aplanado) para el marker del mapa.
+export interface PuntoInteres {
+  id: number;
+  tipo_id: number;
+  nombre: string;
+  direccion?: string | null;
+  latitud: number;
+  longitud: number;
+  radio_metros: number;
+  activo: boolean;
+  notas?: string | null;
+  // Enriquecido desde el tipo (tipo embebido aplanado).
+  tipo_nombre?: string | null;
+  tipo_color?: string | null;
+  tipo_icono?: string | null;
+}
+
+// Reclamo activo dentro de la zona de un POI (GET /poi/puntos/{id}/reclamos-en-zona).
+export interface PoiReclamoEnZona {
+  id: number;
+  titulo: string;
+  estado: string;
+  direccion?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
+export interface PoiReclamosEnZonaResponse {
+  poi_id: number;
+  total: number;
+  reclamos: PoiReclamoEnZona[];
+}
+
+// Resultado de POST /poi/puntos/{id}/consolidar (OT de zona).
+export interface PoiConsolidarResponse {
+  id: number;
+  numero: string;
+  titulo: string;
+  estado: string;
+  prioridad: string;
+  origen: string;
+  poi_id?: number | null;
+  reclamos_count: number;
+  creada: boolean; // true: OT nueva; false: se reusó la vigente
+}
+
+// Resultado de POST /poi/puntos/recalcular.
+export interface PoiRecalcularResponse {
+  reclamos_en_zona: number;
+}
+
 export interface OrdenTrabajo {
   id: number;
   numero: string;

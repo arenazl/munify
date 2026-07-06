@@ -53,6 +53,16 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
     description: 'Clasificá las órdenes de trabajo (poda, bacheo, alumbrado...). Se elige al crear la OT y aparece en la planilla imprimible.',
     accent: 'violet',
   },
+  'mapa-puntos': {
+    title: 'Puntos de interés',
+    description: 'Marcá lugares clave (hospitales, escuelas, plazas) y su zona de influencia. Hacé click en el mapa para crear uno; después consolidá los reclamos que caen en la zona en una sola orden de trabajo.',
+    accent: 'emerald',
+  },
+  'poi-tipos-config': {
+    title: 'Tipos de punto de interés',
+    description: 'Clasificá los puntos del mapa (hospital, escuela, plaza...) con su ícono, color y radio de influencia sugerido. Los puntos concretos se crean después en el Mapa, no acá.',
+    accent: 'emerald',
+  },
   // ========================================================================
   // DASHBOARD — mini tutorial del sistema completo (wizard)
   // ========================================================================

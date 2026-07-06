@@ -4,11 +4,11 @@ import {
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
   Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
   UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
-  Briefcase, PiggyBank, CalendarClock, Trees, Boxes, Hammer,
+  Briefcase, PiggyBank, CalendarClock, Trees, Boxes, Hammer, MapPinned,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { configuracionApi, municipiosApi } from '../lib/api';
+import { configuracionApi, municipiosApi, modulosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
@@ -99,6 +99,8 @@ export default function Configuracion() {
   const [modified, setModified] = useState<Record<string, boolean>>({});
   const [, setMunicipios] = useState<Municipio[]>([]);
   const [, setConfigMunicipioScope] = useState<Record<string, number | null>>({});
+  // Modulos activos del municipio (feature flags) para gatear tiles opt-in (ej: POI).
+  const [modulosActivos, setModulosActivos] = useState<string[]>([]);
 
   // Branding states
   const [brandingLoading, setBrandingLoading] = useState(false);
@@ -135,6 +137,12 @@ export default function Configuracion() {
   useEffect(() => {
     fetchConfigs();
     fetchMunicipios();
+    modulosApi.list()
+      .then((r) => {
+        const rows = (r.data || []) as Array<{ modulo: string; activo: boolean }>;
+        setModulosActivos(rows.filter(m => m.activo).map(m => m.modulo));
+      })
+      .catch(() => setModulosActivos([]));
   }, []);
 
   // Actualizar estados de branding cuando cambia el municipio
@@ -640,6 +648,7 @@ export default function Configuracion() {
         { id: 'categorias-tramite', label: 'Categorías Trámite', description: 'Categorías de trámites del municipio: Obras, Comercio, etc', icon: FolderTree, color: '#10b981', link: '/gestion/categorias-tramite', show: isAdminOrSupervisor },
         { id: 'categorias-inventario', label: 'Categorías Inventario', description: 'Rubros del inventario: vehículos, herramientas, materiales', icon: Boxes, color: '#3b82f6', link: '/gestion/categorias-inventario', show: isAdminOrSupervisor },
         { id: 'tipos-trabajo', label: 'Tipos de Trabajo', description: 'Clasificación de las órdenes de trabajo: poda, bacheo, etc', icon: Hammer, color: '#8b5cf6', link: '/gestion/tipos-trabajo', show: isAdminOrSupervisor },
+        { id: 'poi-tipos', label: 'Tipos de Punto de Interés', description: 'Categorías de puntos en el mapa: hospitales, escuelas, plazas, etc', icon: MapPinned, color: '#ef4444', link: '/gestion/poi-tipos', show: isAdminOrSupervisor && modulosActivos.includes('poi') },
         { id: 'tramites-config', label: 'Tipos de Trámite', description: 'Trámites específicos del municipio (ej: Licencia de Conducir)', icon: FileText, color: '#6366f1', link: '/gestion/tramites-config', show: isAdminOrSupervisor },
         { id: 'zonas', label: 'Zonas', description: 'Barrios y áreas del municipio', icon: MapPin, color: '#06b6d4', link: '/gestion/zonas', show: isAdminOrSupervisor },
         { id: 'importar-padron', label: 'Catálogo de Tasas', description: 'Importá el padrón tributario y mapealo al catálogo Munify', icon: Landmark, color: '#0ea5e9', link: '/gestion/configuracion/importar-padron', show: isAdminOrSupervisor && !isSuperAdmin },
