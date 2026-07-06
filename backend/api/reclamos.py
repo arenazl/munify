@@ -2558,22 +2558,40 @@ async def upload_documento(
 async def get_disponibilidad_empleado(
     empleado_id: int,
     fecha: str,
+    request: Request,
     buscar_siguiente: bool = Query(False, description="Buscar siguiente día si el actual está lleno"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """
-    Obtiene los bloques horarios ocupados de un empleado para una fecha específica.
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
-    """
-    # Por ahora retorna disponibilidad completa ya que no hay empleado_id en reclamos
+    """Disponibilidad REAL del empleado para una fecha (F4): jornada desde
+    EmpleadoHorario (fallback 9-18), bloques ocupados (reclamos + OTs con hora
+    ese día) y dia_lleno según capacidad_maxima. Antes devolvía un stub fijo
+    9-18 siempre libre. Multi-tenant."""
+    from datetime import datetime as _dt
+    from services.asignacion import disponibilidad_de
+    municipio_id = get_effective_municipio_id(request, current_user)
+    try:
+        fecha_d = _dt.strptime(fecha, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido (YYYY-MM-DD)")
+    disp = await disponibilidad_de(db, empleado_id, municipio_id, fecha_d)
+    entrada, salida = disp["jornada"]
     return {
         "fecha": fecha,
-        "bloques_ocupados": [],
-        "proximo_disponible": "09:00:00",
-        "hora_fin_jornada": "18:00:00",
-        "dia_lleno": False,
-        "mensaje": "Pendiente migración a dependencias"
+        "bloques_ocupados": [
+            {
+                "inicio": b["inicio"].strftime("%H:%M") if b["inicio"] else None,
+                "fin": b["fin"].strftime("%H:%M") if b["fin"] else None,
+                "titulo": b["titulo"],
+            }
+            for b in disp["bloques_ocupados"]
+        ],
+        "proximo_disponible": entrada.strftime("%H:%M:%S"),
+        "hora_fin_jornada": salida.strftime("%H:%M:%S"),
+        "dia_lleno": disp["dia_lleno"],
+        "carga_dia": disp["carga_dia"],
+        "capacidad": disp["capacidad"],
+        "ausente": disp["ausente"],
     }
 
 
@@ -2641,10 +2659,9 @@ async def get_sugerencia_asignacion(
     if not empleados:
         return {"sugerencias": [], "mensaje": "No hay empleados operarios activos disponibles"}
 
+    from services.asignacion import carga_de, ausente_en
     sugerencias = []
     hoy = date_type.today()
-    hora_inicio_jornada = time_type(9, 0)
-    hora_fin_jornada = time_type(18, 0)
 
     for empleado in empleados:
         score = 0
@@ -2706,9 +2723,8 @@ async def get_sugerencia_asignacion(
         score += zona_score
 
         # 3. CARGA DE TRABAJO (25 puntos máx - menos carga = más puntos)
-        # TODO: Migrar a dependencia cuando se implemente IA
-        # Por ahora asumimos carga 0 ya que no hay empleado_id en reclamos
-        carga_actual = 0
+        # F4: carga REAL (reclamos activos + OTs vigentes del empleado), no simulada.
+        carga_actual = await carga_de(db, empleado.id, current_user.municipio_id)
         detalles["carga_trabajo"] = carga_actual
 
         # 0 reclamos = 25 pts, 1-2 = 20 pts, 3-4 = 15 pts, 5-6 = 10 pts, 7+ = 5 pts
@@ -2725,15 +2741,17 @@ async def get_sugerencia_asignacion(
 
         score += carga_score
 
-        # 4. DISPONIBILIDAD PRÓXIMA (15 puntos máx)
-        # TODO: Migrar a dependencia cuando se implemente IA
-        # Por ahora asumimos disponibilidad completa ya que no hay empleado_id en reclamos
-        disponibilidad_score = 15  # Máximo por defecto
-        dias_hasta_disponible = 0
-        detalles["proximo_disponible"] = hoy.isoformat()
-        detalles["disponibilidad_horas"] = 45.0  # 5 días * 9 horas
-
-        # disponibilidad_score ya está seteado arriba como 15
+        # 4. DISPONIBILIDAD (15 puntos máx). F4: penaliza FUERTE la ausencia REAL
+        # del empleado en la fecha (antes era un 15 fijo simulado).
+        tipo_ausencia = await ausente_en(db, empleado.id, hoy)
+        if tipo_ausencia:
+            disponibilidad_score = 0
+            detalles["ausente"] = tipo_ausencia
+            detalles["proximo_disponible"] = None
+        else:
+            disponibilidad_score = 15
+            detalles["proximo_disponible"] = hoy.isoformat()
+        detalles["disponibilidad_horas"] = 45.0
 
         score += disponibilidad_score
 
@@ -2831,6 +2849,11 @@ async def auto_asignar_reclamo(
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
     reclamo.empleado_id = empleado_id
+    # F4: setear fecha_programada (hoy) si no tiene, para que el reclamo
+    # auto-asignado aparezca en el canvas de planificación (que exige fecha).
+    if reclamo.fecha_programada is None:
+        from datetime import date as _date
+        reclamo.fecha_programada = _date.today()
     # OT universal (F6): espejar la asignación en una OT implícita 1:1 (silenciosa).
     from api.ordenes_trabajo import upsert_ot_implicita
     await upsert_ot_implicita(db, reclamo, empleado_id, current_user.id)

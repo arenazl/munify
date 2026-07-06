@@ -87,19 +87,6 @@ class TareaReclamo(BaseModel):
         from_attributes = True
 
 
-class TareaTramite(BaseModel):
-    tipo: str = "tramite"
-    id: int
-    numero_tramite: str
-    tramite_nombre: Optional[str] = None
-    estado: str
-    fecha_asignacion: Optional[str] = None
-    empleado_id: Optional[int] = None
-
-    class Config:
-        from_attributes = True
-
-
 class AusenciaPlanificacion(BaseModel):
     id: int
     empleado_id: int
@@ -338,6 +325,21 @@ async def get_planificacion_semanal(
         .scalar_subquery()
     )
     prioridad_orden = func.coalesce(ot_rank_subq, 2)  # sin OT viva -> 'media'
+    # F4: excluir del pool los reclamos YA cubiertos por una OT VIGENTE (de
+    # cuadrilla o individual). Antes, un reclamo canalizado por una OT figuraba
+    # "Sin asignar" e invitaba a doble asignación — la planificación era ciega a
+    # las OTs. Con F6-A toda asignación crea OT, así que esto es clave.
+    from sqlalchemy import exists as _exists
+    tiene_ot_vigente = (
+        _exists()
+        .where(OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .where(OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id)
+        .where(OrdenTrabajo.estado.in_([
+            EstadoOrdenTrabajo.PENDIENTE,
+            EstadoOrdenTrabajo.ASIGNADA,
+            EstadoOrdenTrabajo.EN_CURSO,
+        ]))
+    )
     query_sin_asignar = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
@@ -345,6 +347,7 @@ async def get_planificacion_semanal(
             Reclamo.municipio_id == municipio_id,
             Reclamo.estado.in_(estados_activos_sin_asignar),
             Reclamo.empleado_id.is_(None),
+            ~tiene_ot_vigente,
         )
         .order_by(prioridad_orden.desc(), Reclamo.created_at.asc())
         .limit(30)
@@ -460,19 +463,31 @@ async def asignar_fecha_reclamo(
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
 
+    # F4: validar con datos reales. Estado no asignable BLOQUEA; ausencia y
+    # exceso de capacidad WARNEAN (no bloquean — el supervisor decide).
+    from services.asignacion import validar_asignacion
+    try:
+        fecha_d = datetime.strptime(fecha_programada, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido (YYYY-MM-DD)")
+    validacion = await validar_asignacion(db, empleado_id, municipio_id, fecha_d, reclamo.estado)
+    if not validacion["ok"]:
+        raise HTTPException(status_code=400, detail=validacion["warnings"][0])
+
     # Actualizar reclamo
     try:
         reclamo.empleado_id = empleado_id
-        reclamo.fecha_programada = datetime.strptime(fecha_programada, "%Y-%m-%d").date()
+        reclamo.fecha_programada = fecha_d
 
         if hora_inicio:
             reclamo.hora_inicio = datetime.strptime(hora_inicio, "%H:%M").time()
         if hora_fin:
             reclamo.hora_fin = datetime.strptime(hora_fin, "%H:%M").time()
 
-        # Si estaba en estado "nuevo", pasarlo a "asignado"
+        # F4: NO escribir el estado legacy ASIGNADO. Si venía del legacy NUEVO,
+        # migrarlo al estado canónico RECIBIDO (circuito recibido→en_curso→…).
         if reclamo.estado == EstadoReclamo.NUEVO:
-            reclamo.estado = EstadoReclamo.ASIGNADO
+            reclamo.estado = EstadoReclamo.RECIBIDO
 
         # Miga en el historial (mismo criterio que la asignación directa de reclamos)
         nombre_empleado = f"{empleado.nombre} {empleado.apellido or ''}".strip()
@@ -507,7 +522,8 @@ async def asignar_fecha_reclamo(
             "message": "Reclamo asignado correctamente",
             "reclamo_id": reclamo_id,
             "empleado_id": empleado_id,
-            "fecha_programada": fecha_programada
+            "fecha_programada": fecha_programada,
+            "warnings": validacion["warnings"],
         }
 
     except ValueError as e:
