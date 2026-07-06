@@ -28,7 +28,7 @@ import { ReclamoCard, estadoColors, DynamicIcon } from '../components/ui/Reclamo
 import { estadoLabels } from '../lib/enums/reclamo';
 import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
 import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
-import { prioridadColor, prioridadLabel, prioridadIcon, PRIORIDAD_OPTIONS } from '../lib/enums/prioridad';
+import { prioridadColor, prioridadLabel, prioridadIcon, PRIORIDAD_OPTIONS, prioridadRankOf, prioridadSeverityColor } from '../lib/enums/prioridad';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
 import { CandidatosAsignacion, type SugerenciaAsignacion, type CandidatoDisponibilidad } from '../components/reclamos/CandidatosAsignacion';
@@ -44,6 +44,19 @@ const getCategoryImageUrl = (nombre: string): string | null => {
     .trim();
 
   return `${API_BASE_URL}/static/images/categorias/${safeName}.jpeg`;
+};
+
+// Fecha de vencimiento estimada de un reclamo = created_at + tiempo_estimado_dias
+// (o el SLA de la categoría, fallback 30 días). Compartida entre el cálculo de
+// "zona urgente" del inbox, el orden de "Empecemos por lo urgente" y el render
+// de cada card — antes vivía duplicada en 2 lugares distintos del inbox.
+const getFechaVenceReclamoMs = (r: Reclamo): number | null => {
+  const dias = r.tiempo_estimado_dias
+    ?? (r.categoria as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
+    ?? 30;
+  return r.created_at
+    ? new Date(r.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+    : null;
 };
 
 // Calificación que dejó el vecino tras el cierre del reclamo (T5-F1).
@@ -4669,12 +4682,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
       // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
       // (si no tiene, usar el SLA de la categoría; fallback 30 días).
-      const dias = r.tiempo_estimado_dias
-        ?? (r.categoria as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
-        ?? 30;
-      const fechaVence = r.created_at
-        ? new Date(r.created_at).getTime() + dias * dia
-        : null;
+      const fechaVence = getFechaVenceReclamoMs(r);
       const diffMs = fechaVence ? fechaVence - ahora : null;
 
       // Capa 1: fósil — venció hace más de 30 días, sin importar el estado.
@@ -4710,23 +4718,30 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       // Resto: nuevos sin tomar
       nuevos.push(r);
     }
+
+    // Orden de "Empecemos por lo urgente": prioridad_ot desc (urgente > alta >
+    // media > baja) y, a igual prioridad, por fecha de vencimiento asc (mismo
+    // criterio que ya se usaba arriba para detectar la zona urgente).
+    urgentes.sort((a, b) => {
+      const porPrioridad = prioridadRankOf(b.prioridad_ot) - prioridadRankOf(a.prioridad_ot);
+      if (porPrioridad !== 0) return porPrioridad;
+      const vA = getFechaVenceReclamoMs(a) ?? Infinity;
+      const vB = getFechaVenceReclamoMs(b) ?? Infinity;
+      return vA - vB;
+    });
+
     return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
   }, [filteredReclamos]);
 
   const renderInboxCard = (
     r: Reclamo,
-    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string },
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string; mostrarPrioridad?: boolean },
   ) => {
     const cat = r.categoria;
     const color = cat?.color || DEFAULT_CATEGORY_COLOR;
     const ahora = Date.now();
     const dia = 24 * 60 * 60 * 1000;
-    const dias = r.tiempo_estimado_dias
-      ?? (cat as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
-      ?? 30;
-    const fechaVence = r.created_at
-      ? new Date(r.created_at).getTime() + dias * dia
-      : null;
+    const fechaVence = getFechaVenceReclamoMs(r);
     const venceMs = fechaVence ? fechaVence - ahora : null;
     let tiempoLabel: string | undefined;
     if (venceMs != null) {
@@ -4755,6 +4770,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     const solicitanteNombre = r.es_anonimo
       ? 'Anónimo'
       : ([r.creador?.nombre, r.creador?.apellido].filter(Boolean).join(' ').trim() || undefined);
+    // Badge de prioridad (icono outline + color semáforo) — solo en la sección
+    // "Empecemos por lo urgente", que es la que pidió mostrar la prioridad.
+    const prioridadBadge = opts?.mostrarPrioridad
+      ? (() => {
+          const p = r.prioridad_ot || 'media';
+          const PrioIcon = prioridadIcon(p);
+          return {
+            icon: <PrioIcon className="w-3 h-3" />,
+            color: prioridadSeverityColor(p),
+            label: prioridadLabel(p),
+          };
+        })()
+      : undefined;
     return (
       <InboxCard
         numero={`#${r.id}`}
@@ -4767,6 +4795,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         sectionColor={opts?.sectionColor}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
+        prioridadBadge={prioridadBadge}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
         onClick={() => openViewSheet(r)}
         urgente={opts?.urgente}
@@ -4820,7 +4849,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
           count: inboxData.urgentes.length,
-          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#ef4444' })),
+          // Siempre cards grandes, sin importar la cantidad (30 urgentes = 30
+          // cards grandes) — ya vienen ordenados por prioridad_ot en inboxData.
+          forceDensity: 'large',
+          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#ef4444', mostrarPrioridad: true })),
         },
         {
           id: 'nuevos',

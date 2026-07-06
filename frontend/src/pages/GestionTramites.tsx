@@ -54,6 +54,7 @@ import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
+import { prioridadIcon, prioridadLabel, prioridadSeverityColor, prioridadRankOf, prioridadOTFromNumero } from '../lib/enums/prioridad';
 import type { Solicitud, Tramite, CategoriaTramite, Empleado, EmpleadoDisponibilidad, TipoEmpleado } from '../types';
 import {
   getEstadoInfo,
@@ -69,6 +70,18 @@ import React from 'react';
 const getEstadoConfig = getEstadoInfo;
 const normalizeEstado = normalizarEstado;
 const estadoTransiciones = TRANSICIONES;
+
+// Fecha de vencimiento estimada de un trámite = created_at + tiempo_estimado_dias
+// del trámite (fallback 15 días). Compartida entre el cálculo de "zona urgente"
+// del inbox, el orden de "Empecemos por lo urgente" y el render de cada card —
+// antes vivía duplicada en 2 lugares distintos del inbox (mismo patrón que
+// `getFechaVenceReclamoMs` en Reclamos.tsx).
+const getFechaVenceTramiteMs = (t: Solicitud): number | null => {
+  const dias = t.tramite?.tiempo_estimado_dias || 15;
+  return t.created_at
+    ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+    : null;
+};
 
 interface HistorialItem {
   id: number;
@@ -1470,10 +1483,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       if (estado === 'finalizado' || estado === 'rechazado') continue;
 
       // Vencimiento estimado = created_at + tiempo_estimado_dias del trámite
-      const dias = t.tramite?.tiempo_estimado_dias || 15;
-      const fechaVence = t.created_at
-        ? new Date(t.created_at).getTime() + dias * dia
-        : null;
+      const fechaVence = getFechaVenceTramiteMs(t);
       const diffMs = fechaVence ? fechaVence - ahora : null;
 
       // Capa 1: fósil — venció hace más de 30 días. Se manda a "Para limpiar"
@@ -1507,20 +1517,31 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       // Resto: nuevos sin tomar
       nuevos.push(t);
     }
+
+    // Orden de "Empecemos por lo urgente": mismo criterio que Reclamos —
+    // prioridad desc (urgente > alta > media > baja, mapeando la escala legacy
+    // 1-5 de Trámites al enum canónico) y, a igual prioridad, por fecha de
+    // vencimiento asc.
+    urgentes.sort((a, b) => {
+      const porPrioridad = prioridadRankOf(prioridadOTFromNumero(b.prioridad))
+        - prioridadRankOf(prioridadOTFromNumero(a.prioridad));
+      if (porPrioridad !== 0) return porPrioridad;
+      const vA = getFechaVenceTramiteMs(a) ?? Infinity;
+      const vB = getFechaVenceTramiteMs(b) ?? Infinity;
+      return vA - vB;
+    });
+
     return { urgentes, fosiles, nuevos, enCurso, esperando };
   }, [tramites]);
 
   const renderInboxCard = (
     t: Solicitud,
-    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string },
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string; mostrarPrioridad?: boolean },
   ) => {
     const cat = t.tramite?.categoria_tramite;
     const color = cat?.color || theme.primary;
     const ahora = Date.now();
-    const dias = t.tramite?.tiempo_estimado_dias || 15;
-    const fechaVence = t.created_at
-      ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
-      : null;
+    const fechaVence = getFechaVenceTramiteMs(t);
     const venceMs = fechaVence ? fechaVence - ahora : null;
     let tiempoLabel: string | undefined;
     if (venceMs != null) {
@@ -1547,6 +1568,20 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     if (estado === 'pospuesto') badges.push({ label: 'Pospuesto', color: '#8b5cf6' });
     const solicitanteNombre = [t.nombre_solicitante, t.apellido_solicitante]
       .filter(Boolean).join(' ').trim() || undefined;
+    // Badge de prioridad (icono outline + color semáforo) — solo en la sección
+    // "Empecemos por lo urgente". Mismo SSoT que Reclamos (lib/enums/prioridad),
+    // mapeando la escala legacy 1-5 de Trámites al enum canónico.
+    const prioridadBadge = opts?.mostrarPrioridad
+      ? (() => {
+          const p = prioridadOTFromNumero(t.prioridad);
+          const PrioIcon = prioridadIcon(p);
+          return {
+            icon: <PrioIcon className="w-3 h-3" />,
+            color: prioridadSeverityColor(p),
+            label: prioridadLabel(p),
+          };
+        })()
+      : undefined;
     return (
       <InboxCard
         numero={t.numero_tramite || `#${t.id}`}
@@ -1559,6 +1594,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         sectionColor={opts?.sectionColor}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
+        prioridadBadge={prioridadBadge}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
         onClick={() => openTramite(t)}
         urgente={opts?.urgente}
@@ -1595,7 +1631,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
           count: inboxData.urgentes.length,
-          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density, sectionColor: '#ef4444' })),
+          // Siempre cards grandes, sin importar la cantidad — mismo tratamiento
+          // que Reclamos.tsx. Ya vienen ordenados por prioridad en inboxData.
+          forceDensity: 'large',
+          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density, sectionColor: '#ef4444', mostrarPrioridad: true })),
         },
         {
           id: 'nuevos',
