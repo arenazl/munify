@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Filter,
   Flame,
+  MapPinned,
   Pause,
   Play,
   RotateCcw,
@@ -42,6 +43,7 @@ export interface MapaFiltrosState {
   viewMode: ViewMode;
   showHotspots: boolean;
   showCoverage: boolean;
+  showPois: boolean;
 }
 
 interface MapaFiltrosPanelProps {
@@ -65,6 +67,10 @@ interface MapaFiltrosPanelProps {
   viewMode: ViewMode;
   showHotspots: boolean;
   showCoverage: boolean;
+  showPois: boolean;
+  // Gate del toggle de capa POI: solo se muestra si el módulo 'poi' está activo
+  // (y el rol puede listar puntos). Lo resuelve el padre (canUsePoi).
+  poiLayerEnabled: boolean;
 
   // Setters / handlers
   onCategoriaChange: (key: string | null) => void;
@@ -74,6 +80,7 @@ interface MapaFiltrosPanelProps {
   onViewModeChange: (m: ViewMode) => void;
   onToggleHotspots: () => void;
   onToggleCoverage: () => void;
+  onTogglePois: () => void;
   onClearAll: () => void;
 
   // Time-lapse
@@ -249,6 +256,14 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
         onClear: () => props.onToggleHotspots(),
       });
     }
+    if (props.poiLayerEnabled && props.showPois) {
+      list.push({
+        key: 'pois',
+        label: 'Puntos de interés',
+        color: theme.primary,
+        onClear: () => props.onTogglePois(),
+      });
+    }
     return list;
   }, [
     props.filtroCategoria,
@@ -257,6 +272,8 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
     props.timePreset,
     props.viewMode,
     props.showHotspots,
+    props.showPois,
+    props.poiLayerEnabled,
     props.categoriasDisponibles,
     props.dependenciasDisponibles,
     props.statusColors,
@@ -472,6 +489,23 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
               Hotspots
               {props.hotspotsCount > 0 && ` (${props.hotspotsCount})`}
             </button>
+
+            {/* Puntos de interés (capa opcional; solo con módulo POI activo) */}
+            {props.poiLayerEnabled && (
+              <button
+                onClick={props.onTogglePois}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-95"
+                style={{
+                  backgroundColor: props.showPois ? `${theme.primary}20` : `${theme.textSecondary}10`,
+                  color: props.showPois ? theme.primary : theme.textSecondary,
+                  border: `1px solid ${props.showPois ? theme.primary : theme.border}`,
+                }}
+                title="Mostrar los puntos de interés sobre el mapa"
+              >
+                <MapPinned className="h-3 w-3" />
+                Puntos de interés
+              </button>
+            )}
 
             {/* Cobertura (solo si hay dependencia) */}
             {props.filtroDependencia != null && (() => {

@@ -129,11 +129,12 @@ const createPinIcon = (color: string) =>
 // Marker de POI (modo Puntos): círculo relleno con el color del tipo.
 // Se diferencia del pin de reclamo (gota) para no confundir capas.
 // =====================================================================
-const createPoiIcon = (color: string, selected = false) => {
-  const size = selected ? 30 : 24;
+const createPoiIcon = (color: string, selected = false, sizeOverride?: number) => {
+  const size = sizeOverride ?? (selected ? 30 : 24);
+  const border = size <= 16 ? 2 : 3;
   return L.divIcon({
     className: 'custom-poi-marker',
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:3px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></div>`,
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border}px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.45);"></div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -412,6 +413,7 @@ interface FiltrosPersistidos {
   viewMode: ViewMode;
   showHotspots: boolean;
   showCoverage: boolean;
+  showPois: boolean;
   mapMode: MapMode;
 }
 
@@ -422,6 +424,7 @@ const DEFAULT_FILTROS: FiltrosPersistidos = {
   viewMode: 'pins',
   showHotspots: true,
   showCoverage: true,
+  showPois: false,
   mapMode: 'reclamos',
 };
 
@@ -454,6 +457,10 @@ function loadFiltrosFromStorage(): FiltrosPersistidos {
         typeof parsed.showCoverage === 'boolean'
           ? parsed.showCoverage
           : DEFAULT_FILTROS.showCoverage,
+      showPois:
+        typeof parsed.showPois === 'boolean'
+          ? parsed.showPois
+          : DEFAULT_FILTROS.showPois,
       mapMode: ['reclamos', 'puntos'].includes(parsed.mapMode)
         ? (parsed.mapMode as MapMode)
         : DEFAULT_FILTROS.mapMode,
@@ -530,6 +537,10 @@ export default function Mapa() {
   const [showHotspots, setShowHotspots] = useState(initialFiltros.showHotspots);
   const [showCoverage, setShowCoverage] = useState(initialFiltros.showCoverage);
 
+  // Capa opcional de Puntos de Interés sobre el mapa de RECLAMOS (no confundir
+  // con el modo Puntos, que es una superficie propia). Persistida en la misma key.
+  const [showPois, setShowPois] = useState(initialFiltros.showPois);
+
   // Modo del mapa: Reclamos (default) | Puntos (POI). Persistido en la misma key.
   const [mapMode, setMapMode] = useState<MapMode>(initialFiltros.mapMode);
 
@@ -542,9 +553,10 @@ export default function Mapa() {
       viewMode,
       showHotspots,
       showCoverage,
+      showPois,
       mapMode,
     });
-  }, [filtroEstado, filtroDependencia, timePreset, viewMode, showHotspots, showCoverage, mapMode]);
+  }, [filtroEstado, filtroDependencia, timePreset, viewMode, showHotspots, showCoverage, showPois, mapMode]);
 
   // =================================================================
   // MODO PUNTOS (POI) — gate por módulo activo + rol admin/supervisor
@@ -896,6 +908,7 @@ export default function Mapa() {
     setViewMode('pins');
     setShowHotspots(true);
     setShowCoverage(true);
+    setShowPois(false);
   };
 
   const handleCategoriaChange = (key: string | null) => {
@@ -1237,6 +1250,8 @@ export default function Mapa() {
       viewMode={viewMode}
       showHotspots={showHotspots}
       showCoverage={showCoverage}
+      showPois={showPois}
+      poiLayerEnabled={canUsePoi}
       onCategoriaChange={handleCategoriaChange}
       onEstadoChange={setFiltroEstado}
       onDependenciaChange={setFiltroDependencia}
@@ -1247,6 +1262,7 @@ export default function Mapa() {
       onViewModeChange={setViewMode}
       onToggleHotspots={() => setShowHotspots((s) => !s)}
       onToggleCoverage={() => setShowCoverage((s) => !s)}
+      onTogglePois={() => setShowPois((s) => !s)}
       onClearAll={handleClearAllFiltros}
       isPlaying={isPlaying}
       hasDateRange={dateRange != null}
@@ -1399,6 +1415,42 @@ export default function Mapa() {
             {filtroDependencia != null && showCoverage && coveragePoints.length >= 3 && (
               <CoveragePolygon points={coveragePoints} color={coverageColor} />
             )}
+
+            {/* Capa opcional de Puntos de Interés (tenue) sobre el mapa de
+                reclamos. Reutiliza pois ya cargados por cargarPois(); se dibuja
+                antes que los pins para que los reclamos queden por encima. */}
+            {canUsePoi && showPois &&
+              pois.map((poi) => {
+                const color = poi.tipo_color || theme.primary;
+                return (
+                  <Fragment key={`poi-layer-${poi.id}`}>
+                    <Circle
+                      center={[poi.latitud, poi.longitud]}
+                      radius={poi.radio_metros}
+                      interactive={false}
+                      pathOptions={{
+                        color,
+                        weight: 1,
+                        opacity: 0.35,
+                        fillColor: color,
+                        fillOpacity: poi.activo ? 0.06 : 0.03,
+                        dashArray: poi.activo ? undefined : '6 4',
+                      }}
+                    />
+                    <Marker
+                      position={[poi.latitud, poi.longitud]}
+                      icon={createPoiIcon(color, false, 14)}
+                    >
+                      <Tooltip direction="top" offset={[0, -8]} permanent={false}>
+                        <div className="font-medium text-sm">{poi.nombre}</div>
+                        <div className="text-xs text-gray-500">
+                          {poi.tipo_nombre || 'Sin tipo'} · {poi.radio_metros} m
+                        </div>
+                      </Tooltip>
+                    </Marker>
+                  </Fragment>
+                );
+              })}
 
             {/* Heat layer */}
             {(viewMode === 'heat' || viewMode === 'both') && (

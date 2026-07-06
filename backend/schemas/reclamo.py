@@ -153,6 +153,25 @@ class DocumentoSimple(BaseModel):
         from_attributes = True
 
 
+class PoiEnZona(BaseModel):
+    """Punto de Interes (POI) en cuya zona cae el reclamo (F6 · Etapa B).
+
+    Se expone para que el frontend muestre el banner de consolidacion cuando el
+    reclamo esta vinculado a un POI (`reclamo.poi_id`). Lo llena el atributo
+    transitorio `reclamo.poi` que setea services.poi_matching.set_poi (dict o
+    None), no una columna mapeada.
+    """
+    id: int
+    nombre: str
+    tipo_nombre: Optional[str] = None
+    latitud: float
+    longitud: float
+    radio_metros: int
+
+    class Config:
+        from_attributes = True
+
+
 class PersonaSumada(BaseModel):
     """Persona que se sumó a un reclamo"""
     id: int
@@ -197,6 +216,11 @@ class ReclamoResponse(BaseModel):
     comentario_confirmacion_vecino: Optional[str] = None
     # Canal de ingreso: "app" | "ventanilla_asistida" | "whatsapp" | "web_publica" | None (legacy)
     canal: Optional[str] = None
+    # POI (F6 · Etapa B): si el reclamo cae en la zona de un Punto de Interes,
+    # `poi_id` apunta al POI y `poi` trae sus datos para el banner de
+    # consolidacion. Los llena services.poi_matching.set_poi antes de serializar.
+    poi_id: Optional[int] = None
+    poi: Optional[PoiEnZona] = None
     created_at: datetime
     updated_at: Optional[datetime]
 

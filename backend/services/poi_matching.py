@@ -13,7 +13,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import PuntoInteres, Reclamo
+from models import PoiTipo, PuntoInteres, Reclamo
 from models.enums import EstadoReclamo
 from utils.geo import haversine_distance
 
@@ -94,3 +94,49 @@ async def recalcular_pois_municipio(db: AsyncSession, municipio_id: int) -> int:
         if reclamo.poi_id is not None:
             en_zona += 1
     return en_zona
+
+
+async def set_poi(db: AsyncSession, reclamos) -> None:
+    """Inyecta el atributo transitorio `poi` (dict o None) en cada reclamo ORM.
+
+    Para los reclamos con `poi_id`, carga su PuntoInteres (con el nombre del
+    tipo) en UN solo query batch (sin N+1) y setea:
+        reclamo.poi = {id, nombre, tipo_nombre, latitud, longitud, radio_metros}
+    Reclamos sin `poi_id` -> reclamo.poi = None. Llamar ANTES de serializar a
+    ReclamoResponse, junto a set_prioridad_ot (mismo patron de atributo
+    transitorio: NO es columna mapeada, solo lo lee pydantic). No commitea.
+
+    Multi-tenant: los reclamos ya vienen scopeados; por defensa se filtran los
+    POIs por los municipios de los propios reclamos (mismo criterio que
+    prioridad_ot_map en services/prioridad.py).
+    """
+    reclamos = list(reclamos)
+    if not reclamos:
+        return
+    # Defensa multi-tenant: acotar a los municipios de los propios reclamos.
+    munis = {getattr(r, "municipio_id", None) for r in reclamos}
+    munis.discard(None)
+    poi_ids = {
+        r.poi_id for r in reclamos if getattr(r, "poi_id", None) is not None
+    }
+    mapa: dict[int, dict] = {}
+    if poi_ids:
+        query = (
+            select(PuntoInteres, PoiTipo.nombre)
+            .outerjoin(PoiTipo, PoiTipo.id == PuntoInteres.tipo_id)
+            .where(PuntoInteres.id.in_(poi_ids))
+        )
+        if munis:
+            query = query.where(PuntoInteres.municipio_id.in_(munis))
+        for poi, tipo_nombre in (await db.execute(query)).all():
+            mapa[poi.id] = {
+                "id": poi.id,
+                "nombre": poi.nombre,
+                "tipo_nombre": tipo_nombre,
+                "latitud": poi.latitud,
+                "longitud": poi.longitud,
+                "radio_metros": poi.radio_metros,
+            }
+    for reclamo in reclamos:
+        pid = getattr(reclamo, "poi_id", None)
+        reclamo.poi = mapa.get(pid) if pid is not None else None

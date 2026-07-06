@@ -213,6 +213,18 @@ export interface PuntoInteres {
   tipo_icono?: string | null;
 }
 
+// POI (F6 · Etapa B) en cuya zona cae un reclamo. Lo llena el backend
+// (services.poi_matching.set_poi) y viaja embebido en ReclamoResponse.poi
+// para el banner de consolidación del detalle. Matchea PoiEnZona del schema.
+export interface ReclamoPoi {
+  id: number;
+  nombre: string;
+  tipo_nombre?: string | null;
+  latitud: number;
+  longitud: number;
+  radio_metros: number;
+}
+
 // Reclamo activo dentro de la zona de un POI (GET /poi/puntos/{id}/reclamos-en-zona).
 export interface PoiReclamoEnZona {
   id: number;
@@ -366,6 +378,11 @@ export interface Reclamo {
   fecha_confirmacion_vecino?: string;
   comentario_confirmacion_vecino?: string;
   personas?: ReclamoPersona[];
+  // POI (F6 · Etapa B): si el reclamo cae en la zona de un Punto de Interés,
+  // `poi_id` apunta al POI y `poi` trae sus datos para el banner de
+  // consolidación en OT de zona. Ambos null si no cae en ninguna zona.
+  poi_id?: number | null;
+  poi?: ReclamoPoi | null;
 }
 
 export interface ReclamoPersona {

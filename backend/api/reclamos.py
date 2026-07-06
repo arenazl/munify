@@ -28,7 +28,7 @@ from schemas.reclamo import (
 from schemas.historial import HistorialResponse
 from services.gamificacion_service import GamificacionService
 from services.prioridad import set_prioridad_ot
-from services.poi_matching import match_reclamo_a_poi
+from services.poi_matching import match_reclamo_a_poi, set_poi
 from utils.geo import haversine_distance
 
 router = APIRouter()
@@ -812,6 +812,7 @@ async def get_reclamos(
     reclamos = result.unique().scalars().all()
     # F6 · prioridad unica: inyectar la prioridad efectiva leida de la OT.
     await set_prioridad_ot(db, reclamos)
+    await set_poi(db, reclamos)
     return reclamos
 
 @router.get("/mis-reclamos", response_model=List[ReclamoResponse])
@@ -827,6 +828,7 @@ async def get_mis_reclamos(
     result = await db.execute(query)
     reclamos = result.scalars().all()
     await set_prioridad_ot(db, reclamos)
+    await set_poi(db, reclamos)
     return reclamos
 
 
@@ -925,6 +927,7 @@ async def cambiar_estado_reclamo_drag(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 
@@ -1409,6 +1412,7 @@ async def get_reclamo(
         raise HTTPException(status_code=403, detail="No tienes permiso para ver este reclamo")
 
     await set_prioridad_ot(db, [reclamo])
+    await set_poi(db, [reclamo])
     return reclamo
 
 # Acciones internas que el vecino NO debe ver en el historial (cocina interna).
@@ -1698,6 +1702,7 @@ async def create_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo.id))
     reclamo_final = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_final])
+    await set_poi(db, [reclamo_final])
     logger.info("Reclamo #%s listo para retornar", reclamo_final.id)
     return reclamo_final
 
@@ -1737,6 +1742,7 @@ async def update_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 @router.post("/{reclamo_id}/asignar", response_model=ReclamoResponse)
@@ -1899,6 +1905,7 @@ async def asignar_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 @router.post("/{reclamo_id}/iniciar", response_model=ReclamoResponse)
@@ -1970,6 +1977,7 @@ async def iniciar_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 @router.post("/{reclamo_id}/resolver", response_model=ReclamoResponse)
@@ -2119,6 +2127,7 @@ async def resolver_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 
@@ -2196,6 +2205,7 @@ async def confirmar_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 
@@ -2294,6 +2304,7 @@ async def devolver_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 
@@ -2384,6 +2395,7 @@ async def rechazar_reclamo(
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     reclamo_out = result.scalar_one()
     await set_prioridad_ot(db, [reclamo_out])
+    await set_poi(db, [reclamo_out])
     return reclamo_out
 
 
