@@ -27,12 +27,14 @@ environments:
     backend_origin: https://munify-api-1060106389361.us-east4.run.app
     netlify_site: reclamos-mun
     ambiente_marker: prod
+    ambiente_db_esperado: sugerenciasmun      # _ambiente.db_name_esperado (nombre real de la DB de prod)
   qa:
     branch: qa
     backend_service: munify-api-qa
     backend_origin: https://munify-api-qa-vmpxsxe7ra-uk.a.run.app
     netlify_site: munify-qa
     ambiente_marker: qa
+    ambiente_db_esperado: sugerenciasmun-qa   # _ambiente.db_name_esperado (nombre real de la DB de qa)
     secret_overrides: { DATABASE_URL: DATABASE_URL_QA, SECRET_KEY: SECRET_KEY_QA }
 
 per_env_suffix: _QA
@@ -42,3 +44,18 @@ verify:
   front_url: https://munify-qa.netlify.app
   own_backend_host: munify-api-qa-vmpxsxe7ra-uk.a.run.app
   forbidden_host: munify-api-1060106389361
+
+# La tabla marcador _ambiente (la crea/lee el modulo /admin/ops) tiene 2 campos que Infra siembra por
+# ambiente: entorno (= ambiente_marker) y db_name_esperado (= ambiente_db_esperado). El guardarraiz del
+# modulo aborta cualquier op que muta si el marcador no coincide con el nombre real de la DB.
+
+# Tablas que Infra PUEDE refrescar prod->qa (bulk SQL one-way, target siempre *-qa). Operatoria RECURRENTE
+# (traer datos reales a qa para probar lotes). AFINAR con Infra. NO incluir tablas que aun no existen en
+# prod (ej. poi_tipos, puntos_interes) — esas se llenan con seed, no con refresh.
+data_refresh:
+  - reclamos
+  - reclamo_personas
+  - ordenes_trabajo
+  - tesoreria_contactos
+  - tesoreria_gastos
+  - tesoreria_cajas
