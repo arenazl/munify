@@ -1,0 +1,65 @@
+name: infra-gate
+
+# Enforcement de aislamiento de ambientes. DUENO: Infra (repo structure).
+# Las apps no lo editan; es el candado que verifica que un ambiente le pega a SU
+# backend y no a prod. Objetivo final: exigirlo como required status check en la
+# branch protection de master (asi es imposible mergear a prod con el aislamiento roto).
+#
+#   - wif-auth        : prueba que la Action se autentica a GCP SIN claves (WIF keyless).
+#   - isolation-gate  : corre el gate deterministico (deploy/verify-aislamiento.sh) para qa.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  wif-auth:
+    name: WIF keyless a GCP (prueba de identidad)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # requerido para el OIDC de WIF
+    steps:
+      - name: Auth a GCP via Workload Identity Federation (sin claves)
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: munify-api
+          workload_identity_provider: projects/1060106389361/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: gha-infra-reconcile@munify-api.iam.gserviceaccount.com
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Probar acceso (identidad + nombres de secrets, sin exponer valores)
+        run: |
+          echo "Identidad activa: $(gcloud config get-value account 2>/dev/null)"
+          echo "Secrets visibles en munify-api (solo nombres):"
+          gcloud secrets list --project munify-api --format="value(name)" | head -20
+
+  isolation-gate:
+    name: Gate de aislamiento (munify qa)
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_ACCOUNT_ID: arenazl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python (el gate usa `python` para parsear la Netlify API)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar netlify-cli
+        run: npm i -g netlify-cli@17
+      - name: Correr gate de aislamiento (qa) — falla el job si esta roto
+        run: |
+          bash deploy/verify-aislamiento.sh \
+            arenazl/munify qa \
+            https://munify-qa.netlify.app \
+            munify-api-qa-vmpxsxe7ra-uk.a.run.app \
+            munify-api-1060106389361 \
+            /api/municipios/public \
+            d437d5af-ee87-474b-84b6-ff83a9394262
