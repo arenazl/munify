@@ -1,0 +1,44 @@
+# Contrato de config de nube munify -> Infra. Value-free (solo nombres/refs).
+schema: 1
+app: { id: munify, repo: arenazl/munify, gcp_project: munify-api, region: us-east4 }
+
+backend:
+  runtime: cloudrun
+  source_dir: backend
+  health_path: /health
+  secrets:                      # SOLO NOMBRES (valores en Secret Manager, los pone Infra)
+    - DATABASE_URL
+    - SECRET_KEY
+    - ADMIN_OPS_KEY
+
+frontend:
+  host: netlify
+  source_dir: frontend
+  backend_binding:
+    mode: proxy_same_origin
+    build_input: BACKEND_ORIGIN       # env del site, por ambiente; la setea Infra
+    generator: frontend/scripts/gen-redirects.mjs
+    fail_closed: true
+
+environments:
+  prod:
+    branch: master
+    backend_service: munify-api
+    backend_origin: https://munify-api-1060106389361.us-east4.run.app
+    netlify_site: reclamos-mun
+    ambiente_marker: prod
+  qa:
+    branch: qa
+    backend_service: munify-api-qa
+    backend_origin: https://munify-api-qa-vmpxsxe7ra-uk.a.run.app
+    netlify_site: munify-qa
+    ambiente_marker: qa
+    secret_overrides: { DATABASE_URL: DATABASE_URL_QA, SECRET_KEY: SECRET_KEY_QA }
+
+per_env_suffix: _QA
+
+# Datos que consume el gate 15-verify (ambiente qa):
+verify:
+  front_url: https://munify-qa.netlify.app
+  own_backend_host: munify-api-qa-vmpxsxe7ra-uk.a.run.app
+  forbidden_host: munify-api-1060106389361
