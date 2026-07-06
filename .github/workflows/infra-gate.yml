@@ -10,6 +10,8 @@ name: infra-gate
 
 on:
   workflow_dispatch: {}
+  push:
+    branches: [infra/gate-setup]   # TEMPORAL: probar el gate sin tocar master
   pull_request:
     branches: [master]
 
