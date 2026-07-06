@@ -290,7 +290,9 @@ async def get_mis_stats(
         "nuevos": estados.get('nuevo', 0),
         "asignados": estados.get('asignado', 0),
         "en_curso": estados.get('en_curso', 0),
-        "resueltos": estados.get('resuelto', 0),
+        # Cierre canónico = 'finalizado'; se suma 'resuelto' (legacy) para no perder
+        # los cierres viejos que aún no migraron.
+        "resueltos": estados.get('finalizado', 0) + estados.get('resuelto', 0),
         "rechazados": estados.get('rechazado', 0),
     }
 
@@ -877,7 +879,7 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             *base,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
             func.date(Reclamo.fecha_resolucion) >= hace_7_dias
         )
     )
@@ -887,7 +889,7 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             *base,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
             func.date(Reclamo.fecha_resolucion) >= hace_14_dias,
             func.date(Reclamo.fecha_resolucion) < hace_7_dias
         )
@@ -986,7 +988,6 @@ async def get_metricas_detalle(
                 "categoria": r.categoria.nombre if r.categoria else "Sin categoría",
                 "zona": r.zona.nombre if r.zona else None,
                 "dias_antiguedad": dias,
-                "prioridad": r.prioridad or 1
             })
         return reclamos
 
@@ -1047,7 +1048,7 @@ async def get_metricas_detalle(
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
             *base,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
             func.date(Reclamo.fecha_resolucion) >= hace_7_dias
         )
         .order_by(Reclamo.fecha_resolucion.desc())

@@ -177,15 +177,11 @@ async def get_clusters(
             lat_centro = sum(r.latitud for r in cluster_reclamos) / len(cluster_reclamos)
             lon_centro = sum(r.longitud for r in cluster_reclamos) / len(cluster_reclamos)
 
-            # Calcular prioridad promedio del cluster
-            prioridad_promedio = sum(r.prioridad or 3 for r in cluster_reclamos) / len(cluster_reclamos)
-
             clusters.append({
                 "id": len(clusters) + 1,
                 "centro": {"lat": lat_centro, "lng": lon_centro},
                 "cantidad": len(cluster_reclamos),
                 "reclamos_ids": [r.id for r in cluster_reclamos],
-                "prioridad_promedio": round(prioridad_promedio, 1),
                 "radio_km": radio_km
             })
 
@@ -256,10 +252,10 @@ async def get_cobertura_zonas(
             Zona.id,
             Zona.nombre,
             func.count(Reclamo.id).label('total'),
-            func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
+            # Cierre canónico 'finalizado' + 'resuelto' (legacy) para la tasa de resolución.
+            func.sum(case((Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]), 1), else_=0)).label('resueltos'),
             func.sum(case((Reclamo.estado == EstadoReclamo.NUEVO, 1), else_=0)).label('pendientes'),
             func.sum(case((Reclamo.estado == EstadoReclamo.EN_CURSO, 1), else_=0)).label('en_curso'),
-            func.avg(Reclamo.prioridad).label('prioridad_promedio')
         )
         .select_from(Zona)
         .outerjoin(Reclamo, and_(*join_conds))
@@ -301,7 +297,6 @@ async def get_cobertura_zonas(
             "en_curso": en_curso,
             "tasa_resolucion": round(tasa_resolucion, 1),
             "porcentaje_total": round(porcentaje_total, 1),
-            "prioridad_promedio": round(zona.prioridad_promedio or 3, 1),
             "indice_atencion": round(indice_atencion, 1)
         })
 

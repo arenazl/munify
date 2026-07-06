@@ -50,12 +50,14 @@ export default function MiArea() {
           pendientes: 0,
         };
 
-        // Procesar conteos por estado
+        // Procesar conteos por estado. 'recibido' es el estado inicial canónico
+        // (creación unificada); 'nuevo' queda como legacy. El cierre canónico es
+        // 'finalizado'; 'resuelto' se suma como legacy para no perder cierres viejos.
         conteoData.forEach((item) => {
           reclamosStats.total += item.cantidad;
-          if (item.estado === 'nuevo') reclamosStats.nuevos = item.cantidad;
+          if (item.estado === 'nuevo' || item.estado === 'recibido') reclamosStats.nuevos += item.cantidad;
           if (item.estado === 'en_curso') reclamosStats.en_curso = item.cantidad;
-          if (item.estado === 'resuelto') reclamosStats.resueltos = item.cantidad;
+          if (item.estado === 'resuelto' || item.estado === 'finalizado') reclamosStats.resueltos += item.cantidad;
         });
         reclamosStats.pendientes = reclamosStats.total - reclamosStats.resueltos;
 

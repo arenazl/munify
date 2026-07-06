@@ -24,6 +24,7 @@ from .sla import SLAConfig, SLAViolacion
 from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
 from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo
+from .historial_orden_trabajo import HistorialOrdenTrabajo
 from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
 from .poi import PoiTipo, PuntoInteres
 from .enums import (
@@ -89,6 +90,7 @@ __all__ = [
     "OrdenTrabajo",
     "OrdenTrabajoReclamo",
     "OrdenTrabajoTipo",
+    "HistorialOrdenTrabajo",
     "EstadoOrdenTrabajo",
     "PrioridadOT",
     "OrigenOT",

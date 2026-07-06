@@ -390,7 +390,8 @@ async def get_sla_resumen(
         select(Reclamo)
         .where(
             Reclamo.municipio_id == current_user.municipio_id,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            # Cierre canónico 'finalizado' + 'resuelto' (legacy) para el tiempo promedio.
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
             Reclamo.fecha_resolucion >= hace_30_dias
         )
     )

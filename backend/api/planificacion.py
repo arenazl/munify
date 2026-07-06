@@ -81,7 +81,6 @@ class TareaReclamo(BaseModel):
     hora_inicio: Optional[str] = None
     hora_fin: Optional[str] = None
     empleado_id: Optional[int] = None
-    prioridad: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -241,7 +240,6 @@ async def get_planificacion_semanal(
             hora_inicio=r.hora_inicio.strftime("%H:%M") if r.hora_inicio else None,
             hora_fin=r.hora_fin.strftime("%H:%M") if r.hora_fin else None,
             empleado_id=r.empleado_id,
-            prioridad=r.prioridad
         )
         for r in reclamos
     ]
@@ -372,7 +370,6 @@ async def get_planificacion_semanal(
             hora_inicio=None,
             hora_fin=None,
             empleado_id=None,
-            prioridad=r.prioridad
         )
         for r in sin_asignar
     ]

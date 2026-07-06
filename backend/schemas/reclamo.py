@@ -12,7 +12,6 @@ class ReclamoCreate(BaseModel):
     referencia: Optional[str] = None
     categoria_id: int
     zona_id: Optional[int] = None
-    prioridad: int = 3
     # Datos de contacto del ciudadano (para registro automático - legacy)
     nombre_contacto: Optional[str] = None
     telefono_contacto: Optional[str] = None
@@ -46,7 +45,6 @@ class ReclamoUpdate(BaseModel):
     referencia: Optional[str] = None
     categoria_id: Optional[int] = None
     zona_id: Optional[int] = None
-    prioridad: Optional[int] = None
 
 class ReclamoAsignar(BaseModel):
     """Asignar o reasignar un reclamo a una dependencia"""
@@ -189,7 +187,6 @@ class ReclamoResponse(BaseModel):
     titulo: str
     descripcion: str
     estado: EstadoReclamo
-    prioridad: int  # LEGACY (deprecado F6): campo muerto, se lee prioridad_ot
     # Prioridad efectiva del reclamo, leida de su OT mas prioritaria (F6 ·
     # prioridad unica). 'baja'|'media'|'alta'|'urgente' o None si no tiene OT
     # viva (la UI cae a 'media'). Fuente unica: services/prioridad.py.

@@ -23,7 +23,8 @@ from core.security import get_current_user, require_roles
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
     OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo, EstadoOrdenTrabajo, PrioridadOT,
-    OrigenOT, Reclamo, CategoriaReclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
+    OrigenOT, Reclamo, CategoriaReclamo, HistorialReclamo, HistorialOrdenTrabajo,
+    Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
 from models.enums import RolUsuario, EstadoReclamo
@@ -329,6 +330,24 @@ def _historial_reclamos(db: AsyncSession, reclamos: List[Reclamo], usuario_id: i
             reclamo_id=r.id, usuario_id=usuario_id,
             accion=accion, comentario=comentario,
         ))
+
+
+def _historial_ot(db: AsyncSession, ot: OrdenTrabajo, usuario_id: int, accion: str,
+                  estado_nuevo: Optional[EstadoOrdenTrabajo],
+                  estado_anterior: Optional[EstadoOrdenTrabajo] = None,
+                  comentario: Optional[str] = None):
+    """T6 · registra UNA fila de auditoría de la OT por transición: quién la
+    movió, estado_anterior → estado_nuevo y un comentario. NO commitea (el caller
+    decide el commit, en la misma transacción que la mutación de la OT).
+
+    Multi-tenant heredado: `ot` ya viene scopeada por municipio (resuelta con
+    _get_ot / crear_ot_core), y el vínculo orden_trabajo_id acota el tenant — por
+    eso no se repite municipio_id acá. Requiere `ot.id` (la OT ya flusheada)."""
+    db.add(HistorialOrdenTrabajo(
+        orden_trabajo_id=ot.id, usuario_id=usuario_id, accion=accion,
+        estado_anterior=estado_anterior, estado_nuevo=estado_nuevo,
+        comentario=comentario,
+    ))
 
 
 def _puede_operar_en_campo(ot: OrdenTrabajo, user: User, cuadrillas_ids: set) -> bool:
@@ -893,6 +912,11 @@ async def crear_orden(
         accion="ot_creada",
         comentario=f"Orden de trabajo {ot.numero} creada: {data.titulo}",
     )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_creada",
+        estado_anterior=None, estado_nuevo=ot.estado,
+        comentario=f"OT {ot.numero} creada: {data.titulo}",
+    )
 
     if data.recursos:
         await _sincronizar_recursos(db, ot, data.recursos, municipio_id)
@@ -1013,11 +1037,18 @@ async def iniciar_orden(
     if not _puede_operar_en_campo(ot, current_user, cuadrillas):
         raise HTTPException(status_code=403, detail="No sos responsable de esta OT")
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.EN_CURSO
     ot.fecha_inicio_real = datetime.utcnow()
 
     numero = ot.numero
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_iniciada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} iniciada en campo.",
+    )
 
     # D3: los reclamos que todavía no arrancaron pasan a EN_CURSO (con miga en
     # historial). No tocamos reclamos ya en un estado más avanzado.
@@ -1085,6 +1116,7 @@ async def bloquear_orden(
     if data.motivo and data.motivo.strip():
         detalle += f": {data.motivo.strip()}"
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.BLOQUEADA
     # Reusa motivo_cancelacion como campo de motivo del bloqueo (no hay columna
     # dedicada; si luego se cancela/completa, ese flujo lo sobrescribe).
@@ -1098,6 +1130,11 @@ async def bloquear_orden(
         db, reclamos, current_user.id,
         accion="ot_bloqueada",
         comentario=f"Orden de trabajo {numero} bloqueada: {detalle}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_bloqueada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} bloqueada: {detalle}",
     )
 
     # Avisar a supervisores del muni (matriz: OT bloqueada → supervisores).
@@ -1136,6 +1173,7 @@ async def completar_orden(
     if not _puede_operar_en_campo(ot, current_user, cuadrillas):
         raise HTTPException(status_code=403, detail="No sos responsable de esta OT")
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.COMPLETADA
     ot.notas_cierre = data.notas_cierre
     ot.horas_reales = data.horas_reales
@@ -1160,6 +1198,11 @@ async def completar_orden(
         db, reclamos, current_user.id,
         accion="ot_completada",
         comentario=f"Orden de trabajo {numero} completada: {data.notas_cierre}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_completada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} completada: {data.notas_cierre}",
     )
 
     # D4: opt-in para finalizar también los reclamos vinculados. No tocamos los
@@ -1228,6 +1271,7 @@ async def cancelar_orden(
     if ot.estado in ESTADOS_FINALES:
         raise HTTPException(status_code=400, detail="La OT ya está cerrada")
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.CANCELADA
     ot.motivo_cancelacion = data.motivo
 
@@ -1242,6 +1286,11 @@ async def cancelar_orden(
         db, reclamos, current_user.id,
         accion="ot_cancelada",
         comentario=f"Orden de trabajo {numero} cancelada: {data.motivo}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_cancelada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} cancelada: {data.motivo}",
     )
 
     # Avisar a supervisores del muni (matriz: OT cancelada → supervisores).

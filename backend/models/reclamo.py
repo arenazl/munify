@@ -18,9 +18,14 @@ class Reclamo(Base):
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=False)
 
-    # Estado y prioridad
-    estado = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), default=EstadoReclamo.NUEVO, nullable=False, index=True)
-    prioridad = Column(Integer, default=3)  # 1-5, donde 1 es más urgente
+    # Estado (default RECIBIDO — F3 · creación unificada; ya no NUEVO).
+    estado = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), default=EstadoReclamo.RECIBIDO, nullable=False, index=True)
+
+    # DEPRECADO (F6): la prioridad efectiva se lee de la OT (services/prioridad.py →
+    # ReclamoResponse.prioridad_ot). El schema de la API ya NO la expone. La columna
+    # se MANTIENE (no se dropea todavía) porque aún la leen chat/portal_publico/turnos/
+    # vecino/escalado — el DROP físico es un release posterior, cuando esos 5 migren.
+    prioridad = Column(Integer, default=3)
 
     # Ubicación del reclamo (donde está el problema)
     direccion = Column(String(255), nullable=False)
