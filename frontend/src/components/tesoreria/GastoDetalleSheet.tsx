@@ -14,6 +14,7 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { MoneyInput } from '../ui/MoneyInput';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
+import { formatFechaAR, parseFechaLocal } from '../../lib/tesoreria-helpers';
 import type {
   Gasto, GastoCuota, EstadoGastoCuota, Contacto, Caja,
   DestinoGasto, TipoFinanciacion, FormaPago, FrecuenciaRecurrencia,
@@ -1000,7 +1001,7 @@ export function GastoDetalleSheet({
           <InfoTile
             icon={<Calendar className="h-3.5 w-3.5" />}
             label="Fecha"
-            value={new Date(gasto.fecha).toLocaleDateString('es-AR')}
+            value={formatFechaAR(gasto.fecha)}
           />
           <InfoTile
             icon={<CreditCard className="h-3.5 w-3.5" />}
@@ -1246,7 +1247,7 @@ function CuotaRow({
 
   // Detectar vencidas implicitas
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const venc = new Date(cuota.fecha_vencimiento);
+  const venc = parseFechaLocal(cuota.fecha_vencimiento);
   const esVencidaImplicita = cuota.estado === 'pendiente' && venc < hoy;
   const realMeta = esVencidaImplicita ? CUOTA_META.vencida : meta;
   const RealIcon = realMeta.Icon;
@@ -1274,7 +1275,7 @@ function CuotaRow({
               {realMeta.label}
             </span>
             <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-              · vence {new Date(cuota.fecha_vencimiento).toLocaleDateString('es-AR')}
+              · vence {formatFechaAR(cuota.fecha_vencimiento)}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5">
@@ -1283,7 +1284,7 @@ function CuotaRow({
             </span>
             {cuota.fecha_pago && (
               <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                pagada el {new Date(cuota.fecha_pago).toLocaleDateString('es-AR')}
+                pagada el {formatFechaAR(cuota.fecha_pago)}
               </span>
             )}
             {cuota.comprobante && (

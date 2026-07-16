@@ -113,3 +113,27 @@ export function gastoEnRango(g: Gasto, desde: string, hasta: string): boolean {
   const cuotas = g.cuotas || [];
   return cuotas.some((c: GastoCuota) => enRango(c.fecha_vencimiento, desde, hasta));
 }
+
+// Fechas ISO (YYYY-MM-DD) sin corrimiento de zona horaria ------------------
+// `new Date('2026-07-14')` la interpreta como medianoche UTC; al mostrarla o
+// compararla en Argentina (UTC-3) retrocede al día 13. Anclando la fecha con
+// sus componentes (año, mes, día) queda en el día correcto en hora local.
+
+/** Parsea 'YYYY-MM-DD' como fecha LOCAL (no UTC). Ignora cualquier hora. */
+export function parseFechaLocal(iso: string | null | undefined): Date {
+  const s = (iso || '').slice(0, 10);
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return new Date(NaN);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * Formatea 'YYYY-MM-DD' a 'D/M/YYYY' (es-AR) sin el corrimiento de día que
+ * introduce `new Date(iso)` al parsear como UTC. Devuelve '—' si es vacía o
+ * inválida.
+ */
+export function formatFechaAR(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = parseFechaLocal(iso);
+  return isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString('es-AR');
+}
