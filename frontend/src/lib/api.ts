@@ -1991,10 +1991,10 @@ export const calificacionesApi = {
     api.get('/calificaciones/ranking-empleados', { params: { dias } }),
 
   // Públicas (para link de WhatsApp)
-  getInfoPublica: (reclamoId: number) =>
-    api.get(`/calificaciones/calificar/${reclamoId}`),
-  calificarPublica: (reclamoId: number, data: { puntuacion: number; comentario?: string }) =>
-    api.post(`/calificaciones/calificar/${reclamoId}`, data),
+  getInfoPublica: (reclamoId: number, token?: string) =>
+    api.get(`/calificaciones/calificar/${reclamoId}${token ? `?t=${encodeURIComponent(token)}` : ''}`),
+  calificarPublica: (reclamoId: number, data: { puntuacion: number; comentario?: string }, token?: string) =>
+    api.post(`/calificaciones/calificar/${reclamoId}${token ? `?t=${encodeURIComponent(token)}` : ''}`, data),
 };
 
 // Noticias

@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -19,6 +21,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+
+def compute_calificacion_token(reclamo_id: int) -> str:
+    """Token determinístico y no adivinable para el link público de calificación.
+    Deriva por HMAC de SECRET_KEY: sin el secreto del servidor no se puede computar
+    el token de ningún reclamo, así que el endpoint público /calificar/{id} deja de
+    ser enumerable (el id viaja en el número REC-XXXXX) — sin necesidad de columna
+    en DB (sirve para reclamos nuevos y existentes por igual)."""
+    msg = f"calificacion:{reclamo_id}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).hexdigest()[:32]
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()

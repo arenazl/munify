@@ -277,7 +277,7 @@ export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarH
                       style={{
                         backgroundColor: !notif.leida ? `${theme.primary}05` : 'transparent',
                       }}
-                      onClick={() => !notif.leida && markAsRead(notif.id)}
+                      onClick={() => handleNotificationClick(notif)}
                     >
                       {/* Icon */}
                       <div

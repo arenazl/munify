@@ -1,5 +1,6 @@
 """API de calificaciones de vecinos"""
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -8,13 +9,22 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from core.database import get_db
-from core.security import get_current_user, require_roles
+from core.rate_limit import limiter
+from core.security import get_current_user, require_roles, compute_calificacion_token
 from models import User, Reclamo
 from models.empleado import Empleado
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
 
 router = APIRouter()
+
+
+def _validar_token_calificacion(reclamo_id: int, t: Optional[str]) -> None:
+    """Exige que el ?t= del link coincida con el token HMAC del reclamo.
+    404 genérico si falta o no coincide (no revela si el reclamo existe)."""
+    esperado = compute_calificacion_token(reclamo_id)
+    if not t or not secrets.compare_digest(str(t), esperado):
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
 
 # Schemas
@@ -323,13 +333,16 @@ class ReclamoInfoCalificacion(BaseModel):
 
 
 @router.get("/calificar/{reclamo_id}", response_model=ReclamoInfoCalificacion)
+@limiter.limit("30/minute")
 async def get_info_calificacion_publica(
+    request: Request,
     reclamo_id: int,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Obtener información del reclamo para la página de calificación pública.
-    No requiere autenticación - se accede vía link directo.
+    No requiere login, pero SÍ el token secreto (?t=) que viaja en el link.
     """
     result = await db.execute(
         select(Reclamo)
@@ -343,6 +356,10 @@ async def get_info_calificacion_publica(
 
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Candado: sin el token secreto del link no se expone nada (evita el IDOR
+    # cross-tenant iterando reclamo_id / el número REC-XXXXX).
+    _validar_token_calificacion(reclamo.id, t)
 
     # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
     if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):
@@ -367,14 +384,17 @@ async def get_info_calificacion_publica(
 
 
 @router.post("/calificar/{reclamo_id}")
+@limiter.limit("30/minute")
 async def crear_calificacion_publica(
+    request: Request,
     reclamo_id: int,
     data: CalificacionPublicaCreate,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Crear calificación desde link público (WhatsApp).
-    No requiere autenticación - se asocia al creador del reclamo.
+    Sin login, pero exige el token secreto (?t=) del link; se asocia al creador.
     """
     result = await db.execute(
         select(Reclamo).where(Reclamo.id == reclamo_id)
@@ -383,6 +403,10 @@ async def crear_calificacion_publica(
 
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Candado: sin el token secreto del link no se puede calificar (evita que
+    # un tercero plante la calificación adivinando el id).
+    _validar_token_calificacion(reclamo.id, t)
 
     # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
     if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):

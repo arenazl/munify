@@ -1946,6 +1946,10 @@ async def resolver_reclamo(
             enviar_whatsapp=True
         )
 
+        # Persistir las notificaciones in-app recién creadas: crear_notificacion_inapp
+        # solo flushea; sin este commit get_db cierra la sesión y las descarta (rollback).
+        await db.commit()
+
     else:
         # Admin/Supervisor finaliza directamente
         reclamo.estado = EstadoReclamo.FINALIZADO
@@ -2130,6 +2134,8 @@ async def devolver_reclamo(
             reclamo_id=reclamo.id,
             enviar_whatsapp=True
         )
+        # Persistir la notificación in-app (sin commit se pierde al cerrar la sesión).
+        await db.commit()
     else:
         # T6-F1 fallback: sin empleado_id (típico de reclamos resueltos por una
         # cuadrilla/OT) nadie se enteraba. Avisar a quien marcó el trabajo como
@@ -3012,6 +3018,9 @@ async def confirmar_reclamo_vecino(
                 reclamo_id=reclamo.id,
                 enviar_whatsapp=True,
             )
+            # Persistir la notificación in-app a supervisores (sino se descarta al
+            # cerrar la sesión, que hace rollback de lo no commiteado).
+            await db.commit()
         except Exception as e:
             logging.error(f"Error notificando rechazo vecino reclamo {reclamo.id}: {e}")
 

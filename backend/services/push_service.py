@@ -271,8 +271,11 @@ async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
     titulo = "Reclamo Resuelto"
     mensaje = f"Tu reclamo #{reclamo.id} fue finalizado. Calificá la atención recibida."
     # URL a la pantalla de calificación (no al detalle) — el usuario llega
-    # ahí, califica con estrellas + comentario y vuelve.
-    url_calificar = f"/calificar/{reclamo.id}"
+    # ahí, califica con estrellas + comentario y vuelve. El token secreto del
+    # reclamo viaja en ?t= : el endpoint público lo exige (sin él no se puede
+    # leer/escribir la calificación, cierra el IDOR por id enumerable).
+    from core.security import compute_calificacion_token
+    url_calificar = f"/calificar/{reclamo.id}?t={compute_calificacion_token(reclamo.id)}"
 
     # Crear notificación en BD con accion_url explícita
     await crear_notificacion_db(
