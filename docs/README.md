@@ -46,6 +46,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
 | Ver las inconsistencias de UX/interacción del circuito (49 hallazgos) | [`reclamos/09-analisis-ux-circuito.md`](reclamos/09-analisis-ux-circuito.md) — insumo transversal repartido entre fases |
 | Ver el test de cohesión entre módulos (Reclamo↔OT↔Inventario↔Notificaciones) y el veredicto para San Martín | [`reclamos/10-test-cohesion.md`](reclamos/10-test-cohesion.md) — 94 hallazgos viejos re-verificados + 16 costuras nuevas confirmadas (2026-07-16) |
+| Saber QUÉ queda por hacer en Reclamos/OT (hoja de ruta priorizada, con dueño Munify/externo/config) | [`reclamos/11-hoja-de-ruta-pendiente.md`](reclamos/11-hoja-de-ruta-pendiente.md) — consolida el test 10 en tareas accionables (2026-07-16) |
 | Retomar la refacción de Reclamos en frío (qué se hizo F0-F3, qué falta, cómo seguir) | [`handoffs/2026-07-04_refactor-reclamos-F0-F3-consistencia.md`](handoffs/2026-07-04_refactor-reclamos-F0-F3-consistencia.md) |
 | Pitch / argumentario de ventas para intendentes | [`sales/01-producto-munify.md`](sales/01-producto-munify.md) |
 | Prompt del agente de ventas (Bruno) | [`sales/02-sales-agent-prompt.md`](sales/02-sales-agent-prompt.md) |
