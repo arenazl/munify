@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   PiggyBank, TrendingUp, TrendingDown, Wallet, Edit2, Plus,
-  ArrowUpRight, ArrowDownRight,
+  ArrowUpRight, ArrowDownRight, CreditCard,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import { TourButton } from '../components/ui/TourButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { cajasApi } from '../lib/api';
 import type { Caja } from '../types';
+import { PagarTarjetaModal } from '../components/tesoreria/PagarTarjetaModal';
 
 const TOUR_STEPS = [
   {
@@ -43,10 +44,8 @@ export default function TesoreriaCajas() {
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
-  }
+  // Tarjeta que se está pagando (abre el sheet de pago). null = cerrado.
+  const [pagando, setPagando] = useState<Caja | null>(null);
 
   const fetch = async () => {
     setLoading(true);
@@ -103,6 +102,12 @@ export default function TesoreriaCajas() {
     },
   ];
 
+  // Guard de rol DESPUES de todos los hooks. Con el return temprano arriba, el
+  // orden de hooks cambiaba entre renders y React rompe (error #310).
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
+  }
+
   return (
     <>
       <PageHint pageId="tesoreria-cajas" />
@@ -139,6 +144,10 @@ export default function TesoreriaCajas() {
         const egresos = parseFloat(c.total_egresos || '0') || 0;
         const saldoIni = parseFloat(c.saldo_inicial || '0') || 0;
         const color = c.color || theme.primary;
+        // Tarjeta de crédito: el "saldo inicial" es el LÍMITE y el saldo actual
+        // es el crédito DISPONIBLE (la deuda la calcula el backend).
+        const esTarjeta = !!c.es_tarjeta;
+        const deuda = parseFloat(c.deuda_actual || '0') || 0;
         return (
           <div
             key={c.id}
@@ -186,35 +195,65 @@ export default function TesoreriaCajas() {
               className="rounded-xl p-3 mb-3"
               style={{ background: `linear-gradient(135deg, ${color}15, ${color}05)`, border: `1px solid ${color}30` }}
             >
-              <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Saldo actual</p>
+              <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
+                {esTarjeta ? 'Crédito disponible' : 'Saldo actual'}
+              </p>
               <p className="text-3xl font-bold tabular-nums" style={{ color }}>
                 {fmtMoney(saldo)}
               </p>
+              {esTarjeta && (
+                <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                  Límite {fmtMoney(saldoIni)} · Deuda{' '}
+                  <span className="font-semibold" style={{ color: deuda > 0 ? '#ef4444' : theme.textSecondary }}>
+                    {fmtMoney(deuda)}
+                  </span>
+                </p>
+              )}
             </div>
 
             {/* Desglose: inicial + ingresos − egresos */}
             <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span style={{ color: theme.textSecondary }}>Saldo inicial</span>
+                <span style={{ color: theme.textSecondary }}>{esTarjeta ? 'Límite' : 'Saldo inicial'}</span>
                 <span className="tabular-nums" style={{ color: theme.text }}>{fmtMoney(saldoIni)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1" style={{ color: '#10b981' }}>
-                  <ArrowUpRight className="h-3 w-3" /> Ingresos
+                  <ArrowUpRight className="h-3 w-3" /> {esTarjeta ? 'Pagos hechos' : 'Ingresos'}
                 </span>
                 <span className="tabular-nums font-semibold" style={{ color: '#10b981' }}>+ {fmtMoney(ingresos)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1" style={{ color: '#ef4444' }}>
-                  <ArrowDownRight className="h-3 w-3" /> Egresos
+                  <ArrowDownRight className="h-3 w-3" /> {esTarjeta ? 'Consumos' : 'Egresos'}
                 </span>
                 <span className="tabular-nums font-semibold" style={{ color: '#ef4444' }}>− {fmtMoney(egresos)}</span>
               </div>
             </div>
+
+            {/* Pago de la tarjeta: cancela deuda y libera crédito. */}
+            {esTarjeta && (
+              <button
+                type="button"
+                onClick={() => setPagando(c)}
+                className="w-full mt-3 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.01] active:scale-95"
+                style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}40` }}
+                title="Registrar un pago de esta tarjeta"
+              >
+                <CreditCard className="h-3.5 w-3.5" />
+                Pagar tarjeta
+              </button>
+            )}
           </div>
         );
       })}
     </ABMPage>
+    <PagarTarjetaModal
+      tarjeta={pagando}
+      cajas={cajas}
+      onClose={() => setPagando(null)}
+      onDone={fetch}
+    />
     <MunifyTour tourKey="tesoreria-cajas" steps={TOUR_STEPS} />
     </>
   );

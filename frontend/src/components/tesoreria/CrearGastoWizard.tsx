@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X, Wallet, MapPin } from 'lucide-react';
+import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X, Wallet, MapPin, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
@@ -203,12 +203,27 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     [proyectoAsignaciones]
   );
 
+  // La tarjeta de crédito es, por debajo, una caja (codigo TARJETA) — pero para
+  // el usuario NO es una caja. Si paga con tarjeta mostramos SOLO las tarjetas:
+  // el gasto queda como deuda de la tarjeta y no sale de ningún fondo. Si paga
+  // por cualquier otro medio, mostramos solo las cajas reales.
+  const pagaConTarjeta = formaPago === 'tarjeta';
+  const cajasVisibles = useMemo(
+    () => cajas.filter(c => (pagaConTarjeta ? !!c.es_tarjeta : !c.es_tarjeta)),
+    [cajas, pagaConTarjeta]
+  );
+
+  // Al cambiar la forma de pago, lo elegido antes puede dejar de ser válido.
+  useEffect(() => {
+    if (cajaId && !cajasVisibles.some(c => c.id === cajaId)) setCajaId(null);
+  }, [cajasVisibles, cajaId]);
+
   const guardar = async (continueAdding = false) => {
     if (!concepto.trim()) return toast.error('Falta el concepto');
     if (destinoTipo === 'contacto' && !contactoId) return toast.error('Elegí un contacto');
     if (destinoTipo === 'dependencia' && !dependenciaId) return toast.error('Elegí una secretaría');
     if (!montoPesos || parseFloat(montoPesos) <= 0) return toast.error('Ingresá el monto');
-    if (!cajaId) return toast.error('Elegí de qué caja sale el pago');
+    if (!cajaId) return toast.error(pagaConTarjeta ? 'Elegí con qué tarjeta se paga' : 'Elegí de qué caja sale el pago');
 
     const monto = parseFloat(montoPesos);
     if (totalImputado > monto + 0.001) {
@@ -998,7 +1013,9 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
           {tipoFinanciacion === 'recurrente' && ` — ${frecuencia}`}
         </p>
 
-        <p className="text-[10px] uppercase font-bold mt-3" style={{ color: theme.textSecondary }}>Caja</p>
+        <p className="text-[10px] uppercase font-bold mt-3" style={{ color: theme.textSecondary }}>
+          {pagaConTarjeta ? 'Tarjeta' : 'Caja'}
+        </p>
         <p className="text-base" style={{ color: theme.text }}>
           {cajas.find(c => c.id === cajaId)?.nombre || '—'}
         </p>
@@ -1051,18 +1068,22 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const stepCaja = (
     <div className="space-y-3">
       <p className="text-sm" style={{ color: theme.textSecondary }}>
-        ¿De qué caja sale el pago? Esto es lo que después permite hacer el arqueo.
+        {pagaConTarjeta
+          ? '¿Con qué tarjeta se paga? El gasto queda como deuda de la tarjeta: no sale de ninguna caja. Después lo saldás con "Pagar tarjeta".'
+          : '¿De qué caja sale el pago? Esto es lo que después permite hacer el arqueo.'}
       </p>
-      {cajas.length === 0 ? (
+      {cajasVisibles.length === 0 ? (
         <div
           className="p-3 rounded-xl text-sm"
           style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
         >
-          No hay cajas cargadas en el municipio. Pedile al admin que cree al menos una desde "Configuración → Tesorería".
+          {pagaConTarjeta
+            ? 'No hay tarjetas de crédito cargadas. Pedile al admin que cree una desde "Configuración → Tesorería → Cajas".'
+            : 'No hay cajas cargadas en el municipio. Pedile al admin que cree al menos una desde "Configuración → Tesorería".'}
         </div>
       ) : (
         <div className="space-y-2">
-          {cajas.map(c => {
+          {cajasVisibles.map(c => {
             const saldo = parseFloat(c.saldo_actual || '0');
             const isSelected = cajaId === c.id;
             const color = c.color || theme.primary;
@@ -1082,7 +1103,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                     className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: `${color}25`, color }}
                   >
-                    <Wallet className="h-4 w-4" />
+                    {c.es_tarjeta ? <CreditCard className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -1102,7 +1123,9 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                     )}
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Saldo</p>
+                    <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
+                      {c.es_tarjeta ? 'Disponible' : 'Saldo'}
+                    </p>
                     <p className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>
                       ${saldo.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                     </p>
@@ -1136,8 +1159,12 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       icon: <Calendar className="h-4 w-4" />, content: step4, isValid: true,
     },
     {
-      id: 'caja', title: 'Caja', description: 'De qué fondo sale',
-      icon: <Wallet className="h-4 w-4" />, content: stepCaja, isValid: !!cajaId,
+      id: 'caja',
+      title: pagaConTarjeta ? 'Tarjeta' : 'Caja',
+      description: pagaConTarjeta ? 'Con qué tarjeta' : 'De qué fondo sale',
+      icon: pagaConTarjeta ? <CreditCard className="h-4 w-4" /> : <Wallet className="h-4 w-4" />,
+      content: stepCaja,
+      isValid: !!cajaId,
     },
     {
       id: 'proyectos', title: 'Proyectos', description: 'Imputar a obras (opcional)',
