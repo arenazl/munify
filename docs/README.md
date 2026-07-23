@@ -41,6 +41,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
 | Consolidar tesorería / entender el plan Persona + prueba de paridad | [`tesoreria/01-consolidacion-analisis.md`](tesoreria/01-consolidacion-analisis.md) |
 | Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
+| **Promover a prod la Tarjeta de crédito como caja (qué necesita Infra)** | [`handoffs/2026-07-23_promocion-tarjeta-credito.md`](handoffs/2026-07-23_promocion-tarjeta-credito.md) — sin migración; único paso manual = crear la caja con `codigo=TARJETA` |
 | **Retomar en frío el 2026-07-06 (Reclamos COMPLETO en qa + bloqueo de ambiente + regla "nunca DB directo")** | [`handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md`](handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md) |
 | Entender el estado del universo Reclamos (análisis + decisiones abiertas) | [`reclamos/01-analisis-funcional.md`](reclamos/01-analisis-funcional.md) |
 | Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
