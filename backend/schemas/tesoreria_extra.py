@@ -207,6 +207,13 @@ class CajaResponse(CajaBase):
     total_ingresos: Optional[Decimal] = None
     total_egresos: Optional[Decimal] = None
     saldo_actual: Optional[Decimal] = None
+    # Cajas tipo TARJETA (codigo == 'TARJETA'): la caja representa una tarjeta de
+    # credito. `saldo_inicial` se reinterpreta como LIMITE y `saldo_actual` es el
+    # credito DISPONIBLE. Se exponen calculados para que el front muestre las
+    # palabras correctas (Limite / Disponible / Deuda) sin tocar el modelo.
+    es_tarjeta: bool = False
+    limite: Optional[Decimal] = None
+    deuda_actual: Optional[Decimal] = None
 
 
 # ============================================================

@@ -135,8 +135,34 @@ class TipoMovimientoCaja(str, enum.Enum):
     EGRESO = "egreso"
 
 
+# Codigo reservado que marca una caja como TARJETA DE CREDITO.
+#
+# Decision de diseno: la tarjeta de credito ES una caja (mismo contenedor,
+# mismos movimientos, mismo arqueo) — para el cliente se muestra como "Tarjeta
+# de credito", nunca como caja. Usamos el campo `codigo` (ya existente) como
+# discriminador para NO agregar columnas.
+#
+# Reinterpretacion de campos SOLO para estas cajas:
+#   - `saldo_inicial` = LIMITE de la tarjeta (editable desde el ABM de cajas).
+#   - `saldo_actual`  = credito DISPONIBLE (limite - gastos + pagos).
+#   - deuda actual    = limite - disponible.
+# Un gasto con la tarjeta es un EGRESO de esta caja (baja el disponible) y NO
+# toca ninguna caja real. El pago de la tarjeta es un INGRESO aca + un EGRESO
+# en la caja real de donde sale la plata (ver POST /tesoreria/cajas/pagar-tarjeta).
+CODIGO_CAJA_TARJETA = "TARJETA"
+
+
+def es_caja_tarjeta(caja) -> bool:
+    """True si la caja representa una tarjeta de credito (codigo == TARJETA)."""
+    return (getattr(caja, "codigo", "") or "").strip().upper() == CODIGO_CAJA_TARJETA
+
+
 class TesoreriaCaja(Base):
-    """Caja/fondo del municipio. Ej: FOFINDE, FODEMEP, Coparticipacion, Tesoro propio."""
+    """Caja/fondo del municipio. Ej: FOFINDE, FODEMEP, Coparticipacion, Tesoro propio.
+
+    Si `codigo == 'TARJETA'` la caja representa una TARJETA DE CREDITO — ver
+    CODIGO_CAJA_TARJETA arriba para la reinterpretacion de saldo_inicial/saldo.
+    """
     __tablename__ = "tesoreria_cajas"
 
     id = Column(Integer, primary_key=True, index=True)

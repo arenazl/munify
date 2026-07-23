@@ -851,6 +851,12 @@ export interface Caja {
   total_ingresos?: string | null;
   total_egresos?: string | null;
   saldo_actual?: string | null;
+  // Cajas tipo TARJETA (codigo === 'TARJETA'): para el usuario son una "Tarjeta
+  // de crédito", no una caja. Ahí `saldo_inicial` es el LÍMITE y `saldo_actual`
+  // el crédito DISPONIBLE; `deuda_actual` = límite - disponible.
+  es_tarjeta?: boolean;
+  limite?: string | null;
+  deuda_actual?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -2240,6 +2240,17 @@ export const cajasApi = {
     api.get(`/tesoreria/cajas/${cajaId}/movimientos`, { params }),
   createMovimiento: (data: Record<string, unknown>) => api.post('/tesoreria/cajas/movimientos', data),
   deleteMovimiento: (id: number) => api.delete(`/tesoreria/cajas/movimientos/${id}`),
+  /** Paga (total o parcialmente) una tarjeta de crédito: ingreso en la
+   *  caja-tarjeta (cancela deuda) + egreso en la caja real de donde sale la
+   *  plata. No crea un gasto: el gasto ya se registró al comprar. */
+  pagarTarjeta: (data: {
+    tarjeta_caja_id: number;
+    caja_origen_id: number;
+    monto: string | number;
+    fecha: string;
+    concepto?: string;
+    descripcion?: string;
+  }) => api.post('/tesoreria/cajas/pagar-tarjeta', data),
 };
 
 export const agendaPagosApi = {
