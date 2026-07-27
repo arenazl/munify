@@ -256,6 +256,14 @@ interface ABMPageProps {
      * fila de tabla. Si no se pasa, ABMPage cae en `children` (compat).
      */
     renderItem?: (item: any, indexInGroup: number) => ReactNode;
+    /**
+     * Layout de los items en la vista CARDS:
+     *  - 'grid' (default): grilla multi-columna, para tarjetas verticales (ej. Reclamos).
+     *  - 'list': una sola columna full-width, para cards que son FILAS horizontales
+     *    (ej. Pagos/Gastos: avatar | concepto | monto). En grid se apretaban a 1/3
+     *    y truncaban el texto; en list ocupan todo el ancho como corresponde.
+     */
+    itemLayout?: 'grid' | 'list';
   };
 
   // Panel lateral derecho (solo desktop, lg+). Si se pasa, el grid de cards
@@ -357,7 +365,10 @@ export function ABMPage({
         return saved;
       }
     }
-    return defaultViewMode || (guidedView ? 'guided' : (tableView ? 'table' : 'cards'));
+    // Default global (pedido del dueño): TODOS los ABM abren en TABLA cuando la
+    // pantalla tiene tableView. Sin tabla, cae a guiada o cards. La preferencia
+    // guardada (viewStorageKey) igual manda si el usuario ya eligió otra vista.
+    return defaultViewMode || (tableView ? 'table' : (guidedView ? 'guided' : 'cards'));
   })();
   const [viewMode, setViewModeState] = useState<ViewMode>(resolvedDefaultViewMode);
   const setViewMode = (m: ViewMode) => {
@@ -894,9 +905,13 @@ export function ABMPage({
                         </div>
                         <div
                           className={
-                            sidePanel
-                              ? 'grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5'
-                              : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5'
+                            groupBy.itemLayout === 'list'
+                              // Filas full-width (una sola columna). Para cards
+                              // horizontales tipo Pagos, que en grid quedaban angostas.
+                              ? 'grid grid-cols-1 gap-3'
+                              : sidePanel
+                                ? 'grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5'
+                                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5'
                           }
                         >
                           {g.items.map((it, i) => groupBy.renderItem!(it, i))}

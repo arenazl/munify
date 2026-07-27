@@ -1148,6 +1148,9 @@ export default function Tesoreria() {
       );
     },
     renderItem: (g: Gasto) => renderGastoCard(g),
+    // Cards de pago = filas horizontales -> una sola columna full-width (sino el
+    // grid multi-columna las apretaba a 1/3 y truncaba el concepto).
+    itemLayout: 'list' as const,
   };
 
   return (
