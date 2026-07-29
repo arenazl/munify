@@ -6,7 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
 import { fontPresets } from '../config/fontPresets';
-import { MunifyLogo } from './ui/MunifyLogo';
+import { BrandMark } from '../brands/BrandMark';
+import { BRAND } from '../brands';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
@@ -437,7 +438,7 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <MunifyLogo size={40} variant="sidebar" className="flex-shrink-0" />
+            <BrandMark size={40} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
@@ -450,7 +451,7 @@ export default function Layout() {
                 className="text-lg font-bold whitespace-nowrap"
                 style={{ color: theme.sidebarText }}
               >
-                Munify
+                {BRAND.name}
               </span>
               {/* Super Admin (sin municipio_id) no muestra municipio */}
               {municipioActual && user?.municipio_id && (
