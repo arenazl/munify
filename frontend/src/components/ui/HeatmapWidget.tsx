@@ -194,10 +194,10 @@ function HeatLayer({ data }: { data: HeatmapPoint[] }) {
     // Crear capa de calor con gradiente personalizado
     try {
       const heat = L.heatLayer(heatData, {
-        radius: 28,
-        blur: 22,
+        radius: 32,
+        blur: 20,
         maxZoom: 17,
-        max: 3,
+        max: 1.5,
         minOpacity: 0.55,
         gradient: {
           0.0:  '#1e3a8a',  // azul profundo (frío)

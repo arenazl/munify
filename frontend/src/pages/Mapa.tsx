@@ -421,7 +421,7 @@ const DEFAULT_FILTROS: FiltrosPersistidos = {
   filtroEstado: null,
   filtroDependencia: null,
   timePreset: 'all',
-  viewMode: 'pins',
+  viewMode: 'heat',
   showHotspots: true,
   showCoverage: true,
   showPois: false,
