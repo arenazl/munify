@@ -75,8 +75,15 @@ from models.empleado_cuadrilla import EmpleadoCuadrilla
 from models.sla import SLAConfig
 from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
 from models.inventario import InventarioItem, OrdenTrabajoRecurso
+from models.poi import PoiTipo, PuntoInteres
 from services.categorias_default import crear_categorias_default
 from services.inventario_seed import seed_inventario
+from services.poi_seed import seed_poi_tipos, activar_modulo_poi
+from services.poi_matching import recalcular_pois_municipio
+from scripts.migrate_add_poi import (
+    DDL_POI_TIPOS, DDL_PUNTOS_INTERES, ALTER_RECLAMOS, ALTER_ORDENES,
+    _col_existe, _tabla_existe,
+)
 
 
 # ============================================================
@@ -268,7 +275,15 @@ SLA_CONFIGS = [
 # historial: [{actor: vecino|supervisor|empleado, accion, estado_anterior,
 #              estado_nuevo, comentario}]
 # ============================================================
-_H = int(hashlib.sha1(b"asuncion-reclamos-rico").hexdigest(), 16)  # jitter determinístico
+def _jitter(i: int, amp: float) -> tuple:
+    """Desplazamiento determinístico (dlat, dlon) en ~[-amp, +amp] por índice de
+    reclamo. Reemplaza cualquier random.* (regla dura: NUNCA coords random
+    presentadas como reales). Con amp chico los reclamos de un mismo barrio caen
+    JUNTOS y forman un hotspot; con amp grande se dispersan naturalmente."""
+    h = int(hashlib.sha1(f"asuncion-jitter-{i}".encode()).hexdigest(), 16)
+    dlat = ((h % 4001) / 2000.0 - 1.0) * amp
+    dlon = (((h >> 20) % 4001) / 2000.0 - 1.0) * amp
+    return round(dlat, 6), round(dlon, 6)
 
 RECLAMOS = [
     {  # 1 — recolección, EN_CURSO, OT en curso
@@ -490,6 +505,110 @@ RECLAMOS = [
         ],
     },
 ]
+
+# ============================================================
+# Reclamos "LIGEROS" — pueblan el mapa para que las 4 features luzcan:
+#   mapa de calor (mancha rica), HOTSPOTS (concentraciones), TIME-LAPSE
+#   (created_at repartidos en ~90 días) y DIBUJAR ZONA (contenido en cualquier área).
+# No llevan la cadena pesada (OT / inventario / historial rico) de los 10 "hero"
+# de arriba: son reclamos realistas sobre barrios REALES de Asunción.
+#
+#   - cluster=True  -> jitter chico (~±22 m): caen JUNTOS en el barrio y forman un
+#     hotspot (recurrentHotspots pide >=3 reclamos a <80 m en los últimos 90 días).
+#     Concentramos a propósito en Mercado 4, Centro/La Catedral, Sajonia y Tacumbú.
+#   - cluster=False -> se dispersan por barrios distintos (mapa poblado, sin
+#     hotspots espurios).
+#   - dias reparte los created_at en ~90 días para que el time-lapse muestre avance.
+#
+# (titulo, descripcion, categoria, estado, barrio_cod, canal, dias, vecino, direccion, cluster)
+# La dependencia se deriva de la categoría (_CAT_DEP) para no desalinear el mapeo.
+# ============================================================
+_CAT_DEP = {cat: dep for dep, cats in DEP_CATEGORIAS_MAP.items() for cat in cats}
+
+_E_REC = EstadoReclamo.RECIBIDO
+_E_CUR = EstadoReclamo.EN_CURSO
+_E_FIN = EstadoReclamo.FINALIZADO
+
+RECLAMOS_LIGEROS = [
+    # ---- Concentración MERCADO 4 (barrio 14) — hotspot fuerte ----
+    ("Puesto ambulante bloquea la vereda en el Mercado 4", "Un puesto ocupa toda la vereda sobre Pettirossi y obliga a los peatones a bajar a la calle.", "Higiene urbana", _E_REC, 14, "app", 6, 1, "Mercado 4, Pettirossi c/ Rca. Francesa", True),
+    ("Basura sin recolectar detrás del Mercado 4", "Montículo de residuos de los puestos que no se retiró en varios días.", "Recolección de residuos", _E_CUR, 14, "whatsapp", 11, 0, "Mercado 4, sector carnicerías", True),
+    ("Olor nauseabundo por desagüe tapado en el Mercado 4", "El desagüe del pasillo central está tapado y desborda con olor fuerte.", "Agua y cloacas", _E_REC, 14, "ventanilla_asistida", 17, 2, "Mercado 4, pasillo central", True),
+    ("Roedores en la zona de alimentos del Mercado 4", "Comerciantes reportan ratas cerca de los puestos de alimentos, piden control.", "Plagas y control", _E_CUR, 14, "app", 23, 1, "Mercado 4, sector alimentos", True),
+    ("Cables sueltos de un puesto en el Mercado 4", "Instalación eléctrica precaria de un puesto colgada sobre el paso de la gente.", "Alumbrado público", _E_REC, 14, "app", 29, 0, "Mercado 4, Rca. Francesa", True),
+    ("Micro-basural en la esquina del Mercado 4", "Se juntó basura en la esquina y nadie la retira, atrae moscas.", "Higiene urbana", _E_FIN, 14, "web_publica", 38, 2, "Mercado 4, esquina Pettirossi", True),
+    ("Auto abandonado frente al Mercado 4", "Un vehículo lleva semanas abandonado ocupando lugar de carga y descarga.", "Tránsito y señalización", _E_REC, 14, "app", 44, 1, "Mercado 4, calle lateral", True),
+    ("Ruidos molestos de parlantes en el Mercado 4", "Puestos con parlantes a todo volumen desde temprano, vecinos piden control.", "Ruidos y convivencia", _E_CUR, 14, "whatsapp", 52, 0, "Mercado 4, sobre Pettirossi", True),
+
+    # ---- Concentración CENTRO / LA CATEDRAL (barrio 8) — hotspot ----
+    ("Semáforo intermitente sobre Palma", "El semáforo de Palma y Chile queda en amarillo intermitente, confunde el cruce.", "Tránsito y señalización", _E_CUR, 8, "app", 7, 1, "Palma c/ Chile, Centro", True),
+    ("Vereda rota frente a Correo Central", "Baldosas levantadas en la vereda del microcentro, riesgo de caídas.", "Bacheo y calles", _E_REC, 8, "web_publica", 14, 0, "Alberdi c/ El Paraguayo Independiente", True),
+    ("Cesto de basura desbordado en peatonal Palma", "El cesto de la peatonal está lleno hace días y la basura se vuela.", "Recolección de residuos", _E_FIN, 8, "app", 21, 2, "Peatonal Palma, Centro", True),
+    ("Luminaria apagada en la plaza del Centro", "Una columna de la plaza quedó sin luz, la zona queda oscura de noche.", "Alumbrado público", _E_REC, 8, "app", 33, 1, "Plaza de la Independencia, Centro", True),
+    ("Árbol con ramas caídas en el microcentro", "Un árbol dejó ramas grandes sobre la vereda tras la última tormenta.", "Arbolado y espacios verdes", _E_CUR, 8, "whatsapp", 41, 0, "Chile c/ Palma, Centro", True),
+    ("Grafitis y suciedad en fachada pública", "Fachada de un edificio municipal con pintadas, piden limpieza.", "Higiene urbana", _E_REC, 8, "ventanilla_asistida", 58, 2, "14 de Mayo, Centro", True),
+
+    # ---- Concentración SAJONIA (barrio 1) — hotspot ----
+    ("Calle anegada tras la lluvia en Sajonia", "El agua no drena en la esquina y se forma una laguna que tapa la calle.", "Agua y cloacas", _E_CUR, 1, "app", 9, 0, "Colón c/ Estados Unidos, Sajonia", True),
+    ("Bache grande sobre calle de Sajonia", "Bache profundo que ya dañó autos, sobre calle empedrada.", "Bacheo y calles", _E_REC, 1, "web_publica", 19, 1, "Sajonia, calle interna", True),
+    ("Perro suelto agresivo en Sajonia", "Un perro sin dueño anda suelto y asustó a chicos que iban a la escuela.", "Animales sueltos", _E_FIN, 1, "whatsapp", 31, 2, "Sajonia, cerca de la escuela", True),
+    ("Poste de luz inclinado en Sajonia", "Un poste quedó inclinado y con cables tensos, temen que caiga.", "Alumbrado público", _E_REC, 1, "app", 47, 0, "Sajonia, sobre avenida", True),
+    ("Contenedor roto en Sajonia", "El contenedor del barrio tiene la tapa rota y se llena de agua.", "Higiene urbana", _E_CUR, 1, "app", 70, 1, "Sajonia, esquina del barrio", True),
+
+    # ---- Concentración TACUMBÚ (barrio 6) — hotspot ----
+    ("Descarga clandestina de escombros en Tacumbú", "Camiones descargan escombros de noche en un baldío del barrio.", "Higiene urbana", _E_REC, 6, "app", 12, 2, "Tacumbú, zona baldíos", True),
+    ("Zanja abierta sin señalizar en Tacumbú", "Una zanja quedó abierta sin vallas ni señales, riesgo para autos.", "Bacheo y calles", _E_CUR, 6, "web_publica", 27, 0, "Tacumbú, bajada al puerto", True),
+    ("Agua estancada foco de mosquitos en Tacumbú", "Charco permanente con larvas, piden descacharrado.", "Plagas y control", _E_REC, 6, "whatsapp", 49, 1, "Tacumbú, zona costera", True),
+    ("Falta de recolección en Tacumbú", "Hace días que no pasa el camión recolector por varias cuadras.", "Recolección de residuos", _E_FIN, 6, "app", 62, 2, "Tacumbú, calles internas", True),
+
+    # ---- Dispersos por la ciudad (barrios distintos, sin hotspot) ----
+    ("Luminaria quemada en San Vicente", "Media cuadra sin luz desde hace una semana.", "Alumbrado público", _E_REC, 15, "app", 5, 0, "San Vicente, Asunción", False),
+    ("Poda pendiente en Vista Alegre", "Árbol tapa la señal de tránsito de la esquina.", "Arbolado y espacios verdes", _E_CUR, 17, "web_publica", 16, 1, "Vista Alegre, Asunción", False),
+    ("Bache en Ciudad Nueva", "Bache sobre la avenida principal del barrio.", "Bacheo y calles", _E_REC, 20, "app", 24, 2, "Ciudad Nueva, Asunción", False),
+    ("Recolección irregular en Jara", "El camión pasa salteado y la basura se acumula.", "Recolección de residuos", _E_FIN, 23, "whatsapp", 35, 0, "Jara, Asunción", False),
+    ("Semáforo sin funcionar en Nazareth", "El semáforo de la avenida no anda desde ayer.", "Tránsito y señalización", _E_CUR, 34, "app", 8, 1, "Nazareth, Asunción", False),
+    ("Basural en un baldío de Hipódromo", "Terreno baldío convertido en basural del barrio.", "Higiene urbana", _E_REC, 36, "web_publica", 45, 2, "Hipódromo, Asunción", False),
+    ("Fumigación solicitada en Los Laureles", "Piden fumigación por aumento de mosquitos.", "Plagas y control", _E_REC, 39, "app", 55, 0, "Los Laureles, Asunción", False),
+    ("Caño perdiendo agua en Estigarribia", "Pérdida de agua constante sobre la calzada.", "Agua y cloacas", _E_CUR, 43, "whatsapp", 20, 1, "Mcal. Estigarribia, Asunción", False),
+    ("Perro suelto en Luis A. de Herrera", "Perro sin dueño merodea la parada de colectivos.", "Animales sueltos", _E_FIN, 46, "app", 66, 2, "Luis A. de Herrera, Asunción", False),
+    ("Vereda rota en Tablada Nueva", "Baldosas flojas frente a un comercio.", "Bacheo y calles", _E_REC, 50, "web_publica", 28, 0, "Tablada Nueva, Asunción", False),
+    ("Ruidos molestos de un local en Bella Vista", "Música alta de un local hasta la madrugada.", "Ruidos y convivencia", _E_CUR, 54, "app", 40, 1, "Bella Vista, Asunción", False),
+    ("Alcantarilla tapada en Cañada del Ybyray", "La alcantarilla no traga y se inunda con lluvia leve.", "Agua y cloacas", _E_REC, 56, "whatsapp", 73, 2, "Cañada del Ybyray, Asunción", False),
+    ("Columna de luz sin foco en Mburucuyá", "Columna nueva instalada pero sin luminaria.", "Alumbrado público", _E_REC, 60, "app", 51, 0, "Mburucuyá, Asunción", False),
+    ("Espacio verde sin mantenimiento en Ñu Guazú", "Pasto muy alto en la plaza del barrio.", "Arbolado y espacios verdes", _E_CUR, 64, "web_publica", 60, 1, "Ñu Guazú, Asunción", False),
+    ("Contenedor volcado en San Blas", "Un contenedor volcado desparrama basura en la esquina.", "Recolección de residuos", _E_FIN, 66, "app", 80, 2, "San Blas, Asunción", False),
+    ("Cartel de tránsito derribado en Itá Enramada", "Un cartel de PARE quedó tirado tras un choque.", "Tránsito y señalización", _E_REC, 30, "whatsapp", 88, 0, "Itá Enramada, Asunción", False),
+]
+
+
+def _historial_ligero(estado, canal, direccion):
+    """Historial mínimo pero coherente por estado (creado -> asignado -> cerrado)."""
+    canal_txt = canal.replace("_", " ")
+    hist = [{"actor": "vecino", "accion": "Reclamo creado",
+             "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": f"Reclamo cargado por {canal_txt} — {direccion}."}]
+    if estado in (EstadoReclamo.EN_CURSO, EstadoReclamo.FINALIZADO):
+        hist.append({"actor": "supervisor", "accion": "Cambio de estado",
+                     "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
+                     "comentario": "Reclamo tomado por la dependencia y derivado a la cuadrilla."})
+    if estado == EstadoReclamo.FINALIZADO:
+        hist.append({"actor": "empleado", "accion": "Cambio de estado",
+                     "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO,
+                     "comentario": "Trabajo realizado y verificado en el sitio."})
+    return hist
+
+
+for _lig in RECLAMOS_LIGEROS:
+    _tit, _desc, _cat, _est, _bar, _can, _dias, _vec, _dir, _clu = _lig
+    RECLAMOS.append({
+        "titulo": _tit, "descripcion": _desc, "categoria": _cat,
+        "dep": _CAT_DEP.get(_cat), "estado": _est, "barrio_cod": _bar,
+        "canal": _can, "dias": _dias, "vecino": _vec, "direccion": _dir,
+        "confirmado_vecino": (_est == EstadoReclamo.FINALIZADO) or None,
+        "cluster": _clu, "ot": None,
+        "historial": _historial_ligero(_est, _can, _dir),
+    })
+
 
 # 2 OT extra sin reclamo (preventiva completada + cancelada) para mostrar todos
 # los estados del circuito de campo.
@@ -964,12 +1083,17 @@ async def _seed_reclamos(db: AsyncSession, muni_id: int, cats: dict, muni_deps: 
         md = muni_deps.get(r["dep"])
         base_lat = barrio.latitud if (barrio and barrio.latitud is not None) else CENTRO_LAT
         base_lon = barrio.longitud if (barrio and barrio.longitud is not None) else CENTRO_LON
-        jlat = (((_H >> (i * 3)) % 200) - 100) / 100000.0
-        jlon = (((_H >> (i * 3 + 1)) % 200) - 100) / 100000.0
+        # Cluster -> jitter chico (caen juntos = hotspot); si no, jitter amplio.
+        amp = 0.0002 if r.get("cluster") else 0.0009
+        jlat, jlon = _jitter(i, amp)
         lat = round(base_lat + jlat, 6)
         lon = round(base_lon + jlon, 6)
         creador = vecinos[r["vecino"]]
         created = datetime.utcnow() - timedelta(days=r["dias"])
+        # Reclamos cerrados: fecha_resolucion coherente (entre created y hoy) para
+        # que el tiempo medio de resolución / KPIs del mapa no queden en s/d.
+        resuelto = r["estado"] in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)
+        fecha_res = created + timedelta(days=max(1, r["dias"] // 2)) if resuelto else None
 
         rec = existentes.get(r["titulo"])
         if rec:
@@ -984,6 +1108,7 @@ async def _seed_reclamos(db: AsyncSession, muni_id: int, cats: dict, muni_deps: 
             rec.municipio_dependencia_id = md.id if md else None
             rec.canal = r["canal"]
             rec.confirmado_vecino = r.get("confirmado_vecino")
+            rec.fecha_resolucion = fecha_res
         else:
             rec = Reclamo(
                 municipio_id=muni_id, titulo=r["titulo"], descripcion=r["descripcion"],
@@ -992,6 +1117,7 @@ async def _seed_reclamos(db: AsyncSession, muni_id: int, cats: dict, muni_deps: 
                 barrio_id=barrio.id if barrio else None, creador_id=creador.id,
                 municipio_dependencia_id=md.id if md else None, canal=r["canal"],
                 confirmado_vecino=r.get("confirmado_vecino"), created_at=created,
+                fecha_resolucion=fecha_res,
             )
             db.add(rec)
         reclamos.append(rec)
@@ -1012,7 +1138,7 @@ async def _seed_reclamos(db: AsyncSession, muni_id: int, cats: dict, muni_deps: 
         if rec is None:
             continue
         dep_cod = r["dep"]
-        emp_idx = r["ot"].get("empleado")
+        emp_idx = (r.get("ot") or {}).get("empleado")
         # usuario para actor "empleado": login del empleado si existe, si no supervisor/admin.
         emp_user = empleados_login.get(emp_idx) if emp_idx is not None else None
         sup_user = supervisores.get(dep_cod) or admin
@@ -1143,10 +1269,10 @@ async def _seed_ordenes_trabajo(db: AsyncSession, muni_id: int, reclamos: list,
             activos += 1
         return ot
 
-    # OTs de los reclamos de campo.
+    # OTs de los reclamos de campo (solo los "hero" tienen OT; los ligeros no).
     n = 0
     for rec, r in zip(reclamos, RECLAMOS):
-        if rec is None:
+        if rec is None or not r.get("ot"):
             continue
         n += 1
         await _crear_ot(f"OT-{year}-{n:04d}", r["ot"], reclamo=rec)
@@ -1317,10 +1443,79 @@ async def _habilitar_modulos(db: AsyncSession, muni_id: int) -> None:
 
 
 # ============================================================
+# Puntos de Interés (POI) — habilita el modo "Puntos" del mapa.
+# ============================================================
+# POIs anclados al centroide REAL del barrio (coords Nominatim de
+# BARRIOS_ASUNCION). Nombres de instituciones reales/plausibles de Asunción; la
+# coord es la del barrio (no la del edificio exacto) — mismo criterio honesto que
+# los reclamos. tipo_nombre debe existir en poi_seed.TEMPLATE_TIPOS.
+# Se ubican sobre barrios CON reclamos activos para que la zona tenga conteo > 0.
+# (nombre, tipo_nombre, barrio_cod, radio_metros, notas)
+POIS_ASUNCION = [
+    ("Hospital de Clínicas",                    "Hospital",  1, 2000, "Zona de influencia sanitaria — Sajonia."),
+    ("Cuartel Central de Bomberos Voluntarios", "Bomberos",  8, 2000, "Cobertura del microcentro."),
+    ("Comisaría Central Mercado 4",             "Comisaría", 14, 1500, "Seguridad del Mercado 4 y alrededores."),
+    ("Escuela Básica de Tacumbú",               "Escuela",   6, 1000, "Entorno escolar — Tacumbú."),
+    ("Plaza de la Democracia",                  "Plaza",     13, 500, "Espacio público del casco céntrico."),
+]
+
+
+async def _ensure_poi_schema(engine) -> None:
+    """DDL idempotente de POI (tablas poi_tipos/puntos_interes + columnas poi_id
+    en reclamos/ordenes_trabajo). Mismo criterio que migrate_add_poi.py, embebido
+    para que el seed sea autosuficiente en QA (CLAUDE.md: migraciones sin preguntar)."""
+    async with engine.begin() as conn:
+        if not await _tabla_existe(conn, "poi_tipos"):
+            await conn.execute(text(DDL_POI_TIPOS))
+        if not await _tabla_existe(conn, "puntos_interes"):
+            await conn.execute(text(DDL_PUNTOS_INTERES))
+        if not await _col_existe(conn, "reclamos", "poi_id"):
+            await conn.execute(text(ALTER_RECLAMOS))
+        if not await _col_existe(conn, "ordenes_trabajo", "poi_id"):
+            await conn.execute(text(ALTER_ORDENES))
+    print("[poi-schema] tablas/columnas POI verificadas (idempotente)")
+
+
+async def _seed_poi(db: AsyncSession, muni_id: int, barrios_por_cod: dict) -> int:
+    """Habilita el módulo `poi`, siembra el template de tipos y 5 POIs reales de
+    Asunción, y recalcula el matching reclamo<->POI (setea reclamos.poi_id para
+    que el panel de Puntos muestre el conteo por zona). Idempotente por nombre."""
+    n_tipos = await seed_poi_tipos(db, muni_id)
+    await activar_modulo_poi(db, muni_id)
+    tipos = {t.nombre: t for t in (await db.execute(
+        select(PoiTipo).where(PoiTipo.municipio_id == muni_id)
+    )).scalars().all()}
+    existentes = {p.nombre for p in (await db.execute(
+        select(PuntoInteres).where(PuntoInteres.municipio_id == muni_id)
+    )).scalars().all()}
+    creados = 0
+    for nombre, tipo_nombre, barrio_cod, radio, notas in POIS_ASUNCION:
+        if nombre in existentes:
+            continue
+        tipo = tipos.get(tipo_nombre)
+        barrio = barrios_por_cod.get(barrio_cod)
+        if not tipo or not barrio or barrio.latitud is None:
+            continue
+        db.add(PuntoInteres(
+            municipio_id=muni_id, tipo_id=tipo.id, nombre=nombre,
+            direccion=f"{barrio.nombre}, Asunción",
+            latitud=barrio.latitud, longitud=barrio.longitud,
+            radio_metros=radio, activo=True, notas=notas,
+        ))
+        creados += 1
+    await db.flush()
+    en_zona = await recalcular_pois_municipio(db, muni_id)
+    print(f"[poi] {n_tipos} tipos nuevos, {creados} POIs nuevos, "
+          f"{en_zona} reclamos en zona (módulo poi activo)")
+    return en_zona
+
+
+# ============================================================
 # Main
 # ============================================================
 async def main():
     engine = create_async_engine(settings.DATABASE_URL)
+    await _ensure_poi_schema(engine)  # tablas/columnas POI antes de tocar data
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with Session() as db:
         muni = await _get_or_create_muni(db)
@@ -1391,10 +1586,12 @@ async def main():
         sols = await _seed_solicitudes(db, muni.id, usuarios, muni_deps)
         await _desactivar_legacy(db, muni.id)
         await _habilitar_modulos(db, muni.id)
+        poi_en_zona = await _seed_poi(db, muni.id, barrios_por_cod)
         await db.commit()
 
         print(f"\nOK — Paraguay Limpio (Asunción) RICO listo. muni_id={muni.id}, codigo={CODIGO}")
-        print(f"  reclamos=10, OT_nuevas={ot_stats['ot']}, inventario_items={inv_items_total}, solicitudes={sols}")
+        print(f"  reclamos={len(RECLAMOS)}, OT_nuevas={ot_stats['ot']}, inventario_items={inv_items_total}, "
+              f"solicitudes={sols}, POIs=5 ({poi_en_zona} reclamos en zona)")
         print("Login demo (password demo123, dominio @asuncion.demo.com):")
         print("  admin@asuncion.demo.com | supervisor-<dep>@asuncion.demo.com (x5) |")
         print("  empleado-electricidad@ / empleado-bacheo@ | vecino@ / vecino-liz@ / vecino-rodrigo@")
