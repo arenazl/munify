@@ -716,7 +716,7 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
+        <div className="absolute z-20 flex flex-col items-start gap-2" style={{ top: 14, left: -16 }}>
         {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde, compactos (no pisan el título). */}
         <button
           onClick={() => setPresentOpen(true)}
@@ -1117,6 +1117,7 @@ export default function Dashboard() {
           </div>
           <HeatmapWidget
             data={heatmapData}
+            showMarkers={false}
             height="256px"
             title="Mapa de Calor - Concentracion de Reclamos"
             loading={loadingHeatmap}
