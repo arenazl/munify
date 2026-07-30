@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays, Filter, Star } from 'lucide-react';
 import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi, calificacionesApi } from '../lib/api';
 import { DashboardStats } from '../types';
@@ -247,6 +247,18 @@ export default function Dashboard() {
   // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
   const [liveMode, setLiveMode] = useState(false);
   const [presentOpen, setPresentOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Abrir el dashboard "En Vivo" al llegar con ?live=1 (desde el menú "Más" del
+  // admin en mobile, que no puede montar DashboardLive porque necesita los datos
+  // del dashboard). Consumimos el param para no reabrirlo al navegar.
+  useEffect(() => {
+    if (searchParams.get('live') === '1') {
+      setLiveMode(true);
+      searchParams.delete('live');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Pull-to-refresh: refreshKey fuerza re-fetch cuando el usuario tira hacia abajo
   const [refreshKey, setRefreshKey] = useState(0);
@@ -716,7 +728,7 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute z-20 flex flex-col items-start gap-2" style={{ top: 11, left: -5 }}>
+        <div className="absolute z-20 hidden lg:flex flex-col items-start gap-2" style={{ top: 11, left: -5 }}>
         {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde, compactos (no pisan el título). */}
         <button
           onClick={() => setPresentOpen(true)}

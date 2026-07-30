@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp, Radio } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -12,6 +12,7 @@ import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
+import PresentacionLive from './PresentacionLive';
 import { Sheet } from './ui/Sheet';
 import { usersApi, municipiosApi, navegacionApi, modulosApi, iaConfigApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
@@ -86,6 +87,10 @@ export default function Layout() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  // Recorrido guiado (autocontenido) accesible desde el menú "Más" del admin.
+  // El "En Vivo" (DashboardLive) necesita los datos del dashboard, así que ese
+  // navega a /gestion?live=1 y se abre allí; acá sólo montamos PresentacionLive.
+  const [presentacionOpen, setPresentacionOpen] = useState(false);
   // Estado reactivo para detectar mobile (se actualiza con resize)
   const [isMobile, setIsMobile] = useState(() => isMobileDevice());
   const navigate = useNavigate();
@@ -1338,6 +1343,13 @@ export default function Layout() {
                   // las pantallas relevantes. Vecino solo ve Reclamo/Tramite.
                   const items: Array<{ label: string; icon: any; color: string; onClick: () => void }> = [];
                   if (user?.rol === 'admin' || user?.rol === 'supervisor') {
+                    // Presentaciones destacadas: el admin no da de alta trámites,
+                    // así que acá tiene el recorrido guiado (Conocé) + el dashboard
+                    // en vivo (En Vivo). En el banner se veían mal en la PWA.
+                    items.push(
+                      { label: 'Conocé', icon: Sparkles, color: BRAND.primary, onClick: () => setPresentacionOpen(true) },
+                      { label: 'En Vivo', icon: Radio, color: '#ef4444', onClick: () => navigate('/gestion?live=1') },
+                    );
                     items.push(
                       { label: 'Mapa', icon: Map, color: '#3b82f6', onClick: () => navigate('/gestion/mapa') },
                       { label: 'Mostrador', icon: ScanLine, color: '#8b5cf6', onClick: () => navigate('/gestion/mostrador') },
@@ -2222,6 +2234,9 @@ export default function Layout() {
       {/* Bottom-sheet de activacion de notificaciones — auto-trigger al login
           + listener para post-creacion de reclamos/tramites. */}
       <NotificationActivationSheet />
+
+      {/* Recorrido guiado abierto desde el menú "Más" del admin en mobile. */}
+      <PresentacionLive open={presentacionOpen} onClose={() => setPresentacionOpen(false)} />
     </div>
   );
 }
