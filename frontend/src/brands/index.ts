@@ -50,6 +50,11 @@ export interface Brand {
   themePresetId?: string;
   /** Variante (tonalidad del sidebar) del preset de marca. Default: 'vintage'. */
   themeVariant?: ThemeVariant;
+  /** Presets que la marca OFRECE en su selector (solo si `fixedTheme`). Permite
+   *  que el usuario alterne, p.ej., entre la versión clara y la oscura del
+   *  mismo acento de marca. Si no se setea, el selector muestra los presets
+   *  activos normales (colección de Munify). */
+  themePresetIds?: string[];
 }
 
 const BRANDS: Record<string, Brand> = {
@@ -77,6 +82,7 @@ const BRANDS: Record<string, Brand> = {
     fixedTheme: true,     // identidad verde fija (no dinámica por municipio)
     themePresetId: 'onix-verde', // Onix (casi-negro) con el verde del logo
     themeVariant: 'vintage',     // sidebar casi-negro (#222226)
+    themePresetIds: ['onix-verde', 'nieve-verde'], // el user alterna oscuro/claro
   },
 };
 

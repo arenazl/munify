@@ -309,20 +309,32 @@ export const themePresets: ThemePreset[] = [
       ['#3a3a40', '#222226', '#101012']),
   },
 
-  // 9.bis Onix Verde — CLON de Onix con el verde del logo (marca white-label).
-  // `archived: true` a propósito: NO aparece en el selector de Munify (es
-  // identidad de una marca), pero sigue disponible via getThemeColors() para
-  // que una marca con `fixedTheme` lo use como preset por defecto. El primary
-  // es el mismo #1b7a3d que BRAND.primary → el acento del theme coincide con el
-  // del shell (applyBrand) y toda la app queda con un ÚNICO verde coherente.
+  // 9.bis PAR VERDE de marca (white-label): mismo acento #1b7a3d (= BRAND.primary,
+  // el verde del logo) en dos fondos — OSCURO (clon de Onix, casi-negro) y CLARO
+  // (fondo blanco). `archived: true` a propósito: NO ensucian el selector de
+  // Munify, pero una marca con `fixedTheme` los ofrece via `themePresetIds` para
+  // que el usuario alterne blanco/negro. El primary coincide con el del shell
+  // (applyBrand) → toda la app queda con un ÚNICO verde coherente.
   {
     id: 'onix-verde',
-    name: 'Onix Verde',
+    name: 'Verde Oscuro',
     family: 'dark',
     archived: true,
     palette: ['#1a1a1d', '#222226', '#2d2d33', '#1b7a3d'],
     variants: genCuratedVariants(['#1a1a1d', '#222226', '#2d2d33', '#1b7a3d'], 0, 3,
       ['#3a3a40', '#222226', '#101012']),
+  },
+
+  // 9.ter Verde Claro — gemelo claro del anterior: fondo blanco-grisáceo, mismo
+  // acento verde. Estructura idéntica a los light curados (niebla/marfil/perla).
+  {
+    id: 'nieve-verde',
+    name: 'Verde Claro',
+    family: 'light',
+    archived: true,
+    palette: ['#f4f6fa', '#e7ebf3', '#1e293b', '#1b7a3d'],
+    variants: withAccentWash(genCuratedVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#1b7a3d'], 0, 3,
+      ['#e7ebf3', '#475569', '#1e293b'])),
   },
 
   // ---- SOBRIOS (escala de grises pura, sin color) ----

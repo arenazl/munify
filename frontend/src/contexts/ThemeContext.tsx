@@ -19,6 +19,16 @@ import { BRAND } from '../brands';
 const brandDefaultPreset = BRAND.fixedTheme ? BRAND.themePresetId : undefined;
 const brandDefaultVariant = BRAND.fixedTheme ? BRAND.themeVariant : undefined;
 
+// Presets que ofrece el selector: si la marca declara los suyos (fixedTheme),
+// se muestran ESOS (p.ej. el par verde claro/oscuro); si no, la colección de
+// Munify. Munify no setea themePresetIds → getActivePresets(), como siempre.
+const selectorPresets: ThemePreset[] =
+  BRAND.fixedTheme && BRAND.themePresetIds?.length
+    ? (BRAND.themePresetIds
+        .map((id) => themePresets.find((p) => p.id === id))
+        .filter(Boolean) as ThemePreset[])
+    : getActivePresets();
+
 // Exportar tipos necesarios
 export type { ThemePreset, ThemeColors, ThemeVariant };
 export { themePresets };
@@ -278,7 +288,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setContentBgOpacity,
         currentFontId,
         setFont,
-        presets: getActivePresets(),
+        presets: selectorPresets,
       }}
     >
       {children}
