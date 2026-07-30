@@ -716,7 +716,7 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute z-20 flex flex-col items-start gap-2" style={{ top: 14, left: -16 }}>
+        <div className="absolute z-20 flex flex-col items-start gap-2" style={{ top: 11, left: -5 }}>
         {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde, compactos (no pisan el título). */}
         <button
           onClick={() => setPresentOpen(true)}
@@ -745,9 +745,8 @@ export default function Dashboard() {
         >
           <span className="live-ring absolute inset-0 rounded-full pointer-events-none" />
           <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 live-dot relative z-10" />
           <Radio className="h-4 w-4 relative z-10 live-radio" />
-          <span className="tracking-wider relative z-10">LIVE</span>
+          <span className="tracking-wider relative z-10">RED</span>
         </button>
         </div>
         )}

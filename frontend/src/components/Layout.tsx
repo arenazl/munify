@@ -438,7 +438,7 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <BrandMark size={40} variant="sidebar" className="flex-shrink-0" />
+            <BrandMark size={24} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
@@ -506,10 +506,10 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
-              <p className="text-xs font-semibold leading-tight text-left" style={{ color: theme.sidebarText }}>
+              <p className="text-xs font-semibold leading-tight text-center" style={{ color: theme.sidebarText }}>
                 {user.nombre} {user.apellido}
               </p>
-              <p className="text-xs capitalize mt-0.5 whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>
+              <p className="text-xs capitalize mt-0.5 whitespace-nowrap text-center" style={{ color: theme.sidebarTextSecondary }}>
                 {user.dependencia ? 'Dependencia' : user.rol}
               </p>
             </div>
