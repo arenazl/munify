@@ -4,7 +4,8 @@ import { Loader2, Shield, User, Sparkles, ArrowLeft, Building2, Wrench } from 'l
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import api from '../lib/api';
-import { MunifyLogo } from '../components/ui/MunifyLogo';
+import { BrandMark } from '../brands/BrandMark';
+import { BRAND } from '../brands';
 
 /**
  * Pantalla "demo lista" — landing ultra-minimalista a la que redirige
@@ -103,8 +104,8 @@ export default function DemoReady() {
       <header className="relative z-10 flex-shrink-0 px-6 py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <MunifyLogo size={36} variant="content" />
-            <span className="text-xl font-bold text-white">Munify</span>
+            <BrandMark size={36} variant="content" />
+            <span className="text-xl font-bold text-white">{BRAND.name}</span>
           </div>
           <button
             onClick={() => navigate('/demo')}
@@ -289,7 +290,7 @@ export default function DemoReady() {
 
       <footer className="relative z-10 flex-shrink-0 py-6 px-6">
         <p className="text-center text-slate-500 text-sm">
-          Munify — Demo en vivo
+          {BRAND.name} — Demo en vivo
         </p>
       </footer>
     </div>

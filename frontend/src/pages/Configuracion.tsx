@@ -15,6 +15,7 @@ import SettingsHeader from '../components/ui/SettingsHeader';
 import { QRCarteleria } from '../components/ui/QRCarteleria';
 import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
 import NotificationPreferences from '../components/NotificationPreferences';
+import { BRAND } from '../brands';
 
 // Tipos del dashboard de tarjetas (fusion de Ajustes.tsx)
 interface SettingCard {
@@ -651,7 +652,7 @@ export default function Configuracion() {
         { id: 'poi-tipos', label: 'Tipos de Punto de Interés', description: 'Categorías de puntos en el mapa: hospitales, escuelas, plazas, etc', icon: MapPinned, color: '#ef4444', link: '/gestion/poi-tipos', show: isAdminOrSupervisor && modulosActivos.includes('poi') },
         { id: 'tramites-config', label: 'Tipos de Trámite', description: 'Trámites específicos del municipio (ej: Licencia de Conducir)', icon: FileText, color: '#6366f1', link: '/gestion/tramites-config', show: isAdminOrSupervisor },
         { id: 'zonas', label: 'Zonas', description: 'Barrios y áreas del municipio', icon: MapPin, color: '#06b6d4', link: '/gestion/zonas', show: isAdminOrSupervisor },
-        { id: 'importar-padron', label: 'Catálogo de Tasas', description: 'Importá el padrón tributario y mapealo al catálogo Munify', icon: Landmark, color: '#0ea5e9', link: '/gestion/configuracion/importar-padron', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'importar-padron', label: 'Catálogo de Tasas', description: `Importá el padrón tributario y mapealo al catálogo ${BRAND.name}`, icon: Landmark, color: '#0ea5e9', link: '/gestion/configuracion/importar-padron', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'dashboard-config', label: 'Dashboards', description: 'Personalizá los dashboards por rol', icon: LayoutDashboard, color: '#8b5cf6', link: '/gestion/config-dashboard', show: isAdminOrSupervisor },
       ],
     },

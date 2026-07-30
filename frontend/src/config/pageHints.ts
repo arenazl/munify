@@ -9,6 +9,7 @@
  * El dismiss queda persistido en localStorage con la key
  * `hint_dismissed_{pageId}` — ver `PageHint.tsx`.
  */
+import { BRAND } from '../brands';
 
 export interface HintStep {
   title: string;
@@ -67,11 +68,11 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
   // DASHBOARD — mini tutorial del sistema completo (wizard)
   // ========================================================================
   'dashboard-home': {
-    title: 'Bienvenido a Munify',
+    title: `Bienvenido a ${BRAND.name}`,
     accent: 'violet',
     steps: [
       {
-        title: '¿Qué es Munify?',
+        title: `¿Qué es ${BRAND.name}?`,
         description:
           'La plataforma que unifica la gestión de reclamos y trámites de tu municipio. Los vecinos reportan o inician trámites desde la app, y vos los gestionás desde acá.',
         icon: 'Sparkles',
@@ -709,7 +710,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
       {
         title: 'Requiere CENAT (licencias de conducir)',
         description:
-          'Activá este toggle para trámites de licencia. El vecino sube el comprobante del CENAT nacional (Agencia Nacional de Seguridad Vial) como documento aparte, antes de que el operador cierre el legajo. El pago del CENAT es externo a Munify — solo trackeamos el adjunto.',
+          `Activá este toggle para trámites de licencia. El vecino sube el comprobante del CENAT nacional (Agencia Nacional de Seguridad Vial) como documento aparte, antes de que el operador cierre el legajo. El pago del CENAT es externo a ${BRAND.name} — solo trackeamos el adjunto.`,
         icon: 'Lightbulb',
       },
       {
@@ -865,7 +866,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
       {
         title: 'Conectar credenciales reales',
         description:
-          'Cada proveedor tiene un botón "Conectar credenciales reales". Ahí pegás el Access Token (se cifra en DB con Fernet antes de guardarse), la Public Key y el CUIT del municipio. Con eso los pagos entran DIRECTO a tu cuenta — Munify nunca custodia fondos.',
+          `Cada proveedor tiene un botón "Conectar credenciales reales". Ahí pegás el Access Token (se cifra en DB con Fernet antes de guardarse), la Public Key y el CUIT del municipio. Con eso los pagos entran DIRECTO a tu cuenta — ${BRAND.name} nunca custodia fondos.`,
         icon: 'ClipboardList',
       },
       {

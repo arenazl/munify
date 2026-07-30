@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
 import { saveMunicipio } from '../utils/municipioStorage';
-import { MunifyLogo } from '../components/ui/MunifyLogo';
+import { BrandMark } from '../brands/BrandMark';
 
 /**
  * Acceso directo por código de municipio: `app.munify.com.ar/<codigo>`.
@@ -61,7 +61,7 @@ export default function MunicipioAcceso() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-5 px-6">
-      <MunifyLogo size={48} variant="content" />
+      <BrandMark size={48} variant="content" />
       {error ? (
         <div className="flex flex-col items-center gap-2 text-center">
           <AlertCircle className="h-6 w-6 text-amber-400" />

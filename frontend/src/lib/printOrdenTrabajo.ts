@@ -1,6 +1,7 @@
 import type { OrdenTrabajo } from '../types';
 import { prioridadLabels } from './enums/prioridadOT';
 import { otEstadoLabels } from './enums/ordenTrabajo';
+import { BRAND } from '../brands';
 
 // Planilla imprimible de una OT (el "formato" que la cuadrilla lleva al campo).
 // Abre una ventana nueva con HTML autocontenido (sin depender del theme de la
@@ -120,7 +121,7 @@ export function imprimirOrdenTrabajo(ot: OrdenTrabajo, municipioNombre: string):
     <div class="firma"><div class="linea">Firma del supervisor</div></div>
   </div>
 
-  <div class="pie">Generado desde Munify · ${esc(municipioNombre)}</div>
+  <div class="pie">Generado desde ${esc(BRAND.name)} · ${esc(municipioNombre)}</div>
 </div>
 <script>window.onload = function(){ window.print(); };</script>
 </body></html>`;

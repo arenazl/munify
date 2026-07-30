@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import PresentacionLive from './PresentacionLive';
+import { IS_WHITE_LABEL } from '../brands';
 
 interface Props {
   label?: string;
@@ -15,6 +16,9 @@ interface Props {
 export default function PresentacionLaunchButton({ label = 'Conocé Munify', className = '', style }: Props) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
+  // White-label: el recorrido guiado es 100% Munify (marketing propio) — no se
+  // muestra en marcas de cliente. Guard DESPUÉS de los hooks (rules-of-hooks).
+  if (IS_WHITE_LABEL) return null;
   const accent = theme.primary || '#f5a623';
   const accent2 = theme.primaryHover || '#e08a12';
 

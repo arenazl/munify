@@ -8,6 +8,7 @@ import {
 import { tasasApi, API_BASE_URL } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { BRAND } from '../brands';
 
 type TasaDetectada = {
   codigo_local: string;
@@ -246,15 +247,15 @@ export default function ImportarPadron() {
                 <div className="flex-1 space-y-2">
                   <h3 className="font-semibold text-slate-900">¿Qué hace esta pantalla?</h3>
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    Munify consume el padrón tributario del municipio desde una URL pública
+                    {BRAND.name} consume el padrón tributario del municipio desde una URL pública
                     (o autenticada) que exponga el sistema tributario (GEMA, RAFAM, Municipium,
                     desarrollo propio, etc). Traemos las <strong>tasas</strong>, las <strong>partidas</strong> del
                     padrón y las <strong>deudas</strong> emitidas, y las dejamos listas para que los
                     vecinos las vean y paguen.
                   </p>
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    Como cada muni usa nombres propios ("TSUM", "Derecho de Inspección", etc),
-                    Munify intenta <strong>mapear automáticamente</strong> cada tasa local a su
+                    Como cada muni usa nombres propios ("TSUM", "Derecho de Inspección", etc),{' '}
+                    {BRAND.name} intenta <strong>mapear automáticamente</strong> cada tasa local a su
                     equivalente en nuestro catálogo canónico (ABL, Seguridad e Higiene, Patente,
                     etc). En el paso 2 vas a poder revisar y corregir cada match.
                   </p>
@@ -488,7 +489,7 @@ export default function ImportarPadron() {
                       {/* Lado derecho: selector de mapping */}
                       <div className="w-full md:w-80 flex-shrink-0 space-y-1">
                         <label className="text-xs font-medium text-slate-600 flex items-center gap-1">
-                          Mapear a catálogo Munify
+                          Mapear a catálogo {BRAND.name}
                           <Hint>
                             Elegí el tipo de tasa canónico al que corresponde este ítem del padrón.
                             Si no corresponde a ningún tipo estándar, seleccioná "Saltar — no importar"

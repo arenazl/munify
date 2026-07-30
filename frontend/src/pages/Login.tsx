@@ -6,6 +6,7 @@ import { getDefaultRouteForUser } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
+import { BRAND } from '../brands';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -59,7 +60,7 @@ export default function Login() {
   // Leer valores de localStorage con state para forzar re-render
   const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
   const [municipioCodigo, setMunicipioCodigo] = useState<string | null>(null);
-  const [municipioColor, setMunicipioColor] = useState('#3b82f6');
+  const [municipioColor, setMunicipioColor] = useState(BRAND.primary);
 
   // Cargar datos del municipio al montar
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function Login() {
 
     setMunicipioNombre(nombre);
     setMunicipioCodigo(codigo);
-    setMunicipioColor(color || '#3b82f6');
+    setMunicipioColor(color || BRAND.primary);
 
     // Pre-llenar email si viene desde el botón de supervisor
     const prefilledEmail = localStorage.getItem('prefill_email');

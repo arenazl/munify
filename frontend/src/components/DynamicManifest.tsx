@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { loadMunicipioSync } from '../utils/municipioStorage';
+import { BRAND } from '../brands';
 
 /**
  * Componente que actualiza el manifest de la PWA, el `<title>` del documento,
@@ -21,8 +22,8 @@ export default function DynamicManifest() {
       // Super admin (usuario sin municipio asignado) no debe ver el
       // nombre de un municipio en el title del tab — aunque tenga uno
       // "seleccionado" en localStorage por conveniencia operativa, el
-      // branding de la pestaña queda en "Munify" para reflejar su rol
-      // cross-tenant.
+      // branding de la pestaña queda en la marca activa (BRAND.name) para
+      // reflejar su rol cross-tenant.
       let isSuperAdmin = false;
       try {
         const rawUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -35,10 +36,10 @@ export default function DynamicManifest() {
       }
 
       if (!data?.codigo || isSuperAdmin) {
-        // Sin municipio activo, o super admin: branding genérico de Munify.
+        // Sin municipio activo, o super admin: branding genérico de la marca activa.
         // Resetear título + manifest y revocar cualquier blob previo para
         // que el browser no quede pidiendo un blob:URL huérfano.
-        document.title = 'Munify';
+        document.title = BRAND.name;
         const existingLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
         if (existingLink?.href.startsWith('blob:')) {
           URL.revokeObjectURL(existingLink.href);

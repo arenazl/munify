@@ -5,7 +5,8 @@ import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
 import DemoCreationProgress from '../components/DemoCreationProgress';
 import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
-import { MunifyLogo } from '../components/ui/MunifyLogo';
+import { BrandMark } from '../brands/BrandMark';
+import { BRAND } from '../brands';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 
 interface Municipio {
@@ -223,8 +224,8 @@ export default function Demo() {
       <header className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <MunifyLogo size={36} variant="content" className="flex-shrink-0" />
-            <span className="text-lg sm:text-xl font-bold text-slate-800 truncate">Munify</span>
+            <BrandMark size={36} variant="content" className="flex-shrink-0" />
+            <span className="text-lg sm:text-xl font-bold text-slate-800 truncate">{BRAND.name}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
           <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
@@ -244,7 +245,7 @@ export default function Demo() {
         <div className="w-full max-w-2xl">
           <div className="text-center mb-6 sm:mb-8">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-800 mb-3 leading-tight">
-              Probá Munify en tu municipio
+              Probá {BRAND.name} en tu municipio
             </h1>
             <p className="text-slate-500 text-base sm:text-lg">
               Escribí el nombre y armamos una demo en 3 segundos
@@ -507,7 +508,7 @@ export default function Demo() {
 
       <footer className="flex-shrink-0 py-6 px-6">
         <p className="text-center text-slate-400 text-sm">
-          Munify - Conectando al gobierno con las necesidades del vecino
+          {BRAND.name} - Conectando al gobierno con las necesidades del vecino
         </p>
       </footer>
       </div>

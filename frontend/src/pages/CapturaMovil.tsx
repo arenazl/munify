@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ShieldCheck, ScanLine, Camera, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { capturaMovilApi } from '../lib/api';
+import { BRAND } from '../brands';
 
 type Estado = 'cargando' | 'lista' | 'redirigiendo' | 'cerrada' | 'expirada' | 'error';
 
@@ -81,7 +82,7 @@ export default function CapturaMovil() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 leading-tight">Validación de identidad</p>
-            <p className="text-[11px] text-slate-500 leading-tight">Munify · Captura móvil</p>
+            <p className="text-[11px] text-slate-500 leading-tight">{BRAND.name} · Captura móvil</p>
           </div>
         </div>
       </header>
@@ -167,7 +168,7 @@ export default function CapturaMovil() {
                   href="/bienvenido"
                   className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600"
                 >
-                  Usar Munify en mi celular
+                  Usar {BRAND.name} en mi celular
                 </a>
               </div>
             </div>

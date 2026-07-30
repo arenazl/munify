@@ -46,6 +46,22 @@ const BRANDS: Record<string, Brand> = {
   },
 };
 
-const requested = (import.meta.env.VITE_BRAND as string | undefined)?.trim();
-export const BRAND: Brand = (requested && BRANDS[requested]) || BRANDS.munify;
+// Mapa dominio -> marca. Un solo build sirve a TODOS los dominios y elige la
+// marca por el host (sin env var por site). Infra bindea el mismo repo/branch a
+// cada dominio y listo. Fallback: VITE_BRAND (build) y por último 'munify'.
+const HOST_TO_BRAND: Record<string, string> = {
+  'paraguay-limpio.netlify.app': 'paraguay-limpio',
+};
+
+function resolveBrandId(): string {
+  if (typeof window !== 'undefined') {
+    const byHost = HOST_TO_BRAND[window.location.hostname];
+    if (byHost && BRANDS[byHost]) return byHost;
+  }
+  const env = (import.meta.env.VITE_BRAND as string | undefined)?.trim();
+  if (env && BRANDS[env]) return env;
+  return 'munify';
+}
+
+export const BRAND: Brand = BRANDS[resolveBrandId()] || BRANDS.munify;
 export const IS_WHITE_LABEL = BRAND.id !== 'munify';
