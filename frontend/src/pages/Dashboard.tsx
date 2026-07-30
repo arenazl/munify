@@ -716,9 +716,8 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        {/* Conocé {marca} + LIVE — apilados arriba-izquierda, MISMO borde izquierdo
-            (un solo criterio de alineación para ambos). */}
         <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
+        {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde (misma alineación). */}
         <button
           onClick={() => setPresentOpen(true)}
           className="cm-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
