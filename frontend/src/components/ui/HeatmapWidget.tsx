@@ -159,69 +159,68 @@ function HeatLayer({ data }: { data: HeatmapPoint[] }) {
   useEffect(() => {
     if (!data || data.length === 0) return;
 
-    // Esperar a que el mapa tenga tamaño válido
-    const mapSize = map.getSize();
-    if (!mapSize || mapSize.x === 0 || mapSize.y === 0) {
-      // Reintentar después de un pequeño delay
-      const timer = setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-
-    // Remover capa anterior si existe
-    if (heatLayerRef.current) {
-      map.removeLayer(heatLayerRef.current);
-    }
-
-    // Filtrar puntos válidos (coordenadas en Argentina aproximadamente)
-    const validData = data.filter(
-      (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
-    );
-
-    if (validData.length === 0) {
-      console.warn('No hay puntos válidos en Argentina');
-      return;
-    }
-
-    // Convertir datos al formato de leaflet.heat: [lat, lng, intensidad]
-    const heatData: [number, number, number][] = validData.map((point) => [
-      point.lat,
-      point.lng,
-      point.intensidad || 1,
-    ]);
-
-    // Crear capa de calor con gradiente personalizado
-    try {
-      const heat = L.heatLayer(heatData, {
-        radius: 32,
-        blur: 20,
-        maxZoom: 17,
-        max: 1.5,
-        minOpacity: 0.55,
-        gradient: {
-          0.0:  '#1e3a8a',  // azul profundo (frío)
-          0.15: '#3b82f6',  // azul
-          0.3:  '#06b6d4',  // cian
-          0.45: '#22c55e',  // verde
-          0.6:  '#eab308',  // amarillo
-          0.75: '#f97316',  // naranja
-          0.9:  '#ef4444',  // rojo
-          1.0:  '#ec4899',  // magenta (pico caliente)
-        },
-      });
-
-      heat.addTo(map);
-      heatLayerRef.current = heat;
-    } catch (error) {
-      console.warn('Error creando capa de calor:', error);
-    }
-
-    return () => {
+    // Crea (o recrea) la capa de calor. Se invoca directo si el mapa ya tiene
+    // tamaño, o DESPUÉS de invalidateSize si arrancó en 0. Antes se hacía
+    // invalidateSize y se retornaba SIN crear el heat, y como invalidateSize no
+    // cambia las deps del effect, el heat no se pintaba nunca (mapa vacío).
+    const createHeat = () => {
       if (heatLayerRef.current) {
         map.removeLayer(heatLayerRef.current);
+        heatLayerRef.current = null;
+      }
+      // Filtro de coords plausibles de Sudamérica (incluye Paraguay: lat > -18).
+      const validData = data.filter(
+        (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      );
+      if (validData.length === 0) return;
+      const heatData: [number, number, number][] = validData.map((point) => [
+        point.lat,
+        point.lng,
+        point.intensidad || 1,
+      ]);
+      try {
+        const heat = L.heatLayer(heatData, {
+          radius: 32,
+          blur: 20,
+          maxZoom: 17,
+          max: 1.5,
+          minOpacity: 0.55,
+          gradient: {
+            0.0:  '#1e3a8a',
+            0.15: '#3b82f6',
+            0.3:  '#06b6d4',
+            0.45: '#22c55e',
+            0.6:  '#eab308',
+            0.75: '#f97316',
+            0.9:  '#ef4444',
+            1.0:  '#ec4899',
+          },
+        });
+        heat.addTo(map);
+        heatLayerRef.current = heat;
+      } catch (error) {
+        console.warn('Error creando capa de calor:', error);
       }
     };
+
+    const cleanup = () => {
+      if (heatLayerRef.current) {
+        map.removeLayer(heatLayerRef.current);
+        heatLayerRef.current = null;
+      }
+    };
+
+    const mapSize = map.getSize();
+    if (!mapSize || mapSize.x === 0 || mapSize.y === 0) {
+      const timer = setTimeout(() => {
+        map.invalidateSize();
+        createHeat();
+      }, 150);
+      return () => { clearTimeout(timer); cleanup(); };
+    }
+
+    createHeat();
+    return cleanup;
   }, [data, map]);
 
   return null;
