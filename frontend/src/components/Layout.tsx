@@ -448,7 +448,7 @@ export default function Layout() {
               }}
             >
               <span
-                className="text-lg font-bold whitespace-nowrap"
+                className="block text-base font-bold leading-tight"
                 style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
                 {BRAND.name}
@@ -456,7 +456,7 @@ export default function Layout() {
               {/* Super Admin (sin municipio_id) no muestra municipio */}
               {municipioActual && user?.municipio_id && (
                 <p
-                  className="text-[10px] whitespace-nowrap -mt-0.5"
+                  className="text-[10px] leading-tight mt-0.5 line-clamp-2"
                   style={{ color: theme.sidebarTextSecondary }}
                 >
                   {municipioActual.nombre}

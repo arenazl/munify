@@ -27,6 +27,7 @@ import HeatmapWidget from '../components/ui/HeatmapWidget';
 import PageHint from '../components/ui/PageHint';
 import DashboardLive from '../components/DashboardLive';
 import PresentacionLive from '../components/PresentacionLive';
+import { IS_WHITE_LABEL } from '../brands';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { Radio } from 'lucide-react';
 
@@ -713,8 +714,9 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
-        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
+        {/* Botón LIVE + Conocé Munify — recorrido/presentación del producto Munify.
+            Marketing propio: NO se muestra en marcas white-label. */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && !IS_WHITE_LABEL && (
         <>
         {/* Conoce Munify — extremo IZQUIERDO, mismo estilo/brillo que LIVE (color indigo) */}
         <button
