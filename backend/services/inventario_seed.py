@@ -92,11 +92,13 @@ async def seed_inventario(db: AsyncSession, municipio_id: int, incluir_demo: boo
         return {"categorias": cats_creadas, "items": 0}
 
     # --- Ítems demo ---
-    items_existentes = {
-        i.nombre for i in (await db.execute(
+    # scalars() sobre un SELECT de una sola columna devuelve los nombres (strings),
+    # no objetos InventarioItem — se usan directo (antes hacía i.nombre => AttributeError).
+    items_existentes = set(
+        (await db.execute(
             select(InventarioItem.nombre).where(InventarioItem.municipio_id == municipio_id)
         )).scalars().all()
-    }
+    )
     items_creados = 0
 
     for cat_nombre, items in ITEMS_DEMO_ACTIVOS.items():
