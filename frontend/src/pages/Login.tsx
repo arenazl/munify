@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
-import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench } from 'lucide-react';
+import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
-import { BRAND } from '../brands';
+import { BRAND, IS_WHITE_LABEL } from '../brands';
 import { BrandMark } from '../brands/BrandMark';
 
 export default function Login() {
@@ -74,6 +74,15 @@ export default function Login() {
     const color = localStorage.getItem('municipio_color');
 
     if (!codigo || !nombre) {
+      // White-label monolítico: hay un único municipio fijo (el del brand). No
+      // mandamos a elegir muni; cargamos el del brand para que el login (split)
+      // se muestre con su identidad aunque el municipio aún no esté sembrado.
+      if (IS_WHITE_LABEL && BRAND.municipioCodigo) {
+        setMunicipioNombre(BRAND.name);
+        setMunicipioCodigo(BRAND.municipioCodigo);
+        setMunicipioColor(BRAND.primary);
+        return;
+      }
       // Limpiar todo y redirigir
       localStorage.removeItem('municipio_codigo');
       localStorage.removeItem('municipio_id');
@@ -204,6 +213,171 @@ export default function Login() {
     );
   }
 
+  // ================= WHITE-LABEL: LOGIN SPLIT =================
+  // Hero de marca a la izquierda + panel de acceso (perfiles + email) a la
+  // derecha. Identidad propia con el verde del brand. Reusa toda la lógica de
+  // auth (handleSubmit, quickLogin, Google) del login estándar.
+  if (IS_WHITE_LABEL) {
+    const accent = municipioColor;
+    const features = [
+      { Icon: AlertCircle, t: 'Reportá', s: 'RECLAMOS EN 1 MINUTO' },
+      { Icon: Building2, t: 'Seguí', s: 'ESTADO EN TIEMPO REAL' },
+      { Icon: FileCheck, t: 'Trámites', s: 'ONLINE, SIN FILAS' },
+      { Icon: Wrench, t: 'Resolvé', s: 'CUADRILLAS Y OT' },
+    ];
+    return (
+      <div className="min-h-screen w-full flex flex-col lg:flex-row text-white" style={{ background: '#06130b' }}>
+        {/* ===== HERO (izquierda) ===== */}
+        <div
+          className="relative lg:w-1/2 flex flex-col justify-between gap-10 p-8 sm:p-12 lg:p-16 overflow-hidden"
+          style={{ background: 'linear-gradient(160deg, #0d2a1a 0%, #071a0f 60%, #06130b 100%)' }}
+        >
+          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-25" style={{ background: accent }} />
+          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full blur-3xl opacity-10" style={{ background: accent }} />
+
+          {/* marca */}
+          <div className="relative flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center ring-1 ring-white/10" style={{ backgroundColor: `${accent}1f` }}>
+              <BrandMark size={30} />
+            </div>
+            <div className="leading-tight">
+              <div className="text-lg font-extrabold" style={{ fontFamily: BRAND.nameFont }}>{BRAND.name}</div>
+              <div className="text-[10px] font-semibold tracking-[0.25em]" style={{ color: accent }}>PLATAFORMA CIUDADANA</div>
+            </div>
+          </div>
+
+          {/* copy */}
+          <div className="relative max-w-lg">
+            <div className="text-xs font-bold tracking-[0.25em] mb-4" style={{ color: accent }}>GESTIÓN MUNICIPAL</div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.03]" style={{ fontFamily: BRAND.nameFont }}>
+              De tu reclamo<br />a la <span style={{ color: accent }}>solución.</span>
+            </h1>
+            <p className="mt-6 text-base lg:text-lg text-emerald-50/70 leading-relaxed">
+              {BRAND.tagline || 'Reclamos, trámites y seguimiento en tiempo real, en una sola plataforma.'}
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 mt-8">
+              {features.map(({ Icon, t, s }) => (
+                <div key={t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
+                  <Icon className="h-5 w-5 mb-2" style={{ color: accent }} />
+                  <div className="font-bold text-sm">{t}</div>
+                  <div className="text-[10px] text-emerald-50/45 tracking-wide mt-0.5">{s}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative flex items-center gap-2 text-[11px] text-emerald-50/40">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: accent }} />
+            Sistema operativo · SSL · JWT 24h · 2026 {BRAND.name}
+          </div>
+        </div>
+
+        {/* ===== PANEL (derecha) ===== */}
+        <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-10 lg:p-16">
+          <div className="w-full max-w-md">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: `${accent}1f` }}>
+              <Sparkles className="h-6 w-6" style={{ color: accent }} />
+            </div>
+            <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
+            <p className="text-emerald-50/60 mt-1 mb-6">Elegí tu perfil o usá email + contraseña</p>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/25 text-red-300 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
+            )}
+
+            {demoUsers.length > 0 && (
+              <div className="grid grid-cols-3 gap-2.5 mb-5">
+                {demoUsers.slice(0, 3).map((u, i) => {
+                  const cfg = rolConfig[u.rol] || rolConfig.vecino;
+                  const Icon = cfg.icon;
+                  return (
+                    <button
+                      key={`${u.rol}-${i}`}
+                      type="button"
+                      onClick={() => quickLogin(u.email, 'demo123')}
+                      disabled={loading}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] p-3 text-center transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                    >
+                      <div className="w-9 h-9 mx-auto rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: `${accent}1a` }}>
+                        <Icon className="h-4 w-4" style={{ color: accent }} />
+                      </div>
+                      <div className="text-xs font-bold truncate">{cfg.label}</div>
+                      <div className="text-[9px] text-emerald-50/40 truncate">{u.nombre_completo}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-[10px] tracking-[0.2em] text-emerald-50/40">O CON EMAIL</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold tracking-wide text-emerald-50/60 mb-1">EMAIL</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-50/40" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                    className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-emerald-50/30 outline-none focus:border-white/25 transition-all"
+                    placeholder="tu@email.com"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold tracking-wide text-emerald-50/60 mb-1">CONTRASEÑA</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-50/40" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                    className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-emerald-50/30 outline-none focus:border-white/25 transition-all"
+                    placeholder="Tu contraseña"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 font-bold rounded-xl transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: accent, color: '#06130b', boxShadow: `0 12px 30px ${accent}40` }}
+              >
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Ingresar <span aria-hidden>→</span></>}
+              </button>
+            </form>
+
+            <button
+              type="button"
+              onClick={handleGoogleClick}
+              disabled={googleLoading}
+              className="mt-3 w-full flex items-center justify-center gap-3 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-xl transition-all disabled:opacity-60"
+            >
+              {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                <>
+                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+                  <span>Continuar con Google</span>
+                </>
+              )}
+            </button>
+
+            <p className="text-center text-emerald-50/40 text-xs mt-6">
+              {demoUsers.length > 0 ? 'Acceso de demostración' : 'Acceso'} · {municipioNombre}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 relative overflow-hidden">
       {/* Background */}
@@ -240,7 +414,7 @@ export default function Login() {
               >
                 <BrandMark size={48} />
               </div>
-              <h1 className="text-2xl font-bold text-white mb-1">{municipioNombre}</h1>
+              <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: BRAND.nameFont }}>{municipioNombre}</h1>
               <p className="text-slate-400 text-sm">{BRAND.tagline || 'Acceso al sistema'}</p>
             </div>
 

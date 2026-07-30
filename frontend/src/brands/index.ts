@@ -9,6 +9,9 @@
 // comportamiento actual, cero cambios. Así Munify no se toca y la marca nueva
 // hereda TODO el código (cada mejora de Munify le llega en el próximo build).
 
+import type { ComponentType } from 'react';
+import { ParaguayLimpioLogo } from './ParaguayLimpioLogo';
+
 export interface Brand {
   id: string;
   /** Nombre visible de la app (sidebar, textos del shell). */
@@ -26,6 +29,10 @@ export interface Brand {
   /** White-label monolítico: código del municipio único. En white-label el
    *  acceso entra directo a este muni (no hay generador de demos ni grilla). */
   municipioCodigo?: string;
+  /** Logo como componente SVG (editable, fondo transparente). Preferido sobre logoSrc. */
+  Logo?: ComponentType<{ size?: number; className?: string; title?: string }>;
+  /** Fuente propia para el nombre de la marca (identidad tipográfica). */
+  nameFont?: string;
 }
 
 const BRANDS: Record<string, Brand> = {
@@ -43,7 +50,9 @@ const BRANDS: Record<string, Brand> = {
     name: 'Paraguay Limpio',
     title: 'Paraguay Limpio · Asunción',
     tagline: 'Tu ciudad más limpia. Reportá y seguí tus reclamos.',
-    logoSrc: '/brands/paraguay-limpio/logo.png',
+    logoSrc: null,        // usa el SVG editable, no un PNG con fondo blanco
+    Logo: ParaguayLimpioLogo,
+    nameFont: "'Plus Jakarta Sans', system-ui, sans-serif",
     primary: '#1b7a3d',   // verde oscuro del logo
     accent: '#5cb85c',    // verde claro del logo
     municipioCodigo: 'asuncion',

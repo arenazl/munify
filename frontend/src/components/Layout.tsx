@@ -449,7 +449,7 @@ export default function Layout() {
             >
               <span
                 className="text-lg font-bold whitespace-nowrap"
-                style={{ color: theme.sidebarText }}
+                style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
                 {BRAND.name}
               </span>

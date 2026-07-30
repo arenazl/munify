@@ -14,6 +14,10 @@ interface BrandMarkProps {
  * Reemplaza los usos directos de MunifyLogo en el shell para que respeten la marca.
  */
 export function BrandMark({ size = 32, variant, className, title }: BrandMarkProps) {
+  if (BRAND.Logo) {
+    const Logo = BRAND.Logo;
+    return <Logo size={size} className={className} title={title || BRAND.name} />;
+  }
   if (BRAND.logoSrc) {
     return (
       <img

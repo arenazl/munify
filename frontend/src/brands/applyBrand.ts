@@ -1,4 +1,4 @@
-import { BRAND } from './index';
+import { BRAND, IS_WHITE_LABEL } from './index';
 
 /**
  * Aplica el branding al documento en runtime: <title>, theme-color y favicon.
@@ -14,6 +14,23 @@ export function applyBrand(): void {
 
   const themeColor = document.querySelector('meta[name="theme-color"]');
   if (themeColor) themeColor.setAttribute('content', BRAND.primary);
+
+  // White-label: identidad de color propia desde el arranque. Seteamos las CSS
+  // vars del tema al color del brand, así el shell (nombre con gradiente,
+  // acentos) ya nace con la marca sin depender de que cargue el municipio.
+  if (IS_WHITE_LABEL) {
+    const root = document.documentElement;
+    root.style.setProperty('--munify-primary', BRAND.primary);
+    root.style.setProperty('--munify-hover', BRAND.accent || BRAND.primary);
+    // Fuente propia de la marca (identidad tipográfica).
+    if (BRAND.nameFont && !document.getElementById('brand-font')) {
+      const link = document.createElement('link');
+      link.id = 'brand-font';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap';
+      document.head.appendChild(link);
+    }
+  }
 
   // Favicon propio de la marca (si tiene logo). Munify deja el de index.html.
   if (BRAND.logoSrc) {
