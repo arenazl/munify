@@ -506,7 +506,7 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
-              <p className="text-sm font-semibold leading-none text-left whitespace-nowrap" style={{ color: theme.sidebarText }}>
+              <p className="text-xs font-semibold leading-tight text-left" style={{ color: theme.sidebarText }}>
                 {user.nombre} {user.apellido}
               </p>
               <p className="text-xs capitalize mt-0.5 whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>
