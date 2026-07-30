@@ -26,13 +26,23 @@ export interface Brand {
   primary: string;
   /** Acento secundario. */
   accent?: string;
-  /** White-label monolítico: código del municipio único. En white-label el
-   *  acceso entra directo a este muni (no hay generador de demos ni grilla). */
+  /** Mono-tenant: código del municipio único. Si está presente, la marca entra
+   *  directo a este muni (no hay generador de demos ni grilla): el ruteo cerrado
+   *  se DERIVA de esta propiedad, no de un flag "soy white-label". */
   municipioCodigo?: string;
   /** Logo como componente SVG (editable, fondo transparente). Preferido sobre logoSrc. */
   Logo?: ComponentType<{ size?: number; className?: string; title?: string }>;
   /** Fuente propia para el nombre de la marca (identidad tipográfica). */
   nameFont?: string;
+  /** Layout de la pantalla de login. 'split' = hero de marca + panel de acceso;
+   *  'centered' (default, sin setear) = login clásico de Munify centrado. */
+  loginLayout?: 'split' | 'centered';
+  /** Identidad de color FIJA: el tema NO es dinámico por municipio, es el color
+   *  de la marca desde el arranque. Se modela con un booleano explícito (y no se
+   *  deriva de `municipioCodigo`) a propósito: "ruteo mono-tenant" y "tema fijo"
+   *  son conceptos distintos y quedan desacoplados (una marca podría querer uno
+   *  sin el otro). Munify no lo setea → tema dinámico por muni, como hoy. */
+  fixedTheme?: boolean;
 }
 
 const BRANDS: Record<string, Brand> = {
@@ -56,6 +66,8 @@ const BRANDS: Record<string, Brand> = {
     primary: '#1b7a3d',   // verde oscuro del logo
     accent: '#5cb85c',    // verde claro del logo
     municipioCodigo: 'asuncion',
+    loginLayout: 'split', // hero de marca + panel de acceso
+    fixedTheme: true,     // identidad verde fija (no dinámica por municipio)
   },
 };
 
@@ -77,4 +89,3 @@ function resolveBrandId(): string {
 }
 
 export const BRAND: Brand = BRANDS[resolveBrandId()] || BRANDS.munify;
-export const IS_WHITE_LABEL = BRAND.id !== 'munify';

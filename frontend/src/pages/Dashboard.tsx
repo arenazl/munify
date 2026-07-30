@@ -716,11 +716,12 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <>
-        {/* Conoce Munify — extremo IZQUIERDO, mismo estilo/brillo que LIVE (color indigo) */}
+        {/* Conocé {marca} + LIVE — apilados arriba-izquierda, MISMO borde izquierdo
+            (un solo criterio de alineación para ambos). */}
+        <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
         <button
           onClick={() => setPresentOpen(true)}
-          className="cm-btn absolute top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
+          className="cm-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
             backgroundColor: heroFondoOscuro ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.92)',
             border: '2px solid rgba(99, 102, 241, 0.7)',
@@ -733,10 +734,9 @@ export default function Dashboard() {
           <Sparkles className="h-4 w-4 relative z-10 live-radio" />
           <span className="tracking-wider relative z-10">Conocé {BRAND.name}</span>
         </button>
-        {/* LIVE — extremo DERECHO */}
         <button
           onClick={() => setLiveMode(true)}
-          className="live-btn absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
+          className="live-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
             backgroundColor: heroFondoOscuro ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.92)',
             border: '2px solid rgba(239, 68, 68, 0.7)',
@@ -750,7 +750,7 @@ export default function Dashboard() {
           <Radio className="h-4 w-4 relative z-10 live-radio" />
           <span className="tracking-wider relative z-10">LIVE</span>
         </button>
-        </>
+        </div>
         )}
 
         {/* Botonera de prueba de overlays (variante 8 elegida el 2026-07-03) —

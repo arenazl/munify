@@ -6,7 +6,7 @@ import { getDefaultRouteForUser } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles, ChevronRight } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
-import { BRAND, IS_WHITE_LABEL } from '../brands';
+import { BRAND } from '../brands';
 import { BrandMark } from '../brands/BrandMark';
 
 export default function Login() {
@@ -74,10 +74,10 @@ export default function Login() {
     const color = localStorage.getItem('municipio_color');
 
     if (!codigo || !nombre) {
-      // White-label monolítico: hay un único municipio fijo (el del brand). No
-      // mandamos a elegir muni; cargamos el del brand para que el login (split)
-      // se muestre con su identidad aunque el municipio aún no esté sembrado.
-      if (IS_WHITE_LABEL && BRAND.municipioCodigo) {
+      // Mono-tenant: hay un único municipio fijo (el del brand). No mandamos a
+      // elegir muni; cargamos el del brand para que el login se muestre con su
+      // identidad aunque el municipio aún no esté sembrado.
+      if (BRAND.municipioCodigo) {
         setMunicipioNombre(BRAND.name);
         setMunicipioCodigo(BRAND.municipioCodigo);
         setMunicipioColor(BRAND.primary);
@@ -214,11 +214,12 @@ export default function Login() {
     );
   }
 
-  // ================= WHITE-LABEL: LOGIN SPLIT =================
+  // ================= LOGIN SPLIT (loginLayout === 'split') =================
   // Hero de marca a la izquierda + panel de acceso (perfiles + email) a la
-  // derecha. Identidad propia con el verde del brand. Reusa toda la lógica de
-  // auth (handleSubmit, quickLogin, Google) del login estándar.
-  if (IS_WHITE_LABEL) {
+  // derecha. Identidad propia con el color del brand. Reusa toda la lógica de
+  // auth (handleSubmit, quickLogin, Google) del login estándar. La marca elige
+  // este layout por su config (BRAND.loginLayout), no por un flag white-label.
+  if (BRAND.loginLayout === 'split') {
     const accent = municipioColor;
     const features = [
       { Icon: AlertCircle, t: 'Reportá', s: 'RECLAMOS EN 1 MINUTO' },

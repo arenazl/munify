@@ -435,7 +435,7 @@ export default function Layout() {
             onClick={() => navigate('/gestion')}
             className="flex items-center gap-2 w-full transition-all hover:opacity-80 active:scale-95"
             style={{
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              justifyContent: 'center',
             }}
           >
             <BrandMark size={40} variant="sidebar" className="flex-shrink-0" />
@@ -444,6 +444,7 @@ export default function Layout() {
                 width: isCollapsed ? 0 : 'auto',
                 opacity: isCollapsed ? 0 : 1,
                 overflow: 'hidden',
+                textAlign: 'center',
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >

@@ -176,7 +176,7 @@ function HeatLayer({ data }: { data: HeatmapPoint[] }) {
 
     // Filtrar puntos válidos (coordenadas en Argentina aproximadamente)
     const validData = data.filter(
-      (p) => p.lat < -30 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
     );
 
     if (validData.length === 0) {
@@ -233,7 +233,7 @@ function CategoryMarkers({ data }: { data: HeatmapPoint[] }) {
   const limitedData = useMemo(() => {
     // Filtrar solo puntos en Argentina
     const validData = data.filter(
-      (p) => p.lat < -30 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
     );
     if (validData.length <= 200) return validData;
     // Tomar muestra distribuida
@@ -448,7 +448,7 @@ export default function HeatmapWidget({
   // Filtrar puntos válidos de Argentina
   const validData = useMemo(() => {
     return data.filter(
-      (p) => p.lat < -30 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
     );
   }, [data]);
 
