@@ -33,6 +33,11 @@ export interface Brand {
   municipioCodigo?: string;
   /** Logo como componente SVG (editable, fondo transparente). Preferido sobre logoSrc. */
   Logo?: ComponentType<{ size?: number; className?: string; title?: string }>;
+  /** Carpeta (relativa a /public) con los iconos PWA propios de la marca:
+   *  icon-*.png, apple-touch-icon.png, icon-maskable-512x512.png. Si se setea,
+   *  el manifest dinámico + el apple-touch-icon usan ESTOS (así la PWA se
+   *  instala con el logo de la marca, no el de Munify). Munify no lo setea. */
+  iconPath?: string;
   /** Fuente propia para el nombre de la marca (identidad tipográfica). */
   nameFont?: string;
   /** Layout de la pantalla de login. 'split' = hero de marca + panel de acceso;
@@ -74,6 +79,7 @@ const BRANDS: Record<string, Brand> = {
     tagline: 'Tu ciudad más limpia. Reportá y seguí tus reclamos.',
     logoSrc: null,        // usa el SVG editable, no un PNG con fondo blanco
     Logo: ParaguayLimpioLogo,
+    iconPath: 'brand/paraguay-limpio', // iconos PWA propios (fondo verde + hoja)
     nameFont: "'Plus Jakarta Sans', system-ui, sans-serif",
     primary: '#1b7a3d',   // verde oscuro del logo
     accent: '#5cb85c',    // verde claro del logo

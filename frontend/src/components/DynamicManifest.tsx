@@ -66,32 +66,65 @@ export default function DynamicManifest() {
       // e íconos. Sin esto, el navegador loguea "property 'start_url'
       // ignored, URL is invalid" (y lo mismo para scope e icons.src).
       const origin = window.location.origin;
+
+      // Marca white-label con iconos propios: la PWA se instala con el logo de
+      // la marca (no el de Munify) y con el nombre de la marca. Munify no setea
+      // `iconPath` → íconos y nombre por municipio, como siempre.
+      const brandIcons = BRAND.iconPath; // ej. 'brand/paraguay-limpio'
+      const pwaName = brandIcons ? BRAND.name : (municipioNombre || 'Reclamos Municipal');
+      const pwaShort = brandIcons ? BRAND.name : (municipioNombre?.replace('Municipalidad de ', '') || 'Reclamos');
+      const icons = brandIcons
+        ? [
+            { src: `${origin}/${brandIcons}/icon-maskable-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+            { src: `${origin}/${brandIcons}/icon-72x72.png`, sizes: '72x72', type: 'image/png' },
+            { src: `${origin}/${brandIcons}/icon-96x96.png`, sizes: '96x96', type: 'image/png' },
+            { src: `${origin}/${brandIcons}/icon-128x128.png`, sizes: '128x128', type: 'image/png' },
+            { src: `${origin}/${brandIcons}/icon-144x144.png`, sizes: '144x144', type: 'image/png' },
+            { src: `${origin}/${brandIcons}/icon-152x152.png`, sizes: '152x152', type: 'image/png' },
+            { src: `${origin}/${brandIcons}/icon-192x192.png`, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: `${origin}/${brandIcons}/icon-384x384.png`, sizes: '384x384', type: 'image/png' },
+            { src: `${origin}/${brandIcons}/icon-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ]
+        : [
+            { src: `${origin}/icon-notification.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+            { src: `${origin}/icons/icon-72x72.png`, sizes: '72x72', type: 'image/png' },
+            { src: `${origin}/icons/icon-96x96.png`, sizes: '96x96', type: 'image/png' },
+            { src: `${origin}/icons/icon-128x128.png`, sizes: '128x128', type: 'image/png' },
+            { src: `${origin}/icons/icon-144x144.png`, sizes: '144x144', type: 'image/png' },
+            { src: `${origin}/icons/icon-152x152.png`, sizes: '152x152', type: 'image/png' },
+            { src: `${origin}/icons/icon-192x192.png`, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: `${origin}/icons/icon-384x384.png`, sizes: '384x384', type: 'image/png' },
+            { src: `${origin}/icons/icon-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ];
+
       const manifest = {
-        name: municipioNombre || 'Reclamos Municipal',
-        short_name: municipioNombre?.replace('Municipalidad de ', '') || 'Reclamos',
-        description: `Sistema de reclamos - ${municipioNombre}`,
+        name: pwaName,
+        short_name: pwaShort,
+        description: brandIcons ? `${BRAND.name} — ${municipioNombre}` : `Sistema de reclamos - ${municipioNombre}`,
         start_url: `${origin}/home?municipio=${municipioCodigo}`,
         display: 'standalone',
-        background_color: '#0f172a',
-        theme_color: municipioColor,
+        background_color: brandIcons ? '#12341f' : '#0f172a',
+        theme_color: brandIcons ? BRAND.primary : municipioColor,
         orientation: 'portrait-primary',
-        icons: [
-          { src: `${origin}/icon-notification.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-          { src: `${origin}/icons/icon-72x72.png`, sizes: '72x72', type: 'image/png' },
-          { src: `${origin}/icons/icon-96x96.png`, sizes: '96x96', type: 'image/png' },
-          { src: `${origin}/icons/icon-128x128.png`, sizes: '128x128', type: 'image/png' },
-          { src: `${origin}/icons/icon-144x144.png`, sizes: '144x144', type: 'image/png' },
-          { src: `${origin}/icons/icon-152x152.png`, sizes: '152x152', type: 'image/png' },
-          { src: `${origin}/icons/icon-192x192.png`, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: `${origin}/icons/icon-384x384.png`, sizes: '384x384', type: 'image/png' },
-          { src: `${origin}/icons/icon-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-        ],
+        icons,
         categories: ['government', 'utilities'],
         lang: 'es-AR',
         dir: 'ltr',
         prefer_related_applications: false,
         scope: `${origin}/`,
       };
+
+      // apple-touch-icon (iOS home screen — no lee el manifest): apuntar al de
+      // la marca así el icono guardado en iPhone deja de ser el de Munify.
+      if (brandIcons) {
+        let appleLink = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement | null;
+        if (!appleLink) {
+          appleLink = document.createElement('link');
+          appleLink.rel = 'apple-touch-icon';
+          document.head.appendChild(appleLink);
+        }
+        appleLink.href = `${origin}/${brandIcons}/apple-touch-icon.png`;
+      }
 
       const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
       const manifestUrl = URL.createObjectURL(blob);
@@ -118,7 +151,7 @@ export default function DynamicManifest() {
       // theme-color del navegador (barra superior en mobile, etc.)
       const themeColorMeta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
       if (themeColorMeta) {
-        themeColorMeta.content = municipioColor;
+        themeColorMeta.content = brandIcons ? BRAND.primary : municipioColor;
       }
 
       // Título del tab del navegador

@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Paraguay Limpio">
+  <defs>
+    <linearGradient id="plbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f8a45"/>
+      <stop offset="1" stop-color="#0e4a24"/>
+    </linearGradient>
+  </defs>
+  <!-- Fondo verde full-bleed (iOS ignora transparencia y aplica su mascara) -->
+  <rect width="512" height="512" fill="url(#plbg)"/>
+  <!-- Hoja de marca, centrada con padding. Clara sobre el verde (nunca fondo blanco) -->
+  <g transform="translate(126,120) scale(2.6)">
+    <path fill="#f2fff6" d="M80 16C86 44 72 76 42 85 29 89 18 83 15 70 10 43 40 20 80 16Z"/>
+    <path fill="none" stroke="#9fe3a6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" d="M73 24C55 41 37 60 26 78"/>
+    <path fill="none" stroke="#9fe3a6" stroke-width="4.5" stroke-linecap="round" d="M53 43 66 36M42 59 55 53"/>
+  </g>
+</svg>
