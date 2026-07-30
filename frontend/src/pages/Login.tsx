@@ -6,6 +6,7 @@ import { getDefaultRouteForUser } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles, ChevronRight } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
+import { fetchJsonRetry } from '../lib/fetchRetry';
 import { BRAND } from '../brands';
 import { BrandMark } from '../brands/BrandMark';
 
@@ -171,30 +172,27 @@ export default function Login() {
 
   // API_URL importado desde lib/api.ts
 
-  // Cargar usuarios demo y dependencia desde la API
+  // Cargar usuarios demo y dependencia desde la API.
+  // Con retry+backoff (fetchJsonRetry): si el backend está frío (cold start de
+  // Cloud Run) el primer fetch puede fallar, y sin reintento el login quedaba
+  // con la MITAD de los perfiles (sin la sección ÁREAS) en silencio.
   useEffect(() => {
     if (municipioCodigo) {
-      // Cargar usuarios demo
       const loadDemoUsers = async () => {
         try {
-          const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/demo-users`);
-          if (response.ok) {
-            const users = await response.json();
-            setDemoUsers(users);
-          }
+          const users = await fetchJsonRetry<typeof demoUsers>(
+            `${API_URL}/municipios/public/${municipioCodigo}/demo-users`);
+          setDemoUsers(users);
         } catch (error) {
           console.error('Error al cargar usuarios demo:', error);
         }
       };
 
-      // Cargar usuarios de dependencia
       const loadDependenciaUsers = async () => {
         try {
-          const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/dependencia-users`);
-          if (response.ok) {
-            const users = await response.json();
-            setDependenciaUsers(users);
-          }
+          const users = await fetchJsonRetry<typeof dependenciaUsers>(
+            `${API_URL}/municipios/public/${municipioCodigo}/dependencia-users`);
+          setDependenciaUsers(users);
         } catch (error) {
           console.error('Error al cargar usuarios dependencia:', error);
         }

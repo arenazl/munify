@@ -32,25 +32,38 @@ export default function MunicipioAcceso() {
         navigate('/demo', { replace: true });
         return;
       }
-      try {
-        const { data } = await municipiosApi.getPublicByCodigo(codigo);
-        if (cancelled) return;
+      // Retry con backoff: con el backend frío (cold start de Cloud Run) el
+      // primer request puede fallar o dar 5xx transitorio. Eso NO significa
+      // "el municipio no existe" — solo el 404 es definitivo. Sin esto, el
+      // primer visitante veía el cartel de "no encontramos el municipio".
+      for (let intento = 0; intento < 4; intento++) {
+        try {
+          const { data } = await municipiosApi.getPublicByCodigo(codigo);
+          if (cancelled) return;
 
-        await saveMunicipio({
-          id: String(data.id),
-          codigo: data.codigo,
-          nombre: data.nombre,
-          color: data.color_primario || '#0088cc',
-          logo_url: data.logo_url || undefined,
-        });
-        localStorage.setItem('municipio_actual_id', String(data.id));
+          await saveMunicipio({
+            id: String(data.id),
+            codigo: data.codigo,
+            nombre: data.nombre,
+            color: data.color_primario || '#0088cc',
+            logo_url: data.logo_url || undefined,
+          });
+          localStorage.setItem('municipio_actual_id', String(data.id));
 
-        if (!cancelled) navigate('/login', { replace: true });
-      } catch {
-        if (cancelled) return;
-        setError(true);
-        setTimeout(() => navigate('/demo', { replace: true }), 1800);
+          if (!cancelled) navigate('/login', { replace: true });
+          return;
+        } catch (e) {
+          const status = (e as { response?: { status?: number } })?.response?.status;
+          if (status === 404) break; // no existe de verdad — no reintentar
+          if (intento < 3) {
+            await new Promise((r) => setTimeout(r, 900 * (intento + 1)));
+            if (cancelled) return;
+          }
+        }
       }
+      if (cancelled) return;
+      setError(true);
+      setTimeout(() => navigate('/demo', { replace: true }), 1800);
     };
 
     run();

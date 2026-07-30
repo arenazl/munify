@@ -33,8 +33,13 @@ export function applyBrand(): void {
     }
   }
 
-  // Favicon propio de la marca (si tiene logo). Munify deja el de index.html.
-  if (BRAND.logoSrc) {
+  // Favicon propio de la marca. Munify deja el de index.html. Prioridad:
+  // iconos PWA de la marca (iconPath) > logoSrc raster. Sin esto la pestaña
+  // del navegador quedaba con el favicon de Munify en las marcas white-label.
+  const faviconHref = BRAND.iconPath
+    ? `/${BRAND.iconPath}/icon-96x96.png`
+    : BRAND.logoSrc || null;
+  if (faviconHref) {
     let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!link) {
       link = document.createElement('link');
@@ -42,6 +47,6 @@ export function applyBrand(): void {
       document.head.appendChild(link);
     }
     link.type = 'image/png';
-    link.href = BRAND.logoSrc;
+    link.href = faviconHref;
   }
 }
