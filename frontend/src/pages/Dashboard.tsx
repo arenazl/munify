@@ -663,12 +663,12 @@ export default function Dashboard() {
 
       {/* Hero Header adaptativo — foto propia del muni o hero de marca del theme. */}
       <div
-        className="relative overflow-hidden rounded-2xl"
+        className="relative rounded-2xl"
         style={{ minHeight: '200px' }}
       >
         {/* Fondo del hero: foto propia del muni si la configuro, sino hero de
             marca derivado del theme (sin foto stock generica). */}
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 overflow-hidden rounded-2xl">
           {tienePortada ? (
             <>
               <img
@@ -716,7 +716,7 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute top-2.5 left-3 z-20 flex flex-col items-start gap-1.5">
+        <div className="absolute z-20 flex flex-col items-start gap-1.5" style={{ top: 6, left: 6 }}>
         {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde, compactos (no pisan el título). */}
         <button
           onClick={() => setPresentOpen(true)}
@@ -854,6 +854,10 @@ export default function Dashboard() {
               <div className="flex items-center gap-1.5">
                 <ClipboardList className="w-4 h-4" />
                 <span>{stats?.total || 0} reclamos</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <FileCheck className="w-4 h-4" />
+                <span>{tramitesStats?.total || 0} trámites</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4" />
