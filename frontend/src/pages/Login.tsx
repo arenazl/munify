@@ -7,6 +7,7 @@ import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCi
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
 import { BRAND } from '../brands';
+import { BrandMark } from '../brands/BrandMark';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -209,8 +210,8 @@ export default function Login() {
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
         <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl" style={{ backgroundColor: municipioColor }} />
+          <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl" style={{ backgroundColor: municipioColor }} />
         </div>
       </div>
 
@@ -234,13 +235,13 @@ export default function Login() {
             {/* Logo y título */}
             <div className="text-center mb-8">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                style={{ backgroundColor: `${municipioColor}20` }}
+                className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl ring-1 ring-white/10"
+                style={{ backgroundColor: `${municipioColor}22` }}
               >
-                <Building2 className="h-8 w-8" style={{ color: municipioColor }} />
+                <BrandMark size={48} />
               </div>
               <h1 className="text-2xl font-bold text-white mb-1">{municipioNombre}</h1>
-              <p className="text-slate-400 text-sm">Acceso al sistema</p>
+              <p className="text-slate-400 text-sm">{BRAND.tagline || 'Acceso al sistema'}</p>
             </div>
 
             {/* Form Card */}
@@ -299,7 +300,8 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 text-white font-semibold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: `linear-gradient(135deg, ${municipioColor}, ${municipioColor}dd)`, boxShadow: `0 10px 25px ${municipioColor}40` }}
                 >
                   {loading ? (
                     <>

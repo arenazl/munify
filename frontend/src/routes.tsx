@@ -3,6 +3,11 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
 import ReclamoLegacyRedirect from './components/ReclamoLegacyRedirect';
+import { BRAND, IS_WHITE_LABEL } from './brands';
+
+// White-label: el "home" de la marca es el acceso directo a SU municipio
+// (login con botonera), nunca el generador de demos ni la grilla de Munify.
+const WL_HOME = BRAND.municipioCodigo ? `/${BRAND.municipioCodigo}` : '/login';
 
 // Pages
 import Landing from './pages/Landing';
@@ -121,7 +126,7 @@ import {
 
 export const router = createBrowserRouter([
   // === DEMOS DE DISEÑO ===
-  { path: '/demos', element: <DemosIndex /> },
+  { path: '/demos', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <DemosIndex /> },
   { path: '/demos/glassmorphism', element: <DemoGlassmorphism /> },
   { path: '/demos/neubrutalism', element: <DemoNeubrutalism /> },
   { path: '/demos/minimal', element: <DemoMinimal /> },
@@ -129,9 +134,9 @@ export const router = createBrowserRouter([
   { path: '/demos/cyberpunk', element: <DemoCyberpunk /> },
 
   // === REELS DE PROMOCIÓN (marketing) ===
-  { path: '/reels', element: <ReelsStudio /> },
-  { path: '/reels/videos', element: <ReelsVideos /> },  // galería de finales (voz+música+b-roll)
-  { path: '/voz', element: <VoiceStudio /> },
+  { path: '/reels', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <ReelsStudio /> },
+  { path: '/reels/videos', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <ReelsVideos /> },  // galería de finales (voz+música+b-roll)
+  { path: '/voz', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <VoiceStudio /> },
 
   // === APP MOBILE PARA CIUDADANOS ===
   // /app ahora redirige a /home (página responsiva unificada)
@@ -160,10 +165,10 @@ export const router = createBrowserRouter([
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
-  { path: '/demo', element: <Demo /> },
-  { path: '/demo/listo', element: <DemoReady /> },
+  { path: '/demo', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <Demo /> },
+  { path: '/demo/listo', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <DemoReady /> },
   // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
-  { path: '/presentacion', element: <PresentacionMunify /> },
+  { path: '/presentacion', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <PresentacionMunify /> },
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
@@ -186,7 +191,7 @@ export const router = createBrowserRouter([
   { path: '/onboarding', element: <Onboarding /> },  // Wizard post-registro
 
   // === RUTA RAÍZ - Redirección inteligente ===
-  { path: '/', element: <RootRedirect /> },
+  { path: '/', element: IS_WHITE_LABEL ? <Navigate to={WL_HOME} replace /> : <RootRedirect /> },
 
   // === RUTAS PROTEGIDAS (Panel de Gestión) ===
   {
@@ -449,6 +454,6 @@ export const router = createBrowserRouter([
   // Links historicos: /reclamos/:id -> /gestion/reclamos/:id (sanea push/WhatsApp viejos)
   { path: '/reclamos/:id', element: <ReclamoLegacyRedirect /> },
 
-  // Catch-all: redirigir a demo si no está autenticado
-  { path: '*', element: <Navigate to="/demo" replace /> },
+  // Catch-all: redirigir a demo si no está autenticado (white-label: al acceso de su muni)
+  { path: '*', element: <Navigate to={IS_WHITE_LABEL ? WL_HOME : '/demo'} replace /> },
 ]);

@@ -23,6 +23,9 @@ export interface Brand {
   primary: string;
   /** Acento secundario. */
   accent?: string;
+  /** White-label monolítico: código del municipio único. En white-label el
+   *  acceso entra directo a este muni (no hay generador de demos ni grilla). */
+  municipioCodigo?: string;
 }
 
 const BRANDS: Record<string, Brand> = {
@@ -43,6 +46,7 @@ const BRANDS: Record<string, Brand> = {
     logoSrc: '/brands/paraguay-limpio/logo.png',
     primary: '#1b7a3d',   // verde oscuro del logo
     accent: '#5cb85c',    // verde claro del logo
+    municipioCodigo: 'asuncion',
   },
 };
 
