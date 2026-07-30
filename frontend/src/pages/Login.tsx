@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
-import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles } from 'lucide-react';
+import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles, ChevronRight } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
 import { BRAND, IS_WHITE_LABEL } from '../brands';
@@ -287,43 +287,123 @@ export default function Login() {
               <div className="bg-red-500/10 border border-red-500/25 text-red-300 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
             )}
 
-            {demoUsers.length > 0 && (
-              <div className="mb-5">
-                <div className="text-[10px] font-semibold tracking-[0.2em] text-emerald-50/40 mb-2.5">ELEGÍ UN PERFIL</div>
-                <div className="space-y-2">
-                  {demoUsers.map((u, i) => {
-                    const cfg = rolConfig[u.rol] || rolConfig.vecino;
-                    const Icon = cfg.icon;
-                    const titulo = u.rol === 'admin'
-                      ? 'Administrador'
-                      : u.rol === 'supervisor'
-                        ? (u.dependencia_nombre?.replace(/^(Secretar[ií]a|Direcci[oó]n)\s+de\s+/i, '') || 'Supervisor')
-                        : (u.nombre_completo || cfg.label);
-                    const sub = u.rol === 'admin' ? 'Acceso total'
-                      : u.rol === 'supervisor' ? 'Supervisor'
-                      : cfg.label;
-                    return (
+            {(demoUsers.length > 0 || dependenciaUsers.length > 0) && (() => {
+              const admins = demoUsers.filter(u => u.rol === 'admin');
+              const vecinos = demoUsers.filter(u => u.rol === 'vecino');
+              const empleados = demoUsers.filter(u => u.rol === 'empleado');
+              const Heading = ({ t }: { t: string }) => (
+                <div className="text-[10px] font-bold tracking-[0.2em] text-emerald-50/40 mb-2">{t}</div>
+              );
+              return (
+                <div className="space-y-4 mb-5">
+                  {/* ADMINISTRACIÓN — verde del brand, destacado arriba */}
+                  {admins.map(u => (
+                    <div key={u.email}>
+                      <Heading t="ADMINISTRACIÓN" />
                       <button
-                        key={`${u.email}-${i}`}
                         type="button"
                         onClick={() => quickLogin(u.email, 'demo123')}
                         disabled={loading}
-                        className="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] px-3 py-2.5 text-left transition-all disabled:opacity-50"
+                        className="w-full flex items-center gap-3 p-3.5 rounded-2xl text-left transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 shadow-lg"
+                        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#06130b' }}
                       >
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${accent}1a` }}>
-                          <Icon className="h-4 w-4" style={{ color: accent }} />
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-black/15">
+                          <Shield className="h-5 w-5" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-bold truncate">{titulo}</div>
-                          <div className="text-[11px] text-emerald-50/45 truncate">{sub}</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-extrabold truncate">Administrador</div>
+                          <div className="text-[11px] font-semibold opacity-70 truncate">Acceso a todas las áreas</div>
                         </div>
-                        <span className="text-emerald-50/30 flex-shrink-0" aria-hidden>→</span>
                       </button>
-                    );
-                  })}
+                    </div>
+                  ))}
+
+                  {/* ÁREAS — cada dependencia con su color + reclamos/trámites */}
+                  {dependenciaUsers.length > 0 && (
+                    <div>
+                      <Heading t="ÁREAS" />
+                      <div className="space-y-2">
+                        {dependenciaUsers.map(dep => (
+                          <button
+                            key={dep.email}
+                            type="button"
+                            onClick={() => quickLogin(dep.email, 'demo123')}
+                            disabled={loading}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
+                            style={{ backgroundColor: `${dep.color || accent}1f`, border: `1px solid ${dep.color || accent}33` }}
+                          >
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${dep.color || accent}2e` }}>
+                              <Building2 className="h-5 w-5" style={{ color: dep.color || accent }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-bold text-white truncate">{dep.nombre_dependencia}</div>
+                              <div className="text-[11px] text-emerald-50/50 truncate">
+                                {dep.reclamos_count} reclamos · {dep.tramites_count} trámites
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-emerald-50/30 flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VECINOS — tono azul */}
+                  {vecinos.length > 0 && (
+                    <div>
+                      <Heading t="VECINOS" />
+                      <div className="grid grid-cols-3 gap-2">
+                        {vecinos.map(u => (
+                          <button
+                            key={u.email}
+                            type="button"
+                            onClick={() => quickLogin(u.email, 'demo123')}
+                            disabled={loading}
+                            className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-all hover:brightness-125 active:scale-[0.98] disabled:opacity-50"
+                            style={{ backgroundColor: '#3b82f61a', border: '1px solid #3b82f633' }}
+                          >
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: '#3b82f626' }}>
+                              <User className="h-4 w-4" style={{ color: '#7cb0ff' }} />
+                            </div>
+                            <div className="min-w-0 w-full">
+                              <div className="text-[11px] font-bold text-white truncate">{u.nombre}</div>
+                              <div className="text-[9px] text-emerald-50/45 truncate">Ciudadano</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CAMPO — tono ámbar */}
+                  {empleados.length > 0 && (
+                    <div>
+                      <Heading t="CAMPO" />
+                      <div className="grid grid-cols-2 gap-2">
+                        {empleados.map(u => (
+                          <button
+                            key={u.email}
+                            type="button"
+                            onClick={() => quickLogin(u.email, 'demo123')}
+                            disabled={loading}
+                            className="flex items-center gap-2.5 p-3 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
+                            style={{ backgroundColor: '#f59e0b1a', border: '1px solid #f59e0b33' }}
+                          >
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#f59e0b26' }}>
+                              <Wrench className="h-4 w-4" style={{ color: '#fbbf24' }} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold text-white truncate">{u.nombre_completo}</div>
+                              <div className="text-[9px] text-emerald-50/45 truncate">Órdenes de trabajo</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="flex items-center gap-3 my-5">
               <div className="flex-1 h-px bg-white/10" />
