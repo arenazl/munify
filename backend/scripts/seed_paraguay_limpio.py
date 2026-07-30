@@ -1,35 +1,46 @@
 """
-Seed white-label: municipio "Paraguay Limpio" (Asunción, Departamento Central).
-=================================================================================
+Seed white-label RICO: municipio "Paraguay Limpio" (Asunción, Departamento Central).
+=====================================================================================
 
 Marca cliente (front paraguay-limpio.netlify.app) que corre sobre el MISMO backend
-Munify. Este script deja una demo 100% funcional de RECLAMOS + TRÁMITES sobre datos
-REALES de Asunción, sin tocar ningún otro municipio.
+Munify. Este script deja una demo 100% funcional y RICA de RECLAMOS + TRÁMITES sobre
+datos REALES de Asunción, con TODA la cadena de participantes (vecino → supervisor →
+cuadrilla/empleado → orden de trabajo → inventario), sin tocar ningún otro municipio.
 
-Qué crea (idempotente — seguro de correr N veces):
+Qué crea (idempotente — seguro de correr N veces; NO duplica):
   - Municipio "Asunción, Departamento Central" (codigo `asuncion`), branding verde,
     es_demo=True (expone la botonera de login rápido).
   - 20 categorías default (10 reclamo + 10 trámite).
-  - 4 dependencias operativas (Servicios Públicos, Obras Públicas, Tránsito, Zoonosis)
-    con su mapeo categoría -> dependencia.
+  - 5 dependencias operativas (Servicios Públicos, Obras Públicas, Tránsito, Zoonosis,
+    Seguridad) del catálogo global + su mapeo categoría → dependencia (cubre las 10
+    categorías de reclamo sin huérfanos).
   - 68 barrios REALES del catálogo oficial VigiCanPY/MSPBS, geocodificados con
     Nominatim (66/68 con coords; 2 sin coord conocida quedan en NULL — nunca coords
     inventadas).
-  - 5 usuarios con password `demo123`: admin, supervisor y 3 vecinos (botonera).
-  - 10 reclamos variados (distintos estados, comentarios, 2 trabados a la espera de
-    inventario / con orden de trabajo) con coords reales sobre barrios de Asunción y
-    created_at reciente (para que el mapa de calor los muestre).
-  - 10 trámites completos con documentos requeridos + 8 solicitudes en estados variados.
-  - TODOS los módulos opt-in quedan HABILITADOS (visibles en el sidebar) pero SIN datos
-    cargados — solo reclamos y trámites llevan contenido.
+  - Usuarios (password `demo123`, dominio `@asuncion.demo.com` para que los muestre la
+    botonera): admin, 1 supervisor por dependencia (5), 3 vecinos paraguayos y el login
+    de 2 empleados destacados (para ver el caso desde el POV del operario de campo).
+  - 6 zonas + 10 empleados (nombres paraguayos, DEMO) repartidos por secretaría con las
+    especialidades típicas + 4 cuadrillas (líder + miembros).
+  - 10 reclamos temáticos de Asunción con CADENA COMPLETA y coherente: coords reales
+    sobre barrios, estados variados, historial con comentarios de cada actor, su ORDEN
+    DE TRABAJO (materiales, horas, estado, notas de cierre) y cruce con INVENTARIO
+    (activos reservados + consumibles descontados). 2 casos trabados por falta de
+    insumos (OT BLOQUEADA + nota explícita "a la espera de reposición de inventario").
+  - 10 trámites completos (con documentos requeridos) + 10 solicitudes en estados
+    variados (solicitante = vecinos), mapeadas a su dependencia cuando corresponde.
+  - Inventario (activos + consumibles) coherente con los materiales de las OT.
+  - SLA configs por categoría.
+  - TODOS los módulos opt-in HABILITADOS (visibles en el sidebar): ordenes_trabajo,
+    inventario, sueldos, contaduria, tesoreria.
 
 Correr (desde backend/):  python -m scripts.seed_paraguay_limpio
 Usa settings.DATABASE_URL (el ambiente donde apunte el backend). En QA lo corre Infra.
 """
 import asyncio
 import hashlib
-from datetime import datetime, timedelta
-from typing import Optional
+import unicodedata
+from datetime import date, datetime, time as dtime, timedelta
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -37,13 +48,17 @@ from sqlalchemy.orm import sessionmaker
 
 from core.config import settings
 from core.security import get_password_hash
-from models.enums import RolUsuario, EstadoReclamo
+from models.enums import (
+    RolUsuario, EstadoReclamo, EstadoOrdenTrabajo, PrioridadOT,
+    NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+)
 from models.municipio import Municipio
 from models.user import User
 from models.barrio import Barrio
 from models.dependencia import Dependencia
 from models.municipio_dependencia import MunicipioDependencia
 from models.municipio_dependencia_categoria import MunicipioDependenciaCategoria
+from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
 from models.categoria_reclamo import CategoriaReclamo
 from models.categoria_tramite import CategoriaTramite
 from models.reclamo import Reclamo
@@ -51,7 +66,17 @@ from models.historial import HistorialReclamo
 from models.tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from models.tramite_documento_requerido import TramiteDocumentoRequerido
 from models.municipio_modulo import MunicipioModulo
+from models.zona import Zona
+from models.empleado import Empleado
+from models.empleado_categoria import empleado_categoria
+from models.cuadrilla import Cuadrilla
+from models.cuadrilla_categoria import cuadrilla_categoria
+from models.empleado_cuadrilla import EmpleadoCuadrilla
+from models.sla import SLAConfig
+from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+from models.inventario import InventarioItem, OrdenTrabajoRecurso
 from services.categorias_default import crear_categorias_default
+from services.inventario_seed import seed_inventario
 
 
 # ============================================================
@@ -144,10 +169,11 @@ BARRIOS_ASUNCION = [
 ]
 
 # ============================================================
-# Dependencias operativas (4) + mapeo categoría de reclamo -> dependencia
-# Los códigos existen en el catálogo global (models/dependencia.py).
+# Dependencias operativas (5) + mapeo categoría de reclamo -> dependencia.
+# Los códigos existen en el catálogo global (services/dependencias_default.py).
+# El mapeo cubre las 10 categorías default sin huérfanos.
 # ============================================================
-DEPENDENCIAS = ["SERVICIOS_PUBLICOS", "OBRAS_PUBLICAS", "TRANSITO_VIAL", "ZOONOSIS"]
+DEPENDENCIAS = ["SERVICIOS_PUBLICOS", "OBRAS_PUBLICAS", "TRANSITO_VIAL", "ZOONOSIS", "SEGURIDAD"]
 DEP_CATEGORIAS_MAP = {
     "SERVICIOS_PUBLICOS": [
         "Alumbrado público", "Recolección de residuos",
@@ -156,205 +182,379 @@ DEP_CATEGORIAS_MAP = {
     "OBRAS_PUBLICAS": ["Bacheo y calles"],
     "TRANSITO_VIAL": ["Tránsito y señalización"],
     "ZOONOSIS": ["Plagas y control", "Animales sueltos"],
+    "SEGURIDAD": ["Ruidos y convivencia"],
 }
 
 # ============================================================
-# 3 vecinos demo (nombres paraguayos plausibles — datos de DEMO)
+# 3 vecinos demo (nombres paraguayos plausibles — datos de DEMO).
+# Emails @asuncion.demo.com para que los muestre la botonera de login rápido.
 # ============================================================
 VECINOS = [
-    {"email": "derlis@demo.py",  "nombre": "Derlis",  "apellido": "González", "sexo": "M", "tel": "+595 981 111222"},
-    {"email": "liz@demo.py",     "nombre": "Liz",     "apellido": "Benítez",  "sexo": "F", "tel": "+595 982 333444"},
-    {"email": "rodrigo@demo.py", "nombre": "Rodrigo", "apellido": "Villalba", "sexo": "M", "tel": "+595 983 555666"},
+    {"email": "vecino@asuncion.demo.com",         "nombre": "Derlis",  "apellido": "González", "sexo": "M", "tel": "+595 981 111222"},
+    {"email": "vecino-liz@asuncion.demo.com",     "nombre": "Liz",     "apellido": "Benítez",  "sexo": "F", "tel": "+595 982 333444"},
+    {"email": "vecino-rodrigo@asuncion.demo.com", "nombre": "Rodrigo", "apellido": "Villalba", "sexo": "M", "tel": "+595 983 555666"},
 ]
 
 # ============================================================
-# 10 reclamos variados (coords reales sobre barrios de Asunción)
-# barrio_cod: código del barrio en BARRIOS_ASUNCION.
-# dias: hace cuántos días se creó (para el mapa de calor: todos < 30d).
-# vecino: índice en VECINOS (creador).
+# 6 zonas de Asunción (coords de un barrio representativo de cada sector).
+# codigo <= 20 chars (VARCHAR(20)); se sufija con muni_id para unicidad global.
 # ============================================================
-_H = int(hashlib.sha1(b"asuncion-reclamos").hexdigest(), 16)  # jitter determinístico
+ZONAS = [
+    ("Centro",    "AS-CEN",  -25.285734, -57.633864),  # La Catedral
+    ("Norte",     "AS-NOR",  -25.256776, -57.577834),  # Santísima Trinidad
+    ("Sur",       "AS-SUR",  -25.296526, -57.650481),  # Tacumbú
+    ("Este",      "AS-ESTE", -25.288011, -57.580675),  # Villa Morra
+    ("Costanera", "AS-COST", -25.279437, -57.631739),  # Ricardo Brugada (Chacarita)
+    ("Periferia", "AS-PERI", -25.232477, -57.562022),  # Zeballos Cué
+]
+
+# ============================================================
+# 10 empleados demo (nombres paraguayos — datos de DEMO), repartidos por
+# secretaría con las especialidades de los reclamos típicos de la ciudad.
+# (nombre, apellido, tel, tipo, especialidad, categoria_reclamo, zona, dep_codigo)
+# ============================================================
+EMPLEADOS = [
+    ("Wilson",    "Ayala",    "+595 971 100001", "operario",       "Bacheo y pavimento",       "Bacheo y calles",            "Sur",       "OBRAS_PUBLICAS"),
+    ("Derlis",    "Cardozo",  "+595 971 100002", "operario",       "Recolección y limpieza",   "Recolección de residuos",    "Centro",    "SERVICIOS_PUBLICOS"),
+    ("Gustavo",   "Benítez",  "+595 971 100003", "operario",       "Electricidad pública",     "Alumbrado público",          "Norte",     "SERVICIOS_PUBLICOS"),
+    ("Cristhian", "Ojeda",    "+595 971 100004", "operario",       "Poda y espacios verdes",   "Arbolado y espacios verdes", "Este",      "SERVICIOS_PUBLICOS"),
+    ("Nelson",    "Duarte",   "+595 971 100005", "operario",       "Higiene urbana",           "Higiene urbana",             "Costanera", "SERVICIOS_PUBLICOS"),
+    ("Hugo",      "Espínola", "+595 971 100006", "operario",       "Agua y desagües",          "Agua y cloacas",             "Centro",    "SERVICIOS_PUBLICOS"),
+    ("Óscar",     "Cabral",   "+595 971 100007", "operario",       "Señalización vial",        "Tránsito y señalización",    "Este",      "TRANSITO_VIAL"),
+    ("Rubén",     "Villalba", "+595 971 100008", "operario",       "Fumigación y descacharrado", "Plagas y control",         "Sur",       "ZOONOSIS"),
+    ("Fabián",    "Gauto",    "+595 971 100009", "operario",       "Control y rescate animal", "Animales sueltos",           "Periferia", "ZOONOSIS"),
+    ("Carolina",  "Franco",   "+595 971 100010", "administrativo", "Inspección y convivencia", "Ruidos y convivencia",       "Centro",    "SEGURIDAD"),
+]
+
+# Índices (en EMPLEADOS) de los 2 empleados destacados con login propio,
+# para ver el caso desde el POV del operario de campo.
+EMPLEADOS_LOGIN_IDX = [2, 0]  # Gustavo (Alumbrado), Wilson (Bacheo)
+
+# ============================================================
+# 4 cuadrillas (líder + 1 miembro), tomados de los 10 empleados.
+# (nombre, descripcion, categoria, zona, lider_idx, miembro_idx)
+# ============================================================
+CUADRILLAS = [
+    ("Cuadrilla Bacheo",      "Equipo de reparación de baches y calzada",           "Bacheo y calles",            "Sur",    0, 5),
+    ("Cuadrilla Alumbrado",   "Equipo de mantenimiento eléctrico y luminarias",     "Alumbrado público",          "Norte",  2, 3),
+    ("Cuadrilla Recolección", "Equipo de recolección e higiene urbana",             "Recolección de residuos",    "Centro", 1, 4),
+    ("Cuadrilla Zoonosis",    "Equipo de fumigación y control de plagas/animales",  "Plagas y control",           "Sur",    7, 8),
+]
+
+# ============================================================
+# SLA configs (por categoría + general).
+# (categoria_o_None, resp_h, reso_h, alerta_h)
+# ============================================================
+SLA_CONFIGS = [
+    ("Bacheo y calles",         24, 72,  48),
+    ("Alumbrado público",       12, 48,  24),
+    ("Recolección de residuos",  8, 24,  16),
+    ("Tránsito y señalización",  6, 24,  12),
+    ("Agua y cloacas",           6, 24,  12),
+    ("Plagas y control",        24, 72,  48),
+    (None,                      48, 168, 96),  # General (fallback)
+]
+
+# ============================================================
+# 10 reclamos con CADENA COMPLETA (coords reales sobre barrios de Asunción).
+# Cada uno lleva su Orden de Trabajo (ot) y su historial con comentarios de
+# cada actor. `vecino` = índice en VECINOS. `barrio_cod` = código en
+# BARRIOS_ASUNCION. `dias` = hace cuántos días se creó (mapa de calor < 30d).
+#
+# ot: dict con el circuito de campo — cuadrilla (idx en CUADRILLAS | None),
+#     empleado (idx en EMPLEADOS | None), estado (EstadoOrdenTrabajo),
+#     prioridad, materiales (JSON), h_est/h_real, notas_cierre, y recursos
+#     (cruce con inventario: lista de (item_nombre, tipo, cantidad)).
+# historial: [{actor: vecino|supervisor|empleado, accion, estado_anterior,
+#              estado_nuevo, comentario}]
+# ============================================================
+_H = int(hashlib.sha1(b"asuncion-reclamos-rico").hexdigest(), 16)  # jitter determinístico
 
 RECLAMOS = [
-    {
+    {  # 1 — recolección, EN_CURSO, OT en curso
         "titulo": "Basura acumulada sobre calle Colón",
         "descripcion": "Hace cuatro días que no pasa el recolector por Colón casi Estados Unidos. La basura se amontona en la esquina y hay mal olor.",
         "categoria": "Recolección de residuos", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.EN_CURSO, "barrio_cod": 1, "canal": "app", "dias": 3, "vecino": 0,
         "direccion": "Colón c/ Estados Unidos, Sajonia",
+        "ot": {"titulo": "Retiro de residuos acumulados y refuerzo de recolección",
+               "estado": EstadoOrdenTrabajo.EN_CURSO, "prioridad": PrioridadOT.ALTA,
+               "cuadrilla": 2, "empleado": 1, "dias_prog": 0,
+               "materiales": None, "h_est": 3.0, "h_real": None, "notas_cierre": None,
+               "recursos": [("Camioneta utilitaria", "reserva", None)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
-             "comentario": "Se coordinó recorrida extra del camión recolector para la zona."},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Cargué el reclamo desde la app con foto de la esquina."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "Se generó la OT y se asignó a la Cuadrilla Recolección (Derlis Cardozo) para recorrida extra."},
+            {"actor": "empleado", "accion": "Nota",
+             "comentario": "Salgo con el móvil al sector, confirmo retiro al terminar la cuadra."},
         ],
     },
-    {
+    {  # 2 — higiene urbana, RECIBIDO, OT pendiente
         "titulo": "Microbasural en terreno baldío",
         "descripcion": "Un terreno baldío sobre Palma se convirtió en microbasural. Los vecinos piden limpieza y que se cierre el predio.",
         "categoria": "Higiene urbana", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.RECIBIDO, "barrio_cod": 8, "canal": "whatsapp", "dias": 1, "vecino": 1,
         "direccion": "Palma c/ Alberdi, La Catedral",
+        "ot": {"titulo": "Limpieza de microbasural en baldío",
+               "estado": EstadoOrdenTrabajo.PENDIENTE, "prioridad": PrioridadOT.MEDIA,
+               "cuadrilla": None, "empleado": None, "dias_prog": 3,
+               "materiales": [{"descripcion": "Bolsas de residuo reforzadas", "cantidad": 20, "unidad": "u"}],
+               "h_est": 4.0, "h_real": None, "notas_cierre": None, "recursos": []},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Mandé el reclamo por WhatsApp con la ubicación del baldío."},
         ],
     },
-    {
+    {  # 3 — alumbrado, EN_CURSO, OT BLOQUEADA por falta de inventario
         "titulo": "Recambio de luminarias LED en Av. Mcal. López",
         "descripcion": "Tramo de tres cuadras sin alumbrado sobre Av. Mcal. López. Se pidió el recambio a LED de todo el tramo.",
         "categoria": "Alumbrado público", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.EN_CURSO, "barrio_cod": 42, "canal": "app", "dias": 8, "vecino": 2,
         "direccion": "Av. Mcal. López c/ San Martín, Villa Morra",
+        "ot": {"titulo": "Recambio de tramo de luminarias a LED",
+               "estado": EstadoOrdenTrabajo.BLOQUEADA, "prioridad": PrioridadOT.ALTA,
+               "cuadrilla": 1, "empleado": 2, "dias_prog": -1,
+               "materiales": [{"descripcion": "Lámpara LED 150W", "cantidad": 8, "unidad": "u"}],
+               "h_est": 6.0, "h_real": None, "notas_cierre": None,
+               "recursos": [("Camioneta 4x4", "reserva", None),
+                            ("Lámpara LED 150W", "consumo", 8)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
-             "comentario": "Orden de trabajo OT-0007 generada, cuadrilla de electricidad asignada."},
-            {"accion": "Nota",
-             "comentario": "Trabajo en pausa: sin stock de luminarias LED 100W en depósito. A la espera de reposición de inventario para completar el tramo."},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Todo el tramo quedó a oscuras, es peligroso de noche."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "OT generada y asignada a la Cuadrilla Alumbrado (Gustavo Benítez)."},
+            {"actor": "empleado", "accion": "Nota",
+             "comentario": "Trabajo en pausa: sin stock de luminarias LED 150W en depósito. A la espera de reposición de inventario para completar el tramo."},
         ],
     },
-    {
+    {  # 4 — arbolado, FINALIZADO, OT completada
         "titulo": "Poda de árbol que toca los cables",
         "descripcion": "Un árbol grande sobre Av. España tiene ramas enredadas en los cables de media tensión. Riesgo con viento.",
         "categoria": "Arbolado y espacios verdes", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.FINALIZADO, "barrio_cod": 41, "canal": "app", "dias": 20, "vecino": 0,
         "direccion": "Av. España c/ Brasil, Recoleta",
         "confirmado_vecino": True,
+        "ot": {"titulo": "Poda correctiva de arbolado sobre línea eléctrica",
+               "estado": EstadoOrdenTrabajo.COMPLETADA, "prioridad": PrioridadOT.ALTA,
+               "cuadrilla": None, "empleado": 3, "dias_prog": -3,
+               "materiales": [{"descripcion": "Combustible motosierra", "cantidad": 8, "unidad": "l"}],
+               "h_est": 5.0, "h_real": 4.5,
+               "notas_cierre": "Poda realizada y ramas retiradas. Se despejaron los cables junto con la distribuidora eléctrica.",
+               "recursos": [("Motosierra", "reserva", None),
+                            ("Camioneta utilitaria", "reserva", None)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
-             "comentario": "Cuadrilla de poda coordinada con la distribuidora eléctrica para el corte programado."},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO,
-             "comentario": "Poda realizada y ramas retiradas. Se despejaron los cables."},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Con viento las ramas hacen chispas contra el cable."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "Se coordinó con la distribuidora eléctrica el corte programado y se asignó a Cristhian Ojeda."},
+            {"actor": "empleado", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO,
+             "estado_nuevo": EstadoReclamo.FINALIZADO,
+             "comentario": "Poda terminada, ramas retiradas y cables despejados."},
         ],
     },
-    {
+    {  # 5 — bacheo, EN_CURSO, OT asignada
         "titulo": "Bache profundo sobre Eusebio Ayala",
         "descripcion": "Bache de gran tamaño sobre Av. Eusebio Ayala que ya rompió la rueda de dos autos. Urgente.",
         "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS",
-        "estado": EstadoReclamo.RECIBIDO, "barrio_cod": 18, "canal": "web_publica", "dias": 2, "vecino": 1,
+        "estado": EstadoReclamo.EN_CURSO, "barrio_cod": 18, "canal": "web_publica", "dias": 4, "vecino": 1,
         "direccion": "Av. Eusebio Ayala c/ Molas López, Mburicaó",
+        "ot": {"titulo": "Bacheo de calzada y compactado",
+               "estado": EstadoOrdenTrabajo.ASIGNADA, "prioridad": PrioridadOT.URGENTE,
+               "cuadrilla": 0, "empleado": 0, "dias_prog": 1,
+               "materiales": [{"descripcion": "Asfalto en frío", "cantidad": 6, "unidad": "bolsas"},
+                              {"descripcion": "Arena", "cantidad": 3, "unidad": "m3"}],
+               "h_est": 4.0, "h_real": None, "notas_cierre": None,
+               "recursos": [("Camión volcador", "reserva", None),
+                            ("Arena", "consumo", 3)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "El bache ya rompió ruedas, hay que arreglarlo urgente."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "OT urgente generada, asignada a la Cuadrilla Bacheo (Wilson Ayala) para mañana temprano."},
         ],
     },
-    {
+    {  # 6 — recolección, FINALIZADO, OT completada
         "titulo": "Contenedor desbordado frente al Botánico",
         "descripcion": "El contenedor de la entrada del Jardín Botánico está desbordado hace días, con residuos alrededor.",
         "categoria": "Recolección de residuos", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.FINALIZADO, "barrio_cod": 67, "canal": "whatsapp", "dias": 15, "vecino": 2,
         "direccion": "Av. Artigas, acceso Jardín Botánico",
         "confirmado_vecino": True,
+        "ot": {"titulo": "Vaciado de contenedor y limpieza del sector",
+               "estado": EstadoOrdenTrabajo.COMPLETADA, "prioridad": PrioridadOT.MEDIA,
+               "cuadrilla": 2, "empleado": 1, "dias_prog": -6,
+               "materiales": None, "h_est": 3.0, "h_real": 2.5,
+               "notas_cierre": "Contenedor vaciado y zona limpiada. Se coordinó recolección reforzada del sector.",
+               "recursos": [("Camión volcador", "reserva", None)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "El contenedor de la entrada del Botánico está rebalsado."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
              "comentario": "Recolección reforzada asignada al sector."},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO,
+            {"actor": "empleado", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO,
+             "estado_nuevo": EstadoReclamo.FINALIZADO,
              "comentario": "Contenedor vaciado y zona limpiada."},
         ],
     },
-    {
+    {  # 7 — plagas, EN_CURSO, OT en curso
         "titulo": "Foco de mosquitos: piden fumigación",
         "descripcion": "Zona con agua estancada y muchos mosquitos. Los vecinos piden fumigación y control de foco de dengue.",
         "categoria": "Plagas y control", "dep": "ZOONOSIS",
         "estado": EstadoReclamo.EN_CURSO, "barrio_cod": 6, "canal": "app", "dias": 5, "vecino": 0,
         "direccion": "Bajada Tacumbú, zona costera",
+        "ot": {"titulo": "Fumigación y descacharrado del foco",
+               "estado": EstadoOrdenTrabajo.EN_CURSO, "prioridad": PrioridadOT.ALTA,
+               "cuadrilla": 3, "empleado": 7, "dias_prog": 0,
+               "materiales": [{"descripcion": "Insecticida para fumigación", "cantidad": 4, "unidad": "l"}],
+               "h_est": 5.0, "h_real": None, "notas_cierre": None,
+               "recursos": [("Hidrolavadora", "reserva", None)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
-             "comentario": "Se programó la cuadrilla de fumigación y descacharrado para esta semana."},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Hay agua estancada y muchísimos mosquitos, tememos por el dengue."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "Se programó la Cuadrilla Zoonosis (Rubén Villalba) para fumigación y descacharrado."},
+            {"actor": "empleado", "accion": "Nota",
+             "comentario": "Iniciamos el descacharrado casa por casa antes de la fumigación de la tarde."},
         ],
     },
-    {
+    {  # 8 — tránsito, RECIBIDO, OT pendiente
         "titulo": "Semáforo apagado en cruce concurrido",
         "descripcion": "El semáforo de Brasil y Cerro Corá está apagado desde ayer. El cruce es muy transitado y hay riesgo de choques.",
         "categoria": "Tránsito y señalización", "dep": "TRANSITO_VIAL",
         "estado": EstadoReclamo.RECIBIDO, "barrio_cod": 13, "canal": "web_publica", "dias": 1, "vecino": 1,
         "direccion": "Brasil c/ Cerro Corá, San Roque",
+        "ot": {"titulo": "Reparación de semáforo apagado",
+               "estado": EstadoOrdenTrabajo.PENDIENTE, "prioridad": PrioridadOT.URGENTE,
+               "cuadrilla": None, "empleado": None, "dias_prog": 1,
+               "materiales": [{"descripcion": "Controlador semafórico", "cantidad": 1, "unidad": "u"}],
+               "h_est": 3.0, "h_real": None, "notas_cierre": None, "recursos": []},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "El cruce quedó sin semáforo y es un caos, va a haber un accidente."},
         ],
     },
-    {
+    {  # 9 — higiene, EN_CURSO, OT BLOQUEADA por falta de inventario
         "titulo": "Reparación de contenedores en el Mercado 4",
         "descripcion": "Varios contenedores del Mercado 4 tienen las tapas rotas y no cierran. Piden reparación.",
         "categoria": "Higiene urbana", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.EN_CURSO, "barrio_cod": 14, "canal": "ventanilla_asistida", "dias": 10, "vecino": 2,
         "direccion": "Mercado 4, Pettirossi c/ Rca. Francesa",
+        "ot": {"titulo": "Reparación de tapas de contenedores",
+               "estado": EstadoOrdenTrabajo.BLOQUEADA, "prioridad": PrioridadOT.MEDIA,
+               "cuadrilla": None, "empleado": 4, "dias_prog": -2,
+               "materiales": [{"descripcion": "Bisagras de contenedor", "cantidad": 12, "unidad": "u"},
+                              {"descripcion": "Tapas de repuesto", "cantidad": 6, "unidad": "u"}],
+               "h_est": 4.0, "h_real": None, "notas_cierre": None, "recursos": []},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
-             "comentario": "Orden de trabajo emitida a la cuadrilla de mantenimiento."},
-            {"accion": "Nota",
-             "comentario": "En espera de insumos: faltan bisagras y tapas de repuesto en inventario, pendiente de compra."},
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Los contenedores del Mercado 4 no cierran y se vuela la basura."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "Orden de trabajo emitida a Nelson Duarte (higiene urbana)."},
+            {"actor": "empleado", "accion": "Nota",
+             "comentario": "En espera de insumos: faltan bisagras y tapas de repuesto en inventario, pendiente de reposición/compra."},
         ],
     },
-    {
+    {  # 10 — agua y cloacas, FINALIZADO, OT completada
         "titulo": "Pérdida de agua sobre Av. Artigas",
         "descripcion": "Caño roto sobre Av. Artigas con pérdida constante de agua hacia la calzada. Se desperdicia agua y se forma un charco.",
         "categoria": "Agua y cloacas", "dep": "SERVICIOS_PUBLICOS",
         "estado": EstadoReclamo.FINALIZADO, "barrio_cod": 21, "canal": "app", "dias": 25, "vecino": 0,
         "direccion": "Av. Artigas c/ Gral. Santos, Las Mercedes",
         "confirmado_vecino": True,
+        "ot": {"titulo": "Reparación de caño roto y restitución de calzada",
+               "estado": EstadoOrdenTrabajo.COMPLETADA, "prioridad": PrioridadOT.ALTA,
+               "cuadrilla": 0, "empleado": 5, "dias_prog": -4,
+               "materiales": [{"descripcion": "Caño PVC 110mm", "cantidad": 2, "unidad": "u"}],
+               "h_est": 6.0, "h_real": 5.5,
+               "notas_cierre": "Caño reparado y calzada restituida. Se acompañó a la prestataria de agua en la reparación.",
+               "recursos": [("Retroexcavadora", "reserva", None),
+                            ("Caño PVC 110mm", "consumo", 2)]},
         "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO,
-             "comentario": "Se derivó a la prestataria de agua y se acompañó la reparación de la vía pública."},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO,
+            {"actor": "vecino", "accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO,
+             "comentario": "Hay una pérdida de agua enorme que corre por toda la calle."},
+            {"actor": "supervisor", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO,
+             "estado_nuevo": EstadoReclamo.EN_CURSO,
+             "comentario": "Se derivó a la prestataria de agua y se asignó a Hugo Espínola para la vía pública."},
+            {"actor": "empleado", "accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO,
+             "estado_nuevo": EstadoReclamo.FINALIZADO,
              "comentario": "Caño reparado y calzada restituida."},
         ],
     },
 ]
 
+# 2 OT extra sin reclamo (preventiva completada + cancelada) para mostrar todos
+# los estados del circuito de campo.
+# (titulo, estado, cuadrilla_idx|None, empleado_idx|None, dias_prog, materiales,
+#  h_est, h_real, notas_cierre, motivo_cancelacion, prioridad)
+OTS_EXTRA = [
+    ("Mantenimiento preventivo de luminarias del corredor", EstadoOrdenTrabajo.COMPLETADA, 1, 2, -5,
+     [{"descripcion": "Lámpara LED 150W", "cantidad": 4, "unidad": "u"}], 4.0, 3.5,
+     "Recorrida completa del corredor. 4 luminarias recambiadas.", None, PrioridadOT.BAJA),
+    ("Desmalezado de banquinas en Av. Costanera", EstadoOrdenTrabajo.CANCELADA, 3, None, -1,
+     None, 6.0, None, None, "Se reprogramó por lluvia; se resolvió antes de salir a campo.", PrioridadOT.BAJA),
+]
+
 # ============================================================
-# 10 trámites completos (categoria_tramite por nombre; docs requeridos)
+# 10 trámites completos (categoria_tramite por nombre; docs requeridos).
+# `dep` = dependencia (de las 5 activas) que lo gestiona, o None si ninguna
+# de las 5 aplica (se mapea con MunicipioDependenciaTramite cuando hay dep).
 # ============================================================
 TRAMITES = [
-    {"nombre": "Licencia de conducir - Primera vez", "cat": "Tránsito y Transporte",
+    {"nombre": "Licencia de conducir - Primera vez", "cat": "Tránsito y Transporte", "dep": "TRANSITO_VIAL",
      "descripcion": "Obtención de la licencia de conducir para quienes no poseen una previa.",
      "dias": 15, "costo": 250000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 45,
      "docs": [("Cédula de identidad (frente y dorso)", "Copia del documento", True),
               ("Certificado médico", "Emitido por centro habilitado, vigencia 30 días", True),
               ("Foto tipo carnet", "Fondo blanco, actualizada", True)]},
-    {"nombre": "Renovación de licencia de conducir", "cat": "Tránsito y Transporte",
+    {"nombre": "Renovación de licencia de conducir", "cat": "Tránsito y Transporte", "dep": "TRANSITO_VIAL",
      "descripcion": "Renovación de la licencia de conducir vigente, sin cambio de categoría.",
      "dias": 5, "costo": 180000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 20,
      "docs": [("Cédula de identidad", "Copia del documento", True),
               ("Licencia anterior", "Licencia a renovar", True)]},
-    {"nombre": "Habilitación comercial", "cat": "Habilitaciones Comerciales",
+    {"nombre": "Habilitación comercial", "cat": "Habilitaciones Comerciales", "dep": None,
      "descripcion": "Habilitación para la apertura de un nuevo comercio o actividad comercial.",
      "dias": 30, "costo": 450000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True),
               ("Plano del local", "Plano firmado por profesional", True),
               ("Constancia de RUC", "Inscripción tributaria vigente", True)]},
-    {"nombre": "Renovación de habilitación comercial", "cat": "Habilitaciones Comerciales",
+    {"nombre": "Renovación de habilitación comercial", "cat": "Habilitaciones Comerciales", "dep": None,
      "descripcion": "Renovación anual de la habilitación comercial vigente.",
      "dias": 10, "costo": 200000.0, "tipo_pago": "boton_pago", "modo": "presencial_sin_turno", "turno_min": 30,
      "docs": [("Habilitación anterior", "Constancia de la habilitación a renovar", True)]},
-    {"nombre": "Permiso de obra menor", "cat": "Obras Particulares",
+    {"nombre": "Permiso de obra menor", "cat": "Obras Particulares", "dep": "OBRAS_PUBLICAS",
      "descripcion": "Autorización para obras menores (cercos, veredas, refacciones).",
      "dias": 20, "costo": 150000.0, "tipo_pago": "boton_pago", "modo": "presencial_sin_turno", "turno_min": 30,
      "docs": [("Cédula del propietario", "Copia del documento", True),
               ("Croquis de obra", "Plano o croquis firmado", True)]},
-    {"nombre": "Certificado de libre deuda municipal", "cat": "Tasas y Tributos",
+    {"nombre": "Certificado de libre deuda municipal", "cat": "Tasas y Tributos", "dep": None,
      "descripcion": "Certificado que acredita la inexistencia de deudas con la Municipalidad.",
      "dias": 5, "costo": 60000.0, "tipo_pago": "boton_pago", "modo": "online", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True),
               ("Última boleta municipal", "Boleta del último período abonado", False)]},
-    {"nombre": "Pago de tasa de recolección de residuos", "cat": "Tasas y Tributos",
+    {"nombre": "Pago de tasa de recolección de residuos", "cat": "Tasas y Tributos", "dep": "SERVICIOS_PUBLICOS",
      "descripcion": "Liquidación y pago de la tasa municipal de recolección de residuos.",
-     "dias": 1, "costo": 0.0, "tipo_pago": "boton_pago", "modo": "online", "turno_min": 30,
+     "dias": 1, "costo": 90000.0, "tipo_pago": "boton_pago", "modo": "online", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True)]},
-    {"nombre": "Certificado de residencia", "cat": "Certificados y Documentación",
+    {"nombre": "Certificado de residencia", "cat": "Certificados y Documentación", "dep": None,
      "descripcion": "Constancia que acredita el domicilio del solicitante en la ciudad.",
      "dias": 3, "costo": 40000.0, "tipo_pago": "boton_pago", "modo": "presencial_sin_turno", "turno_min": 15,
      "docs": [("Cédula de identidad", "Copia del documento", True),
               ("Comprobante de domicilio", "Factura de servicio a nombre del solicitante", True)]},
-    {"nombre": "Permiso de poda de árbol", "cat": "Espacios Públicos",
+    {"nombre": "Permiso de poda de árbol", "cat": "Espacios Públicos", "dep": "SERVICIOS_PUBLICOS",
      "descripcion": "Autorización para la poda de arbolado urbano frente al domicilio.",
      "dias": 12, "costo": 0.0, "tipo_pago": None, "modo": "presencial_sin_turno", "turno_min": 20,
      "docs": [("Cédula del solicitante", "Copia del documento", True),
               ("Foto del árbol", "Foto que muestre el estado del árbol", False)]},
-    {"nombre": "Habilitación de transporte de alimentos", "cat": "Salud y Bromatología",
+    {"nombre": "Habilitación de transporte de alimentos", "cat": "Salud y Bromatología", "dep": None,
      "descripcion": "Habilitación bromatológica de vehículos de transporte de alimentos.",
      "dias": 15, "costo": 300000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True),
@@ -362,7 +562,7 @@ TRAMITES = [
               ("Certificado de desinfección", "Emitido por empresa habilitada", True)]},
 ]
 
-# 8 solicitudes de ejemplo: (indice_tramite, indice_vecino, estado)
+# 10 solicitudes de ejemplo: (indice_tramite, indice_vecino, estado)
 SOLICITUDES = [
     (0, 0, EstadoSolicitud.RECIBIDO),
     (2, 1, EstadoSolicitud.EN_CURSO),
@@ -372,16 +572,32 @@ SOLICITUDES = [
     (8, 2, EstadoSolicitud.POSPUESTO),
     (1, 0, EstadoSolicitud.FINALIZADO),
     (9, 1, EstadoSolicitud.RECIBIDO),
+    (4, 2, EstadoSolicitud.EN_CURSO),
+    (3, 0, EstadoSolicitud.FINALIZADO),
 ]
 
 
 # ============================================================
-# Seed
+# Helpers
+# ============================================================
+def _slug(codigo: str) -> str:
+    """slug de email desde un código de dependencia: OBRAS_PUBLICAS -> obras-publicas."""
+    return codigo.lower().replace("_", "-")
+
+
+def _slug_palabra(texto: str) -> str:
+    """Primera palabra significativa sin acentos, en minúscula (para email de empleado)."""
+    limpio = unicodedata.normalize("NFD", texto)
+    limpio = "".join(c for c in limpio if unicodedata.category(c) != "Mn")
+    return limpio.lower().split()[0]
+
+
+# ============================================================
+# Seed — municipio
 # ============================================================
 async def _get_or_create_muni(db: AsyncSession) -> Municipio:
     muni = (await db.execute(select(Municipio).where(Municipio.codigo == CODIGO))).scalar_one_or_none()
     if muni:
-        # Actualizar branding/estado por si cambió (idempotente).
         muni.nombre = NOMBRE
         muni.color_primario = COLOR_PRIMARIO
         muni.color_secundario = COLOR_SECUNDARIO
@@ -407,46 +623,10 @@ async def _get_or_create_muni(db: AsyncSession) -> Municipio:
     return muni
 
 
-async def _seed_usuarios(db: AsyncSession, muni_id: int, sup_dep_id: Optional[int]) -> list[User]:
-    """Admin + supervisor + 3 vecinos (password demo123). Idempotente por email."""
-    hash_demo = get_password_hash(PASSWORD_DEMO)
-    creados = []
-
-    async def ensure_user(**kwargs) -> User:
-        u = (await db.execute(select(User).where(User.email == kwargs["email"]))).scalar_one_or_none()
-        if u:
-            return u
-        u = User(password_hash=hash_demo, municipio_id=muni_id, activo=True,
-                 cuenta_verificada=True, **kwargs)
-        db.add(u)
-        creados.append(u)
-        return u
-
-    await ensure_user(email="admin@asuncion.gov.py", nombre="Administración",
-                      apellido="Municipal", rol=RolUsuario.ADMIN)
-    await ensure_user(email="supervisor@asuncion.gov.py", nombre="Supervisor",
-                      apellido="Servicios Públicos", rol=RolUsuario.SUPERVISOR,
-                      municipio_dependencia_id=sup_dep_id)
-    vecinos = []
-    for v in VECINOS:
-        u = await ensure_user(email=v["email"], nombre=v["nombre"], apellido=v["apellido"],
-                              telefono=v["tel"], sexo=v["sexo"], nacionalidad="PRY",
-                              rol=RolUsuario.VECINO, nivel_verificacion=2)
-        vecinos.append(u)
-    await db.flush()
-    print(f"[usuarios] {len(creados)} creados (admin + supervisor + 3 vecinos si faltaban)")
-    return vecinos
-
-
+# ============================================================
+# Dependencias (5) + mapeo categoría->dep. Idempotente por código.
+# ============================================================
 async def _seed_dependencias(db: AsyncSession, muni_id: int, cats: dict) -> dict:
-    """Habilita 4 dependencias del catálogo global + mapeo categoría->dep. Idempotente."""
-    existentes = (await db.execute(
-        select(MunicipioDependencia).where(MunicipioDependencia.municipio_id == muni_id)
-    )).scalars().all()
-    if existentes:
-        print(f"[deps] ya existen {len(existentes)} — skip")
-        return {d.dependencia_id: d for d in existentes}
-
     cat_deps = (await db.execute(
         select(Dependencia).where(Dependencia.codigo.in_(DEPENDENCIAS))
     )).scalars().all()
@@ -455,16 +635,32 @@ async def _seed_dependencias(db: AsyncSession, muni_id: int, cats: dict) -> dict
         print("[deps] WARNING: catálogo global de Dependencia vacío — reclamos quedarán sin dependencia")
         return {}
 
-    muni_deps = {}
+    existentes = {
+        md.dependencia_id: md for md in (await db.execute(
+            select(MunicipioDependencia).where(MunicipioDependencia.municipio_id == muni_id)
+        )).scalars().all()
+    }
+    muni_deps = {}  # dep_code -> MunicipioDependencia
+    creadas = 0
     for i, cod in enumerate(DEPENDENCIAS):
         dep = dep_por_codigo.get(cod)
         if not dep:
             continue
-        md = MunicipioDependencia(municipio_id=muni_id, dependencia_id=dep.id, activo=True, orden=i)
-        db.add(md)
+        md = existentes.get(dep.id)
+        if not md:
+            md = MunicipioDependencia(municipio_id=muni_id, dependencia_id=dep.id, activo=True, orden=i)
+            db.add(md)
+            creadas += 1
         muni_deps[cod] = md
     await db.flush()
 
+    # Mapeo categoría -> dependencia (idempotente por par).
+    mapeos_existentes = {
+        (m.municipio_dependencia_id, m.categoria_id) for m in (await db.execute(
+            select(MunicipioDependenciaCategoria).where(
+                MunicipioDependenciaCategoria.municipio_id == muni_id)
+        )).scalars().all()
+    }
     for cod, cat_nombres in DEP_CATEGORIAS_MAP.items():
         md = muni_deps.get(cod)
         if not md:
@@ -473,94 +669,522 @@ async def _seed_dependencias(db: AsyncSession, muni_id: int, cats: dict) -> dict
             cat = cats.get(cat_nombre)
             if not cat:
                 continue
+            if (md.id, cat.id) in mapeos_existentes:
+                continue
             db.add(MunicipioDependenciaCategoria(
                 municipio_id=muni_id, dependencia_id=md.dependencia_id,
                 categoria_id=cat.id, municipio_dependencia_id=md.id, activo=True,
             ))
     await db.flush()
-    print(f"[deps] {len(muni_deps)} dependencias + mapeo de categorías creados")
+    print(f"[deps] {len(muni_deps)} dependencias ({creadas} nuevas) + mapeo de categorías")
     return muni_deps
 
 
+# ============================================================
+# Usuarios: admin + supervisor por dep + 3 vecinos. Idempotente por email.
+# (los empleado-login se crean luego, cuando ya existen los Empleado.)
+# ============================================================
+async def _seed_usuarios(db: AsyncSession, muni_id: int, muni_deps: dict) -> dict:
+    hash_demo = get_password_hash(PASSWORD_DEMO)
+    creados = 0
+
+    async def ensure_user(email: str, **kwargs) -> User:
+        nonlocal creados
+        u = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if u:
+            # Reafirmar el vínculo con la dependencia por si cambió (supervisores).
+            if "municipio_dependencia_id" in kwargs:
+                u.municipio_dependencia_id = kwargs["municipio_dependencia_id"]
+            return u
+        u = User(email=email, password_hash=hash_demo, municipio_id=muni_id,
+                 activo=True, cuenta_verificada=True, **kwargs)
+        db.add(u)
+        creados += 1
+        return u
+
+    admin = await ensure_user("admin@asuncion.demo.com", nombre="Administración",
+                              apellido="Municipal", rol=RolUsuario.ADMIN)
+
+    # Un supervisor por dependencia (nombre bonito desde el catálogo).
+    supervisores_by_dep = {}
+    for cod, md in muni_deps.items():
+        dep_obj = await db.get(Dependencia, md.dependencia_id)
+        dep_nombre = dep_obj.nombre if dep_obj else cod
+        sup = await ensure_user(
+            f"supervisor-{_slug(cod)}@asuncion.demo.com",
+            nombre="Supervisor", apellido=dep_nombre,
+            rol=RolUsuario.SUPERVISOR, municipio_dependencia_id=md.id,
+        )
+        supervisores_by_dep[cod] = sup
+
+    vecinos = []
+    for v in VECINOS:
+        u = await ensure_user(v["email"], nombre=v["nombre"], apellido=v["apellido"],
+                              telefono=v["tel"], sexo=v["sexo"], nacionalidad="PRY",
+                              rol=RolUsuario.VECINO, nivel_verificacion=2)
+        vecinos.append(u)
+    await db.flush()
+    print(f"[usuarios] {creados} nuevos (admin + {len(supervisores_by_dep)} supervisores + {len(vecinos)} vecinos)")
+    return {"admin": admin, "supervisores_by_dep": supervisores_by_dep, "vecinos": vecinos}
+
+
+# ============================================================
+# Barrios (68). Idempotente (por nombre).
+# ============================================================
 async def _seed_barrios(db: AsyncSession, muni_id: int) -> dict:
-    """Los 68 barrios oficiales. Idempotente (por nombre)."""
-    n = (await db.execute(
+    existentes = {b.nombre: b for b in (await db.execute(
         select(Barrio).where(Barrio.municipio_id == muni_id)
-    )).scalars().all()
-    if n:
-        print(f"[barrios] ya existen {len(n)} — skip")
-        return {b.nombre: b for b in n}
-    barrios = {}
+    )).scalars().all()}
+    barrios = dict(existentes)
+    creados = 0
     for _cod, nombre, lat, lon in BARRIOS_ASUNCION:
+        if nombre in barrios:
+            continue
         b = Barrio(municipio_id=muni_id, nombre=nombre, latitud=lat, longitud=lon,
                    tipo="suburb", validado=lat is not None)
         db.add(b)
         barrios[nombre] = b
+        creados += 1
     await db.flush()
     con_coord = sum(1 for _c, _n, la, _lo in BARRIOS_ASUNCION if la is not None)
-    print(f"[barrios] {len(barrios)} creados ({con_coord} con coords reales)")
+    print(f"[barrios] {len(barrios)} totales ({creados} nuevos, {con_coord} con coords reales)")
     return barrios
 
 
+# ============================================================
+# Zonas (6). Idempotente por nombre.
+# ============================================================
+async def _seed_zonas(db: AsyncSession, muni_id: int) -> dict:
+    existentes = {z.nombre: z for z in (await db.execute(
+        select(Zona).where(Zona.municipio_id == muni_id)
+    )).scalars().all()}
+    zonas = dict(existentes)
+    for nombre, cod, lat, lon in ZONAS:
+        if nombre in zonas:
+            continue
+        z = Zona(municipio_id=muni_id, nombre=nombre, codigo=f"{cod}-{muni_id}",
+                 latitud_centro=lat, longitud_centro=lon, activo=True)
+        db.add(z)
+        zonas[nombre] = z
+    await db.flush()
+    print(f"[zonas] {len(zonas)} zonas")
+    return zonas
+
+
+# ============================================================
+# Empleados (10) + categoría principal en tabla intermedia. Idempotente por
+# (nombre, apellido). Devuelve lista alineada al orden de EMPLEADOS.
+# ============================================================
+async def _seed_empleados(db: AsyncSession, muni_id: int, cats: dict,
+                          zonas: dict, muni_deps: dict) -> list:
+    existentes = {
+        (e.nombre, e.apellido): e for e in (await db.execute(
+            select(Empleado).where(Empleado.municipio_id == muni_id)
+        )).scalars().all()
+    }
+    empleados = []
+    nuevos = 0
+    for nombre, apellido, tel, tipo, esp, cat_nombre, zona_nombre, dep_cod in EMPLEADOS:
+        e = existentes.get((nombre, apellido))
+        if e:
+            empleados.append(e)
+            continue
+        cat = cats.get(cat_nombre)
+        zona = zonas.get(zona_nombre)
+        md = muni_deps.get(dep_cod)
+        e = Empleado(
+            municipio_id=muni_id, nombre=nombre, apellido=apellido, telefono=tel,
+            tipo=tipo, especialidad=esp,
+            categoria_principal_id=cat.id if cat else None,
+            zona_id=zona.id if zona else None,
+            municipio_dependencia_id=md.id if md else None,
+            capacidad_maxima=8, activo=True,
+        )
+        db.add(e)
+        empleados.append(e)
+        nuevos += 1
+    await db.flush()
+
+    # Tabla intermedia empleado_categorias (categoría principal). Idempotente.
+    ya = {
+        (r.empleado_id, r.categoria_id) for r in (await db.execute(
+            empleado_categoria.select().where(
+                empleado_categoria.c.empleado_id.in_([e.id for e in empleados])
+            )
+        ))
+    } if empleados else set()
+    for e, datos in zip(empleados, EMPLEADOS):
+        cat = cats.get(datos[5])
+        if cat and (e.id, cat.id) not in ya:
+            await db.execute(empleado_categoria.insert().values(
+                empleado_id=e.id, categoria_id=cat.id, es_principal=True))
+    await db.flush()
+    print(f"[empleados] {len(empleados)} totales ({nuevos} nuevos)")
+    return empleados
+
+
+# ============================================================
+# Login de 2 empleados destacados (rol EMPLEADO con empleado_id). Idempotente.
+# ============================================================
+async def _seed_empleados_login(db: AsyncSession, muni_id: int, empleados: list) -> dict:
+    hash_demo = get_password_hash(PASSWORD_DEMO)
+    login_by_idx = {}
+    nuevos = 0
+    for idx in EMPLEADOS_LOGIN_IDX:
+        if idx >= len(empleados):
+            continue
+        emp = empleados[idx]
+        datos = EMPLEADOS[idx]
+        slug = _slug_palabra(datos[4])  # especialidad -> primera palabra
+        email = f"empleado-{slug}@asuncion.demo.com"
+        u = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if u:
+            u.empleado_id = emp.id  # reafirmar el vínculo (empleado idempotente => id estable)
+        else:
+            u = User(email=email, password_hash=hash_demo, municipio_id=muni_id,
+                     nombre=datos[0], apellido=datos[1], rol=RolUsuario.EMPLEADO,
+                     empleado_id=emp.id, activo=True, cuenta_verificada=True)
+            db.add(u)
+            nuevos += 1
+        login_by_idx[idx] = u
+    await db.flush()
+    print(f"[empleados-login] {len(login_by_idx)} logins de empleado ({nuevos} nuevos)")
+    return login_by_idx
+
+
+# ============================================================
+# Cuadrillas (4) con líder + miembro. Idempotente por nombre.
+# ============================================================
+async def _seed_cuadrillas(db: AsyncSession, muni_id: int, empleados: list,
+                          cats: dict, zonas: dict) -> list:
+    existentes = {c.nombre: c for c in (await db.execute(
+        select(Cuadrilla).where(Cuadrilla.municipio_id == muni_id)
+    )).scalars().all()}
+    cuadrillas = []
+    nuevas = 0
+    for nombre, desc, cat_nombre, zona_nombre, _li, _mi in CUADRILLAS:
+        c = existentes.get(nombre)
+        if c:
+            cuadrillas.append(c)
+            continue
+        cat = cats.get(cat_nombre)
+        zona = zonas.get(zona_nombre)
+        c = Cuadrilla(
+            municipio_id=muni_id, nombre=nombre, descripcion=desc,
+            especialidad=cat_nombre, categoria_principal_id=cat.id if cat else None,
+            zona_id=zona.id if zona else None, capacidad_maxima=12, activo=True,
+        )
+        db.add(c)
+        cuadrillas.append(c)
+        nuevas += 1
+    await db.flush()
+
+    # Miembros (líder + miembro) + categoría principal. Idempotente.
+    ya_miembros = {
+        (m.empleado_id, m.cuadrilla_id) for m in (await db.execute(
+            select(EmpleadoCuadrilla).where(
+                EmpleadoCuadrilla.cuadrilla_id.in_([c.id for c in cuadrillas]))
+        )).scalars().all()
+    } if cuadrillas else set()
+    ya_cat = {
+        (r.cuadrilla_id, r.categoria_id) for r in (await db.execute(
+            cuadrilla_categoria.select().where(
+                cuadrilla_categoria.c.cuadrilla_id.in_([c.id for c in cuadrillas]))
+        ))
+    } if cuadrillas else set()
+
+    for c, datos in zip(cuadrillas, CUADRILLAS):
+        _n, _d, cat_nombre, _z, lider_idx, miembro_idx = datos
+        for emp_idx, es_lider in ((lider_idx, True), (miembro_idx, False)):
+            if emp_idx is None or emp_idx >= len(empleados):
+                continue
+            emp = empleados[emp_idx]
+            if (emp.id, c.id) in ya_miembros:
+                continue
+            db.add(EmpleadoCuadrilla(empleado_id=emp.id, cuadrilla_id=c.id,
+                                     es_lider=es_lider, fecha_ingreso=date.today(), activo=True))
+            ya_miembros.add((emp.id, c.id))
+        cat = cats.get(cat_nombre)
+        if cat and (c.id, cat.id) not in ya_cat:
+            await db.execute(cuadrilla_categoria.insert().values(
+                cuadrilla_id=c.id, categoria_id=cat.id, es_principal=True))
+    await db.flush()
+    print(f"[cuadrillas] {len(cuadrillas)} totales ({nuevas} nuevas) con líder + miembro")
+    return cuadrillas
+
+
+# ============================================================
+# SLA configs. Idempotente por (categoria_id or None).
+# ============================================================
+async def _seed_sla(db: AsyncSession, muni_id: int, cats: dict) -> int:
+    existentes = {
+        s.categoria_id for s in (await db.execute(
+            select(SLAConfig).where(SLAConfig.municipio_id == muni_id)
+        )).scalars().all()
+    }
+    creados = 0
+    for cat_nombre, resp, reso, alerta in SLA_CONFIGS:
+        cat_id = None
+        if cat_nombre:
+            cat = cats.get(cat_nombre)
+            if not cat:
+                continue
+            cat_id = cat.id
+        if cat_id in existentes:
+            continue
+        db.add(SLAConfig(municipio_id=muni_id, categoria_id=cat_id, prioridad=None,
+                         tiempo_respuesta=resp, tiempo_resolucion=reso,
+                         tiempo_alerta_amarilla=alerta, activo=True))
+        existentes.add(cat_id)
+        creados += 1
+    await db.flush()
+    print(f"[sla] {creados} configs nuevas")
+    return creados
+
+
+# ============================================================
+# Reclamos (upsert por título) + reconstrucción del historial rico.
+# ============================================================
 async def _seed_reclamos(db: AsyncSession, muni_id: int, cats: dict, muni_deps: dict,
-                         barrios_por_cod: dict, vecinos: list[User]) -> int:
-    n = (await db.execute(select(Reclamo).where(Reclamo.municipio_id == muni_id))).scalars().all()
-    if n:
-        print(f"[reclamos] ya existen {len(n)} — skip")
-        return 0
-    creados = []
-    historiales = []
+                        barrios_por_cod: dict, usuarios: dict, empleados: list,
+                        empleados_login: dict) -> list:
+    existentes = {r.titulo: r for r in (await db.execute(
+        select(Reclamo).where(Reclamo.municipio_id == muni_id)
+    )).scalars().all()}
+    vecinos = usuarios["vecinos"]
+    reclamos = []  # alineado con RECLAMOS
+
     for i, r in enumerate(RECLAMOS):
         cat = cats.get(r["categoria"])
         if not cat:
-            print(f"[reclamos] categoría no encontrada: {r['categoria']} — skip reclamo")
+            print(f"[reclamos] categoría no encontrada: {r['categoria']} — skip")
+            reclamos.append(None)
             continue
         barrio = barrios_por_cod.get(r["barrio_cod"])
         md = muni_deps.get(r["dep"])
-        # Coord = coord del barrio + jitter determinístico (~120m) para que no
-        # queden todos en el mismo punto. Si el barrio no tiene coord, cae al centro.
         base_lat = barrio.latitud if (barrio and barrio.latitud is not None) else CENTRO_LAT
         base_lon = barrio.longitud if (barrio and barrio.longitud is not None) else CENTRO_LON
         jlat = (((_H >> (i * 3)) % 200) - 100) / 100000.0
         jlon = (((_H >> (i * 3 + 1)) % 200) - 100) / 100000.0
-        rec = Reclamo(
-            municipio_id=muni_id, titulo=r["titulo"], descripcion=r["descripcion"],
-            estado=r["estado"], prioridad=3, direccion=r["direccion"],
-            latitud=round(base_lat + jlat, 6), longitud=round(base_lon + jlon, 6),
-            categoria_id=cat.id, barrio_id=(barrio.id if barrio else None),
-            creador_id=vecinos[r["vecino"]].id,
-            municipio_dependencia_id=(md.id if md else None),
-            canal=r["canal"],
-            confirmado_vecino=r.get("confirmado_vecino"),
-            created_at=datetime.utcnow() - timedelta(days=r["dias"]),
-        )
-        db.add(rec)
-        creados.append(rec)
-        historiales.append((r["historial"], vecinos[r["vecino"]].id))
+        lat = round(base_lat + jlat, 6)
+        lon = round(base_lon + jlon, 6)
+        creador = vecinos[r["vecino"]]
+        created = datetime.utcnow() - timedelta(days=r["dias"])
+
+        rec = existentes.get(r["titulo"])
+        if rec:
+            rec.descripcion = r["descripcion"]
+            rec.estado = r["estado"]
+            rec.direccion = r["direccion"]
+            rec.latitud = lat
+            rec.longitud = lon
+            rec.categoria_id = cat.id
+            rec.barrio_id = barrio.id if barrio else None
+            rec.creador_id = creador.id
+            rec.municipio_dependencia_id = md.id if md else None
+            rec.canal = r["canal"]
+            rec.confirmado_vecino = r.get("confirmado_vecino")
+        else:
+            rec = Reclamo(
+                municipio_id=muni_id, titulo=r["titulo"], descripcion=r["descripcion"],
+                estado=r["estado"], prioridad=3, direccion=r["direccion"],
+                latitud=lat, longitud=lon, categoria_id=cat.id,
+                barrio_id=barrio.id if barrio else None, creador_id=creador.id,
+                municipio_dependencia_id=md.id if md else None, canal=r["canal"],
+                confirmado_vecino=r.get("confirmado_vecino"), created_at=created,
+            )
+            db.add(rec)
+        reclamos.append(rec)
     await db.flush()
-    for rec, (hist, uid) in zip(creados, historiales):
-        for h in hist:
+
+    # Reconstruir historial rico: borrar el existente de estos reclamos y re-crear
+    # con el comentario de cada actor (vecino / supervisor / empleado).
+    ids = [rec.id for rec in reclamos if rec is not None]
+    if ids:
+        await db.execute(
+            text("DELETE FROM historial_reclamos WHERE reclamo_id IN "
+                 "(SELECT id FROM reclamos WHERE municipio_id = :m)"),
+            {"m": muni_id},
+        )
+    admin = usuarios["admin"]
+    supervisores = usuarios["supervisores_by_dep"]
+    for rec, r in zip(reclamos, RECLAMOS):
+        if rec is None:
+            continue
+        dep_cod = r["dep"]
+        emp_idx = r["ot"].get("empleado")
+        # usuario para actor "empleado": login del empleado si existe, si no supervisor/admin.
+        emp_user = empleados_login.get(emp_idx) if emp_idx is not None else None
+        sup_user = supervisores.get(dep_cod) or admin
+        creador = vecinos[r["vecino"]]
+        base_created = datetime.utcnow() - timedelta(days=r["dias"])
+        for k, h in enumerate(r["historial"]):
+            actor = h.get("actor", "vecino")
+            if actor == "vecino":
+                uid = creador.id
+            elif actor == "empleado":
+                uid = (emp_user or sup_user).id
+            else:
+                uid = sup_user.id
             db.add(HistorialReclamo(
                 reclamo_id=rec.id, usuario_id=uid, accion=h["accion"],
                 estado_anterior=h.get("estado_anterior"), estado_nuevo=h.get("estado_nuevo"),
                 comentario=h.get("comentario"),
+                created_at=base_created + timedelta(hours=k * 6),
             ))
     await db.flush()
-    print(f"[reclamos] {len(creados)} creados con historial")
-    return len(creados)
+    print(f"[reclamos] {len(ids)} reclamos con historial rico (comentarios por actor)")
+    return reclamos
 
 
+# ============================================================
+# Órdenes de trabajo (una por reclamo de campo + 2 extra) cruzadas con inventario.
+# Idempotente: crea la OT solo si su número no existe; recursos solo si la OT
+# no tiene ninguno (evita doble descuento de stock).
+# ============================================================
+async def _seed_ordenes_trabajo(db: AsyncSession, muni_id: int, reclamos: list,
+                                cuadrillas: list, empleados: list, creador_id: int,
+                                inv_por_nombre: dict) -> dict:
+    ahora = datetime.utcnow()
+    hoy = date.today()
+    year = hoy.year
+
+    existentes = {ot.numero: ot for ot in (await db.execute(
+        select(OrdenTrabajo).where(OrdenTrabajo.municipio_id == muni_id)
+    )).scalars().all()}
+
+    def _cuad(idx):
+        return cuadrillas[idx].id if (idx is not None and idx < len(cuadrillas)) else None
+
+    def _emp(idx):
+        return empleados[idx].id if (idx is not None and idx < len(empleados)) else None
+
+    activos = 0
+    stats = {"ot": 0, "recursos": 0, "reservas": 0, "consumos": 0}
+
+    async def _crear_ot(numero, spec, reclamo=None):
+        nonlocal activos
+        estado = spec["estado"]
+        ot = existentes.get(numero)
+        recien = ot is None
+        if recien:
+            ot = OrdenTrabajo(
+                municipio_id=muni_id, numero=numero, estado=estado,
+                titulo=spec["titulo"],
+                descripcion=f"{spec['titulo']} — circuito de campo Paraguay Limpio (demo).",
+                prioridad=spec.get("prioridad", PrioridadOT.MEDIA),
+                cuadrilla_id=_cuad(spec.get("cuadrilla")),
+                empleado_id=_emp(spec.get("empleado")),
+                fecha_programada=hoy + timedelta(days=spec.get("dias_prog", 0)),
+                hora_inicio=dtime(8, 0), hora_fin=dtime(12, 0),
+                materiales=spec.get("materiales"),
+                horas_estimadas=spec.get("h_est"), horas_reales=spec.get("h_real"),
+                notas_cierre=spec.get("notas_cierre"),
+                motivo_cancelacion=spec.get("motivo_cancelacion")
+                if estado == EstadoOrdenTrabajo.CANCELADA else None,
+                fecha_inicio_real=(ahora - timedelta(hours=3)) if estado in (
+                    EstadoOrdenTrabajo.EN_CURSO, EstadoOrdenTrabajo.BLOQUEADA,
+                    EstadoOrdenTrabajo.COMPLETADA) else None,
+                fecha_completada=(ahora - timedelta(days=abs(spec.get("dias_prog", 0))))
+                if estado == EstadoOrdenTrabajo.COMPLETADA else None,
+                creador_id=creador_id,
+            )
+            db.add(ot)
+            await db.flush()
+            stats["ot"] += 1
+        # Pivot OT<->reclamo
+        if reclamo is not None:
+            existe_pivot = (await db.execute(
+                select(OrdenTrabajoReclamo).where(
+                    OrdenTrabajoReclamo.orden_trabajo_id == ot.id,
+                    OrdenTrabajoReclamo.reclamo_id == reclamo.id)
+            )).scalar_one_or_none()
+            if not existe_pivot:
+                db.add(OrdenTrabajoReclamo(orden_trabajo_id=ot.id, reclamo_id=reclamo.id))
+
+        # Recursos de inventario (solo si la OT aún no tiene ninguno).
+        tiene_recursos = (await db.execute(
+            select(OrdenTrabajoRecurso).where(OrdenTrabajoRecurso.orden_trabajo_id == ot.id)
+        )).first()
+        if not tiene_recursos:
+            for item_nombre, tipo, cantidad in spec.get("recursos", []) or []:
+                item = inv_por_nombre.get(item_nombre)
+                if not item:
+                    continue
+                if tipo == "reserva":
+                    db.add(OrdenTrabajoRecurso(
+                        orden_trabajo_id=ot.id, item_id=item.id,
+                        tipo=TipoRecursoOT.RESERVA, item_nombre=item.nombre, aplicado=False))
+                    stats["reservas"] += 1
+                    stats["recursos"] += 1
+                    # Activo tomado mientras la OT está vigente; liberado si terminó.
+                    if item.naturaleza == NaturalezaInventario.ACTIVO:
+                        if estado in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO,
+                                      EstadoOrdenTrabajo.BLOQUEADA):
+                            item.estado_activo = EstadoActivo.EN_USO
+                            item.ocupado_por_ot_id = ot.id
+                        elif item.ocupado_por_ot_id in (None, ot.id):
+                            # OT terminada: libera el activo, pero NO pisa una
+                            # reserva vigente de otra OT que comparte el mismo bien.
+                            item.estado_activo = EstadoActivo.DISPONIBLE
+                            item.ocupado_por_ot_id = None
+                else:  # consumo
+                    aplicado = estado == EstadoOrdenTrabajo.COMPLETADA
+                    db.add(OrdenTrabajoRecurso(
+                        orden_trabajo_id=ot.id, item_id=item.id,
+                        tipo=TipoRecursoOT.CONSUMO, cantidad=cantidad,
+                        item_nombre=item.nombre, aplicado=aplicado))
+                    stats["consumos"] += 1
+                    stats["recursos"] += 1
+                    if aplicado and item.stock_actual is not None and cantidad:
+                        item.stock_actual = max(0.0, float(item.stock_actual) - float(cantidad))
+        if estado in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO,
+                      EstadoOrdenTrabajo.BLOQUEADA):
+            activos += 1
+        return ot
+
+    # OTs de los reclamos de campo.
+    n = 0
+    for rec, r in zip(reclamos, RECLAMOS):
+        if rec is None:
+            continue
+        n += 1
+        await _crear_ot(f"OT-{year}-{n:04d}", r["ot"], reclamo=rec)
+
+    # OTs extra (preventiva + cancelada).
+    for titulo, estado, c_idx, e_idx, dias, mat, h_est, h_real, notas, motivo, prio in OTS_EXTRA:
+        n += 1
+        spec = {"titulo": titulo, "estado": estado, "prioridad": prio,
+                "cuadrilla": c_idx, "empleado": e_idx, "dias_prog": dias,
+                "materiales": mat, "h_est": h_est, "h_real": h_real,
+                "notas_cierre": notas, "motivo_cancelacion": motivo,
+                "recursos": [("Lámpara LED 150W", "consumo", 4)] if estado == EstadoOrdenTrabajo.COMPLETADA else []}
+        await _crear_ot(f"OT-{year}-{n:04d}", spec)
+
+    await db.flush()
+    print(f"[ordenes_trabajo] {stats['ot']} OT nuevas, {stats['recursos']} recursos "
+          f"({stats['reservas']} reservas / {stats['consumos']} consumos)")
+    return stats
+
+
+# ============================================================
+# Trámites (upsert por nombre) + mapeo trámite->dependencia.
+# ============================================================
 async def _seed_tramites(db: AsyncSession, muni_id: int, cats_tram: dict,
-                         vecinos: list[User]) -> tuple[int, int]:
-    n = (await db.execute(select(Tramite).where(Tramite.municipio_id == muni_id))).scalars().all()
-    if n:
-        print(f"[tramites] ya existen {len(n)} — skip")
-        return 0, 0
-    tramites = []
+                        muni_deps: dict) -> int:
+    existentes = {t.nombre: t for t in (await db.execute(
+        select(Tramite).where(Tramite.municipio_id == muni_id)
+    )).scalars().all()}
+    tramites = {}  # nombre -> Tramite
+    nuevos = 0
     for i, t in enumerate(TRAMITES):
         cat = cats_tram.get(t["cat"])
         if not cat:
             print(f"[tramites] categoría trámite no encontrada: {t['cat']} — skip")
+            continue
+        tr = existentes.get(t["nombre"])
+        if tr:
+            tramites[t["nombre"]] = tr
             continue
         docs = [TramiteDocumentoRequerido(nombre=dn, descripcion=dd, obligatorio=ob, orden=j)
                 for j, (dn, dd, ob) in enumerate(t["docs"])]
@@ -572,22 +1196,68 @@ async def _seed_tramites(db: AsyncSession, muni_id: int, cats_tram: dict,
             activo=True, orden=i, documentos_requeridos=docs,
         )
         db.add(tr)
-        tramites.append(tr)
+        tramites[t["nombre"]] = tr
+        nuevos += 1
     await db.flush()
 
-    # Solicitudes en estados variados.
+    # Mapeo trámite -> dependencia (para las 5 activas). Idempotente por par.
+    ya = {
+        (m.municipio_dependencia_id, m.tramite_id) for m in (await db.execute(
+            select(MunicipioDependenciaTramite).join(
+                MunicipioDependencia,
+                MunicipioDependencia.id == MunicipioDependenciaTramite.municipio_dependencia_id)
+            .where(MunicipioDependencia.municipio_id == muni_id)
+        )).scalars().all()
+    }
+    mapeos = 0
+    for t in TRAMITES:
+        if not t.get("dep"):
+            continue
+        md = muni_deps.get(t["dep"])
+        tr = tramites.get(t["nombre"])
+        if not md or not tr or (md.id, tr.id) in ya:
+            continue
+        db.add(MunicipioDependenciaTramite(municipio_dependencia_id=md.id, tramite_id=tr.id, activo=True))
+        mapeos += 1
+    await db.flush()
+    print(f"[tramites] {len(tramites)} totales ({nuevos} nuevos) + {mapeos} mapeos a dependencia")
+    return len(tramites)
+
+
+# ============================================================
+# Solicitudes (borra + recrea para atarlas a los 3 vecinos nuevos). 10 en
+# estados variados, con historial e id de dependencia cuando corresponde.
+# ============================================================
+async def _seed_solicitudes(db: AsyncSession, muni_id: int, usuarios: dict,
+                           muni_deps: dict) -> int:
+    # Borrar solicitudes previas del muni (y su historial) para recrearlas ricas.
+    await db.execute(text("DELETE FROM historial_solicitudes WHERE solicitud_id IN "
+                          "(SELECT id FROM solicitudes WHERE municipio_id = :m)"), {"m": muni_id})
+    await db.execute(text("DELETE FROM solicitudes WHERE municipio_id = :m"), {"m": muni_id})
+    await db.flush()
+
+    tramites = {t.nombre: t for t in (await db.execute(
+        select(Tramite).where(Tramite.municipio_id == muni_id)
+    )).scalars().all()}
+    tramite_por_idx = [tramites.get(t["nombre"]) for t in TRAMITES]
+    dep_por_idx = [muni_deps.get(t["dep"]) if t.get("dep") else None for t in TRAMITES]
+    vecinos = usuarios["vecinos"]
+    admin = usuarios["admin"]
+
     year = datetime.utcnow().year
     r = await db.execute(text(
         "SELECT COALESCE(MAX(CAST(SUBSTRING(numero_tramite, 10) AS UNSIGNED)), 0) "
         "FROM solicitudes WHERE numero_tramite LIKE :patt"
     ), {"patt": f"SOL-{year}-%"})
     offset = int(r.scalar() or 0)
-    sols = 0
+
+    creadas = 0
     for k, (t_idx, v_idx, estado) in enumerate(SOLICITUDES):
-        if t_idx >= len(tramites):
+        tr = tramite_por_idx[t_idx] if t_idx < len(tramite_por_idx) else None
+        if not tr:
             continue
-        tr = tramites[t_idx]
         v = vecinos[v_idx]
+        md = dep_por_idx[t_idx]
         numero = f"SOL-{year}-{(offset + k + 1):05d}"
         sol = Solicitud(
             municipio_id=muni_id, numero_tramite=numero, tramite_id=tr.id,
@@ -596,28 +1266,46 @@ async def _seed_tramites(db: AsyncSession, muni_id: int, cats_tram: dict,
             estado=estado, solicitante_id=v.id,
             nombre_solicitante=v.nombre, apellido_solicitante=v.apellido,
             email_solicitante=v.email, telefono_solicitante=v.telefono,
-            prioridad=2 + (k % 3),
+            municipio_dependencia_id=md.id if md else None,
+            canal="app", prioridad=2 + (k % 3),
         )
         db.add(sol)
         await db.flush()
         db.add(HistorialSolicitud(
             solicitud_id=sol.id, usuario_id=v.id, estado_nuevo=EstadoSolicitud.RECIBIDO,
-            accion="Solicitud creada", comentario="Solicitud iniciada por el vecino.",
-        ))
+            accion="Solicitud creada", comentario="Solicitud iniciada por el vecino."))
         if estado != EstadoSolicitud.RECIBIDO:
             db.add(HistorialSolicitud(
-                solicitud_id=sol.id, usuario_id=v.id,
+                solicitud_id=sol.id, usuario_id=admin.id,
                 estado_anterior=EstadoSolicitud.RECIBIDO, estado_nuevo=estado,
-                accion=f"Cambio a {estado.value}", comentario="Avance del trámite (demo).",
-            ))
-        sols += 1
+                accion=f"Cambio a {estado.value}", comentario="Avance del trámite (demo)."))
+        creadas += 1
     await db.flush()
-    print(f"[tramites] {len(tramites)} trámites + {sols} solicitudes creados")
-    return len(tramites), sols
+    print(f"[solicitudes] {creadas} solicitudes (atadas a los 3 vecinos) con historial")
+    return creadas
 
 
+# ============================================================
+# Desactivar cuentas demo LEGACY de la versión básica del seed
+# (@asuncion.gov.py / @demo.py). Los endpoints públicos filtran por
+# activo=True, así la botonera queda limpia con SOLO los @asuncion.demo.com.
+# No se borran (reversible) para no romper posibles referencias históricas.
+# ============================================================
+async def _desactivar_legacy(db: AsyncSession, muni_id: int) -> int:
+    res = await db.execute(text(
+        "UPDATE usuarios SET activo=0 WHERE municipio_id=:m AND activo=1 "
+        "AND (email LIKE '%@asuncion.gov.py' OR email LIKE '%@demo.py')"),
+        {"m": muni_id})
+    n = res.rowcount or 0
+    if n:
+        print(f"[legacy] {n} cuentas demo viejas (@asuncion.gov.py / @demo.py) desactivadas")
+    return n
+
+
+# ============================================================
+# Módulos opt-in visibles.
+# ============================================================
 async def _habilitar_modulos(db: AsyncSession, muni_id: int) -> None:
-    """Deja TODOS los módulos opt-in visibles en el sidebar (SIN datos)."""
     existentes = {m.modulo for m in (await db.execute(
         select(MunicipioModulo).where(MunicipioModulo.municipio_id == muni_id)
     )).scalars().all()}
@@ -625,9 +1313,12 @@ async def _habilitar_modulos(db: AsyncSession, muni_id: int) -> None:
         if mod not in existentes:
             db.add(MunicipioModulo(municipio_id=muni_id, modulo=mod, activo=True))
     await db.flush()
-    print("[modulos] opt-in habilitados (visibles, sin datos)")
+    print("[modulos] opt-in habilitados (ordenes_trabajo, inventario, sueldos, contaduria, tesoreria)")
 
 
+# ============================================================
+# Main
+# ============================================================
 async def main():
     engine = create_async_engine(settings.DATABASE_URL)
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -653,23 +1344,60 @@ async def main():
         )).scalars().all()}
 
         muni_deps = await _seed_dependencias(db, muni.id, cats)
-        sup_dep = muni_deps.get("SERVICIOS_PUBLICOS")
-        vecinos = await _seed_usuarios(db, muni.id, sup_dep.id if sup_dep else None)
+        usuarios = await _seed_usuarios(db, muni.id, muni_deps)
         barrios = await _seed_barrios(db, muni.id)
+        zonas = await _seed_zonas(db, muni.id)
+
+        # barrio por código oficial (para los reclamos).
         barrios_por_cod = {}
-        # mapear código oficial -> barrio (para los reclamos)
-        nombre_por_cod = {cod: nom for cod, nom, _la, _lo in BARRIOS_ASUNCION}
-        for cod, nom in nombre_por_cod.items():
+        for cod, nom, _la, _lo in BARRIOS_ASUNCION:
             if nom in barrios:
                 barrios_por_cod[cod] = barrios[nom]
 
-        await _seed_reclamos(db, muni.id, cats, muni_deps, barrios_por_cod, vecinos)
-        await _seed_tramites(db, muni.id, cats_tram, vecinos)
+        empleados = await _seed_empleados(db, muni.id, cats, zonas, muni_deps)
+        empleados_login = await _seed_empleados_login(db, muni.id, empleados)
+        cuadrillas = await _seed_cuadrillas(db, muni.id, empleados, cats, zonas)
+        await _seed_sla(db, muni.id, cats)
+
+        # Inventario ANTES de las OT (para cruzar activos/consumibles).
+        # OJO: services/inventario_seed.py tiene un bug pre-existente al RE-correr
+        # sobre un muni que YA tiene items (hace `i.nombre` sobre strings de
+        # `select(InventarioItem.nombre).scalars()`). Solo sobrevive porque
+        # seed_demo lo llama una vez por muni nuevo. Para que ESTE seed sea
+        # idempotente, solo llamamos a seed_inventario si el inventario está vacío.
+        inv_existentes = (await db.execute(
+            select(InventarioItem).where(InventarioItem.municipio_id == muni.id)
+        )).scalars().all()
+        if not inv_existentes:
+            inv_res = await seed_inventario(db, muni.id, incluir_demo=True)
+            inv_items_total = inv_res["items"]
+        else:
+            inv_items_total = len(inv_existentes)
+            print(f"[inventario] ya existen {inv_items_total} items — skip seed_inventario")
+        inv_por_nombre = {i.nombre: i for i in (await db.execute(
+            select(InventarioItem).where(InventarioItem.municipio_id == muni.id)
+        )).scalars().all()}
+        # Trabar el caso de alumbrado: sin stock de luminarias LED (justifica la OT BLOQUEADA).
+        lamp = inv_por_nombre.get("Lámpara LED 150W")
+        if lamp is not None:
+            lamp.stock_actual = 0.0
+        await db.flush()
+
+        reclamos = await _seed_reclamos(db, muni.id, cats, muni_deps, barrios_por_cod,
+                                        usuarios, empleados, empleados_login)
+        ot_stats = await _seed_ordenes_trabajo(db, muni.id, reclamos, cuadrillas, empleados,
+                                               usuarios["admin"].id, inv_por_nombre)
+        await _seed_tramites(db, muni.id, cats_tram, muni_deps)
+        sols = await _seed_solicitudes(db, muni.id, usuarios, muni_deps)
+        await _desactivar_legacy(db, muni.id)
         await _habilitar_modulos(db, muni.id)
         await db.commit()
-        print(f"\nOK — Paraguay Limpio (Asunción) listo. muni_id={muni.id}, codigo={CODIGO}")
-        print("Login demo (password demo123): admin@asuncion.gov.py, supervisor@asuncion.gov.py,")
-        print("  derlis@demo.py, liz@demo.py, rodrigo@demo.py")
+
+        print(f"\nOK — Paraguay Limpio (Asunción) RICO listo. muni_id={muni.id}, codigo={CODIGO}")
+        print(f"  reclamos=10, OT_nuevas={ot_stats['ot']}, inventario_items={inv_items_total}, solicitudes={sols}")
+        print("Login demo (password demo123, dominio @asuncion.demo.com):")
+        print("  admin@asuncion.demo.com | supervisor-<dep>@asuncion.demo.com (x5) |")
+        print("  empleado-electricidad@ / empleado-bacheo@ | vecino@ / vecino-liz@ / vecino-rodrigo@")
     await engine.dispose()
 
 

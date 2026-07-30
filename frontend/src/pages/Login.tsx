@@ -154,6 +154,7 @@ export default function Login() {
     apellido: string;
     nombre_completo: string;
     rol: string;
+    dependencia_nombre?: string | null;
   }>>([]);
 
   // Estado para usuarios de dependencia
@@ -287,26 +288,37 @@ export default function Login() {
             )}
 
             {demoUsers.length > 0 && (
-              <div className="grid grid-cols-3 gap-2.5 mb-5">
-                {demoUsers.slice(0, 3).map((u, i) => {
-                  const cfg = rolConfig[u.rol] || rolConfig.vecino;
-                  const Icon = cfg.icon;
-                  return (
-                    <button
-                      key={`${u.rol}-${i}`}
-                      type="button"
-                      onClick={() => quickLogin(u.email, 'demo123')}
-                      disabled={loading}
-                      className="rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] p-3 text-center transition-all disabled:opacity-50 hover:-translate-y-0.5"
-                    >
-                      <div className="w-9 h-9 mx-auto rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: `${accent}1a` }}>
-                        <Icon className="h-4 w-4" style={{ color: accent }} />
-                      </div>
-                      <div className="text-xs font-bold truncate">{cfg.label}</div>
-                      <div className="text-[9px] text-emerald-50/40 truncate">{u.nombre_completo}</div>
-                    </button>
-                  );
-                })}
+              <div className="mb-5">
+                <div className="text-[10px] font-semibold tracking-[0.2em] text-emerald-50/40 mb-2.5">ELEGÍ UN PERFIL</div>
+                <div className="grid grid-cols-3 gap-2.5 max-h-[264px] overflow-y-auto pr-1">
+                  {demoUsers.map((u, i) => {
+                    const cfg = rolConfig[u.rol] || rolConfig.vecino;
+                    const Icon = cfg.icon;
+                    const titulo = u.rol === 'admin'
+                      ? 'Administrador'
+                      : u.rol === 'supervisor'
+                        ? (u.dependencia_nombre?.replace(/^(Secretar[ií]a|Direcci[oó]n)\s+de\s+/i, '') || 'Supervisor')
+                        : (u.nombre_completo || cfg.label);
+                    const sub = u.rol === 'admin' ? 'Acceso total'
+                      : u.rol === 'supervisor' ? 'Supervisor'
+                      : cfg.label;
+                    return (
+                      <button
+                        key={`${u.email}-${i}`}
+                        type="button"
+                        onClick={() => quickLogin(u.email, 'demo123')}
+                        disabled={loading}
+                        className="rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] p-3 text-center transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                      >
+                        <div className="w-9 h-9 mx-auto rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: `${accent}1a` }}>
+                          <Icon className="h-4 w-4" style={{ color: accent }} />
+                        </div>
+                        <div className="text-[11px] font-bold leading-tight truncate">{titulo}</div>
+                        <div className="text-[9px] text-emerald-50/40 truncate mt-0.5">{sub}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

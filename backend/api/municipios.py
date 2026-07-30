@@ -290,6 +290,8 @@ async def obtener_usuarios_demo(
             User.email.like("supervisor-%"),
             User.email.like("empleado-%"),
             User.email.like("vecino@%"),
+            # Munis con varios vecinos demo (ej. asuncion: vecino-liz@, vecino-rodrigo@).
+            User.email.like("vecino-%"),
         ),
     )
     from sqlalchemy.orm import selectinload
