@@ -664,7 +664,7 @@ export default function Dashboard() {
       {/* Hero Header adaptativo — foto propia del muni o hero de marca del theme. */}
       <div
         className="relative rounded-2xl"
-        style={{ minHeight: '200px' }}
+        style={{ minHeight: '240px' }}
       >
         {/* Fondo del hero: foto propia del muni si la configuro, sino hero de
             marca derivado del theme (sin foto stock generica). */}
@@ -716,11 +716,11 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute z-20 flex flex-col items-start gap-1.5" style={{ top: 6, left: 6 }}>
+        <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
         {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde, compactos (no pisan el título). */}
         <button
           onClick={() => setPresentOpen(true)}
-          className="cm-btn relative flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs backdrop-blur-md group overflow-hidden"
+          className="cm-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
             backgroundColor: heroFondoOscuro ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.92)',
             border: '2px solid rgba(99, 102, 241, 0.7)',
@@ -735,7 +735,7 @@ export default function Dashboard() {
         </button>
         <button
           onClick={() => setLiveMode(true)}
-          className="live-btn relative flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs backdrop-blur-md group overflow-hidden"
+          className="live-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
             backgroundColor: heroFondoOscuro ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.92)',
             border: '2px solid rgba(239, 68, 68, 0.7)',
@@ -834,7 +834,7 @@ export default function Dashboard() {
         `}</style>
 
         {/* Contenido del header */}
-        <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
+        <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '240px' }}>
           {/* Info principal */}
           <div className="mt-auto">
             {/* Texto adaptativo: claro sobre foto/gradiente intenso (tema oscuro),
