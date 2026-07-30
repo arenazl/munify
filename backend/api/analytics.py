@@ -68,28 +68,40 @@ async def get_heatmap_data(
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
-    query = select(
-        Reclamo.id,
-        Reclamo.latitud,
-        Reclamo.longitud,
-        Reclamo.estado,
-        Categoria.nombre.label('categoria')
-    ).join(Categoria, Reclamo.categoria_id == Categoria.id).where(
-        and_(
-            Reclamo.latitud.isnot(None),
-            Reclamo.longitud.isnot(None),
-            Reclamo.created_at >= fecha_inicio,
-            Reclamo.municipio_id == municipio_id
+    def _build_query(con_fecha: bool):
+        q = select(
+            Reclamo.id,
+            Reclamo.latitud,
+            Reclamo.longitud,
+            Reclamo.estado,
+            Categoria.nombre.label('categoria')
+        ).join(Categoria, Reclamo.categoria_id == Categoria.id).where(
+            and_(
+                Reclamo.latitud.isnot(None),
+                Reclamo.longitud.isnot(None),
+                Reclamo.municipio_id == municipio_id
+            )
         )
-    )
+        if con_fecha:
+            q = q.where(Reclamo.created_at >= fecha_inicio)
+        if categoria_id:
+            q = q.where(Reclamo.categoria_id == categoria_id)
+        if dependencia_id:
+            q = q.where(Reclamo.municipio_dependencia_id == dependencia_id)
+        return q
 
-    if categoria_id:
-        query = query.where(Reclamo.categoria_id == categoria_id)
-    if dependencia_id:
-        query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
-
-    result = await db.execute(query)
+    result = await db.execute(_build_query(con_fecha=True))
     reclamos = result.all()
+
+    # Fallback histórico: si no hubo actividad geolocalizada en la ventana pedida
+    # (muni recién arrancado o data vieja), mostrar TODOS los reclamos con coords
+    # del muni en vez de un mapa vacío. Se marca en la respuesta para que el front
+    # pueda avisar "sin actividad reciente — mostrando histórico".
+    historico = False
+    if not reclamos:
+        result = await db.execute(_build_query(con_fecha=False))
+        reclamos = result.all()
+        historico = bool(reclamos)
 
     # Prioridad canónica desde la OT del reclamo (Reclamo.prioridad deprecado en F6).
     # {reclamo_id: 'baja'|'media'|'alta'|'urgente'}; los reclamos sin OT viva no aparecen.
@@ -119,7 +131,8 @@ async def get_heatmap_data(
     return {
         "puntos": points,
         "total": len(points),
-        "periodo_dias": dias
+        "periodo_dias": dias,
+        "historico": historico
     }
 
 
