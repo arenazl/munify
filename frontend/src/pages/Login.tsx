@@ -281,7 +281,7 @@ export default function Login() {
               <Sparkles className="h-6 w-6" style={{ color: accent }} />
             </div>
             <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
-            <p className="text-emerald-50/60 mt-1 mb-6">Elegí tu perfil o usá email + contraseña</p>
+            <p className="text-emerald-50/60 mt-1 mb-6">Elegí un perfil para entrar a la demo</p>
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/25 text-red-300 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
@@ -290,7 +290,7 @@ export default function Login() {
             {demoUsers.length > 0 && (
               <div className="mb-5">
                 <div className="text-[10px] font-semibold tracking-[0.2em] text-emerald-50/40 mb-2.5">ELEGÍ UN PERFIL</div>
-                <div className="grid grid-cols-3 gap-2.5 max-h-[264px] overflow-y-auto pr-1">
+                <div className="space-y-2">
                   {demoUsers.map((u, i) => {
                     const cfg = rolConfig[u.rol] || rolConfig.vecino;
                     const Icon = cfg.icon;
@@ -308,13 +308,16 @@ export default function Login() {
                         type="button"
                         onClick={() => quickLogin(u.email, 'demo123')}
                         disabled={loading}
-                        className="rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] p-3 text-center transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                        className="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] px-3 py-2.5 text-left transition-all disabled:opacity-50"
                       >
-                        <div className="w-9 h-9 mx-auto rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: `${accent}1a` }}>
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${accent}1a` }}>
                           <Icon className="h-4 w-4" style={{ color: accent }} />
                         </div>
-                        <div className="text-[11px] font-bold leading-tight truncate">{titulo}</div>
-                        <div className="text-[9px] text-emerald-50/40 truncate mt-0.5">{sub}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold truncate">{titulo}</div>
+                          <div className="text-[11px] text-emerald-50/45 truncate">{sub}</div>
+                        </div>
+                        <span className="text-emerald-50/30 flex-shrink-0" aria-hidden>→</span>
                       </button>
                     );
                   })}
@@ -324,48 +327,9 @@ export default function Login() {
 
             <div className="flex items-center gap-3 my-5">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] tracking-[0.2em] text-emerald-50/40">O CON EMAIL</span>
+              <span className="text-[10px] tracking-[0.2em] text-emerald-50/40">O</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold tracking-wide text-emerald-50/60 mb-1">EMAIL</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-50/40" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() => setTouched(t => ({ ...t, email: true }))}
-                    className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-emerald-50/30 outline-none focus:border-white/25 transition-all"
-                    placeholder="tu@email.com"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold tracking-wide text-emerald-50/60 mb-1">CONTRASEÑA</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-emerald-50/40" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onBlur={() => setTouched(t => ({ ...t, password: true }))}
-                    className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-emerald-50/30 outline-none focus:border-white/25 transition-all"
-                    placeholder="Tu contraseña"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 font-bold rounded-xl transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: accent, color: '#06130b', boxShadow: `0 12px 30px ${accent}40` }}
-              >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Ingresar <span aria-hidden>→</span></>}
-              </button>
-            </form>
 
             <button
               type="button"
