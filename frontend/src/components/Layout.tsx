@@ -448,7 +448,7 @@ export default function Layout() {
               }}
             >
               <span
-                className="block text-base font-bold leading-tight"
+                className={`block font-bold leading-tight ${BRAND.name.length > 12 ? 'text-sm' : 'text-lg'}`}
                 style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
                 {BRAND.name}

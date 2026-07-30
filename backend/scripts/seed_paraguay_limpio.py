@@ -83,7 +83,7 @@ from services.inventario_seed import seed_inventario
 # Datos del municipio
 # ============================================================
 CODIGO = "asuncion"
-NOMBRE = "Asunción, Departamento Central"
+NOMBRE = "Asunción, Dpto. Central"
 # Centroide de los barrios geocodificados (centro real de la ciudad).
 CENTRO_LAT = -25.286557
 CENTRO_LON = -57.598648

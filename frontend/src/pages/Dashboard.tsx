@@ -27,7 +27,7 @@ import HeatmapWidget from '../components/ui/HeatmapWidget';
 import PageHint from '../components/ui/PageHint';
 import DashboardLive from '../components/DashboardLive';
 import PresentacionLive from '../components/PresentacionLive';
-import { IS_WHITE_LABEL } from '../brands';
+import { BRAND } from '../brands';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { Radio } from 'lucide-react';
 
@@ -714,9 +714,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Botón LIVE + Conocé Munify — recorrido/presentación del producto Munify.
-            Marketing propio: NO se muestra en marcas white-label. */}
-        {(user?.rol === 'admin' || user?.rol === 'supervisor') && !IS_WHITE_LABEL && (
+        {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
         <>
         {/* Conoce Munify — extremo IZQUIERDO, mismo estilo/brillo que LIVE (color indigo) */}
         <button
@@ -732,7 +731,7 @@ export default function Dashboard() {
           <span className="cm-ring absolute inset-0 rounded-full pointer-events-none" />
           <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
           <Sparkles className="h-4 w-4 relative z-10 live-radio" />
-          <span className="tracking-wider relative z-10">Conocé Munify</span>
+          <span className="tracking-wider relative z-10">Conocé {BRAND.name}</span>
         </button>
         {/* LIVE — extremo DERECHO */}
         <button
