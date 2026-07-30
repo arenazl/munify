@@ -338,7 +338,7 @@ export default function Login() {
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-bold text-white truncate">{dep.nombre_dependencia}</div>
                               <div className="text-[11px] text-emerald-50/50 truncate">
-                                {dep.reclamos_count} reclamos · {dep.tramites_count} trámites
+                                {dep.reclamos_count} {dep.reclamos_count === 1 ? 'reclamo' : 'reclamos'} · {dep.tramites_count} {dep.tramites_count === 1 ? 'trámite' : 'trámites'}
                               </div>
                             </div>
                             <ChevronRight className="h-4 w-4 text-emerald-50/30 flex-shrink-0" />
