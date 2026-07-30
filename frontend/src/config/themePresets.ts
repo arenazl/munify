@@ -309,6 +309,22 @@ export const themePresets: ThemePreset[] = [
       ['#3a3a40', '#222226', '#101012']),
   },
 
+  // 9.bis Onix Verde — CLON de Onix con el verde del logo (marca white-label).
+  // `archived: true` a propósito: NO aparece en el selector de Munify (es
+  // identidad de una marca), pero sigue disponible via getThemeColors() para
+  // que una marca con `fixedTheme` lo use como preset por defecto. El primary
+  // es el mismo #1b7a3d que BRAND.primary → el acento del theme coincide con el
+  // del shell (applyBrand) y toda la app queda con un ÚNICO verde coherente.
+  {
+    id: 'onix-verde',
+    name: 'Onix Verde',
+    family: 'dark',
+    archived: true,
+    palette: ['#1a1a1d', '#222226', '#2d2d33', '#1b7a3d'],
+    variants: genCuratedVariants(['#1a1a1d', '#222226', '#2d2d33', '#1b7a3d'], 0, 3,
+      ['#3a3a40', '#222226', '#101012']),
+  },
+
   // ---- SOBRIOS (escala de grises pura, sin color) ----
 
   // 10. Papel — light sobrio. Blanco crudo + grises + acento negro.

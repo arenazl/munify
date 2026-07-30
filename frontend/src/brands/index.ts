@@ -10,6 +10,7 @@
 // hereda TODO el código (cada mejora de Munify le llega en el próximo build).
 
 import type { ComponentType } from 'react';
+import type { ThemeVariant } from '../config/themePresets';
 import { ParaguayLimpioLogo } from './ParaguayLimpioLogo';
 
 export interface Brand {
@@ -43,6 +44,12 @@ export interface Brand {
    *  son conceptos distintos y quedan desacoplados (una marca podría querer uno
    *  sin el otro). Munify no lo setea → tema dinámico por muni, como hoy. */
   fixedTheme?: boolean;
+  /** Preset de tema por defecto de la marca (solo si `fixedTheme`). Deriva el
+   *  look completo (fondo/sidebar/cards), no sólo el acento. Munify no lo setea
+   *  → sigue el default global (carbon-vsc) o el tema_config del municipio. */
+  themePresetId?: string;
+  /** Variante (tonalidad del sidebar) del preset de marca. Default: 'vintage'. */
+  themeVariant?: ThemeVariant;
 }
 
 const BRANDS: Record<string, Brand> = {
@@ -68,6 +75,8 @@ const BRANDS: Record<string, Brand> = {
     municipioCodigo: 'asuncion',
     loginLayout: 'split', // hero de marca + panel de acceso
     fixedTheme: true,     // identidad verde fija (no dinámica por municipio)
+    themePresetId: 'onix-verde', // Onix (casi-negro) con el verde del logo
+    themeVariant: 'vintage',     // sidebar casi-negro (#222226)
   },
 };
 

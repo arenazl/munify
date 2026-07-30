@@ -11,6 +11,13 @@ import {
 } from '../config/themePresets';
 import { DEFAULT_FONT_ID } from '../config/fontPresets';
 import { applyFontFamily } from '../lib/fontLoader';
+import { BRAND } from '../brands';
+
+// Preset/variante por defecto de la MARCA activa: sólo si la marca declara
+// `fixedTheme` (identidad de color fija). Munify no lo setea → undefined, y el
+// tema sigue saliendo del municipio / default global, como siempre.
+const brandDefaultPreset = BRAND.fixedTheme ? BRAND.themePresetId : undefined;
+const brandDefaultVariant = BRAND.fixedTheme ? BRAND.themeVariant : undefined;
 
 // Exportar tipos necesarios
 export type { ThemePreset, ThemeColors, ThemeVariant };
@@ -77,10 +84,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const initial = readTheme(user?.id);
 
   const [currentPresetId, setCurrentPresetId] = useState<string>(
-    initial.preset || defaultThemeConfig.presetId
+    initial.preset || brandDefaultPreset || defaultThemeConfig.presetId
   );
   const [currentVariant, setCurrentVariant] = useState<ThemeVariant>(
-    initial.variant || defaultThemeConfig.variant
+    initial.variant || brandDefaultVariant || defaultThemeConfig.variant
   );
   const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(
     initial.sidebarBg && initial.sidebarBg !== 'null' ? initial.sidebarBg : null
@@ -110,8 +117,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const saved = readTheme(user?.id);
     const muniConfig = municipioActual?.tema_config;
 
-    const preset = saved.preset || muniConfig?.presetId || defaultThemeConfig.presetId;
-    const variant = (saved.variant || (muniConfig?.variant as ThemeVariant) || defaultThemeConfig.variant) as ThemeVariant;
+    const preset = saved.preset || brandDefaultPreset || muniConfig?.presetId || defaultThemeConfig.presetId;
+    const variant = (saved.variant || brandDefaultVariant || (muniConfig?.variant as ThemeVariant) || defaultThemeConfig.variant) as ThemeVariant;
 
     const sidebarBg = saved.sidebarBg !== null
       ? (saved.sidebarBg && saved.sidebarBg !== 'null' ? saved.sidebarBg : null)
