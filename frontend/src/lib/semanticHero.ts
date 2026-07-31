@@ -23,6 +23,16 @@ export interface HeroFrase {
   acciones?: HeroAccion[];
 }
 
+/** KPI del strip del hero (estilo mockup: eyebrow caps + número display +
+ *  sub-caption chica debajo, ej. "50 pagos" / "71% · 10 pagos"). */
+export interface HeroKpi {
+  etiqueta: string;
+  valor: string | number;
+  /** Renglón chico bajo el número (contexto del KPI). */
+  sub?: string;
+  veredicto?: Veredicto;
+}
+
 /** Azúcar para armar segmentos: seg('12 abiertos', 'advertencia') */
 export function seg(texto: string, veredicto?: Veredicto): HeroSegmento {
   return { texto, veredicto };

@@ -117,6 +117,58 @@
 }
 .sh-accion--primaria:hover { background: var(--pl-green-200); }
 
+/* Strip de KPIs opcional (estilo del hero del mockup de Design: eyebrow en
+   caps + numero display tabular, celdas separadas por hairline). */
+.sh-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pl-border);
+  row-gap: 10px;
+}
+
+.sh-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 20px;
+  border-left: 1px solid var(--pl-border);
+  min-width: 0;
+}
+.sh-kpi:first-child { padding-left: 0; border-left: 0; }
+
+.sh-kpi-etiqueta {
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-kpi-valor {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.sh-kpi-sub {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  line-height: 1.2;
+}
+
+.sh-kpi-valor--bueno { color: var(--pl-green-700); }
+.sh-kpi-valor--advertencia { color: var(--pl-amber-700); }
+.sh-kpi-valor--malo { color: var(--pl-red-700); }
+
 @media (prefers-reduced-motion: reduce) {
   .sh-dot, .sh-nav, .sh-accion { transition: none; }
 }

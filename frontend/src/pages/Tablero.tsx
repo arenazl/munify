@@ -262,14 +262,14 @@ export default function Tablero() {
         })}
       </div>
 
-      {/* Hero semántico: pulso real del tablero (desktop y mobile) */}
-      <SemanticHero etiqueta="TABLERO · FLUJO" frases={heroFrases} className="mt-2" />
-
     </>
   );
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* Hero semántico: pulso real del tablero (desktop y mobile) */}
+      <SemanticHero etiqueta="TABLERO · FLUJO" frases={heroFrases} />
+
       {/* Header Sticky con componente reutilizable */}
       <StickyPageHeader filterPanel={mobileColumnFilters}>
         <PageTitleIcon icon={<Columns3 className="h-4 w-4" />} />

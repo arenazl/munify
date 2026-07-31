@@ -100,6 +100,18 @@
   APP_GUIDE/components/ui/PeriodRangeNavigator / MonthRangeNavigator). Jamás
   datepickers sueltos en grillas.
 - Todas las grillas de la app adoptan este layout al consolidarse.
+- **KPIs DENTRO del hero** (prop `kpis` del SemanticHero, estilo strip del
+  mockup: eyebrow caps + número display tabular + **sub-caption** tipo
+  "50 pagos" / "71% · 10 pagos", veredicto opcional por KPI). Orden interno
+  del hero: **frase → KPIs → acciones**. PROHIBIDAS las filas de KPI sueltas.
+- **El hero va SIEMPRE PRIMERO** en la página (antes de título/búsqueda/
+  filtros/fechas); lo demás abajo. Mismo control en todas las pantallas, nada
+  de copy-paste de markup.
+- **Breadcrumb/contexto: parte del LAYOUT** (la topbar lo arma por ruta +
+  ámbito del usuario) — jamás metido a mano en cada pantalla.
+- Ejemplar adaptado: Mapa (4 KPIs de MapaStats absorbidos por el hero vía
+  `calcularKpisMapa` en lib/mapaUtils.ts; MapaStats queda solo con los paneles
+  analíticos abajo).
 
 ## Hints: estado global
 - Las 11 pantallas de Reclamos+Campo+Trámites ya tienen SemanticHero (9aa061c).

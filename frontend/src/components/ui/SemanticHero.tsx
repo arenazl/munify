@@ -25,17 +25,21 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { type HeroFrase, veredictoDominante } from '../../lib/semanticHero';
+import { type HeroFrase, type HeroKpi, veredictoDominante } from '../../lib/semanticHero';
 
 interface SemanticHeroProps {
   /** Etiqueta del módulo, en caps (ej: "RECLAMOS · HOY"). */
   etiqueta: string;
   /** Una o más frases; con 2+ aparece el carrusel. Vacío → no renderiza. */
   frases: HeroFrase[];
+  /** Strip de KPIs opcional (estilo mockup): eyebrow + número display + sub.
+   *  Regla del estándar: el hero va SIEMPRE primero en la página con sus KPIs
+   *  adentro (orden: frase → KPIs → acciones); nada de filas de KPI sueltas. */
+  kpis?: HeroKpi[];
   className?: string;
 }
 
-export function SemanticHero({ etiqueta, frases, className }: SemanticHeroProps) {
+export function SemanticHero({ etiqueta, frases, kpis, className }: SemanticHeroProps) {
   const [idx, setIdx] = useState(0);
 
   const validas = frases.filter((f) => f.segmentos.length > 0);
@@ -82,6 +86,20 @@ export function SemanticHero({ etiqueta, frases, className }: SemanticHeroProps)
           ),
         )}
       </p>
+
+      {kpis && kpis.length > 0 && (
+        <div className="sh-kpis">
+          {kpis.map((k, i) => (
+            <div key={i} className="sh-kpi">
+              <span className="sh-kpi-etiqueta">{k.etiqueta}</span>
+              <span className={`sh-kpi-valor ${k.veredicto ? `sh-kpi-valor--${k.veredicto}` : ''}`}>
+                {k.valor}
+              </span>
+              {k.sub && <span className="sh-kpi-sub">{k.sub}</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {actual.acciones && actual.acciones.length > 0 && (
         <div className="sh-acciones">

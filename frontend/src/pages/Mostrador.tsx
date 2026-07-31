@@ -149,6 +149,8 @@ export default function Mostrador() {
 
   return (
     <div className="space-y-4">
+      <SemanticHero etiqueta="MOSTRADOR · VENTANILLA" frases={heroFrases} />
+
       {/* === Header + Métricas — sticky arriba === */}
       <div
         className="sticky top-0 z-20 -mx-4 px-4 pt-2 pb-3 space-y-3 backdrop-blur-md"
@@ -203,8 +205,6 @@ export default function Mostrador() {
           return <KpiRow kpis={kpis} />;
         })()}
       </div>
-
-      <SemanticHero etiqueta="MOSTRADOR · VENTANILLA" frases={heroFrases} />
 
       {/* === Cuerpo === */}
       {paso === 'identificar' && municipioId && (

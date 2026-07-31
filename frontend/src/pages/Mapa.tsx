@@ -26,9 +26,6 @@ import {
   Square,
   FileDown,
   FileText,
-  Inbox,
-  PlayCircle,
-  CheckCircle,
   Flame,
   Pencil,
   Trash2,
@@ -41,9 +38,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { estadoColor, estadoLabel, estadoColors, estadoLabels } from '../lib/enums/reclamo';
 import { reclamosApi, poiApi, modulosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
-import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
 import { SemanticHero } from '../components/ui/SemanticHero';
-import { seg, type HeroFrase } from '../lib/semanticHero';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -69,6 +65,7 @@ import {
   reclamosInBBox,
   isResuelto,
   computeKPIs,
+  calcularKpisMapa,
   topZonas,
   Hotspot,
   BBox,
@@ -926,6 +923,13 @@ export default function Mapa() {
     conteosPorEstado,
   ]);
 
+  // KPIs del strip del hero (solo modo Reclamos; en Puntos el hero va sin
+  // strip). Misma fuente que tenía MapaStats: reclamosFiltrados + universo.
+  const heroKpis = useMemo<HeroKpi[] | undefined>(() => {
+    if (isPuntos || loading || reclamos.length === 0) return undefined;
+    return calcularKpisMapa(reclamosFiltrados, reclamos.length, resolverUmbrales());
+  }, [isPuntos, loading, reclamos.length, reclamosFiltrados]);
+
   // Puntos para coverage por dependencia (sobre todos los reclamos de esa dependencia, sin filtro de tiempo)
   const coveragePoints = useMemo(() => {
     if (filtroDependencia == null || !showCoverage) return [];
@@ -1393,6 +1397,12 @@ export default function Mapa() {
 
   return (
     <div className="space-y-6">
+      <SemanticHero
+        etiqueta={isPuntos ? 'MAPA · PUNTOS DE INTERÉS' : 'MAPA · RECLAMOS'}
+        frases={heroFrases}
+        kpis={heroKpis}
+      />
+
       {/* CSS para animación de hotspots */}
       <style>{`
         @keyframes hotspot-pulse {
@@ -1455,59 +1465,9 @@ export default function Mapa() {
         )}
       </StickyPageHeader>
 
-      <SemanticHero
-        etiqueta={isPuntos ? 'MAPA · PUNTOS DE INTERÉS' : 'MAPA · RECLAMOS'}
-        frases={heroFrases}
-      />
-
       {/* ============================ MODO RECLAMOS ============================ */}
       {!isPuntos && (
         <>
-      {/* KPIs canónicos arriba (mismo patrón que Reclamos/Trámites/Tesorería) */}
-      {(() => {
-        const c = conteosPorEstado;
-        const recibidos = (c['recibido'] || 0) + (c['nuevo'] || 0) + (c['asignado'] || 0);
-        const enCurso = (c['en_curso'] || 0) + (c['en_proceso'] || 0) + (c['pendiente_confirmacion'] || 0);
-        const finalizados = (c['finalizado'] || 0) + (c['resuelto'] || 0);
-        const total = reclamosFiltrados.length;
-        const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-        const kpisSpec: KpiSpec[] = [
-          {
-            label: 'En mapa',
-            value: total.toLocaleString('es-AR'),
-            icon: FileText,
-            color: theme.primary,
-            footnote: `${reclamos.length} totales`,
-            highlighted: true,
-          },
-          {
-            label: 'Recibidos',
-            value: recibidos.toLocaleString('es-AR'),
-            icon: Inbox,
-            color: estadoColor('recibido'),
-            footnote: `${pct(recibidos).toFixed(1)}% del filtro`,
-            pct: pct(recibidos),
-          },
-          {
-            label: 'En Curso',
-            value: enCurso.toLocaleString('es-AR'),
-            icon: PlayCircle,
-            color: estadoColor('en_curso'),
-            footnote: `${pct(enCurso).toFixed(1)}% del filtro`,
-            pct: pct(enCurso),
-          },
-          {
-            label: 'Finalizados',
-            value: finalizados.toLocaleString('es-AR'),
-            icon: CheckCircle,
-            color: estadoColor('finalizado'),
-            footnote: `${pct(finalizados).toFixed(1)}% del filtro`,
-            pct: pct(finalizados),
-          },
-        ];
-        return <KpiRow kpis={kpisSpec} />;
-      })()}
-
       <div
         className="relative rounded-lg shadow overflow-hidden"
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
@@ -1677,7 +1637,6 @@ export default function Mapa() {
       {/* === Sección de métricas debajo del mapa === */}
       <MapaStats
         reclamos={reclamosFiltrados}
-        totalUniverso={reclamos.length}
         statusColors={ESTADO_COLORS_LISTA}
         statusLabels={estadoLabels}
         onZonaClick={c => focusOnZona(c.centerLat, c.centerLng)}

@@ -1,13 +1,5 @@
 import { useMemo } from 'react';
-import {
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  CheckCircle2,
-  MapPin,
-  Clock,
-  Flame,
-} from 'lucide-react';
+import { TrendingUp, TrendingDown, Flame } from 'lucide-react';
 import {
   PieChart,
   Pie,
@@ -22,16 +14,17 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { Reclamo } from '../../types';
 import {
-  computeKPIs,
   topZonas,
   dailyTimeline,
   distribucionEstados,
   Cluster,
 } from '../../lib/mapaUtils';
 
+// Los 4 KPIs que vivían acá arriba se movieron al strip del SemanticHero de
+// Mapa.tsx (helper compartido: calcularKpisMapa en lib/mapaUtils). Este
+// componente queda solo con los paneles analíticos de abajo.
 interface Props {
   reclamos: Reclamo[];          // ya filtrados por categoría/estado/dependencia/timeline
-  totalUniverso: number;        // total real (sin filtro) para el ratio de cobertura
   statusColors: Record<string, string>;
   statusLabels: Record<string, string>;
   onZonaClick?: (cluster: Cluster) => void;
@@ -39,14 +32,12 @@ interface Props {
 
 export default function MapaStats({
   reclamos,
-  totalUniverso,
   statusColors,
   statusLabels,
   onZonaClick,
 }: Props) {
   const { theme } = useTheme();
 
-  const kpis = useMemo(() => computeKPIs(reclamos), [reclamos]);
   const zonas = useMemo(() => topZonas(reclamos, 5, 200), [reclamos]);
   const timeline = useMemo(() => dailyTimeline(reclamos, 30), [reclamos]);
   const dist = useMemo(() => distribucionEstados(reclamos), [reclamos]);
@@ -65,71 +56,7 @@ export default function MapaStats({
 
   return (
     <div className="space-y-4">
-      {/* === FILA 1: KPIs grandes === */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* KPI 1: Cobertura geo */}
-        <KpiTile
-          icon={<MapPin className="h-5 w-5" />}
-          color="#3b82f6"
-          label="Georreferenciados"
-          value={`${kpis.conUbicacion}`}
-          sub={`de ${totalUniverso} total · ${kpis.pctGeo.toFixed(0)}%`}
-          theme={theme}
-        />
-
-        {/* KPI 2: % Resueltos con tendencia */}
-        <KpiTile
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          color="#10b981"
-          label="% Resueltos"
-          value={`${kpis.pctResueltos.toFixed(0)}%`}
-          sub={
-            kpis.tendenciaResueltosPp != null ? (
-              <span className="flex items-center gap-1">
-                {kpis.tendenciaResueltosPp >= 0 ? (
-                  <TrendingUp className="h-3 w-3" style={{ color: '#10b981' }} />
-                ) : (
-                  <TrendingDown className="h-3 w-3" style={{ color: '#ef4444' }} />
-                )}
-                <span style={{ color: kpis.tendenciaResueltosPp >= 0 ? '#10b981' : '#ef4444' }}>
-                  {kpis.tendenciaResueltosPp >= 0 ? '+' : ''}
-                  {kpis.tendenciaResueltosPp.toFixed(1)}pp
-                </span>
-                <span style={{ color: theme.textSecondary }}>vs. previo</span>
-              </span>
-            ) : (
-              `${kpis.resueltos} de ${kpis.total}`
-            )
-          }
-          theme={theme}
-        />
-
-        {/* KPI 3: Tiempo medio resolución */}
-        <KpiTile
-          icon={<Clock className="h-5 w-5" />}
-          color="#f59e0b"
-          label="Tiempo medio resolución"
-          value={kpis.tiempoMedioDias != null ? `${kpis.tiempoMedioDias.toFixed(1)}d` : 's/d'}
-          sub={
-            kpis.tiempoMedioDias != null
-              ? `promedio sobre ${kpis.resueltos} resueltos`
-              : 'sin reclamos resueltos en el período'
-          }
-          theme={theme}
-        />
-
-        {/* KPI 4: Abiertos > 30d */}
-        <KpiTile
-          icon={<AlertTriangle className="h-5 w-5" />}
-          color={kpis.abiertos30dPlus > 0 ? '#ef4444' : '#10b981'}
-          label="Abiertos > 30 días"
-          value={`${kpis.abiertos30dPlus}`}
-          sub={kpis.abiertos30dPlus > 0 ? 'requieren revisión urgente' : 'todo dentro del SLA'}
-          theme={theme}
-        />
-      </div>
-
-      {/* === FILA 2: Paneles analíticos === */}
+      {/* === Paneles analíticos === */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Top Zonas Calientes */}
         <div className="rounded-xl p-4" style={cardStyle}>
@@ -325,48 +252,6 @@ export default function MapaStats({
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// =====================================================================
-// KPI Tile
-// =====================================================================
-interface KpiTileProps {
-  icon: React.ReactNode;
-  color: string;
-  label: string;
-  value: string;
-  sub: React.ReactNode;
-  theme: ReturnType<typeof useTheme>['theme'];
-}
-
-function KpiTile({ icon, color, label, value, sub, theme }: KpiTileProps) {
-  return (
-    <div
-      className="rounded-xl p-4 transition-all hover:scale-[1.01]"
-      style={{
-        backgroundColor: theme.card,
-        border: `1px solid ${theme.border}`,
-      }}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${color}20`, color }}
-        >
-          {icon}
-        </div>
-        <span className="text-xs font-medium" style={{ color: theme.textSecondary }}>
-          {label}
-        </span>
-      </div>
-      <p className="text-2xl font-bold mb-1" style={{ color: theme.text }}>
-        {value}
-      </p>
-      <div className="text-xs" style={{ color: theme.textSecondary }}>
-        {sub}
       </div>
     </div>
   );
