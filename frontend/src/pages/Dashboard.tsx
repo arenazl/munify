@@ -758,7 +758,7 @@ export default function Dashboard() {
           <span className="live-ring absolute inset-0 rounded-full pointer-events-none" />
           <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
           <Radio className="h-4 w-4 relative z-10 live-radio" />
-          <span className="tracking-wider relative z-10">RED</span>
+          <span className="relative z-10">Pulso del día</span>
         </button>
         </div>
         )}

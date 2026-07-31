@@ -1,11 +1,12 @@
 /**
- * Genera los iconos PWA de la marca Paraguay Limpio desde su SVG master.
- * Master: public/brand/paraguay-limpio.svg (fondo verde full-bleed + hoja clara).
- * Salida: public/brand/paraguay-limpio/  (icon-*.png, apple-touch-icon.png, maskable).
+ * Genera los iconos PWA de Paraguay Limpio desde el SVG master del isotipo.
+ * Master: public/brand/paraguay-limpio.svg (opcion 1 "Fiel al original",
+ * elegida por el dueño 2026-07-31 — sol + colinas + camino, transparente).
+ * Salida: public/brand/paraguay-limpio/ (icon-*.png, apple-touch, maskable).
  *
- * A diferencia de generate-icons.cjs (Munify, fondo transparente), acá usamos
- * fit:'cover' porque el master ya trae el fondo solido — iOS necesita fondo,
- * y asi el icono guardado deja de ser el logo de Munify en blanco.
+ * Composicion: tile cuadrado BLANCO con el mark centrado (76% del canvas;
+ * maskable al 64% para sobrevivir el recorte circular de Android). iOS no
+ * soporta transparencia en apple-touch-icon, por eso el fondo solido.
  */
 const sharp = require('sharp');
 const fs = require('fs');
@@ -16,9 +17,14 @@ const MASTER = path.join(ROOT, 'public/brand/paraguay-limpio.svg');
 const OUT = path.join(ROOT, 'public/brand/paraguay-limpio');
 const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
 
-async function renderAt(size) {
-  return sharp(MASTER, { density: 300, limitInputPixels: false })
-    .resize(size, size, { fit: 'cover' })
+async function tile(size, contentRatio = 0.76) {
+  const inner = Math.round(size * contentRatio);
+  const markBuf = await sharp(MASTER, { density: 300, limitInputPixels: false })
+    .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+  return sharp({ create: { width: size, height: size, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+    .composite([{ input: markBuf, gravity: 'centre' }])
     .png()
     .toBuffer();
 }
@@ -28,16 +34,13 @@ async function main() {
   if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 
   for (const size of sizes) {
-    fs.writeFileSync(path.join(OUT, `icon-${size}x${size}.png`), await renderAt(size));
+    fs.writeFileSync(path.join(OUT, `icon-${size}x${size}.png`), await tile(size));
     console.log(`OK icon-${size}x${size}.png`);
   }
-  // apple-touch 180 (iOS home screen)
-  fs.writeFileSync(path.join(OUT, 'apple-touch-icon.png'), await renderAt(180));
+  fs.writeFileSync(path.join(OUT, 'apple-touch-icon.png'), await tile(180));
   console.log('OK apple-touch-icon.png');
-  // notification / any-maskable 512 (el master ya trae padding interno)
-  fs.writeFileSync(path.join(OUT, 'icon-maskable-512x512.png'), await renderAt(512));
+  fs.writeFileSync(path.join(OUT, 'icon-maskable-512x512.png'), await tile(512, 0.64));
   console.log('OK icon-maskable-512x512.png');
-
-  console.log('Done PL icons.');
+  console.log('Done PL icons (vector master).');
 }
 main().catch((e) => { console.error(e); process.exit(1); });

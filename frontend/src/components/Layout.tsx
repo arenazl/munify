@@ -1353,7 +1353,7 @@ export default function Layout() {
                     // en vivo (En Vivo). En el banner se veían mal en la PWA.
                     items.push(
                       { label: 'Conocé', icon: Sparkles, color: BRAND.primary, onClick: () => setPresentacionOpen(true) },
-                      { label: 'En Vivo', icon: Radio, color: '#ef4444', onClick: () => navigate('/gestion?live=1') },
+                      { label: 'Pulso', icon: Radio, color: '#ef4444', onClick: () => navigate('/gestion?live=1') },
                     );
                     items.push(
                       { label: 'Mapa', icon: Map, color: '#3b82f6', onClick: () => navigate('/gestion/mapa') },
