@@ -452,11 +452,17 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
+              {/* Nombre de marca con el criterio bicolor del lockup elegido:
+                  primera palabra al color del sidebar, resto en el accent de
+                  la marca. Nombres de una palabra (Munify) quedan igual. */}
               <span
                 className={`block font-bold leading-tight ${BRAND.name.length > 12 ? 'text-sm' : 'text-lg'}`}
                 style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
-                {BRAND.name}
+                {BRAND.name.split(' ')[0]}
+                {BRAND.name.split(' ').length > 1 && (
+                  <span style={{ color: BRAND.accent }}> {BRAND.name.split(' ').slice(1).join(' ')}</span>
+                )}
               </span>
               {/* Super Admin (sin municipio_id) no muestra municipio */}
               {municipioActual && user?.municipio_id && (

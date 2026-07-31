@@ -235,14 +235,20 @@ export default function Login() {
           <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-25" style={{ background: accent }} />
           <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full blur-3xl opacity-10" style={{ background: accent }} />
 
-          {/* marca */}
-          <div className="relative flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center ring-1 ring-white/10" style={{ backgroundColor: `${accent}1f` }}>
-              <BrandMark size={30} />
-            </div>
+          {/* marca — lockup "Logo XL" elegido por el dueño (2026-07-31): logo
+              grande y SUELTO (sin tile con fill), nombre bicolor (primera
+              palabra blanca, resto verde claro) con la tipografía de siempre,
+              y la bajada intacta con sus caps espaciadas. */}
+          <div className="relative flex items-center gap-5">
+            <BrandMark size={82} className="flex-shrink-0" />
             <div className="leading-tight">
-              <div className="text-lg font-extrabold" style={{ fontFamily: BRAND.nameFont }}>{BRAND.name}</div>
-              <div className="text-[10px] font-semibold tracking-[0.25em]" style={{ color: accent }}>PLATAFORMA CIUDADANA</div>
+              <div className="text-[32px] font-extrabold tracking-tight" style={{ fontFamily: BRAND.nameFont }}>
+                <span className="text-white">{BRAND.name.split(' ')[0]}</span>
+                {BRAND.name.split(' ').length > 1 && (
+                  <span style={{ color: '#6fce85' }}> {BRAND.name.split(' ').slice(1).join(' ')}</span>
+                )}
+              </div>
+              <div className="text-[10px] font-semibold tracking-[0.25em] mt-1" style={{ color: accent }}>PLATAFORMA CIUDADANA</div>
             </div>
           </div>
 
