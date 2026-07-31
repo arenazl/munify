@@ -443,7 +443,9 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <BrandMark size={24} variant="sidebar" className="flex-shrink-0" />
+            {/* Logo SIEMPRE a 40 (regla del dueño: "el logo va de este tamaño,
+                el logo que sea" — la referencia es el bloque de Munify). */}
+            <BrandMark size={40} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
