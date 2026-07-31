@@ -3,6 +3,7 @@
 Solo cubre las primitivas que usa el Mostrador:
   - GET  /operador/mostrador/home            -> metricas del operador del dia
   - GET  /operador/vecinos/buscar?dni=...    -> buscador de cliente registrado
+  - POST /operador/vecinos                   -> alta manual de vecino (sin biometria)
   - POST /operador/kyc/iniciar               -> sesion Didit presencial
   - GET  /operador/kyc/{session_id}/estado   -> polling decision Didit
 
@@ -61,6 +62,26 @@ class VecinoEncontrado(BaseModel):
     verificado_at: Optional[str]
 
 
+def _normalizar_dni(dni: str) -> str:
+    """Deja solo digitos: '30.217.134' -> '30217134'."""
+    return "".join(c for c in (dni or "") if c.isdigit())
+
+
+def _vecino_out(u: User) -> VecinoEncontrado:
+    return VecinoEncontrado(
+        user_id=u.id,
+        dni=u.dni or "",
+        nombre=u.nombre,
+        apellido=u.apellido,
+        email=u.email,
+        telefono=u.telefono,
+        direccion=getattr(u, "direccion", None),
+        nivel_verificacion=u.nivel_verificacion or 0,
+        kyc_modo=u.kyc_modo,
+        verificado_at=u.verificado_at.isoformat() if u.verificado_at else None,
+    )
+
+
 @router.get("/vecinos/buscar", response_model=List[VecinoEncontrado])
 async def buscar_vecino(
     dni: Optional[str] = None,
@@ -87,7 +108,14 @@ async def buscar_vecino(
     ]
 
     if dni and dni.strip():
-        conds.append(User.dni == dni.strip())
+        # Match tolerante a formato: compara solo los digitos de ambos lados
+        # ('30.217.134' en BD matchea '30217134' tipeado y viceversa).
+        dni_norm = _normalizar_dni(dni)
+        if not dni_norm:
+            raise HTTPException(status_code=400, detail="DNI inválido")
+        conds.append(
+            func.replace(func.replace(User.dni, ".", ""), " ", "") == dni_norm
+        )
     elif q and q.strip():
         like = f"%{q.strip()}%"
         conds.append(
@@ -103,21 +131,113 @@ async def buscar_vecino(
     r = await db.execute(stmt)
     users = r.scalars().all()
 
-    return [
-        VecinoEncontrado(
-            user_id=u.id,
-            dni=u.dni or "",
-            nombre=u.nombre,
-            apellido=u.apellido,
-            email=u.email,
-            telefono=u.telefono,
-            direccion=getattr(u, "direccion", None),
-            nivel_verificacion=u.nivel_verificacion or 0,
-            kyc_modo=u.kyc_modo,
-            verificado_at=u.verificado_at.isoformat() if u.verificado_at else None,
-        )
-        for u in users
-    ]
+    return [_vecino_out(u) for u in users]
+
+
+# ============================================================
+# 1.bis Alta manual de vecino (sin biometria)
+# ============================================================
+
+class AltaManualVecinoRequest(BaseModel):
+    dni: str
+    nombre: str
+    apellido: str
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    direccion: Optional[str] = None
+
+
+@router.post("/vecinos", response_model=VecinoEncontrado)
+async def alta_manual_vecino(
+    body: AltaManualVecinoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Alta manual de un vecino desde el Mostrador, SIN validacion biometrica.
+
+    Regla de negocio: el alta simple alcanza para RECLAMOS (y turnos). Para
+    TRAMITES la validacion RENAPER del vecino es obligatoria — ese gate vive
+    en api/tramites.py (403 kyc_insuficiente) y el vecino creado aca queda en
+    nivel_verificacion=0 hasta pasar por el flujo 'Por celular' (Didit).
+
+    Idempotente por DNI: si ya existe un vecino con ese DNI en el muni del
+    operador (o sin muni), completa los campos vacios y devuelve el existente.
+    """
+    _asegurar_operador(current_user)
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
+
+    dni = _normalizar_dni(body.dni)
+    if not (6 <= len(dni) <= 9):
+        raise HTTPException(status_code=422, detail="DNI inválido (6 a 9 dígitos)")
+    nombre = (body.nombre or "").strip()
+    apellido = (body.apellido or "").strip()
+    if not nombre or not apellido:
+        raise HTTPException(status_code=422, detail="Nombre y apellido son obligatorios")
+
+    # ¿Ya existe un vecino con ese DNI (en cualquier formato) en este muni?
+    q = await db.execute(
+        select(User).where(
+            func.replace(func.replace(User.dni, ".", ""), " ", "") == dni,
+            User.rol == RolUsuario.VECINO,
+            (User.municipio_id == current_user.municipio_id) | (User.municipio_id.is_(None)),
+        ).limit(1)
+    )
+    existente = q.scalar_one_or_none()
+    if existente:
+        # Completar campos vacios sin pisar lo que ya este cargado.
+        for campo, valor in (
+            ("nombre", nombre),
+            ("apellido", apellido),
+            ("telefono", (body.telefono or "").strip() or None),
+            ("direccion", (body.direccion or "").strip() or None),
+        ):
+            if valor and not getattr(existente, campo, None):
+                setattr(existente, campo, valor)
+        await db.commit()
+        await db.refresh(existente)
+        return _vecino_out(existente)
+
+    # Email: si el operador cargo uno y esta libre, se usa; si esta tomado
+    # por OTRA cuenta, caemos al placeholder (no pisamos cuentas ajenas).
+    from secrets import token_urlsafe
+    from core.security import get_password_hash
+
+    email = (body.email or "").strip().lower() or None
+    if email:
+        qe = await db.execute(select(User).where(User.email == email).limit(1))
+        if qe.scalar_one_or_none() is not None:
+            email = None
+    if not email:
+        email = f"v-{dni}-{current_user.municipio_id}@vecino.munify.local"
+
+    nuevo = User(
+        email=email,
+        password_hash=get_password_hash(token_urlsafe(16)),
+        nombre=nombre,
+        apellido=apellido,
+        dni=dni,
+        telefono=(body.telefono or "").strip() or None,
+        direccion=(body.direccion or "").strip() or None,
+        rol=RolUsuario.VECINO,
+        municipio_id=current_user.municipio_id,
+        cuenta_verificada=False,
+        nivel_verificacion=0,   # sin RENAPER: sirve para reclamos, no para tramites
+        kyc_modo=None,
+    )
+    try:
+        db.add(nuevo)
+        await db.commit()
+        await db.refresh(nuevo)
+        return _vecino_out(nuevo)
+    except Exception:
+        # Colision de email placeholder (mismo DNI ya tenia ghost): re-buscar.
+        await db.rollback()
+        q2 = await db.execute(select(User).where(User.email == email).limit(1))
+        u = q2.scalar_one_or_none()
+        if u is None:
+            raise HTTPException(status_code=500, detail="No se pudo crear el vecino")
+        return _vecino_out(u)
 
 
 # ============================================================

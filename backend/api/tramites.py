@@ -845,6 +845,27 @@ async def crear_solicitud(
         # Defensa: solo vecinos de este muni o sin muni asignado
         if vecino.municipio_id and vecino.municipio_id != municipio_id:
             raise HTTPException(status_code=403, detail="El vecino no pertenece a este municipio")
+        # Regla de negocio Mostrador: para TRAMITES la validacion biometrica
+        # del VECINO es obligatoria (RENAPER via Didit, self-service o
+        # asistida => nivel_verificacion >= 2). El gate `requiere_kyc` de mas
+        # arriba mira a current_user, que en ventanilla es el OPERADOR — aca
+        # validamos al vecino real. Para RECLAMOS el alta simple alcanza
+        # (api/reclamos.py no exige este check).
+        nivel_vecino = int(getattr(vecino, "nivel_verificacion", 0) or 0)
+        if nivel_vecino < 2:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "kyc_insuficiente",
+                    "mensaje": (
+                        "Para iniciar un trámite el vecino tiene que validar su "
+                        "identidad (RENAPER). Hacelo desde el Mostrador con la "
+                        "opción 'Por celular'. Para reclamos no hace falta."
+                    ),
+                    "nivel_requerido": 2,
+                    "nivel_actual": nivel_vecino,
+                },
+            )
         solicitante_id = vecino.id
         es_ventanilla_asistida = True
         # Prellenar campos del solicitante con datos del User

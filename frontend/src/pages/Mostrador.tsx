@@ -8,6 +8,7 @@ import {
   Mail, MapPin, Banknote, Clock, CalendarClock,
 } from 'lucide-react';
 import ReservarTurnoSheet from '../components/turnos/ReservarTurnoSheet';
+import { AltaManualVecinoSheet } from '../components/mostrador/AltaManualVecinoSheet';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -33,6 +34,9 @@ interface KycDatos {
   email?: string | null;
   telefono?: string | null;
   direccion?: string | null;
+  // 0 = sin verificar · 2 = identidad validada (RENAPER, self-service o asistida).
+  // Regla de negocio: trámites exigen >= 2; reclamos/turnos no.
+  nivel_verificacion?: number;
 }
 
 interface VecinoEncontrado {
@@ -69,6 +73,10 @@ export default function Mostrador() {
   const [kycSessionId, setKycSessionId] = useState<string | null>(null);
   const [metricas, setMetricas] = useState<MostradorMetricas | null>(null);
   const [turnoSheetOpen, setTurnoSheetOpen] = useState(false);
+  // Alta manual de vecino (sin biometria) — se abre desde "Cargar vecino
+  // nuevo" / "Cargar a mano", opcionalmente con el DNI ya tipeado.
+  const [altaManualOpen, setAltaManualOpen] = useState(false);
+  const [altaManualDni, setAltaManualDni] = useState('');
 
   const municipioId = user?.municipio_id ?? null;
 
@@ -218,6 +226,7 @@ export default function Mostrador() {
               email: v.email,
               telefono: v.telefono,
               direccion: v.direccion,
+              nivel_verificacion: v.nivel_verificacion,
             }, null)
           }
           onBiometriaOk={(d, sid) =>
@@ -226,13 +235,39 @@ export default function Mostrador() {
               dni: d.dni,
               nombre: d.nombre,
               apellido: d.apellido,
+              nivel_verificacion: 2,
             }, sid)
           }
-          onCargarManual={() =>
-            handleVecinoListo({ user_id: undefined, dni: null, nombre: null, apellido: null }, null)
-          }
+          onCargarManual={(dniPrefill) => {
+            // Guard: si llega desde un onClick directo, el primer arg es un
+            // MouseEvent — solo aceptamos string.
+            setAltaManualDni(typeof dniPrefill === 'string' ? dniPrefill : '');
+            setAltaManualOpen(true);
+          }}
         />
       )}
+
+      {/* Alta manual de vecino (sin biometria): crea el registro real y
+          recien ahi avanza al hub — antes este boton mandaba al hub con un
+          vecino vacio (user_id undefined) y todo quedaba bloqueado. */}
+      <AltaManualVecinoSheet
+        open={altaManualOpen}
+        dniInicial={altaManualDni}
+        onClose={() => setAltaManualOpen(false)}
+        onCreado={(v) => {
+          setAltaManualOpen(false);
+          handleVecinoListo({
+            user_id: v.user_id,
+            dni: v.dni,
+            nombre: v.nombre,
+            apellido: v.apellido,
+            email: v.email,
+            telefono: v.telefono,
+            direccion: v.direccion,
+            nivel_verificacion: v.nivel_verificacion,
+          }, null);
+        }}
+      />
 
       {paso === 'hub' && vecino && (
         <Hub
@@ -266,7 +301,7 @@ export default function Mostrador() {
 function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }: {
   onClienteRegistrado: (v: VecinoEncontrado) => void;
   onBiometriaOk: (datos: KycDatos, sessionId: string) => void;
-  onCargarManual: () => void;
+  onCargarManual: (dniPrefill?: string) => void;
 }) {
   const { theme } = useTheme();
   const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
@@ -281,7 +316,7 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
           label="Por DNI"
           sub="Cliente ya registrado en el padrón municipal"
         >
-          <PanelDni onUsar={onClienteRegistrado} />
+          <PanelDni onUsar={onClienteRegistrado} onCargarManual={onCargarManual} />
         </ColumnaModo>
 
         {/* Columna derecha — Celular / RENAPER */}
@@ -311,7 +346,7 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
           </button>
           <span style={{ color: theme.border }}>·</span>
           <button
-            onClick={onCargarManual}
+            onClick={() => onCargarManual()}
             className="font-semibold hover:underline"
             style={{ color: theme.primary }}
           >
@@ -372,7 +407,10 @@ function ColumnaModo({ color, icon, label, sub, children }: {
 // ============================================================
 // PanelDni — input compacto + resultados enriquecidos
 // ============================================================
-function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
+function PanelDni({ onUsar, onCargarManual }: {
+  onUsar: (v: VecinoEncontrado) => void;
+  onCargarManual: (dniPrefill?: string) => void;
+}) {
   const { theme } = useTheme();
   const [dni, setDni] = useState('');
   const [buscando, setBuscando] = useState(false);
@@ -497,6 +535,14 @@ function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
             <p style={{ color: theme.textSecondary }}>
               Probá con biometría (cliente nuevo) o cargá los datos a mano.
             </p>
+            <button
+              onClick={() => onCargarManual(dni)}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
+              style={{ backgroundColor: theme.primary }}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Cargar a mano con este DNI
+            </button>
           </div>
         </div>
       )}
@@ -657,7 +703,7 @@ function BusquedaLibre({ onUsar, onCargarManual }: {
             <p className="font-semibold" style={{ color: theme.text }}>Sin coincidencias</p>
             <p style={{ color: theme.textSecondary }}>Probá otra palabra o cargalo a mano si es nuevo.</p>
             <button
-              onClick={onCargarManual}
+              onClick={() => onCargarManual()}
               className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
               style={{ backgroundColor: theme.primary }}
             >
@@ -685,20 +731,33 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
 }) {
   const { theme } = useTheme();
 
+  // Regla de negocio: TRAMITES exigen identidad validada (RENAPER, nivel >= 2
+  // o sesion biometrica de esta atencion). RECLAMOS y turnos: alta simple.
+  const tramiteHabilitado = (vecino.nivel_verificacion ?? 0) >= 2 || !!kycSessionId;
+  const irTramiteGuard = useCallback(() => {
+    if (!tramiteHabilitado) {
+      toast.error(
+        'Para trámites el vecino tiene que validar su identidad con RENAPER (opción "Por celular"). Para reclamos no hace falta.',
+      );
+      return;
+    }
+    onIrTramite();
+  }, [tramiteHabilitado, onIrTramite]);
+
   // Atajos de teclado: R / T / D / U / Esc
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); onIrReclamo(); }
-      if (e.key === 't' || e.key === 'T') { e.preventDefault(); onIrTramite(); }
+      if (e.key === 't' || e.key === 'T') { e.preventDefault(); irTramiteGuard(); }
       if (e.key === 'd' || e.key === 'D') { e.preventDefault(); onIrTasas(); }
       if (e.key === 'u' || e.key === 'U') { e.preventDefault(); onIrTurno(); }
       if (e.key === 'Escape') { e.preventDefault(); onReset(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onIrReclamo, onIrTramite, onIrTasas, onIrTurno, onReset]);
+  }, [onIrReclamo, irTramiteGuard, onIrTasas, onIrTurno, onReset]);
 
   return (
     <div className="space-y-4">
@@ -733,11 +792,15 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
           icon={<FileText className="w-5 h-5" />}
           kbd="T"
           title="Trámite"
-          subtitle="Iniciar trámite. Mandá requisitos por WhatsApp o imprimí el PDF."
-          contextBadge={{ tone: 'violet', text: 'AI ayuda a clasificar' }}
-          highlighted
-          ctaLabel="Iniciar trámite"
-          onStart={onIrTramite}
+          subtitle={tramiteHabilitado
+            ? 'Iniciar trámite. Mandá requisitos por WhatsApp o imprimí el PDF.'
+            : 'Requiere validar la identidad del vecino con RENAPER (opción "Por celular").'}
+          contextBadge={tramiteHabilitado
+            ? { tone: 'violet', text: 'AI ayuda a clasificar' }
+            : { tone: 'red', text: 'Requiere RENAPER' }}
+          highlighted={tramiteHabilitado}
+          ctaLabel={tramiteHabilitado ? 'Iniciar trámite' : 'Falta RENAPER'}
+          onStart={irTramiteGuard}
         />
         <GestionCard
           color="#f59e0b"
@@ -811,12 +874,13 @@ function VecinoStrip({ vecino, kycSessionId, onReset }: {
             <p className="text-base font-bold truncate" style={{ color: theme.text }}>
               {vecino.nombre || '—'} {vecino.apellido || ''}
             </p>
-            {kycSessionId && (
+            {(kycSessionId || (vecino.nivel_verificacion ?? 0) >= 2) && (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0"
                 style={{ backgroundColor: '#22c55e20', color: '#22c55e' }}
               >
-                <ShieldCheck className="w-3 h-3" /> Verificado RENAPER
+                <ShieldCheck className="w-3 h-3" />
+                {kycSessionId ? 'Verificado RENAPER' : 'Identidad verificada'}
               </span>
             )}
           </div>
@@ -1286,7 +1350,7 @@ function PanelCelular({ onAprobado, onCargarManual }: {
               <RefreshCcw className="w-3.5 h-3.5" /> Reintentar
             </button>
             <button
-              onClick={onCargarManual}
+              onClick={() => onCargarManual()}
               className="px-3 py-1.5 rounded-lg text-xs font-medium"
               style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
             >
@@ -1328,7 +1392,7 @@ function PanelCelular({ onAprobado, onCargarManual }: {
           <h3 className="text-base font-bold" style={{ color: '#ef4444' }}>No se pudo iniciar</h3>
           <p className="text-sm" style={{ color: theme.textSecondary }}>{error}</p>
           <button
-            onClick={onCargarManual}
+            onClick={() => onCargarManual()}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
           >
