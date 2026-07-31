@@ -443,7 +443,7 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <BrandMark size={24} variant="sidebar" className="flex-shrink-0" />
+            <BrandMark size={30} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
@@ -452,17 +452,35 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
-              {/* Nombre de marca con el criterio bicolor del lockup elegido:
-                  primera palabra al color del sidebar, resto en el accent de
-                  la marca. Nombres de una palabra (Munify) quedan igual. */}
+              {/* Nombre de marca = versión a escala del lockup del hero:
+                  MISMA letra y peso (extrabold), text-lg, bicolor (primera
+                  palabra al color del sidebar, resto en el accent). Solo
+                  nombres muy largos (>16) bajan a text-sm para no desbordar;
+                  Munify (una palabra) queda igual que siempre. */}
               <span
-                className={`block font-bold leading-tight ${BRAND.name.length > 12 ? 'text-sm' : 'text-lg'}`}
+                className={`block font-extrabold tracking-tight leading-tight ${BRAND.name.length > 16 ? 'text-sm' : 'text-lg'}`}
                 style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
-                {BRAND.name.split(' ')[0]}
-                {BRAND.name.split(' ').length > 1 && (
-                  <span style={{ color: BRAND.accent }}> {BRAND.name.split(' ').slice(1).join(' ')}</span>
-                )}
+                {(() => {
+                  // Bicolor: multi-palabra corta por espacio; una palabra usa
+                  // nameAccentIndex (Munify: "Muni"+"fy"). Sin índice → plano.
+                  const words = BRAND.name.split(' ');
+                  let head = BRAND.name;
+                  let tail = '';
+                  if (words.length > 1) {
+                    head = words[0];
+                    tail = ' ' + words.slice(1).join(' ');
+                  } else if (BRAND.nameAccentIndex) {
+                    head = BRAND.name.slice(0, BRAND.nameAccentIndex);
+                    tail = BRAND.name.slice(BRAND.nameAccentIndex);
+                  }
+                  return (
+                    <>
+                      {head}
+                      {tail && <span style={{ color: BRAND.accent }}>{tail}</span>}
+                    </>
+                  );
+                })()}
               </span>
               {/* Super Admin (sin municipio_id) no muestra municipio */}
               {municipioActual && user?.municipio_id && (

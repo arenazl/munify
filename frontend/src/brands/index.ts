@@ -40,6 +40,10 @@ export interface Brand {
   iconPath?: string;
   /** Fuente propia para el nombre de la marca (identidad tipográfica). */
   nameFont?: string;
+  /** Bicolor del nombre para marcas de UNA palabra: índice donde arranca el
+   *  tramo acentuado (ej. Munify con 4 → "Muni"+"fy" en accent). Las marcas
+   *  multi-palabra no lo necesitan: el corte es por espacio. */
+  nameAccentIndex?: number;
   /** Layout de la pantalla de login. 'split' = hero de marca + panel de acceso;
    *  'centered' (default, sin setear) = login clásico de Munify centrado. */
   loginLayout?: 'split' | 'centered';
@@ -71,6 +75,7 @@ const BRANDS: Record<string, Brand> = {
     logoSrc: null,
     primary: '#3b82f6',
     accent: '#22c55e',
+    nameAccentIndex: 4, // "Muni" + "fy" en verde (espejo del logo azul+check verde)
   },
   'paraguay-limpio': {
     id: 'paraguay-limpio',
