@@ -443,7 +443,7 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <BrandMark size={30} variant="sidebar" className="flex-shrink-0" />
+            <BrandMark size={24} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
@@ -452,13 +452,11 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
-              {/* Nombre de marca = versión a escala del lockup del hero:
-                  MISMA letra y peso (extrabold), text-lg, bicolor (primera
-                  palabra al color del sidebar, resto en el accent). Solo
-                  nombres muy largos (>16) bajan a text-sm para no desbordar;
-                  Munify (una palabra) queda igual que siempre. */}
+              {/* Bloque de marca del sidebar: distribución y tamaños ORIGINALES
+                  (la escala grande del lockup es SOLO del hero del login).
+                  Único agregado: el bicolor tenant-driven del nombre. */}
               <span
-                className={`block font-extrabold tracking-tight leading-tight whitespace-nowrap ${BRAND.name.length > 12 ? 'text-[15px]' : 'text-lg'}`}
+                className={`block font-bold leading-tight ${BRAND.name.length > 12 ? 'text-sm' : 'text-lg'}`}
                 style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
                 {(() => {
