@@ -84,8 +84,9 @@ const BRANDS: Record<string, Brand> = {
     tagline: 'Tu ciudad más limpia. Reportá y seguí tus reclamos.',
     logoSrc: null,        // usa el SVG editable, no un PNG con fondo blanco
     Logo: ParaguayLimpioLogo,
-    iconPath: 'brand/paraguay-limpio', // iconos PWA propios (fondo verde + hoja)
-    nameFont: "'Plus Jakarta Sans', system-ui, sans-serif",
+    iconPath: 'brand/paraguay-limpio', // iconos PWA propios (isotipo real)
+    // SIN nameFont a pedido del dueño (2026-07-31): misma letra SIEMPRE — el
+    // nombre renderiza con la fuente de la app (Inter), igual que Munify.
     primary: '#1b7a3d',   // verde oscuro del logo
     accent: '#5cb85c',    // verde claro del logo
     municipioCodigo: 'asuncion',
