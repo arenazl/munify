@@ -688,7 +688,7 @@ export default function Layout() {
         </div>
 
         {/* Navegación */}
-        <nav className="relative z-10 flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
+        <nav className="relative z-10 flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item, idx) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
@@ -707,7 +707,7 @@ export default function Layout() {
               <React.Fragment key={item.href}>
                 {showCategoryHeader && (
                   <div
-                    className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider select-none"
+                    className="pl-4 pr-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider select-none"
                     style={{ color: theme.sidebarTextSecondary, opacity: 0.55 }}
                   >
                     {itemCategoria}
@@ -720,7 +720,7 @@ export default function Layout() {
                   backgroundColor: isActive ? theme.primary : 'transparent',
                   color: isActive ? '#ffffff' : theme.sidebarTextSecondary,
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  paddingLeft: isCollapsed ? '0' : '12px',
+                  paddingLeft: isCollapsed ? '0' : '16px',
                   paddingRight: isCollapsed ? '0' : '12px',
                   transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
