@@ -17,6 +17,7 @@ import './index.css'
 import './styles/animations.css'
 import './styles/pl-tokens.css'
 import './styles/semantic-hero.css'
+import './styles/abmv2.css'
 
 // Aplica la marca activa (VITE_BRAND) al documento antes del render:
 // título, favicon y theme-color. Para 'munify' es un no-op efectivo.
