@@ -11,6 +11,7 @@ import {
 } from '../config/themePresets';
 import { DEFAULT_FONT_ID } from '../config/fontPresets';
 import { applyFontFamily } from '../lib/fontLoader';
+import { mix, lighten, darken, alpha, isLight } from '../lib/colorUtils';
 import { BRAND } from '../brands';
 
 // Preset/variante por defecto de la MARCA activa: sólo si la marca declara
@@ -188,6 +189,83 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--color-primary-hover', theme.primaryHover);
     root.style.setProperty('--bg-card', theme.card);
     root.style.setProperty('--bg-sidebar', theme.sidebar);
+
+    // ---- Puente POLIMÓRFICO de tokens del rediseño v2 (--pl-*) ----
+    // La paleta completa de Claude Design se DERIVA del theme activo: acento,
+    // tintes, superficies, textos, rampa de datos y scrims del hero. Así el
+    // rediseño funciona en todos los presets y marcas sin un color fijo.
+    // (Los tokens estáticos —tipografía/espaciado/radios— viven en
+    // styles/pl-tokens.css.)
+    const p = theme.primary;
+    const claro = isLight(theme.background);
+    const set = (k: string, v: string) => root.style.setProperty(k, v);
+
+    set('--pl-green', p);
+    set('--pl-green-600', theme.primaryHover);
+    set('--pl-green-700', claro ? darken(p, 14) : lighten(p, 30)); // texto sobre acento suave
+    set('--pl-green-200', mix(theme.card, p, 0.30));
+    set('--pl-green-100', mix(theme.card, p, 0.16));
+    set('--pl-green-050', mix(theme.card, p, 0.08));
+    set('--pl-on-brand', theme.primaryText);
+
+    // Semánticos: ÚNICAS constantes = los 3 matices universales (warning/
+    // danger/info). Todas sus variantes (texto accesible, superficie suave)
+    // se DERIVAN del theme activo, igual que el resto.
+    const AMBER = '#F59E0B';
+    const RED = '#E5484D';
+    const BLUE = '#3B82F6';
+    const semantico = (base: string, prefijo: string) => {
+      set(`--pl-${prefijo}`, base);
+      set(`--pl-${prefijo}-700`, claro ? darken(base, 22) : lighten(base, 25));
+      set(`--pl-${prefijo}-100`, mix(theme.card, base, 0.14));
+    };
+    semantico(AMBER, 'amber');
+    semantico(RED, 'red');
+    semantico(BLUE, 'blue');
+    set('--pl-amber-strong', AMBER);
+
+    // Rampa para series de datos (acento → neutro)
+    set('--pl-data-1', p);
+    set('--pl-data-2', mix(p, theme.card, 0.25));
+    set('--pl-data-3', mix(p, theme.card, 0.45));
+    set('--pl-data-4', mix(p, theme.card, 0.62));
+    set('--pl-data-5', mix(theme.card, theme.textSecondary, 0.35));
+
+    // Superficies y texto
+    set('--pl-bg', theme.background);
+    set('--pl-surface', theme.card);
+    set('--pl-surface-2', theme.backgroundSecondary);
+    set('--pl-surface-3', mix(theme.card, theme.background, 0.35));
+    set('--pl-surface-hover', mix(theme.card, theme.text, 0.05));
+    set('--pl-track', mix(theme.card, theme.text, 0.08));
+    set('--pl-sidebar-bg', theme.sidebar);
+    set('--pl-text', theme.text);
+    set('--pl-text-2', mix(theme.text, theme.textSecondary, 0.45));
+    set('--pl-text-3', theme.textSecondary);
+    set('--pl-text-muted', mix(theme.textSecondary, theme.background, 0.25));
+    set('--pl-text-faint', mix(theme.textSecondary, theme.background, 0.45));
+    set('--pl-text-disabled', mix(theme.textSecondary, theme.background, 0.62));
+    set('--pl-border', alpha(theme.text, 0.08));
+    set('--pl-border-strong', alpha(theme.text, 0.14));
+    set('--pl-scrim', alpha('#000000', claro ? 0.40 : 0.62));
+
+    // Sombras (suaves en claro, profundas en oscuro)
+    set('--pl-shadow-card', claro
+      ? '0 1px 2px rgba(13,20,18,.04), 0 2px 6px rgba(13,20,18,.04)'
+      : '0 1px 2px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.35)');
+    set('--pl-shadow-float', claro
+      ? '0 6px 20px rgba(13,20,18,.10), 0 2px 6px rgba(13,20,18,.06)'
+      : '0 6px 20px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.35)');
+
+    // Hero: gradiente del acento + veils sobre foto, todo derivado del primary
+    set('--pl-hero-gradient', `linear-gradient(180deg, ${p} 0%, ${darken(p, 25)} 100%)`);
+    set('--pl-hero-veil',
+      `linear-gradient(96deg, ${alpha(darken(p, 38), 0.90)} 0%, ${alpha(darken(p, 30), 0.62)} 42%, ` +
+      `${alpha(p, 0.18)} 78%, ${alpha(lighten(p, 8), 0.06)} 100%)`);
+    set('--pl-hero-fade',
+      `linear-gradient(180deg, ${alpha(darken(p, 42), 0.28)} 0%, rgba(0,0,0,0) 30%, ${alpha(darken(p, 42), 0.42)} 100%)`);
+    set('--pl-hero-strip',
+      `linear-gradient(180deg, ${alpha(darken(p, 45), 0.62)} 0%, ${alpha(darken(p, 45), 0.82)} 100%)`);
 
     // Aplicar al body directamente
     document.body.style.backgroundColor = theme.background;

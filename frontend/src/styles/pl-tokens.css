@@ -1,0 +1,66 @@
+/* ============================================================
+   Tokens del rediseño v2 (origen: Claude Design, handoff
+   design_handoff_dashboard_municipal/tokens.css).
+
+   POLIMÓRFICO: acá viven SOLO los tokens ESTÁTICOS (tipografía,
+   espaciado, radios, sombras, motion, layout). Los tokens de COLOR
+   (--pl-green*, superficies, textos, bordes, scrims, rampa de datos)
+   los COMPUTA ThemeContext desde el theme activo y los setea en :root
+   en runtime — así el diseño se adapta a los 12+ presets y a cualquier
+   marca sin hardcodear un solo color.
+   ============================================================ */
+
+:root {
+  /* --- Tipografía (una sola familia para toda la app; display = la misma
+     salvo que el dueño apruebe otra) --- */
+  --pl-font-sans: var(--app-font-family, Inter, system-ui, sans-serif);
+  --pl-font-display: var(--pl-font-sans);
+
+  --pl-fs-eyebrow:    10.5px;  /* MAYÚSCULAS, tracking .09em, 700 */
+  --pl-fs-micro:      11px;
+  --pl-fs-caption:    11.5px;
+  --pl-fs-body-sm:    12.5px;
+  --pl-fs-body:       13.5px;
+  --pl-fs-input:      16px;
+  --pl-fs-card-title: 15px;
+  --pl-fs-hero-line:  20px;   /* frase semántica */
+  --pl-fs-kpi:        34px;
+  --pl-fs-hero:       38px;
+
+  --pl-tracking-eyebrow: 0.09em;
+  --pl-tracking-display: -0.02em;
+  --pl-tracking-hero:    -0.025em;
+
+  /* --- Espaciado (base 4) --- */
+  --pl-space-1: 4px;  --pl-space-2: 8px;  --pl-space-3: 12px;
+  --pl-space-4: 16px; --pl-space-5: 20px; --pl-space-6: 24px;
+  --pl-space-8: 32px; --pl-space-10: 40px;
+
+  /* --- Radios --- */
+  --pl-radius-sm:   8px;
+  --pl-radius-md:   10px;
+  --pl-radius-lg:   12px;
+  --pl-radius-xl:   16px;
+  --pl-radius-pill: 999px;
+
+  /* --- Movimiento --- */
+  --pl-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --pl-dur-ui: 150ms;
+  --pl-dur-sheet: 240ms;
+
+  /* --- Layout --- */
+  --pl-sidebar-w: 256px;
+  --pl-sidebar-w-collapsed: 72px;
+  --pl-drawer-w: 480px;
+  --pl-topbar-h: 46px;
+
+  /* --- Colores: DEFAULTS neutros de arranque (los pisa ThemeContext en el
+     primer render; están para que nada quede transparente si algo se lee
+     antes del bridge) --- */
+  --pl-green: var(--color-primary, #1b7a3d);
+  --pl-on-brand: #ffffff;
+  --pl-bg: var(--bg-primary, #1a1a1d);
+  --pl-surface: var(--bg-card, #222226);
+  --pl-text: var(--text-primary, #eef2ea);
+  --pl-border: var(--border-color, rgba(128, 128, 128, 0.2));
+}

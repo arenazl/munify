@@ -15,6 +15,7 @@ import { BRAND } from './brands'
 import { applyBrand } from './brands/applyBrand'
 import './index.css'
 import './styles/animations.css'
+import './styles/pl-tokens.css'
 
 // Aplica la marca activa (VITE_BRAND) al documento antes del render:
 // título, favicon y theme-color. Para 'munify' es un no-op efectivo.
