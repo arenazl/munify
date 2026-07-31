@@ -171,7 +171,9 @@ export const router = createBrowserRouter([
   { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoReady /> },
   // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
   { path: '/presentacion', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <PresentacionMunify /> },
-  { path: '/bienvenido', element: <Landing /> },
+  // Marca mono-tenant: /bienvenido (selector de municipios de Munify) NUNCA se
+  // muestra — logout y deep-links caen en el acceso cerrado de la marca.
+  { path: '/bienvenido', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   // Handoff de captura móvil (DNI + selfie con Didit en el celu del operador)

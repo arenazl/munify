@@ -304,10 +304,10 @@ export default function Landing() {
         <header className="px-3 sm:px-6 py-4 sm:py-6">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              {/* Logo OFICIAL de la marca sobre navy de marca — nunca un icono generico */}
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: '#103070', boxShadow: '0 10px 25px -5px rgba(64,112,192,0.45)' }}>
-                <BrandMark size={22} />
-              </div>
+              {/* Logo OFICIAL de la marca, SIEMPRE suelto — jamás adentro de un
+                  tile con fill (regla del dueño 2026-07-31: el recuadro pintado
+                  aplasta el logo "en ningun caso va"). */}
+              <BrandMark size={44} className="flex-shrink-0" />
               <div className="min-w-0">
                 <h1 className="font-bold text-white text-base sm:text-xl truncate">{BRAND.name}</h1>
                 <p className="text-[10px] sm:text-xs text-slate-400 truncate">Gestión municipal integral</p>
