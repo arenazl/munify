@@ -514,9 +514,14 @@ export default function Layout() {
               <p className="text-xs font-semibold leading-tight text-center" style={{ color: theme.sidebarText }}>
                 {user.nombre} {user.apellido}
               </p>
-              <p className="text-xs capitalize mt-0.5 whitespace-nowrap text-center" style={{ color: theme.sidebarTextSecondary }}>
-                {user.dependencia ? 'Dependencia' : user.rol}
-              </p>
+              {/* Rol dinámico: el bloque nunca pasa de 2 renglones. Si el
+                  nombre es largo y wrapea (>18 chars en el sidebar angosto),
+                  el rol se oculta — nombre en 2 líneas + rol = 3 renglones feos. */}
+              {`${user.nombre} ${user.apellido}`.length <= 18 && (
+                <p className="text-xs capitalize mt-0.5 whitespace-nowrap text-center" style={{ color: theme.sidebarTextSecondary }}>
+                  {user.dependencia ? 'Dependencia' : user.rol}
+                </p>
+              )}
             </div>
             {!isCollapsed && (
               <ChevronDown

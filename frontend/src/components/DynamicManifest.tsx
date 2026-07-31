@@ -88,7 +88,7 @@ export default function DynamicManifest() {
           // en la raíz (el ruteo mono-tenant resuelve solo).
           start_url: data?.codigo ? `${origin}/home?municipio=${data.codigo}` : `${origin}/`,
           display: 'standalone',
-          background_color: '#12341f',
+          background_color: '#ffffff', // splash a juego con los tiles blancos del icono
           theme_color: BRAND.primary,
           orientation: 'portrait-primary',
           icons: [
@@ -110,6 +110,20 @@ export default function DynamicManifest() {
           document.head.appendChild(appleLink);
         }
         appleLink.href = `${base}/apple-touch-icon.png`;
+
+        // Nombre al "Agregar a inicio" en iOS: Safari usa esta meta (o cae al
+        // <title>). Sin ella la PWA se guardaba como "Munify" en iPhone.
+        const ensureMeta = (name: string, content: string) => {
+          let meta = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = name;
+            document.head.appendChild(meta);
+          }
+          meta.content = content;
+        };
+        ensureMeta('apple-mobile-web-app-title', BRAND.name);
+        ensureMeta('application-name', BRAND.name);
 
         const themeColorMeta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
         if (themeColorMeta) themeColorMeta.content = BRAND.primary;
