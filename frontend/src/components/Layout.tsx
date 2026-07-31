@@ -433,7 +433,7 @@ export default function Layout() {
 
         {/* Header del Sidebar: Logo + Municipio */}
         <div
-          className="relative z-10 pl-5 pr-3 py-4 border-b"
+          className="relative z-10 pl-7 pr-3 py-4 border-b"
           style={{ borderColor: `${theme.sidebarTextSecondary}20` }}
         >
           <button
