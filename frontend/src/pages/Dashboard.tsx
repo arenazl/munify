@@ -24,7 +24,9 @@ import {
   Legend,
 } from 'recharts';
 import HeatmapWidget from '../components/ui/HeatmapWidget';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor, veredictoTasa, veredictoMenosEsMejor } from '../lib/veredictos';
 import DashboardLive from '../components/DashboardLive';
 import PresentacionLive from '../components/PresentacionLive';
 import { BRAND } from '../brands';
@@ -483,6 +485,70 @@ export default function Dashboard() {
     return dependencias.find(d => d.id === selectedDependenciaId)?.nombre || null;
   }, [selectedDependenciaId, dependencias]);
 
+  // Frases del hero semántico — solo con datos YA cargados (sin datos, sin frase).
+  // Declarado ANTES de los early returns por la misma regla de hooks de arriba.
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    const u = resolverUmbrales();
+    const frases: HeroFrase[] = [];
+
+    // (a) Entrada del día: nuevos + sin asignar + programados para hoy
+    if (stats && metricasAccion) {
+      frases.push({
+        segmentos: [
+          seg('Hoy entraron '),
+          seg(`${stats.hoy} ${stats.hoy === 1 ? 'reclamo nuevo' : 'reclamos nuevos'}`),
+          seg(', hay '),
+          seg(
+            `${metricasAccion.sin_asignar} sin asignar`,
+            veredictoMasEsPeor(metricasAccion.sin_asignar, u.sinAsignar),
+          ),
+          seg(' y '),
+          seg(
+            `${metricasAccion.para_hoy} ${metricasAccion.para_hoy === 1 ? 'trabajo programado' : 'trabajos programados'}`,
+            'bueno',
+          ),
+          seg(' para hoy.'),
+        ],
+        acciones: [{ label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true }],
+      });
+    }
+
+    // (b) Salud de la gestión: tasa de resolución global + tiempo promedio
+    if (stats && coberturaResumen) {
+      frases.push({
+        segmentos: [
+          seg('Resolvés el '),
+          seg(
+            `${coberturaResumen.tasa_resolucion_global}%`,
+            veredictoTasa(coberturaResumen.tasa_resolucion_global, u.tasaResolucion),
+          ),
+          seg(' de los reclamos, con un promedio de '),
+          seg(
+            `${stats.tiempo_promedio_dias} días`,
+            veredictoMenosEsMejor(stats.tiempo_promedio_dias, u.tiempoResolucionDias),
+          ),
+          seg(' por caso.'),
+        ],
+        acciones: [{ label: 'Ver SLA', to: '/gestion/sla' }],
+      });
+    }
+
+    // (c) La voz del vecino: calificación promedio
+    if (califStats && califStats.total_calificaciones > 0) {
+      frases.push({
+        segmentos: [
+          seg('Los vecinos califican la gestión con '),
+          seg(`${califStats.promedio_general.toFixed(1)} de 5`),
+          seg(
+            ` sobre ${califStats.total_calificaciones} ${califStats.total_calificaciones === 1 ? 'calificación' : 'calificaciones'}.`,
+          ),
+        ],
+      });
+    }
+
+    return frases;
+  }, [stats, metricasAccion, coberturaResumen, califStats]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -657,7 +723,7 @@ export default function Dashboard() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
-      <PageHint pageId="dashboard-home" />
+      <SemanticHero etiqueta={`HOY EN ${municipioNombre.toUpperCase()}`} frases={heroFrases} />
 
       {/* Definiciones de gradientes SVG para los gráficos */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>

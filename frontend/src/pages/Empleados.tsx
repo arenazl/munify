@@ -4,7 +4,9 @@ import { toast } from 'sonner';
 import { empleadosApi, zonasApi, categoriasApi, empleadosGestionApi, dependenciasApi, usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import type { Empleado, Zona, Categoria, User } from '../types';
 
 type VistaRol = 'admin' | 'supervisor' | 'empleado';
@@ -580,6 +582,45 @@ export default function Empleados() {
     },
   ];
 
+  // Hero semántico: solo datos reales ya cargados en la pantalla (sin inventar números)
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading || !isEmpleadoView || empleados.length === 0) return [];
+    const u = resolverUmbrales();
+    const activos = empleados.filter(e => e.activo);
+    const operarios = activos.filter(e => ((e as { tipo?: string }).tipo || 'operario') === 'operario').length;
+    const administrativos = activos.length - operarios;
+    const sinZona = activos.filter(e => !e.zona_id).length;
+
+    const frases: HeroFrase[] = [{
+      segmentos: [
+        seg('Tenés '),
+        seg(
+          `${activos.length} empleado${activos.length === 1 ? '' : 's'} activo${activos.length === 1 ? '' : 's'}`,
+          activos.length > 0 ? 'bueno' : undefined,
+        ),
+        seg(`: ${operarios} operario${operarios === 1 ? '' : 's'} y ${administrativos} administrativo${administrativos === 1 ? '' : 's'}.`),
+      ],
+    }];
+
+    if (activos.length > 0) {
+      frases.push({
+        segmentos:
+          sinZona === 0
+            ? [seg('Cobertura de zonas al día: '), seg('todos con zona asignada', 'bueno'), seg('.')]
+            : [
+                seg('Hay '),
+                seg(
+                  `${sinZona} empleado${sinZona === 1 ? '' : 's'} sin zona asignada`,
+                  veredictoMasEsPeor(sinZona, u.sinAsignar),
+                ),
+                seg(' — asignales una zona para que el despacho los tenga en cuenta.'),
+              ],
+        acciones: [{ label: 'Cuadrillas', to: '/gestion/cuadrillas', primaria: true }],
+      });
+    }
+    return frases;
+  }, [loading, isEmpleadoView, empleados]);
+
   const vistaActual = VISTA_PILLS.find(p => p.value === vistaRol)!;
 
   const pillsBar = (
@@ -639,7 +680,7 @@ export default function Empleados() {
 
   return (
     <>
-      <PageHint pageId="empleados" />
+      <SemanticHero etiqueta="PERSONAL · CAMPO" frases={heroFrases} />
       <ABMPage
       title="Empleados"
       icon={<Users className="h-5 w-5" />}

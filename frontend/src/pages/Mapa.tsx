@@ -42,7 +42,9 @@ import { estadoColor, estadoLabel, estadoColors, estadoLabels } from '../lib/enu
 import { reclamosApi, poiApi, modulosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Slider } from '../components/ui/Slider';
@@ -817,6 +819,113 @@ export default function Mapa() {
     return recurrentHotspots(reclamosFiltrados, { radiusMeters: 80, minPoints: 3, daysBack: 90 });
   }, [reclamosFiltrados, showHotspots]);
 
+  // Frases del hero semántico (reemplaza al PageHint estático). Solo datos ya
+  // cargados: sin datos → [] y el hero no renderiza. Veredictos vía lib/veredictos.
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    const u = resolverUmbrales();
+
+    if (isPuntos) {
+      if (poiLoading) return [];
+      if (pois.length === 0) {
+        return [
+          {
+            segmentos: [
+              seg('Todavía no marcaste ningún punto', 'advertencia'),
+              seg('. Hacé click en el mapa para crear el primero.'),
+            ],
+          },
+        ];
+      }
+      const frases: HeroFrase[] = [
+        {
+          segmentos: [
+            seg('Tenés '),
+            seg(`${pois.length} ${pois.length === 1 ? 'punto marcado' : 'puntos marcados'}`, 'bueno'),
+            tipos.length > 0
+              ? seg(` en el mapa, sobre ${tipos.length} ${tipos.length === 1 ? 'tipo disponible' : 'tipos disponibles'}.`)
+              : seg(' en el mapa.'),
+          ],
+        },
+      ];
+      if (!poiCountsLoading && Object.keys(poiCounts).length > 0) {
+        let topPoi: PuntoInteres | null = null;
+        let topCount = 0;
+        for (const p of pois) {
+          const c = poiCounts[p.id] ?? 0;
+          if (c > topCount) {
+            topCount = c;
+            topPoi = p;
+          }
+        }
+        if (topPoi && topCount > 0) {
+          frases.push({
+            segmentos: [
+              seg('El punto con más reclamos en zona es '),
+              seg(topPoi.nombre),
+              seg(', con '),
+              seg(
+                `${topCount} ${topCount === 1 ? 'reclamo' : 'reclamos'}`,
+                veredictoMasEsPeor(topCount, u.slaRiesgo),
+              ),
+              seg('.'),
+            ],
+            acciones: [{ label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true }],
+          });
+        }
+      }
+      return frases;
+    }
+
+    // Modo reclamos
+    if (loading || reclamos.length === 0) return [];
+    const segmentosA = [
+      seg('Estás viendo '),
+      seg(`${reclamosFiltrados.length} de ${reclamos.length}`),
+      seg(' reclamos georreferenciados'),
+    ];
+    if (showHotspots) {
+      segmentosA.push(
+        seg(', con '),
+        seg(
+          `${hotspots.length} ${hotspots.length === 1 ? 'zona caliente' : 'zonas calientes'}`,
+          veredictoMasEsPeor(hotspots.length, u.slaRiesgo),
+        ),
+      );
+    }
+    segmentosA.push(seg('.'));
+
+    const finalizados = conteosPorEstado['finalizado'] || 0;
+    const recibidos = conteosPorEstado['recibido'] || 0;
+    return [
+      { segmentos: segmentosA },
+      {
+        segmentos: [
+          seg('Hay '),
+          seg(
+            `${finalizados} ${finalizados === 1 ? 'resuelto' : 'resueltos'}`,
+            finalizados > 0 ? 'bueno' : undefined,
+          ),
+          seg(' frente a '),
+          seg(`${recibidos} sin tomar`, veredictoMasEsPeor(recibidos, u.sinAsignar)),
+          seg('.'),
+        ],
+      },
+    ];
+  }, [
+    isPuntos,
+    poiLoading,
+    pois,
+    tipos.length,
+    poiCounts,
+    poiCountsLoading,
+    loading,
+    reclamos.length,
+    reclamosFiltrados.length,
+    showHotspots,
+    hotspots.length,
+    conteosPorEstado,
+  ]);
+
   // Puntos para coverage por dependencia (sobre todos los reclamos de esa dependencia, sin filtro de tiempo)
   const coveragePoints = useMemo(() => {
     if (filtroDependencia == null || !showCoverage) return [];
@@ -1346,7 +1455,10 @@ export default function Mapa() {
         )}
       </StickyPageHeader>
 
-      <PageHint pageId={isPuntos ? 'mapa-puntos' : 'mapa-reclamos'} />
+      <SemanticHero
+        etiqueta={isPuntos ? 'MAPA · PUNTOS DE INTERÉS' : 'MAPA · RECLAMOS'}
+        frases={heroFrases}
+      />
 
       {/* ============================ MODO RECLAMOS ============================ */}
       {!isPuntos && (

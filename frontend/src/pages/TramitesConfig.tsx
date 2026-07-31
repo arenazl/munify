@@ -11,7 +11,8 @@ import { Sheet } from '../components/ui/Sheet';
 import { WizardModal, type WizardStep } from '../components/ui/WizardModal';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { type HeroFrase, seg } from '../lib/semanticHero';
 import { tramitesApi, categoriasTramiteApi, turnosApi, dependenciasApi } from '../lib/api';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import {
@@ -325,6 +326,35 @@ export default function TramitesConfig() {
     (acc[t.categoria_tramite_id] ||= []).push(t);
     return acc;
   }, {});
+
+  // Hero semántico: frases con datos REALES del catálogo ya cargado.
+  // Nota: el listado no trae la oficina asignada por trámite (se consulta
+  // recién al editar), así que esa frase no se genera acá.
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading) return [];
+    if (tramites.length === 0) {
+      return [{
+        segmentos: [
+          seg('El catálogo está vacío', 'malo'),
+          seg(': los vecinos todavía no tienen trámites para iniciar.'),
+        ],
+        acciones: [{ label: 'Crear el primer trámite', onClick: abrirNuevo, primaria: true }],
+      }];
+    }
+    const conTurno = tramites.filter(t => t.modo_atencion === 'presencial_con_turno').length;
+    const conCosto = tramites.filter(t => t.costo != null && t.costo > 0).length;
+    return [{
+      segmentos: [
+        seg(`${tramites.length} ${tramites.length === 1 ? 'trámite' : 'trámites'} en el catálogo`),
+        seg(': '),
+        seg(`${conTurno} con turno online`),
+        seg(' y '),
+        seg(`${conCosto} con costo`),
+        seg('.'),
+      ],
+      acciones: [{ label: 'Ver solicitudes', to: '/gestion/tramites', primaria: true }],
+    }];
+  }, [loading, tramites, abrirNuevo]);
 
   // ============ Steps del wizard ============
 
@@ -723,9 +753,9 @@ export default function TramitesConfig() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Hint SIEMPRE arriba de todo (consistencia con otras pantallas de settings) */}
+      {/* Hero semántico SIEMPRE arriba de todo (consistencia con otras pantallas de settings) */}
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="tramites-config" />
+        <SemanticHero etiqueta="CATÁLOGO · TRÁMITES" frases={heroFrases} />
       </div>
 
       <StickyPageHeader

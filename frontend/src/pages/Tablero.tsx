@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Search, GripVertical, Columns3, Filter, ClipboardList } from 'lucide-react';
@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { DateRangePicker } from '../components/ui/DateRangePicker';
 import { estadoColor } from '../lib/enums/reclamo';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 
 // Solo el ORDEN y el título (plural) de cada columna del tablero.
 // El COLOR de cada estado sale del SSoT (lib/enums/reclamo.ts) vía estadoColor().
@@ -159,6 +162,52 @@ export default function Tablero() {
     return (fechaDesde && fechaReclamo < fechaDesde) || (fechaHasta && fechaReclamo > fechaHasta);
   }).length;
 
+  // Frases del hero semántico: SOLO datos reales ya cargados (sin loading y con lista no vacía).
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading || reclamos.length === 0) return [];
+    const u = resolverUmbrales();
+    const frases: HeroFrase[] = [];
+
+    const recibidos = getReclamosPorEstado('recibido').length;
+    const enCurso = getReclamosPorEstado('en_curso').length;
+    const pospuestos = getReclamosPorEstado('pospuesto').length;
+
+    frases.push({
+      segmentos: [
+        seg('Hay '),
+        seg(
+          `${recibidos} ${recibidos === 1 ? 'recibido' : 'recibidos'} sin tomar`,
+          veredictoMasEsPeor(recibidos, u.sinAsignar),
+        ),
+        seg(', '),
+        seg(`${enCurso} en curso avanzando`, 'bueno'),
+        seg(' y '),
+        seg(
+          `${pospuestos} ${pospuestos === 1 ? 'pospuesto' : 'pospuestos'} sin retomar`,
+          veredictoMasEsPeor(pospuestos, u.vencidos),
+        ),
+        seg(canDrag ? ' — arrastrá para cambiar estados.' : '.'),
+      ],
+      acciones: [{ label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true }],
+    });
+
+    if (ocultosPorFecha > 0) {
+      frases.push({
+        segmentos: [
+          seg('Además, '),
+          seg(
+            `${ocultosPorFecha} ${ocultosPorFecha === 1 ? 'reclamo queda oculto' : 'reclamos quedan ocultos'}`,
+            'advertencia',
+          ),
+          seg(' por el rango de fechas — ampliá el rango para verlos.'),
+        ],
+        acciones: [{ label: 'Ver todos', onClick: () => { setFechaDesde(''); setFechaHasta(''); } }],
+      });
+    }
+
+    return frases;
+  }, [loading, reclamos.length, getReclamosPorEstado, canDrag, ocultosPorFecha]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -213,12 +262,9 @@ export default function Tablero() {
         })}
       </div>
 
-      {/* Instrucciones de drag & drop - solo desktop */}
-      {canDrag && (
-        <p className="text-sm mt-2 px-1 hidden md:block" style={{ color: theme.textSecondary }}>
-          Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
-        </p>
-      )}
+      {/* Hero semántico: pulso real del tablero (desktop y mobile) */}
+      <SemanticHero etiqueta="TABLERO · FLUJO" frases={heroFrases} className="mt-2" />
+
     </>
   );
 

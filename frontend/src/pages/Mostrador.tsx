@@ -13,8 +13,10 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { operadorApi, capturaMovilApi, type CapturaMovilEstado } from '../lib/api';
-import PageHint from '../components/ui/PageHint';
 import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 
 interface MostradorMetricas {
   tramites_hoy: number;
@@ -119,6 +121,32 @@ export default function Mostrador() {
     [metricas, user],
   );
 
+  // Hero semántico: frase con datos reales del día (solo si las métricas ya cargaron).
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (!metricas) return [];
+    const u = resolverUmbrales();
+    const atendidos = metricas.tramites_hoy;
+    const pendientes = Math.max(0, metricas.tramites_hoy - metricas.pagados_hoy);
+    return [{
+      segmentos: [
+        seg('Hoy se atendieron '),
+        seg(
+          `${atendidos.toLocaleString('es-AR')} trámite${atendidos === 1 ? '' : 's'}`,
+          atendidos > 0 ? 'bueno' : undefined,
+        ),
+        seg(' en ventanilla y '),
+        pendientes === 0
+          ? seg('no queda ninguno pendiente de pago', veredictoMasEsPeor(pendientes, u.sinAsignar))
+          : seg(
+              `${pendientes.toLocaleString('es-AR')} sigue${pendientes === 1 ? '' : 'n'} pendiente${pendientes === 1 ? '' : 's'} de pago`,
+              veredictoMasEsPeor(pendientes, u.sinAsignar),
+            ),
+        seg('.'),
+      ],
+      acciones: [{ label: 'Ver trámites', to: '/gestion/tramites', primaria: true }],
+    }];
+  }, [metricas]);
+
   return (
     <div className="space-y-4">
       {/* === Header + Métricas — sticky arriba === */}
@@ -176,7 +204,7 @@ export default function Mostrador() {
         })()}
       </div>
 
-      <PageHint pageId="mostrador" />
+      <SemanticHero etiqueta="MOSTRADOR · VENTANILLA" frases={heroFrases} />
 
       {/* === Cuerpo === */}
       {paso === 'identificar' && municipioId && (

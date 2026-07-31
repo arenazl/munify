@@ -8,7 +8,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import type { KpiSpec } from '../components/ui/KpiCard';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { Sheet } from '../components/ui/Sheet';
 import { StatusPill } from '../components/ui/StatusPill';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
@@ -4733,6 +4735,53 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
   }, [filteredReclamos]);
 
+  // Hero semántico (rediseño v2): frases dinámicas armadas SOLO con datos ya
+  // cargados en la pantalla (inboxData). Sin datos → sin frases → no renderiza.
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading || filteredReclamos.length === 0) return [];
+    const u = resolverUmbrales();
+    const { urgentes, conFeedback, enCurso, nuevos, fosiles } = inboxData;
+    return [
+      {
+        segmentos: [
+          seg('Hay '),
+          seg(`${urgentes.length} por vencer`, veredictoMasEsPeor(urgentes.length, u.vencidos)),
+          seg(' y '),
+          seg(
+            `${conFeedback.length} disputado${conFeedback.length === 1 ? '' : 's'}`,
+            veredictoMasEsPeor(conFeedback.length, u.vencidos),
+          ),
+          seg(' por vecinos; '),
+          seg(`${enCurso.length} en curso`, 'bueno'),
+          seg('.'),
+        ],
+        acciones: [
+          { label: 'Tablero', to: '/gestion/tablero', primaria: true },
+          { label: 'SLA', to: '/gestion/sla' },
+        ],
+      },
+      {
+        segmentos: [
+          seg('Tenés '),
+          seg(
+            `${nuevos.length} recién llegado${nuevos.length === 1 ? '' : 's'}`,
+            veredictoMasEsPeor(nuevos.length, u.sinAsignar),
+          ),
+          seg(' sin tomar y '),
+          seg(
+            `${fosiles.length} fósil${fosiles.length === 1 ? '' : 'es'} de más de 30 días`,
+            veredictoMasEsPeor(fosiles.length, u.vencidos),
+          ),
+          seg(' para depurar.'),
+        ],
+        acciones: [
+          { label: 'SLA', to: '/gestion/sla', primaria: true },
+          { label: 'Tablero', to: '/gestion/tablero' },
+        ],
+      },
+    ];
+  }, [loading, filteredReclamos.length, inboxData]);
+
   const renderInboxCard = (
     r: Reclamo,
     opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string; mostrarPrioridad?: boolean },
@@ -4959,7 +5008,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
-      <PageHint pageId="reclamos-list" />
+      <SemanticHero etiqueta="RECLAMOS · AHORA" frases={heroFrases} />
 
       <ABMPage
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}

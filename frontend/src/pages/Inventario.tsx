@@ -8,7 +8,9 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { inventarioApi } from '../lib/api';
 import {
   naturalezaLabels, naturalezaColors, naturalezaIcons,
@@ -89,6 +91,48 @@ export default function Inventario() {
     const c: Record<string, number> = {};
     for (const it of todos) c[it.naturaleza] = (c[it.naturaleza] || 0) + 1;
     return c;
+  }, [todos]);
+
+  // Frases del hero semántico: solo con datos reales ya cargados (todos).
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (todos.length === 0) return [];
+    const u = resolverUmbrales();
+    const activos = todos.filter(t => t.naturaleza === 'activo').length;
+    const consumibles = todos.filter(t => t.naturaleza === 'consumible').length;
+    const enUso = todos.filter(t => t.estado_activo === 'en_uso').length;
+    const bajoMinimo = todos.filter(t =>
+      t.naturaleza === 'consumible' && t.stock_minimo != null && (t.stock_actual ?? 0) < t.stock_minimo,
+    ).length;
+
+    const frases: HeroFrase[] = [];
+
+    frases.push({
+      segmentos: [
+        seg(`El inventario tiene ${todos.length} ítem${todos.length === 1 ? '' : 's'}: ${activos} activos y ${consumibles} consumibles`),
+        ...(enUso > 0
+          ? [seg(', con '), seg(`${enUso} en uso ahora`, 'bueno'), seg('.')]
+          : [seg('.')]),
+      ],
+      acciones: [{ label: 'Órdenes', to: '/gestion/ordenes-trabajo', primaria: true }],
+    });
+
+    if (consumibles > 0) {
+      frases.push({
+        segmentos: bajoMinimo > 0
+          ? [
+              seg('Hay '),
+              seg(
+                `${bajoMinimo} consumible${bajoMinimo === 1 ? '' : 's'} con stock bajo el mínimo`,
+                veredictoMasEsPeor(bajoMinimo, u.slaRiesgo),
+              ),
+              seg('.'),
+            ]
+          : [seg('Todos los consumibles arriba del mínimo', 'bueno'), seg('.')],
+        acciones: [{ label: 'Órdenes', to: '/gestion/ordenes-trabajo' }],
+      });
+    }
+
+    return frases;
   }, [todos]);
 
   const abrirNuevo = () => {
@@ -254,7 +298,7 @@ export default function Inventario() {
   return (
     <>
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="inventario" />
+        <SemanticHero etiqueta="INVENTARIO · ESTADO" frases={heroFrases} />
       </div>
 
       <ABMPage

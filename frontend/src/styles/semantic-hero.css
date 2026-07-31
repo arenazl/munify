@@ -1,0 +1,122 @@
+/* ============================================================
+   SemanticHero — card de "hero semántico" del rediseño v2.
+   Reemplaza los hints estáticos de las pantallas por una frase
+   con INFO DINÁMICA coloreada por VEREDICTO:
+     bueno → acento · advertencia → ámbar · malo → rojo
+   Todo sobre tokens --pl-* (polimórfico: funciona en todos los
+   themes y marcas). Cero colores fijos en este archivo.
+   ============================================================ */
+
+.sh-card {
+  margin: 0 0 16px;
+  padding: 18px 20px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-green);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-card);
+}
+
+.sh-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sh-etiqueta {
+  font-family: var(--pl-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+.sh-controles {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-text-disabled);
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  transition: background var(--pl-dur-ui) var(--pl-ease), transform var(--pl-dur-ui) var(--pl-ease);
+}
+.sh-dot:hover { transform: scale(1.25); }
+.sh-dot--activo { background: var(--pl-green); }
+.sh-dot--advertencia.sh-dot--activo { background: var(--pl-amber-strong); }
+.sh-dot--malo.sh-dot--activo { background: var(--pl-red); }
+
+.sh-nav {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--pl-radius-sm);
+  border: 1px solid var(--pl-border-strong);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--pl-text-3);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.sh-nav:hover { background: var(--pl-surface-hover); }
+.sh-nav:first-of-type { margin-left: 4px; }
+
+.sh-frase {
+  margin: 8px 0 10px;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-hero-line);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+
+.sh-seg--bueno { color: var(--pl-green-700); }
+.sh-seg--advertencia { color: var(--pl-amber-700); }
+.sh-seg--malo { color: var(--pl-red-700); }
+
+.sh-acciones {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.sh-accion {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.sh-accion:hover { background: var(--pl-surface-hover); text-decoration: none; }
+
+.sh-accion--primaria {
+  background: var(--pl-green-100);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+.sh-accion--primaria:hover { background: var(--pl-green-200); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-dot, .sh-nav, .sh-accion { transition: none; }
+}

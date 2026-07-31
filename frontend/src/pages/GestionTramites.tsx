@@ -49,7 +49,9 @@ import { useIaTramites } from '../hooks/useIaHabilitada';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor, veredictoTasa } from '../lib/veredictos';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { InboxLayout } from '../components/inbox/InboxLayout';
@@ -1737,9 +1739,57 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     ];
   }, [resumen, theme.primary]);
 
+  // Hero semántico (reemplaza el hint estático): frases con datos REALES de
+  // `resumen`. Si el resumen todavía no cargó, no se genera ninguna frase y
+  // el componente no renderiza. Veredictos SOLO vía lib/veredictos.ts.
+  const heroFrases: HeroFrase[] = useMemo(() => {
+    if (!resumen) return [];
+    const u = resolverUmbrales();
+    const porEstado = resumen.por_estado || {};
+    const recibidos = porEstado['recibido'] || 0;
+    const enCurso = porEstado['en_curso'] || 0;
+    const finalizados = porEstado['finalizado'] || 0;
+    const frases: HeroFrase[] = [];
+
+    frases.push({
+      segmentos: [
+        seg('Hoy entraron '),
+        seg(`${resumen.hoy.toLocaleString('es-AR')} solicitudes`),
+        seg('; hay '),
+        seg(
+          `${recibidos.toLocaleString('es-AR')} recibidas sin atender`,
+          veredictoMasEsPeor(recibidos, u.sinAsignar),
+        ),
+        seg(' y '),
+        seg(`${enCurso.toLocaleString('es-AR')} en curso`, 'bueno'),
+        seg('.'),
+      ],
+      acciones: [
+        { label: 'Mostrador', to: '/gestion/mostrador', primaria: true },
+        { label: 'Agenda', to: '/gestion/agenda-turnos' },
+      ],
+    });
+
+    if (resumen.total > 0) {
+      const pctFinalizados = (finalizados / resumen.total) * 100;
+      frases.push({
+        segmentos: [
+          seg('Se finalizaron '),
+          seg(
+            `${finalizados.toLocaleString('es-AR')} de ${resumen.total.toLocaleString('es-AR')} solicitudes (${pctFinalizados.toFixed(0)}%)`,
+            veredictoTasa(pctFinalizados, u.tasaResolucion),
+          ),
+          seg('.'),
+        ],
+      });
+    }
+
+    return frases;
+  }, [resumen]);
+
   return (
     <PullToRefresh onRefresh={async () => { await loadData(); }}>
-      <PageHint pageId="tramites-list" />
+      <SemanticHero etiqueta="TRÁMITES · HOY" frases={heroFrases} />
       <ABMPage
         title="Trámites"
         buttonLabel="Nuevo Trámite"
