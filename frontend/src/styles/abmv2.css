@@ -20,6 +20,7 @@
      [TABLA]      ← pendiente (agente de DataTable)
      [SIDEMODAL]  ← pendiente (agente de SideModal)
      [PERIOD]     ← pendiente (agente de FilterBar/PeriodControl)
+     [VOZ-VECINO] widget dashboard "La voz del vecino" (av2-voz-)
    ============================================================ */
 
 /* ============================================================
@@ -1341,3 +1342,248 @@
 .av2-hero-wrap .av2-hero.sh-card {
   border-left-color: var(--av2-hero-accent, var(--pl-green));
 }
+
+/* ============================================================
+   [VOZ-VECINO] — widget "La voz del vecino" del dashboard
+   (components/dashboard/VozDelVecino.tsx). Card con promedio
+   grande + estrellas + distribución 5..1 y grilla de reseñas;
+   la negativa (1-2 estrellas) va con fondo/borde rojo suave,
+   chip "Requiere respuesta" y acción "Reabrir". Referencia:
+   design/handoff-v2/references/dashboard-*.dc.html. Cero hex:
+   todo sobre tokens --pl-*; inline SOLO el width de las barras.
+   ============================================================ */
+
+.av2-voz {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 24px;
+  min-width: 0;
+}
+
+/* ---- Encabezado: icono + título + período + "Ver todas" ---- */
+.av2-voz-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.av2-voz-head-ico {
+  flex: 0 0 auto;
+  color: var(--pl-amber-strong);
+}
+.av2-voz-title {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+.av2-voz-sub {
+  font-size: 11.5px;
+  color: var(--pl-text-muted);
+}
+.av2-voz-link {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+}
+.av2-voz-link:hover { text-decoration: underline; }
+
+/* ---- Grilla: resumen (izq) + reseñas (der) ---- */
+.av2-voz-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
+  gap: 28px;
+  margin-top: 24px;
+  align-items: start;
+}
+/* Sin reseñas con comentario: el resumen ocupa todo el ancho. */
+.av2-voz-grid--solo { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 720px) {
+  .av2-voz-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+}
+
+/* ---- Resumen: promedio + estrellas + distribución ---- */
+.av2-voz-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.av2-voz-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.av2-voz-score {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: var(--pl-tracking-hero);
+  font-feature-settings: 'tnum';
+  color: var(--pl-text);
+}
+.av2-voz-stars {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.av2-voz-star--on  { color: var(--pl-amber-strong); }
+.av2-voz-star--bad { color: var(--pl-red); }
+.av2-voz-star--off { color: var(--pl-track); }
+.av2-voz-meta {
+  font-size: 11.5px;
+  color: var(--pl-text-muted);
+  margin-top: -8px;
+}
+
+.av2-voz-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.av2-voz-dist-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 9px;
+}
+.av2-voz-dist-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--pl-text-3);
+  font-feature-settings: 'tnum';
+}
+.av2-voz-dist-label svg { color: var(--pl-amber-strong); }
+.av2-voz-track {
+  height: 8px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  position: relative;
+  overflow: hidden;
+}
+.av2-voz-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--pl-radius-pill);
+  transition: width var(--pl-dur-ui) var(--pl-ease);
+}
+/* Rampa semántica 5→1: verde pleno → verde suave → ámbar → rojo. */
+.av2-voz-fill--s5 { background: var(--pl-green); }
+.av2-voz-fill--s4 { background: var(--pl-green-200); }
+.av2-voz-fill--s3 { background: var(--pl-amber-strong); }
+.av2-voz-fill--s2 { background: var(--pl-amber-700); }
+.av2-voz-fill--s1 { background: var(--pl-red); }
+.av2-voz-dist-n {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+}
+
+/* ---- Cards de reseñas ---- */
+.av2-voz-resenas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.av2-voz-card {
+  background: var(--pl-surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--pl-radius-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+/* Reseña negativa (1-2 estrellas): fondo y borde rojo suave. */
+.av2-voz-card--mala {
+  background: var(--pl-red-100);
+  border-color: color-mix(in srgb, var(--pl-red) 22%, transparent);
+}
+.av2-voz-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.av2-voz-card-head .av2-voz-stars { gap: 1px; }
+.av2-voz-fecha {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-voz-flag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-red-700);
+  white-space: nowrap;
+}
+.av2-voz-texto {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+.av2-voz-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+  min-width: 0;
+}
+.av2-voz-avatar {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.av2-voz-avatar--mala {
+  background: color-mix(in srgb, var(--pl-red) 20%, var(--pl-surface));
+  color: var(--pl-red-700);
+}
+.av2-voz-autor {
+  font-size: 11.5px;
+  color: var(--pl-text-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av2-voz-reabrir {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-red-700);
+  white-space: nowrap;
+}
+.av2-voz-reabrir:hover { text-decoration: underline; }

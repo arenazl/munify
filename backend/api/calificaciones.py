@@ -225,6 +225,88 @@ async def get_estadisticas_calificaciones(
     )
 
 
+@router.get("/ultimas")
+async def get_ultimas_resenas(
+    limit: int = 3,
+    dias: int = 90,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Últimas reseñas CON comentario (autor + categoría) para el widget
+    'La voz del vecino' del dashboard. Read-only, multi-tenant (solo
+    calificaciones de reclamos del municipio del usuario). Incluye además
+    el % de reclamos cerrados del período que recibieron calificación.
+    """
+    from datetime import timedelta
+
+    limit = max(1, min(limit, 10))
+    fecha_desde = datetime.utcnow() - timedelta(days=dias)
+
+    result = await db.execute(
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .options(
+            selectinload(Calificacion.usuario),
+            selectinload(Calificacion.reclamo).selectinload(Reclamo.categoria),
+        )
+        .where(
+            Reclamo.municipio_id == current_user.municipio_id,
+            Calificacion.created_at >= fecha_desde,
+            Calificacion.comentario.isnot(None),
+            func.length(func.trim(Calificacion.comentario)) > 0,
+        )
+        .order_by(Calificacion.created_at.desc())
+        .limit(limit)
+    )
+    calificaciones = result.scalars().all()
+
+    # % de cerrados calificados: calificaciones del período sobre reclamos
+    # finalizados (fecha_resolucion) en el mismo período. Ambos multi-tenant.
+    cerrados = (await db.execute(
+        select(func.count(Reclamo.id)).where(
+            Reclamo.municipio_id == current_user.municipio_id,
+            Reclamo.estado.in_((EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)),
+            Reclamo.fecha_resolucion >= fecha_desde,
+        )
+    )).scalar() or 0
+    calificados = (await db.execute(
+        select(func.count(Calificacion.id))
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Reclamo.municipio_id == current_user.municipio_id,
+            Calificacion.created_at >= fecha_desde,
+        )
+    )).scalar() or 0
+    porcentaje = min(100, round(calificados * 100 / cerrados)) if cerrados > 0 else None
+
+    def _autor(u: Optional[User]) -> str:
+        if not u:
+            return "Vecino"
+        apellido = (u.apellido or "").strip()
+        return f"{u.nombre} {apellido[0]}." if apellido else u.nombre
+
+    return {
+        "periodo_dias": dias,
+        "porcentaje_cerrados_calificados": porcentaje,
+        "items": [
+            {
+                "id": c.id,
+                "reclamo_id": c.reclamo_id,
+                "puntuacion": c.puntuacion,
+                "comentario": c.comentario,
+                "autor": _autor(c.usuario),
+                "categoria": (
+                    c.reclamo.categoria.nombre
+                    if c.reclamo and c.reclamo.categoria
+                    else "Sin categoría"
+                ),
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in calificaciones
+        ],
+    }
+
+
 @router.get("/ranking-empleados")
 async def get_ranking_empleados(
     dias: int = 30,

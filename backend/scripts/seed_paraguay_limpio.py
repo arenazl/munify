@@ -63,6 +63,7 @@ from models.categoria_reclamo import CategoriaReclamo
 from models.categoria_tramite import CategoriaTramite
 from models.reclamo import Reclamo
 from models.historial import HistorialReclamo
+from models.calificacion import Calificacion
 from models.tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from models.tramite_documento_requerido import TramiteDocumentoRequerido
 from models.municipio_modulo import MunicipioModulo
@@ -956,6 +957,142 @@ async def _vitalizar_dashboard(db: AsyncSession, muni_id: int) -> None:
 
 
 # ============================================================
+# Calificaciones de vecinos sobre reclamos FINALIZADOS ("la voz del vecino"
+# del Dashboard, GET /calificaciones/estadisticas?dias=90).
+# La tabla calificaciones tiene UNIQUE(reclamo_id) — 1 calificación por
+# reclamo, misma regla que valida la API — así que la cantidad la manda el
+# número de reclamos finalizados del muni (no se inventan cierres extra).
+# Distribución realista: mayoría 5-4, algunas 3, pocas 1-2.
+# Idempotente: upsert por reclamo_id; fechas DETERMINÍSTICAS (sin random),
+# 1-3 días después de la fecha_resolucion, dentro de los últimos 90 días.
+#
+# titulo -> (puntuacion, tiempo_respuesta, calidad_trabajo, atencion,
+#            comentario, tags)  — comentarios [DEMO] verosímiles, firmados
+# por el vecino creador del reclamo (usuario_id = creador_id).
+# ============================================================
+CALIFICACIONES_POR_TITULO = {
+    "Poda de árbol que toca los cables": (
+        5, 5, 5, 5,
+        "Vinieron a los dos días, podaron todo y dejaron la vereda limpia. Muy buen trabajo de la cuadrilla.",
+        "rapidos,prolijos"),
+    "Contenedor desbordado frente al Botánico": (
+        4, 3, 4, 5,
+        "Resolvieron bien y limpiaron todo el sector, aunque tardaron unos días en venir.",
+        "amables"),
+    "Pérdida de agua sobre Av. Artigas": (
+        5, 4, 5, 5,
+        "Arreglaron el caño y dejaron la calzada como estaba antes. Excelente atención del personal.",
+        "prolijos,buena atencion"),
+    "Micro-basural en la esquina del Mercado 4": (
+        4, 4, 4, 4,
+        "Retiraron toda la basura de la esquina. Ojalá mantengan la frecuencia para que no se junte de vuelta.",
+        None),
+    "Cesto de basura desbordado en peatonal Palma": (
+        3, 2, 4, 3,
+        "Lo vaciaron y quedó bien, pero tardaron bastante en pasar por la peatonal.",
+        None),
+    "Perro suelto agresivo en Sajonia": (
+        5, 5, 4, 5,
+        "Vinieron el mismo día y se llevaron al perro con mucho cuidado. Los chicos ya van tranquilos a la escuela.",
+        "rapidos,buena atencion"),
+    "Falta de recolección en Tacumbú": (
+        2, 2, 3, 3,
+        "Pasó el camión una vez y después volvió a faltar varios días. Cerraron el reclamo igual.",
+        None),
+    "Recolección irregular en Jara": (
+        4, 4, 4, 4,
+        "Se normalizó la recolección en el barrio. Buen seguimiento desde la app.",
+        None),
+    "Perro suelto en Luis A. de Herrera": (
+        5, 4, 5, 5,
+        "Retiraron al perro de la parada y nos avisaron enseguida por la app. Muy atentos.",
+        "buena atencion"),
+    "Contenedor volcado en San Blas": (
+        1, 2, 1, 2,
+        "Cerraron el reclamo pero el contenedor sigue roto y la basura se desparrama igual.",
+        None),
+}
+
+# Fallback determinístico para finalizados que no estén en el mapa de arriba
+# (ej. reclamos previos del muni en QA): (puntuacion, comentario, tags).
+CALIF_FALLBACK = [
+    (5, "Muy conforme, el equipo municipal resolvió rápido y avisaron por la app.", "rapidos"),
+    (4, "Se resolvió correctamente, aunque tardaron un poco más de lo esperado.", None),
+    (5, "Excelente respuesta, el trabajo quedó impecable.", "prolijos"),
+    (4, "Buen trabajo de la cuadrilla, conforme con la solución.", None),
+    (3, "Lo resolvieron, pero hubo que insistir para que vinieran.", None),
+    (5, "Vinieron enseguida y dejaron todo en orden.", "rapidos,prolijos"),
+    (4, "Conforme con la gestión, se nota el seguimiento del reclamo.", None),
+    (2, "Cerraron el reclamo pero la solución duró poco.", None),
+]
+
+
+async def _seed_calificaciones(db: AsyncSession, muni_id: int) -> dict:
+    finalizados = (await db.execute(
+        select(Reclamo).where(
+            Reclamo.municipio_id == muni_id,
+            Reclamo.estado.in_((EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)),
+        ).order_by(Reclamo.id)
+    )).scalars().all()
+    if not finalizados:
+        print("[calificaciones] sin reclamos finalizados — skip")
+        return {}
+
+    existentes = {c.reclamo_id: c for c in (await db.execute(
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(Reclamo.municipio_id == muni_id)
+    )).scalars().all()}
+
+    ahora = datetime.utcnow()
+    dist = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    nuevas = 0
+    for i, rec in enumerate(finalizados):
+        spec = CALIFICACIONES_POR_TITULO.get(rec.titulo)
+        if spec:
+            punt, t_resp, cal_t, aten, comentario, tags = spec
+        else:
+            punt, comentario, tags = CALIF_FALLBACK[i % len(CALIF_FALLBACK)]
+            t_resp = max(1, min(5, punt - (rec.id % 2)))
+            cal_t = punt
+            aten = max(1, min(5, punt + (i % 2)))
+
+        # Fecha determinística: el vecino califica 1-3 días después de la
+        # resolución (fecha_resolucion la fija _vitalizar_dashboard antes).
+        if rec.fecha_resolucion is not None:
+            creada = rec.fecha_resolucion + timedelta(days=1 + (rec.id % 3), hours=(rec.id * 5) % 12)
+        else:
+            creada = ahora - timedelta(days=7 + (rec.id * 3) % 80)
+        if creada > ahora:
+            creada = ahora - timedelta(hours=2)
+        if creada < ahora - timedelta(days=89):  # ventana del dashboard (dias=90)
+            creada = ahora - timedelta(days=89)
+
+        c = existentes.get(rec.id)
+        if c:
+            c.usuario_id = rec.creador_id
+            c.puntuacion = punt
+            c.tiempo_respuesta = t_resp
+            c.calidad_trabajo = cal_t
+            c.atencion = aten
+            c.comentario = comentario
+            c.tags = tags
+            c.created_at = creada
+        else:
+            db.add(Calificacion(
+                reclamo_id=rec.id, usuario_id=rec.creador_id, puntuacion=punt,
+                tiempo_respuesta=t_resp, calidad_trabajo=cal_t, atencion=aten,
+                comentario=comentario, tags=tags, created_at=creada,
+            ))
+            nuevas += 1
+        dist[punt] += 1
+    await db.flush()
+    print(f"[calificaciones] {len(finalizados)} reclamos finalizados calificados "
+          f"({nuevas} nuevas) — distribución {dist}")
+    return dist
+
+
+# ============================================================
 # Empleados (10) + categoría principal en tabla intermedia. Idempotente por
 # (nombre, apellido). Devuelve lista alineada al orden de EMPLEADOS.
 # ============================================================
@@ -1656,6 +1793,8 @@ async def main():
         # relativas a hoy para los widgets (para-hoy / resueltos de la semana).
         await _asignar_zonas_reclamos(db, muni.id, zonas)
         await _vitalizar_dashboard(db, muni.id)
+        # Calificaciones DESPUÉS de _vitalizar_dashboard (usa fecha_resolucion).
+        await _seed_calificaciones(db, muni.id)
 
         await db.commit()
 

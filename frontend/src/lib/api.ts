@@ -1989,6 +1989,9 @@ export const calificacionesApi = {
     api.get('/calificaciones/estadisticas', { params }),
   getRankingEmpleados: (dias?: number) =>
     api.get('/calificaciones/ranking-empleados', { params: { dias } }),
+  // Últimas reseñas con autor/categoría (widget "La voz del vecino")
+  getUltimas: (params?: { limit?: number; dias?: number }) =>
+    api.get('/calificaciones/ultimas', { params }),
 
   // Públicas (para link de WhatsApp)
   getInfoPublica: (reclamoId: number, token?: string) =>
