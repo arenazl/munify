@@ -834,7 +834,7 @@ async def get_metricas_accion(
             *base,
             OrdenTrabajo.estado != EstadoOrdenTrabajo.CANCELADA,
             OrdenTrabajo.prioridad.in_([PrioridadOT.ALTA, PrioridadOT.URGENTE]),
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
         )
     )
@@ -845,7 +845,10 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             *base,
-            Reclamo.estado == EstadoReclamo.NUEVO,
+            # RECIBIDO es el estado inicial del circuito nuevo (F3); NUEVO queda
+            # por compatibilidad con datos legacy. Sin esto, "Sin asignar"
+            # siempre daba 0 con reclamos recientes.
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO]),
             func.date(Reclamo.created_at) < hoy
         )
     )
@@ -856,7 +859,7 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             *base,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             Reclamo.fecha_programada != None,
             func.date(Reclamo.fecha_programada) < hoy
         )
@@ -868,7 +871,7 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             *base,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
     )
@@ -1000,7 +1003,7 @@ async def get_metricas_detalle(
         .join(OrdenTrabajo, ot_viva)
         .where(
             *base,
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
         )
         .group_by(Reclamo.id)
@@ -1016,7 +1019,10 @@ async def get_metricas_detalle(
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
             *base,
-            Reclamo.estado == EstadoReclamo.NUEVO,
+            # RECIBIDO es el estado inicial del circuito nuevo (F3); NUEVO queda
+            # por compatibilidad con datos legacy. Sin esto, "Sin asignar"
+            # siempre daba 0 con reclamos recientes.
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO]),
             func.date(Reclamo.created_at) < hoy
         )
         .order_by(Reclamo.created_at.asc())
@@ -1033,7 +1039,7 @@ async def get_metricas_detalle(
         .outerjoin(OrdenTrabajo, ot_viva)
         .where(
             *base,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
+            Reclamo.estado.in_([EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
         .group_by(Reclamo.id)

@@ -207,12 +207,15 @@ VECINOS = [
 # codigo <= 20 chars (VARCHAR(20)); se sufija con muni_id para unicidad global.
 # ============================================================
 ZONAS = [
-    ("Centro",    "AS-CEN",  -25.285734, -57.633864),  # La Catedral
-    ("Norte",     "AS-NOR",  -25.256776, -57.577834),  # Santísima Trinidad
-    ("Sur",       "AS-SUR",  -25.296526, -57.650481),  # Tacumbú
-    ("Este",      "AS-ESTE", -25.288011, -57.580675),  # Villa Morra
-    ("Costanera", "AS-COST", -25.279437, -57.631739),  # Ricardo Brugada (Chacarita)
-    ("Periferia", "AS-PERI", -25.232477, -57.562022),  # Zeballos Cué
+    # Nombres REALES de sectores/barrios ancla de Asunción (pedido del dueño:
+    # nada de Norte/Sur/Este genéricos). El codigo se mantiene estable para que
+    # el rename sea idempotente sobre las zonas ya sembradas.
+    ("Microcentro",        "AS-CEN",  -25.285734, -57.633864),  # La Catedral
+    ("Santísima Trinidad", "AS-NOR",  -25.256776, -57.577834),
+    ("Tacumbú",            "AS-SUR",  -25.296526, -57.650481),
+    ("Villa Morra",        "AS-ESTE", -25.288011, -57.580675),
+    ("Chacarita",          "AS-COST", -25.279437, -57.631739),  # Ricardo Brugada
+    ("Zeballos Cué",       "AS-PERI", -25.232477, -57.562022),
 ]
 
 # ============================================================
@@ -221,16 +224,16 @@ ZONAS = [
 # (nombre, apellido, tel, tipo, especialidad, categoria_reclamo, zona, dep_codigo)
 # ============================================================
 EMPLEADOS = [
-    ("Wilson",    "Ayala",    "+595 971 100001", "operario",       "Bacheo y pavimento",       "Bacheo y calles",            "Sur",       "OBRAS_PUBLICAS"),
-    ("Derlis",    "Cardozo",  "+595 971 100002", "operario",       "Recolección y limpieza",   "Recolección de residuos",    "Centro",    "SERVICIOS_PUBLICOS"),
-    ("Gustavo",   "Benítez",  "+595 971 100003", "operario",       "Electricidad pública",     "Alumbrado público",          "Norte",     "SERVICIOS_PUBLICOS"),
-    ("Cristhian", "Ojeda",    "+595 971 100004", "operario",       "Poda y espacios verdes",   "Arbolado y espacios verdes", "Este",      "SERVICIOS_PUBLICOS"),
-    ("Nelson",    "Duarte",   "+595 971 100005", "operario",       "Higiene urbana",           "Higiene urbana",             "Costanera", "SERVICIOS_PUBLICOS"),
-    ("Hugo",      "Espínola", "+595 971 100006", "operario",       "Agua y desagües",          "Agua y cloacas",             "Centro",    "SERVICIOS_PUBLICOS"),
-    ("Óscar",     "Cabral",   "+595 971 100007", "operario",       "Señalización vial",        "Tránsito y señalización",    "Este",      "TRANSITO_VIAL"),
-    ("Rubén",     "Villalba", "+595 971 100008", "operario",       "Fumigación y descacharrado", "Plagas y control",         "Sur",       "ZOONOSIS"),
-    ("Fabián",    "Gauto",    "+595 971 100009", "operario",       "Control y rescate animal", "Animales sueltos",           "Periferia", "ZOONOSIS"),
-    ("Carolina",  "Franco",   "+595 971 100010", "administrativo", "Inspección y convivencia", "Ruidos y convivencia",       "Centro",    "SEGURIDAD"),
+    ("Wilson",    "Ayala",    "+595 971 100001", "operario",       "Bacheo y pavimento",       "Bacheo y calles",            "Tacumbú",            "OBRAS_PUBLICAS"),
+    ("Derlis",    "Cardozo",  "+595 971 100002", "operario",       "Recolección y limpieza",   "Recolección de residuos",    "Microcentro",        "SERVICIOS_PUBLICOS"),
+    ("Gustavo",   "Benítez",  "+595 971 100003", "operario",       "Electricidad pública",     "Alumbrado público",          "Santísima Trinidad", "SERVICIOS_PUBLICOS"),
+    ("Cristhian", "Ojeda",    "+595 971 100004", "operario",       "Poda y espacios verdes",   "Arbolado y espacios verdes", "Villa Morra",        "SERVICIOS_PUBLICOS"),
+    ("Nelson",    "Duarte",   "+595 971 100005", "operario",       "Higiene urbana",           "Higiene urbana",             "Chacarita",          "SERVICIOS_PUBLICOS"),
+    ("Hugo",      "Espínola", "+595 971 100006", "operario",       "Agua y desagües",          "Agua y cloacas",             "Microcentro",        "SERVICIOS_PUBLICOS"),
+    ("Óscar",     "Cabral",   "+595 971 100007", "operario",       "Señalización vial",        "Tránsito y señalización",    "Villa Morra",        "TRANSITO_VIAL"),
+    ("Rubén",     "Villalba", "+595 971 100008", "operario",       "Fumigación y descacharrado", "Plagas y control",         "Tacumbú",            "ZOONOSIS"),
+    ("Fabián",    "Gauto",    "+595 971 100009", "operario",       "Control y rescate animal", "Animales sueltos",           "Zeballos Cué",       "ZOONOSIS"),
+    ("Carolina",  "Franco",   "+595 971 100010", "administrativo", "Inspección y convivencia", "Ruidos y convivencia",       "Microcentro",        "SEGURIDAD"),
 ]
 
 # Índices (en EMPLEADOS) de los 2 empleados destacados con login propio,
@@ -242,10 +245,10 @@ EMPLEADOS_LOGIN_IDX = [2, 0]  # Gustavo (Alumbrado), Wilson (Bacheo)
 # (nombre, descripcion, categoria, zona, lider_idx, miembro_idx)
 # ============================================================
 CUADRILLAS = [
-    ("Cuadrilla Bacheo",      "Equipo de reparación de baches y calzada",           "Bacheo y calles",            "Sur",    0, 5),
-    ("Cuadrilla Alumbrado",   "Equipo de mantenimiento eléctrico y luminarias",     "Alumbrado público",          "Norte",  2, 3),
-    ("Cuadrilla Recolección", "Equipo de recolección e higiene urbana",             "Recolección de residuos",    "Centro", 1, 4),
-    ("Cuadrilla Zoonosis",    "Equipo de fumigación y control de plagas/animales",  "Plagas y control",           "Sur",    7, 8),
+    ("Cuadrilla Bacheo",      "Equipo de reparación de baches y calzada",           "Bacheo y calles",            "Tacumbú",            0, 5),
+    ("Cuadrilla Alumbrado",   "Equipo de mantenimiento eléctrico y luminarias",     "Alumbrado público",          "Santísima Trinidad", 2, 3),
+    ("Cuadrilla Recolección", "Equipo de recolección e higiene urbana",             "Recolección de residuos",    "Microcentro",        1, 4),
+    ("Cuadrilla Zoonosis",    "Equipo de fumigación y control de plagas/animales",  "Plagas y control",           "Tacumbú",            7, 8),
 ]
 
 # ============================================================
@@ -874,20 +877,82 @@ async def _seed_barrios(db: AsyncSession, muni_id: int) -> dict:
 # Zonas (6). Idempotente por nombre.
 # ============================================================
 async def _seed_zonas(db: AsyncSession, muni_id: int) -> dict:
-    existentes = {z.nombre: z for z in (await db.execute(
+    # Match por CODIGO (estable) para poder RENOMBRAR zonas ya sembradas con
+    # nombres genéricos viejos (Centro/Norte/Sur...) a los sectores reales de
+    # Asunción sin duplicar filas ni romper FKs.
+    existentes = (await db.execute(
         select(Zona).where(Zona.municipio_id == muni_id)
-    )).scalars().all()}
-    zonas = dict(existentes)
+    )).scalars().all()
+    por_codigo = {z.codigo: z for z in existentes}
+    por_nombre = {z.nombre: z for z in existentes}
+    zonas: dict = {}
     for nombre, cod, lat, lon in ZONAS:
-        if nombre in zonas:
-            continue
-        z = Zona(municipio_id=muni_id, nombre=nombre, codigo=f"{cod}-{muni_id}",
-                 latitud_centro=lat, longitud_centro=lon, activo=True)
-        db.add(z)
+        codigo = f"{cod}-{muni_id}"
+        z = por_codigo.get(codigo) or por_nombre.get(nombre)
+        if z:
+            if z.nombre != nombre:
+                print(f"[zonas] rename '{z.nombre}' -> '{nombre}'")
+                z.nombre = nombre
+            z.latitud_centro, z.longitud_centro, z.activo = lat, lon, True
+        else:
+            z = Zona(municipio_id=muni_id, nombre=nombre, codigo=codigo,
+                     latitud_centro=lat, longitud_centro=lon, activo=True)
+            db.add(z)
         zonas[nombre] = z
     await db.flush()
     print(f"[zonas] {len(zonas)} zonas")
     return zonas
+
+
+async def _asignar_zonas_reclamos(db: AsyncSession, muni_id: int, zonas: dict) -> None:
+    """zona_id para TODOS los reclamos del muni por cercanía REAL (lat/lng al
+    centro de zona). Sin esto, los charts 'Cobertura por Zona' y 'Reclamos por
+    Zona' del dashboard quedaban en 0. Determinístico e idempotente."""
+    zlist = [z for z in zonas.values() if z.latitud_centro and z.longitud_centro]
+    default = zonas.get("Microcentro")
+    recs = (await db.execute(
+        select(Reclamo).where(Reclamo.municipio_id == muni_id)
+    )).scalars().all()
+    n = 0
+    for r in recs:
+        if r.latitud and r.longitud:
+            z = min(zlist, key=lambda t: (t.latitud_centro - r.latitud) ** 2 +
+                                         (t.longitud_centro - r.longitud) ** 2)
+        else:
+            z = default
+        if z and r.zona_id != z.id:
+            r.zona_id = z.id
+            n += 1
+    await db.flush()
+    print(f"[zonas-reclamos] {n} reclamos re-asignados a zona")
+
+
+async def _vitalizar_dashboard(db: AsyncSession, muni_id: int) -> None:
+    """Fechas relativas a HOY para que los widgets del dashboard tengan vida:
+    - 'Para hoy': 3 reclamos EN_CURSO con fecha_programada = hoy.
+    - 'Resueltos (semana)': 5 finalizados con fecha_resolucion en los últimos
+      6 días + 3 en la semana anterior (para el comparativo vs sem. ant.).
+    Idempotente: recalcula las fechas en cada corrida (semilla de demo)."""
+    ahora = datetime.now()
+    en_curso = (await db.execute(
+        select(Reclamo).where(Reclamo.municipio_id == muni_id,
+                              Reclamo.estado == EstadoReclamo.EN_CURSO)
+        .order_by(Reclamo.id)
+    )).scalars().all()
+    for r in en_curso[:3]:
+        r.fecha_programada = ahora
+    finalizados = (await db.execute(
+        select(Reclamo).where(Reclamo.municipio_id == muni_id,
+                              Reclamo.estado == EstadoReclamo.FINALIZADO)
+        .order_by(Reclamo.id)
+    )).scalars().all()
+    # 5 de esta semana + 3 de la anterior (offsets en días, determinísticos)
+    offsets = [1, 2, 3, 4, 6, 9, 11, 12]
+    for r, off in zip(finalizados, offsets):
+        r.fecha_resolucion = ahora - timedelta(days=off)
+    await db.flush()
+    print(f"[dashboard] para_hoy={min(3, len(en_curso))} "
+          f"resueltos_recientes={min(len(finalizados), len(offsets))}")
 
 
 # ============================================================
@@ -1587,6 +1652,11 @@ async def main():
         await _desactivar_legacy(db, muni.id)
         await _habilitar_modulos(db, muni.id)
         poi_en_zona = await _seed_poi(db, muni.id, barrios_por_cod)
+        # Vitalidad del dashboard: zonas reales en TODOS los reclamos + fechas
+        # relativas a hoy para los widgets (para-hoy / resueltos de la semana).
+        await _asignar_zonas_reclamos(db, muni.id, zonas)
+        await _vitalizar_dashboard(db, muni.id)
+
         await db.commit()
 
         print(f"\nOK — Paraguay Limpio (Asunción) RICO listo. muni_id={muni.id}, codigo={CODIGO}")
