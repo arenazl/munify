@@ -117,6 +117,28 @@ export default function Mostrador() {
     navigate(`${path}?${params.toString()}`);
   };
 
+  // Reclamo ANONIMO: saltea el paso de identificacion SOLO para reclamos.
+  // Usa el vecino-sistema "Anonimo" del muni (singleton, lo resuelve el
+  // backend) y va directo a la carga. Tramites jamas anonimos (gate 403).
+  const irReclamoAnonimo = async () => {
+    try {
+      const r = await operadorApi.vecinoAnonimo();
+      persistirContexto({
+        user_id: r.data.user_id,
+        dni: r.data.dni,
+        nombre: r.data.nombre,
+        apellido: r.data.apellido,
+        email: r.data.email,
+        telefono: r.data.telefono,
+        nivel_verificacion: r.data.nivel_verificacion,
+      }, null);
+      navigate(`/gestion/crear-reclamo?actuando_como=${r.data.user_id}`);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(typeof msg === 'string' ? msg : 'No se pudo iniciar el reclamo anónimo');
+    }
+  };
+
   const reset = () => {
     sessionStorage.removeItem('mostrador_ctx');
     setVecino(null);
@@ -244,6 +266,7 @@ export default function Mostrador() {
             setAltaManualDni(typeof dniPrefill === 'string' ? dniPrefill : '');
             setAltaManualOpen(true);
           }}
+          onReclamoAnonimo={irReclamoAnonimo}
         />
       )}
 
@@ -298,10 +321,11 @@ export default function Mostrador() {
 // PasoIdentificar — 2 columnas 50/50 SIEMPRE visibles (DNI | Celular)
 // Sin tabs, sin cambio de modo: las 2 opciones a la par.
 // ============================================================
-function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }: {
+function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual, onReclamoAnonimo }: {
   onClienteRegistrado: (v: VecinoEncontrado) => void;
   onBiometriaOk: (datos: KycDatos, sessionId: string) => void;
   onCargarManual: (dniPrefill?: string) => void;
+  onReclamoAnonimo: () => void;
 }) {
   const { theme } = useTheme();
   const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
@@ -351,6 +375,15 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
             style={{ color: theme.primary }}
           >
             Cargar vecino nuevo
+          </button>
+          <span style={{ color: theme.border }}>·</span>
+          <button
+            onClick={onReclamoAnonimo}
+            className="font-semibold hover:underline"
+            style={{ color: theme.primary }}
+            title="Cargar un reclamo sin identificar al vecino (solo reclamos)"
+          >
+            Reclamo anónimo
           </button>
         </div>
         <span className="opacity-70">Última sincronización RENAPER: hace 2 min</span>

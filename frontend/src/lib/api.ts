@@ -1820,11 +1820,12 @@ export const operadorApi = {
     }>>('/operador/vecinos/buscar', { params: dni ? { dni } : { q } }),
 
   // Alta manual de vecino (sin biometria): sirve para reclamos/turnos.
+  // Solo el nombre es obligatorio (para reclamos no se exige DNI).
   // Para tramites el vecino debe validar RENAPER (gate en backend).
   altaManualVecino: (data: {
-    dni: string;
+    dni?: string;
     nombre: string;
-    apellido: string;
+    apellido?: string;
     telefono?: string;
     email?: string;
   }) =>
@@ -1840,6 +1841,22 @@ export const operadorApi = {
       kyc_modo: string | null;
       verificado_at: string | null;
     }>('/operador/vecinos', data),
+
+  // Vecino-sistema "Anonimo" del muni: para cargar reclamos sin identificar
+  // a nadie. Idempotente (singleton por muni). Tramites jamas anonimos.
+  vecinoAnonimo: () =>
+    api.post<{
+      user_id: number;
+      dni: string;
+      nombre: string | null;
+      apellido: string | null;
+      email: string | null;
+      telefono: string | null;
+      direccion: string | null;
+      nivel_verificacion: number;
+      kyc_modo: string | null;
+      verificado_at: string | null;
+    }>('/operador/vecinos/anonimo'),
 
   // Biometria presencial via Didit
   kycIniciar: (municipioId: number, callbackUrl?: string) =>

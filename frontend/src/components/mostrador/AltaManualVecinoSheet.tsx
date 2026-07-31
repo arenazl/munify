@@ -21,7 +21,8 @@ export interface VecinoCreado {
 /**
  * Alta manual de vecino desde el Mostrador (sin biometria).
  *
- * Regla de negocio: el alta simple alcanza para RECLAMOS (y turnos).
+ * Solo el nombre es obligatorio: para reclamos no se exige DNI ni ningun
+ * documento — el resultado es un "usuario a medias" (ghost, nivel 0).
  * Para TRAMITES el vecino tiene que validar identidad con RENAPER
  * (opcion "Por celular") — el backend rechaza con 403 kyc_insuficiente.
  */
@@ -49,20 +50,21 @@ export function AltaManualVecinoSheet({ open, dniInicial, onClose, onCreado }: {
     }
   }, [open, dniInicial]);
 
-  const valido = dni.trim().length >= 6 && nombre.trim().length > 0 && apellido.trim().length > 0;
+  // Solo el nombre es obligatorio; si cargan DNI, que tenga largo valido.
+  const valido = nombre.trim().length > 0 && (dni.trim().length === 0 || dni.trim().length >= 6);
 
   const guardar = async () => {
     if (!valido || guardando) return;
     setGuardando(true);
     try {
       const r = await operadorApi.altaManualVecino({
-        dni: dni.trim(),
+        dni: dni.trim() || undefined,
         nombre: nombre.trim(),
-        apellido: apellido.trim(),
+        apellido: apellido.trim() || undefined,
         telefono: telefono.trim() || undefined,
         email: email.trim() || undefined,
       });
-      toast.success(`Vecino ${r.data.nombre} ${r.data.apellido} listo`);
+      toast.success(`Vecino ${[r.data.nombre, r.data.apellido].filter(Boolean).join(' ')} listo`);
       onCreado(r.data);
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
@@ -112,29 +114,10 @@ export function AltaManualVecinoSheet({ open, dniInicial, onClose, onCreado }: {
         >
           <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
           <p>
-            El alta a mano <b style={{ color: theme.text }}>sirve para reclamos y turnos</b>.
-            Para iniciar un <b style={{ color: theme.text }}>trámite</b>, el vecino tiene que
-            validar su identidad con RENAPER (opción "Por celular").
+            El alta a mano <b style={{ color: theme.text }}>sirve para reclamos y turnos</b> y
+            no exige DNI. Para iniciar un <b style={{ color: theme.text }}>trámite</b>, el vecino
+            tiene que validar su identidad con RENAPER (opción "Por celular").
           </p>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
-            DNI <span style={{ color: '#ef4444' }}>*</span>
-          </label>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={inputStyle}>
-            <IdCard className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-            <input
-              type="text"
-              inputMode="numeric"
-              value={dni}
-              onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
-              placeholder="Sin puntos"
-              className="flex-1 min-w-0 bg-transparent outline-none text-sm font-mono tabular-nums"
-              style={{ color: theme.text }}
-              maxLength={9}
-            />
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -152,7 +135,7 @@ export function AltaManualVecinoSheet({ open, dniInicial, onClose, onCreado }: {
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
-              Apellido <span style={{ color: '#ef4444' }}>*</span>
+              Apellido <span className="font-normal" style={{ color: theme.textSecondary }}>(opcional)</span>
             </label>
             <input
               type="text"
@@ -160,6 +143,25 @@ export function AltaManualVecinoSheet({ open, dniInicial, onClose, onCreado }: {
               onChange={(e) => setApellido(e.target.value)}
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
               style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
+            DNI <span className="font-normal" style={{ color: theme.textSecondary }}>(opcional — necesario recién para trámites)</span>
+          </label>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={inputStyle}>
+            <IdCard className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={dni}
+              onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
+              placeholder="Sin puntos"
+              className="flex-1 min-w-0 bg-transparent outline-none text-sm font-mono tabular-nums"
+              style={{ color: theme.text }}
+              maxLength={9}
             />
           </div>
         </div>
@@ -192,8 +194,8 @@ export function AltaManualVecinoSheet({ open, dniInicial, onClose, onCreado }: {
         </div>
 
         <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-          Si ya existe un vecino con ese DNI en el padrón, se reutiliza su ficha
-          (no se duplica).
+          Si el DNI (o nombre y teléfono) ya están en el padrón, se reutiliza la
+          ficha existente — no se duplica.
         </p>
       </div>
     </Sheet>
