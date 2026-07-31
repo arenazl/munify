@@ -108,6 +108,13 @@ interface PageHintProps {
  *
  * El dismiss se persiste en localStorage por pageId.
  */
+// DEPRECADO (estándar v2, 2026-07-31): los hints estáticos se OCULTAN en toda
+// la app por decisión del dueño ("solo se oculta"). Cada pantalla los va
+// reemplazando por SemanticHero con datos vivos, módulo a módulo (las 11 de
+// Reclamos+Campo+Trámites ya migradas). Cuando no queden usos, borrar este
+// componente y config/pageHints.ts.
+const HINTS_OCULTOS = true;
+
 export default function PageHint({ pageId }: PageHintProps) {
   const { theme } = useTheme();
   const hint = PAGE_HINTS[pageId];
@@ -152,7 +159,7 @@ export default function PageHint({ pageId }: PageHintProps) {
     return Lightbulb;
   }, [isWizard, currentStep]);
 
-  if (!hint || dismissed) return null;
+  if (HINTS_OCULTOS || !hint || dismissed) return null;
 
   const handleDismiss = () => {
     localStorage.setItem(storageKey, 'true');

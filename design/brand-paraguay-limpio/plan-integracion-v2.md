@@ -89,6 +89,25 @@
 - El bloque switcher del sidebar actual (nombre de dependencia en 3-4
   renglones) MUERE en la v2.
 
+## ABMPageSemantic — requisitos de consolidación (EN PAUSA hasta la 2da vuelta
+## de Claude Design con "otro tipo de ABM"; después se consolida en UN componente)
+- Hero semántico SIEMPRE; **KPIs opcionales** (sin KPIs → solo el resumen con veredicto).
+- Header de grilla: **búsqueda** (flex-grow) + **agrupación por combos/pills** +
+  **3 vistas** (toggle) + **botonera de acciones dockeada a la derecha**.
+- Con datos de MONTOS → **totales en el header de cada agrupación**.
+- **Control de fechas NO NEGOCIABLE**: siempre el period-navigator del framework
+  (toggle Mes/Año + ‹ periodo › + "hasta" dinámico para armar rango — ver
+  APP_GUIDE/components/ui/PeriodRangeNavigator / MonthRangeNavigator). Jamás
+  datepickers sueltos en grillas.
+- Todas las grillas de la app adoptan este layout al consolidarse.
+
+## Hints: estado global
+- Las 11 pantallas de Reclamos+Campo+Trámites ya tienen SemanticHero (9aa061c).
+- El RESTO de la app: hints OCULTOS globalmente (flag HINTS_OCULTOS en
+  PageHint.tsx → return null). Se irán reemplazando por heros por módulo:
+  vecino/mobile (11), tesorería (18), config/admin (8) — inventario completo
+  con datos por pantalla en tasks/wr0o3gm8t.output (discovery 53 hints).
+
 ## Estado
 - [x] E1: pl-tokens.css + colorUtils + puente polimórfico en ThemeContext (pusheado)
 - [ ] E2: Sidebar → mock primero
