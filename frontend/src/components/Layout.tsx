@@ -458,7 +458,7 @@ export default function Layout() {
                   nombres muy largos (>16) bajan a text-sm para no desbordar;
                   Munify (una palabra) queda igual que siempre. */}
               <span
-                className={`block font-extrabold tracking-tight leading-tight ${BRAND.name.length > 16 ? 'text-sm' : 'text-lg'}`}
+                className={`block font-extrabold tracking-tight leading-tight whitespace-nowrap ${BRAND.name.length > 12 ? 'text-[15px]' : 'text-lg'}`}
                 style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
                 {(() => {
