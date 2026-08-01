@@ -976,3 +976,35 @@
   border-radius: inherit;
   background: var(--pl-lavado-acento-sutil);
 }
+
+/* ============================================================
+   La fila de analítica: el mapa se lleva DOS TERCIOS.
+
+   Era `1fr 2fr 1fr` (donut · mapa · top categorías) y con eso el
+   mapa —la pieza que más se mira y la que más vende— quedaba en
+   la mitad del ancho, mientras "Top categorías" ocupaba una
+   columna angosta donde sus barras no se comparan entre sí.
+
+   Ahora la fila es de dos columnas (donut + mapa a 2/3) y Top
+   categorías baja a una tira de ancho completo con las barras en
+   tres columnas: son diez categorías, y en una columna angosta
+   sólo entraban cinco.
+   ============================================================ */
+@media (min-width: 1100px) {
+  .dv2-grid-principal {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+  /* El tercer hijo de la fila (Top categorías) pasa a la fila de abajo,
+     ocupando todo el ancho. */
+  .dv2-grid-principal > .dv2-card:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+  /* Sus barras se reparten en tres columnas: diez categorías en una sola
+     columna obligan a cortar en cinco y esconder el resto. */
+  .dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 22px;
+    align-content: start;
+  }
+}
