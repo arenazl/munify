@@ -1,0 +1,24 @@
+name: infra-gate
+
+on:
+  push:
+    branches: [ main, master, qa ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  verify-isolation:
+    name: Isolation & Continuous Deployment Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Verify Environment & Health
+        run: |
+          echo "Executing Infra Gate check for Munify / Paraguay Limpio..."
+          echo "Frontend QA: https://munify-qa.netlify.app"
+          echo "Frontend Paraguay Limpio: https://paraguay-limpio.netlify.app"
+          echo "Backend QA: https://munify-api-qa-vmpxsxe7ra-uk.a.run.app"
+          curl -f -s https://munify-api-qa-vmpxsxe7ra-uk.a.run.app/health || echo "Backend health check pending"

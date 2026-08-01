@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\look\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+            "args": ["D:\\Code\\structure\\scripts\\canal-pending-hook.py", "munify"],
+            "timeout": 10,
+            "statusMessage": "Chequeando pendientes del canal..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\look\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+            "args": ["D:\\Code\\structure\\scripts\\watch-canal.py", "munify"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
