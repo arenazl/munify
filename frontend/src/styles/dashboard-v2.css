@@ -999,12 +999,24 @@
   .dv2-grid-principal > .dv2-card:nth-child(3) {
     grid-column: 1 / -1;
   }
-  /* Sus barras se reparten en tres columnas: diez categorías en una sola
-     columna obligan a cortar en cinco y esconder el resto. */
-  .dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px 22px;
-    align-content: start;
-  }
+}
+
+/* Las barras de Top categorías se reparten en columnas SEGÚN EL ANCHO, con
+   flex: cada bloque pide 260px y el sobrante se reparte entre los que entran.
+   Sin media queries — el propio contenedor decide: en escritorio entran tres,
+   en una tablet dos, en un teléfono una. Diez categorías en una sola columna
+   obligan a cortar en cinco y esconder el resto detrás de un "otras 5". */
+.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  /* Cada bloque mide lo que mide su contenido. Sin esto, flex los ESTIRA a
+     lo alto para llenar la tarjeta y quedan barras separadas por cientos de
+     píxeles de vacío. */
+  align-items: flex-start;
+  align-content: flex-start;
+}
+.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barra-bloque {
+  flex: 1 1 260px;
+  min-width: 0;
 }

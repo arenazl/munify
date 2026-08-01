@@ -710,11 +710,13 @@ export default function Dashboard() {
   }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats]);
 
   // ---- Concentración: botonera de categorías DINÁMICA por municipio ----
-  // Las cuatro de más volumen de ESTE municipio. En uno pesa la basura y en
-  // otro el alumbrado; la botonera se arma sola con lo que cada uno tiene, sin
-  // ninguna lista fija en el código.
+  // Las de más volumen de ESTE municipio. En uno pesa la basura y en otro el
+  // alumbrado; la botonera se arma sola con lo que cada uno tiene, sin ninguna
+  // lista fija en el código. Se ofrecen SEIS: con menos, un municipio con diez
+  // categorías activas deja casi todas escondidas detrás del "+N". Las que no
+  // entren en el ancho las manda ahí AdaptiveFilter, que para eso mide.
   const categoriasConcentracion = useMemo(
-    () => porCategoria.slice(0, 4).map((c) => c.categoria),
+    () => porCategoria.slice(0, 6).map((c) => c.categoria),
     [porCategoria],
   );
 
