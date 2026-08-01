@@ -916,3 +916,63 @@
   font-weight: 700;
   color: var(--pl-text);
 }
+
+/* ============================================================
+   [ACCESO] — tarjeta de acceso rápido (tablero del área).
+   Antes estas tarjetas traían un color fijo por ítem (violeta,
+   azul, naranja) que no tenía nada que ver con la marca. El
+   matiz sale del acento y la distinción la hace el ícono.
+   ============================================================ */
+.dv2-acceso {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease), transform var(--pl-dur-ui) var(--pl-ease);
+}
+.dv2-acceso:hover {
+  border-color: var(--pl-green);
+  transform: translateY(-1px);
+}
+.dv2-acceso-icono {
+  width: 18px;
+  height: 18px;
+  color: var(--pl-green);
+  margin-bottom: 6px;
+}
+.dv2-acceso-titulo {
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  color: var(--pl-text);
+}
+.dv2-acceso-sub {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  /* Se lee entero: "252 p..." no le sirve a nadie. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+/* El mismo patrón de lavado que el hero, en su versión sutil: las tarjetas
+   del tablero comparten la familia visual sin pelearle la atención al hero.
+   Definido UNA vez en pl-tokens.css ([LAVADO DE ACENTO]). */
+.dv2-card {
+  position: relative;
+  isolation: isolate;
+}
+.dv2-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--pl-lavado-acento-sutil);
+}

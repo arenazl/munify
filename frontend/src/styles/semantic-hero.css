@@ -30,12 +30,12 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    115deg,
-    color-mix(in srgb, var(--pl-green) 8.5%, transparent) 0%,
-    color-mix(in srgb, var(--pl-green) 2.8%, transparent) 38%,
-    transparent 72%
-  );
+  /* Una sola definición del lavado, con la intensidad como variable: acá va
+     la fuerte porque el hero es la pieza que habla. El resto de las
+     superficies usa la misma fórmula más baja (ver [LAVADO] en
+     pl-tokens.css), así todo el kit comparte el patrón sin que todo compita
+     por la misma atención. */
+  background: var(--pl-lavado-acento);
 }
 /* Todo el contenido por encima del lavado. */
 .sh-card > * { position: relative; }
@@ -239,4 +239,44 @@
     transition: opacity 120ms linear, visibility 0s linear 120ms;
   }
   .sh-slide--activo { transform: none; }
+}
+
+/* ============================================================
+   TABLERO ANALÓGICO — los datos giran como las fichas de un
+   tablero de estación cuando cambia la frase.
+
+   Gira SÓLO lo veredictado (los números), no la frase entera:
+   con todo girando el texto queda ilegible casi medio segundo,
+   y los números son justamente lo que cambia entre una frase y
+   otra — el giro dice "esto es lo que se actualizó".
+
+   La animación arranca cuando el slide pasa a activo, así que
+   se repite en cada vuelta del carrusel sin tocar el JS.
+   ============================================================ */
+.sh-tablero {
+  /* Las fichas rotan en 3D: sin perspectiva el giro se ve plano. */
+  perspective: 420px;
+  display: inline-block;
+}
+
+.sh-ficha {
+  display: inline-block;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.sh-slide--activo .sh-ficha {
+  animation: shFicha 340ms cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes shFicha {
+  0%   { transform: rotateX(-90deg) translateY(-3px); opacity: 0; }
+  60%  { transform: rotateX(12deg) translateY(0); opacity: 1; }
+  100% { transform: rotateX(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Sin giro: el dato aparece y listo. */
+  .sh-slide--activo .sh-ficha { animation: none; }
+  .sh-tablero { perspective: none; }
 }

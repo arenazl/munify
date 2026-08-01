@@ -7,6 +7,7 @@ import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 // alpha()/lighten() entienden cualquier formato de color; pegar dígitos al
 // final de un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
 import { alpha, lighten } from '../lib/colorUtils';
+import { BentoMenu, type BentoItem } from './ui/BentoMenu';
 import { getNavigation, isMobileDevice } from '../config/navigation';
 import { fontPresets } from '../config/fontPresets';
 import { BrandMark } from '../brands/BrandMark';
@@ -1415,73 +1416,88 @@ export default function Layout() {
                 animation: 'slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
               }}
             >
-              <div className="grid grid-cols-3 gap-2">
-                {(() => {
-                  // Items del menu central. Admin/Supervisor ve accesos a todas
-                  // las pantallas relevantes. Vecino solo ve Reclamo/Tramite.
-                  const items: Array<{ label: string; icon: any; color: string; onClick: () => void }> = [];
-                  if (user?.rol === 'admin' || user?.rol === 'supervisor') {
-                    // Presentaciones destacadas: el admin no da de alta trámites,
-                    // así que acá tiene el recorrido guiado (Conocé) + el dashboard
-                    // en vivo (En Vivo). En el banner se veían mal en la PWA.
-                    items.push(
-                      { label: 'Conocé', icon: Sparkles, color: BRAND.primary, onClick: () => setPresentacionOpen(true) },
-                      { label: 'Pulso', icon: Radio, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion?live=1') },
-                    );
-                    items.push(
-                      { label: 'Mapa', icon: Map, color: 'var(--pl-data-2)', onClick: () => navigate('/gestion/mapa') },
-                      { label: 'Mostrador', icon: ScanLine, color: 'var(--pl-data-3)', onClick: () => navigate('/gestion/mostrador') },
-                    );
-                    // Si el muni opera órdenes de trabajo (opt-in), priorizar accesos
-                    // del universo Reclamos (Órdenes/Tablero) sobre los slots de
-                    // tesorería. Gateado SOLO por ordenes_trabajo (no inventario, que
-                    // está activo en todos los munis) para no alterar el menú de los
-                    // munis que solo usan tesorería (ej. SPN).
-                    const tieneOrdenes = modulosActivos.includes('ordenes_trabajo');
-                    if (tieneOrdenes) {
-                      items.push(
-                        { label: 'Órdenes', icon: ClipboardList, color: 'var(--pl-data-4)', onClick: () => navigate('/gestion/ordenes-trabajo') },
-                        { label: 'Tablero', icon: TrendingUp, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion/tablero') },
-                        { label: 'Agenda', icon: Calendar, color: 'var(--pl-data-2)', onClick: () => navigate('/gestion/tesoreria/agenda') },
-                        { label: 'Config', icon: Settings, color: 'var(--pl-data-3)', onClick: () => navigate('/gestion/configuracion') },
-                      );
-                    } else {
-                      items.push(
-                        { label: 'Agenda', icon: Calendar, color: 'var(--pl-data-4)', onClick: () => navigate('/gestion/tesoreria/agenda') },
-                        { label: 'Contactos', icon: User, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion/tesoreria/contactos') },
-                        { label: 'Resumen', icon: TrendingUp, color: 'var(--pl-data-2)', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
-                        { label: 'Config', icon: Settings, color: 'var(--pl-data-3)', onClick: () => navigate('/gestion/configuracion') },
-                      );
-                    }
-                  } else {
-                    items.push(
-                      { label: 'Reclamo', icon: AlertCircle, color: 'var(--pl-data-4)', onClick: () => navigate('/gestion/crear-reclamo') },
-                      { label: 'Trámite', icon: FileCheck, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion/crear-tramite') },
-                    );
-                  }
-                  return items.map((it) => (
-                    <button
-                      key={it.label}
-                      onClick={() => { setCreateMenuOpen(false); it.onClick(); }}
-                      className="flex flex-col items-center gap-1 px-2 py-3 rounded-2xl transition-all active:scale-95"
-                      style={{
-                        backgroundColor: theme.backgroundSecondary,
-                        border: `1.5px solid ${theme.border}`,
-                      }}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: `${it.color}15` }}
-                      >
-                        <it.icon className="h-5 w-5" style={{ color: it.color }} />
-                      </div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: it.color }}>
-                        {it.label}
-                      </span>
-                    </button>
-                  ));
-                })()}
-              </div>
+              {(() => {
+                // Menú en MOSAICO (BentoMenu del kit): la jerarquía la hace el
+                // TAMAÑO del bloque, no el color. Antes eran ocho tarjetas
+                // idénticas donde encontrar una era leerlas todas — y el botón
+                // decía "+" pero el menú no creaba nada. Ahora lo que crea va
+                // en el bloque grande y lo que sólo navega, en tiras al pie.
+                const items: BentoItem[] = [];
+
+                if (user?.rol === 'admin' || user?.rol === 'supervisor') {
+                  items.push(
+                    {
+                      id: 'reclamo',
+                      titulo: 'Cargar un reclamo',
+                      detalle: 'A nombre de un vecino',
+                      icono: Plus,
+                      forma: 'destacada',
+                      onClick: () => navigate('/gestion/crear-reclamo'),
+                    },
+                    {
+                      id: 'tramite',
+                      titulo: 'Trámite',
+                      detalle: 'Iniciar una gestión',
+                      icono: FileCheck,
+                      forma: 'chica',
+                      onClick: () => navigate('/gestion/crear-tramite'),
+                    },
+                    {
+                      id: 'mostrador',
+                      titulo: 'Mostrador',
+                      detalle: 'Atender en ventanilla',
+                      icono: ScanLine,
+                      forma: 'chica',
+                      onClick: () => navigate('/gestion/mostrador'),
+                    },
+                    { id: 'mapa', titulo: 'Mapa', detalle: 'Dónde se concentran', icono: Map, forma: 'ancha', onClick: () => navigate('/gestion/mapa') },
+                    { id: 'agenda', titulo: 'Agenda', detalle: 'Turnos del día', icono: Calendar, forma: 'ancha', onClick: () => navigate('/gestion/agenda-turnos') },
+                    // "Conocé" y "Pulso" no decían qué hacen: se nombran por lo
+                    // que son.
+                    { id: 'presentacion', titulo: 'Presentación', detalle: 'Recorrido guiado', icono: Sparkles, forma: 'ancha', onClick: () => setPresentacionOpen(true) },
+                    { id: 'vivo', titulo: 'Pantalla en vivo', detalle: 'Para mostrar en una TV', icono: Radio, forma: 'ancha', onClick: () => navigate('/gestion?live=1') },
+                    { id: 'config', titulo: 'Configuración', icono: Settings, forma: 'ancha', onClick: () => navigate('/gestion/configuracion') },
+                  );
+                } else {
+                  // El vecino sí tiene sus contadores reales a mano.
+                  items.push(
+                    {
+                      id: 'reclamo',
+                      titulo: 'Hacer un reclamo',
+                      detalle: 'Contanos qué pasa en tu barrio',
+                      icono: AlertCircle,
+                      forma: 'destacada',
+                      onClick: () => navigate('/gestion/crear-reclamo'),
+                    },
+                    {
+                      id: 'tramite',
+                      titulo: 'Trámite',
+                      detalle: 'Iniciar una gestión',
+                      icono: FileCheck,
+                      forma: 'chica',
+                      onClick: () => navigate('/gestion/crear-tramite'),
+                    },
+                    {
+                      id: 'mis-reclamos',
+                      titulo: 'Mis reclamos',
+                      icono: ClipboardList,
+                      forma: 'chica',
+                      ...(badges.reclamos > 0 ? { dato: badges.reclamos, datoSub: 'en curso' } : {}),
+                      onClick: () => navigate('/gestion/mis-reclamos'),
+                    },
+                  );
+                }
+
+                return (
+                  <BentoMenu
+                    items={items.map((it) => ({
+                      ...it,
+                      onClick: () => { setCreateMenuOpen(false); it.onClick(); },
+                    }))}
+                    ariaLabel="Acciones"
+                  />
+                );
+              })()}
             </div>
           )}
 

@@ -1,0 +1,139 @@
+/* ============================================================
+   BentoMenu — menú de acciones en mosaico asimétrico.
+
+   La jerarquía la hace el TAMAÑO del bloque, no un color: la
+   acción de todos los días ocupa el doble y ancla la vista; lo
+   secundario cae a bloques chicos; lo que sólo navega va en
+   tiras al pie. En una grilla pareja, con ocho tarjetas iguales,
+   encontrar una es leerlas todas.
+
+   Todo sobre tokens --pl-*: cero colores fijos, así cada marca
+   lo hereda en el suyo.
+   ============================================================ */
+
+.bm {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  align-items: stretch;
+}
+
+.bm-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px;
+  border-radius: var(--pl-radius-lg);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-2);
+  color: var(--pl-text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--pl-font-sans);
+  transition:
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    transform var(--pl-dur-ui) var(--pl-ease);
+}
+.bm-item:hover {
+  border-color: var(--pl-green);
+  transform: translateY(-1px);
+}
+.bm-item:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 2px;
+}
+
+/* ---------- destacada: alta, sobre el acento ---------- */
+.bm-item--destacada {
+  grid-row: span 2;
+  justify-content: space-between;
+  background: var(--pl-hero-gradient);
+  border-color: transparent;
+  color: var(--pl-on-brand);
+  min-height: 116px;
+}
+.bm-item--destacada:hover { border-color: transparent; }
+.bm-item--destacada .bm-titulo { font-size: 17px; }
+.bm-item--destacada .bm-detalle { color: color-mix(in srgb, var(--pl-on-brand) 80%, transparent); }
+.bm-item--destacada .bm-icono { color: var(--pl-on-brand); }
+
+/* ---------- ancha: tira de ancho completo ---------- */
+.bm-item--ancha {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+}
+
+.bm-icono {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--pl-green);
+}
+.bm-item--ancha .bm-icono { width: 18px; height: 18px; }
+
+.bm-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bm-titulo {
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  /* Se lee entero: un título cortado no sirve para elegir. */
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.bm-detalle {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* El dato que trae la acción: es lo que hace que el menú informe algo
+   con sólo abrirlo, en vez de ser una lista de etiquetas mudas. */
+.bm-dato {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: none;
+  margin-left: auto;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+.bm-dato b {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-green-700);
+}
+.bm-item--destacada .bm-dato,
+.bm-item--destacada .bm-dato b { color: var(--pl-on-brand); }
+.bm-dato-sub { white-space: nowrap; }
+
+/* En bloques verticales el dato va debajo, no al costado. */
+.bm-item--chica .bm-dato,
+.bm-item--destacada .bm-dato { margin-left: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-item { transition: none; }
+  .bm-item:hover { transform: none; }
+}
+
+/* En pantallas muy angostas el mosaico se endereza: con menos de ~300 px
+   dos columnas dejan títulos de una palabra por renglón. */
+@media (max-width: 340px) {
+  .bm { grid-template-columns: 1fr; }
+  .bm-item--destacada { grid-row: auto; min-height: 0; }
+}

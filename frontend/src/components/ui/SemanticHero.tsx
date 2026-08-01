@@ -75,6 +75,43 @@ function usaMenosMovimiento(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+/**
+ * El dato, girando como las fichas de un tablero de estación.
+ *
+ * Gira SÓLO lo veredictado —los números—, no la frase entera, por dos motivos:
+ * el texto se puede leer desde el primer instante (con toda la frase girando
+ * queda ilegible casi medio segundo, y esta es una pantalla que alguien mira
+ * todo el día), y los números SON lo que cambia entre una frase y otra: que
+ * giren justo ellos no es un adorno, está diciendo "esto es lo que se
+ * actualizó".
+ *
+ * Accesibilidad: el texto se parte en caracteres sólo para la vista. El span
+ * de afuera lleva el valor entero como `aria-label` y las fichas quedan
+ * ocultas para los lectores de pantalla, que si no deletrearían "1", "1", "8".
+ */
+function SegmentoTablero({ texto, veredicto }: { texto: string; veredicto: string }) {
+  return (
+    <span className={`sh-seg--${veredicto} sh-tablero`} aria-label={texto}>
+      {[...texto].map((caracter, i) =>
+        caracter === ' ' ? (
+          ' '
+        ) : (
+          <span
+            key={i}
+            className="sh-ficha"
+            aria-hidden="true"
+            // El retardo en cascada hace que las fichas caigan una detrás de
+            // otra, como en el tablero real, en vez de todas de golpe.
+            style={{ animationDelay: `${i * 26}ms` }}
+          >
+            {caracter}
+          </span>
+        ),
+      )}
+    </span>
+  );
+}
+
 export function SemanticHero({
   etiqueta,
   frases,
@@ -169,7 +206,7 @@ export function SemanticHero({
             <p className="sh-frase">
               {frase.segmentos.map((s, j) =>
                 s.veredicto ? (
-                  <span key={j} className={`sh-seg--${s.veredicto}`}>{s.texto}</span>
+                  <SegmentoTablero key={j} texto={s.texto} veredicto={s.veredicto} />
                 ) : (
                   <span key={j}>{s.texto}</span>
                 ),

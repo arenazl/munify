@@ -66,3 +66,35 @@
   --pl-text: var(--text-primary, #eef2ea);
   --pl-border: var(--border-color, rgba(128, 128, 128, 0.2));
 }
+
+/* ============================================================
+   [LAVADO DE ACENTO] — el patrón de fondo del kit.
+
+   Una diagonal que NACE en el borde izquierdo (donde vive la
+   barra de acento) y se disuelve antes de llegar al texto. El
+   borde deja de ser un apéndice suelto: tiñe lo que toca.
+
+   Hay dos intensidades a propósito. Si todas las superficies
+   llevaran la misma, ninguna destacaría y la pantalla entera
+   quedaría teñida — el hero es la pieza que habla, así que se
+   lleva la fuerte; las tarjetas apenas la insinúan.
+
+   Se deriva del token de acento, así que cada marca lo hereda
+   en su color sin tocar una línea.
+   ============================================================ */
+:root {
+  /* Pieza protagonista (hero semántico). */
+  --pl-lavado-acento: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--pl-green) 8.5%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 2.8%, transparent) 38%,
+    transparent 72%
+  );
+  /* Superficies de apoyo (tarjetas, paneles): se percibe, no se mira. */
+  --pl-lavado-acento-sutil: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--pl-green) 3.6%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 1.2%, transparent) 40%,
+    transparent 74%
+  );
+}

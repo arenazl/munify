@@ -27,6 +27,8 @@ import './styles/ranked-list.css'
 import './styles/balance-bar.css'
 // componente del dashboard: el mapa recorriendo los focos (altura fija)
 import './styles/focos-rotativos.css'
+// componente del KIT: menu de acciones en mosaico asimetrico (jerarquia por tamano)
+import './styles/bento-menu.css'
 // componente del KIT: barra de filtros de una sola línea (pills ⇄ combos)
 import './styles/adaptive-filter.css'
 // componente del KIT: carrusel de cards de altura fija (N por vista medido)
