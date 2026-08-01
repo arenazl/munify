@@ -210,6 +210,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     set('--pl-green-100', mix(theme.card, p, 0.16));
     set('--pl-green-050', mix(theme.card, p, 0.08));
     set('--pl-on-brand', theme.primaryText);
+    // Lo que va ENCIMA del acento sólido (ícono del botón "+" de la barra
+    // inferior, número dentro de una barra llena, etc.): casi-blanco sobre
+    // acentos oscuros, casi-negro sobre acentos claros. Se decide por la
+    // LUMINANCIA del acento, no por si el tema es claro u oscuro — un tema
+    // oscuro puede tener acento amarillo, y ahí el blanco no se lee.
+    // Sale del theme, así que ninguna marca necesita su propio hardcodeo.
+    set('--pl-on-accent', isLight(p) ? '#101614' : '#ffffff');
 
     // Semánticos: ÚNICAS constantes = los 3 matices universales (warning/
     // danger/info). Todas sus variantes (texto accesible, superficie suave)

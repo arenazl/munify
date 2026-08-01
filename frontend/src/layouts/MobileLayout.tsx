@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { Home, Plus, ClipboardList, User, LogOut, FileCheck, Building2, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+// alpha() entiende cualquier formato de color; pegar digitos al final de
+// un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
+import { alpha } from '../lib/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificacionesDropdown } from '../components/NotificacionesDropdown';
 import { FabActionSheet } from '../components/mobile/FabActionSheet';
@@ -105,10 +108,10 @@ export default function MobileLayout() {
       <header
         className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between"
         style={{
-          backgroundColor: `${theme.card}e8`,
+          backgroundColor: `${alpha(theme.card, 0.91)}`,
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: `1px solid ${theme.border}40`,
+          borderBottom: `1px solid ${alpha(theme.border, 0.25)}`,
         }}
       >
         {/* Espacio izquierdo (para balance visual) */}
@@ -119,8 +122,8 @@ export default function MobileLayout() {
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{
-              background: `linear-gradient(135deg, ${colorPrimario}25, ${colorPrimario}10)`,
-              border: `1px solid ${colorPrimario}30`,
+              background: `linear-gradient(135deg, ${alpha(colorPrimario, 0.15)}, ${alpha(colorPrimario, 0.06)})`,
+              border: `1px solid ${alpha(colorPrimario, 0.19)}`,
             }}
           >
             {logoUrl ? (
@@ -163,10 +166,10 @@ export default function MobileLayout() {
         <div
           className="mx-auto max-w-md rounded-2xl px-1 py-1.5 flex items-center justify-around"
           style={{
-            backgroundColor: `${theme.card}f5`,
+            backgroundColor: `${alpha(theme.card, 0.96)}`,
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: `0 -4px 32px rgba(0,0,0,0.12), 0 0 0 1px ${theme.border}30`,
+            boxShadow: `0 -4px 32px rgba(0,0,0,0.12), 0 0 0 1px ${alpha(theme.border, 0.19)}`,
           }}
         >
           {tabs.map((tab) => {
@@ -185,17 +188,29 @@ export default function MobileLayout() {
                     className="absolute w-16 h-16 rounded-2xl blur-xl opacity-40"
                     style={{ backgroundColor: theme.primary }}
                   />
-                  {/* Botón flotante con gradiente */}
+                  {/* Botón flotante con gradiente.
+                      Antes las transparencias se armaban pegando dígitos al
+                      final del color (`${alpha(theme.primary, 0.8)}`, `${alpha(theme.primary, 0.31)}`).
+                      Eso da por hecho que el acento SIEMPRE es un hex de seis
+                      dígitos: si un preset lo define de otra forma, el string
+                      queda inválido y el navegador pinta cualquier cosa —de ahí
+                      el rojizo raro—. `alpha()` entiende cualquier formato. */}
                   <div
                     className="relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all active:scale-90 hover:scale-105"
                     style={{
-                      background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}cc)`,
-                      boxShadow: `0 4px 20px ${theme.primary}50`,
+                      background: `linear-gradient(135deg, ${theme.primary}, ${alpha(theme.primary, 0.8)})`,
+                      boxShadow: `0 4px 20px ${alpha(theme.primary, 0.31)}`,
                       transform: fabOpen ? 'rotate(45deg)' : 'rotate(0deg)',
                       transition: 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease',
                     }}
                   >
-                    <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
+                    {/* Blanco o negro según la luminancia del acento, no fijo:
+                        sobre un acento claro el blanco no se lee. */}
+                    <Plus
+                      className="h-7 w-7"
+                      strokeWidth={2.5}
+                      style={{ color: 'var(--pl-on-accent)' }}
+                    />
                   </div>
                   <span
                     className="text-[10px] mt-1 font-semibold"
@@ -220,7 +235,7 @@ export default function MobileLayout() {
                     <div
                       className="p-2 rounded-xl transition-all duration-200"
                       style={{
-                        backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
+                        backgroundColor: isActive ? `${alpha(theme.primary, 0.08)}` : 'transparent',
                         transform: isActive ? 'scale(1.05)' : 'scale(1)',
                       }}
                     >

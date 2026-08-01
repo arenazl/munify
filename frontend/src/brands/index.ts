@@ -105,10 +105,53 @@ const HOST_TO_BRAND: Record<string, string> = {
   'paraguay-limpio.netlify.app': 'paraguay-limpio',
 };
 
+/** Dónde se recuerda la marca elegida por URL, mientras dure la pestaña. */
+const CLAVE_MARCA_SESION = 'brand_id';
+
+/**
+ * Qué marca mostrar. En orden, de lo más explícito a lo más general:
+ *
+ *   1. HOST propio de la marca (paraguay-limpio.netlify.app).
+ *   2. RUTA `/<codigo>` — entrar por `/asuncion` abre Paraguay Limpio en
+ *      CUALQUIER dominio. Es la vía que pidió el dueño: el dominio pelado
+ *      lleva al acceso de siempre y sólo la ruta del municipio entra a su
+ *      marca.
+ *   3. Lo elegido antes en esta pestaña: la SPA navega de `/asuncion` a
+ *      `/login` y el path deja de tener el código, pero la identidad tiene
+ *      que sobrevivir a ese salto.
+ *   4. VITE_BRAND del build.
+ *   5. Munify.
+ *
+ * El HOST va primero y la RUTA después a propósito: en el dominio propio de
+ * una marca no hay forma de salirse de ella escribiendo otra URL.
+ */
 function resolveBrandId(): string {
   if (typeof window !== 'undefined') {
     const byHost = HOST_TO_BRAND[window.location.hostname];
     if (byHost && BRANDS[byHost]) return byHost;
+
+    const primerTramo = window.location.pathname.split('/')[1]?.toLowerCase();
+    if (primerTramo) {
+      const porRuta = Object.values(BRANDS).find(
+        (b) => b.municipioCodigo && b.municipioCodigo.toLowerCase() === primerTramo,
+      );
+      if (porRuta) {
+        try {
+          window.sessionStorage.setItem(CLAVE_MARCA_SESION, porRuta.id);
+        } catch {
+          // Navegación privada sin sessionStorage: la marca vale para esta
+          // vista igual, sólo no sobrevive al cambio de ruta.
+        }
+        return porRuta.id;
+      }
+    }
+
+    try {
+      const recordada = window.sessionStorage.getItem(CLAVE_MARCA_SESION);
+      if (recordada && BRANDS[recordada]) return recordada;
+    } catch {
+      // Sin sessionStorage se sigue con el resto de la cadena.
+    }
   }
   const env = (import.meta.env.VITE_BRAND as string | undefined)?.trim();
   if (env && BRANDS[env]) return env;
