@@ -58,6 +58,36 @@ const CHACABUCO_BOUNDS = {
   maxLng: -60.35,  // Este de Chacabuco
 };
 
+/**
+ * Sigue al foco elegido desde afuera.
+ *
+ * Cuando el que usa el widget controla el encuadre (`center` + `zoom`), el
+ * mapa tiene que MOVERSE cada vez que ese centro cambia. Sin esto, el widget
+ * sólo miraba `center` al montarse y el mapa quedaba clavado mientras el pie
+ * iba nombrando otra esquina: el texto contaba una cosa y el mapa mostraba
+ * otra. Se usa flyTo para que el salto se vea como un recorrido y no como un
+ * corte seco.
+ */
+function SeguirCentro({
+  center,
+  zoom,
+  onReady,
+}: { center: [number, number]; zoom: number; onReady?: () => void }) {
+  const map = useMap();
+  const [lat, lng] = center;
+
+  useEffect(() => {
+    map.invalidateSize();
+    map.flyTo([lat, lng], zoom, { duration: 1.1 });
+    // El aviso de "ya está" también sale por acá: si no, con encuadre
+    // controlado el mapa se quedaba con el velo de carga puesto para siempre.
+    const t = setTimeout(() => onReady?.(), 250);
+    return () => clearTimeout(t);
+  }, [map, lat, lng, zoom, onReady]);
+
+  return null;
+}
+
 // Componente para ajustar el zoom a los datos
 function FitBoundsToData({ data, onReady }: { data: HeatmapPoint[]; onReady?: () => void }) {
   const map = useMap();
@@ -377,6 +407,15 @@ export default function HeatmapWidget({
   })();
   const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
 
+  // Leaflet dibuja sobre canvas y necesita un color concreto, así que se lee
+  // del MISMO token que usa el CSS. Nada de hex fijo: cada marca marca su
+  // foco en su propio color.
+  const acentoMapa = useMemo(() => {
+    if (typeof window === 'undefined') return theme.primary;
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--pl-green').trim();
+    return v || theme.primary;
+  }, [theme.primary]);
+
   const [isExpanded, setIsExpanded] = useState(false);
   // Estado de filtros - todas las categorías activas por defecto
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
@@ -567,7 +606,29 @@ export default function HeatmapWidget({
           attribution='&copy; OSM &copy; CARTO'
         />
         <InvalidateOnResize />
-        <FitBoundsToData data={filteredData} onReady={handleMapReady} />
+        {/* Con encuadre CONTROLADO desde afuera el auto-fit no corre: pisaba
+            el foco con el centroide de todos los puntos. */}
+        {center ? (
+          <>
+            <SeguirCentro center={center} zoom={zoom} onReady={handleMapReady} />
+            {/* SEÑALAR, no sólo centrar: sin una marca el usuario ve el mapa
+                moverse pero no sabe cuál de todo lo que hay es la esquina que
+                el pie está nombrando. Dos anillos: uno amplio y tenue que
+                acota la zona, y el punto exacto encima. */}
+            <CircleMarker
+              center={center}
+              radius={26}
+              pathOptions={{ color: acentoMapa, weight: 2, opacity: 0.55, fillColor: acentoMapa, fillOpacity: 0.10 }}
+            />
+            <CircleMarker
+              center={center}
+              radius={7}
+              pathOptions={{ color: '#ffffff', weight: 2.5, fillColor: acentoMapa, fillOpacity: 1 }}
+            />
+          </>
+        ) : (
+          <FitBoundsToData data={filteredData} onReady={handleMapReady} />
+        )}
         <HeatLayer data={filteredData} />
         {showMarkers && <CategoryMarkers data={filteredData} />}
         {isFullscreen && <ZoomControls />}
