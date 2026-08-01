@@ -19,21 +19,22 @@
   box-shadow: var(--pl-shadow-card);
 }
 
-/* Lavado de acento que sube desde el piso de la tarjeta: le da volumen y
-   ata el borde izquierdo con el resto, sin llegar nunca a la frase. Va MUY
-   bajo a propósito — si el fondo levanta, compite con el verde del veredicto
-   y "113 cerrados" deja de leerse como bueno. Sale del token de acento, así
-   que cada marca lo hereda en su color. */
+/* Lavado de acento en diagonal, NACIENDO en el borde izquierdo: el color
+   entra por donde está la barra de acento y se disuelve antes de llegar al
+   texto. Así el borde deja de ser un apéndice suelto y tiñe lo que toca.
+   Va MUY bajo a propósito — si el fondo levanta, compite con el verde del
+   veredicto y "113 cerrados" deja de leerse como bueno. Sale del token de
+   acento, así que cada marca lo hereda en su color. */
 .sh-card::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   background: linear-gradient(
-    0deg,
-    color-mix(in srgb, var(--pl-green) 9%, transparent) 0%,
-    color-mix(in srgb, var(--pl-green) 2.5%, transparent) 45%,
-    transparent 78%
+    115deg,
+    color-mix(in srgb, var(--pl-green) 8.5%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 2.8%, transparent) 38%,
+    transparent 72%
   );
 }
 /* Todo el contenido por encima del lavado. */

@@ -861,3 +861,18 @@
   .dv2-pulse-dot, .dv2-spin, .dv2-skel { animation: none; }
   .dv2-barra-fill { transition: none; }
 }
+
+/* Frase que remata el ranking de Concentración: el dato con su consecuencia
+   ("14 esquinas concentran 76 reclamos: 1 de cada 10"), no una descripción de
+   lo que hace el widget. */
+.dv2-concentracion-frase {
+  margin: 12px 0 4px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.45;
+  color: var(--pl-text-3);
+}
+.dv2-concentracion-frase strong {
+  font-weight: 700;
+  color: var(--pl-text);
+}

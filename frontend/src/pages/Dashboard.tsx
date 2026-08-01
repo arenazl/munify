@@ -26,6 +26,7 @@ import {
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { BalanceBar } from '../components/ui/BalanceBar';
+import { RankedList, type RankedListItem } from '../components/ui/RankedList';
 import { textoBalance } from '../lib/balance';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import {
@@ -58,6 +59,12 @@ interface ReclamoRecurrente {
   zona: string;
   cantidad: number;
   categorias: string[];
+  /** La categoría que más pesa en esa esquina, y cuántos de sus reclamos son.
+   *  Es lo que deja decir "6 de cada 10 son de Higiene urbana" cuando se está
+   *  mirando el mapa sin filtrar por categoría. Opcional: si el backend viejo
+   *  todavía no las manda, la fila muestra sólo la dirección. */
+  categoria_top?: string | null;
+  categoria_top_cantidad?: number;
 }
 
 interface ReclamoSimilarGrupo {
@@ -727,6 +734,42 @@ export default function Dashboard() {
     [heatmapData, catConcentracion],
   );
 
+  // Ranking de esquinas que acompaña al mapa. Una mancha no se puede accionar:
+  // no dice qué calle es, cuántos son ni de qué. Cada fila contesta las tres.
+  const esquinasRanking = useMemo<RankedListItem[]>(() => {
+    const base = catConcentracion
+      ? recurrentes.filter((r) => r.categorias?.includes(catConcentracion))
+      : recurrentes;
+    return base.slice(0, 5).map((r, i) => {
+      // Con "todas" seleccionado, la fila aclara de qué son la mayoría; con
+      // una categoría elegida eso sería redundante y se muestra la zona.
+      const detalle =
+        !catConcentracion && r.categoria_top && r.categoria_top_cantidad
+          ? `${r.categoria_top_cantidad} de ${r.cantidad} son de ${r.categoria_top}`
+          : r.zona;
+      return {
+        id: `${r.direccion}-${i}`,
+        titulo: r.direccion,
+        detalle,
+        valor: r.cantidad,
+        valorSub: r.cantidad === 1 ? 'reclamo' : 'reclamos',
+        onClick: () => navigate(`/gestion/mapa?direccion=${encodeURIComponent(r.direccion)}`),
+      };
+    });
+  }, [recurrentes, catConcentracion, navigate]);
+
+  /** La frase que resume el ranking, con su consecuencia dicha. */
+  const resumenConcentracion = useMemo(() => {
+    if (esquinasRanking.length === 0) return null;
+    const enFoco = esquinasRanking.reduce((acc, e) => acc + Number(e.valor), 0);
+    const universo = catConcentracion
+      ? heatmapFiltrado.length
+      : porCategoria.reduce((acc, c) => acc + c.cantidad, 0);
+    if (universo <= 0) return null;
+    const cadaCuantos = Math.round(universo / Math.max(enFoco, 1));
+    return { esquinas: esquinasRanking.length, enFoco, cadaCuantos };
+  }, [esquinasRanking, catConcentracion, heatmapFiltrado, porCategoria]);
+
   // Matices del puente de tokens (--pl-*), leídos del :root: recharts necesita
   // colores concretos, así que los sacamos de los MISMOS tokens que usa el CSS
   // (patrón polimórfico: funciona en los 12 themes, cero hex fijos).
@@ -1158,14 +1201,29 @@ export default function Dashboard() {
             {categoriasConcentracion.length > 0 && (
               <AdaptiveFilter groups={gruposConcentracion} />
             )}
+            {/* El mapa UBICA, la lista ACCIONA. La mancha sola es linda pero no
+                dice qué calle, cuántos ni de qué; el ranking contesta las tres
+                cosas y usa el mismo lenguaje que la consulta guiada del Mapa,
+                así que la app no habla de dos formas distintas. */}
             <HeatmapWidget
               data={heatmapFiltrado}
               showMarkers={false}
-              height="300px"
+              height="190px"
               title="Mapa de Calor - Concentración de Reclamos"
               loading={loadingHeatmap}
               onCategoryClick={handleCategoryClick}
             />
+            {resumenConcentracion && (
+              <p className="dv2-concentracion-frase">
+                <strong>{resumenConcentracion.esquinas} esquinas</strong> concentran{' '}
+                <strong>{resumenConcentracion.enFoco} reclamos</strong>
+                {resumenConcentracion.cadaCuantos > 1 && (
+                  <>: <span className="dv2-auto">1 de cada {resumenConcentracion.cadaCuantos}</span></>
+                )}
+                .
+              </p>
+            )}
+            <RankedList items={esquinasRanking} ariaLabel="Esquinas con más reclamos" />
           </div>
 
           {/* Top categorías */}

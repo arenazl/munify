@@ -1224,34 +1224,57 @@ async def get_recurrentes(
         .limit(10)
     )
 
+    filas = query.all()
+    if not filas:
+        return []
+
+    # ------------------------------------------------------------------
+    # Antes acá había un N+1: por CADA dirección del top se hacían dos
+    # queries más (una para el nombre de zona y otra para sus categorías).
+    # Con 10 direcciones eran 21 viajes a la base. Ahora son 2 en total,
+    # resueltas con un IN sobre las direcciones del top.
+    # ------------------------------------------------------------------
+    direcciones = [f[0] for f in filas]
+    zona_ids = {f[1] for f in filas if f[1]}
+
+    nombres_zona = {}
+    if zona_ids:
+        zq = await db.execute(select(Zona.id, Zona.nombre).where(Zona.id.in_(zona_ids)))
+        nombres_zona = {zid: nombre for zid, nombre in zq.all()}
+
+    # Categorías CON su conteo (antes venían DISTINCT, sin cantidad, así que
+    # no se podía saber cuál pesa). Con el conteo, cada esquina puede decir de
+    # qué son la mayoría de sus reclamos — que es lo que vuelve accionable al
+    # ranking cuando se está mirando "todas las categorías".
+    cat_filters = [
+        Reclamo.municipio_id == municipio_id,
+        Reclamo.direccion.in_(direcciones),
+        func.date(Reclamo.created_at) >= fecha_inicio,
+    ]
+    if dependencia_id:
+        cat_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
+    cat_query = await db.execute(
+        select(Reclamo.direccion, Categoria.nombre, func.count(Reclamo.id))
+        .join(Categoria, Reclamo.categoria_id == Categoria.id)
+        .where(*cat_filters)
+        .group_by(Reclamo.direccion, Categoria.nombre)
+    )
+    por_direccion: dict[str, list[tuple[str, int]]] = {}
+    for direccion, nombre_cat, n in cat_query.all():
+        por_direccion.setdefault(direccion, []).append((nombre_cat, n))
+
     resultado = []
-    for direccion, zona_id, cantidad in query.all():
-        # Obtener nombre de zona
-        zona_nombre = "Sin zona"
-        if zona_id:
-            zona_query = await db.execute(select(Zona.nombre).where(Zona.id == zona_id))
-            zona_nombre = zona_query.scalar() or "Sin zona"
-
-        # Obtener categorías de esos reclamos
-        cat_filters = [
-            Reclamo.direccion == direccion,
-            Reclamo.municipio_id == municipio_id,
-        ]
-        if dependencia_id:
-            cat_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
-        cat_query = await db.execute(
-            select(Categoria.nombre)
-            .join(Reclamo, Reclamo.categoria_id == Categoria.id)
-            .where(*cat_filters)
-            .distinct()
-        )
-        categorias = [c[0] for c in cat_query.all()]
-
+    for direccion, zona_id, cantidad in filas:
+        pares = sorted(por_direccion.get(direccion, []), key=lambda x: x[1], reverse=True)
+        top_cat, top_n = pares[0] if pares else (None, 0)
         resultado.append({
             "direccion": direccion,
-            "zona": zona_nombre,
+            "zona": nombres_zona.get(zona_id, "Sin zona"),
             "cantidad": cantidad,
-            "categorias": categorias
+            "categorias": [nombre for nombre, _ in pares],
+            # La que más pesa en esa esquina, con cuántos de los suyos son.
+            "categoria_top": top_cat,
+            "categoria_top_cantidad": top_n,
         })
 
     return resultado
