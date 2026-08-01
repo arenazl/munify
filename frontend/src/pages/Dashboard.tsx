@@ -1230,6 +1230,12 @@ export default function Dashboard() {
             />
           </div>
 
+        </div>
+      )}
+
+      {/* ================= Analítica: métricas + cobertura + charts ================= */}
+      <SectionTitleV2 icon={TrendingUp} label="Analítica" />
+      <div className="dv2-grid-3">
           {/* Top categorías */}
           <div className="dv2-card">
             <div className="dv2-card-head">
@@ -1272,12 +1278,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* ================= Analítica: métricas + cobertura + charts ================= */}
-      <SectionTitleV2 icon={TrendingUp} label="Analítica" />
-      <div className="dv2-grid-2">
         {/* Panel de métricas con segmented control */}
         <div className="dv2-card">
           {/* Segmented control de texto (sin iconos), como la referencia */}

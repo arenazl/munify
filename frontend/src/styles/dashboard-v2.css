@@ -994,32 +994,29 @@
   .dv2-grid-principal {
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   }
-  /* El tercer hijo de la fila (Top categorías) pasa a la fila de abajo,
-     ocupando todo el ancho. */
-  .dv2-grid-principal > .dv2-card:nth-child(3) {
-    grid-column: 1 / -1;
-  }
 }
 
-/* Las barras de Top categorías se reparten en columnas SEGÚN EL ANCHO, con
-   flex: cada bloque pide 260px y el sobrante se reparte entre los que entran.
-   Sin media queries — el propio contenedor decide: en escritorio entran tres,
-   en una tablet dos, en un teléfono una. Diez categorías en una sola columna
-   obligan a cortar en cinco y esconder el resto detrás de un "otras 5". */
-.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
+
+
+/* ============================================================
+   [GRID-3] — fila de tres paneles comparables.
+
+   Los tres rankings de la analítica (categorías, barrios y
+   zonas) van en la MISMA fila y con el MISMO formato: así se
+   leen uno contra otro. Antes categorías vivía en una tira
+   aparte a lo ancho y no se podía comparar con nada.
+
+   Con flex y no con grid: cada panel pide 300px y entran los
+   que quepan — tres en escritorio, dos en tablet, uno en
+   teléfono. Lo decide el contenedor, no un breakpoint.
+   ============================================================ */
+.dv2-grid-3 {
   display: flex;
-  /* `flex-direction: row` EXPLÍCITO. La regla base de .dv2-barras es
-     `column`, y sin pisarla el `flex-basis: 260px` de abajo se aplicaba al
-     ALTO en vez de al ancho: cada barra reservaba 260px de alto y quedaban
-     separadas por un vacío enorme. En flex, `basis` mide sobre el eje
-     principal, y el eje principal lo define la dirección. */
-  flex-direction: row;
   flex-wrap: wrap;
-  gap: 10px 22px;
-  align-items: flex-start;
-  align-content: flex-start;
+  gap: 12px;
+  align-items: stretch;
 }
-.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barra-bloque {
-  flex: 1 1 260px;
+.dv2-grid-3 > * {
+  flex: 1 1 300px;
   min-width: 0;
 }
