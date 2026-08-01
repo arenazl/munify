@@ -23,6 +23,9 @@ function RecIcono({ nombre, color }: { nombre: string; color: string }) {
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
+import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
 import type { Reclamo } from '../types';
 import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 
@@ -212,6 +215,67 @@ export default function DashboardVecino() {
     || 'Mi Municipio';
 
   const municipioLogo = municipioActual?.logo_url || localStorage.getItem('municipio_logo_url');
+  // Portada del municipio si la tiene. Antes acá iba una foto de banco de
+  // imágenes fija —una ciudad cualquiera, no la del vecino— y sin portada
+  // propia el banner cae al gradiente del acento, que al menos es la marca.
+  const municipioPortada = (municipioActual as { imagen_portada?: string })?.imagen_portada || null;
+
+  /** Los números del vecino, cortos para que entren en una fila en el celular. */
+  const kpisVecino: HeroStripKpi[] = [
+    { etiqueta: 'Tus reclamos', etiquetaCorta: 'Tuyos', valor: misEstadisticas.total },
+    { etiqueta: 'En curso', etiquetaCorta: 'En curso', valor: reclamosPendientes },
+    { etiqueta: 'Resueltos', etiquetaCorta: 'Resueltos', valor: misEstadisticas.resueltos },
+  ];
+
+  /**
+   * Lo que le pasa AL VECINO, dicho en su idioma.
+   *
+   * No es el tablero del municipio con otros números: al vecino no le importa
+   * la tasa global ni cuántos reclamos hay en la ciudad. Le importa si al
+   * SUYO le dieron bola. Por eso las frases hablan de lo suyo y el veredicto
+   * mira su experiencia, no la productividad del municipio.
+   */
+  const frasesVecino: HeroFrase[] = (() => {
+    const fs: HeroFrase[] = [];
+    if (misEstadisticas.total === 0) {
+      fs.push({
+        segmentos: [
+          seg('Todavía no reportaste nada. '),
+          seg('Cuando cargues un reclamo', 'bueno'),
+          seg(' vas a poder seguirlo desde acá.'),
+        ],
+        acciones: [{ label: 'Hacer un reclamo', to: '/gestion/crear-reclamo', primaria: true }],
+      });
+      return fs;
+    }
+
+    fs.push({
+      segmentos: [
+        seg('Tenés '),
+        seg(
+          `${reclamosPendientes} ${reclamosPendientes === 1 ? 'reclamo en curso' : 'reclamos en curso'}`,
+          reclamosPendientes > 0 ? 'advertencia' : 'bueno',
+        ),
+        seg(' y '),
+        seg(`${misEstadisticas.resueltos} ya resueltos`, 'bueno'),
+        seg('.'),
+      ],
+      acciones: [{ label: 'Ver mis reclamos', to: '/gestion/mis-reclamos', primaria: true }],
+    });
+
+    if (misEstadisticas.rechazados > 0) {
+      fs.push({
+        segmentos: [
+          seg(`${misEstadisticas.rechazados} `, 'malo'),
+          seg(misEstadisticas.rechazados === 1 ? 'de tus reclamos fue rechazado' : 'de tus reclamos fueron rechazados'),
+          seg('. Podés ver el motivo y volver a reportarlo.'),
+        ],
+        acciones: [{ label: 'Ver el motivo', to: '/gestion/mis-reclamos?estado=rechazado' }],
+      });
+    }
+    return fs;
+  })();
+
 
   // Stats cards data
   const statsCards = [
@@ -248,57 +312,20 @@ export default function DashboardVecino() {
   return (
     <PullToRefresh onRefresh={async () => { await fetchData(); }}>
     <div className="space-y-6">
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '180px' }}>
-        <div className="absolute inset-0">
-          <img
-            alt={municipioNombre}
-            className="w-full h-full object-cover"
-            src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.7) 50%, ${theme.backgroundSecondary}90 100%)`,
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
-        </div>
+      {/* Encabezado v2: el mismo banner y el mismo hero semantico que el resto
+          de la app. Antes esta pantalla tenia su propio banner con una FOTO DE
+          BANCO DE IMAGENES hardcodeada (una ciudad que no es la del vecino) y
+          colores fijos rgba(15,23,42): entrar como vecino parecia otra
+          aplicacion. Ahora usa las piezas del kit y hereda el tema. */}
+      <HeroBannerV2
+        eyebrow={`Mi panel · ${municipioNombre}`}
+        titulo={`Hola, ${user?.nombre || 'vecino'}`}
+        sub="Todo lo que reportaste y en que anda cada cosa."
+        fotoUrl={municipioPortada}
+        kpis={kpisVecino}
+      />
 
-        <div className="relative z-10 p-6 flex items-center gap-5" style={{ minHeight: '180px' }}>
-          {municipioLogo && (
-            <img
-              src={municipioLogo}
-              alt={municipioNombre}
-              className="h-20 w-20 md:h-24 md:w-24 rounded-2xl object-contain bg-white/10 backdrop-blur p-3 flex-shrink-0"
-            />
-          )}
-
-          <div className="flex-1">
-            <h1 className="text-2xl md:text-3xl mb-1 drop-shadow-lg text-white">
-              <span className="font-light">Municipalidad de </span>
-              <span className="font-bold">{municipioNombre}</span>
-            </h1>
-            <p className="text-sm md:text-base mb-3" style={{ color: 'rgba(148, 163, 184, 1)' }}>
-              ¡Hola, {user?.nombre}! Bienvenido a tu panel
-            </p>
-            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'rgba(148, 163, 184, 1)' }}>
-              <div className="flex items-center gap-1.5">
-                <FileText className="w-4 h-4" />
-                <span>{misEstadisticas.total} reclamos</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4" />
-                <span>{reclamosPendientes} pendientes</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4" />
-                <span>{misEstadisticas.resueltos} resueltos</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SemanticHero etiqueta="TUS RECLAMOS" frases={frasesVecino} />
 
       {/* Recomendaciones inteligentes */}
       {recomendaciones.length > 0 && (
