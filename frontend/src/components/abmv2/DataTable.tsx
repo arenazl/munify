@@ -20,17 +20,30 @@
  *   - 'money' → .av2-money 13.5px (la página ya formatea el importe).
  *   - 'chip'  → ChipCellData {label, tone} o string de estado (tono por
  *               `toneDeEstado`, label por lib/enums/reclamo si aplica).
- *   - 'entity'→ EntityCellData (tile de icono + título + subtítulo con
- *               punto de color); si no matchea, cae a texto.
+ *   - 'entity'→ EntityCellData (tile de icono/iniciales + título + subtítulo
+ *               con punto de color); si no matchea, cae a texto.
+ *   - 'dot'   → [v2.1] DotCellData {label, dotColor} o string: punto de color
+ *               (runtime) + texto NEUTRO — versión liviana de 'entity' para
+ *               columnas taxonómicas (categoría, dependencia, zona).
  *   - 'actions' → la resuelve SIEMPRE el DataTable con `rowActions`
  *               (máximo 2 visibles; el resto va a un menú "…").
  * La página declara la columna de acciones en `columns` (kind: 'actions');
  * sin esa columna, las rowActions no se renderizan.
  *
+ * [v2.1] Upgrade con el backlog agnóstico de los pilotos (contratos en
+ * types.ts, cada uno documenta su porqué):
+ *   - `loading` → 6 skeleton rows (.av2-skeleton, shimmer con tokens) sobre
+ *     el MISMO template de columnas; el vacío no se muestra mientras carga.
+ *   - `emptyMessage` → copy del estado vacío (fallback al texto genérico).
+ *   - EntityCell acepta `initials` (avatar circular, excluyente con icon) e
+ *     `icon: LucideIcon | ReactNode` (nodos ya instanciados, p. ej. <img>).
+ *   - EntityCellData/DotCellData son canónicas en types.ts; acá se
+ *     RE-EXPORTAN para no romper los imports existentes (Empleados).
+ *
  * kind='board' NO se implementa en esta fase (Planificación): se muestra
  * un placeholder explicativo. Ver types.ts.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { isValidElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { MoreHorizontal } from 'lucide-react';
@@ -41,10 +54,16 @@ import type {
   ChipTone,
   ColumnSpec,
   DataTableProps,
+  DotCellData,
+  EntityCellData,
   RowAction,
   TableGroup,
 } from './types';
 import { toneDeEstado } from './estadoTonos';
+
+/** [v2.1] Canónicas en types.ts; re-export para los imports existentes
+ *  de las páginas (Empleados importa EntityCellData desde './DataTable'). */
+export type { EntityCellData, DotCellData } from './types';
 
 
 /* ============================================================
@@ -62,34 +81,49 @@ export function ChipEstado({ label, tone = 'gray' }: ChipCellData) {
   return <span className={`av2-chip-estado av2-chip-estado--${tone}`}>{label}</span>;
 }
 
-/** Datos de la celda de entidad (kind='entity'): tile + título + subtítulo. */
-export interface EntityCellData {
-  /** Icono lucide del tile (28-30px, fondo suave de la familia). */
-  icon?: LucideIcon;
-  /** Color de la familia/categoría — viene de DATOS (runtime): tiñe el
-   *  icono y el fondo suave del tile. Sin él, tile neutro por tokens. */
-  tileColor?: string;
-  title: string;
-  /** Subtítulo: punto de color + TEXTO NEUTRO (nunca texto coloreado). */
-  subtitle?: string;
-  /** Color del punto del subtítulo — runtime (categoría de los datos). */
-  dotColor?: string;
-}
-
-/** Entidad de la fila: tile de icono + título 13/600 + subtítulo con punto. */
-export function EntityCell({ icon: Icon, tileColor, title, subtitle, dotColor }: EntityCellData) {
+/** Entidad de la fila: tile de icono O avatar de iniciales + título 13/600 +
+ *  subtítulo con punto. [v2.1] `initials` es EXCLUYENTE con `icon` (gana
+ *  initials, más específico); `icon` acepta LucideIcon o un nodo ya
+ *  instanciado (p. ej. <img> de thumbnail, iconos dinámicos por nombre que
+ *  resuelve la página). Contrato: EntityCellData en types.ts. */
+export function EntityCell({ icon, initials, tileColor, title, subtitle, dotColor }: EntityCellData) {
   // Colores de categoría = valores runtime que vienen de datos (permitidos
   // inline por la regla polimórfica). El fondo suave se deriva del color.
   const tileStyle: CSSProperties | undefined = tileColor
     ? { color: tileColor, background: `color-mix(in srgb, ${tileColor} 12%, transparent)` }
     : undefined;
+
+  let tile: ReactNode = null;
+  if (initials) {
+    // Avatar circular 30px, 11px/700. Sin tileColor cae a --pl-green-100
+    // por la clase (tokens).
+    tile = (
+      <span className="av2-entidad-avatar" style={tileStyle}>
+        {initials}
+      </span>
+    );
+  } else if (icon != null) {
+    if (isValidElement(icon)) {
+      // Nodo ya instanciado: se pinta tal cual dentro del tile.
+      tile = (
+        <span className="av2-entidad-tile" style={tileStyle}>
+          {icon}
+        </span>
+      );
+    } else {
+      // Componente LucideIcon (typeof no alcanza: lucide usa forwardRef).
+      const Icono = icon as LucideIcon;
+      tile = (
+        <span className="av2-entidad-tile" style={tileStyle}>
+          <Icono size={16} strokeWidth={2} />
+        </span>
+      );
+    }
+  }
+
   return (
     <span className="av2-entidad">
-      {Icon && (
-        <span className="av2-entidad-tile" style={tileStyle}>
-          <Icon size={16} strokeWidth={2} />
-        </span>
-      )}
+      {tile}
       <span className="av2-entidad-cuerpo">
         <span className="av2-entidad-titulo">{title}</span>
         {subtitle && (
@@ -99,6 +133,22 @@ export function EntityCell({ icon: Icon, tileColor, title, subtitle, dotColor }:
           </span>
         )}
       </span>
+    </span>
+  );
+}
+
+/** [v2.1] Celda kind='dot': punto de color (runtime) + texto NEUTRO.
+ *  Versión liviana de EntityCell para columnas taxonómicas. Sin dotColor,
+ *  punto neutro por tokens. Contrato: DotCellData en types.ts. */
+export function DotCell({ label, dotColor }: DotCellData) {
+  return (
+    <span className="av2-dot-celda">
+      <span
+        className="av2-dot-punto"
+        // Color del punto = valor runtime que viene de datos.
+        style={dotColor ? { background: dotColor } : undefined}
+      />
+      <span className="av2-dot-texto">{label}</span>
     </span>
   );
 }
@@ -126,6 +176,9 @@ const esChipData = (v: unknown): v is ChipCellData =>
 const esEntityData = (v: unknown): v is EntityCellData =>
   typeof v === 'object' && v !== null && typeof (v as EntityCellData).title === 'string';
 
+const esDotData = (v: unknown): v is DotCellData =>
+  typeof v === 'object' && v !== null && typeof (v as DotCellData).label === 'string';
+
 /** Render por defecto de una celda según ColumnSpec.kind (ver doc de arriba). */
 function celdaPorDefecto<Row>(col: ColumnSpec<Row>, row: Row): ReactNode {
   const valor = (row as Record<string, unknown>)[col.id];
@@ -147,6 +200,11 @@ function celdaPorDefecto<Row>(col: ColumnSpec<Row>, row: Row): ReactNode {
     case 'entity': {
       if (esEntityData(valor)) return <EntityCell {...valor} />;
       return <span className="av2-tabla-texto">{valor == null ? '—' : String(valor)}</span>;
+    }
+    case 'dot': {
+      if (esDotData(valor)) return <DotCell {...valor} />;
+      if (typeof valor === 'string' && valor) return <DotCell label={valor} />;
+      return <span className="av2-tabla-texto">—</span>;
     }
     case 'text':
     default:
@@ -233,6 +291,14 @@ function MenuAcciones<Row>({
 
 const MENU_ANCHO = 168; // debe coincidir con min-width de .av2-tabla-menu
 
+/** [v2.1] Cantidad de filas fantasma del skeleton (loading). */
+const SKELETON_FILAS = 6;
+
+/** Copy genérico del estado vacío (fallback cuando no viene emptyMessage). */
+const MENSAJE_VACIO =
+  'No hay registros que coincidan con la búsqueda y los filtros aplicados. Probá ampliar el ' +
+  'período o limpiar los filtros.';
+
 export function DataTable<Row>({
   kind,
   columns,
@@ -245,6 +311,8 @@ export function DataTable<Row>({
   onRowClick,
   footer,
   tableMinWidth = 940,
+  loading = false,
+  emptyMessage,
 }: DataTableProps<Row>) {
   const [menu, setMenu] = useState<MenuAbierto | null>(null);
   const cerrarMenu = useCallback(() => setMenu(null), []);
@@ -392,6 +460,41 @@ export function DataTable<Row>({
     );
   };
 
+  /** [v2.1] Skeleton rows: filas fantasma sobre el MISMO template de columnas
+   *  (av2-tabla-grid hereda --av2-cols). Barras con ancho por clase cíclica
+   *  (presentacional → CSS, nada inline); 'entity' pinta tile + dos líneas y
+   *  'actions' un botón fantasma. Sin spinner — shimmer con tokens. */
+  const renderSkeleton = () => (
+    <div aria-hidden="true">
+      {Array.from({ length: SKELETON_FILAS }, (_, f) => (
+        <div key={f} className="av2-tabla-grid av2-tabla-fila av2-tabla-fila--skel" role="presentation">
+          {columns.map((col, c) => (
+            <span
+              key={col.id}
+              className={`av2-celda ${clasePorAlineado(
+                col.align ?? (col.kind === 'money' || col.kind === 'actions' ? 'right' : 'left'),
+              )}`}
+            >
+              {col.kind === 'entity' ? (
+                <span className="av2-skel-entidad">
+                  <span className="av2-skeleton av2-skeleton--tile" />
+                  <span className="av2-skel-lineas">
+                    <span className="av2-skeleton av2-skeleton--w2" />
+                    <span className="av2-skeleton av2-skeleton--w1 av2-skeleton--fina" />
+                  </span>
+                </span>
+              ) : col.kind === 'actions' ? (
+                <span className="av2-skeleton av2-skeleton--accion" />
+              ) : (
+                <span className={`av2-skeleton av2-skeleton--w${((f + c) % 3) + 1}`} />
+              )}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
   const renderPieAccion = (a: Action) =>
     a.to ? (
       <Link className="av2-tabla-pie-accion" to={a.to}>
@@ -405,7 +508,7 @@ export function DataTable<Row>({
 
   return (
     <section className="av2-tabla">
-      <div className="av2-tabla-scroll" role="table" style={estiloGrid}>
+      <div className="av2-tabla-scroll" role="table" aria-busy={loading || undefined} style={estiloGrid}>
         {/* Encabezado eyebrow */}
         <div className="av2-tabla-grid av2-tabla-encabezado" role="row">
           {columns.map((col) => (
@@ -421,11 +524,13 @@ export function DataTable<Row>({
           ))}
         </div>
 
-        {/* Cuerpo: grupos o filas planas */}
-        {totalFilas === 0 ? (
+        {/* Cuerpo: skeleton (loading) > grupos o filas planas > vacío.
+            Mientras carga NUNCA se muestra el vacío (falso "No hay registros"). */}
+        {loading ? (
+          renderSkeleton()
+        ) : totalFilas === 0 ? (
           <div className="av2-tabla-vacia" role="row">
-            No hay registros que coincidan con la búsqueda y los filtros aplicados. Probá ampliar el
-            período o limpiar los filtros.
+            {emptyMessage ?? MENSAJE_VACIO}
           </div>
         ) : usarGrupos ? (
           groups!.map(renderGrupo)

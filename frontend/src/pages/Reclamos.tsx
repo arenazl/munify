@@ -1,22 +1,31 @@
 import { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList, ThumbsDown, Star } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi, calificacionesApi, poiApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
-import type { KpiSpec } from '../components/ui/KpiCard';
+import { ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible } from '../components/ui/ABMPage';
 import { SemanticHero } from '../components/ui/SemanticHero';
-import { seg, type HeroFrase } from '../lib/semanticHero';
+import { seg, type HeroAccion, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { Sheet } from '../components/ui/Sheet';
-import { StatusPill } from '../components/ui/StatusPill';
+// Suite del estándar SemanticAbmPage (rediseño v2). Composición manual de las
+// piezas (PageHeader/ListToolbar/FilterBar/DataTable) porque el orquestador
+// todavía no soporta las vistas alternativas (cards/guiada) de esta página —
+// ver dudas del piloto. El contrato de props ES el del estándar, incluido el
+// ORDEN v2.2: cabecera → hero → (toolbar + filtros como una sola tarjeta).
+import { PageHeader } from '../components/abmv2/PageHeader';
+import { ListToolbar } from '../components/abmv2/ListToolbar';
+import { FilterBar } from '../components/abmv2/FilterBar';
+import { DataTable, EntityCell, ChipEstado } from '../components/abmv2/DataTable';
+import type { ColumnSpec, RowAction, StatusTab, TableGroup, ViewKind } from '../components/abmv2/types';
+import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { useIaReclamos } from '../hooks/useIaHabilitada';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
-import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
@@ -59,6 +68,58 @@ const getFechaVenceReclamoMs = (r: Reclamo): number | null => {
   return r.created_at
     ? new Date(r.created_at).getTime() + dias * 24 * 60 * 60 * 1000
     : null;
+};
+
+// --- Vencimiento y asignación, para los KPIs y las acciones del hero ---
+// Un reclamo cerrado (finalizado/resuelto/rechazado) ya no vence ni necesita
+// dependencia: TODAS las métricas de abajo miran sólo los ABIERTOS, igual que
+// las secciones de la vista guiada.
+const CERRADOS = new Set(['finalizado', 'resuelto', 'rechazado']);
+const estaAbierto = (r: Reclamo) => !CERRADOS.has((r.estado || '').toLowerCase());
+
+/** Vence DENTRO del día de hoy (misma fecha estimada que usa la frase del hero). */
+const venceHoy = (r: Reclamo): boolean => {
+  if (!estaAbierto(r)) return false;
+  const ms = getFechaVenceReclamoMs(r);
+  if (ms == null) return false;
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0, 0, 0, 0);
+  const finHoy = inicioHoy.getTime() + 24 * 60 * 60 * 1000;
+  return ms >= inicioHoy.getTime() && ms < finHoy;
+};
+
+/** Ya venció (antes del comienzo de hoy). */
+const yaVencio = (r: Reclamo): boolean => {
+  if (!estaAbierto(r)) return false;
+  const ms = getFechaVenceReclamoMs(r);
+  if (ms == null) return false;
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0, 0, 0, 0);
+  return ms < inicioHoy.getTime();
+};
+
+/** Sin dependencia asignada = nadie se hizo cargo todavía. Es el dato de
+ *  responsable que la LISTA tiene (la cuadrilla/empleado vive en la OT y no
+ *  viaja en la fila del listado). */
+const sinDependencia = (r: Reclamo): boolean =>
+  estaAbierto(r) && !(r.dependencia_asignada as { id?: number } | undefined)?.id;
+
+/** Agrupaciones de estado del hero — LAS MISMAS que suman los KPIs desde los
+ *  conteos del backend, para que el detalle del subtexto hable del mismo
+ *  conjunto que el número que tiene arriba. */
+const ESTADOS_RECIBIDO = new Set(['recibido', 'nuevo', 'asignado']);
+const ESTADOS_EN_CURSO = new Set(['en_curso', 'en_proceso', 'pendiente_confirmacion']);
+
+/**
+ * Focos del hero: grupos de trabajo a los que sus acciones acotan la lista.
+ * Cada uno tiene su predicado (el mismo que cuenta el KPI) y su etiqueta para
+ * el resumen de la barra de filtros. Agregar un foco = agregar una entrada.
+ */
+type FocoHero = 'vencen-hoy' | 'vencidos' | 'sin-dependencia' | null;
+const FOCOS: Record<Exclude<FocoHero, null>, { test: (r: Reclamo) => boolean; resumen: string }> = {
+  'vencen-hoy': { test: venceHoy, resumen: 'vencen hoy' },
+  vencidos: { test: yaVencio, resumen: 'ya vencidos' },
+  'sin-dependencia': { test: sinDependencia, resumen: 'sin dependencia' },
 };
 
 // Calificación que dejó el vecino tras el cierre del reclamo (T5-F1).
@@ -195,12 +256,199 @@ function getCategoryPlaceholders(nombre: string) {
   return categoryPlaceholders.default;
 }
 
+// Resuelve el icono lucide de una categoría a partir de su campo `icono` (nombre
+// del icono en la DB, mismo criterio que DynamicIcon de ReclamoCard) para poder
+// pasarlo a EntityCell del estándar, que espera un componente LucideIcon.
+// Fallback: AlertTriangle (igual que las cards del inbox).
+const iconoDeCategoria = (icono?: string | null): LucideIcon => {
+  if (icono) {
+    const Icono = (LucideIcons as unknown as Record<string, LucideIcon | undefined>)[icono];
+    if (Icono) return Icono;
+  }
+  return AlertTriangle;
+};
+
+// Columnas del DataTable del estándar SemanticAbmPage (kind='plain').
+// Espejo de design/handoff-v2/references/reclamos-lista.dc.html:
+// # · RECLAMO · VECINO/DEPENDENCIA · UBICACIÓN · ESTADO · CREADO · VENCE (+ ACCIONES).
+// Los colores de categoría/dependencia vienen de DATOS (runtime) — permitidos
+// por la regla polimórfica; el resto sale de las clases av2-* con tokens.
+const columnasTabla: ColumnSpec<Reclamo>[] = [
+  {
+    id: 'id',
+    header: '#',
+    width: '58px',
+    kind: 'text',
+    cell: (r) => <span className="av2-tabla-texto av2-tnum">#{r.id}</span>,
+  },
+  {
+    id: 'reclamo',
+    header: 'RECLAMO',
+    width: 'minmax(220px, 2fr)',
+    kind: 'entity',
+    cell: (r) => {
+      const catColor = r.categoria?.color || DEFAULT_CATEGORY_COLOR;
+      return (
+        <EntityCell
+          icon={iconoDeCategoria(r.categoria?.icono)}
+          tileColor={catColor}
+          title={r.titulo || r.categoria?.nombre || 'Reclamo'}
+          subtitle={r.categoria?.nombre}
+          dotColor={catColor}
+        />
+      );
+    },
+  },
+  {
+    id: 'vecino',
+    header: 'VECINO / DEPENDENCIA',
+    width: 'minmax(150px, 1.25fr)',
+    kind: 'entity',
+    cell: (r) => {
+      // Tolera el shape legacy anidado ({ dependencia: { nombre } }) además del tipado plano.
+      const dep = r.dependencia_asignada as
+        | { nombre?: string; color?: string; dependencia?: { nombre?: string; color?: string } }
+        | undefined;
+      const depNombre = dep?.dependencia?.nombre || dep?.nombre;
+      const depColor = dep?.color || dep?.dependencia?.color;
+      const nombre = r.creador
+        ? `${r.creador.nombre} ${r.creador.apellido}`.trim()
+        : r.es_anonimo ? 'Anónimo' : '—';
+      return (
+        <EntityCell icon={User} tileColor={depColor} title={nombre} subtitle={depNombre} dotColor={depColor} />
+      );
+    },
+  },
+  { id: 'direccion', header: 'UBICACIÓN', width: 'minmax(130px, 1fr)', kind: 'text' },
+  { id: 'estado', header: 'ESTADO', width: 'minmax(88px, 110px)', kind: 'chip' },
+  {
+    id: 'creado',
+    header: 'CREADO',
+    width: 'minmax(66px, 80px)',
+    kind: 'date',
+    cell: (r) => {
+      const d = new Date(r.created_at);
+      return (
+        <span className="av2-tabla-fecha av2-tnum">
+          {`${d.getDate()}/${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`}
+        </span>
+      );
+    },
+  },
+  {
+    id: 'vence',
+    header: 'VENCE',
+    width: 'minmax(70px, 96px)',
+    kind: 'chip',
+    cell: (r) => {
+      if (!r.fecha_programada) return <span className="av2-tabla-texto">—</span>;
+      const diffDias = Math.ceil((new Date(r.fecha_programada).getTime() - Date.now()) / 86400000);
+      const vencido = diffDias < 0;
+      const porVencer = !vencido && diffDias <= 3;
+      const diasAbs = Math.abs(diffDias);
+      let texto: string;
+      if (diffDias === 0) texto = 'Hoy';
+      else if (diasAbs < 30) texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
+      else {
+        const meses = Math.floor(diasAbs / 30);
+        texto = `${vencido ? '-' : ''}${meses} ${meses > 1 ? 'meses' : 'mes'}`;
+      }
+      return <ChipEstado label={texto} tone={vencido ? 'red' : porVencer ? 'amber' : 'green'} />;
+    },
+  },
+  { id: 'acciones', header: 'ACCIONES', width: 'minmax(76px, 0.5fr)', kind: 'actions', align: 'right' },
+];
 
 type SheetMode = 'closed' | 'view';
 
 interface ReclamosProps {
   soloMisTrabajos?: boolean;
   soloMiArea?: boolean;
+}
+
+/**
+ * Arma las secciones de la vista guiada (Inbox) de una lista de reclamos.
+ * Fuera del componente porque no depende de nada suyo: recibe la lista y
+ * devuelve los grupos. Se llama dos veces (lista visible y base sin foco).
+ * Mismo patrón que GestionTramites.tsx.
+ */
+function armarInbox(lista: Reclamo[]) {
+  const ahora = Date.now();
+  const dia = 24 * 60 * 60 * 1000;
+
+  const conFeedback: Reclamo[] = []; // vecino dijo "sigue el problema"
+  const urgentes: Reclamo[] = [];
+  const fosiles: Reclamo[] = [];   // vencidos hace > 30 días — para limpiar
+  const nuevos: Reclamo[] = [];
+  const enCurso: Reclamo[] = [];
+  const esperando: Reclamo[] = [];
+
+  for (const r of lista) {
+    const estado = (r.estado || '').toLowerCase();
+
+    // Capa 0: feedback negativo del vecino. MAXIMA PRIORIDAD: aparecen
+    // aunque el reclamo este "finalizado", porque el vecino dice que el
+    // problema sigue y la dependencia tiene que retomarlo.
+    if (r.confirmado_vecino === false) {
+      conFeedback.push(r);
+      continue;
+    }
+
+    // Excluir cerrados de la vista guiada (los con feedback ya quedaron
+    // arriba; estos son cierres limpios sin disputa).
+    if (estado === 'finalizado' || estado === 'rechazado' || estado === 'resuelto') continue;
+
+    // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
+    // (si no tiene, usar el SLA de la categoría; fallback 30 días).
+    const fechaVence = getFechaVenceReclamoMs(r);
+    const diffMs = fechaVence ? fechaVence - ahora : null;
+
+    // Capa 1: fósil — venció hace más de 30 días, sin importar el estado.
+    if (diffMs != null && diffMs < -30 * dia) {
+      fosiles.push(r);
+      continue;
+    }
+
+    // Capa 2: el ESTADO manda sobre la urgencia. Si el reclamo ya esta
+    // en curso o pospuesto, vive en su seccion correspondiente aunque
+    // sea urgente — la urgencia ya esta atendida (alguien lo esta
+    // trabajando o lo postergo concientemente).
+    if (estado === 'pospuesto') {
+      esperando.push(r);
+      continue;
+    }
+    if (estado === 'en_curso') {
+      enCurso.push(r);
+      continue;
+    }
+
+    // Capa 3: urgente real — solo entre los que aun no fueron tomados
+    // (recibido / nuevo / asignado / legacy). Prioridad de la OT alta/urgente
+    // (F6: la prioridad canónica vive en la OT, no en el campo legacy) OR
+    // vence entre -7 y +3 dias.
+    const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
+    const esUrgente = r.prioridad_ot === 'alta' || r.prioridad_ot === 'urgente' || enZonaUrgente;
+    if (esUrgente) {
+      urgentes.push(r);
+      continue;
+    }
+
+    // Resto: nuevos sin tomar
+    nuevos.push(r);
+  }
+
+  // Orden de "Empecemos por lo urgente": prioridad_ot desc (urgente > alta >
+  // media > baja) y, a igual prioridad, por fecha de vencimiento asc (mismo
+  // criterio que ya se usaba arriba para detectar la zona urgente).
+  urgentes.sort((a, b) => {
+    const porPrioridad = prioridadRankOf(b.prioridad_ot) - prioridadRankOf(a.prioridad_ot);
+    if (porPrioridad !== 0) return porPrioridad;
+    const vA = getFechaVenceReclamoMs(a) ?? Infinity;
+    const vB = getFechaVenceReclamoMs(b) ?? Infinity;
+    return vA - vB;
+  });
+
+  return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
 }
 
 export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }: ReclamosProps) {
@@ -224,8 +472,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
-  const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
+  // Foco del hero: acota la lista al grupo que la frase acaba de nombrar
+  // ("los que vencen hoy", "los que no tienen dependencia"). Es un filtro
+  // CLIENTE sobre lo ya cargado — no toca los params del fetch. Se prende y
+  // se apaga desde las acciones del hero y se anuncia en el resumen de la
+  // barra de filtros para que nunca quede un filtro invisible aplicado.
+  const [foco, setFoco] = useState<FocoHero>(null);
 
   // Dashboard IA operativo: urgentes + recomendaciones (LLM) + secciones (SQL).
   const [dashboardIA, setDashboardIA] = useState<DashboardIAData | null>(null);
@@ -238,21 +491,21 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // clasificación— es independiente de este flag y sigue operando.
   const iaOn = useIaReclamos();
 
-  // Vista guiada (Inbox) vs vista grilla clásica.
-  // Misma lógica que GestionTramites: clasifica reclamos en secciones por
-  // urgencia/estado y los muestra con InboxLayout. Persiste en localStorage.
-  const [vistaInbox, setVistaInbox] = useState<boolean>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('reclamos_vista_inbox') : null;
-    if (saved !== null) return saved === '1';
-    return false; // Por default, vista clásica (los usuarios actuales ya la conocen)
+  // Vista del listado (segmented del ListToolbar estándar): tabla / tarjetas /
+  // guiada (Inbox). Persiste en localStorage con la MISMA key que usaba ABMPage
+  // ('reclamos_view') para respetar la elección previa de cada usuario.
+  const [activeView, setActiveView] = useState<ViewKind>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('reclamos_view') : null;
+    return saved === 'cards' || saved === 'guided' || saved === 'table' ? saved : 'table';
   });
+  const cambiarVista = (v: ViewKind) => {
+    setActiveView(v);
+    if (typeof window !== 'undefined') localStorage.setItem('reclamos_view', v);
+  };
 
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
-  // Paginación client-side adicional (50 items por página)
-  const [pageClient, setPageClient] = useState(1);
-  const [pageSizeClient, setPageSizeClient] = useState(50);
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
 
   // Chips de categorías: limitadas a 2 renglones dinámicos.
@@ -1212,7 +1465,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      setFilterLoading(null); // Clear filter loading state
     }
   };
 
@@ -2033,8 +2285,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  // Filtro local - siempre filtra cuando hay búsqueda
-  const filteredReclamos = reclamos.filter(r => {
+  // Filtro local - siempre filtra cuando hay búsqueda.
+  // `reclamosBuscados` es la BASE de la pantalla (búsqueda + orden). El foco
+  // del hero se aplica DESPUÉS (ver `filteredReclamos`), para que los KPIs y
+  // la frase del hero —que miran esta base— no se muevan cuando el usuario
+  // aplica el foco que el propio hero le ofreció.
+  const reclamosBuscados = useMemo(() => reclamos.filter(r => {
     // Si no hay búsqueda, mostrar todos
     if (!search || !search.trim()) return true;
 
@@ -2085,17 +2341,33 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       const fechaB = new Date(b.updated_at || b.created_at).getTime();
       return fechaB - fechaA;
     }
-  });
+  }), [reclamos, search, ordenamiento]);
 
-  const paginatedReclamos = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(filteredReclamos.length / pageSizeClient));
-    if (pageClient > totalPages) return filteredReclamos.slice(0, pageSizeClient);
-    return filteredReclamos.slice((pageClient - 1) * pageSizeClient, pageClient * pageSizeClient);
-  }, [filteredReclamos, pageClient, pageSizeClient]);
+  // Lista que consume TODA la pantalla (tabla, tarjetas, vista guiada, pie):
+  // la base + el foco del hero si está activo.
+  const filteredReclamos = useMemo(
+    () => (foco ? reclamosBuscados.filter(FOCOS[foco].test) : reclamosBuscados),
+    [reclamosBuscados, foco],
+  );
 
-  useEffect(() => {
-    setPageClient(1);
-  }, [filteredReclamos.length]);
+  // Métricas de vencimiento y de asignación para el hero. Se calculan sobre la
+  // BASE (sin foco) y sólo sobre lo que el cliente tiene cargado: por eso los
+  // subtextos con detalle recién se muestran cuando ya no queda nada por
+  // paginar (`!hasMore`), para no dar por global un número de una página.
+  const metricasHero = useMemo(() => {
+    let vencenHoy = 0, vencidos = 0, sinDep = 0, recibidosSinDep = 0, enCursoConDep = 0;
+    for (const r of reclamosBuscados) {
+      if (venceHoy(r)) vencenHoy++;
+      if (yaVencio(r)) vencidos++;
+      if (!estaAbierto(r)) continue;
+      const estado = (r.estado || '').toLowerCase();
+      const huerfano = sinDependencia(r);
+      if (huerfano) sinDep++;
+      if (ESTADOS_RECIBIDO.has(estado) && huerfano) recibidosSinDep++;
+      if (ESTADOS_EN_CURSO.has(estado) && !huerfano) enCursoConDep++;
+    }
+    return { vencenHoy, vencidos, sinDep, recibidosSinDep, enCursoConDep, universoCompleto: !hasMore };
+  }, [reclamosBuscados, hasMore]);
 
   // Wizard Step 0: Describir problema
   const wizardStep0 = (
@@ -3159,194 +3431,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     { id: 'detalles', title: 'Detalles', description: 'Agregá más información', icon: <FileText className="h-5 w-5" />, content: wizardStep3, isValid: !!formData.titulo && !!formData.descripcion },
     { id: 'contacto', title: 'Contacto', description: 'Tus datos para seguimiento', icon: <Phone className="h-5 w-5" />, content: wizardStepContacto, isValid: esAnonimo || (!!formData.nombre_contacto && !!formData.telefono_contacto) },
     { id: 'resumen', title: 'Confirmar', description: 'Revisa y envía', icon: <CheckCircle2 className="h-5 w-5" />, content: wizardStep4, isValid: true },
-  ];
-
-  // Columnas para la vista de tabla
-  const tableColumns = [
-    {
-      key: 'id',
-      header: '#',
-      sortValue: (r: Reclamo) => r.id,
-      render: (r: Reclamo) => (
-        <span className="font-mono text-xs" style={{ color: theme.textSecondary }}>#{r.id}</span>
-      ),
-    },
-    {
-      key: 'titulo',
-      header: 'Título',
-      width: '280px',
-      sortValue: (r: Reclamo) => r.titulo,
-      render: (r: Reclamo) => {
-        const catColor = r.categoria.color || DEFAULT_CATEGORY_COLOR;
-        return (
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: catColor + '20', color: catColor }}
-          >
-            {getCategoryIcon(r.categoria.nombre)}
-          </div>
-          <div className="min-w-0">
-            <span className="text-sm font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
-            <span
-              className="text-[11px]"
-              style={{ color: catColor }}
-            >
-              {r.categoria.nombre}
-            </span>
-          </div>
-        </div>
-        );
-      },
-    },
-    {
-      key: 'vecino',
-      header: 'Vecino',
-      sortValue: (r: Reclamo) => `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`,
-      render: (r: Reclamo) => {
-        const dep = r.dependencia_asignada as any;
-        const depNombre = dep?.dependencia?.nombre || dep?.nombre;
-        const depColor = dep?.color || dep?.dependencia?.color || theme.primary;
-        const nombre = r.creador ? `${r.creador.nombre} ${r.creador.apellido}` : r.es_anonimo ? 'Anónimo' : '-';
-        return (
-          <div className="flex items-start gap-2 min-w-0">
-            <span
-              className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
-              style={{ backgroundColor: `${depColor}20` }}
-            >
-              <User className="h-3.5 w-3.5" style={{ color: depColor }} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-xs truncate font-medium" style={{ color: theme.text }} title={nombre}>
-                {nombre}
-              </div>
-              {depNombre && (
-                <div className="text-[10px] truncate" style={{ color: depColor }} title={depNombre}>
-                  {depNombre}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'direccion',
-      header: 'Ubicación',
-      sortValue: (r: Reclamo) => r.direccion,
-      render: (r: Reclamo) => (
-        <div className="flex items-center gap-2 max-w-[200px]" title={r.direccion}>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
-            <MapPin className="h-3.5 w-3.5" style={{ color: theme.primary }} />
-          </div>
-          <span className="truncate text-sm" style={{ color: theme.text }}>{r.direccion}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'estado',
-      header: 'Estado',
-      sortValue: (r: Reclamo) => r.estado,
-      render: (r: Reclamo) => {
-        const color = estadoColors[r.estado]?.bg || '#6366f1';
-        return <StatusPill label={estadoLabels[r.estado]} color={color} />;
-      },
-    },
-    {
-      key: 'creacion',
-      header: 'Creación',
-      sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
-      render: (r: Reclamo) => {
-        const d = new Date(r.created_at);
-        const yy = String(d.getFullYear()).slice(-2);
-        return (
-          <span className="text-[11px]" style={{ color: theme.textSecondary }}>
-            {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'modificacion',
-      header: 'Modificación',
-      sortValue: (r: Reclamo) => new Date(r.updated_at || r.created_at).getTime(),
-      render: (r: Reclamo) => {
-        const iso = r.updated_at || r.created_at;
-        const d = new Date(iso);
-        const yy = String(d.getFullYear()).slice(-2);
-        return (
-          <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
-            {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'vencimiento',
-      header: 'Vence',
-      sortValue: (r: Reclamo) => r.fecha_programada ? new Date(r.fecha_programada).getTime() : Infinity,
-      render: (r: Reclamo) => {
-        if (!r.fecha_programada) return null;
-        const fechaProg = new Date(r.fecha_programada);
-        const ahora = new Date();
-        const diffMs = fechaProg.getTime() - ahora.getTime();
-        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-        const vencido = diffDias < 0;
-        const porVencer = !vencido && diffDias <= 3;
-        const color = vencido ? '#ef4444' : porVencer ? '#f59e0b' : '#10b981';
-        const bg = vencido ? '#ef444420' : porVencer ? '#f59e0b20' : '#10b98120';
-
-        const diasAbs = Math.abs(diffDias);
-        let texto: string;
-        if (diffDias === 0) {
-          texto = 'Hoy';
-        } else if (diasAbs < 30) {
-          texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
-        } else {
-          const meses = Math.floor(diasAbs / 30);
-          texto = vencido ? `-${meses} ${meses > 1 ? 'meses' : 'mes'}` : `${meses} ${meses > 1 ? 'meses' : 'mes'}`;
-        }
-
-        return (
-          <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap"
-            style={{ color, backgroundColor: bg }}
-          >
-            {texto}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'actividad',
-      header: '',
-      sortable: false,
-      className: 'text-center',
-      render: (r: Reclamo) => {
-        const tieneActividadReciente = r.updated_at &&
-          new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000;
-        if (!tieneActividadReciente) return null;
-        const vecinoRechazo = r.confirmado_vecino === false;
-        const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
-        return (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); openViewSheet(r); }}
-            className="w-5 h-5 rounded-md inline-flex items-center justify-center mx-auto transition-transform hover:scale-110"
-            style={{
-              backgroundColor: `${bg}18`,
-              border: `1px solid ${bg}40`,
-            }}
-            title={vecinoRechazo
-              ? 'El vecino marcó que el problema NO se solucionó · click para ver notas'
-              : 'Actividad reciente · click para ver notas'}
-          >
-            <MessageCircle className="h-3 w-3" style={{ color: bg }} />
-          </button>
-        );
-      },
-    },
   ];
 
   // Consolidar este reclamo en LA orden de trabajo de zona de su POI (F6 · Etapa
@@ -4654,93 +4738,58 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   // ============================================================
   // INBOX (vista guiada) — secciones por urgencia/estado
-  // Mismo patrón que GestionTramites.tsx (líneas 1452-1632).
+  // `inboxData` mira la lista QUE SE VE (con el foco del hero aplicado);
+  // `inboxBase` mira la base sin foco y es la que alimenta la frase del hero,
+  // para que el hero siga contando el universo del módulo aunque el usuario
+  // haya acotado la lista con una de sus propias acciones. Sin foco, ambas
+  // son el mismo objeto (no se recalcula nada).
   // ============================================================
-  const inboxData = useMemo(() => {
-    const ahora = Date.now();
-    const dia = 24 * 60 * 60 * 1000;
+  const inboxData = useMemo(() => armarInbox(filteredReclamos), [filteredReclamos]);
+  const inboxBase = useMemo(
+    () => (foco ? armarInbox(reclamosBuscados) : inboxData),
+    [foco, reclamosBuscados, inboxData],
+  );
 
-    const conFeedback: Reclamo[] = []; // vecino dijo "sigue el problema"
-    const urgentes: Reclamo[] = [];
-    const fosiles: Reclamo[] = [];   // vencidos hace > 30 días — para limpiar
-    const nuevos: Reclamo[] = [];
-    const enCurso: Reclamo[] = [];
-    const esperando: Reclamo[] = [];
-
-    for (const r of filteredReclamos) {
-      const estado = (r.estado || '').toLowerCase();
-
-      // Capa 0: feedback negativo del vecino. MAXIMA PRIORIDAD: aparecen
-      // aunque el reclamo este "finalizado", porque el vecino dice que el
-      // problema sigue y la dependencia tiene que retomarlo.
-      if (r.confirmado_vecino === false) {
-        conFeedback.push(r);
-        continue;
-      }
-
-      // Excluir cerrados de la vista guiada (los con feedback ya quedaron
-      // arriba; estos son cierres limpios sin disputa).
-      if (estado === 'finalizado' || estado === 'rechazado' || estado === 'resuelto') continue;
-
-      // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
-      // (si no tiene, usar el SLA de la categoría; fallback 30 días).
-      const fechaVence = getFechaVenceReclamoMs(r);
-      const diffMs = fechaVence ? fechaVence - ahora : null;
-
-      // Capa 1: fósil — venció hace más de 30 días, sin importar el estado.
-      if (diffMs != null && diffMs < -30 * dia) {
-        fosiles.push(r);
-        continue;
-      }
-
-      // Capa 2: el ESTADO manda sobre la urgencia. Si el reclamo ya esta
-      // en curso o pospuesto, vive en su seccion correspondiente aunque
-      // sea urgente — la urgencia ya esta atendida (alguien lo esta
-      // trabajando o lo postergo concientemente).
-      if (estado === 'pospuesto') {
-        esperando.push(r);
-        continue;
-      }
-      if (estado === 'en_curso') {
-        enCurso.push(r);
-        continue;
-      }
-
-      // Capa 3: urgente real — solo entre los que aun no fueron tomados
-      // (recibido / nuevo / asignado / legacy). Prioridad de la OT alta/urgente
-      // (F6: la prioridad canónica vive en la OT, no en el campo legacy) OR
-      // vence entre -7 y +3 dias.
-      const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
-      const esUrgente = r.prioridad_ot === 'alta' || r.prioridad_ot === 'urgente' || enZonaUrgente;
-      if (esUrgente) {
-        urgentes.push(r);
-        continue;
-      }
-
-      // Resto: nuevos sin tomar
-      nuevos.push(r);
-    }
-
-    // Orden de "Empecemos por lo urgente": prioridad_ot desc (urgente > alta >
-    // media > baja) y, a igual prioridad, por fecha de vencimiento asc (mismo
-    // criterio que ya se usaba arriba para detectar la zona urgente).
-    urgentes.sort((a, b) => {
-      const porPrioridad = prioridadRankOf(b.prioridad_ot) - prioridadRankOf(a.prioridad_ot);
-      if (porPrioridad !== 0) return porPrioridad;
-      const vA = getFechaVenceReclamoMs(a) ?? Infinity;
-      const vB = getFechaVenceReclamoMs(b) ?? Infinity;
-      return vA - vB;
-    });
-
-    return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
-  }, [filteredReclamos]);
 
   // Hero semántico (rediseño v2): frases dinámicas armadas SOLO con datos ya
   // cargados en la pantalla (inboxData). Sin datos → sin frases → no renderiza.
+  // Acciones del hero: OPERAN SOBRE ESTA PANTALLA (acotan la lista al grupo
+  // que la frase acaba de nombrar), no mandan a otra pantalla. El conteo real
+  // va en el label y un grupo vacío NO se ofrece — nunca "ver los 0 que…".
+  // Con el foco puesto, la primera acción es sacarlo, así el filtro siempre
+  // tiene su salida a la vista. No hay tercera acción de exportar: esta
+  // pantalla no tiene exportación (un botón muerto sería peor que nada).
+  const accionesHero = useMemo<HeroAccion[]>(() => {
+    const { vencenHoy, vencidos, sinDep } = metricasHero;
+    // Candidatas en orden de urgencia. Cada una lleva SU conteo real en el
+    // label y se cae sola si el grupo está vacío.
+    const candidatas: { foco: Exclude<FocoHero, null>; n: number; label: string }[] = [
+      { foco: 'vencen-hoy', n: vencenHoy, label: `Ver los ${vencenHoy} que vencen hoy` },
+      { foco: 'vencidos', n: vencidos, label: `Ver los ${vencidos} ya vencidos` },
+      { foco: 'sin-dependencia', n: sinDep, label: `Ver los ${sinDep} sin dependencia` },
+    ];
+    const disponibles = candidatas
+      .filter((c) => c.n > 0 && c.foco !== foco)
+      .map<HeroAccion>((c) => ({ label: c.label, onClick: () => setFoco(c.foco) }));
+
+    if (foco) {
+      // Con el foco puesto, sacarlo es la acción primaria: el filtro siempre
+      // tiene su salida a la vista, arriba de todo.
+      return [
+        { label: 'Quitar el foco y ver todos', onClick: () => setFoco(null), primaria: true },
+        ...disponibles.slice(0, 2),
+      ];
+    }
+    return disponibles.slice(0, 3).map((a, i) => (i === 0 ? { ...a, primaria: true } : a));
+  }, [metricasHero, foco]);
+
   const heroFrases = useMemo<HeroFrase[]>(() => {
-    if (loading || filteredReclamos.length === 0) return [];
+    // La guarda mira la BASE, no la lista con foco: si el foco deja 0
+    // resultados el hero tiene que seguir en pantalla, porque ahí está la
+    // única salida ("Quitar el foco y ver todos").
+    if (loading || reclamosBuscados.length === 0) return [];
     const u = resolverUmbrales();
-    const { urgentes, conFeedback, enCurso, nuevos, fosiles } = inboxData;
+    const { urgentes, conFeedback, enCurso, nuevos, fosiles } = inboxBase;
     return [
       {
         segmentos: [
@@ -4755,10 +4804,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           seg(`${enCurso.length} en curso`, 'bueno'),
           seg('.'),
         ],
-        acciones: [
-          { label: 'Tablero', to: '/gestion/tablero', primaria: true },
-          { label: 'SLA', to: '/gestion/sla' },
-        ],
+        acciones: accionesHero,
       },
       {
         segmentos: [
@@ -4774,13 +4820,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           ),
           seg(' para depurar.'),
         ],
-        acciones: [
-          { label: 'SLA', to: '/gestion/sla', primaria: true },
-          { label: 'Tablero', to: '/gestion/tablero' },
-        ],
+        acciones: accionesHero,
       },
     ];
-  }, [loading, filteredReclamos.length, inboxData]);
+  }, [loading, reclamosBuscados.length, inboxBase, accionesHero]);
 
   const renderInboxCard = (
     r: Reclamo,
@@ -4853,10 +4896,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     );
   };
 
-  // Siempre devolver el InboxLayout (no depender de vistaInbox). ABMPage
-  // controla cuando mostrarlo via su viewMode. Si lo condicionamos aca,
-  // al togglear el boton guiado desaparece del toggle de ABMPage y la
-  // vista clasica queda en blanco al volver (bug del ciclo clasica->guiada->clasica).
+  // Vista guiada (Inbox): se muestra cuando activeView === 'guided' en el
+  // segmented del ListToolbar estándar. El JSX se arma siempre (es barato:
+  // solo se monta cuando la rama guiada lo renderiza).
   const inboxView = (
     <InboxLayout
       saludoNombre={user?.nombre || ''}
@@ -4950,221 +4992,365 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     />
   );
 
-  // KPIs arriba del ABMPage (mismo patrón que Tesorería/Trámites).
-  // Lee de conteosEstados que ya carga la pagina por filtro.
-  const kpisSpec: KpiSpec[] = useMemo(() => {
+  // Total global según los conteos del backend (misma aritmética que tenían
+  // los KPIs viejos). Alimenta el chip del ListToolbar, el tab "Todos" y el
+  // pie de la tabla.
+  const totalConteos = useMemo(
+    () => Object.values(conteosEstados).reduce((a, b) => a + (b || 0), 0),
+    [conteosEstados],
+  );
+
+  // Stat strip DEL HERO (estándar SemanticAbmPage: los números viven en el
+  // hero, nada de tarjetas de KPI sueltas arriba). Mismos números que los
+  // KpiCards viejos; solo la celda que exige acción se colorea (disputados).
+  const heroKpis = useMemo<HeroKpi[]>(() => {
     const c = conteosEstados;
     const recibidos = (c['recibido'] || 0) + (c['nuevo'] || 0) + (c['asignado'] || 0);
     const enCurso = (c['en_curso'] || 0) + (c['en_proceso'] || 0) + (c['pendiente_confirmacion'] || 0);
     const finalizados = (c['finalizado'] || 0) + (c['resuelto'] || 0);
-    const total = Object.values(c).reduce((a, b) => a + (b || 0), 0);
-    const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+    const pct = (n: number) => (totalConteos > 0 ? Math.round((n / totalConteos) * 100) : 0);
     // D2 (F1): cierres disputados por el vecino ("sigue el problema"). Viene del
     // conteo del backend (pseudo-estado 'disputados') para contar el TOTAL real,
     // no solo la pagina cargada en el cliente.
-    const disputados = conteosEstados['disputados'] || 0;
+    const disputados = c['disputados'] || 0;
+    // Detalle de los subtextos: sólo cuando el cliente ya cargó TODO el
+    // universo, porque `metricasHero` mira lo cargado y el % viene de los
+    // conteos globales del backend — mezclarlos con media página mentiría.
+    const { vencenHoy, vencidos, recibidosSinDep, enCursoConDep, universoCompleto } = metricasHero;
+    const conDetalle = (porcentaje: number, detalle: string) =>
+      universoCompleto ? `${porcentaje}% · ${detalle}` : `${porcentaje}% del total`;
     return [
       {
-        label: 'Total Reclamos',
-        value: total.toLocaleString('es-AR'),
-        icon: FileText,
-        color: theme.primary,
-        footnote: `${reclamos.length} en pantalla`,
-        highlighted: true,
+        etiqueta: 'TOTAL',
+        valor: totalConteos.toLocaleString('es-AR'),
+        sub: `${reclamos.length} en pantalla`,
       },
-      ...(disputados > 0 ? [{
-        label: 'Disputados',
-        value: disputados.toLocaleString('es-AR'),
-        icon: ThumbsDown,
-        color: '#ef4444',
-        footnote: 'el vecino dice que sigue',
-      }] : []),
+      ...(disputados > 0
+        ? [{
+            etiqueta: 'DISPUTADOS',
+            valor: disputados.toLocaleString('es-AR'),
+            sub: 'el vecino dice que sigue',
+            veredicto: 'malo' as const,
+          }]
+        : []),
       {
-        label: 'Recibidos',
-        value: recibidos.toLocaleString('es-AR'),
-        icon: Inbox,
-        color: '#3b82f6',
-        footnote: `${pct(recibidos).toFixed(1)}% del total`,
-        pct: pct(recibidos),
+        etiqueta: 'RECIBIDOS',
+        valor: recibidos.toLocaleString('es-AR'),
+        sub: conDetalle(
+          pct(recibidos),
+          recibidosSinDep > 0 ? `${recibidosSinDep} sin dependencia` : 'todos con dependencia',
+        ),
       },
       {
-        label: 'En Curso',
-        value: enCurso.toLocaleString('es-AR'),
-        icon: PlayCircle,
-        color: '#f59e0b',
-        footnote: `${pct(enCurso).toFixed(1)}% del total`,
-        pct: pct(enCurso),
+        etiqueta: 'EN CURSO',
+        valor: enCurso.toLocaleString('es-AR'),
+        sub: conDetalle(pct(enCurso), `${enCursoConDep} con dependencia`),
       },
       {
-        label: 'Finalizados',
-        value: finalizados.toLocaleString('es-AR'),
-        icon: CheckCircle,
-        color: '#22c55e',
-        footnote: `${pct(finalizados).toFixed(1)}% del total`,
-        pct: pct(finalizados),
+        etiqueta: 'FINALIZADOS',
+        valor: finalizados.toLocaleString('es-AR'),
+        // Sin promedio de estrellas: la calificación del vecino se pide por
+        // reclamo al abrir el detalle (calificacionesApi.getReclamo), el
+        // listado no la trae — no hay con qué calcular el promedio acá.
+        sub: `${pct(finalizados)}% del total`,
+      },
+      {
+        etiqueta: 'VENCEN HOY',
+        valor: vencenHoy.toLocaleString('es-AR'),
+        sub: vencidos > 0
+          ? `y ${vencidos} ya vencido${vencidos === 1 ? '' : 's'}`
+          : 'sin vencidos arrastrados',
+        // El número en ámbar sólo cuando efectivamente hay algo venciendo hoy.
+        ...(vencenHoy > 0 ? { veredicto: 'advertencia' as const } : {}),
       },
     ];
-  }, [conteosEstados, reclamos, theme.primary]);
+  }, [conteosEstados, totalConteos, reclamos.length, metricasHero]);
+
+  // Grupos por fecha para el DataTable del estándar (la página agrupa y
+  // formatea; el DataTable solo pinta). El criterio replica la tabla vieja:
+  // 'reciente' → orden y agrupado por fecha de creación (desc);
+  // 'programado' → por fecha programada (asc), los sin fecha al final.
+  const gruposTabla = useMemo<TableGroup<Reclamo>[]>(() => {
+    const filas = [...filteredReclamos].sort((a, b) => {
+      if (ordenamiento === 'programado') {
+        const va = a.fecha_programada ? new Date(a.fecha_programada).getTime() : Infinity;
+        const vb = b.fecha_programada ? new Date(b.fecha_programada).getTime() : Infinity;
+        return va - vb;
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    const grupos: TableGroup<Reclamo>[] = [];
+    let actual: TableGroup<Reclamo> | null = null;
+    for (const r of filas) {
+      const iso = ordenamiento === 'programado' ? r.fecha_programada : r.created_at;
+      const d = iso ? new Date(iso) : null;
+      const key = d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : 'sin-fecha';
+      if (!actual || actual.key !== key) {
+        actual = {
+          key,
+          badge: d
+            ? {
+                top: String(d.getDate()),
+                bottom: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').toUpperCase(),
+              }
+            : undefined,
+          label: '',
+          rows: [],
+        };
+        grupos.push(actual);
+      }
+      actual.rows.push(r);
+    }
+    for (const g of grupos) {
+      const n = g.rows.length;
+      const base = `${n} reclamo${n === 1 ? '' : 's'}`;
+      g.label = g.key === 'sin-fecha' ? `Sin fecha programada · ${base}` : base;
+    }
+    return grupos;
+  }, [filteredReclamos, ordenamiento]);
+
+  // --- Specs del shell estándar (piloto SemanticAbmPage) ---
+  const puedeCrear = !soloMisTrabajos && !soloMiArea;
+  // Cabecera de módulo (estándar v2.2): eyebrow = el módulo, H1 = lo que el
+  // usuario viene a resolver, bajada = de dónde salen las filas y cómo se
+  // agrupan. Un copy por modo de la pantalla (general / dependencia / mis
+  // trabajos): los tres listan lo mismo pero NO son el mismo trabajo.
+  const cabecera = soloMiArea
+    ? {
+        eyebrow: 'Reclamos del área',
+        title: 'Lo que le derivaron a tu dependencia y qué falta resolver',
+        description:
+          'Sólo los reclamos derivados a tu dependencia, con su categoría, su responsable y su estado. La tabla los agrupa por día de ingreso.',
+      }
+    : soloMisTrabajos
+      ? {
+          eyebrow: 'Mis trabajos',
+          title: 'Los reclamos que tenés asignados y cómo vienen de plazo',
+          description:
+            'Sólo los reclamos asignados a vos. Abrí cualquiera para ver el detalle, cargar el avance y cerrarlo.',
+        }
+      : {
+          eyebrow: 'Reclamos',
+          title: 'Todo lo que el vecino pidió y qué falta resolver',
+          description:
+            'Reclamos que entran por la app, WhatsApp, la web y la ventanilla, con su categoría, su dependencia y su estado. La tabla los agrupa por día de ingreso.',
+        };
+  const mensajeVacio = debouncedSearch
+    ? `No se encontraron reclamos para "${debouncedSearch}"`
+    : 'No se encontraron reclamos';
+
+  // Opciones de los selects de la FilterBar. Los `color` extra viajan al
+  // ModernSelect interno (los soporta en runtime, mismos datos que antes).
+  const opcionesCategoria = [
+    { value: '', label: 'Todas' },
+    ...categorias
+      .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
+      .map(cat => ({
+        value: String(cat.id),
+        label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
+        color: cat.color || DEFAULT_CATEGORY_COLOR,
+      })),
+  ];
+  const opcionesDependencia = [
+    { value: '', label: 'Todas' },
+    ...dependenciasDisponibles
+      .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
+      .map(dep => ({
+        value: String(dep.id),
+        label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
+        color: dep.color || DEFAULT_CATEGORY_COLOR,
+      })),
+  ];
+  const opcionesCanal = [
+    { value: '', label: 'Todos' },
+    ...CANAL_OPTIONS.map(c => ({ value: c.value, label: c.label, color: canalColors[c.value] })),
+  ];
+  const mostrarSelectDependencia = (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea;
+
+  // Segmented de estados con conteos reales (mismas agrupaciones que las
+  // status pills viejas + tab "Todos"). count 0 ⇒ la FilterBar lo apaga.
+  const tabsEstado: StatusTab[] = [
+    { id: '', label: 'Todos', count: totalConteos },
+    { id: 'recibido', label: 'Recibidos', count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
+    { id: 'en_curso', label: 'En curso', count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
+    { id: 'finalizado', label: 'Finalizados', count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
+    { id: 'pospuesto', label: 'Pospuestos', count: conteosEstados['pospuesto'] || 0 },
+    { id: 'rechazado', label: 'Rechazados', count: conteosEstados['rechazado'] || 0 },
+  ];
+
+  const accionesFila: RowAction<Reclamo>[] = [
+    { id: 'ver', label: 'Ver', icon: Eye, onClick: (r) => openViewSheet(r) },
+  ];
+
+  // Panel IA (se preserva del layout anterior: columna sticky a la derecha).
+  const panelIA = iaOn && !soloMisTrabajos ? (
+    <DashboardIAPanel
+      data={dashboardIA}
+      loading={dashboardIALoading}
+      title="Reclamos · IA"
+      onCollapsedChange={setIaCollapsed}
+      onTipClick={(tip) => {
+        const firstId = tip.items?.[0];
+        if (firstId) {
+          const target = reclamos.find(r => r.id === firstId);
+          if (target) openViewSheet(target);
+        }
+      }}
+    />
+  ) : null;
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
-      <SemanticHero etiqueta="RECLAMOS · AHORA" frases={heroFrases} />
+      <div className="av2-page" data-module="reclamos">
+        {/* 1. Cabecera de módulo: eyebrow + H1 + bajada. Va ARRIBA DE TODO
+            (v2.2): antes el título del módulo vivía dentro de la toolbar y
+            terminaba abajo del hero, pegado al buscador. */}
+        <PageHeader
+          eyebrow={cabecera.eyebrow}
+          title={cabecera.title}
+          description={cabecera.description}
+        />
 
-      <ABMPage
-        title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
-        buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
-        onAdd={soloMisTrabajos || soloMiArea || false ? undefined : openWizard}
-        kpis={kpisSpec}
-        searchPlaceholder="Buscar reclamos..."
-        searchValue={search}
-        onSearchChange={setSearch}
-        loading={loading}
-        isEmpty={filteredReclamos.length === 0 && !vistaInbox}
-        emptyMessage={debouncedSearch ? `No se encontraron reclamos para "${debouncedSearch}"` : "No se encontraron reclamos"}
-        defaultViewMode="table"
-        viewStorageKey="reclamos_view"
-        onViewModeChange={(m) => setVistaInbox(m === 'guided')}
-        sheetOpen={false}
-        sheetTitle=""
-        sheetDescription=""
-        onSheetClose={() => {}}
-        extraFilters={undefined}
-        sidePanel={iaOn && !soloMisTrabajos ? (
-          <DashboardIAPanel
-            data={dashboardIA}
-            loading={dashboardIALoading}
-            title="Reclamos · IA"
-            onCollapsedChange={setIaCollapsed}
-            onTipClick={(tip) => {
-              const firstId = tip.items?.[0];
-              if (firstId) {
-                const target = reclamos.find(r => r.id === firstId);
-                if (target) openViewSheet(target);
-              }
+        {/* 2. ModuleHero = SemanticHero con la stat strip ADENTRO (estándar:
+            los números viven en el hero, sin tarjetas de KPI sueltas). */}
+        <div className="av2-hero-wrap">
+          <SemanticHero etiqueta="RECLAMOS · AHORA" frases={heroFrases} kpis={heroKpis} className="av2-hero" />
+        </div>
+
+        {/* 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. */}
+        <div className="av2-controles">
+          {/* Toolbar: buscador + vistas + orden + único CTA primario (sin H1) */}
+          <ListToolbar
+            searchPlaceholder="Buscar por código, dirección o vecino…"
+            search={search}
+            onSearchChange={setSearch}
+            views={['table', 'cards', 'guided']}
+            activeView={activeView}
+            onViewChange={cambiarVista}
+            secondaryAction={{
+              label: ordenamiento === 'reciente' ? 'Más recientes' : 'Por vencer',
+              icon: ordenamiento === 'reciente' ? ArrowUpDown : Calendar,
+              onClick: () => setOrdenamiento(ordenamiento === 'reciente' ? 'programado' : 'reciente'),
             }}
+            primaryAction={puedeCrear
+              ? { label: 'Nuevo reclamo', onClick: openWizard }
+              : {
+                  label: 'Nuevo reclamo',
+                  disabled: true,
+                  disabledReason: 'La carga de reclamos se hace desde la pantalla general de Reclamos',
+                }}
           />
-        ) : undefined}
-        sidePanelWidth={iaOn && !soloMisTrabajos ? (iaCollapsed ? 44 : 280) : 0}
-        stickyHeader={true}
-        toolbar={{
-          combos: [
-            {
-              key: 'categoria',
-              placeholder: 'Categorías',
-              value: filtroCategoria === null ? '' : String(filtroCategoria),
-              onChange: (v) => {
-                setFilterLoading(v ? `cat-${v}` : 'cat-all');
-                setFiltroCategoria(v ? parseInt(v, 10) : null);
+
+          {/* Filtros: selects + segmented de estados con conteos reales.
+              Sin PeriodControl: este listado no filtra por período (trae todo
+              paginado del server); agregarlo cambiaría la lógica de datos. */}
+          <FilterBar
+            selects={[
+              {
+                id: 'categoria',
+                label: 'Categoría',
+                value: filtroCategoria === null ? '' : String(filtroCategoria),
+                options: opcionesCategoria,
+                onChange: (v) => setFiltroCategoria(v ? parseInt(v, 10) : null),
               },
-              options: categorias
-                .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
-                .map(cat => ({
-                  value: String(cat.id),
-                  label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
-                  color: cat.color || DEFAULT_CATEGORY_COLOR,
-                })),
-              searchable: true,
-            },
-            {
-              key: 'dependencia',
-              placeholder: 'Dependencias',
-              value: filtroDependencia === null ? '' : String(filtroDependencia),
-              onChange: (v) => {
-                setFilterLoading(v ? `dep-${v}` : 'dep-all');
-                setFiltroDependencia(v ? parseInt(v, 10) : null);
+              ...(mostrarSelectDependencia
+                ? [{
+                    id: 'dependencia',
+                    label: 'Dependencia',
+                    value: filtroDependencia === null ? '' : String(filtroDependencia),
+                    options: opcionesDependencia,
+                    onChange: (v: string) => setFiltroDependencia(v ? parseInt(v, 10) : null),
+                  }]
+                : []),
+              {
+                id: 'canal',
+                label: 'Canal',
+                value: filtroCanal === null ? '' : filtroCanal,
+                options: opcionesCanal,
+                onChange: (v) => setFiltroCanal(v || null),
               },
-              options: dependenciasDisponibles
-                .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
-                .map(dep => ({
-                  value: String(dep.id),
-                  label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
-                  color: dep.color || '#6366f1',
-                })),
-              searchable: true,
-              visible: (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea,
-            },
-            {
-              key: 'canal',
-              placeholder: 'Canales',
-              value: filtroCanal === null ? '' : filtroCanal,
-              onChange: (v) => {
-                setFilterLoading(v ? `canal-${v}` : 'canal-all');
-                setFiltroCanal(v || null);
-              },
-              options: CANAL_OPTIONS.map(c => ({
-                value: c.value,
-                label: c.label,
-                color: canalColors[c.value],
-              })),
-            },
-          ],
-          statusPills: {
-            value: filtroEstado,
-            onChange: (v) => { setFilterLoading(`estado-${v}`); setFiltroEstado(v); },
-            items: [
-              { key: 'recibido', label: 'Recibidos', icon: Inbox, color: estadoColors.recibido.bg, count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
-              { key: 'en_curso', label: 'En curso', icon: Play, color: estadoColors.en_curso.bg, count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
-              { key: 'finalizado', label: 'Finalizados', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
-              { key: 'pospuesto', label: 'Pospuestos', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
-              { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
-            ],
-          },
-          actions: [
-            { key: 'reciente', label: 'Más recientes', icon: ArrowUpDown, active: ordenamiento === 'reciente', onClick: () => setOrdenamiento('reciente') },
-            { key: 'programado', label: 'Por vencer', icon: Calendar, active: ordenamiento === 'programado', onClick: () => setOrdenamiento('programado') },
-          ],
-          layout: 'left',
-        }}
-        pagination={{
-          page: pageClient,
-          pageSize: pageSizeClient,
-          totalItems: filteredReclamos.length,
-          onPageChange: setPageClient,
-          onPageSizeChange: (s) => { setPageSizeClient(s); setPageClient(1); },
-        }}
-        guidedView={inboxView}
-        tableView={
-          <ABMTable
-            key={`table-${ordenamiento}`}
-            data={paginatedReclamos}
-            columns={tableColumns}
-            keyExtractor={(r) => r.id}
-            onRowClick={(r) => openViewSheet(r)}
-            defaultSortKey={ordenamiento === 'programado' ? 'fecha_programada' : 'creacion'}
-            defaultSortDirection={ordenamiento === 'programado' ? 'asc' : 'desc'}
-            defaultGroupByDateKey="created_at"
-            defaultGroupBySortKeys={['created_at', 'creacion', 'fecha', 'fecha_programada']}
-            defaultGroupByItemLabel={{ singular: 'reclamo', plural: 'reclamos' }}
+            ]}
+            statusTabs={tabsEstado}
+            activeStatus={filtroEstado}
+            onStatusChange={(id) => setFiltroEstado(id)}
+            /* Un foco puesto desde el hero NUNCA queda invisible: se anuncia
+               acá, y se saca desde la acción del propio hero (arriba de todo). */
+            filterSummary={
+              foco
+                ? `Foco: ${FOCOS[foco].resumen} · ${filteredReclamos.length} de ${reclamosBuscados.length}`
+                : undefined
+            }
           />
-        }
-        sheetContent={null}
-      >
-        {loading ? (
-          // Mostrar skeletons mientras carga
-          Array.from({ length: 6 }).map((_, i) => (
-            <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
-          ))
-        ) : (
-          paginatedReclamos.map((r, index) => {
-            const isVisible = animationDone || visibleCards.has(r.id);
-            return (
-              <ReclamoCard
-                key={r.id}
-                reclamo={r}
-                onClick={() => openViewSheet(r)}
-                showCreador={true}
-                similaresCount={similaresCounts[r.id] || 0}
-                isVisible={isVisible}
-                animationDelay={index * 50}
+        </div>
+
+        {/* 5. Cuerpo por vista (tabla estándar / tarjetas / guiada) + panel IA */}
+        <div className={panelIA ? 'lg:flex lg:gap-4' : undefined}>
+          <div className={panelIA ? 'flex-1 min-w-0' : undefined}>
+            {loading ? (
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
+                ))}
+              </div>
+            ) : activeView === 'guided' ? (
+              <div className="mt-3">{inboxView}</div>
+            ) : activeView === 'cards' ? (
+              filteredReclamos.length === 0 ? (
+                <section className="av2-tabla">
+                  <div className="av2-tabla-vacia">{mensajeVacio}</div>
+                </section>
+              ) : (
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                  {filteredReclamos.map((r, index) => (
+                    <ReclamoCard
+                      key={r.id}
+                      reclamo={r}
+                      onClick={() => openViewSheet(r)}
+                      showCreador={true}
+                      similaresCount={similaresCounts[r.id] || 0}
+                      isVisible={animationDone || visibleCards.has(r.id)}
+                      animationDelay={index * 50}
+                    />
+                  ))}
+                </div>
+              )
+            ) : (
+              <DataTable<Reclamo>
+                kind="plain"
+                columns={columnasTabla}
+                groupBy="date"
+                groups={gruposTabla}
+                rows={[]}
+                rowKey={(r) => r.id}
+                rowActions={accionesFila}
+                onRowClick={(r) => openViewSheet(r)}
+                footer={{
+                  showing: `Mostrando ${filteredReclamos.length.toLocaleString('es-AR')} de ${totalConteos.toLocaleString('es-AR')}`,
+                  action: hasMore
+                    ? {
+                        label: loadingMore ? 'Cargando…' : 'Cargar más',
+                        onClick: () => setPage((p) => p + 1),
+                        disabled: loadingMore,
+                        disabledReason: 'Ya se está cargando la página siguiente',
+                      }
+                    : undefined,
+                }}
               />
-            );
-          })
-        )}
-      </ABMPage>
+            )}
+          </div>
+          {panelIA && (
+            <aside
+              className={`hidden lg:block flex-shrink-0 self-start lg:sticky lg:top-[168px] mt-3 ${iaCollapsed ? 'w-11' : 'w-[280px]'}`}
+            >
+              {panelIA}
+            </aside>
+          )}
+        </div>
+      </div>
 
       {/* Sentinel para infinite scroll + spinner de carga.
-          Solo en vista clásica — en vista Inbox la lista no se pagina igual. */}
-      {!vistaInbox && (
+          Solo en vistas tabla/tarjetas — en la guiada la lista no se pagina igual. */}
+      {activeView !== 'guided' && (
         <div ref={observerTarget} className="py-4">
           {loadingMore && (
             <div className="flex items-center justify-center gap-2">

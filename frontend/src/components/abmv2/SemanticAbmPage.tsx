@@ -1,15 +1,40 @@
 /**
  * SemanticAbmPage — orquestador del estándar de páginas ABM (rediseño v2).
  *
- * Compone, en el ORDEN ESTÁNDAR (design/handoff-v2/STANDARD-SemanticAbmPage.md):
+ * Compone, en el ORDEN ESTÁNDAR (design/handoff-v2/STANDARD-SemanticAbmPage.md
+ * + referencia nueva references/reclamos-lista-v2.dc.html):
  *
+ *   <PageHeader>     ← [v2.2] eyebrow + H1 34px + bajada (cabecera de módulo)
  *   <SemanticHero>   ← el ModuleHero ES el SemanticHero existente (ui/SemanticHero)
- *   <ListToolbar>    ← H1 + total + buscador + vistas + secundario + CTA primario
+ *   <ListToolbar>    ← buscador + vistas + steps + secundario + CTA (SIN H1)
  *   <FilterBar>      ← selects + PeriodControl + segmented de estados + resumen
- *   <DataTable>      ← encabezado + grupos con subtotal + filas + pie
+ *   <cuerpo>         ← slot de la vista activa (viewSlots) o DataTable estándar
  *   <SideModal>      ← drawer derecho (detalle de la fila / alta)
  *
+ * [v2.2] El cambio de fondo respecto de v2.1: el título del módulo estaba
+ * DENTRO de la toolbar y por lo tanto ABAJO del hero, pegado al buscador. Se
+ * extrajo a `PageHeader` y ahora encabeza la página. Toolbar y FilterBar
+ * quedan envueltas en `.av2-controles`: se ven como UNA tarjeta partida por
+ * una línea (la toolbar redondea arriba; si la FilterBar no renderiza nada,
+ * el CSS le devuelve las 4 esquinas a la toolbar).
+ *
  * El TopBar sticky NO es de este componente: lo pone el layout shell de la app.
+ *
+ * [v2.1] Backlog agnóstico de los pilotos (ver types.ts, cada prop documenta
+ * su porqué):
+ *  - `viewSlots`: cuerpo alternativo por vista. Si la vista activa tiene slot
+ *    (aunque sea null explícito), se renderiza ESE nodo como cuerpo — hero,
+ *    toolbar, filtros y drawer quedan intactos. Sin slot: 'table' cae al
+ *    DataTable estándar; las demás vistas no renderizan cuerpo (en dev se
+ *    avisa por consola para no dejar un hueco silencioso).
+ *  - `aside`: panel lateral sticky a la derecha del cuerpo (.av2-body flex +
+ *    .av2-aside sticky bajo el TopBar; en viewports angostos cae debajo).
+ *    El ancho runtime va por style var --av2-aside-w (default ~320 en CSS).
+ *    Sin `aside` NO se agrega wrapper: el cuerpo se renderiza directo (DOM
+ *    idéntico al de las páginas existentes).
+ *  - `primaryAction` OPCIONAL: sin CTA la toolbar no renderiza botón primario.
+ *  - `steps` / `sortSpec` / `loading` / `emptyMessage`: pass-through a
+ *    ListToolbar / FilterBar / DataTable respectivamente.
  *
  * Estado del SideModal: si la página pasa el builder `sideModal`, el
  * orquestador maneja abrir/cerrar — click en una fila abre `mode='detail'`
@@ -25,12 +50,14 @@
  * kind='board' (Planificación) NO está implementado en esta fase: en dev
  * tira un error explícito; en prod DataTable muestra su placeholder.
  *
- * Polimórfico: clases av2-* (styles/abmv2.css, sección [PAGE]) sobre tokens
- * --pl-*. Inline SOLO el valor runtime del acento del hero.
+ * Polimórfico: clases av2-* (styles/abmv2.css, secciones [PAGE] y [PAGE v2.1])
+ * sobre tokens --pl-*. Inline SOLO valores runtime: el acento del hero
+ * (--av2-hero-accent) y el ancho del aside (--av2-aside-w).
  */
 import { useCallback, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SemanticHero } from '../ui/SemanticHero';
+import { PageHeader } from './PageHeader';
 import { ListToolbar } from './ListToolbar';
 import { FilterBar } from './FilterBar';
 import { DataTable } from './DataTable';
@@ -84,20 +111,26 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
   const {
     /* identidad */
     moduleKey,
+    eyebrow,
+    title,
+    description,
     hero,
     accentColor,
     /* toolbar */
-    title,
-    totalCount,
     searchPlaceholder,
     views,
     secondaryAction,
     primaryAction,
+    steps,
     /* filtros */
     selects,
     period,
     statusTabs,
+    sortSpec,
     filterSummary,
+    /* cuerpo */
+    viewSlots,
+    aside,
     /* tabla */
     kind,
     columns,
@@ -107,6 +140,8 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     groups,
     rowActions,
     footer,
+    loading,
+    emptyMessage,
     /* estado controlado */
     search,
     onSearchChange,
@@ -139,6 +174,12 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
           'obligatorio en toda lista con importes — §3 del estándar).',
       );
     }
+    if (primaryOpensCreate && !primaryAction) {
+      console.warn(
+        `SemanticAbmPage[${moduleKey}]: primaryOpensCreate sin \`primaryAction\` — ` +
+          'no hay CTA que abra el create (el CTA es opcional desde v2.1).',
+      );
+    }
   }
 
   /* --- Click en fila: callback de la página + detail del drawer --- */
@@ -151,22 +192,59 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
   );
   const filaClickeable = !!onRowClick || !!sideModal;
 
-  /* --- CTA primario: puede abrir el create del drawer --- */
+  /* --- CTA primario: puede abrir el create del drawer.
+         [v2.1] `primaryAction` es opcional — sin CTA no hay nada que envolver
+         y la toolbar no renderiza botón primario. --- */
   const abreCreate = primaryOpensCreate && !!sideModal;
-  const primarioEfectivo: Action = abreCreate
-    ? {
-        ...primaryAction,
-        to: undefined,
-        onClick: () => {
-          primaryAction.onClick?.();
-          setDrawer({ mode: 'create', row: null });
-        },
-      }
-    : primaryAction;
+  const primarioEfectivo: Action | undefined =
+    primaryAction && abreCreate
+      ? {
+          ...primaryAction,
+          to: undefined,
+          onClick: () => {
+            primaryAction.onClick?.();
+            setDrawer({ mode: 'create', row: null });
+          },
+        }
+      : primaryAction;
 
   /* --- Acento del hero: token runtime vía style var --- */
   const estiloHero = accentColor
     ? ({ '--av2-hero-accent': accentColor } as CSSProperties)
+    : undefined;
+
+  /* --- [v2.1] Cuerpo por vista: slot de la vista activa o DataTable.
+         `in` (y no `?.[activeView] ?? …`) para respetar un slot null
+         EXPLÍCITO de la página ("esta vista no lleva cuerpo"). --- */
+  const tieneSlot = !!viewSlots && activeView in viewSlots;
+  if (import.meta.env.DEV && !tieneSlot && activeView !== 'table') {
+    console.warn(
+      `SemanticAbmPage[${moduleKey}]: la vista '${activeView}' no tiene slot en ` +
+        "`viewSlots` y solo 'table' cae al DataTable estándar — el cuerpo queda vacío.",
+    );
+  }
+  const cuerpo = tieneSlot ? (
+    viewSlots?.[activeView]
+  ) : activeView === 'table' ? (
+    <DataTable<Row>
+      kind={kind}
+      columns={columns}
+      groupBy={groupBy}
+      showGroupSubtotal={showGroupSubtotal}
+      rows={rows}
+      groups={groups}
+      rowKey={rowKey}
+      rowActions={rowActions}
+      onRowClick={filaClickeable ? manejarFila : undefined}
+      footer={footer}
+      loading={loading}
+      emptyMessage={emptyMessage}
+    />
+  ) : null;
+
+  /* --- [v2.1] Ancho runtime del aside vía style var (default en CSS). --- */
+  const estiloAside = aside?.width
+    ? ({ '--av2-aside-w': `${aside.width}px` } as CSSProperties)
     : undefined;
 
   /* --- Spec del drawer abierto --- */
@@ -174,7 +252,10 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
 
   return (
     <div className="av2-page" data-module={moduleKey}>
-      {/* 1. ModuleHero = SemanticHero existente. Los números viven acá
+      {/* 1. [v2.2] Cabecera de módulo: lo PRIMERO que se lee de la pantalla. */}
+      <PageHeader eyebrow={eyebrow} title={title} description={description} />
+
+      {/* 2. ModuleHero = SemanticHero existente. Los números viven acá
           (stat strip en `hero.kpis`) — nada de KPIs sueltos arriba. */}
       <div className="av2-hero-wrap" style={estiloHero}>
         <SemanticHero
@@ -185,46 +266,47 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         />
       </div>
 
-      {/* 2. ListToolbar */}
-      <ListToolbar
-        title={title}
-        totalCount={totalCount}
-        searchPlaceholder={searchPlaceholder}
-        search={search}
-        onSearchChange={onSearchChange}
-        views={views}
-        activeView={activeView}
-        onViewChange={onViewChange}
-        secondaryAction={secondaryAction}
-        primaryAction={primarioEfectivo}
-      />
+      {/* 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. */}
+      <div className="av2-controles">
+        <ListToolbar
+          searchPlaceholder={searchPlaceholder}
+          search={search}
+          onSearchChange={onSearchChange}
+          views={views}
+          activeView={activeView}
+          onViewChange={onViewChange}
+          secondaryAction={secondaryAction}
+          primaryAction={primarioEfectivo}
+          steps={steps}
+        />
 
-      {/* 3. FilterBar */}
-      <FilterBar
-        selects={selects}
-        period={period}
-        onPeriodChange={onPeriodChange}
-        statusTabs={statusTabs}
-        activeStatus={activeStatus}
-        onStatusChange={onStatusChange}
-        filterSummary={filterSummary}
-      />
+        <FilterBar
+          selects={selects}
+          period={period}
+          onPeriodChange={onPeriodChange}
+          statusTabs={statusTabs}
+          activeStatus={activeStatus}
+          onStatusChange={onStatusChange}
+          sortSpec={sortSpec}
+          filterSummary={filterSummary}
+        />
+      </div>
 
-      {/* 4. DataTable */}
-      <DataTable<Row>
-        kind={kind}
-        columns={columns}
-        groupBy={groupBy}
-        showGroupSubtotal={showGroupSubtotal}
-        rows={rows}
-        groups={groups}
-        rowKey={rowKey}
-        rowActions={rowActions}
-        onRowClick={filaClickeable ? manejarFila : undefined}
-        footer={footer}
-      />
+      {/* 5. Cuerpo: slot de la vista activa o DataTable estándar. Con `aside`
+          se envuelve en el flex .av2-body (panel sticky a la derecha); sin él,
+          cuerpo directo — DOM idéntico al previo a v2.1. */}
+      {aside ? (
+        <div className="av2-body">
+          <div className="av2-body-main">{cuerpo}</div>
+          <aside className="av2-aside" style={estiloAside}>
+            {aside.content}
+          </aside>
+        </div>
+      ) : (
+        cuerpo
+      )}
 
-      {/* 5. SideModal (si la página delegó el estado en el orquestador) */}
+      {/* 6. SideModal (si la página delegó el estado en el orquestador) */}
       {specDrawer && <SideModal {...specDrawer} open onClose={cerrarDrawer} />}
     </div>
   );

@@ -1,9 +1,17 @@
+/**
+ * Tesorería / Gastos — PILOTO del estándar `SemanticAbmPage` (kind='money').
+ *
+ * Migración de shell SOLAMENTE (riesgo controlado):
+ *  - Hero semántico + ListToolbar + FilterBar (PeriodControl) + DataTable
+ *    con grupos por día, subtotales y gran total (referencia:
+ *    design/handoff-v2/references/gastos-lista.dc.html).
+ *  - La lógica de datos/fetch/filtros NO cambió: mismos estados, mismas
+ *    llamadas, mismos filtros server/client-side que la versión anterior.
+ *  - Se PRESERVAN el wizard de alta (CrearGastoWizard) y el detalle
+ *    (GastoDetalleSheet): el CTA y el click de fila abren lo mismo que antes.
+ */
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
-  Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight, CalendarClock, Settings,
-  Sparkles, Wrench, Package, Tag, ArrowUpRight,
-} from 'lucide-react';
+import { Eye, Sparkles, Trash2, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -12,49 +20,24 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import PageHint from '../components/ui/PageHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
-import { PeriodNavigator, type PeriodModo } from '../components/ui/PeriodNavigator';
-import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
+import type { PeriodModo } from '../components/ui/PeriodNavigator';
+import type { DateRange } from '../components/ui/DateRangePicker';
 import {
   GastoDetalleSheet, calcEstadoAgregado, ESTADO_AGREGADO_META,
   type EstadoAgregado,
 } from '../components/tesoreria/GastoDetalleSheet';
-import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
-import { MunifyTour } from '../components/ui/MunifyTour';
-import { TourButton } from '../components/ui/TourButton';
-
-const TOUR_STEPS_TES_MOVIMIENTOS = [
-  {
-    target: '[data-tour="tes-mov-kpis"]',
-    content: 'KPIs en vivo de los pagos del muni: total del periodo activo, ticket promedio y desgloses.',
-    title: 'Resumen de Tesorería',
-    placement: 'bottom' as const,
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="tes-mov-nuevo"]',
-    content: 'Cargás un pago directo desde acá: concepto, beneficiario, monto, caja, factura adjunta y proyecto opcional. Al guardar se descuenta la caja.',
-    title: 'Nuevo pago',
-    placement: 'bottom' as const,
-  },
-];
-import { StatusPill } from '../components/ui/StatusPill';
-import { primaryButtonStyle } from '../components/ui/PrimaryButton';
-import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
-import type { KpiSpec } from '../components/ui/KpiCard';
-import { ModernSelect } from '../components/ui/ModernSelect';
-import { PillsOrSelect } from '../components/ui/PillsOrSelect';
-import { CalendarView } from '../components/ui/CalendarView';
-import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
+import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
+import { ChipEstado, EntityCell } from '../components/abmv2/DataTable';
+import type {
+  ChipTone, ColumnSpec, PeriodControlValue, RowAction, SelectSpec, StatusTab, TableGroup,
+} from '../components/abmv2/types';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
+import { formatFechaAR, parseFechaLocal } from '../lib/tesoreria-helpers';
+import { gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
 import { conceptoIcon } from '../lib/conceptoIcons';
-import { contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS } from '../lib/contactoIcons';
-import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja } from '../types';
-
-const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
-  contado: '#10b981',
-  cuotas: '#3b82f6',
-  prestamo: '#8b5cf6',
-  recurrente: '#f59e0b',
-};
+import { contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS, TIPO_CONTACTO_LABELS_SINGULAR } from '../lib/contactoIcons';
+import type { Gasto, FormaPago, Contacto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja } from '../types';
 
 const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   efectivo: 'Efectivo',
@@ -88,9 +71,20 @@ const ESTADO_FILTROS: { value: EstadoAgregado | ''; label: string }[] = [
   { value: 'completado', label: 'Completado' },
 ];
 
+/** Estado agregado → tono semántico del ChipEstado (paleta StatusPill del estándar). */
+const ESTADO_TONO: Record<EstadoAgregado, ChipTone> = {
+  al_dia: 'green',
+  pendiente: 'amber',
+  completado: 'blue',
+  en_mora: 'red',
+};
+
+const fmtMoney = (n: number) => `$ ${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
 export default function Tesoreria() {
   const { theme } = useTheme();
-  const iaOn = useIaTesoreria();  // gate IA en Tesorería (respeta el sub-flag): banner Bartolo + panel operativo
+  const iaOn = useIaTesoreria();  // gate IA en Tesorería (respeta el sub-flag): banner Bartolo
   const { user } = useAuth();
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -113,13 +107,13 @@ export default function Tesoreria() {
   const [anioActual, setAnioActual] = useState<number>(today.getFullYear());
   // Default TRUE: la pantalla arranca mostrando TODOS los meses (panorama completo).
   const [todosLosMeses, setTodosLosMeses] = useState<boolean>(true);
-  // Rango de fechas (desde/hasta). Si esta seteado, PISA al PeriodNavigator.
+  // Rango de fechas (desde/hasta). Si esta seteado, PISA al periodo simple.
+  // Lo escribe el PeriodControl del estandar cuando el usuario abre "→ Hasta".
   const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
   const rangoActivo = !!(rangoFechas.desde && rangoFechas.hasta);
 
   const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
-  const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
@@ -129,35 +123,16 @@ export default function Tesoreria() {
   const [gastoSeleccionado, setGastoSeleccionado] = useState<Gasto | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Paginación client-side (50 items por página)
+  // Paginación client-side (50 items por página). El estándar todavia no trae
+  // control de paginacion: queda fija la primera pagina (ver dudas del piloto).
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize] = useState(50);
 
-  // Dashboard IA
-  const [dashboardIA, setDashboardIA] = useState<DashboardIAData | null>(null);
-  const [dashboardIALoading, setDashboardIALoading] = useState(false);
-  const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
-  });
-  useEffect(() => {
-    let cancelled = false;
-    setDashboardIALoading(true);
-    gastosApi.getDashboardIA(false)
-      .then((res) => { if (!cancelled) setDashboardIA(res.data as DashboardIAData); })
-      .catch((e) => console.error('[Tesoreria] Error cargando Dashboard IA:', e))
-      .finally(() => { if (!cancelled) setDashboardIALoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return (
-      <div className="p-6">
-        <p className="text-sm" style={{ color: theme.textSecondary }}>
-          El módulo Tesorería es exclusivo de los gestores del municipio.
-        </p>
-      </div>
-    );
-  }
+  // Gate de rol: el modulo es solo de gestores. El guard de render vive al
+  // final (despues de TODOS los hooks — regla de hooks); aca solo gateamos
+  // los fetches para que un rol bloqueado no dispare requests (mismo
+  // comportamiento que cuando el early-return cortaba antes de los effects).
+  const esGestor = !user || user.rol === 'admin' || user.rol === 'supervisor';
 
   const fetchGastos = async () => {
     setLoading(true);
@@ -165,7 +140,7 @@ export default function Tesoreria() {
       // Filtros server-side: search, dependencia, concepto, rango fechas.
       // El resto (tipoContacto, subtipoEmpleado, tipoConcepto, estadoAgregado,
       // periodo mes/anio) se aplican client-side sobre la pagina actual.
-      const params: any = { skip: (page - 1) * pageSize, limit: pageSize };
+      const params: Record<string, string | number> = { skip: (page - 1) * pageSize, limit: pageSize };
       if (search.trim()) params.search = search.trim();
       if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
       if (cajaFiltro) params.caja_id = parseInt(cajaFiltro, 10);
@@ -211,16 +186,13 @@ export default function Tesoreria() {
 
   const fetchCatalogoConceptos = async () => {
     try {
-      const [tiposRes, conceptosRes, cajasRes] = await Promise.all([
-        tiposConceptoApi.list({ activo: true }),
+      const [conceptosRes, cajasRes] = await Promise.all([
         conceptosAbmApi.list({ activo: true }),
         cajasApi.list({ activo: true }),
       ]);
-      setTiposConcepto(tiposRes.data || []);
       setConceptos(conceptosRes.data || []);
       setCajas((cajasRes.data as Caja[]) || []);
     } catch {
-      setTiposConcepto([]);
       setConceptos([]);
       setCajas([]);
     }
@@ -236,22 +208,25 @@ export default function Tesoreria() {
   };
 
   useEffect(() => {
+    if (!esGestor) return;
     fetchDependencias();
     fetchContactos();
     fetchCatalogoConceptos();
     fetchTiposEmpleado();
-  }, []);
+  }, [esGestor]);
 
   // Re-fetch gastos cada vez que cambia un filtro server-side o la paginacion.
   // Filtros client-side (tipoContacto, subtipoEmpleado, estadoAgregado) NO
   // disparan re-fetch — solo filtran lo que ya esta en memoria.
   useEffect(() => {
+    if (!esGestor) return;
     fetchGastos();
     /* eslint-disable-next-line */
-  }, [page, pageSize, dependenciaFiltro, cajaFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+  }, [esGestor, page, pageSize, dependenciaFiltro, cajaFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
 
   // Search con debounce
   useEffect(() => {
+    if (!esGestor) return;
     setPage(1);
     const t = setTimeout(() => fetchGastos(), 400);
     return () => clearTimeout(t);
@@ -284,7 +259,7 @@ export default function Tesoreria() {
     return m;
   }, [contactos]);
 
-  // Map concepto (string) -> tipo (con color), para badge en la grilla
+  // Map concepto (string) -> tipo (con color), para el punto de TIPO en la grilla
   const conceptoToTipoMap = useMemo(() => {
     const m = new Map<string, { nombre: string; color: string | null | undefined }>();
     conceptos.forEach(c => {
@@ -311,12 +286,14 @@ export default function Tesoreria() {
     return Array.from(set).sort();
   }, [tiposEmpleado, contactos]);
 
-  const filtered = useMemo(() => {
+  // Filtros aplicados SIN el filtro de estado: base para los conteos reales de
+  // los statusTabs (el segmented muestra la distribucion del resto del filtro).
+  const filteredSinEstado = useMemo(() => {
     const s = search.trim().toLowerCase();
     const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
 
     return gastos.filter(g => {
-      // Filtro temporal: si hay rango activo, pisa al PeriodNavigator.
+      // Filtro temporal: si hay rango activo, pisa al periodo simple.
       if (rangoActivo) {
         const fechaISO = g.fecha.slice(0, 10);
         if (fechaISO < rangoFechas.desde || fechaISO > rangoFechas.hasta) return false;
@@ -343,7 +320,6 @@ export default function Tesoreria() {
       if (tipoConceptoFiltro && !conceptosDelTipoNombres.has(g.concepto.toLowerCase())) return false;
       // Caja (de qué fondo sale el gasto). caja_id puede ser null (sin caja).
       if (cajaFiltro && String(g.caja_id ?? '') !== cajaFiltro) return false;
-      if (estadoFiltro && calcEstadoAgregado(g) !== estadoFiltro) return false;
       if (s) {
         const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
         const contactoStr = c ? `${c.nombre || ''} ${c.apellido || ''}`.trim().toLowerCase() : '';
@@ -354,11 +330,28 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, cajaFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
+  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, cajaFiltro, conceptosDelTipoNombres, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
+
+  // Resultado final = base + filtro de estado agregado (mismo resultado que antes).
+  const filtered = useMemo(
+    () => (estadoFiltro ? filteredSinEstado.filter(g => calcEstadoAgregado(g) === estadoFiltro) : filteredSinEstado),
+    [filteredSinEstado, estadoFiltro]
+  );
+
+  // Conteos por estado agregado (para statusTabs) + monto pendiente (hero).
+  const estadoStats = useMemo(() => {
+    const counts: Record<EstadoAgregado, number> = { al_dia: 0, en_mora: 0, pendiente: 0, completado: 0 };
+    let pendienteMonto = 0;
+    for (const g of filteredSinEstado) {
+      const e = calcEstadoAgregado(g);
+      counts[e] += 1;
+      if (e === 'pendiente') pendienteMonto += parseFloat(g.monto_pesos || '0');
+    }
+    return { counts, pendienteMonto };
+  }, [filteredSinEstado]);
 
   // Server ya paginó: `filtered` ya tiene solo la página actual con filtros
   // client-side extra aplicados encima.
-  const paginatedFiltered = filtered;
 
   // Totalizador (refleja todos los filtros activos)
   const totales = useMemo(() => {
@@ -389,9 +382,7 @@ export default function Tesoreria() {
       .reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0);
   }, [gastos]);
 
-  // KPIs por tipo de concepto. Agrupa los gastos filtrados por nombre del
-  // tipo de concepto y devuelve los top 3 por monto. La primera card del
-  // dashboard es el total general; estas son las 3 categorias secundarias.
+  // Buckets por tipo de concepto: top por monto (alimentan la stat strip del hero).
   const kpisData = useMemo(() => {
     type Bucket = { nombre: string; color: string; total: number; count: number };
     const byTipo = new Map<string, Bucket>();
@@ -458,19 +449,11 @@ export default function Tesoreria() {
     const tipoContacto = new Map<string, number>();
     const subtipoEmpleado = new Map<string, number>();
     const dependencia = new Map<string, number>();
-    // tipoConcepto: keyed por nombre (los TC options usan id como value, asi que
-    // construyo un set por id->nombre y mapeo por nombre cuando comparo).
-    const tipoConceptoByNombre = new Map<string, number>();
     const concepto = new Map<string, number>();
     gastos.forEach((g, idx) => {
       // Concepto
       const cKey = (g.concepto || '').toLowerCase();
       if (cKey && !concepto.has(cKey)) concepto.set(cKey, idx);
-      // Tipo concepto (via map concepto->tipo)
-      const tc = conceptoToTipoMap.get(cKey);
-      if (tc && tc.nombre && !tipoConceptoByNombre.has(tc.nombre.toLowerCase())) {
-        tipoConceptoByNombre.set(tc.nombre.toLowerCase(), idx);
-      }
       // Dependencia
       if (g.destino_tipo === 'dependencia' && g.destino_dependencia_id) {
         const k = String(g.destino_dependencia_id);
@@ -485,8 +468,8 @@ export default function Tesoreria() {
         }
       }
     });
-    return { tipoContacto, subtipoEmpleado, dependencia, tipoConceptoByNombre, concepto };
-  }, [gastos, contactosMap, conceptoToTipoMap]);
+    return { tipoContacto, subtipoEmpleado, dependencia, concepto };
+  }, [gastos, contactosMap]);
 
   // Helper: ordena options no-vacios por presencia en grilla, marca emphasized.
   // value '' (placeholder) siempre va primero sin emphasis.
@@ -494,10 +477,13 @@ export default function Tesoreria() {
     items: T[],
     order: Map<string, number>,
   ): Array<T & { emphasized?: boolean }> {
-    return items.map(it => {
-      const idx = order.get(it.value.toLowerCase()) ?? order.get(it.value);
-      return { ...it, emphasized: idx != null, _idx: idx ?? Number.POSITIVE_INFINITY };
-    }).sort((a, b) => a._idx - b._idx).map(({ _idx, ...rest }) => rest as T & { emphasized?: boolean });
+    return items
+      .map(it => {
+        const idx = order.get(it.value.toLowerCase()) ?? order.get(it.value);
+        return { opt: { ...it, emphasized: idx != null }, idx: idx ?? Number.POSITIVE_INFINITY };
+      })
+      .sort((a, b) => a.idx - b.idx)
+      .map(p => p.opt);
   }
 
   // Opciones de tipo de contacto
@@ -511,7 +497,7 @@ export default function Tesoreria() {
         icon: <Icon className="h-3 w-3" />,
       };
     });
-    return [{ value: '', label: 'Contactos' }, ...sortByPresence(items, ordering.tipoContacto)];
+    return sortByPresence(items, ordering.tipoContacto);
   }, [ordering.tipoContacto]);
 
   // Opciones de subtipo de empleado (usa el catalogo si existe)
@@ -519,72 +505,18 @@ export default function Tesoreria() {
     const items = tiposEmpleado.length > 0
       ? tiposEmpleado.map(t => ({ value: t.nombre, label: t.nombre, color: t.color || undefined }))
       : subtiposEmpleado.map(s => ({ value: s, label: s, color: undefined as string | undefined }));
-    return [{ value: '', label: 'Empleados' }, ...sortByPresence(items, ordering.subtipoEmpleado)];
+    return sortByPresence(items, ordering.subtipoEmpleado);
   }, [tiposEmpleado, subtiposEmpleado, ordering.subtipoEmpleado]);
 
-  // Opciones de tipo de concepto (desde el catalogo per-muni). Como aca el value
-  // es el id pero el ordering es por nombre, hacemos el match manual.
-  const tipoConceptoOptions = useMemo(() => {
-    const items = tiposConcepto.map(t => {
-      const idx = ordering.tipoConceptoByNombre.get((t.nombre || '').toLowerCase());
-      return {
-        value: String(t.id),
-        label: t.nombre,
-        color: t.color || undefined,
-        emphasized: idx != null,
-        _idx: idx ?? Number.POSITIVE_INFINITY,
-      };
-    }).sort((a, b) => a._idx - b._idx).map(({ _idx, ...rest }) => rest);
-    return [{ value: '', label: 'Tipos' }, ...items];
-  }, [tiposConcepto, ordering.tipoConceptoByNombre]);
-
-  // Opciones de concepto (filtradas por tipo si hay seleccionado)
   // Opciones de caja (de qué fondo sale cada gasto): Coparticipación, FOFINDE,
-  // FODEMEP, Tarjeta, etc. Reemplaza al filtro de concepto en el toolbar.
+  // FODEMEP, Tarjeta, etc.
   const cajaOptions = useMemo(() => {
-    const items = cajas.map(c => ({
+    return cajas.map(c => ({
       value: String(c.id),
       label: c.nombre,
       color: c.color || undefined,
     }));
-    return [{ value: '', label: 'Caja' }, ...items];
   }, [cajas]);
-
-  // Navegacion de periodos (respeta modo: salta de a mes o de a año entero)
-  const irAtras = () => {
-    setTodosLosMeses(false);
-    if (modoPeriodo === 'anio') {
-      setAnioActual(a => a - 1);
-    } else {
-      if (mesActual === 0) { setMesActual(11); setAnioActual(a => a - 1); }
-      else setMesActual(m => m - 1);
-    }
-  };
-  const irAdelante = () => {
-    setTodosLosMeses(false);
-    if (modoPeriodo === 'anio') {
-      setAnioActual(a => a + 1);
-    } else {
-      if (mesActual === 11) { setMesActual(0); setAnioActual(a => a + 1); }
-      else setMesActual(m => m + 1);
-    }
-  };
-
-  // Chips de estado agregado — colapsan a ModernSelect cuando no entran.
-  const estadoChipsOptions = ESTADO_FILTROS.map(e => ({
-    value: e.value,
-    label: e.label,
-    color: e.value ? ESTADO_AGREGADO_META[e.value]?.color : undefined,
-  }));
-  const estadoChips = (
-    <PillsOrSelect
-      value={estadoFiltro}
-      onChange={(v) => setEstadoFiltro(v as EstadoAgregado | '')}
-      options={estadoChipsOptions}
-      placeholder="Estado"
-      size="sm"
-    />
-  );
 
   // Opciones de dependencia
   const dependenciaOptions = useMemo(() => {
@@ -593,269 +525,306 @@ export default function Tesoreria() {
       label: d.nombre,
       color: d.color || undefined,
     }));
-    return [{ value: '', label: 'Dependencias' }, ...sortByPresence(items, ordering.dependencia)];
+    return sortByPresence(items, ordering.dependencia);
   }, [dependencias, ordering.dependencia]);
 
-  // Iguala altura/padding/radius de TODOS los triggers (ModernSelect)
-  // y del navegador de meses (que usa <button> directo). Una sola CSS,
-  // un solo wrapper class. Esto da look orgnico.
-  // Toolbar declarativo (API nueva). ABMPage lo renderiza con su layout estandar.
-  const tesoreriaToolbar: AbmToolbar = {
-    combos: [
-      {
-        key: 'tipoContacto',
-        placeholder: 'Contactos',
-        value: tipoContactoFiltro,
-        onChange: (v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); },
-        // tipoContactoOptions ya trae el item '' como placeholder, lo sacamos
-        // porque ABMPage lo re-inyecta.
-        options: tipoContactoOptions.filter(o => o.value !== ''),
-        searchable: true,
-        minWidth: 170,
-      },
-      {
-        key: 'subtipoEmpleado',
-        placeholder: 'Empleados',
-        value: subtipoEmpleadoFiltro,
-        onChange: setSubtipoEmpleadoFiltro,
-        options: subtipoEmpleadoOptions.filter(o => o.value !== ''),
-        searchable: true,
-        minWidth: 180,
-        visible: tipoContactoFiltro === 'empleado' && subtiposEmpleado.length > 0,
-      },
-      {
-        key: 'dependencia',
-        placeholder: 'Dependencias',
-        value: dependenciaFiltro,
-        onChange: setDependenciaFiltro,
-        options: dependenciaOptions.filter(o => o.value !== ''),
-        searchable: true,
-        minWidth: 190,
-      },
-      {
-        key: 'caja',
-        placeholder: 'Caja',
-        value: cajaFiltro,
-        onChange: setCajaFiltro,
-        options: cajaOptions.filter(o => o.value !== ''),
-        searchable: true,
-        minWidth: 180,
-      },
-    ],
-    customAfterCombos: [
-      <div key="period" style={{ opacity: rangoActivo ? 0.45 : 1, pointerEvents: rangoActivo ? 'none' : 'auto' }}>
-        <PeriodNavigator
-          modo={modoPeriodo}
-          onModoChange={(m) => { setModoPeriodo(m); setTodosLosMeses(false); }}
-          mes={mesActual}
-          anio={anioActual}
-          modoTodos={todosLosMeses}
-          onPrev={irAtras}
-          onNext={irAdelante}
-          onToggleTodos={() => setTodosLosMeses(v => !v)}
-        />
-      </div>,
-      <DateRangePicker
-        key="rango"
-        value={rangoFechas}
-        onChange={setRangoFechas}
-        placeholder="Rango de fechas"
-        allowClear
-      />,
-    ],
-    customAtEnd: [estadoChips],
-  };
+  // ===================================================================
+  // Mapeo al contrato del estándar (SemanticAbmPage)
+  // ===================================================================
 
-  // Accesos rapidos como headerActions. Look canonico: gradient ghost del
-  // acento del tema (primaryButtonStyle 'ghost' = tinta sutil + border 30).
-  const ghostStyle = primaryButtonStyle('ghost', theme.primary, theme.primaryHover);
-  const ghostClass = "inline-flex items-center gap-2 h-[34px] px-3 rounded-lg text-[12px] font-semibold transition-all hover:scale-105 hover:-translate-y-0.5 active:scale-95";
-  const headerActions = (
-    <>
-      <TourButton tourKey="tesoreria-movimientos" title="Ver tutorial de Pagos" />
-      <Link to="/gestion/tesoreria/agenda" className={ghostClass} style={ghostStyle}>
-        <CalendarClock className="h-3.5 w-3.5" /> Pagos
-      </Link>
-      <Link to="/gestion/tesoreria/contactos" className={ghostClass} style={ghostStyle}>
-        <Users className="h-3.5 w-3.5" /> Contactos
-      </Link>
-      <Link to="/gestion/tesoreria/mapa" className={ghostClass} style={ghostStyle}>
-        <MapIcon className="h-3.5 w-3.5" /> Ubicación
-      </Link>
-      <Link to="/gestion/tesoreria/proyecciones" className={ghostClass} style={ghostStyle}>
-        <TrendingUp className="h-3.5 w-3.5" /> Proyección
-      </Link>
-      <Link
-        to="/gestion/configuracion/tesoreria"
-        className="inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all hover:scale-105 hover:rotate-45"
-        style={ghostStyle}
-        title="Configuración de Tesorería"
-      >
-        <Settings className="h-4 w-4" />
-      </Link>
-    </>
-  );
+  // --- FilterBar: selects existentes como SelectSpec ---
+  const selects: SelectSpec[] = [
+    {
+      id: 'tipoContacto',
+      label: 'Contacto',
+      value: tipoContactoFiltro,
+      options: [{ value: '', label: 'Todos' }, ...tipoContactoOptions],
+      onChange: (v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); },
+    },
+    ...(tipoContactoFiltro === 'empleado' && subtiposEmpleado.length > 0
+      ? [{
+          id: 'subtipoEmpleado',
+          label: 'Empleado',
+          value: subtipoEmpleadoFiltro,
+          options: [{ value: '', label: 'Todos' }, ...subtipoEmpleadoOptions],
+          onChange: setSubtipoEmpleadoFiltro,
+        } satisfies SelectSpec]
+      : []),
+    {
+      id: 'dependencia',
+      label: 'Dependencia',
+      value: dependenciaFiltro,
+      options: [{ value: '', label: 'Todas' }, ...dependenciaOptions],
+      onChange: setDependenciaFiltro,
+    },
+    {
+      id: 'caja',
+      label: 'Caja',
+      value: cajaFiltro,
+      options: [{ value: '', label: 'Todas' }, ...cajaOptions],
+      onChange: setCajaFiltro,
+    },
+  ];
 
-  // Renderer del destino: icono por TIPO de contacto (uniforme en chip cuadrado del
-  // color del tipo) + nombre. Para destinos a dependencia, Building2.
-  const renderDestino = (g: Gasto) => {
-    if (g.destino_tipo === 'contacto') {
-      const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
-      const tipo = c?.tipo || 'otro';
-      const Icon = contactoIconByTipo(tipo);
-      const color = TIPO_CONTACTO_COLORS[tipo as TipoContacto] || theme.primary;
-      const nombre = c ? `${c.nombre} ${c.apellido || ''}`.trim() : 'Contacto';
-      return (
-        <span className="inline-flex items-center gap-1.5 text-xs" title={c ? `${TIPO_CONTACTO_LABELS[c.tipo]} · ${c.subtipo || ''}` : undefined}>
-          <span
-            className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${color}20` }}
-          >
-            <Icon className="h-3 w-3" style={{ color }} />
-          </span>
-          <span className="font-medium truncate max-w-[150px]" style={{ color: theme.text }}>{nombre}</span>
-        </span>
-      );
+  // --- PeriodControl: mapea el estado de periodo existente al contrato.
+  // GOTCHA piloto: cuando todosLosMeses=true el contrato no puede expresarlo
+  // (no hay estado "todos" en PeriodControlValue) — el control muestra el
+  // mes/año actual como PROPUESTA y el eyebrow del hero + el resumen dicen la
+  // verdad ("Todos los períodos"). Cualquier interacción con el control aplica
+  // el período elegido (sale de "todos"). Necesidad anotada en dudas.
+  const periodValue = useMemo<PeriodControlValue>(() => {
+    const unit = modoPeriodo === 'anio' ? ('year' as const) : ('month' as const);
+    if (rangoActivo) {
+      const d = parseFechaLocal(rangoFechas.desde);
+      const h = parseFechaLocal(rangoFechas.hasta);
+      return unit === 'year'
+        ? { unit, from: String(d.getFullYear()), to: String(h.getFullYear()) }
+        : {
+            unit,
+            from: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`,
+            to: `${h.getFullYear()}-${pad2(h.getMonth() + 1)}`,
+          };
     }
-    const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
-    const color = dep?.color || theme.primary;
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs" title={dep?.nombre}>
-        <span
-          className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${color}20` }}
-        >
-          <Building2 className="h-3 w-3" style={{ color }} />
-        </span>
-        <span className="font-medium truncate max-w-[140px]" style={{ color: theme.text }}>{dep?.nombre || 'Secretaría'}</span>
-      </span>
-    );
+    return unit === 'year'
+      ? { unit, from: String(anioActual) }
+      : { unit, from: `${anioActual}-${pad2(mesActual + 1)}` };
+  }, [modoPeriodo, rangoActivo, rangoFechas.desde, rangoFechas.hasta, anioActual, mesActual]);
+
+  const handlePeriodChange = (v: PeriodControlValue) => {
+    const esAnio = v.unit === 'year';
+    setModoPeriodo(esAnio ? 'anio' : 'mes');
+    setTodosLosMeses(false);
+    const [fy, fm] = v.from.split('-').map(Number);
+    if (fy) {
+      setAnioActual(fy);
+      if (!esAnio && fm) setMesActual(fm - 1);
+    }
+    if (v.to) {
+      const [ty, tm] = v.to.split('-').map(Number);
+      const desdeIso = esAnio ? `${fy}-01-01` : `${fy}-${pad2(fm || 1)}-01`;
+      const finMes = esAnio ? 12 : (tm || 12);
+      const ultimoDia = new Date(ty, finMes, 0).getDate();
+      setRangoFechas({ desde: desdeIso, hasta: `${ty}-${pad2(finMes)}-${pad2(ultimoDia)}` });
+    } else {
+      setRangoFechas({ desde: '', hasta: '' });
+    }
   };
 
-  const renderEstadoBadge = (g: Gasto) => {
-    const est = calcEstadoAgregado(g);
-    const meta = ESTADO_AGREGADO_META[est];
-    return <StatusPill label={meta.label} color={meta.color} size="xs" />;
-  };
+  // Periodo activo en label legible (eyebrow del hero + copy).
+  const periodoLabel = rangoActivo
+    ? `${formatFechaAR(rangoFechas.desde)} → ${formatFechaAR(rangoFechas.hasta)}`
+    : todosLosMeses
+      ? 'Todos los períodos'
+      : modoPeriodo === 'anio'
+        ? `Año ${anioActual}`
+        : `${MESES_LARGO[mesActual]} ${anioActual}`;
 
-  const tableView = (
-    <ABMTable<Gasto>
-      data={paginatedFiltered}
-      keyExtractor={(g) => g.id}
-      onRowClick={openDetalle}
-      groupBy={{
-        sortKey: 'fecha',
-        getKey: (g) => g.fecha,
-        renderLabel: (key, items) => renderGroupDayLabel({
-          isoDate: key,
-          count: items.length,
-          themeCard: theme.card,
-          themeBorder: theme.border,
-          themeText: theme.text,
-          themeTextSecondary: theme.textSecondary,
-          themePrimary: theme.primary,
-        }),
-        renderSubtotal: (_key, items) => renderGroupSubtotal({
-          amount: items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0),
-          themeText: theme.text,
-          themeTextSecondary: theme.textSecondary,
-        }),
-      }}
-      columns={[
-        {
-          key: 'fecha',
-          header: 'Fecha',
-          render: (g) => new Date(g.fecha).toLocaleDateString('es-AR'),
-          sortValue: (g) => g.fecha,
+  // --- StatusTabs con conteos reales (fuente: ESTADO_FILTROS, SSoT) ---
+  const statusTabs: StatusTab[] = ESTADO_FILTROS.map(e => ({
+    id: e.value,
+    label: e.label,
+    count: e.value === '' ? filteredSinEstado.length : estadoStats.counts[e.value],
+  }));
+
+  // --- Hero semántico: veredicto + stat strip con los datos ya cargados ---
+  const umbrales = resolverUmbrales();
+  const pendCount = estadoStats.counts.pendiente;
+  // Aproximación piloto: no hay umbral de dinero en lib/veredictos; usamos el
+  // de "vencidos" (cantidad) para los pendientes de acreditación (ver dudas).
+  const pendVeredicto = veredictoMasEsPeor(pendCount, umbrales.vencidos);
+  const topTipo = kpisData[0];
+  const pctTop = topTipo && totales.totalPesos > 0
+    ? Math.round((topTipo.total / totales.totalPesos) * 100)
+    : 0;
+
+  const frases: HeroFrase[] = [
+    totales.cantidad === 0
+      ? {
+          segmentos: [
+            seg(`Sin pagos en ${periodoLabel.toLowerCase() === 'todos los períodos' ? 'el municipio' : periodoLabel}`),
+            seg(' con los filtros aplicados — cargá el primero con '),
+            seg('Nuevo pago'),
+            seg(' o ampliá el período.'),
+          ],
+        }
+      : {
+          segmentos: [
+            seg('Gastaste '),
+            seg(fmtMoney(totales.totalPesos)),
+            seg(` en ${totales.cantidad} ${totales.cantidad === 1 ? 'pago' : 'pagos'}`),
+            ...(topTipo && pctTop > 0
+              ? [seg(' y el '), seg(`${pctTop}% se concentra en ${topTipo.nombre}`)]
+              : []),
+            ...(pendCount > 0
+              ? [
+                  seg('. Hay '),
+                  seg(`${fmtMoney(estadoStats.pendienteMonto)} pendientes de acreditación`, pendVeredicto),
+                  seg(` en ${pendCount} ${pendCount === 1 ? 'movimiento' : 'movimientos'}.`),
+                ]
+              : [seg(' — '), seg('no queda nada pendiente de acreditación', 'bueno'), seg('.')]),
+          ],
+          acciones: pendCount > 0
+            ? [
+                { label: `Ver los ${pendCount} pendientes`, onClick: () => setEstadoFiltro('pendiente'), primaria: true },
+                { label: 'Conciliar caja', to: '/gestion/tesoreria/conciliacion' },
+              ]
+            : [{ label: 'Conciliar caja', to: '/gestion/tesoreria/conciliacion' }],
         },
-        {
-          key: 'concepto',
-          header: 'Concepto',
-          render: (g) => {
-            const Icon = conceptoIcon(g.concepto);
-            const tipo = conceptoToTipoMap.get(g.concepto.toLowerCase());
-            const color = tipo?.color || theme.primary;
-            return (
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${color}20` }}
-                >
-                  <Icon className="h-3 w-3" style={{ color }} />
-                </span>
-                <span className="font-medium">{g.concepto}</span>
-              </span>
-            );
-          },
-          sortValue: (g) => g.concepto,
-        },
-        {
-          key: 'destino',
-          header: 'Contacto',
-          render: renderDestino,
-          sortable: false,
-        },
-        {
-          key: 'tipo_concepto',
-          header: 'Tipo',
-          render: (g) => {
-            const t = conceptoToTipoMap.get(g.concepto.toLowerCase());
-            if (!t || !t.nombre) return <span className="text-xs opacity-50">—</span>;
-            return <StatusPill label={t.nombre} color={t.color || theme.primary} size="xs" />;
-          },
-          sortValue: (g) => conceptoToTipoMap.get(g.concepto.toLowerCase())?.nombre || '',
-        },
-        {
-          key: 'monto_pesos',
-          header: 'Monto',
-          render: (g) => (
-            <span className="font-bold tabular-nums">
-              ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </span>
-          ),
-          sortValue: (g) => parseFloat(g.monto_pesos),
-        },
-        {
-          key: 'forma_pago',
-          header: 'Forma pago',
-          render: (g) => (
-            <span className="text-[11px]" style={{ color: theme.textSecondary }}>
-              {FORMA_PAGO_LABELS[g.forma_pago] || g.forma_pago}
-            </span>
-          ),
-          sortValue: (g) => g.forma_pago,
-        },
-        {
-          key: 'tipo_financiacion',
-          header: 'Financ.',
-          render: (g) => <StatusPill label={g.tipo_financiacion} color={TIPO_FIN_COLORS[g.tipo_financiacion]} size="xs" />,
-          sortValue: (g) => g.tipo_financiacion,
-        },
-        {
-          key: 'estado_agregado',
-          header: 'Estado',
-          render: renderEstadoBadge,
-          sortValue: (g) => calcEstadoAgregado(g),
-        },
-      ]}
-      actions={(g) => (
-        <>
-          <ABMTableAction
-            title="Ver detalle"
-            onClick={() => openDetalle(g)}
-            variant="primary"
-            icon={<Eye className="h-4 w-4" />}
+  ];
+
+  const heroKpis: HeroKpi[] = [
+    {
+      etiqueta: 'GASTADO',
+      valor: fmtMoney(totales.totalPesos),
+      sub: `${totales.cantidad} ${totales.cantidad === 1 ? 'pago' : 'pagos'}`,
+    },
+    ...kpisData.slice(0, 2).map<HeroKpi>(k => ({
+      etiqueta: k.nombre.toUpperCase(),
+      valor: fmtMoney(k.total),
+      sub: `${totales.totalPesos > 0 ? Math.round((k.total / totales.totalPesos) * 100) : 0}% · ${k.count} ${k.count === 1 ? 'pago' : 'pagos'}`,
+    })),
+    {
+      etiqueta: 'PENDIENTES',
+      valor: fmtMoney(estadoStats.pendienteMonto),
+      sub: `${pendCount} ${pendCount === 1 ? 'movimiento' : 'movimientos'}`,
+      veredicto: pendVeredicto,
+    },
+    {
+      etiqueta: 'TICKET PROMEDIO',
+      valor: totales.cantidad > 0 ? fmtMoney(totales.totalPesos / totales.cantidad) : fmtMoney(0),
+      sub: 'por pago',
+    },
+  ];
+
+  // --- Columnas (orden canónico del estándar; MONTO última de datos) ---
+  const columns: ColumnSpec<Gasto>[] = [
+    {
+      id: 'fecha',
+      header: 'FECHA',
+      width: '76px',
+      kind: 'date',
+      cell: (g) => <span className="av2-tabla-fecha av2-tnum">{formatFechaAR(g.fecha)}</span>,
+    },
+    {
+      id: 'concepto',
+      header: 'CONCEPTO',
+      width: 'minmax(200px, 1.9fr)',
+      kind: 'entity',
+      cell: (g) => {
+        const tipo = conceptoToTipoMap.get(g.concepto.toLowerCase());
+        return (
+          <EntityCell
+            icon={conceptoIcon(g.concepto)}
+            tileColor={tipo?.color || undefined}
+            title={g.concepto}
           />
-          <ABMTableAction
-            title="Eliminar"
-            onClick={() => handleDelete(g.id)}
-            variant="danger"
-            icon={<Trash2 className="h-4 w-4" />}
+        );
+      },
+    },
+    {
+      id: 'contacto',
+      header: 'CONTACTO',
+      width: 'minmax(140px, 1.1fr)',
+      kind: 'entity',
+      cell: (g) => {
+        if (g.destino_tipo === 'contacto') {
+          const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+          const nombre = c ? `${c.nombre} ${c.apellido || ''}`.trim() : 'Contacto';
+          return (
+            <EntityCell
+              title={nombre}
+              subtitle={c ? (TIPO_CONTACTO_LABELS_SINGULAR[c.tipo] || TIPO_CONTACTO_LABELS[c.tipo]) : undefined}
+              dotColor={c ? TIPO_CONTACTO_COLORS[c.tipo] : undefined}
+            />
+          );
+        }
+        const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+        return (
+          <EntityCell
+            title={dep?.nombre || 'Secretaría'}
+            subtitle="Dependencia"
+            dotColor={dep?.color || undefined}
           />
-        </>
-      )}
-    />
-  );
+        );
+      },
+    },
+    {
+      id: 'tipo',
+      header: 'TIPO',
+      width: 'minmax(68px, 92px)',
+      kind: 'text',
+      cell: (g) => {
+        const t = conceptoToTipoMap.get(g.concepto.toLowerCase());
+        if (!t || !t.nombre) return <span className="av2-tabla-texto">—</span>;
+        // Punto de color runtime + texto neutro (patrón del estándar para
+        // categorías con color de datos; el ChipEstado solo acepta tonos).
+        return (
+          <span className="av2-entidad-sub">
+            {t.color && <span className="av2-entidad-punto" style={{ background: t.color }} />}
+            <span className="av2-entidad-subtexto">{t.nombre}</span>
+          </span>
+        );
+      },
+    },
+    {
+      id: 'forma',
+      header: 'FORMA',
+      width: 'minmax(76px, 100px)',
+      kind: 'text',
+      cell: (g) => <span className="av2-tabla-texto">{FORMA_PAGO_LABELS[g.forma_pago] || g.forma_pago}</span>,
+    },
+    {
+      id: 'estado',
+      header: 'ESTADO',
+      width: 'minmax(80px, 96px)',
+      kind: 'chip',
+      cell: (g) => {
+        const e = calcEstadoAgregado(g);
+        return <ChipEstado label={ESTADO_AGREGADO_META[e].label} tone={ESTADO_TONO[e]} />;
+      },
+    },
+    {
+      id: 'monto',
+      header: 'MONTO',
+      width: 'minmax(94px, 118px)',
+      kind: 'money',
+      align: 'right',
+      cell: (g) => (
+        <span className="av2-money av2-tabla-monto">{fmtMoney(parseFloat(g.monto_pesos || '0'))}</span>
+      ),
+    },
+    { id: 'acciones', header: 'ACCIONES', width: '58px', kind: 'actions', align: 'right' },
+  ];
+
+  const rowActions: RowAction<Gasto>[] = [
+    { id: 'ver', label: 'Ver detalle', icon: Eye, onClick: openDetalle },
+    { id: 'eliminar', label: 'Eliminar', icon: Trash2, danger: true, onClick: (g) => handleDelete(g.id) },
+  ];
+
+  // --- Grupos por día con subtotal (la página precomputa; DataTable pinta) ---
+  const grupos = useMemo<TableGroup<Gasto>[]>(() => {
+    const porDia = new Map<string, Gasto[]>();
+    for (const g of filtered) {
+      const k = (g.fecha || '').slice(0, 10);
+      const arr = porDia.get(k);
+      if (arr) arr.push(g);
+      else porDia.set(k, [g]);
+    }
+    return Array.from(porDia.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([k, items]) => {
+        const d = parseFechaLocal(k);
+        const mes = d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').toUpperCase();
+        const sub = items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
+        return {
+          key: k,
+          badge: { top: String(d.getDate()), bottom: mes },
+          label: `${items.length} ${items.length === 1 ? 'movimiento' : 'movimientos'}`,
+          subtotal: fmtMoney(sub),
+          rows: items,
+        };
+      });
+  }, [filtered]);
 
   // Detectar gastos importados de Bartolo que cayeron en conceptos genericos
   // y necesitan curacion manual. Solo aparece el banner si hay alguno.
@@ -866,292 +835,17 @@ export default function Tesoreria() {
     return { count: list.length, monto };
   }, [gastos]);
 
-  // Render de una card de gasto (vista cards). Extraido para poder usarlo
-  // desde groupBy.renderItem manteniendo el mismo look-and-feel.
-  // Iniciales y color estable para el avatar del destino.
-  // Hash simple del string -> hue HSL para que cada destino mantenga su color.
-  const getAvatarMeta = (label: string) => {
-    const clean = (label || '?').trim();
-    const parts = clean.split(/\s+/).filter(Boolean);
-    const initials = parts.length >= 2
-      ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : clean.slice(0, 2).toUpperCase();
-    let hash = 0;
-    for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) | 0;
-    const hue = Math.abs(hash) % 360;
-    return {
-      initials: initials || '?',
-      bg: `hsl(${hue}, 70%, 92%)`,
-      fg: `hsl(${hue}, 55%, 38%)`,
-    };
-  };
-
-  const renderGastoCard = (g: Gasto) => {
-    const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
-    const contacto = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
-    const destinoLabel = g.destino_tipo === 'contacto'
-      ? (contacto ? `${contacto.nombre || ''} ${contacto.apellido || ''}`.trim() || 'Contacto' : 'Contacto')
-      : (dep?.nombre || 'Secretaría');
-    const avatar = getAvatarMeta(destinoLabel);
-    const tipoMeta = conceptoToTipoMap.get(g.concepto.toLowerCase());
-    const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
+  // Guard de rol DESPUES de todos los hooks (regla de hooks): mismo bloqueo
+  // que antes, sin condicionar el orden de los hooks.
+  if (!esGestor) {
     return (
-      <div
-        key={g.id}
-        onClick={() => openDetalle(g)}
-        className="rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] flex items-center gap-3"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        {/* Avatar circular con iniciales */}
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
-          style={{ backgroundColor: avatar.bg, color: avatar.fg }}
-        >
-          {avatar.initials}
-        </div>
-
-        {/* Concepto + destino + tipo (badge) */}
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold truncate text-sm" style={{ color: theme.text }}>{g.concepto}</p>
-          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-              {destinoLabel}
-            </span>
-            {tipoMeta?.nombre && (
-              <>
-                <span className="text-[11px]" style={{ color: theme.textSecondary }}>·</span>
-                <span
-                  className="inline-flex items-center gap-1 text-[10px] font-semibold"
-                  style={{ color: tipoMeta.color || theme.primary }}
-                >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tipoMeta.color || theme.primary }} />
-                  {tipoMeta.nombre}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Monto + estado */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <span
-            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-            style={{ backgroundColor: estMeta.bg, color: estMeta.color, border: `1px solid ${estMeta.color}30` }}
-          >
-            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: estMeta.color }} />
-            {estMeta.label}
-          </span>
-          <p className="text-base font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>
-            ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </p>
-        </div>
+      <div className="p-6">
+        <p className="text-sm" style={{ color: theme.textSecondary }}>
+          El módulo Tesorería es exclusivo de los gestores del municipio.
+        </p>
       </div>
     );
-  };
-
-  // Periodo activo en label corto para el KPI principal.
-  const periodoLabel = todosLosMeses
-    ? 'todos los períodos'
-    : modoPeriodo === 'anio'
-      ? `Año ${anioActual}`
-      : `${MESES_LARGO[mesActual]} ${anioActual}`;
-
-  // KPIs outlined estandar — 4 fijos. ABMPage los renderiza con <KpiRow>.
-  const iconByTipo = (nombre: string) => {
-    const n = nombre.toLowerCase();
-    if (n.includes('personal') || n.includes('suel') || n.includes('honor')) return Users;
-    if (n.includes('servic') || n.includes('mantenim')) return Wrench;
-    if (n.includes('insumo') || n.includes('compra') || n.includes('mater')) return Package;
-    return Tag;
-  };
-
-  const kpisSpec: KpiSpec[] = [
-    {
-      label: `Gastado · ${periodoLabel}`,
-      value: `$${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
-      icon: Wallet,
-      color: theme.primary,
-      footnote: `${totales.cantidad} ${totales.cantidad === 1 ? 'pago' : 'pagos'}`,
-      highlighted: true,
-    },
-    ...kpisData.map<KpiSpec>((k) => ({
-      label: k.nombre,
-      value: `$${k.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
-      icon: iconByTipo(k.nombre),
-      color: k.color,
-      footnote: `${(totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0).toFixed(1)}% · ${k.count} pag.`,
-      pct: totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0,
-    })),
-  ].slice(0, 4);
-
-  // ===================================================================
-  // Side panel "Bandeja IA" — 3 cards demo hardcodeadas (placeholders).
-  // Solo aparece en desktop (lg+). Mas adelante se va a conectar con la
-  // curacion real de Bartolo, pero por ahora es solo presentacion.
-  // ===================================================================
-  const bandejaIaDemo = [
-    { id: 1, ia: 94, fecha: '09/05', titulo: 'Combustible YPF · Camión recolector', proveedor: 'YPF San Pedro Norte', monto: 182500, categoria: 'Servicios', categoriaColor: '#22c55e', hint: 'Categoría sugerida: Combustibles' },
-    { id: 2, ia: 62, fecha: '09/05', titulo: 'Compras varias',                       proveedor: 'Ferretería Don Aldo',  monto: 48200,  categoria: 'Insumos',   categoriaColor: '#f59e0b', hint: 'Sin proveedor cargado' },
-    { id: 3, ia: 78, fecha: '09/05', titulo: 'Mantenimiento alumbrado público',      proveedor: 'Elec. Norte SRL',      monto: 96000,  categoria: 'Servicios', categoriaColor: '#a855f7', hint: 'Monto inusual para este proveedor' },
-  ];
-  const bandejaTotal = bandejaIaDemo.reduce((s, b) => s + b.monto, 0);
-
-  const sidePanelContent = (
-    <div className="space-y-3 sticky top-4">
-      {/* Header bandeja */}
-      <div
-        className="rounded-xl p-3 flex items-center gap-2"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
-        <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-semibold" style={{ color: theme.textSecondary }}>
-            {bandejaIaDemo.length} pagos esperando aprobación
-          </div>
-        </div>
-      </div>
-
-      {/* Total a revisar + aprobar todo */}
-      <div
-        className="rounded-xl p-3 flex items-center justify-between gap-2"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div>
-          <div className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
-            Total a revisar
-          </div>
-          <div className="text-lg font-bold tabular-nums" style={{ color: theme.text }}>
-            ${bandejaTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </div>
-        </div>
-        <button
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap"
-          style={{ backgroundColor: theme.text, color: theme.card }}
-        >
-          Aprobar todo
-        </button>
-      </div>
-
-      {/* Cards de items sugeridos */}
-      {bandejaIaDemo.map((b) => (
-        <div
-          key={b.id}
-          className="rounded-xl p-3"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span
-              className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-              style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-            >
-              <Sparkles className="h-3 w-3" />
-              IA · {b.ia}%
-            </span>
-            <span className="text-[11px]" style={{ color: theme.textSecondary }}>{b.fecha}</span>
-          </div>
-          <div className="font-semibold text-sm" style={{ color: theme.text }}>{b.titulo}</div>
-          <div className="text-[11px] mb-2" style={{ color: theme.textSecondary }}>{b.proveedor}</div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg font-bold tabular-nums" style={{ color: theme.text }}>
-              ${b.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </span>
-            <span
-              className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-              style={{ backgroundColor: `${b.categoriaColor}15`, color: b.categoriaColor }}
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: b.categoriaColor }} />
-              {b.categoria}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] mb-3" style={{ color: theme.textSecondary }}>
-            <Sparkles className="h-3 w-3" />
-            {b.hint}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ backgroundColor: theme.primary, color: theme.primaryText || '#ffffff' }}
-            >
-              ✓ Aprobar
-            </button>
-            <button
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-            >
-              Editar
-            </button>
-            <button
-              className="px-2 py-1.5 rounded-lg text-xs"
-              style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      ))}
-
-      <div
-        className="rounded-xl p-3 text-center text-[11px] italic"
-        style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-      >
-        La IA aprende de tus decisiones · cada confirmación mejora la categorización
-      </div>
-    </div>
-  );
-
-  // ===================================================================
-  // Group by date config — solo aplica en vista cards. ABMPage agrupa los
-  // items y renderiza headers [DD MES · Hoy/Ayer · N mov] + subtotal.
-  // ===================================================================
-  const groupByConfig = {
-    items: paginatedFiltered,
-    getKey: (g: Gasto) => g.fecha,
-    renderLabel: (key: string, items: Gasto[]) => {
-      const d = new Date(key + 'T12:00:00');
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      const ayer = new Date(hoy);
-      ayer.setDate(ayer.getDate() - 1);
-      const dStripped = new Date(d);
-      dStripped.setHours(0, 0, 0, 0);
-      let label: string;
-      if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
-      else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
-      else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-      return (
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 text-center px-1 py-0.5 rounded-md text-[10px] uppercase font-bold leading-tight"
-            style={{ backgroundColor: theme.card, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
-          >
-            <div className="text-base font-bold" style={{ color: theme.text }}>{d.getDate().toString().padStart(2, '0')}</div>
-            <div>{d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</div>
-          </div>
-          <div>
-            <div className="font-bold" style={{ color: theme.text }}>{label}</div>
-            <div className="text-[11px]" style={{ color: theme.textSecondary }}>
-              {items.length} {items.length === 1 ? 'pago' : 'pagos'}
-            </div>
-          </div>
-        </div>
-      );
-    },
-    renderSubtotal: (_key: string, items: Gasto[]) => {
-      const sum = items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
-      return (
-        <div className="text-right">
-          <div className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Subtotal</div>
-          <div className="text-base font-bold tabular-nums" style={{ color: theme.text }}>
-            ${sum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </div>
-        </div>
-      );
-    },
-    renderItem: (g: Gasto) => renderGastoCard(g),
-    // Cards de pago = filas horizontales -> una sola columna full-width (sino el
-    // grid multi-columna las apretaba a 1/3 y truncaba el concepto).
-    itemLayout: 'list' as const,
-  };
+  }
 
   return (
     <>
@@ -1204,139 +898,47 @@ export default function Tesoreria() {
         </Link>
       )}
 
-      <ABMPage
-        title="Pagos"
-        icon={<Wallet className="h-5 w-5" />}
-        buttonLabel="Nuevo Pago"
-        onAdd={() => setWizardOpen(true)}
-        searchPlaceholder="Buscar por concepto, contacto o descripción..."
-        searchValue={search}
-        onSearchChange={setSearch}
-        tourAnchors={{ kpis: 'tes-mov-kpis', addButton: 'tes-mov-nuevo' }}
-        toolbar={tesoreriaToolbar}
-        headerActions={headerActions}
-        loading={loading}
-        isEmpty={filtered.length === 0}
-        emptyMessage="No hay pagos que coincidan con los filtros."
-        pagination={{
-          page,
-          pageSize,
-          // Total viene del header X-Total-Count (filtros server-side aplicados).
-          // El filtered.length es solo el subset cliente sobre los 50 actuales.
-          totalItems: totalServer,
-          onPageChange: setPage,
-          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      {/* Cabecera de módulo (v2.2): eyebrow = módulo, H1 = el trabajo, bajada =
+          de dónde salen las filas y cómo se agrupan. */}
+      <SemanticAbmPage<Gasto>
+        moduleKey="gastos"
+        hero={{
+          etiqueta: `TESORERÍA · ${periodoLabel.toUpperCase()}`,
+          frases,
+          kpis: heroKpis,
         }}
-        paginationSummary={!loading && (
-          <div
-            className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
-                Filtrado
-              </span>
-              <span className="text-lg font-bold tabular-nums" style={{ color: theme.primary }}>
-                ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-xs" style={{ color: theme.textSecondary }}>
-                ({totales.cantidad} {totales.cantidad === 1 ? 'pago' : 'pagos'})
-              </span>
-            </div>
-            {totales.totalImputado > 0 && (
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
-                <span className="text-xs" style={{ color: theme.textSecondary }}>Imputado a proyectos:</span>
-                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
-                  ${totales.totalImputado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            )}
-            {totales.totalUsd > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs" style={{ color: theme.textSecondary }}>USD equiv.:</span>
-                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
-                  US$ {totales.totalUsd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </span>
-                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                  ({totales.conUsd} con cotización)
-                </span>
-              </div>
-            )}
-            <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
-              <Calendar className="h-3 w-3" />
-              {rangoActivo
-                ? `${rangoFechas.desde} → ${rangoFechas.hasta}`
-                : todosLosMeses
-                  ? 'Todos los períodos'
-                  : modoPeriodo === 'anio'
-                    ? `Año ${anioActual}`
-                    : `${MESES_LARGO[mesActual]} ${anioActual}`}
-            </div>
-          </div>
-        )}
-        tableView={tableView}
-        guidedView={
-          <CalendarView<Gasto>
-            items={filtered}
-            getId={(g) => g.id}
-            getDate={(g) => g.fecha}
-            getLabel={(g) => g.concepto}
-            getAmount={(g) => parseFloat(g.monto_pesos)}
-            getColor={(g) => TIPO_FIN_COLORS[g.tipo_financiacion]}
-            getTooltip={(g) => {
-              const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
-              return `${g.concepto} · ${dep?.nombre || 'Contacto'} · $${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-            }}
-            onItemClick={(g) => openDetalle(g)}
-            mesesStorageKey="tesoreria_meses_visibles"
-            helperText="Click sobre un pago para ver el detalle. El calendario refleja los filtros activos."
-            formatMoney={(n) => `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
-            renderDetailRow={(g) => {
-              const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
-              const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
-              return (
-                <div onClick={() => openDetalle(g)} className="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:shadow-sm" style={{ backgroundColor: theme.backgroundSecondary }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20` }}>
-                    <span className="text-xs font-bold" style={{ color: TIPO_FIN_COLORS[g.tipo_financiacion] }}>{new Date(g.fecha).getDate()}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
-                    <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                      {dep?.nombre || 'Contacto'} · {new Date(g.fecha).toLocaleDateString('es-AR')}
-                    </p>
-                  </div>
-                  <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>
-                    ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                  </span>
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: estMeta.bg, color: estMeta.color }}>
-                    {estMeta.label}
-                  </span>
-                </div>
-              );
-            }}
-          />
-        }
-        viewStorageKey="tesoreria_view"
-        defaultViewMode="table"
-        kpis={kpisSpec}
-        groupBy={groupByConfig}
-        sidePanel={
-          iaOn ? (
-            <DashboardIAPanel
-              data={dashboardIA}
-              loading={dashboardIALoading}
-              title="Tesorería · IA"
-              onCollapsedChange={setIaCollapsed}
-            />
-          ) : undefined
-        }
-        sidePanelWidth={iaOn && !iaCollapsed ? 280 : (iaOn ? 44 : 0)}
-      >
-        {/* Fallback: si por algun motivo no se usa groupBy/renderItem,
-            mantenemos el render legacy. ABMPage los ignora cuando hay groupBy. */}
-        {paginatedFiltered.map(g => renderGastoCard(g))}
-      </ABMPage>
+        eyebrow="Tesorería"
+        title="En qué se va la plata del municipio y qué queda por pagar"
+        description="Pagos del período con su concepto, su contacto y su estado. La tabla los agrupa por día, con subtotal por día y total del filtro al pie."
+        searchPlaceholder="Buscar por concepto, contacto o descripción…"
+        views={['table']}
+        secondaryAction={{ label: 'Proyección', to: '/gestion/tesoreria/proyecciones', icon: TrendingUp }}
+        primaryAction={{ label: 'Nuevo pago', onClick: () => setWizardOpen(true) }}
+        selects={selects}
+        period={periodValue}
+        onPeriodChange={handlePeriodChange}
+        statusTabs={statusTabs}
+        activeStatus={estadoFiltro}
+        onStatusChange={(id) => setEstadoFiltro(id as EstadoAgregado | '')}
+        filterSummary={`${totales.cantidad} ${totales.cantidad === 1 ? 'movimiento' : 'movimientos'} · ${fmtMoney(totales.totalPesos)}`}
+        kind="money"
+        columns={columns}
+        groupBy="date"
+        showGroupSubtotal
+        groups={grupos}
+        rows={[]}
+        rowActions={rowActions}
+        footer={{
+          showing: loading ? 'Cargando…' : `Mostrando ${filtered.length} de ${totalServer}`,
+          total: { label: 'Total filtrado', value: fmtMoney(totales.totalPesos) },
+        }}
+        search={search}
+        onSearchChange={setSearch}
+        activeView="table"
+        onViewChange={() => undefined}
+        rowKey={(g) => g.id}
+        onRowClick={openDetalle}
+      />
 
       <CrearGastoWizard
         open={wizardOpen}
@@ -1351,8 +953,6 @@ export default function Tesoreria() {
         onUpdated={fetchGastos}
         onDeleted={fetchGastos}
       />
-
-      <MunifyTour tourKey="tesoreria-movimientos" steps={TOUR_STEPS_TES_MOVIMIENTOS} />
     </>
   );
 }

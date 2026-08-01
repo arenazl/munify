@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Edit, Trash2, User as UserIcon, Star, X, Check, Users, Clock, Shield, Mail, Phone, Wrench, ShieldCheck } from 'lucide-react';
+import { Edit, Trash2, User as UserIcon, Star, X, Check, Clock, Shield, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, zonasApi, categoriasApi, empleadosGestionApi, dependenciasApi, usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
-import { SemanticHero } from '../components/ui/SemanticHero';
+import { ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect } from '../components/ui/ABMPage';
+import { Sheet } from '../components/ui/Sheet';
+import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
+import type { ChipCellData, EntityCellData } from '../components/abmv2/DataTable';
+import type { ColumnSpec, RowAction, SelectSpec, StatusTab, ViewKind } from '../components/abmv2/types';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import type { Empleado, Zona, Categoria, User } from '../types';
@@ -12,17 +15,46 @@ import type { Empleado, Zona, Categoria, User } from '../types';
 type VistaRol = 'admin' | 'supervisor' | 'empleado';
 type TipoEmpleado = 'todos' | 'administrativo' | 'operario';
 
-const VISTA_PILLS: Array<{ value: VistaRol; label: string; icon: typeof UserIcon; color: string }> = [
-  { value: 'admin', label: 'Administrador', icon: Shield, color: '#8b5cf6' },
-  { value: 'supervisor', label: 'Supervisor', icon: ShieldCheck, color: '#eab308' },
-  { value: 'empleado', label: 'Empleado', icon: Wrench, color: '#3b82f6' },
+const ROL_LABELS: Record<VistaRol, string> = {
+  admin: 'Administrador',
+  supervisor: 'Supervisor',
+  empleado: 'Empleado',
+};
+
+/** Opciones del select "Rol" de la FilterBar (reemplaza las pills viejas). */
+const ROL_OPTIONS = [
+  { value: 'empleado', label: 'Empleados' },
+  { value: 'supervisor', label: 'Supervisores' },
+  { value: 'admin', label: 'Administradores' },
 ];
 
-const TIPO_PILLS: Array<{ value: TipoEmpleado; label: string }> = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'administrativo', label: 'Administrativo' },
-  { value: 'operario', label: 'Técnico' },
-];
+/** Tamaño del bloque incremental del pie "Cargar más" (estándar plain). */
+const PAGE_SIZE = 50;
+
+const tipoDe = (e: Empleado): 'operario' | 'administrativo' =>
+  ((e as { tipo?: string }).tipo || 'operario') === 'administrativo' ? 'administrativo' : 'operario';
+
+const getNombreCompleto = (e: Empleado) => (e.apellido ? `${e.nombre} ${e.apellido}` : e.nombre);
+
+/**
+ * View-model de fila del DataTable del estándar: cada campo matchea el `id`
+ * de su columna para usar el render por defecto por `kind` (entity/chip/text).
+ * `origen*` guarda la entidad real para abrir el detalle (Sheet) existente.
+ */
+interface PersonalRow {
+  id: number;
+  empleado: EntityCellData;
+  tipo?: ChipCellData;
+  especialidad?: string;
+  zona?: string;
+  dependencia?: string;
+  email?: string;
+  telefono?: string;
+  dni?: string;
+  estado: ChipCellData;
+  origenEmpleado?: Empleado;
+  origenUsuario?: User;
+}
 
 const DIAS_SEMANA = [
   { value: 0, label: 'Lunes', short: 'Lun' },
@@ -85,9 +117,9 @@ export default function Empleados() {
     direccion: '',
   });
   const [horariosSemana, setHorariosSemana] = useState<Record<number, HorarioDia>>(horariosDefault);
-  // Paginación client-side (50 items por página)
+  // Carga incremental client-side (pie "Cargar más" del estándar)
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [vista, setVista] = useState<ViewKind>('table');
 
   const isEmpleadoView = vistaRol === 'empleado';
 
@@ -137,7 +169,7 @@ export default function Empleados() {
         dni: '',
         descripcion: empleado.descripcion || '',
         especialidad: empleado.especialidad || '',
-        tipo: (empleado as any).tipo || 'operario',
+        tipo: (empleado as { tipo?: 'operario' | 'administrativo' }).tipo || 'operario',
         capacidad_maxima: empleado.capacidad_maxima,
         zona_id: empleado.zona_id?.toString() || '',
         municipio_dependencia_id: empleado.municipio_dependencia_id?.toString() || '',
@@ -394,193 +426,122 @@ export default function Empleados() {
     );
   });
 
-  // Slice paginado de la lista activa según vista
+  // Ventana visible de la lista activa; el pie "Cargar más" suma de a PAGE_SIZE
   const currentList = isEmpleadoView ? filteredEmpleados : filteredUsuarios;
-  const paginatedItems = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(currentList.length / pageSize));
-    if (page > totalPages) return currentList.slice(0, pageSize);
-    return currentList.slice((page - 1) * pageSize, page * pageSize);
-  }, [currentList, page, pageSize]);
+  const visibles = useMemo(() => currentList.slice(0, page * PAGE_SIZE), [currentList, page]);
 
   useEffect(() => {
     setPage(1);
   }, [currentList.length, vistaRol]);
 
-  const paginatedEmpleados = isEmpleadoView ? (paginatedItems as Empleado[]) : [];
-  const paginatedUsuarios = !isEmpleadoView ? (paginatedItems as User[]) : [];
-
-  const getNombreCompleto = (e: Empleado) => {
-    if (e.apellido) {
-      return `${e.nombre} ${e.apellido}`;
+  // Filas del DataTable (view-model): resuelve zona/dependencia y arma los
+  // datos de celda que pinta el render por defecto según ColumnSpec.kind.
+  const filas = useMemo<PersonalRow[]>(() => {
+    if (isEmpleadoView) {
+      return (visibles as Empleado[]).map((e): PersonalRow => {
+        const zona = zonas.find(z => z.id === e.zona_id);
+        const dep = dependencias.find(d => d.id === e.municipio_dependencia_id);
+        const esOperario = tipoDe(e) === 'operario';
+        return {
+          id: e.id,
+          empleado: {
+            icon: UserIcon,
+            tileColor: e.categoria_principal?.color,
+            title: getNombreCompleto(e),
+            subtitle: e.telefono || undefined,
+          },
+          tipo: esOperario
+            ? { label: 'Operario', tone: 'gray' }
+            : { label: 'Administrativo', tone: 'blue' },
+          especialidad: e.categoria_principal?.nombre ?? '',
+          zona: zona?.nombre ?? '',
+          dependencia: dep?.nombre ?? '',
+          estado: e.activo
+            ? { label: 'Activo', tone: 'green' }
+            : { label: 'Inactivo', tone: 'gray' },
+          origenEmpleado: e,
+        };
+      });
     }
-    return e.nombre;
+    const RolIcon = vistaRol === 'admin' ? Shield : ShieldCheck;
+    return (visibles as User[]).map((u): PersonalRow => ({
+      id: u.id,
+      empleado: { icon: RolIcon, title: `${u.nombre} ${u.apellido}` },
+      email: u.email,
+      telefono: u.telefono || '',
+      dni: u.dni || '',
+      estado: u.activo
+        ? { label: 'Activo', tone: 'green' }
+        : { label: 'Inactivo', tone: 'gray' },
+      origenUsuario: u,
+    }));
+  }, [visibles, isEmpleadoView, vistaRol, zonas, dependencias]);
+
+  const rolLabel = ROL_LABELS[vistaRol];
+
+  const columnas: ColumnSpec<PersonalRow>[] = isEmpleadoView
+    ? [
+        { id: 'empleado', header: 'EMPLEADO', width: 'minmax(190px, 1.6fr)', kind: 'entity' },
+        { id: 'tipo', header: 'TIPO', width: 'minmax(110px, 0.8fr)', kind: 'chip' },
+        { id: 'especialidad', header: 'ESPECIALIDAD', width: 'minmax(150px, 1.3fr)', kind: 'text' },
+        { id: 'zona', header: 'ZONA', width: 'minmax(110px, 1fr)', kind: 'text' },
+        { id: 'dependencia', header: 'DEPENDENCIA', width: 'minmax(140px, 1.2fr)', kind: 'text' },
+        { id: 'estado', header: 'ESTADO', width: 'minmax(96px, 0.7fr)', kind: 'chip' },
+        { id: 'acciones', header: 'ACCIONES', width: 'minmax(76px, 0.5fr)', kind: 'actions', align: 'right' },
+      ]
+    : [
+        { id: 'empleado', header: rolLabel.toUpperCase(), width: 'minmax(190px, 1.6fr)', kind: 'entity' },
+        { id: 'email', header: 'EMAIL', width: 'minmax(190px, 1.5fr)', kind: 'text' },
+        { id: 'telefono', header: 'TELÉFONO', width: 'minmax(120px, 1fr)', kind: 'text' },
+        { id: 'dni', header: 'DNI', width: 'minmax(100px, 0.8fr)', kind: 'text' },
+        { id: 'estado', header: 'ESTADO', width: 'minmax(96px, 0.7fr)', kind: 'chip' },
+        { id: 'acciones', header: 'ACCIONES', width: 'minmax(76px, 0.5fr)', kind: 'actions', align: 'right' },
+      ];
+
+  // Detalle actual preservado: click en fila o "Editar" abren el Sheet existente
+  const abrirDetalle = (r: PersonalRow) => {
+    if (r.origenEmpleado) openSheet(r.origenEmpleado);
+    else if (r.origenUsuario) openUserSheet(r.origenUsuario);
   };
 
-  const tableColumns = [
+  const accionesFila: RowAction<PersonalRow>[] = [
+    { id: 'editar', label: 'Editar', icon: Edit, onClick: abrirDetalle },
     {
-      key: 'nombre',
-      header: 'Empleado',
-      sortValue: (c: Empleado) => getNombreCompleto(c),
-      render: (c: Empleado) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-            <UserIcon className="h-4 w-4 text-purple-600" />
-          </div>
-          <span className="font-medium">{getNombreCompleto(c)}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'tipo',
-      header: 'Tipo',
-      sortValue: (c: Empleado) => (c as any).tipo || 'operario',
-      render: (c: Empleado) => {
-        const tipo = (c as any).tipo || 'operario';
-        const isOperario = tipo === 'operario';
-        return (
-          <span
-            className="inline-flex items-center px-2 py-0.5 text-xs rounded-full font-medium"
-            style={{
-              backgroundColor: isOperario ? '#f59e0b20' : '#3b82f620',
-              color: isOperario ? '#f59e0b' : '#3b82f6',
-            }}
-          >
-            {isOperario ? 'Operario' : 'Administrativo'}
-          </span>
-        );
+      id: 'eliminar',
+      label: 'Desactivar',
+      icon: Trash2,
+      danger: true,
+      onClick: (r) => {
+        if (r.origenEmpleado) handleDelete(r.origenEmpleado.id);
+        else if (r.origenUsuario) handleUserDelete(r.origenUsuario.id);
       },
-    },
-    {
-      key: 'funcion',
-      header: 'Función',
-      sortValue: (c: Empleado) => c.categoria_principal?.nombre || '',
-      render: (c: Empleado) => {
-        if (!c.categoria_principal) {
-          return <span className="text-xs" style={{ color: theme.textSecondary }}>—</span>;
-        }
-        const color = c.categoria_principal.color || '#6b7280';
-        return (
-          <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium"
-            style={{
-              backgroundColor: `${color}20`,
-              color: color,
-            }}
-          >
-            <Star className="h-3 w-3 fill-current" />
-            {c.categoria_principal.nombre}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'especialidades',
-      header: 'Especialidades',
-      sortValue: (c: Empleado) => c.categorias?.length || 0,
-      render: (c: Empleado) => (
-        <div className="flex flex-wrap gap-1">
-          {c.categorias && c.categorias.length > 0 ? (
-            c.categorias.slice(0, 3).map(cat => (
-              <span
-                key={cat.id}
-                className="px-2 py-0.5 text-xs rounded-full text-white"
-                style={{ backgroundColor: cat.color || '#6b7280' }}
-              >
-                {cat.nombre}
-              </span>
-            ))
-          ) : (
-            <span style={{ color: theme.textSecondary }}>-</span>
-          )}
-          {c.categorias && c.categorias.length > 3 && (
-            <span className="px-2 py-0.5 text-xs rounded-full" style={{ backgroundColor: theme.border }}>
-              +{c.categorias.length - 3}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'zona',
-      header: 'Zona',
-      sortValue: (c: Empleado) => {
-        const zona = zonas.find(z => z.id === c.zona_id);
-        return zona?.nombre || '';
-      },
-      render: (c: Empleado) => {
-        const zona = zonas.find(z => z.id === c.zona_id);
-        return zona ? (
-          <span className="text-xs" style={{ color: theme.text }}>{zona.nombre}</span>
-        ) : (
-          <span className="text-xs" style={{ color: theme.textSecondary }}>—</span>
-        );
-      },
-    },
-    {
-      key: 'activo',
-      header: 'Estado',
-      sortValue: (c: Empleado) => c.activo,
-      render: (c: Empleado) => <ABMBadge active={c.activo} />,
     },
   ];
 
-  const userTableColumns = [
+  // El switch de rol de las pills viejas, en el vocabulario del estándar:
+  // un select taxonómico de la FilterBar.
+  const selects: SelectSpec[] = [
     {
-      key: 'nombre',
-      header: vistaRol === 'admin' ? 'Administrador' : 'Supervisor',
-      sortValue: (u: User) => `${u.nombre} ${u.apellido}`,
-      render: (u: User) => {
-        const Icon = vistaRol === 'admin' ? Shield : ShieldCheck;
-        const bg = vistaRol === 'admin' ? 'bg-purple-500' : 'bg-yellow-500';
-        return (
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center`}>
-              <Icon className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-medium">{u.nombre} {u.apellido}</span>
-          </div>
-        );
+      id: 'rol',
+      label: 'Rol',
+      value: vistaRol,
+      options: ROL_OPTIONS,
+      onChange: (v) => {
+        setVistaRol(v as VistaRol);
+        if (v !== 'empleado') setTipoFiltro('todos');
       },
     },
-    {
-      key: 'email',
-      header: 'Email',
-      sortValue: (u: User) => u.email,
-      render: (u: User) => (
-        <div className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
-          <Mail className="h-3 w-3" />
-          {u.email}
-        </div>
-      ),
-    },
-    {
-      key: 'telefono',
-      header: 'Teléfono',
-      sortValue: (u: User) => u.telefono || '',
-      render: (u: User) => (
-        <div className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
-          {u.telefono ? (
-            <>
-              <Phone className="h-3 w-3" />
-              {u.telefono}
-            </>
-          ) : '-'}
-        </div>
-      ),
-    },
-    {
-      key: 'dni',
-      header: 'DNI',
-      sortValue: (u: User) => u.dni || '',
-      render: (u: User) => u.dni || '-',
-    },
-    {
-      key: 'activo',
-      header: 'Estado',
-      sortValue: (u: User) => u.activo,
-      render: (u: User) => <ABMBadge active={u.activo} />,
-    },
   ];
+
+  // Segmented de estados con conteos reales del universo cargado
+  const conteoOperarios = empleados.filter(e => tipoDe(e) === 'operario').length;
+  const statusTabs: StatusTab[] = isEmpleadoView
+    ? [
+        { id: 'todos', label: 'Todos', count: empleados.length },
+        { id: 'operario', label: 'Operarios', count: conteoOperarios },
+        { id: 'administrativo', label: 'Administrativos', count: empleados.length - conteoOperarios },
+      ]
+    : [{ id: 'todos', label: 'Todos', count: usuarios.length }];
 
   // Hero semántico: solo datos reales ya cargados en la pantalla (sin inventar números)
   const heroFrases = useMemo<HeroFrase[]>(() => {
@@ -621,153 +582,70 @@ export default function Empleados() {
     return frases;
   }, [loading, isEmpleadoView, empleados]);
 
-  const vistaActual = VISTA_PILLS.find(p => p.value === vistaRol)!;
-
-  const pillsBar = (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap gap-1.5">
-        {VISTA_PILLS.map(p => {
-          const active = vistaRol === p.value;
-          const Icon = p.icon;
-          return (
-            <button
-              key={p.value}
-              type="button"
-              onClick={() => {
-                setVistaRol(p.value);
-                if (p.value !== 'empleado') setTipoFiltro('todos');
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-95"
-              style={{
-                backgroundColor: active ? p.color : 'transparent',
-                color: active ? '#ffffff' : theme.textSecondary,
-                border: `1px solid ${active ? p.color : theme.border}`,
-              }}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
-      {vistaRol === 'empleado' && (
-        <>
-          <span className="text-xs px-1" style={{ color: theme.textSecondary }}>·</span>
-          <div className="flex flex-wrap gap-1.5">
-            {TIPO_PILLS.map(t => {
-              const active = tipoFiltro === t.value;
-              return (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => setTipoFiltro(t.value)}
-                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-95"
-                  style={{
-                    backgroundColor: active ? `${vistaActual.color}20` : 'transparent',
-                    color: active ? vistaActual.color : theme.textSecondary,
-                    border: `1px solid ${active ? vistaActual.color : theme.border}`,
-                  }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-
   return (
     <>
-      <SemanticHero etiqueta="PERSONAL · CAMPO" frases={heroFrases} />
-      <ABMPage
-      title="Empleados"
-      icon={<Users className="h-5 w-5" />}
-      backLink="/gestion/configuracion"
-      buttonLabel={isEmpleadoView ? 'Nuevo Empleado' : `Nuevo ${vistaActual.label}`}
-      onAdd={() => (isEmpleadoView ? openSheet() : openUserSheet())}
-      searchPlaceholder={isEmpleadoView ? 'Buscar empleados...' : `Buscar ${vistaActual.label.toLowerCase()}es...`}
-      searchValue={search}
-      onSearchChange={setSearch}
-      loading={loading}
-      isEmpty={isEmpleadoView ? filteredEmpleados.length === 0 : filteredUsuarios.length === 0}
-      emptyMessage={isEmpleadoView ? 'No se encontraron empleados' : `No se encontraron ${vistaActual.label.toLowerCase()}es`}
-      sheetOpen={sheetOpen}
-      sheetTitle={
-        isEmpleadoView
+      {/* Cabecera de módulo (v2.2, props eyebrow/title/description): el eyebrow
+          nombra el módulo y el H1 el trabajo. Dos copys porque el select de Rol
+          cambia el universo: empleados de campo vs. usuarios del sistema. */}
+      <SemanticAbmPage<PersonalRow>
+        moduleKey="personal"
+        hero={{ etiqueta: 'PERSONAL · CAMPO', frases: heroFrases }}
+        eyebrow="Personal"
+        title={isEmpleadoView
+          ? 'Quién sale a la calle y con qué está equipado'
+          : `Quién entra al sistema como ${rolLabel.toLowerCase()}`}
+        description={isEmpleadoView
+          ? 'Operarios y administrativos del municipio, con su especialidad, su zona y su dependencia. Desde acá se dan de alta, se editan y se desactivan.'
+          : `Usuarios con rol de ${rolLabel.toLowerCase()} y acceso al sistema, con su contacto y su estado. Cambiá el rol en el filtro para ver otro universo.`}
+        searchPlaceholder={isEmpleadoView
+          ? 'Buscar por nombre, apellido o especialidad…'
+          : 'Buscar por nombre, email o DNI…'}
+        views={['table']}
+        activeView={vista}
+        onViewChange={setVista}
+        primaryAction={{
+          label: isEmpleadoView ? 'Nuevo empleado' : `Nuevo ${rolLabel.toLowerCase()}`,
+          onClick: () => (isEmpleadoView ? openSheet() : openUserSheet()),
+        }}
+        selects={selects}
+        statusTabs={statusTabs}
+        activeStatus={isEmpleadoView ? tipoFiltro : 'todos'}
+        onStatusChange={(id) => setTipoFiltro(id as TipoEmpleado)}
+        search={search}
+        onSearchChange={setSearch}
+        kind="plain"
+        columns={columnas}
+        rows={filas}
+        rowActions={accionesFila}
+        rowKey={(r) => r.id}
+        onRowClick={abrirDetalle}
+        footer={{
+          showing: `Mostrando ${filas.length} de ${currentList.length}`,
+          action: filas.length < currentList.length
+            ? { label: 'Cargar más', onClick: () => setPage(p => p + 1) }
+            : undefined,
+        }}
+      />
+
+      {/* Detalle/alta EXISTENTES preservados (piloto): mismo Sheet y formularios */}
+      <Sheet
+        open={sheetOpen}
+        onClose={closeSheet}
+        title={isEmpleadoView
           ? (selectedEmpleado ? 'Editar Empleado' : 'Nuevo Empleado')
-          : (selectedUsuario ? `Editar ${vistaActual.label}` : `Nuevo ${vistaActual.label}`)
-      }
-      sheetDescription={
-        isEmpleadoView
+          : (selectedUsuario ? `Editar ${rolLabel}` : `Nuevo ${rolLabel}`)}
+        description={isEmpleadoView
           ? (selectedEmpleado ? 'Modifica los datos del empleado' : 'Completa los datos para crear un nuevo empleado')
-          : (selectedUsuario ? `Modifica los datos del ${vistaActual.label.toLowerCase()}` : `Completa los datos para crear un nuevo ${vistaActual.label.toLowerCase()}`)
-      }
-      onSheetClose={closeSheet}
-      extraFilters={pillsBar}
-      pagination={{
-        page,
-        pageSize,
-        totalItems: currentList.length,
-        onPageChange: setPage,
-        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
-      }}
-      tableView={
-        isEmpleadoView ? (
-          <ABMTable
-            data={paginatedEmpleados}
-            columns={tableColumns}
-            keyExtractor={(c) => c.id}
-            onRowClick={(c) => openSheet(c)}
-            actions={(c) => (
-              <>
-                <ABMTableAction
-                  icon={<Edit className="h-4 w-4" />}
-                  onClick={() => openSheet(c)}
-                  title="Editar"
-                />
-                <ABMTableAction
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => handleDelete(c.id)}
-                  title="Desactivar"
-                  variant="danger"
-                />
-              </>
-            )}
+          : (selectedUsuario ? `Modifica los datos del ${rolLabel.toLowerCase()}` : `Completa los datos para crear un nuevo ${rolLabel.toLowerCase()}`)}
+        stickyFooter={
+          <ABMSheetFooter
+            onCancel={closeSheet}
+            onSave={isEmpleadoView ? handleSubmit : handleUserSubmit}
+            saving={saving}
           />
-        ) : (
-          <ABMTable
-            data={paginatedUsuarios}
-            columns={userTableColumns}
-            keyExtractor={(u) => u.id}
-            onRowClick={(u) => openUserSheet(u)}
-            actions={(u) => (
-              <>
-                <ABMTableAction
-                  icon={<Edit className="h-4 w-4" />}
-                  onClick={() => openUserSheet(u)}
-                  title="Editar"
-                />
-                <ABMTableAction
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => handleUserDelete(u.id)}
-                  title="Desactivar"
-                  variant="danger"
-                />
-              </>
-            )}
-          />
-        )
-      }
-      sheetFooter={
-        <ABMSheetFooter
-          onCancel={closeSheet}
-          onSave={isEmpleadoView ? handleSubmit : handleUserSubmit}
-          saving={saving}
-        />
-      }
-      sheetContent={isEmpleadoView ? (
+        }
+      >
+        {isEmpleadoView ? (
         <form className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <ABMInput
@@ -1036,7 +914,7 @@ export default function Empleados() {
                       className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2"
                       style={{ backgroundColor: theme.border, color: theme.text }}
                     >
-                      {m.nombre[0]}{m.apellido[0]}
+                      {(m.nombre?.[0] || '?')}{m.apellido?.[0] || ''}
                     </div>
                     <span>{m.nombre} {m.apellido}</span>
                   </div>
@@ -1104,178 +982,7 @@ export default function Empleados() {
           />
         </form>
       )}
-    >
-      {isEmpleadoView ? paginatedEmpleados.map((c) => {
-        // Usar el color de la categoría principal, o un gradiente morado por defecto
-        const mainColor = c.categoria_principal?.color || '#8B5CF6';
-        const zona = zonas.find(z => z.id === c.zona_id);
-
-        return (
-          <div
-            key={c.id}
-            onClick={() => openSheet(c)}
-            className="group relative rounded-2xl p-5 cursor-pointer overflow-hidden abm-card-hover animate-fade-in-up"
-            style={{
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-              ['--card-primary' as string]: mainColor,
-            }}
-          >
-            {/* Fondo con gradiente sutil del color principal */}
-            <div
-              className="absolute inset-0 opacity-[0.06] group-hover:opacity-[0.12] transition-opacity duration-500"
-              style={{
-                background: `
-                  radial-gradient(ellipse at top left, ${mainColor}50 0%, transparent 50%),
-                  radial-gradient(ellipse at bottom right, ${mainColor}30 0%, transparent 50%)
-                `,
-              }}
-            />
-
-            {/* Línea decorativa superior con el color */}
-            <div
-              className="absolute top-0 left-0 right-0 h-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300"
-              style={{
-                background: `linear-gradient(90deg, ${mainColor}, ${mainColor}50, transparent)`,
-              }}
-            />
-
-            {/* Contenido */}
-            <div className="relative z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {/* Avatar con gradiente */}
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-3"
-                    style={{
-                      background: `linear-gradient(135deg, ${mainColor}, ${mainColor}CC)`,
-                      boxShadow: `0 4px 14px ${mainColor}40`,
-                    }}
-                  >
-                    <UserIcon className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="font-semibold text-lg" style={{ color: theme.text }}>
-                      {getNombreCompleto(c)}
-                    </p>
-                    {c.categoria_principal && (
-                      <p className="text-sm flex items-center gap-1.5" style={{ color: mainColor }}>
-                        <Star className="h-3.5 w-3.5 fill-current" />
-                        {c.categoria_principal.nombre}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <ABMBadge active={c.activo} />
-              </div>
-
-              {/* Especialidades con chips */}
-              {c.categorias && c.categorias.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-4">
-                  {c.categorias.map(cat => (
-                    <span
-                      key={cat.id}
-                      className="px-2.5 py-1 text-xs rounded-full font-medium transition-transform duration-200 hover:scale-105"
-                      style={{
-                        backgroundColor: `${cat.color || '#6b7280'}20`,
-                        color: cat.color || '#6b7280',
-                        border: `1px solid ${cat.color || '#6b7280'}30`,
-                      }}
-                    >
-                      {cat.nombre}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {c.descripcion && (
-                <p className="text-sm mt-4 line-clamp-2" style={{ color: theme.textSecondary }}>
-                  {c.descripcion}
-                </p>
-              )}
-
-              <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
-                <div className="flex items-center gap-2">
-                  {zona ? (
-                    <span
-                      className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"
-                      style={{
-                        backgroundColor: `${mainColor}10`,
-                        color: theme.textSecondary,
-                      }}
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {zona.nombre}
-                    </span>
-                  ) : (
-                    <span className="text-xs" style={{ color: theme.textSecondary }}>Sin zona</span>
-                  )}
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      color: theme.textSecondary,
-                    }}
-                  >
-                    Cap. {c.capacidad_maxima}
-                  </span>
-                </div>
-                <ABMCardActions
-                  onEdit={() => openSheet(c)}
-                  onDelete={() => handleDelete(c.id)}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      }) : paginatedUsuarios.map((u) => {
-        const Icon = vistaRol === 'admin' ? Shield : ShieldCheck;
-        const bg = vistaRol === 'admin' ? 'bg-purple-500' : 'bg-yellow-500';
-        return (
-          <ABMCard key={u.id} onClick={() => openUserSheet(u)}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center`}>
-                  <Icon className="h-5 w-5 text-white" />
-                </div>
-                <div className="ml-3">
-                  <p className="font-medium">{u.nombre} {u.apellido}</p>
-                  <p className="text-sm flex items-center" style={{ color: theme.textSecondary }}>
-                    <Mail className="h-3 w-3 mr-1" />
-                    {u.email}
-                  </p>
-                </div>
-              </div>
-              <ABMBadge active={u.activo} />
-            </div>
-
-            <div className="mt-3 space-y-1">
-              {u.telefono && (
-                <p className="text-sm flex items-center" style={{ color: theme.textSecondary }}>
-                  <Phone className="h-3 w-3 mr-1" />
-                  {u.telefono}
-                </p>
-              )}
-              {u.dni && (
-                <p className="text-sm" style={{ color: theme.textSecondary }}>
-                  DNI: {u.dni}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
-              <ABMCardActions
-                onEdit={() => openUserSheet(u)}
-                onDelete={() => handleUserDelete(u.id)}
-              />
-            </div>
-          </ABMCard>
-        );
-      })}
-    </ABMPage>
+      </Sheet>
     </>
   );
 }

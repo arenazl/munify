@@ -622,7 +622,7 @@ export default function ReclamoDetalle() {
                 className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium"
                 style={{ backgroundColor: theme.primary }}
               >
-                {reclamo.creador.nombre[0]}{reclamo.creador.apellido[0]}
+                {(reclamo.creador.nombre?.[0] || '?')}{reclamo.creador.apellido?.[0] || ''}
               </div>
               <div>
                 <p className="font-medium" style={{ color: theme.text }}>

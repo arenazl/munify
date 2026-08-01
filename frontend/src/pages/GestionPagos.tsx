@@ -596,7 +596,7 @@ export default function GestionPagos() {
       title="Cobros"
       icon={<Wallet className="w-5 h-5" />}
       kpis={kpisSpec}
-      searchPlaceholder="Buscar por concepto o N° de operación…"
+      searchPlaceholder="Buscar por vecino, DNI, concepto o N° de operación…"
       searchValue={search}
       onSearchChange={setSearch}
       secondaryFilters={
