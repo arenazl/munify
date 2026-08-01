@@ -16,6 +16,9 @@ import PresentacionLive from './PresentacionLive';
 import { Sheet } from './ui/Sheet';
 import { usersApi, municipiosApi, navegacionApi, modulosApi, iaConfigApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
+import { SidebarV2 } from './shell/SidebarV2';
+import { TopbarV2 } from './shell/TopbarV2';
+import { MigasProvider } from '../contexts/MigasProvider';
 import NotificationSettings from './NotificationSettings';
 import { NotificationActivationSheet } from './NotificationActivationSheet';
 import { subscribeToPush } from '../lib/pushNotifications';
@@ -379,14 +382,79 @@ export default function Layout() {
   });
   const mobileTabs = getMobileTabs(user.rol, modulosActivos);
 
-  // Anchos dinámicos con medidas relativas para mejor responsividad
-  // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
-  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4rem' : '13rem');
+  // ---- Shell v2 (solo desktop) -------------------------------------------
+  // Acciones globales de la topbar: tema + notificaciones + ajustes. El
+  // dropdown del tema sigue viviendo en este Layout (portal siempre montado,
+  // compartido con el trigger del header mobile); acá va solo el trigger.
+  const accionesTopbar = (
+    <>
+      <button
+        type="button"
+        className="tv2-iconbtn"
+        title="Tema"
+        onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+      >
+        <Palette className="tv2-iconbtn-svg" />
+      </button>
+      <NotificacionesDropdown />
+      <Link to="/gestion/configuracion" className="tv2-iconbtn" title="Configuración">
+        <Settings className="tv2-iconbtn-svg" />
+      </Link>
+    </>
+  );
+
+  // Menú de la persona en la topbar (decisión del dueño: el switcher de
+  // usuario del sidebar viejo desaparece en desktop — la persona vive acá).
+  // Mismas opciones que el dropdown viejo: perfil, notificaciones, salir.
+  const menuUsuarioTopbar = (
+    <>
+      <div className="tv2-menu-cab">
+        <p className="tv2-menu-nombre">{user.nombre} {user.apellido}</p>
+        <p className="tv2-menu-email">{user.email}</p>
+      </div>
+      <button type="button" className="tv2-menu-item" onClick={handleOpenProfile}>
+        <User className="tv2-menu-icono" />
+        Mi Perfil
+      </button>
+      <button
+        type="button"
+        className="tv2-menu-item"
+        onClick={handleTopBarPushSubscribe}
+        disabled={pushSubscribed || pushSubscribing}
+      >
+        <BellRing className="tv2-menu-icono" />
+        {pushSubscribing
+          ? 'Activando notificaciones…'
+          : pushSubscribed
+            ? 'Notificaciones activas'
+            : 'Activar notificaciones'}
+      </button>
+      <div className="tv2-menu-sep" />
+      <button
+        type="button"
+        className="tv2-menu-item tv2-menu-item--peligro"
+        onClick={() => logout()}
+      >
+        <LogOut className="tv2-menu-icono" />
+        Cerrar sesión
+      </button>
+    </>
+  );
+
+  // Anchos dinámicos con medidas relativas para mejor responsividad.
+  // Desktop = shell v2: 16rem/4.5rem (= --pl-sidebar-w 256px / 72px).
+  // Mobile mantiene el drawer compacto de siempre (12rem).
+  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4.5rem' : '16rem');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;
 
   return (
+    // Miga de pan (Ámbito / Página) publicada para toda la app: la dibuja la
+    // TopbarV2 y la lee el PageHeader de los ABMs para no repetir el eyebrow.
+    // `visible` = hay topbar dibujándola (en mobile no hay: el header mobile
+    // muestra el municipio, no la pantalla).
+    <MigasProvider items={navigation} visible={!isMobile}>
     <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme.contentBackground, overflowX: 'clip' }}>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
@@ -396,10 +464,23 @@ export default function Layout() {
         />
       )}
 
-      {/* Sidebar - full height desde arriba */}
+      {/* Shell v2 DESKTOP: sidebar nuevo (256/72, tokens --pl-sidebar-w*).
+          Colapso controlado acá: persiste en localStorage y de él sale el
+          padding-left del contenido (var --sidebar-width). */}
+      {!isMobile && (
+        <SidebarV2
+          items={navigation}
+          colapsado={sidebarCollapsed}
+          onToggleColapsado={() => setSidebarCollapsed((v) => !v)}
+        />
+      )}
+
+      {/* Sidebar VIEJO — solo MOBILE (drawer + header + bottom bar quedan
+          como están; en desktop lo reemplaza el shell v2). */}
       {/* Transition SOLO transform para evitar jank en el primer click (antes
          usaba transition-all + -translate-x-full clase => el primer paint no
          tenia transform base y aparecia un frame mal posicionado). */}
+      {isMobile && (
       <div
         className={`fixed left-0 top-0 bottom-0 z-50 shadow-xl flex flex-col sidebar-container backdrop-blur-sm ${isCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
@@ -525,7 +606,7 @@ export default function Layout() {
               className="h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
               style={{ backgroundColor: theme.primary }}
             >
-              {user.nombre[0]}{user.apellido[0]}
+              {(user.nombre?.[0] || '?')}{user.apellido?.[0] || ''}
             </div>
             <div
               style={{
@@ -815,6 +896,7 @@ export default function Layout() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Header sticky solo mobile */}
       {isMobile && (
@@ -912,27 +994,15 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
-          {/* Barra superior ultra-compacta - iconos a la derecha - SOLO DESKTOP.
-              Sticky: se mantiene visible al hacer scroll de la página. */}
-          <div
-            className="hidden lg:flex items-center justify-end pt-4 pb-2 sticky top-0 z-50"
-            style={{ backgroundColor: theme.contentBackground }}
-          >
+          {/* Topbar v2 — SOLO DESKTOP: contexto | breadcrumb || acciones |
+              persona. Sticky en flujo (mismo mecanismo que la barra vieja). */}
+          {!isMobile && (
+            <TopbarV2 acciones={accionesTopbar} menuUsuario={menuUsuarioTopbar} />
+          )}
 
-            {/* Iconos de acciones */}
-            <div className="flex items-center">
-              {/* Theme selector */}
-              <div className="relative">
-                <button
-                  className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
-                  onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-                  style={{ color: theme.textSecondary }}
-                  title="Tema"
-                >
-                  <Palette className="h-4 w-4" strokeWidth={3} />
-                </button>
-
-                {themeMenuOpen && createPortal(
+          {/* Dropdown del tema — portal SIEMPRE montado (los triggers viven
+              en la topbar v2 en desktop y en el header sticky en mobile). */}
+          {themeMenuOpen && createPortal(
                   <>
                     <div
                       className="fixed inset-0 z-[60]"
@@ -1217,35 +1287,11 @@ export default function Layout() {
                   </>,
                   document.body
                 )}
-              </div>
 
-              {/* Notificaciones */}
-              <NotificacionesDropdown />
-
-              {/* Asistente IA — OCULTO temporalmente por pedido del user. */}
-              {/* <button
-                onClick={() => window.dispatchEvent(new Event('munify:toggle-chat'))}
-                className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{ color: theme.primary }}
-                title="Asistente IA"
-              >
-                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-              </button> */}
-
-              {/* Ajustes */}
-              <Link
-                to="/gestion/configuracion"
-                className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{ color: theme.textSecondary }}
-                title="Configuración"
-              >
-                <Settings className="h-4 w-4" strokeWidth={3} />
-              </Link>
-            </div>
-          </div>
-
-          {/* Banner de Dependencia - visible solo para usuarios de dependencia */}
-          {user.dependencia && (() => {
+          {/* Banner de Dependencia — solo MOBILE: en desktop el contexto de
+              la dependencia vive en la pill de la topbar v2 (el breadcrumb y
+              el contexto van en la topbar, no en la página). */}
+          {isMobile && user.dependencia && (() => {
             // Usar imagen_portada, logo_url, o una imagen por defecto
             const defaultBannerImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
             const bannerImage = municipioActual?.imagen_portada || municipioActual?.logo_url || defaultBannerImage;
@@ -1851,7 +1897,7 @@ export default function Layout() {
               className="h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
               style={{ backgroundColor: theme.primary }}
             >
-              {user.nombre[0]}{user.apellido[0]}
+              {(user.nombre?.[0] || '?')}{user.apellido?.[0] || ''}
             </div>
             <div>
               <p className="text-lg font-semibold" style={{ color: theme.text }}>
@@ -2112,7 +2158,7 @@ export default function Layout() {
                   boxShadow: `0 8px 32px ${theme.primary}40`,
                 }}
               >
-                {user.nombre[0]}{user.apellido[0]}
+                {(user.nombre?.[0] || '?')}{user.apellido?.[0] || ''}
               </div>
               <h2 className="text-xl font-bold" style={{ color: theme.text }}>
                 {user.nombre} {user.apellido}
@@ -2267,5 +2313,6 @@ export default function Layout() {
       {/* Recorrido guiado abierto desde el menú "Más" del admin en mobile. */}
       <PresentacionLive open={presentacionOpen} onClose={() => setPresentacionOpen(false)} />
     </div>
+    </MigasProvider>
   );
 }
