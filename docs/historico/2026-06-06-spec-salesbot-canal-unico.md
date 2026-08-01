@@ -13,6 +13,7 @@ El bot NO toca la base de Munify. Único canal permitido:
 ```
 HTTP  +  header  X-SalesBot-Key: <key>   →   https://munify-api-vmpxsxe7ra-rj.a.run.app
 ```
+**[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app]**
 
 Cualquier `import` de `munify_db`, cualquier `create_async_engine` apuntando a
 `sugerenciasmun`, cualquier `SELECT` crudo contra tablas de Munify: **se elimina**.
@@ -27,6 +28,7 @@ Cualquier `import` de `munify_db`, cualquier `create_async_engine` apuntando a
 MUNIFY_BASE_URL=https://munify-api-vmpxsxe7ra-rj.a.run.app   # sin /api al final
 MUNIFY_API_KEY=<la que ya está seteada>                       # va en X-SalesBot-Key
 ```
+**[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app]**
 
 `MUNIFY_API_KEY` es la que el bot ya usa (hoy ya le pega a varios endpoints y dan
 200). No cambia. Si hay que reconfirmar el valor, lo provee Munify por canal
@@ -46,7 +48,7 @@ que estas credenciales dejan de funcionar. No las dejes como fallback.
 
 ## 3. Endpoints disponibles
 
-Base: `https://munify-api-vmpxsxe7ra-rj.a.run.app`
+Base: `https://munify-api-vmpxsxe7ra-rj.a.run.app` **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app]**
 Todos los del bot llevan header `X-SalesBot-Key`. (Los `mi-config` son JWT del
 panel del municipio — el bot NO los usa, se listan solo para que no los confundas.)
 

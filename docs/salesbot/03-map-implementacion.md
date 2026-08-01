@@ -19,6 +19,7 @@
 ```
 https://munify-api-1060106389361.southamerica-east1.run.app
 ```
+**[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app]**
 (Backend en Google Cloud Run, NO Heroku.)
 
 ## Auth — backend a backend

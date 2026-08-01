@@ -113,6 +113,81 @@
   `calcularKpisMapa` en lib/mapaUtils.ts; MapaStats queda solo con los paneles
   analíticos abajo).
 
+## DIRECTIVA 100% ABMs (dueño, 2026-07-31 — reemplaza la "pausa" del ABM)
+"Salvo los kanban/tableros y las agendas, todos los demás son variaciones de
+ABMs: estandarizar VÍA PROPS respetando el nuevo layout (hero, KPIs, estilos,
+posición de botones, TODO) en el 100% de las pantallas operacionales."
+- Pantalla sin texto semántico dinámico posible → hero con **frase ESTÁTICA**
+  que sirva de hint (mismo control, sin veredictos).
+- Cambiar el **100% de los ABMs** aunque Paraguay Limpio no los use (Munify
+  entero) y REVISAR todas las pantallas para que queden orgánicas.
+- Después: **probar que todos los endpoints llenen la UX** (verificación
+  integral pantalla por pantalla).
+- Semilla de demo: sacar los gráficos con zonas GENÉRICAS → zonas reales del
+  tenant; **agregar valoraciones del vecino** al dashboard (widget "La voz del
+  vecino" del diseño nuevo: promedio grande + distribución 1-5★ + cards de
+  reseñas, la negativa con "Requiere respuesta"/Reabrir en rojo) + calificaciones
+  en la semilla con textos [DEMO] verosímiles.
+- Van a llegar MÁS diseños de Claude Design; integrarlos con el mismo criterio
+  (tokens polimórficos, un control, cero copy-paste).
+
+### TEST INTEGRAL DE CIERRE (directiva del dueño, 2026-07-31 — correr al
+### terminar refactor + semilla integral)
+Verificar que TODAS las patas estén bien relacionadas, con la matriz de
+variantes completa (no solo el camino feliz):
+- Usuarios ↔ órdenes de trabajo (relaciones íntegras, sin huérfanos).
+- Empleados: algunos CON cuadrilla y otros SIN (ambas variantes vivas).
+- Reclamos asignados CON empleado y SIN empleado (asignación simple).
+- Circuito de RECLAMOS en TODAS sus etapas × variantes: con OT / SIN OT
+  (la OT no es obligatoria), con uso de inventario (activos tomados/liberados
+  + consumibles descontados) / sin inventario.
+- Circuito de TRÁMITES en todas sus etapas (solicitud → docs → verificación
+  → turno → finalización) × variantes (con/sin turno, con/sin KYC según regla).
+- Identidad ventanilla: anónimo / usuario a medias / verificado RENAPER.
+Método: sobre la semilla integral en QA, workflow de verificación que recorra
+API + DB chequeando integridad relacional y que cada variante EXISTA en los
+datos; reportar matriz variante × estado con evidencia. Las variantes que
+falten se agregan a las semillas (m_*) para que la matriz quede completa.
+
+### Fases
+- F1: inventario 100% pantallas operacionales (tipo, base, datos para hero,
+  endpoints) + diseño del ABMPageSemantic consolidado via props.
+- F2: migración fan-out de todos los ABMs al layout nuevo.
+- F3: heros estáticos donde no haya datos (resto de pantallas ocultas).
+- F4: "La voz del vecino" en Dashboard + semilla (calificaciones, zonas).
+- F5: verificación endpoints→UX integral en QA.
+
+## DECISIÓN DE ARQUITECTURA (dueño + agente, 2026-07-31): piezas sueltas + slot de cuerpo
+- Las piezas del estándar (SemanticHero, ListToolbar, FilterBar, DataTable,
+  SideModal) son componentes INDEPENDIENTES; `SemanticAbmPage` es solo el
+  orquestador que las compone.
+- Pantallas SIN grilla (Mostrador, Tablero, Planificación, Cuadrillas...):
+  usan las mismas piezas — hero standalone + `SemanticAbmPage` con **slot de
+  cuerpo** (`viewSlots`: la DataTable se reemplaza por steps/kanban/paneles
+  manteniendo hero+toolbar+filtros). Jamás grilla deshabilitada ni estructura
+  duplicada. (El slot viene del backlog de los pilotos.)
+- La hoja de miga/breadcrumb va al **TopBar del shell** (contexto | breadcrumb
+  | persona) — E3, no a cada pantalla.
+- Mostrador demo: el DNI del dueño (30217134) debe validar en el padrón demo
+  y avanzar al paso 2; botón "Cargar vecino a mano" roto → arreglar. Regla de
+  negocio: RENAPER OBLIGATORIO para trámites; alta simple SIN RENAPER para
+  reclamos. La pantalla del paso 2 ("Cargar la gestión") la curará Claude
+  Design (pendiente).
+
+## CHECKLIST DE PARIDAD DASHBOARD (loop hasta igualar la referencia)
+Contra dashboard-claro/oscuro.dc.html + captura del dueño: sidebar acordeones+
+badges+Ayuda y soporte, topbar pill dependencia+persona, **banner con FOTO del
+muni SUPER SUAVE detrás** (desaturada bajo --pl-hero-veil + --pl-hero-fade) +
+strip de stats, hero semántico con acciones, pills FILTRAR, filas KPI con
+sparklines y subtextos, Cola de trabajo con items embebidos, Voz del vecino,
+claro Y oscuro, responsive mobile intacto.
+
+## ESTRATEGIA MOBILE (acordada 2026-07-31)
+- Lado gestión/admin = UNA web responsive (mismo HTML): el mobile va EN
+  PARALELO dentro de cada migración (mismo diff, breakpoints intactos).
+- PWA del vecino (`pages/mobile/*` + MobileLayout) = árbol de UI APARTE:
+  se migra AL FINAL como fase propia, con el kit ya depurado.
+
 ## Hints: estado global
 - Las 11 pantallas de Reclamos+Campo+Trámites ya tienen SemanticHero (9aa061c).
 - El RESTO de la app: hints OCULTOS globalmente (flag HINTS_OCULTOS en

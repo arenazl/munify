@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Paraguay Limpio — Elegí el isotipo</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; background: #101012; color: #e8efe9; padding: 28px 32px 60px; }
+  h1 { font-size: 20px; margin: 0 0 2px; } .sub { color: #8fa596; font-size: 13px; margin-bottom: 22px; }
+  .ref { display: flex; align-items: center; gap: 14px; background: #fff; border-radius: 12px; padding: 10px 16px; width: fit-content; margin-bottom: 26px; }
+  .ref img { height: 74px; display: block; } .ref span { color: #333; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 20px; }
+  .card { background: #1a1a1d; border: 1px solid #2c2c31; border-radius: 16px; padding: 18px 20px; }
+  .card h2 { display: flex; align-items: center; gap: 10px; font-size: 15px; margin: 0 0 4px; }
+  .letter { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background: #1b7a3d; color: #fff; font-weight: 800; font-size: 16px; }
+  .desc { color: #93a89a; font-size: 12px; margin: 0 0 14px; }
+  .row { display: flex; gap: 14px; align-items: stretch; }
+  .tile { border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: 1; padding: 14px 0; }
+  .dark { background: #222226; border: 1px solid #333; }
+  .light { background: #f4f6fa; border: 1px solid #dde3ea; }
+  .mini { background: #222226; border: 1px solid #333; flex-direction: column; gap: 10px; padding: 10px 14px; flex: 0 0 110px; }
+  .mini small { color: #8fa596; font-size: 10px; }
+  .sidebar-sim { display: flex; align-items: center; gap: 8px; background: #222226; border-radius: 8px; padding: 6px 10px; }
+  .sidebar-sim b { color: #fff; font-size: 12px; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>Paraguay Limpio — elegí el isotipo (A / B / C / D)</h1>
+<p class="sub">Vectoriales, fieles al logo oficial. Cada uno sobre sidebar oscuro, fondo claro, y a 24px como en la app. Decime la letra y lo integro en todo (sidebar, login, PWA).</p>
+
+<div class="ref"><img src="logo-referencia.jpeg" alt="referencia" /><span>Logo oficial<br/>(referencia)</span></div>
+
+<!-- ============ DEFINICION DE LOS 4 SVG (symbol + use) ============ -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- forma de la colina compartida -->
+    <path id="hillShape" d="M6,60 Q50,42 94,60 Q97,76 80,87 Q60,97 34,93 Q12,88 6,60 Z"/>
+    <clipPath id="clipA"><use href="#hillShape"/></clipPath>
+
+    <!-- A: FIEL — 3 bandas de verde + camino blanco -->
+    <g id="markA">
+      <g>
+        <circle cx="50" cy="37" r="14.5" fill="#F5A81C"/>
+        <g fill="#F5A81C">
+          <polygon points="50,12 47.4,22 52.6,22"/>
+          <polygon points="70,17.5 62.5,25 66.8,28"/>
+          <polygon points="83,33.5 73,32.5 74.5,37.5"/>
+          <polygon points="30,17.5 37.5,25 33.2,28"/>
+          <polygon points="17,33.5 27,32.5 25.5,37.5"/>
+          <polygon points="86,49 76,45.5 76,50.5"/>
+          <polygon points="14,49 24,45.5 24,50.5"/>
+        </g>
+      </g>
+      <g clip-path="url(#clipA)">
+        <rect x="0" y="40" width="100" height="60" fill="#4CAF50"/>
+        <path d="M0,74 Q34,62 60,72 Q84,81 100,74 L100,100 L0,100 Z" fill="#2E7D32"/>
+        <path d="M0,86 Q40,76 70,86 Q88,92 100,86 L100,100 L0,100 Z" fill="#1B5E20"/>
+        <path d="M47,45 C60,53 38,62 51,70 C62,77 42,84 54,93" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <!-- B: CONTORNO — igual que A + borde sutil (mejor sobre blanco) -->
+    <g id="markB">
+      <use href="#markA"/>
+      <use href="#hillShape" fill="none" stroke="#14532D" stroke-width="1.6"/>
+      <circle cx="50" cy="37" r="14.5" fill="none" stroke="#c47f0e" stroke-width="1.2"/>
+    </g>
+
+    <!-- C: MINIMAL — 2 verdes, camino grueso, geometria simple (mejor a 24px) -->
+    <g id="markC">
+      <circle cx="50" cy="36" r="16" fill="#F5A81C"/>
+      <g fill="#F5A81C">
+        <polygon points="50,9 46.8,21 53.2,21"/>
+        <polygon points="73,15.5 64,24.5 69,28"/>
+        <polygon points="27,15.5 36,24.5 31,28"/>
+        <polygon points="87,34 75.5,33 77.5,39"/>
+        <polygon points="13,34 24.5,33 22.5,39"/>
+      </g>
+      <g clip-path="url(#clipA)">
+        <rect x="0" y="40" width="100" height="60" fill="#3F9E4D"/>
+        <path d="M0,78 Q40,66 72,78 Q90,85 100,78 L100,100 L0,100 Z" fill="#1B5E20"/>
+        <path d="M46,44 C62,54 36,64 52,74 C64,82 44,88 56,95" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <!-- D: BADGE — la marca A dentro de un circulo blanco (siempre contrasta) -->
+    <g id="markD">
+      <circle cx="50" cy="50" r="49" fill="#ffffff"/>
+      <g transform="translate(11,13) scale(0.78)"><use href="#markA"/></g>
+    </g>
+  </defs>
+</svg>
+
+<div class="grid">
+  <div class="card">
+    <h2><span class="letter">A</span> Fiel al original</h2>
+    <p class="desc">3 tonos de verde + camino blanco, sin fondo. El mas parecido al logo.</p>
+    <div class="row">
+      <div class="tile dark"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markA"/></svg></div>
+      <div class="tile light"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markA"/></svg></div>
+      <div class="tile mini">
+        <div class="sidebar-sim"><svg viewBox="0 0 100 100" width="24" height="24"><use href="#markA"/></svg><b>Paraguay Limpio</b></div>
+        <svg viewBox="0 0 100 100" width="48" height="48"><use href="#markA"/></svg>
+        <small>24px / 48px</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="letter">B</span> Con contorno</h2>
+    <p class="desc">Igual que A pero con borde fino: no se "pierde" sobre fondos claros.</p>
+    <div class="row">
+      <div class="tile dark"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markB"/></svg></div>
+      <div class="tile light"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markB"/></svg></div>
+      <div class="tile mini">
+        <div class="sidebar-sim"><svg viewBox="0 0 100 100" width="24" height="24"><use href="#markB"/></svg><b>Paraguay Limpio</b></div>
+        <svg viewBox="0 0 100 100" width="48" height="48"><use href="#markB"/></svg>
+        <small>24px / 48px</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="letter">C</span> Minimal</h2>
+    <p class="desc">Geometria simplificada, camino mas grueso: gana nitidez en tamanos chicos.</p>
+    <div class="row">
+      <div class="tile dark"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markC"/></svg></div>
+      <div class="tile light"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markC"/></svg></div>
+      <div class="tile mini">
+        <div class="sidebar-sim"><svg viewBox="0 0 100 100" width="24" height="24"><use href="#markC"/></svg><b>Paraguay Limpio</b></div>
+        <svg viewBox="0 0 100 100" width="48" height="48"><use href="#markC"/></svg>
+        <small>24px / 48px</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="letter">D</span> Badge circular</h2>
+    <p class="desc">La marca dentro de un circulo blanco: contraste garantizado en cualquier fondo.</p>
+    <div class="row">
+      <div class="tile dark"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markD"/></svg></div>
+      <div class="tile light"><svg viewBox="0 0 100 100" width="150" height="150"><use href="#markD"/></svg></div>
+      <div class="tile mini">
+        <div class="sidebar-sim"><svg viewBox="0 0 100 100" width="24" height="24"><use href="#markD"/></svg><b>Paraguay Limpio</b></div>
+        <svg viewBox="0 0 100 100" width="48" height="48"><use href="#markD"/></svg>
+        <small>24px / 48px</small>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
