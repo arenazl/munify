@@ -7,7 +7,7 @@ import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCi
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
 import { fetchJsonRetry } from '../lib/fetchRetry';
-import { BRAND } from '../brands';
+import { BRAND, marcaDeMunicipio } from '../brands';
 import { BrandMark } from '../brands/BrandMark';
 
 export default function Login() {
@@ -74,7 +74,20 @@ export default function Login() {
     const codigo = localStorage.getItem('municipio_codigo');
     const color = localStorage.getItem('municipio_color');
 
-    if (!codigo || !nombre) {
+    // Un municipio con MARCA PROPIA no se muestra dentro del acceso genérico:
+    // quedaba la mezcla de entrar por la raíz (marca Munify) y ver "Asunción,
+    // Dpto. Central" arriba de un login que NO es el de Asunción, sólo porque
+    // el nombre había quedado guardado de una visita anterior.
+    //
+    // Se IGNORA ese municipio y se cae al selector. Ojo: acá NO se puede
+    // redirigir a `/<codigo>` —se probó y hace un bucle infinito—, porque
+    // `BRAND` se resuelve una sola vez al cargar el módulo: al navegar dentro
+    // de la SPA sigue valiendo Munify, vuelve a entrar por esta rama y rebota
+    // /login -> /asuncion -> /login para siempre. Para ver la marca hay que
+    // cargar SU ruta de entrada, no navegar hacia ella.
+    const municipioAjeno = Boolean(codigo && !BRAND.municipioCodigo && marcaDeMunicipio(codigo));
+
+    if (!codigo || !nombre || municipioAjeno) {
       // Mono-tenant: hay un único municipio fijo (el del brand). No mandamos a
       // elegir muni; cargamos el del brand para que el login se muestre con su
       // identidad aunque el municipio aún no esté sembrado.
@@ -141,11 +154,16 @@ export default function Login() {
   };
 
   // Configuración visual por rol
-  const rolConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
-    admin: { icon: Shield, color: 'from-red-500 to-rose-600', label: 'Administrador' },
-    supervisor: { icon: Users, color: 'from-orange-500 to-amber-600', label: 'Supervisor' },
-    empleado: { icon: Wrench, color: 'from-emerald-500 to-teal-600', label: 'Empleado' },
-    vecino: { icon: User, color: 'from-blue-500 to-indigo-600', label: 'Vecino' },
+  // Los perfiles de demo se distinguen por ICONO y etiqueta, no por un color
+  // propio. Antes cada rol traía su gradiente fijo (rojo, naranja, verde,
+  // azul): un arcoíris que no tiene nada que ver con la marca y que hacía ver
+  // el login de cualquier municipio como otra aplicación. El color ahora sale
+  // del tema y es el mismo para todos; lo que cambia es el símbolo.
+  const rolConfig: Record<string, { icon: typeof Shield; label: string }> = {
+    admin: { icon: Shield, label: 'Administrador' },
+    supervisor: { icon: Users, label: 'Supervisor' },
+    empleado: { icon: Wrench, label: 'Empleado' },
+    vecino: { icon: User, label: 'Vecino' },
   };
 
   // Estado para usuarios demo cargados desde la API
@@ -617,7 +635,12 @@ export default function Login() {
                           type="button"
                           onClick={() => quickLogin(user.email, 'demo123')}
                           disabled={loading}
-                          className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                          className="relative overflow-hidden py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+                          style={{
+                            backgroundColor: `${municipioColor}1f`,
+                            border: `1px solid ${municipioColor}45`,
+                            color: 'var(--pl-text, #fff)',
+                          }}
                         >
                           <div className="flex items-center gap-2">
                             <Icon className="h-4 w-4 flex-shrink-0" />

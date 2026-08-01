@@ -158,4 +158,22 @@ function resolveBrandId(): string {
   return 'munify';
 }
 
+/**
+ * ¿Este municipio tiene marca propia? Devuelve la marca, o null.
+ *
+ * Sirve para no mostrar un municipio de marca ajena dentro del acceso
+ * genérico: si alguien entra por la raíz con "asuncion" guardado de una
+ * visita anterior, corresponde mandarlo a SU login, no pintar el nombre de
+ * Asunción arriba de una pantalla que no es la suya.
+ */
+export function marcaDeMunicipio(codigo: string | null | undefined): Brand | null {
+  if (!codigo) return null;
+  const buscado = codigo.trim().toLowerCase();
+  return (
+    Object.values(BRANDS).find(
+      (b) => b.municipioCodigo && b.municipioCodigo.toLowerCase() === buscado,
+    ) || null
+  );
+}
+
 export const BRAND: Brand = BRANDS[resolveBrandId()] || BRANDS.munify;
