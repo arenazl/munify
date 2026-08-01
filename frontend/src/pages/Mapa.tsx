@@ -3135,9 +3135,13 @@ export default function Mapa() {
   // móvil, LO QUE ESTÉ SELECCIONADO. Mientras corre muestra el rango real.
   const continuacionConsulta: ConsultaAccion = {
     id: 'timelapse',
-    label:
+    // En reposo el botón queda REDONDO, sólo con el play: con texto competía
+    // con la oración y en tablet se le encimaba. Mientras reproduce sí hay
+    // algo que decir —el rango que se está viendo— y ahí vuelve el texto.
+    label: tlEstado === 'reproduciendo' ? (rangoTimelapseLabel ?? 'Pausar') : '',
+    titulo:
       tlEstado === 'reproduciendo'
-        ? (rangoTimelapseLabel ?? 'Pausar')
+        ? 'Pausar'
         : tlEstado === 'pausado'
           ? 'Seguir'
           : tlEstado === 'finalizado'

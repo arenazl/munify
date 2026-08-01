@@ -107,7 +107,10 @@ export interface ConsultaPregunta {
 /** Herramienta del costado: no filtra, hace algo. */
 export interface ConsultaAccion {
   id: string;
+  /** Texto visible. Vacío = el botón queda redondo, sólo con su ícono. */
   label: string;
+  /** Nombre accesible cuando no hay label (title + aria-label). */
+  titulo?: string;
   icono?: LucideIcon;
   activo?: boolean;
   disabled?: boolean;
@@ -314,12 +317,22 @@ export function ConsultaGuiada({
               );
             })}
             {continuacion && (
+              /* Sin `label` el botón queda REDONDO, sólo con su ícono. Un
+                 botón con texto largo metido dentro de la oración competía
+                 con la frase y en tablet se le encimaba: el play se explica
+                 solo, y el nombre queda en el title y en el aria-label para
+                 quien lo necesite. Cuando hay algo que decir —el rango que se
+                 está reproduciendo— vuelve el texto. */
               <button
                 type="button"
-                className={`cg-continuacion${continuacion.activo ? ' cg-continuacion--activa' : ''}`}
+                className={
+                  `cg-continuacion${continuacion.activo ? ' cg-continuacion--activa' : ''}` +
+                  (continuacion.label ? '' : ' cg-continuacion--icono')
+                }
                 onClick={continuacion.onClick}
                 disabled={continuacion.disabled}
-                title={continuacion.label}
+                title={continuacion.titulo || continuacion.label}
+                aria-label={continuacion.titulo || continuacion.label}
               >
                 {continuacion.icono && <continuacion.icono className="cg-continuacion-icono" aria-hidden />}
                 {continuacion.label}

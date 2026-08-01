@@ -335,3 +335,17 @@
   .cg-continuacion,
   .cg-combo .ms2-trigger { transition: none; }
 }
+
+/* Variante REDONDA: el botón que continúa la oración cuando no lleva texto.
+   Un botón con label largo ("Ver la evolución") metido dentro de la frase
+   competía con ella y en tablet se le encimaba. El play se explica solo. */
+.cg-continuacion--icono {
+  width: 42px;
+  padding: 0;
+  border-radius: var(--pl-radius-pill);
+  justify-content: center;
+  gap: 0;
+}
+.cg-continuacion--icono .cg-continuacion-icono {
+  margin: 0;
+}

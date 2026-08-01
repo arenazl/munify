@@ -26,7 +26,7 @@ import {
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { BalanceBar } from '../components/ui/BalanceBar';
-import { RankedList, type RankedListItem } from '../components/ui/RankedList';
+import { FocosRotativos, type Foco } from '../components/dashboard/FocosRotativos';
 import { textoBalance } from '../lib/balance';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import {
@@ -65,6 +65,10 @@ interface ReclamoRecurrente {
    *  todavía no las manda, la fila muestra sólo la dirección. */
   categoria_top?: string | null;
   categoria_top_cantidad?: number;
+  /** Centro de la esquina (promedio de sus reclamos), para encuadrar el mapa.
+   *  null si esos reclamos no tienen coordenadas: ese foco se saltea. */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 interface ReclamoSimilarGrupo {
@@ -734,41 +738,24 @@ export default function Dashboard() {
     [heatmapData, catConcentracion],
   );
 
-  // Ranking de esquinas que acompaña al mapa. Una mancha no se puede accionar:
-  // no dice qué calle es, cuántos son ni de qué. Cada fila contesta las tres.
-  const esquinasRanking = useMemo<RankedListItem[]>(() => {
+  // Los focos que el mapa RECORRE. Cuatro, como las categorías de la botonera:
+  // el listado largo hacía crecer la tarjeta y rompía la simetría de la fila.
+  const focosConcentracion = useMemo<Foco[]>(() => {
     const base = catConcentracion
       ? recurrentes.filter((r) => r.categorias?.includes(catConcentracion))
       : recurrentes;
-    return base.slice(0, 5).map((r, i) => {
-      // Con "todas" seleccionado, la fila aclara de qué son la mayoría; con
-      // una categoría elegida eso sería redundante y se muestra la zona.
-      const detalle =
-        !catConcentracion && r.categoria_top && r.categoria_top_cantidad
-          ? `${r.categoria_top_cantidad} de ${r.cantidad} son de ${r.categoria_top}`
-          : r.zona;
-      return {
-        id: `${r.direccion}-${i}`,
-        titulo: r.direccion,
-        detalle,
-        valor: r.cantidad,
-        valorSub: r.cantidad === 1 ? 'reclamo' : 'reclamos',
-        onClick: () => navigate(`/gestion/mapa?direccion=${encodeURIComponent(r.direccion)}`),
-      };
-    });
-  }, [recurrentes, catConcentracion, navigate]);
-
-  /** La frase que resume el ranking, con su consecuencia dicha. */
-  const resumenConcentracion = useMemo(() => {
-    if (esquinasRanking.length === 0) return null;
-    const enFoco = esquinasRanking.reduce((acc, e) => acc + Number(e.valor), 0);
-    const universo = catConcentracion
-      ? heatmapFiltrado.length
-      : porCategoria.reduce((acc, c) => acc + c.cantidad, 0);
-    if (universo <= 0) return null;
-    const cadaCuantos = Math.round(universo / Math.max(enFoco, 1));
-    return { esquinas: esquinasRanking.length, enFoco, cadaCuantos };
-  }, [esquinasRanking, catConcentracion, heatmapFiltrado, porCategoria]);
+    return base.slice(0, 4).map((r) => ({
+      direccion: r.direccion,
+      zona: r.zona,
+      cantidad: r.cantidad,
+      lat: r.lat,
+      lng: r.lng,
+      // Con "todas" seleccionado se aclara qué categoría pesa en esa esquina;
+      // con una categoría ya elegida sería repetir lo mismo.
+      categoriaTop: catConcentracion ? null : r.categoria_top,
+      categoriaTopCantidad: catConcentracion ? undefined : r.categoria_top_cantidad,
+    }));
+  }, [recurrentes, catConcentracion]);
 
   // Matices del puente de tokens (--pl-*), leídos del :root: recharts necesita
   // colores concretos, así que los sacamos de los MISMOS tokens que usa el CSS
@@ -1203,29 +1190,18 @@ export default function Dashboard() {
             {categoriasConcentracion.length > 0 && (
               <AdaptiveFilter groups={gruposConcentracion} />
             )}
-            {/* El mapa UBICA, la lista ACCIONA. La mancha sola es linda pero no
-                dice qué calle, cuántos ni de qué; el ranking contesta las tres
-                cosas y usa el mismo lenguaje que la consulta guiada del Mapa,
-                así que la app no habla de dos formas distintas. */}
-            <HeatmapWidget
-              data={heatmapFiltrado}
-              showMarkers={false}
-              height="190px"
-              title="Mapa de Calor - Concentración de Reclamos"
+            {/* El mapa RECORRE los cuatro focos como un reproductor: se centra
+                en cada esquina y cuenta qué pasa ahí. Antes iba un listado
+                debajo, que crecía con los datos y rompía la simetría de la
+                fila —las tarjetas de al lado quedaban cortas—. Así el alto es
+                fijo y además la pantalla se lee sola en una demo. */}
+            <FocosRotativos
+              focos={focosConcentracion}
+              puntos={heatmapFiltrado}
               loading={loadingHeatmap}
-              onCategoryClick={handleCategoryClick}
+              altura="230px"
+              onVerFoco={(f) => navigate(`/gestion/mapa?direccion=${encodeURIComponent(f.direccion)}`)}
             />
-            {resumenConcentracion && (
-              <p className="dv2-concentracion-frase">
-                <strong>{resumenConcentracion.esquinas} esquinas</strong> concentran{' '}
-                <strong>{resumenConcentracion.enFoco} reclamos</strong>
-                {resumenConcentracion.cadaCuantos > 1 && (
-                  <>: <span className="dv2-auto">1 de cada {resumenConcentracion.cadaCuantos}</span></>
-                )}
-                .
-              </p>
-            )}
-            <RankedList items={esquinasRanking} ariaLabel="Esquinas con más reclamos" />
           </div>
 
           {/* Top categorías */}

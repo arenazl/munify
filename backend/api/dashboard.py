@@ -1209,7 +1209,11 @@ async def get_recurrentes(
         select(
             Reclamo.direccion,
             Reclamo.zona_id,
-            func.count(Reclamo.id).label('cantidad')
+            func.count(Reclamo.id).label('cantidad'),
+            # Centro de la esquina: el promedio de sus reclamos. Sirve para que
+            # el mapa pueda ENCUADRAR cada foco, no solo listarlo.
+            func.avg(Reclamo.latitud).label('lat'),
+            func.avg(Reclamo.longitud).label('lng'),
         )
         .where(*sub_filters)
         .group_by(Reclamo.direccion, Reclamo.zona_id)
@@ -1219,7 +1223,8 @@ async def get_recurrentes(
 
     # Obtener las direcciones con más reclamos
     query = await db.execute(
-        select(subquery.c.direccion, subquery.c.zona_id, subquery.c.cantidad)
+        select(subquery.c.direccion, subquery.c.zona_id, subquery.c.cantidad,
+               subquery.c.lat, subquery.c.lng)
         .order_by(subquery.c.cantidad.desc())
         .limit(10)
     )
@@ -1264,13 +1269,17 @@ async def get_recurrentes(
         por_direccion.setdefault(direccion, []).append((nombre_cat, n))
 
     resultado = []
-    for direccion, zona_id, cantidad in filas:
+    for direccion, zona_id, cantidad, lat, lng in filas:
         pares = sorted(por_direccion.get(direccion, []), key=lambda x: x[1], reverse=True)
         top_cat, top_n = pares[0] if pares else (None, 0)
         resultado.append({
             "direccion": direccion,
             "zona": nombres_zona.get(zona_id, "Sin zona"),
             "cantidad": cantidad,
+            # None si los reclamos de esa esquina no tienen coordenadas: el
+            # front lo saltea en vez de inventar un punto en el mapa.
+            "lat": float(lat) if lat is not None else None,
+            "lng": float(lng) if lng is not None else None,
             "categorias": [nombre for nombre, _ in pares],
             # La que más pesa en esa esquina, con cuántos de los suyos son.
             "categoria_top": top_cat,
