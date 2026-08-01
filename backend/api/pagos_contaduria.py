@@ -13,10 +13,11 @@ Dos tipos de origen conviven en PagoSesion:
 Tenancy: admin/supervisor ven SOLO los pagos de su municipio.
 """
 from datetime import datetime, date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from io import StringIO
 from typing import Optional, List
 import csv
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -157,6 +158,113 @@ def _build_filtros_base(
     return conds
 
 
+# ------------------------------------------------------------
+# Buscador libre (`search`) — UNA sola definicion para TODOS los
+# endpoints de contaduria (listar / exportar / cola de imputacion).
+#
+# Cubre datos de la sesion de pago Y del vecino asociado, porque en el
+# mostrador la gente busca por apellido o DNI, no por el id interno de
+# la sesion:
+#   - concepto / external_id / session_id (+ columnas extra por endpoint)
+#   - nombre y apellido del vecino, sueltos o como nombre completo en
+#     CUALQUIER orden ("Juan Perez" y "Perez Juan" dan lo mismo)
+#   - DNI tipeado con o sin puntos, contra el DNI guardado con o sin puntos
+#   - email y telefono del vecino
+#   - monto exacto, si el termino es numerico
+#
+# OJO: la clausula referencia columnas de `usuarios`, asi que TODA query
+# que la use tiene que pasar antes por `_join_vecino(stmt)` (OUTER join:
+# hay sesiones sin vecino y no pueden desaparecer del listado).
+# ------------------------------------------------------------
+
+_RE_ESPACIOS = re.compile(r"\s+")
+# "30217134", "30.217.134", "30-217-134" -> parece DNI. "1500,50" no.
+_RE_DNI = re.compile(r"^\d[\d.\-]*$")
+# Candidato a monto: arranca con digito y solo tiene digitos/separadores.
+_RE_MONTO = re.compile(r"^\d[\d.,]*$")
+
+
+def _normalizar_dni(term: str) -> Optional[str]:
+    """'30.217.134' -> '30217134'. None si el termino no parece un DNI."""
+    t = term.replace(" ", "")
+    if not _RE_DNI.match(t):
+        return None
+    return re.sub(r"\D", "", t) or None
+
+
+def _parse_monto(term: str) -> Optional[Decimal]:
+    """Interpreta el termino como monto ('1500', '1.500', '1500,50'). None si no lo es."""
+    t = term.replace(" ", "")
+    if not _RE_MONTO.match(t):
+        return None
+    if "." in t and "," in t:          # 1.500,50 -> punto = miles, coma = decimal
+        t = t.replace(".", "").replace(",", ".")
+    elif "," in t:                      # 1500,50
+        t = t.replace(",", ".")
+    elif t.count(".") > 1 or re.search(r"\.\d{3}$", t):   # 1.500.000 / 1.500
+        t = t.replace(".", "")
+    try:
+        return Decimal(t)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _dni_sin_puntos():
+    """Expresion SQL: el DNI guardado, normalizado (sin puntos/espacios/guiones)."""
+    return func.replace(
+        func.replace(func.replace(User.dni, ".", ""), " ", ""), "-", ""
+    )
+
+
+def _join_vecino(stmt):
+    """OUTER join a `usuarios` por el vecino de la sesion.
+
+    OUTER y no INNER a proposito: los pagos sin vecino asociado tienen que
+    seguir apareciendo. Se aplica SOLO cuando hay termino de busqueda para
+    no penalizar el listado normal.
+    """
+    return stmt.outerjoin(User, User.id == PagoSesion.vecino_user_id)
+
+
+def _build_search_filter(search: Optional[str], extra_cols: Optional[list] = None):
+    """Arma la clausula OR del buscador libre. None si no hay termino."""
+    term = _RE_ESPACIOS.sub(" ", (search or "").strip())
+    if not term:
+        return None
+
+    like = f"%{term}%"
+    nombre_completo = func.concat_ws(" ", User.nombre, User.apellido)
+    nombre_invertido = func.concat_ws(" ", User.apellido, User.nombre)
+
+    clauses = [
+        # --- sesion de pago
+        PagoSesion.concepto.ilike(like),
+        PagoSesion.external_id.ilike(like),
+        PagoSesion.id.ilike(like),
+        # --- vecino
+        User.nombre.ilike(like),
+        User.apellido.ilike(like),
+        nombre_completo.ilike(like),
+        nombre_invertido.ilike(like),
+        User.email.ilike(like),
+        User.telefono.ilike(like),
+    ]
+    for col in (extra_cols or []):
+        clauses.append(col.ilike(like))
+
+    dni = _normalizar_dni(term)
+    if dni:
+        # Compara normalizado contra normalizado: encuentra el vecino tanto si
+        # el DNI quedo guardado "30217134" como "30.217.134".
+        clauses.append(_dni_sin_puntos().ilike(f"%{dni}%"))
+
+    monto = _parse_monto(term)
+    if monto is not None:
+        clauses.append(PagoSesion.monto == monto)
+
+    return or_(*clauses)
+
+
 async def _cargar_dependencias_por_solicitud(
     db: AsyncSession, solicitud_ids: list[int]
 ) -> dict[int, tuple[Optional[int], Optional[str]]]:
@@ -224,24 +332,23 @@ async def listar_pagos(
         municipio_id, fecha_desde, fecha_hasta, estados_enum, medios_enum, origen_filtro, usuario_id
     )
 
-    if search:
-        like = f"%{search.strip()}%"
-        conds.append(or_(
-            PagoSesion.concepto.ilike(like),
-            PagoSesion.external_id.ilike(like),
-            PagoSesion.id.ilike(like),
-        ))
+    search_clause = _build_search_filter(search)
+    if search_clause is not None:
+        conds.append(search_clause)
 
     # Total
-    total_q = await db.execute(select(func.count()).select_from(PagoSesion).where(and_(*conds)))
+    total_stmt = select(func.count()).select_from(PagoSesion)
+    if search_clause is not None:
+        total_stmt = _join_vecino(total_stmt)
+    total_q = await db.execute(total_stmt.where(and_(*conds)))
     total = int(total_q.scalar() or 0)
 
     # Page
+    stmt = select(PagoSesion).options(selectinload(PagoSesion.vecino))
+    if search_clause is not None:
+        stmt = _join_vecino(stmt)
     stmt = (
-        select(PagoSesion)
-        .options(
-            selectinload(PagoSesion.vecino),
-        )
+        stmt
         .where(and_(*conds))
         .order_by(func.coalesce(PagoSesion.completed_at, PagoSesion.created_at).desc())
         .offset((page - 1) * page_size)
@@ -570,24 +677,28 @@ async def imputacion_pendientes(
     elif origen == "tasa":
         conds.append(PagoSesion.deuda_id.isnot(None))
 
-    if search:
-        like = f"%{search.strip()}%"
-        conds.append(or_(
-            PagoSesion.concepto.ilike(like),
-            PagoSesion.codigo_cut_qr.ilike(like),
-            PagoSesion.external_id.ilike(like),
-            PagoSesion.imputacion_referencia_externa.ilike(like),
-        ))
+    search_clause = _build_search_filter(search, extra_cols=[
+        PagoSesion.codigo_cut_qr,
+        PagoSesion.imputacion_referencia_externa,
+    ])
+    if search_clause is not None:
+        conds.append(search_clause)
 
     # Total
-    total_q = await db.execute(select(func.count()).select_from(PagoSesion).where(and_(*conds)))
+    total_stmt = select(func.count()).select_from(PagoSesion)
+    if search_clause is not None:
+        total_stmt = _join_vecino(total_stmt)
+    total_q = await db.execute(total_stmt.where(and_(*conds)))
     total = int(total_q.scalar() or 0)
 
     # Conteo global por estado de imputacion (no se ve afectado por el filtro
     # de imputacion_estado — sirve para los badges del header).
     conds_global = [c for c in conds if "imputacion_estado" not in str(c)]
+    conteo_stmt = select(PagoSesion.imputacion_estado, func.count()).select_from(PagoSesion)
+    if search_clause is not None:
+        conteo_stmt = _join_vecino(conteo_stmt)
     conteo_q = await db.execute(
-        select(PagoSesion.imputacion_estado, func.count())
+        conteo_stmt
         .where(and_(*conds_global))
         .group_by(PagoSesion.imputacion_estado)
     )
@@ -599,12 +710,14 @@ async def imputacion_pendientes(
         conteo_por_estado[val] = int(cant or 0)
 
     # Page
+    stmt = select(PagoSesion).options(
+        selectinload(PagoSesion.vecino),
+        selectinload(PagoSesion.imputado_por),
+    )
+    if search_clause is not None:
+        stmt = _join_vecino(stmt)
     stmt = (
-        select(PagoSesion)
-        .options(
-            selectinload(PagoSesion.vecino),
-            selectinload(PagoSesion.imputado_por),
-        )
+        stmt
         .where(and_(*conds))
         .order_by(func.coalesce(PagoSesion.completed_at, PagoSesion.created_at).desc())
         .offset((page - 1) * page_size)

@@ -775,27 +775,71 @@ async def get_tendencia(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
+    """Serie diaria de ingresos y resoluciones.
+
+    Devuelve TODOS los días del rango (incluidos los que no tuvieron actividad, en 0)
+    para que el gráfico no comprima el eje temporal y exagere la tendencia.
+
+    - `cantidad`: reclamos creados ese día (contrato histórico, no tocar).
+    - `resueltos`: reclamos con `fecha_resolucion` ese día.
+    """
     municipio_id = get_effective_municipio_id(request, current_user)
-    fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)
+    # Acotado: como ahora se rellena día por día, un `dias` gigante materializaría
+    # una fila por día en memoria. Un año cubre cualquier vista del tablero.
+    dias = max(1, min(dias, 365))
+    hoy = datetime.utcnow().date()
+    fecha_inicio = hoy - timedelta(days=dias)
 
-    filters = [
-        Reclamo.municipio_id == municipio_id,
-        func.date(Reclamo.created_at) >= fecha_inicio,
-    ]
+    base_filters = [Reclamo.municipio_id == municipio_id]
     if dependencia_id:
-        filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
+        base_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
 
+    def _clave(valor) -> str:
+        # func.date() puede volver date, datetime o str según el driver: normalizamos a YYYY-MM-DD
+        return str(valor)[:10]
+
+    # Serie 1: ingresados (por fecha de creación)
     query = await db.execute(
         select(
             func.date(Reclamo.created_at).label('fecha'),
             func.count(Reclamo.id)
         )
-        .where(*filters)
+        .where(*base_filters, func.date(Reclamo.created_at) >= fecha_inicio)
         .group_by(func.date(Reclamo.created_at))
         .order_by(func.date(Reclamo.created_at))
     )
+    ingresados = {_clave(fecha): count for fecha, count in query.all()}
 
-    result = [{"fecha": str(fecha), "cantidad": count} for fecha, count in query.all()]
+    # Serie 2: resueltos (por fecha de resolución).
+    # Mismo criterio de cierre que el resto del archivo: canónico 'finalizado'
+    # + legacy 'resuelto' (ver get_mis_stats y get_metricas_accion).
+    query_resueltos = await db.execute(
+        select(
+            func.date(Reclamo.fecha_resolucion).label('fecha'),
+            func.count(Reclamo.id)
+        )
+        .where(
+            *base_filters,
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
+            Reclamo.fecha_resolucion.isnot(None),
+            func.date(Reclamo.fecha_resolucion) >= fecha_inicio,
+        )
+        .group_by(func.date(Reclamo.fecha_resolucion))
+        .order_by(func.date(Reclamo.fecha_resolucion))
+    )
+    resueltos = {_clave(fecha): count for fecha, count in query_resueltos.all()}
+
+    # Relleno día por día: sin esto los días sin actividad desaparecen y el gráfico miente.
+    result = []
+    dia = fecha_inicio
+    while dia <= hoy:
+        clave = dia.isoformat()
+        result.append({
+            "fecha": clave,
+            "cantidad": ingresados.get(clave, 0),
+            "resueltos": resueltos.get(clave, 0),
+        })
+        dia += timedelta(days=1)
 
     return result
 

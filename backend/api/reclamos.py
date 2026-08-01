@@ -29,6 +29,12 @@ from services.gamificacion_service import GamificacionService
 from services.prioridad import set_prioridad_ot
 from services.poi_matching import match_reclamo_a_poi, set_poi
 from utils.geo import haversine_distance
+from utils.busqueda import (
+    normalizar_termino,
+    clausulas_nombre_completo,
+    clausula_dni,
+    normalizar_numero,
+)
 
 router = APIRouter()
 
@@ -715,10 +721,14 @@ async def get_reclamos(
 ):
     from models.categoria_reclamo import CategoriaReclamo as Categoria
     from models.zona import Zona
+    from models.barrio import Barrio
     from sqlalchemy import or_, cast, String
     from sqlalchemy.orm import joinedload
 
-    # Si hay búsqueda, usar JOINs para poder filtrar en tablas relacionadas
+    # Si hay búsqueda, usar JOINs para poder filtrar en tablas relacionadas.
+    # TODOS los joins son OUTER a propósito: un reclamo sin zona / sin barrio /
+    # sin creador (huérfano) NO puede desaparecer del listado al buscar. Los
+    # joins se agregan SOLO en esta rama para no penalizar el listado normal.
     if search and search.strip():
         query = select(Reclamo).options(
             selectinload(Reclamo.categoria),
@@ -727,7 +737,7 @@ async def get_reclamos(
             selectinload(Reclamo.creador),
             selectinload(Reclamo.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
             selectinload(Reclamo.documentos)
-        ).join(Reclamo.creador).outerjoin(Reclamo.categoria).outerjoin(Reclamo.zona).outerjoin(Reclamo.dependencia_asignada)
+        ).outerjoin(Reclamo.creador).outerjoin(Reclamo.categoria).outerjoin(Reclamo.zona).outerjoin(Reclamo.barrio).outerjoin(Reclamo.dependencia_asignada)
     else:
         query = get_reclamos_query()
 
@@ -784,29 +794,51 @@ async def get_reclamos(
 
     # Búsqueda en todos los campos
     if search and search.strip():
-        search_term = f"%{search.strip().lower()}%"
-        query = query.where(
-            or_(
-                # Campos del reclamo
-                func.lower(Reclamo.titulo).like(search_term),
-                func.lower(Reclamo.descripcion).like(search_term),
-                func.lower(Reclamo.direccion).like(search_term),
-                func.lower(Reclamo.referencia).like(search_term),
-                func.lower(Reclamo.resolucion).like(search_term),
-                cast(Reclamo.id, String).like(search_term),
-                # Creador
-                func.lower(User.nombre).like(search_term),
-                func.lower(User.apellido).like(search_term),
-                func.lower(User.email).like(search_term),
-                User.telefono.like(search_term),
-                User.dni.like(search_term),
-                # Categoría
-                func.lower(Categoria.nombre).like(search_term),
-                # Zona
-                func.lower(Zona.nombre).like(search_term),
-                func.lower(Zona.codigo).like(search_term),
-            )
-        )
+        termino = normalizar_termino(search)
+        search_term = f"%{termino.lower()}%"
+        clausulas = [
+            # Campos del reclamo
+            func.lower(Reclamo.titulo).like(search_term),
+            func.lower(Reclamo.descripcion).like(search_term),
+            func.lower(Reclamo.direccion).like(search_term),
+            func.lower(Reclamo.referencia).like(search_term),
+            func.lower(Reclamo.resolucion).like(search_term),
+            cast(Reclamo.id, String).like(search_term),
+            # Creador
+            func.lower(User.nombre).like(search_term),
+            func.lower(User.apellido).like(search_term),
+            func.lower(User.email).like(search_term),
+            User.telefono.like(search_term),
+            User.dni.like(search_term),
+            # Categoría
+            func.lower(Categoria.nombre).like(search_term),
+            # Zona
+            func.lower(Zona.nombre).like(search_term),
+            func.lower(Zona.codigo).like(search_term),
+            # Barrio (detectado desde la dirección; la API ya lo expone en
+            # ReclamoResponse.barrio, pero no se podía buscar por él)
+            func.lower(Barrio.nombre).like(search_term),
+        ]
+
+        # Nombre completo del vecino en CUALQUIER orden: sin esto, tipear
+        # "Juan Perez" no matchea nada porque nombre y apellido son columnas
+        # sueltas y ninguna contiene el string entero.
+        clausulas.extend(clausulas_nombre_completo(User.nombre, User.apellido, termino))
+
+        # DNI normalizado contra DNI normalizado: encuentra al vecino tanto si
+        # el operador tipea "30.217.134" como "30217134", y sin importar cómo
+        # quedó guardado.
+        cl_dni = clausula_dni(User.dni, termino)
+        if cl_dni is not None:
+            clausulas.append(cl_dni)
+
+        # El número tal como lo muestra la UI ("#5622" / "REC-5622"): el LIKE
+        # crudo contra el id no matchea con el numeral/prefijo adelante.
+        numero = normalizar_numero(termino, prefijos=("rec",))
+        if numero:
+            clausulas.append(cast(Reclamo.id, String).like(f"%{numero}%"))
+
+        query = query.where(or_(*clausulas))
 
     query = query.order_by(Reclamo.created_at.desc())
     query = query.offset(skip).limit(limit)
