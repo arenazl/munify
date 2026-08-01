@@ -247,9 +247,15 @@ export function NotificationActivationSheet() {
         aria-hidden="true"
       />
 
-      {/* Sheet ~35vh anclado abajo. */}
+      {/* Sheet anclado abajo, pero POR ENCIMA de la barra de navegación.
+          Antes se apoyaba en bottom-0, igual que la barra, y la tapaba
+          entera: el aviso aparece solo a los dos segundos de entrar, así que
+          alcanzaba con eso para dejar la app sin navegación hasta cerrarlo.
+          El alto de la barra sale de --pl-tabbar-h (con un valor por defecto
+          por si la pantalla no la tiene) más el área segura del teléfono. */}
       <div
-        className="fixed left-0 right-0 bottom-0 z-[101] animate-in slide-in-from-bottom duration-300"
+        className="fixed left-0 right-0 z-[101] animate-in slide-in-from-bottom duration-300"
+        style={{ bottom: 'calc(var(--pl-tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
         role="dialog"
         aria-modal="true"
       >

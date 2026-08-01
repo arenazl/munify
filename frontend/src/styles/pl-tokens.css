@@ -98,3 +98,21 @@
     transparent 74%
   );
 }
+
+/* ============================================================
+   [BARRA INFERIOR] — alto de la tab bar de la app móvil.
+
+   Lo declara el shell cuando la barra está en pantalla, y lo
+   consumen las piezas que se apoyan abajo (bottom sheets, toasts)
+   para no taparla. Sin esto, un sheet anclado en bottom:0 cubre
+   la navegación entera y deja la app sin salida hasta cerrarlo.
+
+   Vale 0 por defecto: en las pantallas sin barra, todo lo que se
+   apoya abajo sigue pegado al borde como antes.
+   ============================================================ */
+:root { --pl-tabbar-h: 0px; }
+
+/* El valor REAL lo publica el shell midiendo su propia barra (ver Layout):
+   el alto cambia con el área segura del teléfono y con el tamaño de fuente
+   del sistema, así que un número fijo queda corto justo en los aparatos
+   donde más molesta. Este 0 es sólo el default de arranque. */

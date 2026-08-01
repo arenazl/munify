@@ -780,7 +780,13 @@ export function AdaptiveFilter({
         aria-label={c.placeholder}
         data-af-grupo={viva ? undefined : ''}
       >
-        {visibles.map((idx) => pill(c, todas[idx], viva))}
+        {/* Se descartan los índices que ya no existen. El plan se calcula
+            contra una FOTO de las opciones; si mientras tanto la lista se
+            achica —por ejemplo una botonera cuyas opciones dependen de un
+            filtro de arriba— quedan índices apuntando al vacío y el render
+            reventaba con "Cannot read properties of undefined". El kit tiene
+            que aguantar que sus opciones cambien en vivo. */}
+        {visibles.filter((idx) => todas[idx]).map((idx) => pill(c, todas[idx], viva))}
         {(!viva || ocultas.length > 0) && (
           <div
             className="af-mas"
@@ -792,7 +798,7 @@ export function AdaptiveFilter({
               variant="v2"
               value=""
               onChange={viva ? c.onChange : noop}
-              options={viva ? ocultas.map((idx) => todas[idx]) : []}
+              options={viva ? ocultas.map((idx) => todas[idx]).filter(Boolean) : []}
               placeholder={`+${viva ? ocultas.length : c.opciones.length}`}
               searchable={viva && ocultas.length > 8}
               abbreviate={false}

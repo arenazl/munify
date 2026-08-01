@@ -150,6 +150,32 @@ export default function Layout() {
   const location = useLocation();
 
   // Badges de items pendientes (reclamos/tramites/tasas) — solo aplica a vecinos.
+
+  // La barra inferior publica su ALTO REAL en --pl-tabbar-h, para que lo que
+  // se apoya abajo (bottom sheets, toasts) no la tape. Se mide en vez de
+  // hardcodear: el alto cambia con el area segura del telefono y con el
+  // tamano de fuente del sistema, y un numero fijo queda corto justo en los
+  // aparatos donde mas molesta.
+  const navInferiorRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const nav = navInferiorRef.current;
+    const root = document.documentElement;
+    if (!nav) {
+      root.style.setProperty('--pl-tabbar-h', '0px');
+      return;
+    }
+    const medir = () => {
+      root.style.setProperty('--pl-tabbar-h', `${Math.round(nav.getBoundingClientRect().height)}px`);
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(nav);
+    return () => {
+      ro.disconnect();
+      root.style.setProperty('--pl-tabbar-h', '0px');
+    };
+  });
+
   const badges = useVecinoBadges();
   // Contadores de gestion (admin/supervisor). Cachea una vez por sesion.
   const navBadges = useNavBadges();
@@ -1519,6 +1545,7 @@ export default function Layout() {
           )}
 
           <nav
+            ref={navInferiorRef}
             className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe overflow-visible"
             style={{
               backgroundColor: theme.card,
