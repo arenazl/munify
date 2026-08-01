@@ -4,7 +4,15 @@
  * Reemplaza los hints/banners estáticos de las pantallas por una FRASE con
  * información DINÁMICA de esa pantalla, coloreada por VEREDICTO:
  *   bueno → acento del theme · advertencia → ámbar · malo → rojo
- * Soporta varias frases (carrusel con puntos + flechas) y hasta 2 acciones.
+ * Soporta varias frases (carrusel con puntos + flechas) y hasta 3 acciones
+ * por frase (la referencia v2 del estándar ABM usa las 3: "Ver los que vencen
+ * hoy" / "Asignar los sin cuadrilla" / "Exportar el período").
+ *
+ * ES EL ÚNICO HERO de la app: el estándar `SemanticAbmPage` usa ESTE
+ * componente con la clase de contexto `av2-hero`, que en styles/abmv2.css
+ * ([PAGE]) aplica la variante de layout de la referencia nueva (superficie
+ * verde suave, borde de acento 4px, KPIs con hairline verde, acción primaria
+ * sólida). No hay —ni debe haber— un segundo componente de hero.
  *
  * Polimórfico: estilos en styles/semantic-hero.css sobre tokens --pl-*
  * (derivados del theme activo por ThemeContext) — funciona en todos los
@@ -103,7 +111,7 @@ export function SemanticHero({ etiqueta, frases, kpis, className }: SemanticHero
 
       {actual.acciones && actual.acciones.length > 0 && (
         <div className="sh-acciones">
-          {actual.acciones.slice(0, 2).map((a, i) =>
+          {actual.acciones.slice(0, 3).map((a, i) =>
             a.to ? (
               <Link key={i} to={a.to} className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}>
                 {a.label}

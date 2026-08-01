@@ -1,13 +1,25 @@
 /**
  * VozDelVecino — sección del dashboard con las calificaciones de vecinos.
  * Referencia visual: design/handoff-v2/references/dashboard-{claro,oscuro}.dc.html
- * ("La voz del vecino": promedio grande + estrellas + distribución 5..1 +
- * cards de reseñas; la negativa con fondo rojo suave, chip "Requiere
- * respuesta" y acción "Reabrir" que navega al detalle del reclamo).
+ * ("La voz del vecino": promedio + estrellas + distribución 5..1 + cards de
+ * reseñas; la negativa con fondo rojo suave, chip "Requiere respuesta" y
+ * acción "Reabrir" que navega al detalle del reclamo).
+ *
+ * COMPOSICIÓN (no es un widget monolítico): las dos piezas reusables son del
+ * KIT y no saben nada de municipios —
+ *   - `RatingSummary` (ui/RatingSummary.tsx): promedio + estrellas + distribución.
+ *   - `CardCarousel`  (ui/CardCarousel.tsx): las reseñas, de a las que entren.
+ * Acá vive SÓLO lo del dominio: el fetch, el criterio de reseña negativa, la
+ * card de reseña y el copy.
+ *
+ * ALTURA: la manda el bloque de calificación. La grilla es de 4 columnas
+ * (1 = calificación, 2-4 = reseñas) y la zona de reseñas no aporta alto: su
+ * contenido va absoluto (`inset: 0`), así el alto de la fila es el del
+ * resumen y el carrusel se recorta dentro. La sección nunca crece con la
+ * cantidad de reseñas.
  *
  * POLIMÓRFICO: cero colores fijos — clases av2-voz-* (styles/abmv2.css,
- * sección [VOZ-VECINO]) sobre tokens --pl-*. Estilos inline SOLO para
- * valores runtime (ancho de las barras de distribución).
+ * sección [VOZ-VECINO]) sobre tokens --pl-*.
  *
  * Datos: recibe las estadísticas ya cargadas por el Dashboard (evita el
  * doble fetch de /estadisticas) y hace fetch propio de las últimas reseñas
@@ -17,6 +29,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { calificacionesApi } from '../../lib/api';
+import { CardCarousel } from '../ui/CardCarousel';
+import { RatingSummary } from '../ui/RatingSummary';
 
 // Subconjunto estructural de la respuesta de GET /calificaciones/estadisticas
 // (el Dashboard ya la tiene tipada completa; acá solo lo que se usa).
@@ -37,9 +51,18 @@ interface Resena {
 }
 
 const DIAS_PERIODO = 90;
-const MAX_RESENAS = 3;
+/** Se ven las que entran (3 en escritorio) y el resto se navega: se piden
+ *  todas las que el backend permite (tope duro del endpoint: 10). */
+const MAX_RESENAS = 10;
 // Umbral de reseña negativa: 1-2 estrellas requieren respuesta del muni.
 const PUNTUACION_NEGATIVA = 2;
+/** Escala de la calificación (5 estrellas). */
+const MAX_ESTRELLAS = 5;
+/** Ancho mínimo de una card de reseña: con la grilla de 4 columnas da 3 por
+ *  vista en escritorio, 2 en pantalla media y 1 en angosta. */
+const ANCHO_MIN_RESENA = 275;
+/** Igual al gap de la grilla: así cada card cae exactamente en una columna. */
+const GAP_RESENAS = 20;
 
 /** "hace 2 días" a partir del isoformat del backend (UTC naive → forzar Z). */
 function haceTexto(iso: string | null): string {
@@ -102,7 +125,10 @@ export function VozDelVecino({ stats }: { stats: VozDelVecinoStats | null }) {
   if (!hayDatos || !stats) return null;
 
   const total = stats.total_calificaciones;
-  const promedio = stats.promedio_general;
+  const distribucion = [5, 4, 3, 2, 1].map((nivel) => ({
+    nivel,
+    cantidad: stats.distribucion[String(nivel)] || 0,
+  }));
 
   return (
     <section className="av2-voz">
@@ -116,75 +142,66 @@ export function VozDelVecino({ stats }: { stats: VozDelVecinoStats | null }) {
       </div>
 
       <div className={`av2-voz-grid${resenas.length === 0 ? ' av2-voz-grid--solo' : ''}`}>
-        {/* Columna izquierda: promedio + distribución */}
-        <div className="av2-voz-resumen">
-          <div className="av2-voz-score-row">
-            <span className="av2-voz-score">{promedio.toFixed(1).replace('.', ',')}</span>
-            <Estrellas puntuacion={Math.round(promedio)} size={15} />
-          </div>
-          <span className="av2-voz-meta">
-            {total} {total === 1 ? 'calificación' : 'calificaciones'}
-            {pctCerrados !== null && ` · ${pctCerrados}% de los cerrados`}
-          </span>
-          <div className="av2-voz-dist">
-            {[5, 4, 3, 2, 1].map((estrella) => {
-              const cantidad = stats.distribucion[String(estrella)] || 0;
-              const pct = Math.round((cantidad / total) * 100);
-              return (
-                <div key={estrella} className="av2-voz-dist-row">
-                  <span className="av2-voz-dist-label">
-                    {estrella}
-                    <Star size={11} fill="currentColor" strokeWidth={0} />
-                  </span>
-                  <span className="av2-voz-track">
-                    <span
-                      className={`av2-voz-fill av2-voz-fill--s${estrella}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </span>
-                  <span className="av2-voz-dist-n">{cantidad}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* Columna 1: la calificación. Es la que MANDA la altura de la fila. */}
+        <RatingSummary
+          className="av2-voz-resumen"
+          promedio={stats.promedio_general}
+          total={total}
+          maxNivel={MAX_ESTRELLAS}
+          locale="es-AR"
+          distribucion={distribucion}
+          subtitulo={
+            <>
+              {total} {total === 1 ? 'calificación' : 'calificaciones'}
+              {pctCerrados !== null && ` · ${pctCerrados}% de los cerrados`}
+            </>
+          }
+        />
 
-        {/* Columna derecha: últimas reseñas con comentario */}
+        {/* Columnas 2-4: las reseñas con comentario, en carrusel. La zona no
+            aporta alto (el carrusel va absoluto): el alto es el del resumen. */}
         {resenas.length > 0 && (
           <div className="av2-voz-resenas">
-            {resenas.map((r) => {
-              const negativa = r.puntuacion <= PUNTUACION_NEGATIVA;
-              return (
-                <article key={r.id} className={`av2-voz-card${negativa ? ' av2-voz-card--mala' : ''}`}>
-                  <div className="av2-voz-card-head">
-                    <Estrellas puntuacion={r.puntuacion} negativa={negativa} size={13} />
-                    {negativa ? (
-                      <span className="av2-voz-flag">Requiere respuesta</span>
-                    ) : (
-                      <span className="av2-voz-fecha">{haceTexto(r.created_at)}</span>
-                    )}
-                  </div>
-                  <p className="av2-voz-texto">"{r.comentario}"</p>
-                  <div className="av2-voz-card-foot">
-                    <span className={`av2-voz-avatar${negativa ? ' av2-voz-avatar--mala' : ''}`}>
-                      {iniciales(r.autor)}
-                    </span>
-                    <span className="av2-voz-autor">
-                      {r.autor} · {r.categoria}
-                    </span>
-                    {negativa && (
-                      <button
-                        type="button"
-                        className="av2-voz-reabrir"
-                        onClick={() => navigate(`/gestion/reclamos/${r.reclamo_id}`)}
-                      >
-                        Reabrir
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
+            <CardCarousel
+              className="av2-voz-carrusel"
+              ariaLabel="Reseñas de vecinos"
+              minCardWidth={ANCHO_MIN_RESENA}
+              gap={GAP_RESENAS}
+            >
+              {resenas.map((r) => {
+                const negativa = r.puntuacion <= PUNTUACION_NEGATIVA;
+                return (
+                  <article key={r.id} className={`av2-voz-card${negativa ? ' av2-voz-card--mala' : ''}`}>
+                    <div className="av2-voz-card-head">
+                      <Estrellas puntuacion={r.puntuacion} negativa={negativa} size={13} />
+                      {negativa ? (
+                        <span className="av2-voz-flag">Requiere respuesta</span>
+                      ) : (
+                        <span className="av2-voz-fecha">{haceTexto(r.created_at)}</span>
+                      )}
+                    </div>
+                    <p className="av2-voz-texto">"{r.comentario}"</p>
+                    <div className="av2-voz-card-foot">
+                      <span className={`av2-voz-avatar${negativa ? ' av2-voz-avatar--mala' : ''}`}>
+                        {iniciales(r.autor)}
+                      </span>
+                      <span className="av2-voz-autor">
+                        {r.autor} · {r.categoria}
+                      </span>
+                      {negativa && (
+                        <button
+                          type="button"
+                          className="av2-voz-reabrir"
+                          onClick={() => navigate(`/gestion/reclamos/${r.reclamo_id}`)}
+                        >
+                          Reabrir
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </CardCarousel>
           </div>
         )}
       </div>

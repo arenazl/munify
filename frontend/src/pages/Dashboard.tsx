@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays, Filter } from 'lucide-react';
-import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi, calificacionesApi } from '../lib/api';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ClipboardList, TrendingUp, MapPin, Users, ListChecks, FileCheck } from 'lucide-react';
+import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi, calificacionesApi, municipiosApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
-import { ChartSkeleton, DashboardStatSkeleton } from '../components/ui/Skeleton';
-import { ModernSelect } from '../components/ui/ModernSelect';
-import { estadoColor } from '../lib/enums/reclamo';
+import { useAuth, type Municipio } from '../contexts/AuthContext';
+import { ChartSkeleton } from '../components/ui/Skeleton';
+import { AdaptiveFilter, type AdaptiveFilterGroup } from '../components/ui/AdaptiveFilter';
+import { BarList, type BarListItem, type BarListTono } from '../components/ui/BarList';
+import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
+import { parseFechaLocal } from '../lib/tesoreria-helpers';
 import {
   XAxis,
   YAxis,
@@ -17,22 +19,28 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
-  Legend,
 } from 'recharts';
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { seg, type HeroFrase } from '../lib/semanticHero';
-import { resolverUmbrales, veredictoMasEsPeor, veredictoTasa, veredictoMenosEsMejor } from '../lib/veredictos';
+import {
+  resolverUmbrales,
+  veredictoMasEsPeor,
+  veredictoTasa,
+  veredictoMenosEsMejor,
+  metaResolucionDias,
+} from '../lib/veredictos';
 import DashboardLive from '../components/DashboardLive';
 import { VozDelVecino } from '../components/dashboard/VozDelVecino';
+import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
+import { SectionTitleV2 } from '../components/dashboard/SectionTitleV2';
+import { KpiCardV2, type KpiCardV2Props } from '../components/dashboard/KpiCardV2';
 import PresentacionLive from '../components/PresentacionLive';
 import { BRAND } from '../brands';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
-import { Radio } from 'lucide-react';
 
 // Tipos para analytics
 interface HeatmapPoint {
@@ -62,40 +70,17 @@ interface ReclamoSimilarGrupo {
 
 interface TendenciaData {
   fecha: string;
+  /** Reclamos ingresados ese día (contrato histórico del endpoint). */
   cantidad: number;
+  /**
+   * Reclamos cerrados ese día. OPCIONAL a propósito: si el backend todavía no
+   * la devuelve, el gráfico dibuja sólo ingresados y oculta la leyenda —
+   * jamás se inventa la serie.
+   */
+  resueltos?: number;
 }
 
-type VistaMetrica = 'barrios' | 'tiempos' | 'recurrentes' | 'tendencias' | 'categorias';
-
-// Trend real de una stat-card. null = sin datos suficientes para comparar (no se muestra badge).
-interface TrendInfo {
-  text: string;
-  up: boolean;
-}
-
-const trendPct = (actual: number, previo: number): TrendInfo | null =>
-  previo > 0
-    ? { text: `${actual >= previo ? '+' : ''}${Math.round(((actual - previo) / previo) * 100)}%`, up: actual >= previo }
-    : null;
-
-const trendCount = (actual: number, previo: number): TrendInfo | null => {
-  if (actual === 0 && previo === 0) return null;
-  const delta = actual - previo;
-  return { text: `${delta >= 0 ? '+' : ''}${delta}`, up: delta >= 0 };
-};
-
-const trendDias = (actual: number | null | undefined, previo: number | null | undefined): TrendInfo | null => {
-  if (actual == null || previo == null) return null;
-  const delta = Math.round((actual - previo) * 10) / 10;
-  return { text: `${delta >= 0 ? '+' : ''}${delta}d`, up: delta >= 0 };
-};
-
-interface EmpleadoDistancia {
-  empleado_nombre: string;
-  reclamos_resueltos: number;
-  distancia_total_km: number;
-  distancia_promedio_km: number;
-}
+type VistaMetrica = 'barrios' | 'tiempos' | 'recurrentes' | 'categorias';
 
 interface ZonaCobertura {
   zona_nombre: string;
@@ -140,69 +125,147 @@ interface CalifEstadisticas {
   tags_frecuentes: { tag: string; count: number }[];
 }
 
-export default function Dashboard() {
-  console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
-  const { theme } = useTheme();
-  // Detecta tema claro a partir de la luminancia del background del tema activo
-  // (mas robusto que mirar nombres de preset/variant).
-  const isLightTheme = (() => {
-    const hex = (theme.background || '#000000').replace('#', '');
-    const r = parseInt(hex.slice(0, 2), 16) || 0;
-    const g = parseInt(hex.slice(2, 4), 16) || 0;
-    const b = parseInt(hex.slice(4, 6), 16) || 0;
-    return ((r * 299 + g * 587 + b * 114) / 1000) > 155;
-  })();
-  const { municipioActual, user } = useAuth();
+// Estados que NO cuentan como "abiertos" para el strip del hero.
+// Patrón resiliente: cualquier estado desconocido cuenta como abierto.
+const ESTADOS_CERRADOS = new Set(['finalizado', 'rechazado', 'resuelto']);
 
-  // --- Hero header adaptativo -------------------------------------------
-  // Si el muni configuro una portada propia la respetamos (foto + overlay
-  // oscuro, texto blanco). Si no, en vez de una foto stock generica usamos un
-  // "hero de marca" derivado del theme: gradiente con theme.primary + el escudo
-  // del muni (o un icono) como watermark. Asi el banner deja de ser una isla
-  // oscura en los temas claros y respeta la identidad del municipio.
-  // Imagen de fondo del banner: la portada del muni si la cargo; si no, una
-  // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
-  const claroVariant = 7; // variante 8 (elegida 2026-07-03) — fija, botonera de prueba sacada
-  const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
-  const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
-  const tienePortada = true; // siempre hay imagen (portada propia o default)
-  // Tema OSCURO -> banner oscuro: velo + tinte del color, la foto manda, texto blanco.
-  // Tema CLARO  -> banner claro: overlay que se funde con el fondo de la app
-  //                (no queda una isla oscura chocante) y el texto va oscuro.
-  const heroFondoOscuro = !isLightTheme;
-  // 10 variantes del overlay para TEMA CLARO (distintas: direccion, opacity,
-  // con/sin tinte del color). El degrade va concentrado a la izquierda (texto) y
-  // se abre hacia la derecha, parecido al modo oscuro. Botonera abajo para elegir.
-  const _pc = theme.primary;
-  const bannerClaroOverlays = [
-    `linear-gradient(105deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.40) 50%, transparent 85%)`,
-    `linear-gradient(105deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0.15) 100%)`,
-    `linear-gradient(105deg, rgba(255,255,255,0.90) 0%, ${_pc}1f 50%, transparent 90%)`,
-    `linear-gradient(105deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.50) 50%, rgba(255,255,255,0.34) 100%)`,
-    `linear-gradient(105deg, ${_pc}3d 0%, rgba(255,255,255,0.62) 48%, transparent 88%)`,
-    `linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.32) 35%, transparent 70%)`,
-    `linear-gradient(0deg, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.30) 50%, transparent 85%)`,
-    `radial-gradient(125% 135% at 12% 50%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.45) 35%, transparent 64%)`,
-    `linear-gradient(105deg, rgba(255,255,255,0.56) 0%, rgba(255,255,255,0.24) 45%, transparent 80%)`,
-    `linear-gradient(105deg, rgba(255,255,255,0.90) 0%, ${_pc}24 47%, rgba(255,255,255,0.20) 90%)`,
-  ];
-  // Opacity extra del overlay en tema claro: suaviza la variante elegida para que
-  // no quede tan fuerte (la foto se ve un poco mas). Ajustable por esta variable.
-  const claroOverlayOpacity = 0.72;
-  const bannerOverlay = isLightTheme
-    ? bannerClaroOverlays[claroVariant]
-    : `linear-gradient(105deg, rgba(0,0,0,0.58) 0%, ${theme.primary}33 47%, transparent 86%)`;
-  const heroBrandBg = isLightTheme
-    ? `linear-gradient(135deg, ${theme.primary}26 0%, ${theme.card} 55%, ${theme.primary}14 100%)`
-    : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`;
-  const heroTextColor = heroFondoOscuro ? '#ffffff' : theme.text;
-  const heroTextMuted = heroFondoOscuro ? 'rgba(255,255,255,0.9)' : theme.textSecondary;
-  // Tema claro: el overlay radial (variante 8) se abre bastante hacia abajo/derecha,
-  // asi que el texto (anclado abajo, justify-end) puede quedar sin proteccion sobre
-  // la foto. Un halo blanco sutil en el shadow compensa sin oscurecer el texto.
-  const heroShadowStrong = heroFondoOscuro ? '0 2px 8px rgba(0,0,0,0.5)' : '0 1px 12px rgba(255,255,255,0.9), 0 1px 2px rgba(255,255,255,0.9)';
-  const heroShadowSoft = heroFondoOscuro ? '0 1px 4px rgba(0,0,0,0.4)' : '0 1px 10px rgba(255,255,255,0.85), 0 1px 2px rgba(255,255,255,0.85)';
-  // ----------------------------------------------------------------------
+const contarAbiertos = (s: DashboardStats | null): number =>
+  s
+    ? Object.entries(s.por_estado || {}).reduce(
+        (acc, [estado, n]) => (ESTADOS_CERRADOS.has(estado) ? acc : acc + (n as number)),
+        0,
+      )
+    : 0;
+
+// ====================================================================
+// Filas de KPI v2 (Reclamos / Trámites) — TODO sale de datos reales del
+// backend (stats + stats.tendencias); los deltas se calculan contra los
+// períodos previos y, si falta la base de comparación, se degrada a un
+// subtexto informativo. JAMÁS se inventan series ni porcentajes.
+// ====================================================================
+
+const fmtDias = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 1 });
+
+/**
+ * 'YYYY-MM-DD' → '1 jul' (día + mes corto en minúscula). Parsea LOCAL:
+ * `new Date('2026-07-01')` se lee como UTC y en ARG muestra el día anterior.
+ */
+const fmtFechaCorta = (iso: string): string => {
+  const d = parseFechaLocal(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d
+    .toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+    .replace(/\./g, '')
+    .toLowerCase();
+};
+
+/** % de variación redondeado; null si no hay base de comparación. */
+const pctDelta = (actual: number, prev: number): number | null =>
+  prev > 0 ? Math.round(((actual - prev) / prev) * 100) : null;
+
+/** Suma la serie diaria en bloques semanales (de más viejo a más nuevo). */
+const seriePorSemana = (diaria: number[]): number[] => {
+  const semanas: number[] = [];
+  for (let i = diaria.length; i > 0; i -= 7) {
+    semanas.unshift(diaria.slice(Math.max(0, i - 7), i).reduce((a, b) => a + b, 0));
+  }
+  return semanas;
+};
+
+const buildKpisPeriodo = (opts: {
+  stats: DashboardStats;
+  etiquetaTotal: string;
+  /** Serie diaria real de ingresos (ej: tendencia 30 días de reclamos). */
+  serieDiaria?: number[];
+  color: string;
+  colorNeutro: string;
+  msgSinCierres: string;
+}): KpiCardV2Props[] => {
+  const s = opts.stats;
+  const t = s.tendencias;
+  const diaria = opts.serieDiaria && opts.serieDiaria.length >= 2 ? opts.serieDiaria : null;
+  const colorear = (card: KpiCardV2Props): KpiCardV2Props => ({
+    ...card,
+    serieColor: card.atenuado ? opts.colorNeutro : opts.color,
+  });
+
+  const pctMes = t ? pctDelta(t.creados_30d, t.creados_30d_prev) : null;
+  const total: KpiCardV2Props = {
+    eyebrow: opts.etiquetaTotal,
+    valor: s.total,
+    atenuado: s.total === 0,
+    serie: diaria ?? (t ? [t.creados_30d_prev, t.creados_30d] : undefined),
+    delta: pctMes != null && pctMes !== 0
+      ? {
+          texto: `${Math.abs(pctMes)}%`,
+          direccion: pctMes > 0 ? 'sube' : 'baja',
+          veredicto: pctMes > 0 ? 'advertencia' : 'bueno',
+        }
+      : null,
+    sub: pctMes != null
+      ? (pctMes === 0
+          ? 'igual que el mes pasado'
+          : pctMes > 0 ? 'más que el mes pasado' : 'menos que el mes pasado')
+      : t ? `${t.creados_30d} en los últimos 30 días` : undefined,
+  };
+
+  const nuevosHoy: KpiCardV2Props = {
+    eyebrow: 'Nuevos hoy',
+    valor: s.hoy,
+    atenuado: s.hoy === 0,
+    serie: diaria ? diaria.slice(-7) : (t ? [t.ayer, s.hoy] : undefined),
+    sub: t ? (t.ayer === 1 ? 'Ayer entró 1' : `Ayer entraron ${t.ayer}`) : undefined,
+  };
+
+  const pctSemana = t ? pctDelta(s.semana, t.semana_pasada) : null;
+  const estaSemana: KpiCardV2Props = {
+    eyebrow: 'Esta semana',
+    valor: s.semana,
+    atenuado: s.semana === 0,
+    serie: diaria ? seriePorSemana(diaria) : (t ? [t.semana_pasada, s.semana] : undefined),
+    delta: pctSemana != null && pctSemana !== 0
+      ? {
+          texto: `${Math.abs(pctSemana)}%`,
+          direccion: pctSemana > 0 ? 'sube' : 'baja',
+          veredicto: pctSemana > 0 ? 'advertencia' : 'bueno',
+        }
+      : null,
+    sub: pctSemana != null
+      ? (pctSemana === 0 ? 'igual que la semana anterior' : 'vs. semana anterior')
+      : t ? `Semana pasada: ${t.semana_pasada}` : undefined,
+  };
+
+  const t30 = t?.tiempo_resolucion_30d ?? null;
+  const t30prev = t?.tiempo_resolucion_30d_prev ?? null;
+  const diffDias = t30 != null && t30prev != null ? t30prev - t30 : null; // >0 = más rápido
+  const resolucion: KpiCardV2Props = {
+    eyebrow: 'Resolución promedio',
+    valor: t30 != null ? fmtDias(t30) : '—',
+    unidad: t30 != null ? 'días' : undefined,
+    atenuado: t30 == null,
+    serie: t30 != null && t30prev != null ? [t30prev, t30] : undefined,
+    delta: diffDias != null && Math.abs(diffDias) >= 0.1
+      ? {
+          texto: `${fmtDias(Math.abs(diffDias))} d`,
+          direccion: diffDias > 0 ? 'baja' : 'sube',
+          veredicto: diffDias > 0 ? 'bueno' : 'malo',
+        }
+      : null,
+    sub: t30 == null
+      ? opts.msgSinCierres
+      : diffDias == null
+        ? 'sin base del mes anterior'
+        : Math.abs(diffDias) >= 0.1
+          ? (diffDias > 0 ? 'más rápido que el mes pasado' : 'más lento que el mes pasado')
+          : 'igual que el mes pasado',
+  };
+
+  return [total, nuevosHoy, estaSemana, resolucion].map(colorear);
+};
+
+export default function Dashboard() {
+  const { theme } = useTheme();
+  const { municipioActual, municipios, user } = useAuth();
 
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -220,12 +283,8 @@ export default function Dashboard() {
   const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
   const [reclamosSimilares, setReclamosSimilares] = useState<ReclamoSimilarGrupo[]>([]);
   const [tendencias, setTendencias] = useState<TendenciaData[]>([]);
-  const [distancias, setDistancias] = useState<EmpleadoDistancia[]>([]);
   const [cobertura, setCobertura] = useState<ZonaCobertura[]>([]);
   const [tiempoResolucion, setTiempoResolucion] = useState<TiempoCategoria[]>([]);
-  const [rendimientoEmpleados, setRendimientoEmpleados] = useState<{ semana: string; [key: string]: string | number }[]>([]);
-  const [empleadosNames, setEmpleadosNames] = useState<string[]>([]);
-  const [distanciasResumen, setDistanciasResumen] = useState<{ distancia_total_km: number; reclamos_total: number; distancia_promedio_por_reclamo_km: number } | null>(null);
   const [coberturaResumen, setCoberturaResumen] = useState<{ zonas_criticas: number; tasa_resolucion_global: number } | null>(null);
   const [metricasAccion, setMetricasAccion] = useState<{
     urgentes: number;
@@ -243,7 +302,7 @@ export default function Dashboard() {
   const [califStats, setCalifStats] = useState<CalifEstadisticas | null>(null);
 
   // Callback para navegar al mapa cuando se hace click en una categoría del heatmap
-  const handleCategoryClick = useCallback((categoryKey: string, categoryLabel: string) => {
+  const handleCategoryClick = useCallback((categoryKey: string) => {
     navigate(`/gestion/mapa?categoria=${encodeURIComponent(categoryKey)}`);
   }, [navigate]);
 
@@ -292,7 +351,7 @@ export default function Dashboard() {
       try {
         const res = await dependenciasApi.getMunicipio({ activo: true });
         if (cancel) return;
-        const items: DependenciaItem[] = (res.data || []).map((d: any) => ({
+        const items: DependenciaItem[] = (res.data || []).map((d: { id: number; nombre: string; color?: string; icono?: string }) => ({
           id: d.id,
           nombre: d.nombre,
           color: d.color,
@@ -332,6 +391,46 @@ export default function Dashboard() {
     }
   }, [lsKey]);
 
+  // ====================================================================
+  // Muni del tablero. Para el SUPER ADMIN `municipioActual` queda null en
+  // toda la sesión (el switcher solo persiste el id en storage y
+  // loadMunicipios hace early-return), y el hero caía SIEMPRE al gradiente
+  // aunque el muni tuviera portada. Resolvemos el detalle real: contexto >
+  // lista del contexto > fetch por el id guardado. Escucha `municipio-changed`
+  // para seguir los cambios del switcher sin recargar.
+  // ====================================================================
+  const [muniResuelto, setMuniResuelto] = useState<Municipio | null>(null);
+  useEffect(() => {
+    let cancel = false;
+    const resolver = () => {
+      if (municipioActual) {
+        setMuniResuelto(null);
+        return;
+      }
+      const stored = localStorage.getItem('municipio_actual_id');
+      const id = stored ? parseInt(stored, 10) : NaN;
+      if (!Number.isFinite(id)) {
+        setMuniResuelto(null);
+        return;
+      }
+      const enLista = municipios.find((m) => m.id === id);
+      if (enLista) {
+        setMuniResuelto(enLista);
+        return;
+      }
+      municipiosApi.getOne(id)
+        .then((res) => { if (!cancel) setMuniResuelto(res.data as Municipio); })
+        .catch(() => { /* sin detalle el hero cae al gradiente (fallback) */ });
+    };
+    resolver();
+    window.addEventListener('municipio-changed', resolver);
+    return () => {
+      cancel = true;
+      window.removeEventListener('municipio-changed', resolver);
+    };
+  }, [municipioActual, municipios]);
+  const muniTablero = municipioActual ?? muniResuelto;
+
   // Indicador sutil mientras refrescamos por cambio de dependencia
   const [refreshing, setRefreshing] = useState(false);
 
@@ -355,8 +454,6 @@ export default function Dashboard() {
               return { data: null };
             }),
           ]);
-          console.log('📊 Stats:', statsRes.data);
-          console.log('📋 Tramites Stats:', tramitesRes.data);
           setStats(statsRes.data);
           setTramitesStats(tramitesRes.data);
           setLoading(false);
@@ -368,12 +465,14 @@ export default function Dashboard() {
         // Paso 2: Cargar gráficos básicos (independientemente)
         try {
           const [categoriaRes, zonasRes, metricasRes] = await Promise.all([
-            dashboardApi.getPorCategoria(depId).catch(e => ({ data: [] })),
-            dashboardApi.getPorZona(depId).catch(e => ({ data: [] })),
-            dashboardApi.getMetricasAccion(depId).catch(e => ({ data: null })),
+            dashboardApi.getPorCategoria(depId).catch(() => ({ data: [] })),
+            dashboardApi.getPorZona(depId).catch(() => ({ data: [] })),
+            dashboardApi.getMetricasAccion(depId).catch(() => ({ data: null })),
           ]);
           setPorCategoria(categoriaRes.data || []);
-          setPorZona((zonasRes.data || []).slice(0, 5));
+          // Lista COMPLETA de zonas: las cards muestran el top 5 pero necesitan
+          // el total real para el "Top 5 de N" y el link "Ver los N barrios".
+          setPorZona(zonasRes.data || []);
           setMetricasAccion(metricasRes.data || null);
         } catch (error) {
           console.error('Error cargando gráficos básicos:', error);
@@ -386,9 +485,9 @@ export default function Dashboard() {
         try {
           const muniId = municipioActual?.id;
           const [tendenciasRes, recurrentesRes, similaresRes] = await Promise.all([
-            dashboardApi.getTendencia(30, depId).catch(e => ({ data: [] })),
-            dashboardApi.getRecurrentes(90, 2, depId).catch(e => ({ data: [] })),
-            muniId ? reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2, municipio_id: muniId }).catch(e => ({ data: [] })) : Promise.resolve({ data: [] }),
+            dashboardApi.getTendencia(30, depId).catch(() => ({ data: [] })),
+            dashboardApi.getRecurrentes(90, 2, depId).catch(() => ({ data: [] })),
+            muniId ? reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2, municipio_id: muniId }).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
           ]);
           setTendencias(tendenciasRes.data || []);
           setRecurrentes(recurrentesRes.data || []);
@@ -400,7 +499,7 @@ export default function Dashboard() {
         // Paso 4: Cargar analytics avanzados (más pesados) de a uno
         try {
           // Traer 90 días para el mapa de calor (más representativo)
-          const heatmapRes = await analyticsApi.getHeatmap(90, undefined, depId).catch(e => ({ data: { puntos: [] } }));
+          const heatmapRes = await analyticsApi.getHeatmap(90, undefined, depId).catch(() => ({ data: { puntos: [] } }));
           setHeatmapData(heatmapRes.data.puntos || []);
         } catch (error) {
           console.error('Error cargando heatmap:', error);
@@ -408,16 +507,11 @@ export default function Dashboard() {
           setLoadingHeatmap(false);
         }
 
-        try {
-          const distanciasRes = await analyticsApi.getDistancias(30).catch(e => ({ data: { empleados: [], resumen: null } }));
-          setDistancias(distanciasRes.data.empleados || []);
-          setDistanciasResumen(distanciasRes.data.resumen || null);
-        } catch (error) {
-          console.error('Error cargando distancias:', error);
-        }
+        // Nota: getDistancias / getRendimientoEmpleados se dejaron de pedir en la
+        // migración v2 — el tablero nunca los renderizaba (estados muertos).
 
         try {
-          const coberturaRes = await analyticsApi.getCobertura(30, depId).catch(e => ({ data: { zonas: [], resumen: null } }));
+          const coberturaRes = await analyticsApi.getCobertura(30, depId).catch(() => ({ data: { zonas: [], resumen: null } }));
           setCobertura(coberturaRes.data.zonas || []);
           setCoberturaResumen(coberturaRes.data.resumen || null);
         } catch (error) {
@@ -425,22 +519,14 @@ export default function Dashboard() {
         }
 
         try {
-          const tiempoRes = await analyticsApi.getTiempoResolucion(90, depId).catch(e => ({ data: { categorias: [] } }));
+          const tiempoRes = await analyticsApi.getTiempoResolucion(90, depId).catch(() => ({ data: { categorias: [] } }));
           setTiempoResolucion(tiempoRes.data.categorias || []);
         } catch (error) {
           console.error('Error cargando tiempo resolución:', error);
         }
 
         try {
-          const rendimientoRes = await analyticsApi.getRendimientoEmpleados(4).catch(e => ({ data: { semanas: [], empleados: [] } }));
-          setRendimientoEmpleados(rendimientoRes.data.semanas || []);
-          setEmpleadosNames(rendimientoRes.data.empleados || []);
-        } catch (error) {
-          console.error('Error cargando rendimiento empleados:', error);
-        }
-
-        try {
-          const metricasDetalleRes = await dashboardApi.getMetricasDetalle(depId).catch(e => ({ data: null }));
+          const metricasDetalleRes = await dashboardApi.getMetricasDetalle(depId).catch(() => ({ data: null }));
           setMetricasDetalle(metricasDetalleRes.data || null);
         } catch (error) {
           console.error('Error cargando métricas detalle:', error);
@@ -473,14 +559,15 @@ export default function Dashboard() {
   // early return — si no, el primer render (loading=true) salta estos hooks
   // y el segundo (loading=false) los ejecuta → React #310 (more hooks).
   const showDepFilter = user?.rol === 'admin' || user?.rol === 'supervisor';
-  const dependenciaOptions = useMemo(() => [
-    { value: '', label: 'Dependencias' },
-    ...dependencias.map(d => ({
-      value: String(d.id),
-      label: d.nombre,
-      color: d.color,
-    })),
-  ], [dependencias]);
+  // Un solo grupo: dependencias. El AdaptiveFilter decide solo si las muestra
+  // como píldoras o colapsa a combo según el ancho disponible.
+  const gruposFiltro = useMemo<AdaptiveFilterGroup[]>(() => [{
+    id: 'dependencia',
+    placeholder: 'Todas las dependencias',
+    options: dependencias.map(d => ({ value: String(d.id), label: d.nombre })),
+    value: selectedDependenciaId ? String(selectedDependenciaId) : '',
+    onChange: handleDependenciaChange,
+  }], [dependencias, selectedDependenciaId, handleDependenciaChange]);
   const selectedDepNombre = useMemo(() => {
     if (!selectedDependenciaId) return null;
     return dependencias.find(d => d.id === selectedDependenciaId)?.nombre || null;
@@ -550,42 +637,37 @@ export default function Dashboard() {
     return frases;
   }, [stats, metricasAccion, coberturaResumen, califStats]);
 
+  // Matices del puente de tokens (--pl-*), leídos del :root: recharts necesita
+  // colores concretos, así que los sacamos de los MISMOS tokens que usa el CSS
+  // (patrón polimórfico: funciona en los 12 themes, cero hex fijos).
+  const semColors = useMemo(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const read = (token: string, fallback: string) => cs.getPropertyValue(token).trim() || fallback;
+    return {
+      bueno: read('--pl-green', theme.primary),
+      advertencia: read('--pl-amber-strong', theme.primary),
+      malo: read('--pl-red', theme.primary),
+      azul: read('--pl-blue', theme.primary),
+      neutro: read('--pl-border-strong', theme.textSecondary),
+      // Última posición de la rampa de datos: serie secundaria (resueltos)
+      data5: read('--pl-data-5', theme.textSecondary),
+      // Riel de las barras / grilla de los charts
+      track: read('--pl-track', theme.textSecondary),
+    };
+  }, [theme.primary, theme.textSecondary]);
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        {/* Skeleton header */}
-        <div className="rounded-2xl p-6 animate-pulse" style={{ backgroundColor: theme.card }}>
-          <div className="h-8 w-48 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}20` }} />
-          <div className="h-4 w-72 mt-2 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10` }} />
-        </div>
-        {/* Skeleton cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="dv2-page">
+        <div className="dv2-skel dv2-skel-hero" />
+        <div className="dv2-grid-cola">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="rounded-2xl p-5 animate-pulse" style={{ backgroundColor: theme.card }}>
-              <div className="flex justify-between">
-                <div className="space-y-3">
-                  <div className="h-3 w-20 rounded" style={{ backgroundColor: `${theme.textSecondary}20` }} />
-                  <div className="h-8 w-16 rounded" style={{ backgroundColor: `${theme.textSecondary}30` }} />
-                  <div className="h-3 w-24 rounded" style={{ backgroundColor: `${theme.textSecondary}15` }} />
-                </div>
-                <div className="w-14 h-14 rounded-2xl" style={{ backgroundColor: `${theme.textSecondary}20` }} />
-              </div>
-            </div>
+            <div key={i} className="dv2-skel dv2-skel-card" />
           ))}
         </div>
-        {/* Loading indicator */}
-        <div className="flex items-center justify-center gap-3 py-8">
-          <div className="relative">
-            <div
-              className="animate-spin rounded-full h-10 w-10 border-3 border-t-transparent"
-              style={{ borderColor: `${theme.primary}30`, borderTopColor: theme.primary }}
-            />
-            <Sparkles
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 animate-pulse"
-              style={{ color: theme.primary }}
-            />
-          </div>
-          <p className="text-sm font-medium" style={{ color: theme.textSecondary }}>Cargando analytics...</p>
+        <div className="dv2-skel-cargando">
+          <span className="dv2-spin" aria-hidden="true" />
+          Cargando el tablero…
         </div>
       </div>
     );
@@ -593,119 +675,118 @@ export default function Dashboard() {
 
   if (!stats) return null;
 
-  // Cards de Reclamos — trends calculados con las comparativas reales del backend
-  const tr = stats.tendencias;
-  const reclamosCards = [
-    {
-      title: 'Total Reclamos',
-      value: stats.total,
-      icon: ClipboardList,
-      iconBg: `${theme.primary}30`,
-      iconColor: theme.primary,
-      trend: tr ? trendPct(tr.creados_30d, tr.creados_30d_prev) : null,
-      trendLabel: 'vs mes ant.',
-    },
-    {
-      title: 'Nuevos Hoy',
-      value: stats.hoy,
-      icon: Calendar,
-      iconBg: '#f59e0b30',
-      iconColor: '#f59e0b',
-      trend: tr ? trendCount(stats.hoy, tr.ayer) : null,
-      trendLabel: 'vs ayer',
-    },
-    {
-      title: 'Esta Semana',
-      value: stats.semana,
-      icon: TrendingUp,
-      iconBg: '#22c55e30',
-      iconColor: '#22c55e',
-      trend: tr ? trendPct(stats.semana, tr.semana_pasada) : null,
-      trendLabel: 'vs sem. ant.',
-    },
-    {
-      title: 'Tiempo Promedio',
-      value: `${stats.tiempo_promedio_dias}d`,
-      icon: Clock,
-      iconBg: '#8b5cf630',
-      iconColor: '#8b5cf6',
-      trend: tr ? trendDias(tr.tiempo_resolucion_30d, tr.tiempo_resolucion_30d_prev) : null,
-      trendLabel: 'vs mes ant.',
-    },
+  // Obtener datos del municipio (preferir contexto/detalle resuelto sobre
+  // localStorage). Limpiar el nombre si ya incluye "Municipalidad de"
+  const rawNombre = muniTablero?.nombre || localStorage.getItem('municipio_nombre') || 'Tu Municipio';
+  const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
+
+  // ---- Hero banner v2: eyebrow + sub + strip de stats (datos reales) ----
+  const reclamosAbiertos = contarAbiertos(stats);
+  const tramitesActivos = contarAbiertos(tramitesStats);
+  const enRiesgoSla = metricasAccion?.vencidos ?? null;
+
+  const heroKpis: HeroStripKpi[] = [
+    { etiqueta: 'Reclamos abiertos', valor: reclamosAbiertos },
+    { etiqueta: 'Trámites activos', valor: tramitesActivos },
+    { etiqueta: 'Resolución promedio', valor: `${stats.tiempo_promedio_dias} d` },
+    { etiqueta: 'En riesgo de SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 },
   ];
 
-  // Cards de Trámites (siempre se muestran, con 0 si no hay datos)
-  const tt = tramitesStats?.tendencias;
-  const tramitesCards = [
-    {
-      title: 'Total Trámites',
-      value: tramitesStats?.total ?? 0,
-      icon: FileCheck,
-      iconBg: '#06b6d430',
-      iconColor: '#06b6d4',
-      trend: tt ? trendPct(tt.creados_30d, tt.creados_30d_prev) : null,
-      trendLabel: 'vs mes ant.',
-    },
-    {
-      title: 'Nuevos Hoy',
-      value: tramitesStats?.hoy ?? 0,
-      icon: CalendarDays,
-      iconBg: '#ec489930',
-      iconColor: '#ec4899',
-      trend: tt ? trendCount(tramitesStats?.hoy ?? 0, tt.ayer) : null,
-      trendLabel: 'vs ayer',
-    },
-    {
-      title: 'Esta Semana',
-      value: tramitesStats?.semana ?? 0,
-      icon: TrendingUp,
-      iconBg: '#14b8a630',
-      iconColor: '#14b8a6',
-      trend: tt ? trendPct(tramitesStats?.semana ?? 0, tt.semana_pasada) : null,
-      trendLabel: 'vs sem. ant.',
-    },
-    {
-      title: 'Tiempo Promedio',
-      value: `${tramitesStats?.tiempo_promedio_dias ?? 0}d`,
-      icon: Clock,
-      iconBg: '#a855f730',
-      iconColor: '#a855f7',
-      trend: tt ? trendDias(tt.tiempo_resolucion_30d, tt.tiempo_resolucion_30d_prev) : null,
-      trendLabel: 'vs mes ant.',
-    },
-  ];
+  const heroAcciones = (user?.rol === 'admin' || user?.rol === 'supervisor')
+    ? {
+        conoceLabel: `Conocé ${BRAND.name}`,
+        onConoce: () => setPresentOpen(true),
+        onPulso: () => setLiveMode(true),
+      }
+    : null;
 
+  // ---- Datos derivados para los charts ----
   const estadosData = Object.entries(stats.por_estado).map(([estado, cantidad]) => ({
-    name: estado.replace('_', ' '),
+    name: estadoLabel(estado),
     value: cantidad as number,
     color: estadoColor(estado),
   }));
 
-  const chartColors = {
-    primary: theme.primary,
-    secondary: '#8b5cf6',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    grid: `${theme.textSecondary}20`,
-    text: theme.textSecondary,
-  };
+  const totalCategorias = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
+  const maxCategoria = porCategoria.length > 0 ? Math.max(...porCategoria.map(c => c.cantidad)) : 0;
+  const maxZona = porZona.length > 0 ? Math.max(...porZona.map(z => z.cantidad)) : 0;
 
-  const lineColors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+  // ==================================================================
+  // Analítica — los umbrales y la meta SIEMPRE salen de lib/veredictos
+  // (SSoT configurable), nunca números sueltos acá.
+  // ==================================================================
+  const umbrales = resolverUmbrales();
+  const metaDias = metaResolucionDias(umbrales);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  /** Top 5 de barrios/zonas por volumen (barra relativa al primero). */
+  const itemsBarrios: BarListItem[] = porZona.slice(0, 5).map((z) => ({
+    id: z.zona,
+    label: z.zona,
+    pct: maxZona > 0 ? (z.cantidad / maxZona) * 100 : 0,
+    valor: z.cantidad,
+  }));
+
+  /** Top 5 de categorías por volumen (barra relativa a la primera). */
+  const itemsCategorias: BarListItem[] = porCategoria.slice(0, 5).map((c) => ({
+    id: c.categoria,
+    label: c.categoria,
+    pct: maxCategoria > 0 ? (c.cantidad / maxCategoria) * 100 : 0,
+    valor: c.cantidad,
+  }));
+
+  /** Cobertura por zona: % de resolución con veredicto + fracción resueltos/total. */
+  const itemsCobertura: BarListItem[] = cobertura.slice(0, 5).map((z) => ({
+    id: z.zona_nombre,
+    label: z.zona_nombre,
+    pct: z.tasa_resolucion,
+    valor: `${z.tasa_resolucion}%`,
+    valorSub: `${z.resueltos}/${z.total_reclamos}`,
+    tono: (veredictoTasa(z.tasa_resolucion, umbrales.tasaResolucion) ?? 'neutro') as BarListTono,
+  }));
+
+  // Tiempo de resolución: las que MÁS tardan primero (el resto queda fuera del top 5)
+  const tiempoOrdenado = [...tiempoResolucion].sort((a, b) => b.dias_promedio - a.dias_promedio);
+  const maxDias = tiempoOrdenado.length > 0 ? tiempoOrdenado[0].dias_promedio : 0;
+  const itemsTiempo: BarListItem[] = tiempoOrdenado.slice(0, 5).map((t) => ({
+    id: t.categoria,
+    label: t.categoria,
+    pct: maxDias > 0 ? (t.dias_promedio / maxDias) * 100 : 0,
+    valor: `${fmtDias(t.dias_promedio)} d`,
+    tono: (veredictoMenosEsMejor(t.dias_promedio, umbrales.tiempoResolucionDias) ?? 'neutro') as BarListTono,
+  }));
+  const categoriasSobreMeta = tiempoResolucion.filter((t) => t.dias_promedio > metaDias).length;
+
+  // Tendencia: la serie de resueltos es OPCIONAL (backend viejo no la manda)
+  const haySerieResueltos = tendencias.some((t) => t.resueltos != null);
+  /** 4 marcas de tiempo (primera, ~1/3, ~2/3, última) — el eje X lo dibujamos nosotros. */
+  const marcasTendencia = (() => {
+    const n = tendencias.length;
+    if (n === 0) return [];
+    const idx = [0, Math.round((n - 1) / 3), Math.round(((n - 1) * 2) / 3), n - 1];
+    return [...new Set(idx)].map((i) => fmtFechaCorta(tendencias[i].fecha));
+  })();
+
+  interface TooltipEntry {
+    name?: string;
+    value?: number | string;
+    color?: string;
+    payload?: { color?: string };
+  }
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: TooltipEntry[];
+    label?: string | number;
+  }) => {
     if (active && payload && payload.length) {
+      // Las series temporales traen el label como 'YYYY-MM-DD': lo mostramos corto.
+      const titulo =
+        typeof label === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(label) ? fmtFechaCorta(label) : label;
       return (
-        <div
-          className="rounded-lg p-3 shadow-lg"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          <p className="font-medium mb-1" style={{ color: theme.text }}>{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
+        <div className="dv2-tooltip">
+          {titulo != null && <p className="dv2-tooltip-titulo">{titulo}</p>}
+          {payload.map((entry, index) => (
+            // color runtime: viene de la serie del chart
+            <p key={index} className="dv2-tooltip-fila" style={{ color: entry.color || entry.payload?.color }}>
               {entry.name}: {entry.value}
             </p>
           ))}
@@ -715,1070 +796,587 @@ export default function Dashboard() {
     return null;
   };
 
-  // Obtener datos del municipio (preferir contexto sobre localStorage)
-  const municipioColor = municipioActual?.color_primario || localStorage.getItem('municipio_color') || theme.primary;
-  // Limpiar el nombre si ya incluye "Municipalidad de"
-  const rawNombre = municipioActual?.nombre || localStorage.getItem('municipio_nombre') || 'Tu Municipio';
-  const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
+  // ---- Widgets operativos (cola de trabajo) ----
+  const cambioEf = metricasAccion?.cambio_eficiencia ?? 0;
+  const colaCards: {
+    label: string;
+    sublabel: string;
+    value: number;
+    tone: 'red' | 'amber' | 'blue' | 'green';
+    detailKey: keyof MetricasDetalle;
+    vacio: string;
+    footer: string;
+  }[] = [
+    {
+      label: 'Urgentes',
+      sublabel: 'Prioridad alta, +3 días abiertos',
+      value: metricasAccion?.urgentes ?? 0,
+      tone: 'red',
+      detailKey: 'urgentes',
+      vacio: 'Nada urgente pendiente.',
+      footer: 'Ver reclamos',
+    },
+    {
+      label: 'Sin asignar',
+      sublabel: 'Esperando asignación +24 h',
+      value: metricasAccion?.sin_asignar ?? 0,
+      tone: 'amber',
+      detailKey: 'sin_asignar',
+      vacio: 'Todo tiene responsable.',
+      footer: 'Asignar reclamos',
+    },
+    {
+      label: 'Para hoy',
+      sublabel: 'Programados para la jornada',
+      value: metricasAccion?.para_hoy ?? 0,
+      tone: 'blue',
+      detailKey: 'para_hoy',
+      vacio: 'No hay nada agendado para hoy.',
+      footer: 'Ver agenda',
+    },
+    {
+      label: 'Resueltos',
+      sublabel: `${cambioEf >= 0 ? '+' : ''}${cambioEf}% vs. semana anterior`,
+      value: metricasAccion?.resueltos_semana ?? 0,
+      tone: 'green',
+      detailKey: 'resueltos',
+      vacio: 'Sin cierres esta semana.',
+      footer: 'Ver cerrados',
+    },
+  ];
+
+  // ---- Filas de KPI v2 — series y deltas SOLO con datos reales cargados ----
+  const serieDiariaReclamos = tendencias.map((t) => t.cantidad);
+  const kpisReclamos = buildKpisPeriodo({
+    stats,
+    etiquetaTotal: 'Total reclamos',
+    serieDiaria: serieDiariaReclamos,
+    color: semColors.bueno,
+    colorNeutro: semColors.neutro,
+    msgSinCierres: 'Sin cierres en los últimos 30 días',
+  });
+  // Para trámites no hay serie diaria cargada en la página: cada card usa la
+  // evolución real de 2 puntos (período previo → actual) de stats.tendencias.
+  const kpisTramites = tramitesStats
+    ? buildKpisPeriodo({
+        stats: tramitesStats,
+        etiquetaTotal: 'Total trámites',
+        color: semColors.azul,
+        colorNeutro: semColors.neutro,
+        msgSinCierres: 'Sin trámites cerrados todavía',
+      })
+    : null;
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="space-y-6">
+    <div className="dv2-page">
+
+      {/* ================= HERO BANNER v2 ================= */}
+      <HeroBannerV2
+        eyebrow={selectedDepNombre ? `Municipalidad · ${selectedDepNombre}` : 'Municipalidad · Vista consolidada'}
+        titulo={municipioNombre}
+        sub={selectedDepNombre
+          ? `Vista de la dependencia ${selectedDepNombre}.`
+          : 'Todas las dependencias en un solo tablero.'}
+        fotoUrl={muniTablero?.imagen_portada || null}
+        fotoOpacity={muniTablero?.tema_config?.portadaOpacity}
+        kpis={heroKpis}
+        acciones={heroAcciones}
+      />
+
+      {/* ================= Hero semántico (carrusel) ================= */}
       <SemanticHero etiqueta={`HOY EN ${municipioNombre.toUpperCase()}`} frases={heroFrases} />
 
-      {/* Definiciones de gradientes SVG para los gráficos */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
-        <defs>
-          <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={theme.primary} stopOpacity={0.8} />
-            <stop offset="100%" stopColor={theme.primaryHover} stopOpacity={0.3} />
-          </linearGradient>
-          <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={theme.primary} stopOpacity={1} />
-            <stop offset="100%" stopColor={theme.primaryHover} stopOpacity={0.8} />
-          </linearGradient>
-        </defs>
-      </svg>
+      {/* ================= Filtro por dependencia (AdaptiveFilter del KIT) ================= */}
+      {showDepFilter && dependencias.length > 0 && (
+        <AdaptiveFilter groups={gruposFiltro} busy={refreshing} />
+      )}
 
-      {/* Hero Header adaptativo — foto propia del muni o hero de marca del theme. */}
-      <div
-        className="relative rounded-2xl"
-        style={{ minHeight: '240px' }}
-      >
-        {/* Fondo del hero: foto propia del muni si la configuro, sino hero de
-            marca derivado del theme (sin foto stock generica). */}
-        <div className="absolute inset-0 overflow-hidden rounded-2xl">
-          {tienePortada ? (
-            <>
-              <img
-                src={heroBgImage}
-                alt={municipioActual?.nombre || "Portada"}
-                className="w-full h-full object-cover"
-                style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
-              />
-              {/* Overlay con el COLOR DEL TEMA y alta opacity: el banner toma el
-                  tono del muni y la foto queda como textura tenue de fondo. El
-                  texto del municipio y los botones (LIVE / Conoce Munify) van por
-                  encima (z-10), nitidos y sin overlay. */}
-              <div
-                className="absolute inset-0"
-                style={{ background: bannerOverlay, opacity: isLightTheme ? claroOverlayOpacity : 1 }}
-              />
-            </>
-          ) : (
-            <>
-              {/* Hero de marca: gradiente del theme + watermark del escudo (o icono). */}
-              <div className="absolute inset-0" style={{ background: heroBrandBg }} />
-              {municipioActual?.logo_url ? (
-                <img
-                  src={municipioActual.logo_url}
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute -right-6 -bottom-8 h-52 w-52 object-contain pointer-events-none select-none"
-                  style={{ opacity: isLightTheme ? 0.1 : 0.16 }}
-                />
+      {/* ================= Reclamos — fila de KPIs v2 ================= */}
+      <SectionTitleV2
+        icon={ClipboardList}
+        label="Reclamos"
+        action={{ label: 'Ver todos', to: '/gestion/reclamos' }}
+      />
+      <div className="dv2-grid-kpi">
+        {kpisReclamos.map((k) => (
+          <KpiCardV2 key={k.eyebrow} {...k} />
+        ))}
+      </div>
+
+      {/* ================= Trámites — fila de KPIs v2 ================= */}
+      {kpisTramites && (
+        <>
+          <SectionTitleV2
+            icon={FileCheck}
+            label="Trámites"
+            tone="blue"
+            action={{ label: 'Ver todos', to: '/gestion/tramites' }}
+          />
+          <div className="dv2-grid-kpi">
+            {kpisTramites.map((k) => (
+              <KpiCardV2 key={k.eyebrow} {...k} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ================= Cola de trabajo ================= */}
+      <SectionTitleV2
+        icon={ListChecks}
+        label="Cola de trabajo"
+        action={{ label: 'Ver reclamos', to: '/gestion/reclamos' }}
+      />
+      <div className="dv2-grid-cola">
+        {colaCards.map((card) => {
+          const reclamos = metricasDetalle?.[card.detailKey] || [];
+          return (
+            <div key={card.label} className={`dv2-card dv2-cola-card dv2-cola-card--${card.tone}`}>
+              <div className="dv2-cola-head">
+                <span className="dv2-cola-dot" aria-hidden="true" />
+                <span className="dv2-cola-label">{card.label}</span>
+                <span className={`dv2-cola-num${card.value === 0 ? ' dv2-cola-num--cero' : ''}`}>
+                  {card.value}
+                </span>
+              </div>
+              <span className="dv2-cola-sub">{card.sublabel}</span>
+              {reclamos.length > 0 ? (
+                <div className="dv2-cola-lista">
+                  {reclamos.map((r) => (
+                    <div
+                      key={r.id}
+                      className="dv2-cola-item"
+                      onClick={() => navigate(`/gestion/reclamos/${r.id}`)}
+                    >
+                      <div className="dv2-cola-item-titulo">{r.titulo}</div>
+                      <div className="dv2-cola-item-meta">
+                        {r.categoria}
+                        {r.dias_antiguedad > 0 ? ` · ${r.dias_antiguedad} d` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <Building2
-                  aria-hidden="true"
-                  className="absolute -right-8 -bottom-10 pointer-events-none"
-                  style={{
-                    width: '13rem',
-                    height: '13rem',
-                    color: heroFondoOscuro ? '#ffffff' : theme.primary,
-                    opacity: isLightTheme ? 0.08 : 0.13,
-                  }}
-                />
+                <div className="dv2-cola-vacio">{card.vacio}</div>
+              )}
+              <button
+                type="button"
+                className="dv2-cola-link"
+                onClick={() => navigate('/gestion/reclamos')}
+              >
+                {card.footer}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ============ Estado + concentración + top categorías ============
+          (sin título de sección: en la referencia esta grilla sigue directo
+          a la cola de trabajo, y el título "Reclamos" ya vive en la fila de
+          KPIs de arriba — evitamos duplicarlo) */}
+      {loadingCharts ? (
+        <div className="dv2-grid-principal">
+          <ChartSkeleton height={300} />
+          <ChartSkeleton height={300} />
+          <ChartSkeleton height={300} />
+        </div>
+      ) : (
+        <div className="dv2-grid-principal">
+          {/* Por estado — donut + leyenda */}
+          <div className="dv2-card">
+            <div className="dv2-card-head">
+              <h3 className="dv2-card-titulo">Por estado</h3>
+            </div>
+            <div className="dv2-donut-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={estadosData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={54}
+                    outerRadius={80}
+                    paddingAngle={3}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {estadosData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="dv2-donut-centro">
+                <span>
+                  <span className="dv2-donut-total">{stats.total}</span>
+                  <span className="dv2-donut-sub">reclamos</span>
+                </span>
+              </div>
+            </div>
+            <div className="dv2-leyenda">
+              {estadosData.map((item) => (
+                <div key={item.name} className="dv2-leyenda-fila">
+                  {/* color runtime: viene del SSoT de estados */}
+                  <span className="dv2-leyenda-dot" style={{ backgroundColor: item.color }} />
+                  <span className="dv2-leyenda-label">{item.name}</span>
+                  <span className="dv2-leyenda-valor">{item.value}</span>
+                  <span className="dv2-leyenda-pct">
+                    {stats.total > 0 ? Math.round((item.value / stats.total) * 100) : 0}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Concentración — mapa de calor */}
+          <div className="dv2-card">
+            <div className="dv2-card-head dv2-card-head--icono">
+              <MapPin className="dv2-card-head-icono" aria-hidden="true" />
+              <h3 className="dv2-card-titulo">Concentración</h3>
+              <span className="dv2-card-caption">90 días</span>
+              <span className="dv2-card-caption dv2-card-caption--auto">{heatmapData.length} puntos</span>
+            </div>
+            <HeatmapWidget
+              data={heatmapData}
+              showMarkers={false}
+              height="300px"
+              title="Mapa de Calor - Concentración de Reclamos"
+              loading={loadingHeatmap}
+              onCategoryClick={handleCategoryClick}
+            />
+          </div>
+
+          {/* Top categorías */}
+          <div className="dv2-card">
+            <div className="dv2-card-head">
+              <h3 className="dv2-card-titulo">Top categorías</h3>
+              <span className="dv2-card-caption dv2-card-caption--auto">Por volumen</span>
+            </div>
+            {porCategoria.length > 0 ? (
+              <div className="dv2-barras">
+                {porCategoria.slice(0, 5).map((item, index) => {
+                  const pct = totalCategorias > 0 ? Math.round((item.cantidad / totalCategorias) * 100) : 0;
+                  const ancho = maxCategoria > 0 ? (item.cantidad / maxCategoria) * 100 : 0;
+                  // Rampa hasta d4: d5 es el neutro, no un puesto del ranking (igual que BarList)
+                  const rampa = Math.min(index + 1, 4);
+                  return (
+                    <div key={item.categoria} className="dv2-barra-bloque">
+                      <div className="dv2-barra-bloque-head">
+                        <span className="dv2-barra-bloque-nombre">{item.categoria}</span>
+                        <span className="dv2-barra-bloque-pct">{item.cantidad}</span>
+                        <span className="dv2-barra-bloque-frac">{pct}%</span>
+                      </div>
+                      <div className="dv2-barra-track">
+                        <span
+                          className={`dv2-barra-fill dv2-barra-fill--d${rampa}`}
+                          style={{ width: `${ancho}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="dv2-vacio">Sin datos</p>
+            )}
+            {porCategoria.length > 5 && (
+              <div className="dv2-card-foot">
+                <span>Otras {porCategoria.length - 5} categorías</span>
+                <span className="dv2-card-foot-valor dv2-auto">
+                  {totalCategorias - porCategoria.slice(0, 5).reduce((acc, c) => acc + c.cantidad, 0)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= Analítica: métricas + cobertura + charts ================= */}
+      <SectionTitleV2 icon={TrendingUp} label="Analítica" />
+      <div className="dv2-grid-2">
+        {/* Panel de métricas con segmented control */}
+        <div className="dv2-card">
+          {/* Segmented control de texto (sin iconos), como la referencia */}
+          <div className="dv2-tabs">
+            {[
+              { id: 'barrios' as VistaMetrica, label: 'Barrios' },
+              { id: 'tiempos' as VistaMetrica, label: 'Tiempos' },
+              { id: 'recurrentes' as VistaMetrica, label: 'Recurrentes' },
+              { id: 'categorias' as VistaMetrica, label: 'Categorías' },
+            ].map((btn) => (
+              <button
+                key={btn.id}
+                type="button"
+                className={`dv2-tab${vistaActiva === btn.id ? ' dv2-tab--activa' : ''}`}
+                onClick={() => setVistaActiva(btn.id)}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Vista: Barrios/Zonas */}
+          {vistaActiva === 'barrios' && (
+            <>
+              <div className="dv2-card-head dv2-card-head--bajo-tabs">
+                <h3 className="dv2-card-titulo">Reclamos por barrio</h3>
+                <span className="dv2-card-caption dv2-card-caption--auto">
+                  Top {itemsBarrios.length} de {porZona.length}
+                </span>
+              </div>
+              {itemsBarrios.length > 0 ? (
+                <>
+                  <BarList items={itemsBarrios} tono="rampa" labelWidth={116} valueWidth={32} />
+                  <Link to="/gestion/mapa" className="dv2-card-link">
+                    {porZona.length === 1 ? 'Ver el barrio en el mapa' : `Ver los ${porZona.length} barrios`}
+                  </Link>
+                </>
+              ) : (
+                <p className="dv2-vacio">Sin datos</p>
+              )}
+            </>
+          )}
+
+          {/* Vista: Tiempos de resolución */}
+          {vistaActiva === 'tiempos' && (
+            <>
+              <div className="dv2-card-head dv2-card-head--bajo-tabs">
+                <h3 className="dv2-card-titulo">Tiempo promedio de resolución</h3>
+              </div>
+              {tiempoResolucion.length > 0 ? (
+                <div className="dv2-leyenda">
+                  {tiempoResolucion.slice(0, 6).map((item) => {
+                    // Mismo veredicto que la card "Tiempo de resolución": SSoT en lib/veredictos
+                    const v = veredictoMenosEsMejor(item.dias_promedio, umbrales.tiempoResolucionDias) ?? 'advertencia';
+                    return (
+                      <div key={item.categoria} className="dv2-leyenda-fila">
+                        <span className="dv2-leyenda-label">{item.categoria}</span>
+                        <span className="dv2-leyenda-valor">
+                          <span className={`dv2-chip-dias dv2-chip-dias--${v}`}>{fmtDias(item.dias_promedio)} d</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="dv2-vacio">Sin datos</p>
+              )}
+            </>
+          )}
+
+          {/* Vista: Reclamos recurrentes */}
+          {vistaActiva === 'recurrentes' && (
+            <div>
+              {reclamosSimilares.length > 0 && (
+                <div className="dv2-bloque">
+                  <h3 className="dv2-subtitulo">
+                    <Users className="dv2-subtitulo-icono" aria-hidden="true" />
+                    Reclamos similares en la zona
+                  </h3>
+                  <div className="dv2-items">
+                    {reclamosSimilares.slice(0, 5).map((item) => (
+                      <div
+                        key={item.id}
+                        className="dv2-item dv2-item--amber"
+                        onClick={() => navigate(`/gestion/reclamos/${item.id}`)}
+                      >
+                        <div className="dv2-item-head">
+                          <span className="dv2-item-titulo">{item.titulo}</span>
+                          <span className="dv2-badge dv2-badge--amber">
+                            <Users className="dv2-badge-icono" aria-hidden="true" />
+                            {item.cantidad_reportes}
+                          </span>
+                        </div>
+                        <div className="dv2-item-meta">
+                          <MapPin className="dv2-item-meta-icono" aria-hidden="true" />
+                          <span className="dv2-item-meta-trunc">{item.direccion}</span>
+                        </div>
+                        <div className="dv2-item-meta">
+                          <span className="dv2-chip-cat">{item.categoria?.nombre || 'Sin categoría'}</span>
+                          {item.zona && <span className="dv2-item-meta-trunc">{item.zona}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <h3 className="dv2-subtitulo">Direcciones con reclamos recurrentes</h3>
+              {recurrentes.length > 0 ? (
+                <div className="dv2-items">
+                  {recurrentes.slice(0, 5).map((item, index) => (
+                    <div key={index} className="dv2-item">
+                      <div className="dv2-item-head">
+                        <span className="dv2-item-titulo">{item.direccion}</span>
+                        <span className="dv2-badge dv2-badge--red">{item.cantidad}x</span>
+                      </div>
+                      <div className="dv2-item-meta">
+                        <span>{item.zona}</span>
+                        <span>·</span>
+                        <span className="dv2-item-meta-trunc">{item.categorias.join(', ')}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="dv2-vacio">No hay reclamos recurrentes</p>
+              )}
+            </div>
+          )}
+
+          {/* Vista: Categorías — misma estructura que Barrios */}
+          {vistaActiva === 'categorias' && (
+            <>
+              <div className="dv2-card-head dv2-card-head--bajo-tabs">
+                <h3 className="dv2-card-titulo">Distribución por categoría</h3>
+                <span className="dv2-card-caption dv2-card-caption--auto">
+                  Top {itemsCategorias.length} de {porCategoria.length}
+                </span>
+              </div>
+              {itemsCategorias.length > 0 ? (
+                <>
+                  <BarList items={itemsCategorias} tono="rampa" labelWidth={116} valueWidth={32} />
+                  <Link to="/gestion/categorias-reclamo" className="dv2-card-link">
+                    {porCategoria.length === 1
+                      ? 'Ver la categoría'
+                      : `Ver las ${porCategoria.length} categorías`}
+                  </Link>
+                </>
+              ) : (
+                <p className="dv2-vacio">Sin datos</p>
               )}
             </>
           )}
         </div>
 
-        {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
-        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute z-20 hidden lg:flex flex-col items-start gap-2" style={{ top: 11, left: -5 }}>
-        {/* Conocé {marca} + LIVE — apilados arriba-izquierda, mismo borde, compactos (no pisan el título). */}
-        <button
-          onClick={() => setPresentOpen(true)}
-          className="cm-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
-          style={{
-            backgroundColor: heroFondoOscuro ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.92)',
-            border: '2px solid rgba(99, 102, 241, 0.7)',
-            color: '#ffffff',
-          }}
-          title="Recorrido guiado del producto"
-        >
-          <span className="cm-ring absolute inset-0 rounded-full pointer-events-none" />
-          <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
-          <Sparkles className="h-4 w-4 relative z-10 live-radio" />
-          <span className="tracking-wider relative z-10">Conocé {BRAND.name}</span>
-        </button>
-        <button
-          onClick={() => setLiveMode(true)}
-          className="live-btn relative flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
-          style={{
-            backgroundColor: heroFondoOscuro ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.92)',
-            border: '2px solid rgba(239, 68, 68, 0.7)',
-            color: '#ffffff',
-          }}
-          title="Modo televisor — slides en pantalla completa"
-        >
-          <span className="live-ring absolute inset-0 rounded-full pointer-events-none" />
-          <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
-          <Radio className="h-4 w-4 relative z-10 live-radio" />
-          <span className="relative z-10">Pulso del día</span>
-        </button>
-        </div>
-        )}
-
-        {/* Botonera de prueba de overlays (variante 8 elegida el 2026-07-03) —
-            sacada de la UI. El array bannerClaroOverlays queda por si se
-            quiere retomar la comparación más adelante. */}
-
-
-        <style>{`
-          .live-btn {
-            animation: liveBtnBreathe 2.4s ease-in-out infinite;
-            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
-          }
-          .live-btn:hover {
-            animation-play-state: paused;
-            transform: scale(1.08);
-            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.7);
-          }
-          .live-btn:active { transform: scale(0.95); }
-
-          @keyframes liveBtnBreathe {
-            0%, 100% { box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5); transform: scale(1); }
-            50%      { box-shadow: 0 6px 28px rgba(239, 68, 68, 0.85); transform: scale(1.04); }
-          }
-
-          /* Anillo pulsante que se expande hacia afuera */
-          .live-ring {
-            border: 2px solid rgba(239, 68, 68, 0.6);
-            animation: liveRingPulse 2s ease-out infinite;
-          }
-          @keyframes liveRingPulse {
-            0%   { transform: scale(1);   opacity: 0.7; }
-            100% { transform: scale(1.6); opacity: 0; }
-          }
-
-          /* Shimmer diagonal que cruza cada 3s */
-          .live-shimmer-btn {
-            background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.35) 45%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.35) 55%, transparent 70%);
-            background-size: 250% 100%;
-            background-position: 200% 0;
-            animation: liveShimmerMove 3s ease-in-out infinite;
-          }
-          @keyframes liveShimmerMove {
-            0%, 100% { background-position: 200% 0; }
-            50%      { background-position: -50% 0; }
-          }
-
-          /* Puntito rojo con pulso más vivo */
-          .live-dot {
-            box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
-            animation: liveDotPulse 1.2s ease-in-out infinite;
-          }
-          @keyframes liveDotPulse {
-            0%, 100% { transform: scale(1);   opacity: 1;   box-shadow: 0 0 8px rgba(239,68,68,0.9); }
-            50%      { transform: scale(1.3); opacity: 0.7; box-shadow: 0 0 14px rgba(239,68,68,1); }
-          }
-
-          /* Icono de radio con micro-wobble sutil */
-          .live-radio {
-            animation: liveRadioWobble 4s ease-in-out infinite;
-          }
-          @keyframes liveRadioWobble {
-            0%, 100% { transform: rotate(0deg); }
-            25%      { transform: rotate(-8deg); }
-            75%      { transform: rotate(8deg); }
-          }
-
-          /* Conoce Munify — mismas animaciones que LIVE, color distinto (indigo) */
-          @keyframes cmBtnBreathe {
-            0%, 100% { box-shadow: 0 4px 16px rgba(99,102,241,0.5); transform: scale(1); }
-            50%      { box-shadow: 0 6px 28px rgba(99,102,241,0.85); transform: scale(1.04); }
-          }
-          .cm-btn { animation: cmBtnBreathe 2.4s ease-in-out infinite; box-shadow: 0 4px 16px rgba(99,102,241,0.5); }
-          .cm-btn:hover { animation-play-state: paused; transform: scale(1.08); box-shadow: 0 8px 24px rgba(99,102,241,0.7); }
-          .cm-btn:active { transform: scale(0.95); }
-          .cm-ring { border: 2px solid rgba(99,102,241,0.6); animation: liveRingPulse 2s ease-out infinite; }
-
-          @media (prefers-reduced-motion: reduce) {
-            .live-btn, .live-ring, .live-shimmer-btn, .live-dot, .live-radio, .cm-btn, .cm-ring {
-              animation: none !important;
-            }
-          }
-        `}</style>
-
-        {/* Contenido del header */}
-        <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '240px' }}>
-          {/* Info principal */}
-          <div className="mt-auto">
-            {/* Texto adaptativo: claro sobre foto/gradiente intenso (tema oscuro),
-                oscuro sobre el hero de marca suave (tema claro). Ver heroTextColor. */}
-            <h1 className="text-3xl md:text-4xl mb-2" style={{ color: heroTextColor, textShadow: heroShadowStrong }}>
-              <span className="font-light">Municipalidad de </span>
-              <span className="font-bold">{municipioNombre}</span>
-            </h1>
-            <p className="text-sm md:text-base mb-4 font-medium" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
-              {selectedDepNombre
-                ? <>Vista de la dependencia <strong>{selectedDepNombre}</strong></>
-                : 'Vista consolidada de todas las dependencias'}
-            </p>
-
-            {/* Stats rápidos estilo Wok */}
-            <div className="flex flex-wrap items-center gap-4 text-sm font-medium" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
-              <div className="flex items-center gap-1.5">
-                <ClipboardList className="w-4 h-4" />
-                <span>{stats?.total || 0} reclamos</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <FileCheck className="w-4 h-4" />
-                <span>{tramitesStats?.total || 0} trámites</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4" />
-                <span>{stats?.tiempo_promedio_dias || 0}d promedio</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Building2 className="w-4 h-4" />
-                <span>{municipioNombre}</span>
-              </div>
-            </div>
+        {/* Cobertura por zona */}
+        <div className="dv2-card">
+          <div className="dv2-card-head">
+            <h3 className="dv2-card-titulo">Cobertura por zona</h3>
+            <span className="dv2-card-caption dv2-card-caption--auto">Resueltos / recibidos</span>
           </div>
-        </div>
-      </div>
-
-      {/* Filtro por dependencia — gobierna toda la información del tablero.
-          A nivel admin no tiene sentido un dashboard "global" sin foco; por
-          eso arranca pre-seleccionando la primera dependencia activa. */}
-      {showDepFilter && dependencias.length > 0 && (
-        <div
-          className="flex items-center gap-3 rounded-2xl px-4 py-3"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-          }}
-        >
-          <div
-            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}18` }}
-          >
-            <Filter className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div className="flex-shrink-0 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-              Filtrar tablero
-            </p>
-            <p className="text-xs" style={{ color: theme.text }}>Dependencia</p>
-          </div>
-          <div className="flex-1 min-w-0 max-w-md">
-            <ModernSelect
-              value={selectedDependenciaId ? String(selectedDependenciaId) : ''}
-              onChange={handleDependenciaChange}
-              options={dependenciaOptions}
-              placeholder="Elegir dependencia..."
-              searchable
-            />
-          </div>
-          {refreshing && (
-            <div className="flex items-center gap-2 text-xs flex-shrink-0" style={{ color: theme.textSecondary }}>
-              <div
-                className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: `${theme.primary}50`, borderTopColor: 'transparent' }}
-              />
-              <span className="hidden sm:inline">Actualizando…</span>
-            </div>
+          {itemsCobertura.length > 0 ? (
+            <BarList items={itemsCobertura} layout="stacked" />
+          ) : (
+            <p className="dv2-vacio">Sin datos</p>
           )}
-        </div>
-      )}
-
-      {/* Stats cards - Dos filas: Reclamos y Trámites */}
-      <div className="space-y-4">
-        {/* Fila Reclamos */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <ClipboardList className="h-4 w-4" style={{ color: theme.primary }} />
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Reclamos</span>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            {reclamosCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <div
-                  key={card.title}
-                  className="group relative rounded-2xl p-3 md:p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
-                  style={{
-                    backgroundColor: theme.card,
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                    style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
-                  />
-                  <div
-                    className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
-                    style={{ backgroundColor: card.iconColor }}
-                  />
-                  <div className="relative flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
-                        {card.title}
-                      </p>
-                      <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
-                      {card.trend && (
-                        <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
-                          <span
-                            className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: card.trend.up ? '#22c55e20' : '#ef444420',
-                              color: card.trend.up ? '#22c55e' : '#ef4444'
-                            }}
-                          >
-                            {card.trend.text}
-                          </span>
-                          <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>{card.trendLabel}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div
-                      className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
-                      style={{
-                        backgroundColor: card.iconBg,
-                        boxShadow: `0 8px 32px ${card.iconColor}30`
-                      }}
-                    >
-                      <Icon className="h-5 w-5 md:h-7 md:w-7" style={{ color: card.iconColor }} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Fila Trámites */}
-        <div>
-            <div className="flex items-center gap-2 mb-3">
-              <FileCheck className="h-4 w-4" style={{ color: '#06b6d4' }} />
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Trámites</span>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              {tramitesCards.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <div
-                    key={card.title}
-                    className="group relative rounded-2xl p-3 md:p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
-                    style={{
-                      backgroundColor: theme.card,
-                      border: `1px solid ${theme.border}`,
-                    }}
-                  >
-                    <div
-                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                      style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
-                    />
-                    <div
-                      className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
-                      style={{ backgroundColor: card.iconColor }}
-                    />
-                    <div className="relative flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
-                          {card.title}
-                        </p>
-                        <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
-                        {card.trend && (
-                          <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
-                            <span
-                              className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
-                              style={{
-                                backgroundColor: card.trend.up ? '#22c55e20' : '#ef444420',
-                                color: card.trend.up ? '#22c55e' : '#ef4444'
-                              }}
-                            >
-                              {card.trend.text}
-                            </span>
-                            <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>{card.trendLabel}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div
-                        className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
-                        style={{
-                          backgroundColor: card.iconBg,
-                          boxShadow: `0 8px 32px ${card.iconColor}30`
-                        }}
-                      >
-                        <Icon className="h-5 w-5 md:h-7 md:w-7" style={{ color: card.iconColor }} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-      </div>
-
-      {/* Fila 1: Estado, Mapa de Calor y Top Categorías */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {loadingCharts ? (
-          <>
-            <ChartSkeleton height={300} />
-            <div className="lg:col-span-2"><ChartSkeleton height={300} /></div>
-            <ChartSkeleton height={300} />
-          </>
-        ) : (
-          <>
-        {/* Estado de reclamos - Donut Chart */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Por Estado
-          </h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={estadosData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {estadosData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-3 mt-2">
-            {estadosData.map((item) => (
-              <div key={item.name} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-xs capitalize" style={{ color: theme.textSecondary }}>
-                  {item.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Mapa de Calor - Leaflet con capa de calor real */}
-        <div
-          className="lg:col-span-2 rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin className="h-5 w-5" style={{ color: theme.primary }} />
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Mapa de Calor - Concentracion de Reclamos
-            </h2>
-          </div>
-          <HeatmapWidget
-            data={heatmapData}
-            showMarkers={false}
-            height="256px"
-            title="Mapa de Calor - Concentracion de Reclamos"
-            loading={loadingHeatmap}
-            onCategoryClick={handleCategoryClick}
-          />
-          <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
-            {heatmapData.length} puntos en los ultimos 90 dias
-          </p>
-        </div>
-
-        {/* Top categorías */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Top Categorias
-            </h2>
-            <div className="p-2 rounded-xl" style={{ backgroundColor: '#f59e0b20' }}>
-              <AlertTriangle className="h-5 w-5" style={{ color: '#f59e0b' }} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            {(porCategoria.length > 0 ? porCategoria : []).slice(0, 5).map((item, index) => {
-              const total = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
-              const percent = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
-              const colors = [theme.primary, '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444'];
-              return (
-                <div key={item.categoria}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm" style={{ color: theme.text }}>{item.categoria}</span>
-                    <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>
-                      {item.cantidad} ({percent}%)
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}20` }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percent}%`, backgroundColor: colors[index % colors.length] }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-          </>
-        )}
-      </div>
-
-      {/* Fila 2: Métricas con botonera y Cobertura */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Panel de métricas con botonera */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          {/* Botonera de vistas - Modern pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-5 p-1 rounded-2xl" style={{ backgroundColor: `${theme.textSecondary}10` }}>
-            {[
-              { id: 'barrios' as VistaMetrica, label: 'Barrios', icon: Building2 },
-              { id: 'tiempos' as VistaMetrica, label: 'Tiempos', icon: Clock },
-              { id: 'recurrentes' as VistaMetrica, label: 'Recurrentes', icon: Repeat },
-              { id: 'tendencias' as VistaMetrica, label: 'Tendencias', icon: TrendingUp },
-              { id: 'categorias' as VistaMetrica, label: 'Categorías', icon: Tags },
-            ].map((btn) => {
-              const Icon = btn.icon;
-              const isActive = vistaActiva === btn.id;
-              return (
-                <button
-                  key={btn.id}
-                  onClick={() => setVistaActiva(btn.id)}
-                  className={`relative flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-xs font-semibold transition-all duration-300 ${
-                    isActive ? 'shadow-lg' : 'hover:bg-white/5'
-                  }`}
-                  style={{
-                    background: isActive ? `linear-gradient(135deg, ${theme.primary} 0%, #8b5cf6 100%)` : 'transparent',
-                    color: isActive ? 'white' : theme.textSecondary,
-                    boxShadow: isActive ? `0 4px 20px ${theme.primary}40` : 'none',
-                  }}
-                >
-                  <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
-                  <span className="truncate">{btn.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Contenido según vista activa */}
-          <div className="min-h-[200px]">
-            {/* Vista: Barrios/Zonas */}
-            {vistaActiva === 'barrios' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                  Reclamos por Barrio/Zona
-                </h3>
-                {porZona.length > 0 ? porZona.slice(0, 6).map((item, index) => {
-                  const maxVal = Math.max(...porZona.map(z => z.cantidad));
-                  const percent = maxVal > 0 ? (item.cantidad / maxVal) * 100 : 0;
-                  return (
-                    <div key={item.zona} className="flex items-center gap-3">
-                      <span className="text-xs w-20 truncate" style={{ color: theme.textSecondary }}>{item.zona}</span>
-                      <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}15` }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${percent}%`, backgroundColor: lineColors[index % lineColors.length] }}
-                        />
-                      </div>
-                      <span className="text-xs font-bold w-8 text-right" style={{ color: theme.text }}>{item.cantidad}</span>
-                    </div>
-                  );
-                }) : (
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>Sin datos</p>
-                )}
-              </div>
-            )}
-
-            {/* Vista: Tiempos de resolución */}
-            {vistaActiva === 'tiempos' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                  Tiempo Promedio de Resolución
-                </h3>
-                {tiempoResolucion.length > 0 ? tiempoResolucion.slice(0, 6).map((item) => {
-                  const color = item.dias_promedio <= 2 ? '#22c55e' : item.dias_promedio <= 5 ? '#f59e0b' : '#ef4444';
-                  return (
-                    <div key={item.categoria} className="flex items-center justify-between p-2 rounded-lg" style={{ backgroundColor: `${color}10` }}>
-                      <span className="text-xs truncate flex-1" style={{ color: theme.text }}>{item.categoria}</span>
-                      <span className="text-sm font-bold px-2 py-0.5 rounded" style={{ backgroundColor: color, color: 'white' }}>
-                        {item.dias_promedio}d
-                      </span>
-                    </div>
-                  );
-                }) : (
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>Sin datos</p>
-                )}
-              </div>
-            )}
-
-            {/* Vista: Reclamos recurrentes */}
-            {vistaActiva === 'recurrentes' && (
-              <div className="space-y-4">
-                {/* Reclamos similares por ubicacion */}
-                {reclamosSimilares.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: theme.text }}>
-                      <Users className="h-4 w-4" style={{ color: '#f59e0b' }} />
-                      Reclamos Similares en la Zona
-                    </h3>
-                    <div className="space-y-2">
-                      {reclamosSimilares.slice(0, 5).map((item) => (
-                        <div
-                          key={item.id}
-                          className="p-3 rounded-lg cursor-pointer hover:scale-[1.01] transition-all"
-                          style={{ backgroundColor: '#f59e0b15', border: '1px solid #f59e0b30' }}
-                          onClick={() => navigate(`/gestion/reclamos/${item.id}`)}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <span className="text-xs font-medium line-clamp-1" style={{ color: theme.text }}>{item.titulo}</span>
-                            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#f59e0b', color: 'white' }}>
-                              <Users className="h-3 w-3" />
-                              {item.cantidad_reportes}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px]" style={{ color: theme.textSecondary }}>
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">{item.direccion}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>{item.categoria?.nombre || 'Sin categoría'}</span>
-                            {item.zona && <span className="text-[10px]" style={{ color: theme.textSecondary }}>{item.zona}</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Direcciones recurrentes */}
-                <div>
-                  <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                    Direcciones con Reclamos Recurrentes
-                  </h3>
-                  {recurrentes.length > 0 ? recurrentes.slice(0, 5).map((item, index) => (
-                    <div key={index} className="p-2 rounded-lg mb-2" style={{ backgroundColor: `${theme.primary}10` }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium truncate flex-1" style={{ color: theme.text }}>{item.direccion}</span>
-                        <span className="text-xs font-bold px-2 py-0.5 rounded ml-2" style={{ backgroundColor: '#ef4444', color: 'white' }}>
-                          {item.cantidad}x
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px]" style={{ color: theme.textSecondary }}>{item.zona}</span>
-                        <span className="text-[10px]" style={{ color: theme.textSecondary }}>•</span>
-                        <span className="text-[10px] truncate" style={{ color: theme.textSecondary }}>{item.categorias.join(', ')}</span>
-                      </div>
-                    </div>
-                  )) : (
-                    <p className="text-sm" style={{ color: theme.textSecondary }}>No hay reclamos recurrentes</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Vista: Tendencias */}
-            {vistaActiva === 'tendencias' && (
-              <div>
-                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                  Tendencia de Reclamos (30 días)
-                </h3>
-                <div className="h-[180px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={tendencias}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                      <XAxis dataKey="fecha" stroke={chartColors.text} fontSize={9} tickFormatter={(val) => val.slice(5)} />
-                      <YAxis stroke={chartColors.text} fontSize={10} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Line type="monotone" dataKey="cantidad" name="Reclamos" stroke={theme.primary} strokeWidth={3} dot={false} fill="url(#colorGradient)" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            {/* Vista: Categorías */}
-            {vistaActiva === 'categorias' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                  Distribución por Categoría
-                </h3>
-                {porCategoria.length > 0 ? porCategoria.slice(0, 6).map((item, index) => {
-                  const total = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
-                  const percent = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
-                  return (
-                    <div key={item.categoria}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs" style={{ color: theme.text }}>{item.categoria}</span>
-                        <span className="text-xs" style={{ color: theme.textSecondary }}>{item.cantidad} ({percent}%)</span>
-                      </div>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}15` }}>
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${percent}%`, backgroundColor: lineColors[index % lineColors.length] }}
-                        />
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>Sin datos</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Cobertura por Zona */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="h-5 w-5" style={{ color: '#22c55e' }} />
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Cobertura por Zona
-            </h2>
-          </div>
-          <div className="space-y-3">
-            {cobertura.slice(0, 5).map((zona) => {
-              const color = zona.indice_atencion >= 70 ? '#22c55e' : zona.indice_atencion >= 40 ? '#f59e0b' : '#ef4444';
-              return (
-                <div key={zona.zona_nombre}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm" style={{ color: theme.text }}>{zona.zona_nombre}</span>
-                    <span className="text-xs" style={{ color }}>
-                      {zona.tasa_resolucion}% resueltos
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}20` }}>
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${zona.indice_atencion}%`, backgroundColor: color }}
-                      />
-                    </div>
-                    <span className="text-xs w-8" style={{ color: theme.textSecondary }}>
-                      {zona.total_reclamos}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
           {coberturaResumen && (
-            <div className="mt-4 pt-4 border-t flex justify-between text-xs" style={{ borderColor: theme.border }}>
-              <span style={{ color: theme.textSecondary }}>
-                Zonas criticas: <strong style={{ color: '#ef4444' }}>{coberturaResumen.zonas_criticas}</strong>
+            <div className="dv2-card-foot">
+              <span>Zonas críticas</span>
+              {/* Sin zonas críticas no hay por qué pintar el número de rojo */}
+              <span className={`dv2-card-foot-valor${coberturaResumen.zonas_criticas > 0 ? ' dv2-card-foot-valor--malo' : ''}`}>
+                {coberturaResumen.zonas_criticas}
               </span>
-              <span style={{ color: theme.textSecondary }}>
-                Resolucion global: <strong style={{ color: '#22c55e' }}>{coberturaResumen.tasa_resolucion_global}%</strong>
+              <span className="dv2-auto">Resolución global</span>
+              <span
+                className={`dv2-card-foot-valor dv2-card-foot-valor--${
+                  veredictoTasa(coberturaResumen.tasa_resolucion_global, umbrales.tasaResolucion) ?? 'advertencia'
+                }`}
+              >
+                {coberturaResumen.tasa_resolucion_global}%
               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Fila 3, 4, 5: Analytics Avanzados */}
       {loadingAnalytics ? (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ChartSkeleton height={300} />
-            <ChartSkeleton height={300} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ChartSkeleton height={300} />
-            <ChartSkeleton height={300} />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <DashboardStatSkeleton />
-            <DashboardStatSkeleton />
-            <DashboardStatSkeleton />
-            <DashboardStatSkeleton />
-          </div>
-        </>
+        <div className="dv2-grid-2">
+          <ChartSkeleton height={300} />
+          <ChartSkeleton height={300} />
+        </div>
       ) : (
       <>
-      {/* Fila 3: Distancias y Zonas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Reclamos por Categoría */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Reclamos por Categoría
-          </h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={porCategoria.slice(0, 6)} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
-                <XAxis type="number" stroke={chartColors.text} fontSize={12} />
-                <YAxis dataKey="categoria" type="category" stroke={chartColors.text} fontSize={11} width={120} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="cantidad" name="Reclamos" fill="url(#barGradient)" radius={[0, 4, 4, 0]} barSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-2 pt-2 border-t flex justify-between text-xs" style={{ borderColor: theme.border }}>
-            <span style={{ color: theme.textSecondary }}>
-              Total categorías: <strong>{porCategoria.length}</strong>
-            </span>
-            <span style={{ color: theme.textSecondary }}>
-              Total reclamos: <strong>{porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0)}</strong>
+      <div className="dv2-grid-2">
+        {/* Tendencia: área de ingresados + línea punteada de resueltos.
+            La 2da serie se dibuja SOLO si el backend la manda. */}
+        <div className="dv2-card">
+          <div className="dv2-card-head dv2-card-head--pegado">
+            <h3 className="dv2-card-titulo">Tendencia</h3>
+            <span className="dv2-card-caption">últimos 30 días</span>
+            <span className="dv2-chart-leyenda">
+              <span className="dv2-chart-leyenda-marca dv2-chart-leyenda-marca--acento" aria-hidden="true" />
+              Ingresados
+              {haySerieResueltos && (
+                <>
+                  <span className="dv2-chart-leyenda-marca dv2-chart-leyenda-marca--neutra" aria-hidden="true" />
+                  Resueltos
+                </>
+              )}
             </span>
           </div>
-        </div>
-
-        {/* Reclamos por Zona */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Reclamos por Zona
-          </h2>
-          <div className="h-56">
+          <div className="dv2-chart-area dv2-chart-area--flex">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={porZona} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
-                <XAxis type="number" stroke={chartColors.text} fontSize={12} />
-                <YAxis dataKey="zona" type="category" stroke={chartColors.text} fontSize={12} width={60} />
+              <ComposedChart data={tendencias} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+                {/* Grilla SOLO horizontal, sin ejes visibles (el eje X lo dibujamos abajo) */}
+                <CartesianGrid vertical={false} stroke={semColors.track} />
+                <XAxis dataKey="fecha" hide />
+                <YAxis hide />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="cantidad" name="Reclamos" fill="url(#barGradient)" radius={[0, 4, 4, 0]} barSize={18} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Fila 4: Tiempo Resolucion y Rendimiento */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Tiempo de Resolución por Categoría */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Tiempo Promedio de Resolucion
-          </h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={tiempoResolucion}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                <XAxis dataKey="categoria" stroke={chartColors.text} fontSize={10} angle={-15} textAnchor="end" height={50} />
-                <YAxis stroke={chartColors.text} fontSize={12} unit="d" />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="dias_promedio" name="Dias" radius={[4, 4, 0, 0]} barSize={30}>
-                  {tiempoResolucion.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.dias_promedio <= 2 ? '#22c55e' : entry.dias_promedio <= 5 ? '#f59e0b' : '#ef4444'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Tendencia de Reclamos */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Tendencia de Reclamos (Últimos 7 días)
-          </h2>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={tendencias}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                <XAxis dataKey="fecha" stroke={chartColors.text} fontSize={12} />
-                <YAxis stroke={chartColors.text} fontSize={12} />
-                <Tooltip content={<CustomTooltip />} />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="cantidad"
-                  name="Reclamos"
-                  stroke={theme.primary}
-                  strokeWidth={2}
-                  dot={{ fill: theme.primary, strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6 }}
+                  name="Ingresados"
+                  stroke={semColors.bueno}
+                  strokeWidth={2.5}
+                  fill={semColors.bueno}
+                  fillOpacity={0.1}
+                  dot={false}
+                  activeDot={{ r: 4 }}
                 />
-              </LineChart>
+                {haySerieResueltos && (
+                  <Line
+                    type="monotone"
+                    dataKey="resueltos"
+                    name="Resueltos"
+                    stroke={semColors.data5}
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
+          {marcasTendencia.length > 0 && (
+            <div className="dv2-chart-fechas">
+              {marcasTendencia.map((f, i) => (
+                <span key={`${i}-${f}`}>{f}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tiempo de resolución por categoría — las que más tardan primero */}
+        <div className="dv2-card">
+          <div className="dv2-card-head">
+            <h3 className="dv2-card-titulo">Tiempo de resolución</h3>
+            <span className="dv2-card-caption dv2-card-caption--auto">Meta {fmtDias(metaDias)} d</span>
+          </div>
+          {itemsTiempo.length > 0 ? (
+            <BarList items={itemsTiempo} labelWidth={130} valueWidth={42} destacarPrimero={false} />
+          ) : (
+            <p className="dv2-vacio">Sin datos</p>
+          )}
+          {tiempoResolucion.length > 0 && (
+            <div className="dv2-card-foot">
+              <span>
+                {categoriasSobreMeta} de {tiempoResolucion.length}{' '}
+                {tiempoResolucion.length === 1 ? 'categoría' : 'categorías'} sobre la meta
+              </span>
+              <Link to="/gestion/sla" className="dv2-card-foot-link">
+                Ver detalle
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Fila 5: Métricas Accionables */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-            {
-              label: 'Urgentes',
-              sublabel: 'Prioridad alta +3 días',
-              value: metricasAccion?.urgentes ?? 0,
-              color: '#ef4444',
-              icon: AlertCircle,
-              alert: (metricasAccion?.urgentes ?? 0) > 0,
-              detailKey: 'urgentes' as keyof MetricasDetalle
-            },
-            {
-              label: 'Sin Asignar',
-              sublabel: 'Esperando +24h',
-              value: metricasAccion?.sin_asignar ?? 0,
-              color: '#f59e0b',
-              icon: Clock,
-              alert: (metricasAccion?.sin_asignar ?? 0) > 3,
-              detailKey: 'sin_asignar' as keyof MetricasDetalle
-            },
-            {
-              label: 'Para Hoy',
-              sublabel: 'Programados',
-              value: metricasAccion?.para_hoy ?? 0,
-              color: theme.primary,
-              icon: CalendarCheck,
-              alert: false,
-              detailKey: 'para_hoy' as keyof MetricasDetalle
-            },
-            {
-              label: 'Resueltos',
-              sublabel: `${(metricasAccion?.cambio_eficiencia ?? 0) >= 0 ? '+' : ''}${metricasAccion?.cambio_eficiencia ?? 0}% vs sem. ant.`,
-              value: metricasAccion?.resueltos_semana ?? 0,
-              color: '#22c55e',
-              icon: CheckCircle2,
-              alert: false,
-              detailKey: 'resueltos' as keyof MetricasDetalle
-            },
-          ].map((item) => {
-            const Icon = item.icon;
-            const reclamos = metricasDetalle?.[item.detailKey] || [];
-            return (
-              <div
-                key={item.label}
-                className={`group relative rounded-2xl p-4 flex flex-col transition-all duration-500 hover:-translate-y-1 overflow-hidden ${item.alert ? 'animate-pulse' : ''}`}
-                style={{
-                  backgroundColor: `${item.color}15`,
-                  border: `1px solid ${item.color}40`,
-                  boxShadow: `0 4px 20px ${item.color}20`,
-                }}
-              >
-                {/* Glow effect on hover */}
-                <div
-                  className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-500"
-                  style={{ backgroundColor: item.color }}
-                />
-                {/* Header */}
-                <div className="relative flex items-center justify-between mb-2">
-                  <div className="p-2 rounded-xl" style={{ backgroundColor: `${item.color}25` }}>
-                    <Icon className="h-4 w-4" style={{ color: item.color }} />
-                  </div>
-                  <p className="text-3xl font-black" style={{ color: item.color }}>{item.value}</p>
-                </div>
-                <p className="text-xs font-semibold" style={{ color: theme.text }}>{item.label}</p>
-                <p className="text-[10px] mb-2" style={{ color: theme.textSecondary }}>{item.sublabel}</p>
-
-                {/* Lista con scroll iOS */}
-                <div
-                  className="mt-2 pt-2 border-t overflow-y-auto scroll-smooth max-h-[120px]"
-                  style={{
-                    borderColor: `${item.color}40`,
-                    scrollbarWidth: 'none',
-                    msOverflowStyle: 'none',
-                    WebkitOverflowScrolling: 'touch'
-                  }}
-                >
-                  <style>{`
-                    .ios-scroll::-webkit-scrollbar { display: none; }
-                  `}</style>
-                  <div className="space-y-1.5 ios-scroll">
-                    {reclamos.length > 0 ? reclamos.map((r) => (
-                      <div
-                        key={r.id}
-                        className="p-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ backgroundColor: `${item.color}15` }}
-                        onClick={() => navigate(`/gestion/reclamos/${r.id}`)}
-                      >
-                        <p className="text-[10px] font-medium truncate" style={{ color: theme.text }}>
-                          {r.titulo}
-                        </p>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-[9px] px-1 rounded" style={{ backgroundColor: `${item.color}25`, color: item.color }}>
-                            {r.categoria}
-                          </span>
-                          {r.dias_antiguedad > 0 && (
-                            <span className="text-[9px]" style={{ color: theme.textSecondary }}>
-                              {r.dias_antiguedad}d
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )) : (
-                      <p className="text-[10px] text-center py-4" style={{ color: theme.textSecondary }}>
-                        Sin reclamos
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-      </div>
-
-      {/* Fila 6: La voz del vecino — promedio + distribución + últimas reseñas
-          (referencia design/handoff-v2). Sin calificaciones NO renderiza. */}
+      {/* La voz del vecino — promedio + distribución + últimas reseñas
+          (ya es v2). Sin calificaciones NO renderiza. */}
       <VozDelVecino stats={califStats} />
       </>
       )}
@@ -1790,7 +1388,7 @@ export default function Dashboard() {
         municipioNombre={municipioNombre}
         stats={stats}
         porCategoria={porCategoria}
-        porZona={porZona}
+        porZona={porZona.slice(0, 5)}
         tendencias={tendencias}
         heatmapData={heatmapData}
       />
