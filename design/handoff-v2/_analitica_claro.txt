@@ -1,0 +1,165 @@
+ gap: 12px; margin-top: 12px; align-items: stretch;">
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; gap: 2px; padding: 3px; background: #F3F7F5; border-radius: 10px; margin-bottom: 16px; overflow: hidden;">
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.06); font-size: 12px; font-weight: 600; color: #0D1412; white-space: nowrap; cursor: pointer;">Barrios</span>
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #5B6764; white-space: nowrap; cursor: pointer;" style-hover="background: #EAF0ED;">Tiempos</span>
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #5B6764; white-space: nowrap; cursor: pointer;" style-hover="background: #EAF0ED;">Recurrentes</span>
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #5B6764; white-space: nowrap; cursor: pointer;" style-hover="background: #EAF0ED;">Categorías</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Reclamos por barrio</h3>
+          <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0;">Top 5 de 22</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Virrey del Pino</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 999px; background: #00B37E;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">24</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ciudad Evita</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 96%; border-radius: 999px; background: #34C596;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">23</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Lomas del Mirador</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 92%; border-radius: 999px; background: #5FD2AC;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">22</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tapiales</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 79%; border-radius: 999px; background: #8FDFC4;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">19</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Aldo Bonzi</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 75%; border-radius: 999px; background: #8FDFC4;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">18</span>
+          </div>
+        </div>
+        <a href="#" style="font-size: 12px; font-weight: 600; margin-top: auto; padding-top: 16px;">Ver los 22 barrios</a>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Cobertura por zona</h3>
+          <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0;">Resueltos / recibidos</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 13px;">
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">San Justo</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #00794F; font-feature-settings: 'tnum';">68%</span>
+              <span style="font-size: 11.5px; color: #98A3A0; font-feature-settings: 'tnum';">41/60</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 68%; border-radius: 999px; background: #00B37E;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Ramos Mejía</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #00794F; font-feature-settings: 'tnum';">54%</span>
+              <span style="font-size: 11.5px; color: #98A3A0; font-feature-settings: 'tnum';">27/50</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 54%; border-radius: 999px; background: #34C596;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Isidro Casanova</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #B4560F; font-feature-settings: 'tnum';">38%</span>
+              <span style="font-size: 11.5px; color: #98A3A0; font-feature-settings: 'tnum';">19/50</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 38%; border-radius: 999px; background: #F59E0B;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">González Catán</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #B4560F; font-feature-settings: 'tnum';">31%</span>
+              <span style="font-size: 11.5px; color: #98A3A0; font-feature-settings: 'tnum';">14/45</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 31%; border-radius: 999px; background: #F59E0B;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Gregorio de Laferrere</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #C93A3E; font-feature-settings: 'tnum';">18%</span>
+              <span style="font-size: 11.5px; color: #98A3A0; font-feature-settings: 'tnum';">7/40</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 18%; border-radius: 999px; background: #E5484D;"></span></span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); font-size: 11.5px;">
+          <span style="color: #98A3A0;">Zonas críticas</span>
+          <span style="font-weight: 600; color: #C93A3E;">2</span>
+          <span style="margin-left: auto; color: #98A3A0;">Resolución global</span>
+          <span style="font-weight: 600; color: #00794F;">46%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; align-items: stretch;">
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Tendencia</h3>
+          <span style="font-size: 11.5px; color: #98A3A0;">últimos 30 días</span>
+          <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #7A8783; white-space: nowrap;">
+            <span style="width: 14px; height: 2px; background: #00B37E; border-radius: 2px;"></span>Ingresados
+            <span style="width: 14px; height: 2px; background: #C6CFCB; border-radius: 2px; margin-left: 6px;"></span>Resueltos
+          </span>
+        </div>
+        <div style="flex: 1; min-height: 176px; margin-top: 14px;">
+          <svg viewBox="0 0 620 170" width="100%" height="100%" preserveAspectRatio="none" fill="none" style="display: block;">
+            <g stroke="#EDF1EF" stroke-width="1"><path d="M0 14h620M0 52h620M0 90h620M0 128h620M0 166h620" /></g>
+            <path d="M0 120 41 112 82 128 124 96 165 104 206 78 248 88 289 62 330 74 372 52 413 66 454 40 496 58 537 34 578 46 620 28 620 166 0 166Z" fill="rgba(0,179,126,0.10)" />
+            <polyline points="0,120 41,112 82,128 124,96 165,104 206,78 248,88 289,62 330,74 372,52 413,66 454,40 496,58 537,34 578,46 620,28" stroke="#00B37E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline points="0,142 41,138 82,144 124,130 165,136 206,124 248,130 289,118 330,124 372,112 413,120 454,106 496,116 537,104 578,112 620,98" stroke="#C6CFCB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 5" />
+          </svg>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #98A3A0; padding-top: 8px; font-feature-settings: 'tnum';">
+          <span>1 jul</span><span>10 jul</span><span>20 jul</span><span>30 jul</span>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Tiempo de resolución</h3>
+          <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0;">Meta 15 d</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Plagas y control</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 96%; border-radius: 999px; background: #E5484D;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #C93A3E; font-feature-settings: 'tnum';">27 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Animales sueltos</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 79%; border-radius: 999px; background: #F59E0B;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #B4560F; font-feature-settings: 'tnum';">22 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Recolección</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 68%; border-radius: 999px; background: #F59E0B;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #B4560F; font-feature-settings: 'tnum';">19 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Agua y cloacas</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 43%; border-radius: 999px; background: #00B37E;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #00794F; font-feature-settings: 'tnum';">12 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Espacios verdes</span>
+            <span style="height: 10px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 36%; border-radius: 999px; background: #00B37E;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #00794F; font-feature-settings: 'tnum';">10 d</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); font-size: 11.5px; color: #98A3A0;">
+          <span>3 de 10 categorías sobre la meta</span>
+          <a href="#" style="margin-left: auto; font-weight: 600;">Ver detalle</a>
+        </div>
+      </div>
+    </div>
+    <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 24px; margin-top: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 17px;"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+        <h3 style="margin: 0; font-family: Sora, sans-serif; fon
