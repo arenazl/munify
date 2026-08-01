@@ -90,3 +90,22 @@ export function veredictoMenosEsMejor(
   if (valor >= u.malo) return 'malo';
   return 'advertencia';
 }
+
+/**
+ * META de días de resolución: el plazo que el tablero muestra como "Meta N d"
+ * y contra el que cuenta cuántas categorías quedaron "sobre la meta".
+ *
+ * NO es un número nuevo: la meta ES el piso `bueno` de `tiempoResolucionDias`
+ * — cerrar dentro de ese plazo es exactamente lo que el veredicto considera
+ * bueno. Así el color de cada fila y el conteo del pie jamás se contradicen, y
+ * cuando exista la pantalla de settings la meta se configura sola con el resto
+ * de los umbrales (misma forma de override parcial).
+ *
+ * NOTA: el módulo SLA tiene metas MÁS FINAS por categoría/prioridad
+ * (`sla_configs.tiempo_resolucion`, en HORAS). El tablero no las carga (serían
+ * N requests para un caption); si algún día las necesita, este helper es el
+ * único punto a tocar.
+ */
+export function metaResolucionDias(u: UmbralesVeredicto = UMBRALES_DEFAULT): number {
+  return u.tiempoResolucionDias.bueno;
+}

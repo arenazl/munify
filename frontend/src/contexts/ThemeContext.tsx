@@ -203,6 +203,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     set('--pl-green', p);
     set('--pl-green-600', theme.primaryHover);
     set('--pl-green-700', claro ? darken(p, 14) : lighten(p, 30)); // texto sobre acento suave
+    // Ink del acento: texto sobre superficies blancas DENTRO del banner brand
+    // (botón sólido del hero). No depende de claro/oscuro: el banner es oscuro siempre.
+    set('--pl-accent-ink', darken(p, 32));
     set('--pl-green-200', mix(theme.card, p, 0.30));
     set('--pl-green-100', mix(theme.card, p, 0.16));
     set('--pl-green-050', mix(theme.card, p, 0.08));
@@ -223,6 +226,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     semantico(RED, 'red');
     semantico(BLUE, 'blue');
     set('--pl-amber-strong', AMBER);
+    // Ámbar legible SOBRE el banner brand (fondo oscuro siempre): valor fijo
+    // de la referencia, variante on-brand del matiz universal.
+    set('--pl-amber-onbrand', '#FFD66B');
 
     // Rampa para series de datos (acento → neutro)
     set('--pl-data-1', p);
@@ -266,6 +272,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       `linear-gradient(180deg, ${alpha(darken(p, 42), 0.28)} 0%, rgba(0,0,0,0) 30%, ${alpha(darken(p, 42), 0.42)} 100%)`);
     set('--pl-hero-strip',
       `linear-gradient(180deg, ${alpha(darken(p, 45), 0.62)} 0%, ${alpha(darken(p, 45), 0.82)} 100%)`);
+    // Fondo del botón outline DEL HERO: acento casi negro al 50% (no scrim neutro)
+    set('--pl-hero-scrim', alpha(darken(p, 45), 0.50));
 
     // Aplicar al body directamente
     document.body.style.backgroundColor = theme.background;

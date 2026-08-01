@@ -18,6 +18,22 @@ import './styles/animations.css'
 import './styles/pl-tokens.css'
 import './styles/semantic-hero.css'
 import './styles/abmv2.css'
+// componente del KIT: listas de barras (ranking / cobertura / comparativa)
+import './styles/bar-list.css'
+import './styles/electro.css'
+// componente del KIT: lista rankeada (top N con puesto, detalle y valor)
+import './styles/ranked-list.css'
+// componente del KIT: barra de filtros de una sola línea (pills ⇄ combos)
+import './styles/adaptive-filter.css'
+// componente del KIT: carrusel de cards de altura fija (N por vista medido)
+import './styles/card-carousel.css'
+// componente del KIT: promedio + estrellas + distribución de una calificación
+import './styles/rating-summary.css'
+// variante v2 (opt-in) del ModernSelect — el clásico no la usa
+import './styles/modern-select-v2.css'
+// dashboard v2 (agente de la página Dashboard) — hero banner + strip + cards v2
+import './styles/dashboard-v2.css'
+import './styles/shell-v2.css'
 
 // Aplica la marca activa (VITE_BRAND) al documento antes del render:
 // título, favicon y theme-color. Para 'munify' es un no-op efectivo.

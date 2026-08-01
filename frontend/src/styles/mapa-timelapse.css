@@ -1,0 +1,239 @@
+/* ============================================================
+   mapa-timelapse.css — banda del RECORRIDO del Mapa
+   (components/mapa/MapaTimelapseBanda)
+
+   Prefijo `mtl-`. Cero colores fijos: todo sale de tokens --pl-*.
+   Reemplaza al bloque `.av2-tl-*` de abmv2.css (barra de progreso
+   lineal), que quedó sin uso al pasar la banda al electro.
+   ============================================================ */
+
+.mtl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-card);
+}
+
+/* --- Cabecera: una sola línea ------------------------------ */
+.mtl-cab {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.mtl-play {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: none;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+  color: var(--pl-on-brand);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease),
+              transform var(--pl-dur-ui) var(--pl-ease);
+}
+.mtl-play:hover { background: var(--pl-green-600); transform: scale(1.06); }
+
+/* En reposo late para que se note que hay algo para reproducir. */
+.mtl-play--llama::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: var(--pl-radius-pill);
+  border: 2px solid var(--pl-green);
+  animation: mtlLlama 2.2s var(--pl-ease) infinite;
+  pointer-events: none;
+}
+@keyframes mtlLlama {
+  0%   { opacity: 0.55; transform: scale(1); }
+  70%  { opacity: 0;    transform: scale(1.35); }
+  100% { opacity: 0;    transform: scale(1.35); }
+}
+
+/* Texto que acompaña la invitación, cuando el recorrido está detenido. */
+.mtl-fechas--invita { color: var(--pl-green-700); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mtl-play--llama::after { animation: none; opacity: 0.4; }
+  .mtl-play:hover { transform: none; }
+}
+.mtl-play-icono {
+  width: 17px;
+  height: 17px;
+  /* El triángulo del play se ve descentrado si no se corre un pelo. */
+  margin-left: 1px;
+}
+.mtl-play:has(.lucide-pause) .mtl-play-icono { margin-left: 0; }
+
+.mtl-rango {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.mtl-rotulo {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.mtl-fechas {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mtl-conteo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  /* Absorbe el sobrante: los controles quedan dockeados a la derecha. */
+  flex: 1 1 auto;
+}
+.mtl-conteo-valor {
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+.mtl-conteo-cmp {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+  white-space: nowrap;
+}
+.mtl-conteo-cmp--bueno { color: var(--pl-green-700); }
+.mtl-conteo-cmp--malo  { color: var(--pl-red-700); }
+
+.mtl-controles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* --- Velocidades ------------------------------------------- */
+.mtl-vel {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface-2);
+}
+.mtl-vel-btn {
+  min-width: 30px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.mtl-vel-btn:hover { color: var(--pl-text); }
+.mtl-vel-btn--activo {
+  background: var(--pl-green);
+  color: var(--pl-on-brand);
+}
+
+/* --- Botones de icono y salida ------------------------------ */
+.mtl-icono { width: 14px; height: 14px; flex: 0 0 14px; }
+
+.mtl-icono-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.mtl-icono-btn:hover { background: var(--pl-surface-hover); }
+.mtl-icono-btn--activo {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+
+.mtl-salir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.mtl-salir:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+
+/* --- Electro -------------------------------------------------- */
+.mtl-electro { width: 100%; }
+
+/* --- Remate del recorrido ------------------------------------- */
+.mtl-remate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--pl-green-200);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-050);
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-green-700);
+}
+.mtl-remate-icono {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+/* --- Angosto: la cabecera se parte en dos filas ---------------- */
+@media (max-width: 720px) {
+  .mtl-conteo { flex: 1 1 100%; order: 3; }
+  .mtl-controles { margin-left: auto; }
+  .mtl-salir { padding: 0 8px; }
+}

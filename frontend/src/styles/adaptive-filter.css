@@ -1,0 +1,617 @@
+/* ============================================================
+   adaptive-filter.css — LA BOTONERA del kit (AdaptiveFilter)
+   (components/ui/AdaptiveFilter.tsx)
+
+   AGNÓSTICO y POLIMÓRFICO: cero colores literales (ni un hex, ni un
+   rgba suelto), cero lógica de dominio. Todo sale de tokens --pl-*
+   (estáticos en pl-tokens.css; los de color los computa ThemeContext
+   desde el theme activo). Las transparencias se arman con color-mix()
+   sobre un token, nunca con un color escrito a mano.
+
+   REGLA DE COLOR: el ACENTO aparece SOLO donde hay una elección del
+   usuario — píldora activa, opción activa del segmented, acción
+   encendida, opción seleccionada del combo. El contenedor va con borde
+   neutro --pl-border como cualquier card; los focos son neutros. Nada
+   de bordes/rings de acento alrededor del control.
+
+   ESTRUCTURA
+     .af            tarjeta (1 o 2 filas). Siempre las 4 esquinas
+                    redondeadas; con dos filas, hairline entre ellas.
+     .af-fila       una línea de controles.
+     .af-marca      icono + rótulo de la barra. En las filas 2+ se repite
+                    INVISIBLE para que todas arranquen en la misma X.
+     .af-cuerpo     espacio libre de la fila (referencia de medición).
+     .af-bloque     GRUPO ETIQUETADO: rótulo + N controles. Indivisible.
+     .af-grupomenu  ese mismo grupo colapsado a un botón compacto.
+
+   SIMETRÍA — los números viven acá, una sola vez, y todos los tipos los
+   consumen. Antes convivían alturas de 27 (píldora), 28 (combo), 33
+   (segmented) y 34 (acción/icono/búsqueda): eso es lo que se veía
+   desprolijo. Ahora TODO mide --af-h.
+     --af-h            altura única de control
+     --af-r            radio único de los controles tipo botón
+     --af-icono        tamaño único de icono
+     --af-gap-bloque   separación ENTRE bloques (mayor)
+     --af-gap-interno  separación DENTRO de un grupo etiquetado (menor)
+     --af-gap-pill     separación entre píldoras de un mismo control
+   Excepciones deliberadas al radio: la píldora conserva su radio pill
+   (es la identidad del control de opciones) y el segmento activo usa
+   --pl-radius-sm porque va ANIDADO dentro del track de --af-r.
+
+   Prefijo de clases: af-.
+   ============================================================ */
+
+.af {
+  --af-h: 34px;
+  --af-r: var(--pl-radius-md);
+  --af-icono: 15px;
+  --af-gap-bloque: 10px;
+  --af-gap-interno: 8px;
+  --af-gap-pill: 6px;
+
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+
+/* Hairline entre filas, DENTRO de la misma tarjeta. */
+.af-fila + .af-fila {
+  border-top: 1px solid var(--pl-border);
+}
+
+.af-fila {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-bloque);
+  padding: 10px 14px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+/* Marca de la barra (icono + rótulo). Misma X en todas las filas: en las
+   filas 2+ se renderiza igual pero invisible, así el cuerpo empieza
+   exactamente donde empieza el de arriba. */
+.af-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--af-gap-bloque);
+  flex: 0 0 auto;
+}
+.af-marca[data-af-fantasma] {
+  visibility: hidden;
+}
+
+.af-label {
+  font-family: var(--pl-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Icono ÚNICO de todos los tipos (acción, icono, búsqueda, chevron, marca). */
+.af-ico {
+  width: var(--af-icono);
+  height: var(--af-icono);
+  flex: 0 0 var(--af-icono);
+}
+.af-ico--tenue {
+  color: var(--pl-text-muted);
+}
+
+/* Cuerpo = espacio libre de la fila. `flex: 1 1 0%` + `min-width: 0`
+   hace que su ancho NO dependa del contenido: es la referencia estable
+   contra la que se mide el fantasma (por eso no hay loop).
+   `justify-content: flex-start`: el contenido se apoya en la marca y
+   el sobrante lo reparte el empuje elástico (o la búsqueda) — nunca
+   queda un hueco muerto en el medio.
+
+   `flex-wrap: wrap` es la RED DE CONTENCIÓN física, no el mecanismo de
+   layout: el .tsx planifica siempre para una línea y sólo agota la
+   escalera de degradación en pantallas mínimas donde los controles ya no
+   entran ni comprimidos (el propio handoff deja las filas wrappeables).
+   Preferimos que baje una fila antes que recortar un control con
+   `overflow: hidden` y dejarlo inalcanzable. */
+.af-cuerpo {
+  position: relative;
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--af-gap-bloque);
+  flex-wrap: wrap;
+  row-gap: var(--af-gap-interno);
+  /* contiene al fantasma (absoluto y ancho por definición). */
+  overflow: hidden;
+}
+/* Respiro entre la marca y el primer control, como el mockup. */
+.af-fila--rotulada .af-cuerpo {
+  margin-left: 4px;
+}
+
+/* Separador elástico entre el bloque de inicio y el de fin. Se pone
+   `--fijo` cuando la fila tiene una búsqueda desplegada: ahí el sobrante
+   lo absorbe la búsqueda y el empuje sólo marca el corte. */
+.af-empuje {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+.af-empuje--fijo {
+  flex: 0 0 0px;
+}
+
+/* Divisor vertical ENTRE bloques. Nunca dentro de un grupo. */
+.af-sep {
+  width: 1px;
+  height: 24px;
+  flex: 0 0 1px;
+  background: var(--pl-border);
+}
+
+/* ---------- rótulo (grupo etiquetado y etiqueta de toggles) ---------- */
+.af-rotulo {
+  font-family: var(--pl-font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ---------- GRUPO ETIQUETADO ---------- */
+/* Unidad semántica e INDIVISIBLE: el rótulo dice qué son los controles
+   que lo siguen. Adentro se usa el gap chico; entre grupos, el grande +
+   el divisor. Así la jerarquía se lee sola. */
+.af-bloque {
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-interno);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* El mismo grupo, colapsado: conserva el rótulo mientras puede. */
+.af-grupomenu {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--af-h);
+  padding: 0 11px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--af-r);
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-grupomenu:hover {
+  background: var(--pl-surface-hover);
+  border-color: var(--pl-border-strong);
+}
+.af-grupomenu:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 2px;
+}
+/* Sin rótulo (último recurso): cuadrado, como cualquier botón de icono. */
+.af-grupomenu--icono {
+  width: var(--af-h);
+  padding: 0;
+  justify-content: center;
+  flex: 0 0 var(--af-h);
+}
+
+/* ---------- tipo 'opciones': píldoras ---------- */
+.af-grupo {
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-pill);
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+/* Los labels llegan ABREVIADOS desde el .tsx (Sec. / Dir. / Depto.), no
+   truncados: nada de ellipsis acá. Si aun abreviados no entran en la
+   línea, el componente manda el resto al `+K` y, en el peor caso,
+   colapsa el grupo a combo. */
+.af-pill {
+  display: inline-flex;
+  align-items: center;
+  height: var(--af-h);
+  padding: 0 12px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--pl-text-3);
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-pill:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+/* Foco NEUTRO (nada de ring de acento). */
+.af-pill:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 2px;
+}
+
+.af-pill--activa {
+  font-weight: 600;
+  color: var(--pl-green-700);
+  background: var(--pl-green-100);
+  border-color: var(--pl-green-200);
+}
+/* El hover no debe "apagar" la activa. */
+.af-pill--activa:hover {
+  color: var(--pl-green-700);
+  background: color-mix(in srgb, var(--pl-green-100) 82%, var(--pl-green-200));
+}
+
+/* ---------- control de overflow "+K" ---------- */
+/* Compacto y al contenido: entra al final del grupo cuando alguna píldora
+   no llegó a la línea. Su ancho lo MIDE el .tsx en el fantasma (por eso
+   acá manda el CSS y no hay número mágico en el JS). */
+.af-mas {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 76px;
+  max-width: 96px;
+}
+
+/* ---------- fallback: grupo entero en combo ---------- */
+/* Sólo cuando no entra ni la primera píldora. Ancho NATURAL ACOTADO,
+   alineado a la izquierda: un combo estirado a toda la fila para decir
+   "Todas las dependencias" es un despropósito. `min-width: 0` para que
+   pueda encogerse en pantallas mínimas en vez de desbordar la línea. */
+.af-combo {
+  flex: 0 1 240px;
+  min-width: 0;
+  max-width: 260px;
+}
+
+/* Los combos del kit entran en la MISMA grilla de altura y radio que el
+   resto de la botonera (el default del ModernSelect v2 es más bajo). */
+.af .ms2-trigger {
+  min-height: var(--af-h);
+  border-radius: var(--af-r);
+}
+
+/* ---------- tipo 'toggles': segmented control ---------- */
+/* Bloque indivisible: o entra entero (etiqueta + pastillas) o colapsa a
+   .af-togglescombo. Nunca se parte ni pierde opciones. */
+.af-toggles {
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-interno);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.af-seg {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: var(--af-h);
+  padding: 3px;
+  background: var(--pl-surface-2);
+  border-radius: var(--af-r);
+  flex: 0 0 auto;
+}
+
+.af-seg-op {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 13px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-seg-op:hover { color: var(--pl-text); }
+.af-seg-op:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 1px;
+}
+/* La pastilla activa se despega del track con superficie + sombra sutil. */
+.af-seg-op--activa {
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  box-shadow: var(--pl-shadow-card);
+}
+
+/* Colapso del grupo de toggles: combo compacto, al contenido. Puede
+   ENCOGERSE (shrink 1) por debajo de su ancho natural cuando la fila ya
+   agotó la escalera: el label del combo elide y el control sigue usable,
+   que es mejor que empujar la fila. */
+.af-togglescombo {
+  flex: 0 1 auto;
+  width: max-content;
+  min-width: 72px;
+  max-width: 176px;
+}
+
+/* ---------- tipo 'accion': icono + label (+ badge) ---------- */
+.af-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: var(--af-h);
+  padding: 0 11px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--pl-text-2);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--af-r);
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-accion:hover:not(:disabled) {
+  background: var(--pl-surface-hover);
+  border-color: var(--pl-border-strong);
+  color: var(--pl-text);
+}
+.af-accion:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 2px;
+}
+.af-accion:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Degradación: sin label, el botón queda cuadrado como los de icono. */
+.af-accion--icono {
+  width: var(--af-h);
+  padding: 0;
+  justify-content: center;
+  flex: 0 0 var(--af-h);
+}
+
+/* Acción ENCENDIDA: acento suave, nunca sólido (el sólido es del hero). */
+.af-accion--activa {
+  color: var(--pl-green-700);
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+}
+.af-accion--activa:hover:not(:disabled) {
+  color: var(--pl-green-700);
+  background: var(--pl-green-100);
+  border-color: var(--pl-green-200);
+}
+
+.af-accion-label {
+  white-space: nowrap;
+}
+
+.af-accion-badge {
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 1px 6px;
+  border-radius: var(--pl-radius-pill);
+  color: var(--pl-green-700);
+  background: var(--pl-green-100);
+  font-feature-settings: 'tnum';
+  flex: 0 0 auto;
+}
+.af-accion--activa .af-accion-badge {
+  color: var(--pl-on-brand);
+  background: var(--pl-green);
+}
+
+/* ---------- tipo 'icono': botón cuadrado ---------- */
+.af-iconobtn {
+  width: var(--af-h);
+  height: var(--af-h);
+  flex: 0 0 var(--af-h);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--pl-text-2);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--af-r);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-iconobtn:hover:not(:disabled) {
+  background: var(--pl-surface-hover);
+  border-color: var(--pl-border-strong);
+  color: var(--pl-text);
+}
+.af-iconobtn:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 2px;
+}
+.af-iconobtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.af-iconobtn--activo {
+  color: var(--pl-green-700);
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+}
+
+/* ---------- tipo 'busqueda' ---------- */
+/* Es el elemento ELÁSTICO de la fila: el .tsx le reserva su ancho ideal
+   (o el mínimo cuando aprieta) vía `flex-basis` inline — un valor de
+   runtime, no un color ni un estilo — y `flex-grow: 1` le da el sobrante. */
+.af-busqueda {
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-interno);
+  height: var(--af-h);
+  padding: 0 11px;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--af-r);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-busqueda:focus-within {
+  border-color: var(--pl-border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pl-text) 7%, transparent);
+}
+
+.af-busqueda-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text);
+  appearance: none;
+}
+.af-busqueda-input::placeholder { color: var(--pl-text-muted); }
+.af-busqueda-input::-webkit-search-cancel-button { appearance: none; }
+
+/* ---------- panel sobre la fila ---------- */
+/* Búsqueda colapsada abierta, o los controles de un grupo que colapsó. Es
+   absoluto: no compite por el ancho y no realimenta la medición. */
+.af-panel {
+  position: absolute;
+  inset: 6px 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-interno);
+  padding: 0 11px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--af-r);
+  box-shadow: var(--pl-shadow-float);
+  /* Si los controles del grupo no entran en el panel, se scrollea: ninguna
+     capacidad queda inalcanzable (que es el punto de toda la escalera). */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.af-panel-cerrar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  /* Pegado al borde derecho aunque el panel se scrollee. */
+  position: sticky;
+  right: 0;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+}
+.af-panel-cerrar:hover { background: var(--pl-surface-hover); color: var(--pl-text); }
+.af-panel-cerrar:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 1px;
+}
+
+/* ---------- render fantasma (medición) ---------- */
+/* Invisible por partida triple: fuera del flujo, alto 0 con overflow
+   hidden (no puede pintar un solo píxel aunque algo pisara la
+   visibilidad) y `visibility: hidden`. Sin bordes ni outline propios;
+   los de los controles sí cuentan, porque son parte del ancho medido. */
+.af-fantasma {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--af-gap-bloque);
+  flex-wrap: nowrap;
+  width: max-content;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  border: 0;
+  outline: 0;
+}
+
+/* ---------- indicador de recarga ---------- */
+.af-spin {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: var(--pl-radius-pill);
+  border: 2px solid var(--pl-border);
+  border-top-color: var(--pl-green);
+  animation: afSpin 0.8s linear infinite;
+}
+@keyframes afSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* En pantallas angostas la marca cede su lugar a los controles y el combo
+   puede achicarse por debajo del mínimo de desktop (el ResizeObserver
+   del cuerpo re-mide solo). El input de búsqueda sube a 16px: por debajo
+   de eso iOS hace zoom al enfocarlo. */
+@media (max-width: 560px) {
+  .af-fila { gap: 8px; padding: 8px 10px; }
+  .af-label { display: none; }
+  .af-fila--rotulada .af-cuerpo { margin-left: 0; }
+  .af-combo { flex: 1 1 0%; max-width: none; }
+  .af-busqueda-input { font-size: var(--pl-fs-input); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-spin { animation: none; }
+  .af-pill,
+  .af-seg-op,
+  .af-accion,
+  .af-iconobtn,
+  .af-grupomenu,
+  .af-busqueda { transition: none; }
+}

@@ -1,0 +1,989 @@
+/* ============================================================
+   Shell v2 de Munify — SidebarV2 (sv2-) + TopbarV2 (tv2-).
+
+   Adaptación de APP_GUIDE/components/v2 (sidebar-v2.css + topbar-v2.css)
+   al shell real de Munify:
+   - El sidebar es FIXED (left 0, full height) porque el Layout empuja el
+     contenido con padding-left = var(--sidebar-width) (mecánica existente
+     que usan StickyPageHeader y las páginas). El ancho real lo dan los
+     tokens --pl-sidebar-w / --pl-sidebar-w-collapsed (256 / 72).
+   - Fondo del sidebar = var(--pl-surface) (NO --pl-sidebar-bg): la rampa
+     de textos --pl-text-* está calculada contra las superficies del
+     contenido, así el contraste queda garantizado en los 12 themes.
+     (El "tono sidebar" del selector sigue vivo en el drawer mobile.)
+
+   POLIMÓRFICO: cero colores fijos — todo entra por tokens --pl-*
+   (estáticos en pl-tokens.css, de color via puente del ThemeContext).
+   Solo desktop: el shell v2 no se monta en mobile (Layout lo gatea por
+   isMobile) y además se apaga por CSS como cinturón de seguridad.
+   ============================================================ */
+
+/* --- SidebarV2: contenedor --------------------------------------- */
+
+.sv2 {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 50;
+  width: var(--pl-sidebar-w);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--pl-surface);
+  border-right: 1px solid var(--pl-border);
+  font-family: var(--pl-font-sans);
+  /* Mismo timing que el padding-left de .main-content-area (Layout):
+     sidebar y contenido se mueven juntos al colapsar/expandir. */
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sv2--colapsado {
+  width: var(--pl-sidebar-w-collapsed);
+  align-items: center;
+  gap: 3px;
+  padding: 18px 0;
+}
+
+/* --- Header de marca --------------------------------------------- */
+
+/* Se quedó con el aire que dejó el buscador inerte (antes 18px 16px 14px). */
+.sv2-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px 18px;
+}
+
+/* Tile del logo (clickeable: vuelve al dashboard) */
+.sv2-logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-050);
+  border: 1px solid var(--pl-border);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-logo:hover {
+  border-color: var(--pl-green-200);
+}
+
+.sv2-logo--tile {
+  margin-bottom: 12px;
+}
+
+.sv2-marca-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sv2-nombre {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: var(--pl-fs-card-title);
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* El tramo acentuado del nombre lleva el color de MARCA (BRAND.accent),
+   que es un valor runtime — va inline en el componente. */
+
+.sv2-subtitulo {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sv2-colapsar {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--pl-radius-sm);
+  border: 1px solid var(--pl-border-strong);
+  background: transparent;
+  color: var(--pl-text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-colapsar:hover {
+  background: var(--pl-surface-hover);
+}
+
+/* El sidebar NO tiene buscador: el que había era inerte y se borró. La
+   búsqueda (y el atajo ⌘K) viven en la topbar → .tv2-buscar*. */
+
+/* Chevrons de colapsar/expandir (el tamaño lo fija la clase, no el atributo) */
+.sv2-chev {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+/* --- Navegación (expandido) -------------------------------------- */
+
+.sv2-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sv2-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-2);
+  font-size: var(--pl-fs-body);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-item:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+  text-decoration: none;
+}
+
+/* Item suelto (fuera de grupos, ej. Dashboard) */
+.sv2-item--suelto {
+  height: 36px;
+  font-weight: 600;
+}
+
+.sv2-item--activo,
+.sv2-item--activo:hover {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  font-weight: 600;
+}
+
+/* Barra de activo: 3px pegada al borde izquierdo del pill */
+.sv2-item--activo::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--pl-green);
+}
+
+.sv2-item-icono {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--pl-text-3);
+}
+.sv2-item-icono > svg {
+  width: 18px;
+  height: 18px;
+}
+.sv2-item--activo .sv2-item-icono {
+  color: inherit;
+}
+
+.sv2-item-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Badges (contadores pendientes) ------------------------------- */
+
+.sv2-badge {
+  flex: 0 0 auto;
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  border-radius: var(--pl-radius-pill);
+  padding: 1px 7px;
+  color: var(--pl-green-700);
+  background: var(--pl-green-100);
+}
+
+/* Variante alerta (referencia: SLA con reclamos en riesgo → ámbar) */
+.sv2-badge--alerta {
+  color: var(--pl-amber-700);
+  background: var(--pl-amber-100);
+}
+
+/* --- Grupos acordeón --------------------------------------------- */
+
+.sv2-grupo-cab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 10px 5px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.sv2-grupo-titulo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+.sv2-grupo-chevron {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  color: var(--pl-text-3);
+  transition: transform var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-grupo-cab--cerrado .sv2-grupo-chevron {
+  transform: rotate(-90deg);
+}
+
+/* Colapso animado sin inline styles: truco grid-template-rows 1fr/0fr */
+.sv2-grupo-items {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--pl-dur-sheet) var(--pl-ease);
+}
+.sv2-grupo-items--cerrado {
+  grid-template-rows: 0fr;
+}
+.sv2-grupo-items-int {
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* --- Pie del sidebar: "Ayuda y soporte" (solo expandido) ---------- */
+
+.sv2-pie {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--pl-border); /* hairline como la referencia */
+  padding: 10px 12px;
+}
+
+/* Inerte por ahora (sin destino): cursor default, hover suave de paridad */
+.sv2-pie-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-3);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+  cursor: default;
+  transition:
+    background-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-pie-item:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+
+/* --- Modo colapsado (solo iconos) -------------------------------- */
+
+.sv2-cnav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sv2-citem {
+  position: relative;
+  width: 42px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: var(--pl-radius-md);
+  display: grid;
+  place-items: center;
+  color: var(--pl-text-3);
+  text-decoration: none;
+  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-citem:hover {
+  background: var(--pl-surface-hover);
+}
+.sv2-citem--activo,
+.sv2-citem--activo:hover {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+.sv2-citem--activo .sv2-item-icono {
+  color: inherit;
+}
+
+.sv2-cseparador {
+  width: 26px;
+  height: 1px;
+  flex: 0 0 auto;
+  background: var(--pl-border-strong);
+  margin: 7px 0;
+}
+
+/* Mini badge del modo colapsado */
+.sv2-minibadge {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: var(--pl-radius-pill);
+  font-size: 9px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  background: var(--pl-green);
+  color: var(--pl-on-brand);
+}
+
+.sv2-minibadge--alerta {
+  background: var(--pl-amber-strong);
+  color: var(--pl-on-brand);
+}
+
+.sv2-cespaciador {
+  flex: 1;
+}
+
+.sv2-expandir {
+  width: 42px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: var(--pl-radius-md);
+  border: 1px solid var(--pl-border-strong);
+  background: transparent;
+  color: var(--pl-text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-expandir:hover {
+  background: var(--pl-surface-hover);
+}
+
+/* ============================================================
+   TopbarV2 — CONTEXTO a la izquierda, PERSONA a la derecha.
+   Sticky en flujo dentro del <main> (mismo mecanismo que la barra
+   vieja): no necesita padding-top extra en el contenido.
+   ============================================================ */
+
+.tv2 {
+  position: sticky;
+  top: 0;
+  z-index: 45; /* bajo el sidebar (50), sobre los StickyPageHeader (40) */
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--pl-topbar-h);
+  padding: 8px 2px 6px;
+  background: var(--pl-bg);
+  font-family: var(--pl-font-sans);
+}
+
+/* --- Izquierda: contexto + breadcrumb ----------------------- */
+
+/* La miga NO es el flex-grow de la barra: crece el buscador. Ella ocupa lo
+   que necesita (y encoge con ellipsis si no entra). */
+.tv2-migas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-3);
+}
+
+.tv2-sep-miga {
+  color: var(--pl-text-faint);
+  flex: none;
+}
+
+.tv2-pagina {
+  color: var(--pl-text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pill de contexto FIJO (usuario de dependencia) */
+.tv2-pill-fijo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--pl-green-100);
+  border: 1px solid var(--pl-green-200);
+  border-radius: var(--pl-radius-pill);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-green-700);
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.tv2-pill-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Ámbito en TEXTO (admin/supervisor del muni, sin dependencia asignada).
+   Mismo lugar que la pill, sin el peso visual de la pill verde. */
+.tv2-ambito {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 0 1 auto;
+  color: var(--pl-text-3);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+}
+
+.tv2-icono {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+/* --- Centro: separador elástico -----------------------------------
+   La topbar NO lleva buscador: la búsqueda de la app es por pantalla
+   (cada listado filtra lo que el usuario está mirando). Este espacio
+   sólo empuja la miga a la izquierda y la persona a la derecha. */
+.tv2-espacio {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* --- Buscador global (HOY SIN USO en la topbar) -------------------
+   Estilos del componente `BuscadorGlobal`, que quedó en el repo por si
+   más adelante hay búsqueda indexada entre módulos. No se borran para
+   que volver a enchufarlo sea sólo montar el componente. */
+.tv2-buscar-zona {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.tv2-buscar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  cursor: text;
+  transition:
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.tv2-buscar:hover {
+  border-color: var(--pl-border-strong);
+}
+.tv2-buscar:focus-within {
+  border-color: var(--pl-green);
+  background: var(--pl-surface);
+}
+
+.tv2-buscar-icono {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--pl-text-muted);
+}
+
+.tv2-buscar-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--pl-fs-body);
+  color: var(--pl-text);
+}
+.tv2-buscar-input::placeholder {
+  color: var(--pl-text-muted);
+}
+
+.tv2-buscar-atajo {
+  flex: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 6px;
+  padding: 2px 5px;
+}
+
+/* Desplegable de resultados. Hoy sólo muestra el aviso de construcción; el
+   markup de grupos ya es el definitivo. */
+.tv2-buscar-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 8px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-float);
+}
+
+.tv2-buscar-grupo + .tv2-buscar-grupo {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--pl-border);
+}
+
+.tv2-buscar-grupo-titulo {
+  margin: 0;
+  padding: 8px 10px 6px;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+.tv2-buscar-fila {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tv2-buscar-fila:hover {
+  background: var(--pl-surface-hover);
+}
+
+.tv2-buscar-fila-icono {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--pl-radius-sm);
+  background: var(--pl-surface-2);
+  color: var(--pl-text-3);
+}
+
+.tv2-buscar-fila-textos {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tv2-buscar-fila-titulo {
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv2-buscar-fila-detalle {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv2-buscar-pill {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--pl-radius-pill);
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  background: var(--pl-surface-2);
+  color: var(--pl-text-3);
+}
+.tv2-buscar-pill--exito {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+.tv2-buscar-pill--alerta {
+  background: var(--pl-amber-100);
+  color: var(--pl-amber-700);
+}
+.tv2-buscar-pill--peligro {
+  background: var(--pl-red-100);
+  color: var(--pl-red-700);
+}
+
+.tv2-buscar-estado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 10px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+}
+
+.tv2-buscar-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  animation: tv2-girar 900ms linear infinite;
+}
+
+@keyframes tv2-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Aviso honesto mientras no exista el motor de búsqueda. */
+.tv2-buscar-aviso {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 10px 14px;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-3);
+}
+.tv2-buscar-aviso strong {
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+
+/* Desktop angosto: la miga y la persona mandan; el buscador se retira. */
+@media (max-width: 1180px) {
+  .tv2-buscar-zona {
+    display: none;
+  }
+}
+
+/* Contenedor del MunicipioSwitcher (super admin) reubicado en la topbar */
+.tv2-contexto-switcher {
+  flex: 0 1 auto;
+  min-width: 160px;
+  max-width: 260px;
+}
+
+.tv2-chevron {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--pl-text-3);
+  transition: transform var(--pl-dur-ui) var(--pl-ease);
+}
+
+/* --- Derecha: acciones | persona ---------------------------- */
+
+.tv2-derecha {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.tv2-acciones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Botón de icono de 32px (tema, ajustes) — sirve para <button> y <a> */
+.tv2-iconbtn {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--pl-radius-sm);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--pl-text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.tv2-iconbtn:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+.tv2-iconbtn-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tv2-sep-v {
+  width: 1px;
+  height: 22px;
+  background: var(--pl-border-strong);
+  margin: 0 4px;
+  flex: none;
+}
+
+/* --- Persona (avatar + nombre + rol + menú) ----------------- */
+
+.tv2-persona {
+  position: relative;
+  display: inline-flex;
+}
+
+.tv2-persona-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 34px;
+  padding: 0 6px 0 4px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.tv2-persona-btn:hover {
+  background: var(--pl-surface-hover);
+}
+.tv2-persona-btn[aria-expanded='true'] .tv2-chevron {
+  transform: rotate(180deg);
+}
+
+.tv2-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+  color: var(--pl-on-brand);
+  display: grid;
+  place-items: center;
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  flex: none;
+}
+
+.tv2-persona-datos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.tv2-persona-nombre {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.tv2-persona-rol {
+  font-size: var(--pl-fs-eyebrow);
+  color: var(--pl-text-3);
+  line-height: 1.2;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+/* Menú desplegable de la persona */
+.tv2-persona-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-float);
+  padding: 6px;
+  z-index: 40;
+}
+
+/* Contenido del menú de usuario (lo arma el Layout) */
+.tv2-menu-cab {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--pl-border);
+  margin-bottom: 6px;
+}
+.tv2-menu-nombre {
+  margin: 0;
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.tv2-menu-email {
+  margin: 2px 0 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv2-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body);
+  color: var(--pl-text-2);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.tv2-menu-item:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+.tv2-menu-item:disabled {
+  color: var(--pl-text-disabled);
+  cursor: default;
+}
+.tv2-menu-item:disabled:hover {
+  background: transparent;
+  color: var(--pl-text-disabled);
+}
+
+.tv2-menu-icono {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--pl-text-3);
+}
+
+.tv2-menu-item--peligro {
+  color: var(--pl-red-700);
+}
+.tv2-menu-item--peligro:hover {
+  background: var(--pl-red-100);
+  color: var(--pl-red-700);
+}
+.tv2-menu-item--peligro .tv2-menu-icono {
+  color: inherit;
+}
+
+.tv2-menu-sep {
+  height: 1px;
+  background: var(--pl-border);
+  margin: 6px 0;
+}
+
+/* --- Accesibilidad / seguridad ----------------------------------- */
+
+.sv2-item:focus-visible,
+.sv2-citem:focus-visible,
+.sv2-grupo-cab:focus-visible,
+.sv2-logo:focus-visible,
+.sv2-colapsar:focus-visible,
+.sv2-expandir:focus-visible,
+.tv2-iconbtn:focus-visible,
+.tv2-persona-btn:focus-visible,
+.tv2-menu-item:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 1px;
+}
+
+/* Cinturón de seguridad: el shell v2 es SOLO desktop (el Layout ya lo
+   gatea por isMobile; esto evita cualquier flash en el límite 1024px). */
+@media (max-width: 1023px) {
+  .sv2,
+  .tv2 {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv2,
+  .sv2-item,
+  .sv2-citem,
+  .sv2-colapsar,
+  .sv2-expandir,
+  .sv2-grupo-chevron,
+  .sv2-grupo-items,
+  .sv2-pie-item,
+  .tv2-iconbtn,
+  .tv2-persona-btn,
+  .tv2-menu-item,
+  .tv2-chevron {
+    transition: none;
+  }
+}

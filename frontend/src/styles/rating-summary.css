@@ -1,0 +1,102 @@
+/* ============================================================
+   rating-summary.css — componente RatingSummary del KIT
+   (components/ui/RatingSummary.tsx). Promedio + estrellas +
+   subtítulo + distribución por nivel con barras.
+   Compacto a propósito: este bloque suele MANDAR la altura de
+   la sección que lo contiene, así que no se estira de gusto
+   (el promedio es el dato principal, no un cartel).
+   Polimórfico: todo sobre tokens --pl-*. Cero hex.
+   ============================================================ */
+
+.rs {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rs-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.rs-score {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  /* Sobrescribible por quien lo usa (--rs-score-fs). */
+  font-size: var(--rs-score-fs, 28px);
+  line-height: 1;
+  letter-spacing: var(--pl-tracking-hero);
+  font-feature-settings: 'tnum';
+  color: var(--pl-text);
+}
+
+.rs-stars {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.rs-star--on { color: var(--pl-amber-strong); }
+.rs-star--off { color: var(--pl-track); }
+
+.rs-sub {
+  margin-top: 5px;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.35;
+  color: var(--pl-text-muted);
+}
+
+/* ---- Distribución por nivel ---- */
+.rs-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 14px;
+}
+.rs-dist-fila {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 8px;
+}
+.rs-dist-nivel {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+  font-feature-settings: 'tnum';
+}
+.rs-dist-nivel svg { color: var(--pl-amber-strong); }
+
+.rs-track {
+  position: relative;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+.rs-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--pl-radius-pill);
+  transition: width var(--pl-dur-ui) var(--pl-ease);
+}
+/* Rampa por relación nivel/escala: mejor → acento, medio → ámbar, peor → rojo. */
+.rs-fill--optimo { background: var(--pl-green); }
+.rs-fill--bueno  { background: var(--pl-green-200); }
+.rs-fill--medio  { background: var(--pl-amber-strong); }
+.rs-fill--bajo   { background: var(--pl-amber-700); }
+.rs-fill--malo   { background: var(--pl-red); }
+
+.rs-dist-n {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  text-align: right;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-fill { transition: none; }
+}

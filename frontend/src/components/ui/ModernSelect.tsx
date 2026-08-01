@@ -7,6 +7,15 @@ import { abreviarPalabras } from '../../lib/textAbbreviation';
 /**
  * ModernSelect — Combo dropdown canónico de la app. REEMPLAZA `<select>` nativo.
  *
+ * VARIANTES (`variant`):
+ *   - `clasico` (DEFAULT, no tocar): el look histórico, con estilos inline
+ *     derivados del theme. Lo usan las decenas de pantallas sin migrar.
+ *   - `v2`: estética del estándar v2 (mockup de Claude Design) — superficie
+ *     --pl-surface-2, borde fino --pl-border, radius 10px, tipografía 12.5px,
+ *     alto de píldora. OPT-IN y 100% por clases `ms2-*` en
+ *     styles/modern-select-v2.css sobre tokens --pl-* (cero hex, cero rgba).
+ *     Es la variante que usa AdaptiveFilter al colapsar.
+ *
  * Soporta:
  *   - `searchable`: convierte el combo en autocomplete con input "Buscar..."
  *      al abrirlo. Las opciones se filtran por `label` y `description`.
@@ -71,6 +80,9 @@ interface ModernSelectProps {
    * texto completo. Pasar `abbreviate={false}` solo cuando se necesite
    * texto exacto en el trigger (raro). */
   abbreviate?: boolean;
+  /** Estética. `clasico` (default) = look histórico intacto; `v2` = estándar
+   *  v2 por clases `ms2-*` (styles/modern-select-v2.css). Ver cabecera. */
+  variant?: 'clasico' | 'v2';
 }
 
 export function ModernSelect({
@@ -85,8 +97,12 @@ export function ModernSelect({
   onOpen,
   onClose,
   abbreviate = true,
+  variant = 'clasico',
 }: ModernSelectProps) {
   const { theme } = useTheme();
+  // Interruptor de la variante: con `v2` NO se aplica ningún estilo inline de
+  // color — manda el CSS de clases (así el look sale íntegro de tokens --pl-*).
+  const esV2 = variant === 'v2';
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -217,47 +233,64 @@ export function ModernSelect({
         type="button"
         onClick={handleOpen}
         disabled={disabled}
-        className={`
+        className={esV2
+          ? `ms2-trigger${isOpen ? ' ms2-trigger--abierto' : ''}${disabled ? ' ms2-trigger--off' : ''}`
+          : `
           w-full h-[34px] flex items-center justify-between gap-1.5 px-2.5 rounded-lg
           transition-all duration-200 text-left text-[12px]
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-opacity-60'}
           ${isOpen ? 'ring-2' : ''}
         `}
-        style={{
+        style={esV2 ? undefined : {
           backgroundColor: theme.backgroundSecondary,
           border: `1px solid ${isOpen ? theme.primary : theme.border}`,
           color: theme.text,
           ['--tw-ring-color' as string]: `${theme.primary}40`,
         }}
       >
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <div className={esV2 ? 'ms2-cara' : 'flex items-center gap-1.5 flex-1 min-w-0'}>
           {selectedOption?.icon && (
             <div
-              className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-              style={{
-                backgroundColor: selectedOption.color ? `${selectedOption.color}20` : `${theme.primary}20`,
-                color: selectedOption.color || theme.primary
-              }}
+              className={esV2 ? 'ms2-icono' : 'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0'}
+              style={esV2
+                ? (selectedOption.color ? { color: selectedOption.color } : undefined)
+                : {
+                    backgroundColor: selectedOption.color ? `${selectedOption.color}20` : `${theme.primary}20`,
+                    color: selectedOption.color || theme.primary
+                  }}
             >
               {selectedOption.icon}
             </div>
           )}
-          <div className="min-w-0 flex-1">
-            {selectedOption ? (
-              <span
-                className="block truncate font-medium leading-tight"
-                style={{ color: selectedOption.color || theme.text }}
-              >
+          {esV2 ? (
+            selectedOption ? (
+              // runtime: color de la opción (dato), si la trae
+              <span className="ms2-valor" style={selectedOption.color ? { color: selectedOption.color } : undefined}>
                 {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
               </span>
             ) : (
-              <span className="truncate block" style={{ color: theme.textSecondary }}>{placeholder}</span>
-            )}
-          </div>
+              <span className="ms2-placeholder">{placeholder}</span>
+            )
+          ) : (
+            <div className="min-w-0 flex-1">
+              {selectedOption ? (
+                <span
+                  className="block truncate font-medium leading-tight"
+                  style={{ color: selectedOption.color || theme.text }}
+                >
+                  {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
+                </span>
+              ) : (
+                <span className="truncate block" style={{ color: theme.textSecondary }}>{placeholder}</span>
+              )}
+            </div>
+          )}
         </div>
         <ChevronDown
-          className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          style={{ color: theme.textSecondary }}
+          className={esV2
+            ? `ms2-chevron${isOpen ? ' ms2-chevron--abierto' : ''}`
+            : `h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          style={esV2 ? undefined : { color: theme.textSecondary }}
         />
       </button>
 
@@ -267,7 +300,9 @@ export function ModernSelect({
       {isOpen && dropdownPos && typeof document !== 'undefined' && createPortal(
         <div
           ref={dropdownRef}
-          className="rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          className={esV2
+            ? 'ms2-menu'
+            : 'rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200'}
           style={{
             position: 'fixed',
             top: dropdownPos.openUp ? undefined : dropdownPos.top,
@@ -275,16 +310,18 @@ export function ModernSelect({
             left: dropdownPos.left,
             width: dropdownPos.width,
             zIndex: 9999,
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: `0 20px 40px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px ${theme.border}`,
+            ...(esV2 ? {} : {
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+              boxShadow: `0 20px 40px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px ${theme.border}`,
+            }),
           }}
         >
           {/* Search Input */}
           {searchable && (
             <div
-              className="p-2 border-b"
-              style={{ borderColor: theme.border }}
+              className={esV2 ? 'ms2-buscador' : 'p-2 border-b'}
+              style={esV2 ? undefined : { borderColor: theme.border }}
             >
               <input
                 ref={inputRef}
@@ -292,8 +329,8 @@ export function ModernSelect({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar..."
-                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
-                style={{
+                className={esV2 ? 'ms2-input' : 'w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2'}
+                style={esV2 ? undefined : {
                   backgroundColor: theme.backgroundSecondary,
                   color: theme.text,
                   border: `1px solid ${theme.border}`,
@@ -304,11 +341,14 @@ export function ModernSelect({
           )}
 
           {/* Options List */}
-          <div className="overflow-y-auto py-1" style={{ maxHeight: dropdownPos.maxHeight - (searchable ? 60 : 0) }}>
+          <div
+            className={esV2 ? 'ms2-lista' : 'overflow-y-auto py-1'}
+            style={{ maxHeight: dropdownPos.maxHeight - (searchable ? 60 : 0) }}
+          >
             {filteredOptions.length === 0 ? (
               <div
-                className="px-4 py-3 text-sm text-center"
-                style={{ color: theme.textSecondary }}
+                className={esV2 ? 'ms2-vacio' : 'px-4 py-3 text-sm text-center'}
+                style={esV2 ? undefined : { color: theme.textSecondary }}
               >
                 No se encontraron opciones
               </div>
@@ -320,49 +360,59 @@ export function ModernSelect({
                     key={option.value}
                     type="button"
                     onClick={() => handleSelect(option.value)}
-                    className={`
+                    className={esV2
+                      ? `ms2-opcion${isSelected ? ' ms2-opcion--sel' : ''}${
+                          option.emphasized === false ? ' ms2-opcion--tenue' : ''
+                        }${!isSelected && option.emphasized ? ' ms2-opcion--fuerte' : ''}`
+                      : `
                       w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12px]
                       transition-all duration-150
                     `}
-                    style={{
+                    style={esV2 ? undefined : {
                       backgroundColor: isSelected ? `${theme.primary}15` : 'transparent',
                     }}
-                    onMouseEnter={(e) => {
+                    onMouseEnter={esV2 ? undefined : (e) => {
                       if (!isSelected) {
                         e.currentTarget.style.backgroundColor = `${theme.primary}08`;
                       }
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={esV2 ? undefined : (e) => {
                       e.currentTarget.style.backgroundColor = isSelected ? `${theme.primary}15` : 'transparent';
                     }}
                   >
                     {option.icon && (
                       <div
-                        className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
-                        style={{
-                          backgroundColor: option.color ? `${option.color}20` : `${theme.primary}20`,
-                          color: option.color || theme.primary
-                        }}
+                        className={esV2 ? 'ms2-opcion-icono' : 'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0'}
+                        style={esV2
+                          ? (option.color ? { color: option.color } : undefined)
+                          : {
+                              backgroundColor: option.color ? `${option.color}20` : `${theme.primary}20`,
+                              color: option.color || theme.primary
+                            }}
                       >
                         {option.icon}
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
+                    <div className={esV2 ? 'ms2-opcion-textos' : 'min-w-0 flex-1'}>
                       <span
-                        className={`block truncate leading-tight ${
-                          isSelected ? 'font-semibold' : option.emphasized ? 'font-bold' : 'font-medium'
-                        }`}
-                        style={{
-                          color: option.color || theme.text,
-                          opacity: option.emphasized === false ? 0.45 : 1,
-                        }}
+                        className={esV2
+                          ? 'ms2-opcion-label'
+                          : `block truncate leading-tight ${
+                              isSelected ? 'font-semibold' : option.emphasized ? 'font-bold' : 'font-medium'
+                            }`}
+                        style={esV2
+                          ? (option.color ? { color: option.color } : undefined)
+                          : {
+                              color: option.color || theme.text,
+                              opacity: option.emphasized === false ? 0.45 : 1,
+                            }}
                       >
                         {option.label}
                       </span>
                       {option.description && (
                         <span
-                          className="block text-[11px] truncate leading-tight"
-                          style={{ color: theme.textSecondary }}
+                          className={esV2 ? 'ms2-opcion-desc' : 'block text-[11px] truncate leading-tight'}
+                          style={esV2 ? undefined : { color: theme.textSecondary }}
                         >
                           {option.description}
                         </span>
@@ -370,8 +420,8 @@ export function ModernSelect({
                     </div>
                     {isSelected && (
                       <Check
-                        className="h-4 w-4 flex-shrink-0"
-                        style={{ color: theme.primary }}
+                        className={esV2 ? 'ms2-check' : 'h-4 w-4 flex-shrink-0'}
+                        style={esV2 ? undefined : { color: theme.primary }}
                       />
                     )}
                   </button>

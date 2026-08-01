@@ -1,0 +1,234 @@
+/* ============================================================
+   modern-select-v2.css — variante `v2` de ModernSelect
+   (components/ui/ModernSelect.tsx, prop `variant="v2"`)
+
+   OPT-IN: el ModernSelect clásico (default) NO usa nada de este
+   archivo — sigue con su look inline de siempre. Estas clases sólo
+   se activan con `variant="v2"`, para las pantallas ya migradas al
+   estándar v2 (mockup: superficies suaves, borde fino, radius 10px,
+   tipografía 12.5px, alto de píldora).
+
+   AGNÓSTICO y POLIMÓRFICO: cero colores literales. Todo por tokens
+   --pl-*; transparencias con color-mix() sobre un token.
+
+   Prefijo de clases: ms2-.
+   ============================================================ */
+
+/* ---------- trigger ---------- */
+.ms2-trigger {
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 10px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  color: var(--pl-text);
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    box-shadow var(--pl-dur-ui) var(--pl-ease);
+}
+.ms2-trigger:hover {
+  background: var(--pl-surface-hover);
+  border-color: var(--pl-border-strong);
+}
+/* Foco y estado abierto NEUTROS: el acento se reserva para la selección
+   (opción marcada), nunca para el borde/ring del control. */
+.ms2-trigger:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 2px;
+}
+.ms2-trigger--abierto {
+  border-color: var(--pl-border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pl-text) 7%, transparent);
+}
+.ms2-trigger--off {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ms2-cara {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ms2-icono {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pl-radius-sm);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
+.ms2-valor {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms2-placeholder {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms2-chevron {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: var(--pl-text-muted);
+  transition: transform var(--pl-dur-ui) var(--pl-ease);
+}
+.ms2-chevron--abierto { transform: rotate(180deg); }
+
+/* ---------- menú (portaleado a body, position: fixed desde el .tsx) ---------- */
+.ms2-menu {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-float);
+  overflow: hidden;
+}
+
+.ms2-buscador {
+  padding: 8px;
+  border-bottom: 1px solid var(--pl-border);
+}
+/* 16px a propósito: por debajo de eso iOS hace zoom al enfocar el input. */
+.ms2-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-input);
+  color: var(--pl-text);
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-sm);
+}
+.ms2-input::placeholder { color: var(--pl-text-muted); }
+.ms2-input:focus {
+  outline: none;
+  border-color: var(--pl-border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pl-text) 7%, transparent);
+}
+
+.ms2-lista {
+  padding: 4px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ms2-opcion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  color: var(--pl-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.ms2-opcion:hover { background: var(--pl-surface-hover); }
+.ms2-opcion:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: -2px;
+}
+.ms2-opcion--sel {
+  font-weight: 600;
+  color: var(--pl-green-700);
+  background: var(--pl-green-100);
+}
+.ms2-opcion--sel:hover {
+  background: color-mix(in srgb, var(--pl-green-100) 82%, var(--pl-green-200));
+}
+/* Opción sin elementos en el dataset actual (emphasized === false). */
+.ms2-opcion--tenue { opacity: 0.45; }
+.ms2-opcion--fuerte { font-weight: 700; }
+
+.ms2-opcion-icono {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pl-radius-sm);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
+.ms2-opcion-textos {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ms2-opcion-label {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ms2-opcion-desc {
+  display: block;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms2-check {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: var(--pl-green-700);
+}
+
+.ms2-vacio {
+  padding: 12px;
+  text-align: center;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms2-trigger,
+  .ms2-chevron,
+  .ms2-opcion { transition: none; }
+}

@@ -14,7 +14,9 @@
   /* --- Tipografía (una sola familia para toda la app; display = la misma
      salvo que el dueño apruebe otra) --- */
   --pl-font-sans: var(--app-font-family, Inter, system-ui, sans-serif);
-  --pl-font-display: var(--pl-font-sans);
+  /* Display (H1, números grandes, títulos de card): Sora como en la referencia.
+     Una marca puede pisarlo definiendo --app-font-display. */
+  --pl-font-display: var(--app-font-display, 'Sora', system-ui, sans-serif);
 
   --pl-fs-eyebrow:    10.5px;  /* MAYÚSCULAS, tracking .09em, 700 */
   --pl-fs-micro:      11px;
