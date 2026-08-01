@@ -91,3 +91,25 @@ backend/env.yaml
 
 # Backups de migraciones/curación con datos reales (PII) — NUNCA commitear
 backend/scripts/_backup_*.json
+
+# Material de trabajo pesado (videos, capturas, planillas) — no es código de la app
+par-limpio/
+reels/
+sofi/
+*.zip
+
+# Scratch de diseño: assets pesados y canvas de trabajo.
+# El handoff versionado vive en design/handoff-v2/
+design/uploads/
+design/exports/
+design/new/
+design/scraps/
+design/.design-canvas.state.json
+
+# Scripts descartables: verificación con Playwright, respaldos y análisis ad-hoc
+frontend/_*.mjs
+frontend/_*.cjs
+frontend/check_imports.py
+backend/_old_*.py
+backend/backend/
+backend/scripts/_*.py
