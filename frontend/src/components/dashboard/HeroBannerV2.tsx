@@ -17,6 +17,11 @@ import { MapPin, Sparkles } from 'lucide-react';
 
 export interface HeroStripKpi {
   etiqueta: string;
+  /** Versión corta para celular. En el ancho de un teléfono los cuatro KPIs
+   *  entran en una sola fila, y ahí "Resolución promedio" no cabe: se ABREVIA
+   *  ("Resolución"), nunca se corta con puntos suspensivos. Si no viene, se
+   *  usa la etiqueta larga. */
+  etiquetaCorta?: string;
   valor: string | number;
   /** Pinta el número en ámbar (ej: "En riesgo de SLA" > 0). */
   amber?: boolean;
@@ -93,7 +98,14 @@ export function HeroBannerV2({ eyebrow, titulo, sub, fotoUrl, fotoOpacity, kpis,
       <div className="dv2-hero-strip">
         {kpis.map((k) => (
           <div key={k.etiqueta} className="dv2-hero-kpi">
-            <span className="dv2-hero-kpi-etiqueta">{k.etiqueta}</span>
+            {/* Las dos versiones se renderizan y el CSS muestra la que entra
+                según el ancho. Se resuelve por media query y no midiendo el
+                nodo: medir el nodo real lo hace colapsar, dejar de desbordar,
+                volver y parpadear para siempre. */}
+            <span className="dv2-hero-kpi-etiqueta">
+              <span className="dv2-kpi-larga">{k.etiqueta}</span>
+              <span className="dv2-kpi-corta">{k.etiquetaCorta || k.etiqueta}</span>
+            </span>
             <span className={`dv2-hero-kpi-valor${k.amber ? ' dv2-hero-kpi-valor--amber' : ''}`}>
               {k.valor}
             </span>

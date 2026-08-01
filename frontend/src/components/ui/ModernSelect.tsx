@@ -132,10 +132,19 @@ export function ModernSelect({
       openUp = true;
       maxHeight = Math.min(maxAlturaDeseada, espacioArriba);
     }
+    // El menú NO puede heredar el ancho del disparador. Cuando el disparador
+    // es angosto —el "+5" de la botonera mide 96 px— las opciones salían todas
+    // cortadas con puntos ("Secre…", "Direcc…") y el combo dejaba de servir:
+    // hay que poder LEER lo que se elige. Ahora el panel se abre con un ancho
+    // legible y, si eso lo saca de la pantalla, se corre para adentro.
+    const MARGEN = 12;
+    const anchoLegible = Math.min(280, window.innerWidth - MARGEN * 2);
+    const width = Math.max(r.width, anchoLegible);
+    const left = Math.max(MARGEN, Math.min(r.left, window.innerWidth - width - MARGEN));
     setDropdownPos({
       top: openUp ? r.top - 8 : r.bottom + 8,
-      left: r.left,
-      width: r.width,
+      left,
+      width,
       maxHeight: Math.max(200, maxHeight),
       openUp,
     });

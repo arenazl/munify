@@ -197,11 +197,15 @@
   min-width: 0;
   flex: 1 1 auto;
 }
+/* La opción se lee ENTERA. Si el nombre es largo ("Secretaría de Servicios
+   Públicos y Ambiente"), baja a dos renglones en vez de cortarse: elegir a
+   ciegas entre "Secre…" y "Secre…" no es elegir. El alto lo absorbe el menú,
+   que ya scrollea. */
 .ms2-opcion-label {
   display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 .ms2-opcion-desc {
   display: block;

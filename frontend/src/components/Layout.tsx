@@ -4,6 +4,9 @@ import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-do
 import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp, Radio } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
+// alpha()/lighten() entienden cualquier formato de color; pegar dígitos al
+// final de un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
+import { alpha, lighten } from '../lib/colorUtils';
 import { getNavigation, isMobileDevice } from '../config/navigation';
 import { fontPresets } from '../config/fontPresets';
 import { BrandMark } from '../brands/BrandMark';
@@ -1423,11 +1426,11 @@ export default function Layout() {
                     // en vivo (En Vivo). En el banner se veían mal en la PWA.
                     items.push(
                       { label: 'Conocé', icon: Sparkles, color: BRAND.primary, onClick: () => setPresentacionOpen(true) },
-                      { label: 'Pulso', icon: Radio, color: '#ef4444', onClick: () => navigate('/gestion?live=1') },
+                      { label: 'Pulso', icon: Radio, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion?live=1') },
                     );
                     items.push(
-                      { label: 'Mapa', icon: Map, color: '#3b82f6', onClick: () => navigate('/gestion/mapa') },
-                      { label: 'Mostrador', icon: ScanLine, color: '#8b5cf6', onClick: () => navigate('/gestion/mostrador') },
+                      { label: 'Mapa', icon: Map, color: 'var(--pl-data-2)', onClick: () => navigate('/gestion/mapa') },
+                      { label: 'Mostrador', icon: ScanLine, color: 'var(--pl-data-3)', onClick: () => navigate('/gestion/mostrador') },
                     );
                     // Si el muni opera órdenes de trabajo (opt-in), priorizar accesos
                     // del universo Reclamos (Órdenes/Tablero) sobre los slots de
@@ -1437,23 +1440,23 @@ export default function Layout() {
                     const tieneOrdenes = modulosActivos.includes('ordenes_trabajo');
                     if (tieneOrdenes) {
                       items.push(
-                        { label: 'Órdenes', icon: ClipboardList, color: '#f97316', onClick: () => navigate('/gestion/ordenes-trabajo') },
-                        { label: 'Tablero', icon: TrendingUp, color: '#14b8a6', onClick: () => navigate('/gestion/tablero') },
-                        { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
-                        { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
+                        { label: 'Órdenes', icon: ClipboardList, color: 'var(--pl-data-4)', onClick: () => navigate('/gestion/ordenes-trabajo') },
+                        { label: 'Tablero', icon: TrendingUp, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion/tablero') },
+                        { label: 'Agenda', icon: Calendar, color: 'var(--pl-data-2)', onClick: () => navigate('/gestion/tesoreria/agenda') },
+                        { label: 'Config', icon: Settings, color: 'var(--pl-data-3)', onClick: () => navigate('/gestion/configuracion') },
                       );
                     } else {
                       items.push(
-                        { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
-                        { label: 'Contactos', icon: User, color: '#06b6d4', onClick: () => navigate('/gestion/tesoreria/contactos') },
-                        { label: 'Resumen', icon: TrendingUp, color: '#10b981', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
-                        { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
+                        { label: 'Agenda', icon: Calendar, color: 'var(--pl-data-4)', onClick: () => navigate('/gestion/tesoreria/agenda') },
+                        { label: 'Contactos', icon: User, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion/tesoreria/contactos') },
+                        { label: 'Resumen', icon: TrendingUp, color: 'var(--pl-data-2)', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
+                        { label: 'Config', icon: Settings, color: 'var(--pl-data-3)', onClick: () => navigate('/gestion/configuracion') },
                       );
                     }
                   } else {
                     items.push(
-                      { label: 'Reclamo', icon: AlertCircle, color: '#ef4444', onClick: () => navigate('/gestion/crear-reclamo') },
-                      { label: 'Trámite', icon: FileCheck, color: '#10b981', onClick: () => navigate('/gestion/crear-tramite') },
+                      { label: 'Reclamo', icon: AlertCircle, color: 'var(--pl-data-4)', onClick: () => navigate('/gestion/crear-reclamo') },
+                      { label: 'Trámite', icon: FileCheck, color: 'var(--pl-data-1)', onClick: () => navigate('/gestion/crear-tramite') },
                     );
                   }
                   return items.map((it) => (
@@ -1502,17 +1505,28 @@ export default function Layout() {
                       onClick={() => setCreateMenuOpen(!createMenuOpen)}
                       className="flex flex-col items-center min-w-0 flex-1 relative -mt-5"
                     >
+                      {/* El gradiente terminaba en #ec4899 (rosa fucsia) FIJO en el
+                          código: en la marca verde el botón salía rosado y no se
+                          parecía a nada del tema. Ahora los dos extremos salen del
+                          acento activo, así que cada marca lo hereda en su color.
+                          Las transparencias van por alpha(): pegar dígitos al final
+                          del color sólo funciona si SIEMPRE es un hex de seis. */}
                       <div
                         className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 relative"
                         style={{
-                          background: `linear-gradient(135deg, ${theme.primary} 0%, #ec4899 100%)`,
+                          background: `linear-gradient(135deg, ${lighten(theme.primary, 12)} 0%, ${theme.primary} 100%)`,
                           boxShadow: createMenuOpen
-                            ? `0 6px 25px ${theme.primary}60`
-                            : `0 4px 20px ${theme.primary}50`,
+                            ? `0 6px 25px ${alpha(theme.primary, 0.38)}`
+                            : `0 4px 20px ${alpha(theme.primary, 0.31)}`,
                           transform: createMenuOpen ? 'rotate(45deg) scale(1.1)' : 'rotate(0deg) scale(1)',
                         }}
                       >
-                        <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
+                        {/* Blanco o negro según la luminancia del acento, no fijo. */}
+                        <Plus
+                          className="h-7 w-7"
+                          strokeWidth={2.5}
+                          style={{ color: 'var(--pl-on-accent)' }}
+                        />
                       </div>
                       <span
                         className="text-[10px] font-semibold mt-1"

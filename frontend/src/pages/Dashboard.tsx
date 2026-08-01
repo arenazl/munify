@@ -819,10 +819,12 @@ export default function Dashboard() {
   const enRiesgoSla = metricasAccion?.vencidos ?? null;
 
   const heroKpis: HeroStripKpi[] = [
-    { etiqueta: 'Reclamos abiertos', valor: reclamosAbiertos },
-    { etiqueta: 'Trámites activos', valor: tramitesActivos },
-    { etiqueta: 'Resolución promedio', valor: `${stats.tiempo_promedio_dias} d` },
-    { etiqueta: 'En riesgo de SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 },
+    // La etiqueta corta es la que se ve en celular, donde los cuatro entran en
+    // una sola fila: se abrevia, no se corta con puntos suspensivos.
+    { etiqueta: 'Reclamos abiertos', etiquetaCorta: 'Abiertos', valor: reclamosAbiertos },
+    { etiqueta: 'Trámites activos', etiquetaCorta: 'Trámites', valor: tramitesActivos },
+    { etiqueta: 'Resolución promedio', etiquetaCorta: 'Resolución', valor: `${stats.tiempo_promedio_dias} d` },
+    { etiqueta: 'En riesgo de SLA', etiquetaCorta: 'Riesgo SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 },
   ];
 
   const heroAcciones = (user?.rol === 'admin' || user?.rol === 'supervisor')
