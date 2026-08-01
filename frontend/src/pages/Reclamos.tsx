@@ -33,6 +33,9 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, estadoColors, DynamicIcon } from '../components/ui/ReclamoCard';
+import { FilaLista, type FilaListaItem, type FilaTono } from '../components/ui/FilaLista';
+import { useEsAngosto } from '../hooks/useEsAngosto';
+import { haceCuanto, tonoDeEstado } from '../lib/filaLista-helpers';
 // estadoLabels (flat) viene del SSoT canónico (lib/enums/reclamo). estadoColors se sigue
 // tomando del adaptador {bg,text} de ReclamoCard: el Sheet del monolito accede a `.bg`
 // (el SSoT expone color plano vía estadoColor(); no reescribimos la lógica del monolito acá).
@@ -451,6 +454,27 @@ function armarInbox(lista: Reclamo[]) {
   return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
 }
 
+
+/**
+ * Un reclamo, dicho como una fila de listado.
+ *
+ * Se muestra SOLO lo que hace falta para decidir si abrirlo: que es, de quien
+ * y hace cuanto. El numero pasa a la meta en letra chica —sigue estando para
+ * quien lo busca— y deja de ser lo mas grande de la tarjeta, que era el caso.
+ */
+function aFilaReclamo(r: Reclamo, onClick: () => void): FilaListaItem {
+  const vecino = r.creador ? `${r.creador.nombre} ${r.creador.apellido}`.trim() : null;
+  const area = r.dependencia_asignada?.nombre || r.categoria?.nombre || null;
+  return {
+    id: r.id,
+    titulo: r.titulo,
+    meta: [vecino, area, `#${r.id}`],
+    estado: { label: estadoLabels[r.estado] || r.estado, tono: tonoDeEstado(r.estado) },
+    hace: haceCuanto(r.created_at),
+    onClick,
+  };
+}
+
 export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }: ReclamosProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -490,6 +514,10 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // (la grilla ocupa el 100% del ancho). La IA funcional —auto-asignación,
   // clasificación— es independiente de este flag y sigue operando.
   const iaOn = useIaReclamos();
+  // Pantalla de telefono: la vista de tarjetas se dibuja como filas (ver el
+  // render de `cards`). Es un cambio de ARBOL, no de estilo, asi que no
+  // alcanza con una media query de CSS.
+  const esAngosto = useEsAngosto();
 
   // Vista del listado (segmented del ListToolbar estándar): tabla / tarjetas /
   // guiada (Inbox). Persiste en localStorage con la MISMA key que usaba ABMPage
@@ -5294,25 +5322,45 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               </div>
             ) : activeView === 'guided' ? (
               <div className="mt-3">{inboxView}</div>
+            ) : esAngosto ? (
+              /* En un telefono no hay tabla ni grilla que sirvan: la tabla
+                 obliga a scrollear de costado y la tarjeta grande deja menos
+                 de dos items por pantalla. La vista elegida (tabla/tarjetas)
+                 es una preferencia de ESCRITORIO; en angosto siempre manda la
+                 lista, que muestra lo necesario para decidir si abrir —que
+                 es, de quien y hace cuanto— con el estado como barra de color
+                 al costado. */
+              filteredReclamos.length === 0 ? (
+                <section className="av2-tabla">
+                  <div className="av2-tabla-vacia">{mensajeVacio}</div>
+                </section>
+              ) : (
+                <FilaLista
+                  ariaLabel="Reclamos"
+                  items={filteredReclamos.map((r) => aFilaReclamo(r, () => openViewSheet(r)))}
+                />
+              )
             ) : activeView === 'cards' ? (
               filteredReclamos.length === 0 ? (
                 <section className="av2-tabla">
                   <div className="av2-tabla-vacia">{mensajeVacio}</div>
                 </section>
               ) : (
-                <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
-                  {filteredReclamos.map((r, index) => (
-                    <ReclamoCard
-                      key={r.id}
-                      reclamo={r}
-                      onClick={() => openViewSheet(r)}
-                      showCreador={true}
-                      similaresCount={similaresCounts[r.id] || 0}
-                      isVisible={animationDone || visibleCards.has(r.id)}
-                      animationDelay={index * 50}
-                    />
-                  ))}
-                </div>
+                (
+                  <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                    {filteredReclamos.map((r, index) => (
+                      <ReclamoCard
+                        key={r.id}
+                        reclamo={r}
+                        onClick={() => openViewSheet(r)}
+                        showCreador={true}
+                        similaresCount={similaresCounts[r.id] || 0}
+                        isVisible={animationDone || visibleCards.has(r.id)}
+                        animationDelay={index * 50}
+                      />
+                    ))}
+                  </div>
+                )
               )
             ) : (
               <DataTable<Reclamo>

@@ -29,6 +29,8 @@ import './styles/balance-bar.css'
 import './styles/focos-rotativos.css'
 // componente del KIT: menu de acciones en mosaico asimetrico (jerarquia por tamano)
 import './styles/bento-menu.css'
+// componente del KIT: fila de listado para pantalla angosta (barra de estado)
+import './styles/fila-lista.css'
 // componente del KIT: barra de filtros de una sola línea (pills ⇄ combos)
 import './styles/adaptive-filter.css'
 // componente del KIT: carrusel de cards de altura fija (N por vista medido)

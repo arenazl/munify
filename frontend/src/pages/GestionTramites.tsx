@@ -43,6 +43,9 @@ import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizar
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
+import { FilaLista, type FilaListaItem } from '../components/ui/FilaLista';
+import { useEsAngosto } from '../hooks/useEsAngosto';
+import { haceCuanto, tonoDeEstado } from '../lib/filaLista-helpers';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { useIaTramites } from '../hooks/useIaHabilitada';
@@ -118,8 +121,33 @@ interface GestionTramitesProps {
   soloMiArea?: boolean;
 }
 
+
+/**
+ * Una solicitud de tramite, dicha como una fila de listado.
+ *
+ * Mismo criterio que en reclamos: que es, de quien y hace cuanto. El nombre
+ * del tramite aparecia DOS VECES en la tarjeta vieja (en un chip y otra vez
+ * en el titulo); aca va una sola.
+ */
+function aFilaTramite(t: Solicitud, onClick: () => void): FilaListaItem {
+  const vecino =
+    `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim() || null;
+  const area = t.tramite?.categoria_tramite?.nombre || t.tramite?.nombre || null;
+  return {
+    id: t.id,
+    titulo: t.tramite?.nombre || t.asunto || 'Tramite',
+    meta: [vecino, area, `#${t.id}`],
+    estado: { label: getEstadoConfig(t.estado).label, tono: tonoDeEstado(t.estado) },
+    hace: haceCuanto(t.created_at),
+    onClick,
+  };
+}
+
 export default function GestionTramites({ soloMiArea = false }: GestionTramitesProps) {
   const { theme } = useTheme();
+  // Pantalla de telefono: las tarjetas se dibujan como filas (misma pieza que
+  // Reclamos). Es un cambio de ARBOL, no de estilo.
+  const esAngosto = useEsAngosto();
   const { user, municipioActual } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -892,6 +920,18 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       return Array.from({ length: 6 }).map((_, i) => (
         <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
       ));
+    }
+
+    // En un telefono la tarjeta grande deja menos de dos items por pantalla.
+    // Se usa la MISMA fila del kit que Reclamos —esa era la condicion: una
+    // sola pieza para las dos pantallas— y entran siete u ocho.
+    if (esAngosto) {
+      return (
+        <FilaLista
+          ariaLabel="Tramites"
+          items={paginatedTramites.map((t) => aFilaTramite(t, () => openTramite(t)))}
+        />
+      );
     }
 
     return paginatedTramites.map((t) => {
