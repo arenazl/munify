@@ -90,7 +90,12 @@ export default function DynamicManifest() {
           display: 'standalone',
           background_color: '#ffffff', // splash a juego con los tiles blancos del icono
           theme_color: BRAND.primary,
-          orientation: 'portrait-primary',
+          // 'any' y no 'portrait-primary': con una orientación fija, una
+          // tablet apoyada en su teclado abre la PWA y Android la ROTA a la
+          // fuerza — se ve la ventana chica un instante y después el giro.
+          // La app es responsive (verificado en 390, 834 y 1440), así que no
+          // hay motivo para pelearse con cómo el usuario tiene el aparato.
+          orientation: 'any',
           icons: [
             { src: `${base}/icon-maskable-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
             ...iconSet(base),
@@ -165,7 +170,9 @@ export default function DynamicManifest() {
         display: 'standalone',
         background_color: '#0f172a',
         theme_color: municipioColor,
-        orientation: 'portrait-primary',
+        // Ver la nota de arriba: orientación libre para no forzar el giro
+        // en tablets.
+        orientation: 'any',
         icons: [
           { src: `${origin}/icon-notification.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
           ...iconSet(`${origin}/icons`),

@@ -45,6 +45,55 @@
   outline-offset: 2px;
 }
 
+/* ---------- banner: ancho, bajo, con tratamiento de portada ----------
+   La acción principal ocupa el ANCHO, no el alto. Antes era un bloque
+   vertical que abarcaba dos filas y le sobraba la mitad: el contenido
+   entraba arriba y quedaban dos tercios de verde vacío. Como banner mide
+   lo que su contenido necesita, se lee de un vistazo y deja lugar para
+   un dato al costado. */
+.bm-item--banner {
+  grid-column: 1 / -1;
+  position: relative;
+  overflow: hidden;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
+  background: var(--pl-hero-gradient);
+  border-color: transparent;
+  color: var(--pl-on-brand);
+}
+.bm-item--banner:hover { border-color: transparent; }
+
+/* Textura de portada: la misma idea del banner del tablero — una veladura
+   diagonal que le da cuerpo sin necesitar una foto. Si el municipio tiene
+   portada propia se pinta abajo con --bm-portada. */
+.bm-item--banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    var(--bm-portada, none),
+    linear-gradient(112deg, color-mix(in srgb, #fff 14%, transparent) 0%, transparent 46%),
+    radial-gradient(120% 150% at 100% 0%, color-mix(in srgb, #000 22%, transparent) 0%, transparent 60%);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.85;
+}
+.bm-item--banner > * { position: relative; }
+
+.bm-item--banner .bm-titulo { font-size: 16px; }
+.bm-item--banner .bm-detalle { color: color-mix(in srgb, var(--pl-on-brand) 82%, transparent); }
+.bm-item--banner .bm-icono {
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: var(--pl-radius-md);
+  background: color-mix(in srgb, var(--pl-on-brand) 18%, transparent);
+  color: var(--pl-on-brand);
+}
+
 /* ---------- destacada: alta, sobre el acento ---------- */
 .bm-item--destacada {
   grid-row: span 2;
@@ -119,7 +168,26 @@
   color: var(--pl-green-700);
 }
 .bm-item--destacada .bm-dato,
-.bm-item--destacada .bm-dato b { color: var(--pl-on-brand); }
+.bm-item--destacada .bm-dato b,
+.bm-item--banner .bm-dato,
+.bm-item--banner .bm-dato b { color: var(--pl-on-brand); }
+
+/* En el banner el dato va a la derecha, alineado con el titulo. */
+.bm-item--banner .bm-dato {
+  margin-left: auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  text-align: right;
+}
+.bm-item--banner .bm-dato b { font-size: 20px; line-height: 1.1; }
+.bm-item--banner .bm-dato-sub {
+  white-space: normal;
+  font-size: var(--pl-fs-micro);
+  color: color-mix(in srgb, var(--pl-on-brand) 78%, transparent);
+  max-width: 11ch;
+  line-height: 1.2;
+}
 .bm-dato-sub { white-space: nowrap; }
 
 /* En bloques verticales el dato va debajo, no al costado. */

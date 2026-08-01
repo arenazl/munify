@@ -31,7 +31,7 @@
  */
 import type { LucideIcon } from 'lucide-react';
 
-export type BentoForma = 'destacada' | 'chica' | 'ancha';
+export type BentoForma = 'banner' | 'destacada' | 'chica' | 'ancha';
 
 export interface BentoItem {
   id: string;

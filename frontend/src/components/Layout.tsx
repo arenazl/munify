@@ -13,6 +13,7 @@ import { fontPresets } from '../config/fontPresets';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
+import { useNavBadges } from './shell/useNavBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
@@ -150,6 +151,8 @@ export default function Layout() {
 
   // Badges de items pendientes (reclamos/tramites/tasas) — solo aplica a vecinos.
   const badges = useVecinoBadges();
+  // Contadores de gestion (admin/supervisor). Cachea una vez por sesion.
+  const navBadges = useNavBadges();
 
   // Guardar estado del sidebar en localStorage
   useEffect(() => {
@@ -1431,7 +1434,16 @@ export default function Layout() {
                       titulo: 'Cargar un reclamo',
                       detalle: 'A nombre de un vecino',
                       icono: Plus,
-                      forma: 'destacada',
+                      forma: 'banner',
+                      // El dato es CONTEXTUAL a quien mira: a alguien de
+                      // gestion lo que le importa junto a "cargar" es cuanto
+                      // hay en riesgo de vencer. Solo se muestra si el
+                      // contador existe de verdad.
+                      ...(navBadges.sla
+                        ? { dato: navBadges.sla, datoSub: 'en riesgo de vencer' }
+                        : navBadges.reclamos
+                          ? { dato: navBadges.reclamos, datoSub: 'reclamos en total' }
+                          : {}),
                       onClick: () => navigate('/gestion/crear-reclamo'),
                     },
                     {
@@ -1466,7 +1478,12 @@ export default function Layout() {
                       titulo: 'Hacer un reclamo',
                       detalle: 'Contanos qué pasa en tu barrio',
                       icono: AlertCircle,
-                      forma: 'destacada',
+                      forma: 'banner',
+                      // Al vecino no le sirve el total del municipio: le
+                      // sirve cuantos SUYOS estan en curso.
+                      ...(badges.reclamos > 0
+                        ? { dato: badges.reclamos, datoSub: 'tuyos en curso' }
+                        : {}),
                       onClick: () => navigate('/gestion/crear-reclamo'),
                     },
                     {
