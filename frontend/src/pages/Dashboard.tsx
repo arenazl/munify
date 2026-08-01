@@ -1079,7 +1079,31 @@ export default function Dashboard() {
                 {card.balance ? textoBalance(card.balance) : card.sublabel}
               </span>
               {card.balance ? (
-                <BalanceBar {...card.balance} />
+                /* La tarjeta de cierres muestra el balance Y la lista, igual
+                   que sus vecinas. Con solo la barra quedaba media tarjeta
+                   vacia y ademas era la unica de la fila que no decia QUE se
+                   habia cerrado: el numero sin los casos no deja hacer nada
+                   con el. */
+                <>
+                  <BalanceBar {...card.balance} />
+                  {reclamos.length > 0 && (
+                    <div className="dv2-cola-lista">
+                      {reclamos.slice(0, 2).map((r) => (
+                        <div
+                          key={r.id}
+                          className="dv2-cola-item"
+                          onClick={() => navigate(`/gestion/reclamos/${r.id}`)}
+                        >
+                          <div className="dv2-cola-item-titulo">{r.titulo}</div>
+                          <div className="dv2-cola-item-meta">
+                            {r.categoria}
+                            {r.dias_antiguedad > 0 ? ` · cerrado en ${r.dias_antiguedad} d` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : reclamos.length > 0 ? (
                 <div className="dv2-cola-lista">
                   {reclamos.map((r) => (
