@@ -1008,11 +1008,14 @@
    obligan a cortar en cinco y esconder el resto detrás de un "otras 5". */
 .dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
   display: flex;
+  /* `flex-direction: row` EXPLÍCITO. La regla base de .dv2-barras es
+     `column`, y sin pisarla el `flex-basis: 260px` de abajo se aplicaba al
+     ALTO en vez de al ancho: cada barra reservaba 260px de alto y quedaban
+     separadas por un vacío enorme. En flex, `basis` mide sobre el eje
+     principal, y el eje principal lo define la dirección. */
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 10px 22px;
-  /* Cada bloque mide lo que mide su contenido. Sin esto, flex los ESTIRA a
-     lo alto para llenar la tarjeta y quedan barras separadas por cientos de
-     píxeles de vacío. */
   align-items: flex-start;
   align-content: flex-start;
 }
