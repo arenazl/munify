@@ -435,6 +435,14 @@ export interface DashboardTendencias {
   creados_30d_prev: number;
   tiempo_resolucion_30d: number | null;
   tiempo_resolucion_30d_prev: number | null;
+  /**
+   * Tiempo de resolución semana a semana (8 semanas, de la más vieja a la más
+   * nueva) para el sparkline. Las semanas sin cierres vienen `null` — no se
+   * rellenan con 0, que se leería como "resolvimos todo en el día".
+   * Opcional: si el backend aún no la devuelve, la tarjeta cae al par
+   * mes-actual/mes-previo en vez de inventar la serie.
+   */
+  serie_resolucion_semanal?: (number | null)[];
 }
 
 export interface DashboardStats {

@@ -242,12 +242,24 @@ const buildKpisPeriodo = (opts: {
   const t30 = t?.tiempo_resolucion_30d ?? null;
   const t30prev = t?.tiempo_resolucion_30d_prev ?? null;
   const diffDias = t30 != null && t30prev != null ? t30prev - t30 : null; // >0 = más rápido
+  // Serie semanal real de tiempo de resolución. Las semanas sin cierres vienen
+  // null: se descartan en vez de dibujarlas como 0 (un 0 se leería como
+  // "resolvimos todo en el día"). Con menos de 3 puntos no hay tendencia que
+  // mostrar y se deja sin serie.
+  const serieResolucionCruda = (t?.serie_resolucion_semanal ?? []).filter(
+    (v): v is number => typeof v === 'number',
+  );
+  const serieResolucion = serieResolucionCruda.length >= 3 ? serieResolucionCruda : null;
   const resolucion: KpiCardV2Props = {
     eyebrow: 'Resolución promedio',
     valor: t30 != null ? fmtDias(t30) : '—',
     unidad: t30 != null ? 'días' : undefined,
     atenuado: t30 == null,
-    serie: t30 != null && t30prev != null ? [t30prev, t30] : undefined,
+    // Serie REAL semana a semana. Antes eran dos puntos (mes actual vs. mes
+    // previo): una recta entre dos valores, que parecía un gráfico sin mostrar
+    // ninguna tendencia. Si el backend todavía no la manda, se cae al par de
+    // siempre; jamás se inventa la serie.
+    serie: serieResolucion ?? (t30 != null && t30prev != null ? [t30prev, t30] : undefined),
     delta: diffDias != null && Math.abs(diffDias) >= 0.1
       ? {
           texto: `${fmtDias(Math.abs(diffDias))} d`,
@@ -283,6 +295,8 @@ export default function Dashboard() {
 
   // Analytics avanzados
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+  /** Categoría elegida en la botonera de Concentración; null = todas. */
+  const [catConcentracion, setCatConcentracion] = useState<string | null>(null);
   const [vistaActiva, setVistaActiva] = useState<VistaMetrica>('barrios');
   const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
   const [reclamosSimilares, setReclamosSimilares] = useState<ReclamoSimilarGrupo[]>([]);
@@ -683,6 +697,35 @@ export default function Dashboard() {
 
     return frases;
   }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats]);
+
+  // ---- Concentración: botonera de categorías DINÁMICA por municipio ----
+  // Las cuatro de más volumen de ESTE municipio. En uno pesa la basura y en
+  // otro el alumbrado; la botonera se arma sola con lo que cada uno tiene, sin
+  // ninguna lista fija en el código.
+  const categoriasConcentracion = useMemo(
+    () => porCategoria.slice(0, 4).map((c) => c.categoria),
+    [porCategoria],
+  );
+
+  const gruposConcentracion = useMemo<AdaptiveFilterGroup[]>(
+    () => [
+      {
+        id: 'concentracion-categoria',
+        placeholder: 'Todas las categorías',
+        options: categoriasConcentracion.map((c) => ({ value: c, label: c })),
+        value: catConcentracion ?? '',
+        onChange: (v) => setCatConcentracion(v || null),
+      },
+    ],
+    [categoriasConcentracion, catConcentracion],
+  );
+
+  // El heatmap trae la categoría en cada punto, así que el filtro es local:
+  // no hace falta ir de nuevo al backend para cambiar de categoría.
+  const heatmapFiltrado = useMemo(
+    () => (catConcentracion ? heatmapData.filter((p) => p.categoria === catConcentracion) : heatmapData),
+    [heatmapData, catConcentracion],
+  );
 
   // Matices del puente de tokens (--pl-*), leídos del :root: recharts necesita
   // colores concretos, así que los sacamos de los MISMOS tokens que usa el CSS
@@ -1101,10 +1144,22 @@ export default function Dashboard() {
               <MapPin className="dv2-card-head-icono" aria-hidden="true" />
               <h3 className="dv2-card-titulo">Concentración</h3>
               <span className="dv2-card-caption">90 días</span>
-              <span className="dv2-card-caption dv2-card-caption--auto">{heatmapData.length} puntos</span>
+              {/* Antes acá iba el conteo de puntos: nadie sabe qué es un
+                  "punto" del mapa ni qué hacer con el número. En su lugar, lo
+                  que se está mirando, dicho en castellano. */}
+              <span className="dv2-card-caption dv2-card-caption--auto">
+                {catConcentracion ?? 'Todas las categorías'}
+              </span>
             </div>
+            {/* Botonera en vez de combo: un combo esconde las opciones y hay
+                que abrirlo para saber qué se puede ver. Las cuatro categorías
+                salen del VOLUMEN REAL de este municipio, así que cada uno ve
+                las suyas. Si no entran, AdaptiveFilter las manda al "+N" solo. */}
+            {categoriasConcentracion.length > 0 && (
+              <AdaptiveFilter groups={gruposConcentracion} />
+            )}
             <HeatmapWidget
-              data={heatmapData}
+              data={heatmapFiltrado}
               showMarkers={false}
               height="300px"
               title="Mapa de Calor - Concentración de Reclamos"

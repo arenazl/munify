@@ -373,6 +373,33 @@ async def _tendencias_periodo(db: AsyncSession, model, base_filters: list, filtr
         )).scalar()
         return round(float(val), 1) if val is not None else None
 
+    # Serie REAL de tiempo de resolución, semana a semana (8 semanas, de la más
+    # vieja a la más nueva). Antes la tarjeta "Resolución promedio" dibujaba su
+    # sparkline con DOS puntos (mes actual vs. mes previo): una recta entre dos
+    # valores, que parece un gráfico pero no muestra ninguna tendencia. Con la
+    # serie, la línea dice de verdad si el municipio viene acelerando o no.
+    # Semana 0 = los últimos 7 días; semana 7 = hace ocho semanas.
+    semanas_bucket = func.floor(
+        func.datediff(func.curdate(), func.date(model.fecha_resolucion)) / 7
+    ).label("bucket")
+    filas = (await db.execute(
+        select(
+            semanas_bucket,
+            func.avg(func.datediff(model.fecha_resolucion, model.created_at)),
+        )
+        .where(
+            *base_filters,
+            *filtro_resueltos,
+            model.fecha_resolucion.isnot(None),
+            func.date(model.fecha_resolucion) > hoy - timedelta(days=56),
+        )
+        .group_by(semanas_bucket)
+    )).all()
+    por_bucket = {int(b): round(float(v), 1) for b, v in filas if b is not None and v is not None}
+    # Semanas sin cierres quedan en None: el front corta la línea ahí en vez de
+    # dibujar un cero que se leería como "resolvimos todo en el día".
+    serie_resolucion = [por_bucket.get(i) for i in range(7, -1, -1)]
+
     return {
         "ayer": ayer,
         "semana_pasada": semana_pasada,
@@ -380,6 +407,7 @@ async def _tendencias_periodo(db: AsyncSession, model, base_filters: list, filtr
         "creados_30d_prev": creados_30d_prev,
         "tiempo_resolucion_30d": await _avg_resolucion(hoy - timedelta(days=30), hoy),
         "tiempo_resolucion_30d_prev": await _avg_resolucion(hoy - timedelta(days=60), hoy - timedelta(days=30)),
+        "serie_resolucion_semanal": serie_resolucion,
     }
 
 
