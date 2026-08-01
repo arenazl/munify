@@ -11,12 +11,20 @@
 .fr {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  /* Aire entre el mapa y el pie. Con poca separación el nombre de la calle
+     queda pegado al borde del mapa y se lee como si fuera parte de la imagen.
+     El PISO es 16px y no 12: a 834px de ancho (una tablet de 11") el tramo
+     proporcional todavía no llega, así que el mínimo es el que manda ahí — y
+     con 12 se seguía viendo apretado. Arriba crece hasta 22. */
+  gap: clamp(16px, 1.6vw, 22px);
 }
 
 .fr-mapa {
   border-radius: var(--pl-radius-lg);
   overflow: hidden;
+  /* El mapa es una imagen a sangre: sin un borde propio se funde con el
+     fondo de la tarjeta y no se entiende dónde termina. */
+  border: 1px solid var(--pl-border);
 }
 
 .fr-pie {
@@ -24,6 +32,9 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  /* Un respiro extra bajo el mapa, aparte del gap: el pie es texto y el
+     texto necesita más aire del que necesita un bloque. */
+  padding-bottom: 2px;
 }
 
 .fr-puesto {
