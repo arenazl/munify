@@ -7,15 +7,13 @@ const getApiUrl = () => {
     return envUrl;
   }
 
-  // Dev local (vite): apuntar al backend en localhost por puerto configurable.
-  const host = window.location.hostname || 'localhost';
-  if (host === 'localhost' || host === '127.0.0.1') {
-    const port = import.meta.env.VITE_API_PORT || '8000';
-    return `http://${host}:${port}/api`;
-  }
-
-  // Prod: same-origin. Netlify proxea /api/* al backend (ver netlify.toml).
-  // Sin URL absoluta en el bundle → sin secrets scanning y sin CORS.
+  // SIEMPRE same-origin, en todos los ambientes (framework-first):
+  //  - Netlify proxea /api/* al backend del ambiente (gen-redirects).
+  //  - Dev local (vite): el proxy de vite.config.ts manda /api al backend QA
+  //    real ("siempre contra la base de qa" — regla del dueño 2026-07-31).
+  //  - ¿Backend local? SOLO con override explícito VITE_API_URL completo.
+  // Antes acá se adivinaba http://localhost:{VITE_API_PORT}/api y sin backend
+  // local TODO daba ERR_CONNECTION_REFUSED en dev.
   return '/api';
 };
 
