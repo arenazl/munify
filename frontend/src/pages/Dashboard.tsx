@@ -25,6 +25,8 @@ import {
 } from 'recharts';
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import { SemanticHero } from '../components/ui/SemanticHero';
+import { BalanceBar } from '../components/ui/BalanceBar';
+import { textoBalance } from '../lib/balance';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import {
   resolverUmbrales,
@@ -111,6 +113,8 @@ interface MetricasDetalle {
   urgentes: ReclamoResumen[];
   sin_asignar: ReclamoResumen[];
   para_hoy: ReclamoResumen[];
+  /** Trabajados por la cuadrilla, esperando el cierre del supervisor. */
+  esperando_visto_bueno: ReclamoResumen[];
   resueltos: ReclamoResumen[];
 }
 
@@ -291,7 +295,12 @@ export default function Dashboard() {
     sin_asignar: number;
     vencidos: number;
     para_hoy: number;
+    /** Ya trabajados por la cuadrilla, esperando que un supervisor los cierre. */
+    esperando_visto_bueno?: number;
     resueltos_semana: number;
+    /** Entrados en los mismos 7 días: sin esto, "resueltos" no dice si el
+     *  municipio va ganando o acumulando. */
+    entraron_semana?: number;
     cambio_eficiencia: number;
     empleados_activos: number;
     total_empleados: number;
@@ -579,25 +588,59 @@ export default function Dashboard() {
     const u = resolverUmbrales();
     const frases: HeroFrase[] = [];
 
-    // (a) Entrada del día: nuevos + sin asignar + programados para hoy
+    // (a) El día en reclamos: lo que entró, lo que nadie tomó y lo que espera
+    // el cierre del supervisor.
     if (stats && metricasAccion) {
+      const esperando = metricasAccion.esperando_visto_bueno ?? 0;
       frases.push({
         segmentos: [
           seg('Hoy entraron '),
-          seg(`${stats.hoy} ${stats.hoy === 1 ? 'reclamo nuevo' : 'reclamos nuevos'}`),
+          // Que entren reclamos POR EL SISTEMA es buena noticia: significa que
+          // el canal está vivo. En cero no se pinta nada — un cero no es un
+          // logro que festejar en verde.
+          seg(
+            `${stats.hoy} ${stats.hoy === 1 ? 'reclamo nuevo' : 'reclamos nuevos'}`,
+            stats.hoy > 0 ? 'bueno' : undefined,
+          ),
           seg(', hay '),
           seg(
             `${metricasAccion.sin_asignar} sin asignar`,
             veredictoMasEsPeor(metricasAccion.sin_asignar, u.sinAsignar),
           ),
           seg(' y '),
+          // Antes acá iba "trabajos programados" con el veredicto 'bueno'
+          // FIJO: un 0 se pintaba de verde como si fuera un logro. Ahora es
+          // una cola real, y cuanto más alta, peor.
           seg(
-            `${metricasAccion.para_hoy} ${metricasAccion.para_hoy === 1 ? 'trabajo programado' : 'trabajos programados'}`,
-            'bueno',
+            `${esperando} ${esperando === 1 ? 'esperando tu visto bueno' : 'esperando tu visto bueno'}`,
+            veredictoMasEsPeor(esperando, u.sinAsignar),
           ),
-          seg(' para hoy.'),
+          seg('.'),
         ],
-        acciones: [{ label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true }],
+        acciones: [
+          { label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true },
+          ...(esperando > 0
+            ? [{ label: `Cerrar los ${esperando}`, to: '/gestion/reclamos?estado=pendiente_confirmacion' }]
+            : []),
+        ],
+      });
+    }
+
+    // (b) El día en trámites: mismo formato que reclamos, otro módulo.
+    if (tramitesStats) {
+      const abiertos = contarAbiertos(tramitesStats);
+      frases.push({
+        segmentos: [
+          seg('En trámites entraron '),
+          seg(
+            `${tramitesStats.hoy} ${tramitesStats.hoy === 1 ? 'gestión' : 'gestiones'} hoy`,
+            tramitesStats.hoy > 0 ? 'bueno' : undefined,
+          ),
+          seg(', con '),
+          seg(`${abiertos} en curso`, veredictoMasEsPeor(abiertos, u.sinAsignar)),
+          seg(' sobre el mostrador.'),
+        ],
+        acciones: [{ label: 'Ver trámites', to: '/gestion/tramites', primaria: true }],
       });
     }
 
@@ -621,21 +664,25 @@ export default function Dashboard() {
       });
     }
 
-    // (c) La voz del vecino: calificación promedio
+    // (d) La voz del vecino: calificación promedio. La nota SÍ es un juicio,
+    // así que va con veredicto — antes salía en negro como si fuera un dato
+    // neutro más.
     if (califStats && califStats.total_calificaciones > 0) {
+      const nota = califStats.promedio_general;
       frases.push({
         segmentos: [
           seg('Los vecinos califican la gestión con '),
-          seg(`${califStats.promedio_general.toFixed(1)} de 5`),
+          seg(`${nota.toFixed(1)} de 5`, veredictoTasa((nota / 5) * 100, u.tasaResolucion)),
           seg(
             ` sobre ${califStats.total_calificaciones} ${califStats.total_calificaciones === 1 ? 'calificación' : 'calificaciones'}.`,
           ),
         ],
+        acciones: [{ label: 'Ver la voz del vecino', to: '/gestion/calificaciones', primaria: true }],
       });
     }
 
     return frases;
-  }, [stats, metricasAccion, coberturaResumen, califStats]);
+  }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats]);
 
   // Matices del puente de tokens (--pl-*), leídos del :root: recharts necesita
   // colores concretos, así que los sacamos de los MISMOS tokens que usa el CSS
@@ -806,6 +853,8 @@ export default function Dashboard() {
     detailKey: keyof MetricasDetalle;
     vacio: string;
     footer: string;
+    /** Solo la tarjeta de cierres: dibuja "entró vs. salió" en vez de la lista. */
+    balance?: { cerrados: number; entrados: number };
   }[] = [
     {
       label: 'Urgentes',
@@ -825,14 +874,19 @@ export default function Dashboard() {
       vacio: 'Todo tiene responsable.',
       footer: 'Asignar reclamos',
     },
+    // Antes acá iba "Para hoy" (programados para la jornada). Dependía de que
+    // el municipio cargara la agenda todos los días y en los que no la usan
+    // vivía en cero, ocupando un cuarto del espacio más caro del tablero.
+    // Esta cola, en cambio, es la única que se destraba desde el escritorio:
+    // el trabajo ya está hecho y falta el cierre del supervisor.
     {
-      label: 'Para hoy',
-      sublabel: 'Programados para la jornada',
-      value: metricasAccion?.para_hoy ?? 0,
-      tone: 'blue',
-      detailKey: 'para_hoy',
-      vacio: 'No hay nada agendado para hoy.',
-      footer: 'Ver agenda',
+      label: 'Esperando tu visto bueno',
+      sublabel: 'La cuadrilla ya terminó · falta cerrarlos',
+      value: metricasAccion?.esperando_visto_bueno ?? 0,
+      tone: 'amber',
+      detailKey: 'esperando_visto_bueno',
+      vacio: 'No hay nada esperando cierre.',
+      footer: 'Revisar y cerrar',
     },
     {
       label: 'Resueltos',
@@ -842,6 +896,13 @@ export default function Dashboard() {
       detailKey: 'resueltos',
       vacio: 'Sin cierres esta semana.',
       footer: 'Ver cerrados',
+      // Un conteo de resueltos solo no dice nada ("¿6 está bien? ¿contra
+      // qué?"). El balance contra lo que entró en los mismos 7 días sí tiene
+      // veredicto: al día, empatando, o acumulando.
+      balance: {
+        cerrados: metricasAccion?.resueltos_semana ?? 0,
+        entrados: metricasAccion?.entraron_semana ?? 0,
+      },
     },
   ];
 
@@ -939,8 +1000,12 @@ export default function Dashboard() {
                   {card.value}
                 </span>
               </div>
-              <span className="dv2-cola-sub">{card.sublabel}</span>
-              {reclamos.length > 0 ? (
+              <span className="dv2-cola-sub">
+                {card.balance ? textoBalance(card.balance) : card.sublabel}
+              </span>
+              {card.balance ? (
+                <BalanceBar {...card.balance} />
+              ) : reclamos.length > 0 ? (
                 <div className="dv2-cola-lista">
                   {reclamos.map((r) => (
                     <div

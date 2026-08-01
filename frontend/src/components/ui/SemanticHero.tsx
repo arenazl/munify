@@ -4,15 +4,30 @@
  * Reemplaza los hints/banners estáticos de las pantallas por una FRASE con
  * información DINÁMICA de esa pantalla, coloreada por VEREDICTO:
  *   bueno → acento del theme · advertencia → ámbar · malo → rojo
- * Soporta varias frases (carrusel con puntos + flechas) y hasta 3 acciones
- * por frase (la referencia v2 del estándar ABM usa las 3: "Ver los que vencen
- * hoy" / "Asignar los sin cuadrilla" / "Exportar el período").
+ * Soporta varias frases (carrusel con puntos + flechas), cada una con SUS
+ * PROPIAS acciones (hasta 3), y un strip de KPIs opcional.
  *
  * ES EL ÚNICO HERO de la app: el estándar `SemanticAbmPage` usa ESTE
  * componente con la clase de contexto `av2-hero`, que en styles/abmv2.css
- * ([PAGE]) aplica la variante de layout de la referencia nueva (superficie
- * verde suave, borde de acento 4px, KPIs con hairline verde, acción primaria
- * sólida). No hay —ni debe haber— un segundo componente de hero.
+ * ([PAGE]) aplica la variante de layout de la referencia nueva. No hay —ni
+ * debe haber— un segundo componente de hero.
+ *
+ * AGNÓSTICO: no sabe de reclamos, trámites ni de ningún dominio. Recibe
+ * frases ya armadas y las muestra. Sirve igual para una fábrica de tornillos
+ * que para un municipio; lo único que cambia es quién arma las frases.
+ *
+ * ALTURA ESTABLE (sin JS): todas las frases se renderizan apiladas en la
+ * misma celda de un grid, y las inactivas quedan con `visibility: hidden`
+ * — siguen ocupando su lugar, así que el alto del bloque es SIEMPRE el de la
+ * frase más larga y el carrusel no pega saltos al rotar. Se prefiere esto a
+ * medir el nodo con JS: medir el nodo real lo hace colapsar, dejar de
+ * desbordar, volver y parpadear para siempre.
+ *
+ * ROTACIÓN: con 2+ frases rota sola cada `intervaloMs` (10 s por defecto),
+ * con transición de slide. Se PAUSA sola cuando el mouse está encima o algo
+ * adentro tiene el foco — nadie pierde el renglón que estaba leyendo ni el
+ * botón que iba a apretar. Con `prefers-reduced-motion` no se desplaza (sólo
+ * funde) y no rota sola.
  *
  * Polimórfico: estilos en styles/semantic-hero.css sobre tokens --pl-*
  * (derivados del theme activo por ThemeContext) — funciona en todos los
@@ -30,10 +45,13 @@
  *     }]}
  *   />
  */
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { type HeroFrase, type HeroKpi, veredictoDominante } from '../../lib/semanticHero';
+
+/** Cada cuánto pasa a la frase siguiente cuando hay más de una. */
+const INTERVALO_ROTACION_MS = 10_000;
 
 interface SemanticHeroProps {
   /** Etiqueta del módulo, en caps (ej: "RECLAMOS · HOY"). */
@@ -44,21 +62,73 @@ interface SemanticHeroProps {
    *  Regla del estándar: el hero va SIEMPRE primero en la página con sus KPIs
    *  adentro (orden: frase → KPIs → acciones); nada de filas de KPI sueltas. */
   kpis?: HeroKpi[];
+  /** Cada cuánto rota. Por defecto 10 s. */
+  intervaloMs?: number;
+  /** Cortar la rotación automática (las flechas y los puntos siguen andando). */
+  sinAutoRotacion?: boolean;
   className?: string;
 }
 
-export function SemanticHero({ etiqueta, frases, kpis, className }: SemanticHeroProps) {
+/** ¿El visitante pidió menos movimiento? Entonces no se desplaza ni rota solo. */
+function usaMenosMovimiento(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+export function SemanticHero({
+  etiqueta,
+  frases,
+  kpis,
+  intervaloMs = INTERVALO_ROTACION_MS,
+  sinAutoRotacion,
+  className,
+}: SemanticHeroProps) {
   const [idx, setIdx] = useState(0);
+  // Hacia dónde entra la frase nueva: define de qué lado aparece el slide.
+  const [sentido, setSentido] = useState<'adelante' | 'atras'>('adelante');
+  const [detenido, setDetenido] = useState(false);
+  // useState con inicializador perezoso, no useRef: la preferencia se lee una
+  // sola vez al montar y leer `.current` durante el render está prohibido.
+  const [menosMovimiento] = useState(usaMenosMovimiento);
 
   const validas = frases.filter((f) => f.segmentos.length > 0);
-  if (validas.length === 0) return null;
+  const total = validas.length;
+  const varias = total > 1;
 
-  const actual = validas[Math.min(idx, validas.length - 1)];
-  const varias = validas.length > 1;
-  const ir = (i: number) => setIdx((i + validas.length) % validas.length);
+  const ir = useCallback(
+    (destino: number, desde: number) => {
+      if (total === 0) return;
+      const siguiente = ((destino % total) + total) % total;
+      setSentido(siguiente === desde ? 'adelante' : siguiente > desde ? 'adelante' : 'atras');
+      setIdx(siguiente);
+    },
+    [total],
+  );
+
+  // Rotación automática. Depende de `idx` a propósito: cada avance —también el
+  // manual— reinicia la cuenta, así una frase recién elegida se ve entera.
+  useEffect(() => {
+    if (!varias || detenido || sinAutoRotacion || menosMovimiento) return;
+    const t = window.setTimeout(() => {
+      setSentido('adelante');
+      setIdx((i) => (i + 1) % total);
+    }, intervaloMs);
+    return () => window.clearTimeout(t);
+  }, [idx, varias, detenido, sinAutoRotacion, menosMovimiento, intervaloMs, total]);
+
+  if (total === 0) return null;
+
+  const actual = Math.min(idx, total - 1);
 
   return (
-    <section className={`sh-card ${className || ''}`} aria-label={etiqueta}>
+    <section
+      className={`sh-card ${className || ''}`}
+      aria-label={etiqueta}
+      onMouseEnter={() => setDetenido(true)}
+      onMouseLeave={() => setDetenido(false)}
+      onFocusCapture={() => setDetenido(true)}
+      onBlurCapture={() => setDetenido(false)}
+    >
       <div className="sh-head">
         <span className="sh-etiqueta">{etiqueta}</span>
         {varias && (
@@ -69,31 +139,66 @@ export function SemanticHero({ etiqueta, frases, kpis, className }: SemanticHero
                 <button
                   key={i}
                   type="button"
-                  aria-label={`Frase ${i + 1}`}
-                  className={`sh-dot ${v ? `sh-dot--${v}` : ''} ${i === idx ? 'sh-dot--activo' : ''}`}
-                  onClick={() => ir(i)}
+                  aria-label={`Frase ${i + 1} de ${total}`}
+                  aria-current={i === actual}
+                  className={`sh-dot ${v ? `sh-dot--${v}` : ''} ${i === actual ? 'sh-dot--activo' : ''}`}
+                  onClick={() => ir(i, actual)}
                 />
               );
             })}
-            <button type="button" aria-label="Anterior" className="sh-nav" onClick={() => ir(idx - 1)}>
+            <button type="button" aria-label="Anterior" className="sh-nav" onClick={() => ir(actual - 1, actual)}>
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
-            <button type="button" aria-label="Siguiente" className="sh-nav" onClick={() => ir(idx + 1)}>
+            <button type="button" aria-label="Siguiente" className="sh-nav" onClick={() => ir(actual + 1, actual)}>
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         )}
       </div>
 
-      <p className="sh-frase">
-        {actual.segmentos.map((s, i) =>
-          s.veredicto ? (
-            <span key={i} className={`sh-seg--${s.veredicto}`}>{s.texto}</span>
-          ) : (
-            <span key={i}>{s.texto}</span>
-          ),
-        )}
-      </p>
+      {/* Pila: todas las frases en la misma celda. Las inactivas siguen
+          ocupando lugar (visibility, no display) — de ahí sale la altura
+          estable, sin medir nada. */}
+      <div className={`sh-stack sh-stack--${sentido}`} aria-live="polite">
+        {validas.map((frase, i) => (
+          <div
+            key={i}
+            className={`sh-slide ${i === actual ? 'sh-slide--activo' : ''}`}
+            aria-hidden={i !== actual}
+          >
+            <p className="sh-frase">
+              {frase.segmentos.map((s, j) =>
+                s.veredicto ? (
+                  <span key={j} className={`sh-seg--${s.veredicto}`}>{s.texto}</span>
+                ) : (
+                  <span key={j}>{s.texto}</span>
+                ),
+              )}
+            </p>
+
+            {frase.acciones && frase.acciones.length > 0 && (
+              <div className="sh-acciones">
+                {frase.acciones.slice(0, 3).map((a, j) =>
+                  a.to ? (
+                    <Link key={j} to={a.to} className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}>
+                      {a.label}
+                    </Link>
+                  ) : (
+                    <button
+                      key={j}
+                      type="button"
+                      onClick={a.onClick}
+                      className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}
+                    >
+                      {a.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
 
       {kpis && kpis.length > 0 && (
         <div className="sh-kpis">
@@ -106,27 +211,6 @@ export function SemanticHero({ etiqueta, frases, kpis, className }: SemanticHero
               {k.sub && <span className="sh-kpi-sub">{k.sub}</span>}
             </div>
           ))}
-        </div>
-      )}
-
-      {actual.acciones && actual.acciones.length > 0 && (
-        <div className="sh-acciones">
-          {actual.acciones.slice(0, 3).map((a, i) =>
-            a.to ? (
-              <Link key={i} to={a.to} className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}>
-                {a.label}
-              </Link>
-            ) : (
-              <button
-                key={i}
-                type="button"
-                onClick={a.onClick}
-                className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}
-              >
-                {a.label}
-              </button>
-            ),
-          )}
         </div>
       )}
     </section>

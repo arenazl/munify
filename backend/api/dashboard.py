@@ -921,6 +921,18 @@ async def get_metricas_accion(
     )
     para_hoy = para_hoy_query.scalar() or 0
 
+    # 4.bis Esperando el visto bueno: la cuadrilla ya dio el trabajo por hecho
+    # y falta que un supervisor lo cierre. Es la única cola de la fila que se
+    # destraba desde el escritorio, sin salir a la calle, y cada cierre suma
+    # directo a "resueltos". Reemplaza a "para hoy" en el tablero: aquella
+    # dependía de que el municipio cargara la agenda todos los días y vivía en
+    # cero en los que no la usan.
+    esperando_vb_query = await db.execute(
+        select(func.count(Reclamo.id))
+        .where(*base, Reclamo.estado == EstadoReclamo.PENDIENTE_CONFIRMACION)
+    )
+    esperando_visto_bueno = esperando_vb_query.scalar() or 0
+
     # 5. Eficiencia semanal (resueltos esta semana vs semana anterior)
     resueltos_semana_query = await db.execute(
         select(func.count(Reclamo.id))
@@ -948,6 +960,16 @@ async def get_metricas_accion(
     else:
         cambio_eficiencia = 100 if resueltos_semana > 0 else 0
 
+    # 5.bis Lo que ENTRÓ en la misma semana. Un conteo de resueltos solo no
+    # dice nada ("¿6 está bien? ¿contra qué?"): el dato con consecuencia es si
+    # el municipio cierra más de lo que le entra. Con los dos números el
+    # tablero puede dar veredicto — al día, empatando, o acumulando.
+    entraron_semana_query = await db.execute(
+        select(func.count(Reclamo.id))
+        .where(*base, func.date(Reclamo.created_at) >= hace_7_dias)
+    )
+    entraron_semana = entraron_semana_query.scalar() or 0
+
     # 6. Empleados activos - TODO: Migrar a dependencias cuando se implemente IA
     # Por ahora retornamos 0 ya que no hay empleado_id en reclamos
     empleados_activos = 0
@@ -964,7 +986,9 @@ async def get_metricas_accion(
         "sin_asignar": sin_asignar,
         "vencidos": vencidos,
         "para_hoy": para_hoy,
+        "esperando_visto_bueno": esperando_visto_bueno,
         "resueltos_semana": resueltos_semana,
+        "entraron_semana": entraron_semana,
         "cambio_eficiencia": cambio_eficiencia,
         "empleados_activos": empleados_activos,
         "total_empleados": total_empleados
@@ -1092,6 +1116,18 @@ async def get_metricas_detalle(
     )
     para_hoy = await get_reclamos_resumen(para_hoy_query.scalars().all())
 
+    # 3.bis Esperando el visto bueno del supervisor. Los más viejos primero:
+    # un trabajo hecho que no se cierra es un vecino esperando novedades de
+    # algo que la cuadrilla ya resolvió.
+    esperando_vb_query = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .where(*base, Reclamo.estado == EstadoReclamo.PENDIENTE_CONFIRMACION)
+        .order_by(Reclamo.updated_at.asc())
+        .limit(10)
+    )
+    esperando_visto_bueno = await get_reclamos_resumen(esperando_vb_query.scalars().all())
+
     # 4. Resueltos esta semana
     resueltos_query = await db.execute(
         select(Reclamo)
@@ -1110,6 +1146,7 @@ async def get_metricas_detalle(
         "urgentes": urgentes,
         "sin_asignar": sin_asignar,
         "para_hoy": para_hoy,
+        "esperando_visto_bueno": esperando_visto_bueno,
         "resueltos": resueltos
     }
 

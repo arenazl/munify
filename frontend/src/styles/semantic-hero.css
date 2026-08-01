@@ -8,6 +8,8 @@
    ============================================================ */
 
 .sh-card {
+  position: relative;
+  overflow: hidden;
   margin: 0 0 16px;
   padding: 18px 20px;
   background: var(--pl-surface);
@@ -16,6 +18,26 @@
   border-radius: var(--pl-radius-lg);
   box-shadow: var(--pl-shadow-card);
 }
+
+/* Lavado de acento que sube desde el piso de la tarjeta: le da volumen y
+   ata el borde izquierdo con el resto, sin llegar nunca a la frase. Va MUY
+   bajo a propósito — si el fondo levanta, compite con el verde del veredicto
+   y "113 cerrados" deja de leerse como bueno. Sale del token de acento, así
+   que cada marca lo hereda en su color. */
+.sh-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--pl-green) 9%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 2.5%, transparent) 45%,
+    transparent 78%
+  );
+}
+/* Todo el contenido por encima del lavado. */
+.sh-card > * { position: relative; }
 
 .sh-head {
   display: flex;
@@ -69,6 +91,44 @@
 }
 .sh-nav:hover { background: var(--pl-surface-hover); }
 .sh-nav:first-of-type { margin-left: 4px; }
+
+/* ============================================================
+   Pila de frases — de acá sale la ALTURA ESTABLE del carrusel.
+
+   Todas las frases van a la MISMA celda del grid (1 / 1). Las
+   inactivas se ocultan con `visibility`, NO con `display`: siguen
+   ocupando su lugar, así que el alto de la pila es siempre el de
+   la frase más larga y al rotar no hay salto. Sin medir nada por
+   JS — medir el nodo real lo hace colapsar, dejar de desbordar,
+   volver, y parpadear para siempre.
+   ============================================================ */
+.sh-stack {
+  display: grid;
+  grid-template-areas: 'frase';
+}
+
+.sh-slide {
+  grid-area: frase;
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(var(--sh-salida, 14px));
+  transition:
+    opacity var(--pl-dur-panel, 260ms) var(--pl-ease),
+    transform var(--pl-dur-panel, 260ms) var(--pl-ease),
+    visibility 0s linear var(--pl-dur-panel, 260ms);
+}
+
+.sh-slide--activo {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  transition-delay: 0s;
+}
+
+/* La frase nueva entra del lado hacia el que avanza el carrusel. */
+.sh-stack--adelante { --sh-salida: 14px; }
+.sh-stack--atras { --sh-salida: -14px; }
 
 .sh-frase {
   margin: 8px 0 10px;
@@ -171,4 +231,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sh-dot, .sh-nav, .sh-accion { transition: none; }
+  /* Sin desplazamiento: la frase funde en el lugar. La rotación automática
+     además se apaga desde el componente. */
+  .sh-slide {
+    transform: none;
+    transition: opacity 120ms linear, visibility 0s linear 120ms;
+  }
+  .sh-slide--activo { transform: none; }
 }
