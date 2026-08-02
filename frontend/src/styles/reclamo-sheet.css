@@ -414,6 +414,80 @@
   margin-top: 2px;
 }
 
+/* ---------- Candidatos: tarjetas-radio (calcadas del diseño) ---------- */
+
+.rs-cand {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 6px;
+  padding: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.rs-cand:first-of-type { margin-top: 12px; }
+.rs-cand:hover { background: var(--pl-surface-hover); }
+
+.rs-cand--activo,
+.rs-cand--activo:hover {
+  background: color-mix(in srgb, var(--pl-green) 6%, var(--pl-surface));
+  border-color: var(--pl-green-200);
+}
+
+.rs-cand-radio {
+  margin-top: 2px;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  accent-color: var(--pl-green);
+}
+
+.rs-cand-cuerpo { min-width: 0; flex: 1; }
+
+.rs-cand-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.rs-cand-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.rs-cand-estado {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+}
+.rs-cand-estado--ok {
+  font-weight: 600;
+  color: var(--pl-green-700);
+}
+.rs-cand-razon {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--pl-text-2);
+  margin-top: 4px;
+}
+
+/* Combo "O elegir otro" debajo de las tarjetas. */
+.rs-asignar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.rs-asignar-combo {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ---------- Pie: nota + CTAs ---------- */
 
 .rs-pie-nota {
