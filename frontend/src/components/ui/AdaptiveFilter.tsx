@@ -214,8 +214,7 @@ export interface AdaptiveFilterProps {
   controles?: AdaptiveControl[];
   /** @deprecated usar `controles`. Se traduce a controles de tipo 'opciones'. */
   groups?: AdaptiveFilterGroup[];
-  /** Rótulo de la izquierda de la fila 1. Default: "FILTRAR" con `groups`,
-   *  ninguno con `controles`. `null` lo oculta siempre. */
+  /** Rótulo de la izquierda de la fila 1. Default: ninguno. */
   label?: string | null;
   icon?: LucideIcon;
   /** Diccionario palabra → abreviatura para los labels de las píldoras.
@@ -256,17 +255,16 @@ const GAP_INTERNO_FALLBACK = 8;
 const BUSQUEDA_IDEAL = 260;
 const BUSQUEDA_MIN = 132;
 
-/** Opción sintética "todas" que abre cada grupo (índice 0 de las píldoras). */
+/** Opción sintética "todas": ya NO es una píldora (el default ES todas y el
+ *  filtro se limpia con la cruz de la píldora activa). Sobrevive únicamente
+ *  como primera opción del combo colapsado, que no tiene cruz donde resetear. */
 const opcionTodas = (c: AdaptiveControlOpciones): AdaptiveFilterOption => ({
   value: '',
   label: c.placeholder,
 });
 
-/** Píldoras de un grupo: "todas" + sus opciones, en orden natural. */
-const pillsDe = (c: AdaptiveControlOpciones): AdaptiveFilterOption[] => [
-  opcionTodas(c),
-  ...c.opciones,
-];
+/** Píldoras de un grupo: SUS opciones, sin sintéticas. */
+const pillsDe = (c: AdaptiveControlOpciones): AdaptiveFilterOption[] => c.opciones;
 
 const noop = () => {};
 
@@ -386,10 +384,10 @@ function resolverGrupo(
   };
 
   let r = acomodar(indices(total));
-  // La opción ACTIVA siempre visible: si quedó afuera, se adelanta justo
-  // detrás de "todas" (que es el reset y no se pierde nunca) y se recalcula.
-  if (seleccionado > 0 && !r.visibles.includes(seleccionado)) {
-    const orden = [0, seleccionado, ...indices(total).filter((i) => i !== 0 && i !== seleccionado)];
+  // La opción ACTIVA siempre visible: si quedó afuera se adelanta al frente
+  // y se recalcula. `seleccionado` -1 = sin selección (todas), nada que fijar.
+  if (seleccionado >= 0 && !r.visibles.includes(seleccionado)) {
+    const orden = [seleccionado, ...indices(total).filter((i) => i !== seleccionado)];
     r = acomodar(orden);
   }
 
@@ -745,25 +743,28 @@ export function AdaptiveFilter({
 
   if (lista.length === 0) return null;
 
-  // Con la API vieja el rótulo "FILTRAR" es el default histórico; con la
-  // botonera heterogénea no hay rótulo salvo que lo pidan explícito.
-  const rotuloBarra = label !== undefined ? label : groups && !controles ? 'FILTRAR' : null;
+  // Sin rótulo por defecto (la palabra "FILTRAR" voló del control): sólo se
+  // muestra si la pantalla pasa `label` explícito.
+  const rotuloBarra = label ?? null;
 
   /* ---------- renders por tipo (compartidos con el fantasma) ---------- */
 
+  // Sin píldora "todas": el default ES todas. La píldora activa lleva la
+  // cruz de limpiar — clickearla (entera) resetea el filtro en un gesto.
   const pill = (c: AdaptiveControlOpciones, opcion: AdaptiveFilterOption, viva: boolean) => {
     const activa = opcion.value === c.value;
     return (
       <button
-        key={opcion.value || '__todas__'}
+        key={opcion.value}
         type="button"
         className={`af-pill${activa ? ' af-pill--activa' : ''}`}
-        title={opcion.label}
+        title={activa ? `${opcion.label} — limpiar filtro` : opcion.label}
         aria-pressed={activa}
         tabIndex={viva ? undefined : -1}
-        onClick={viva ? () => c.onChange(opcion.value) : undefined}
+        onClick={viva ? () => c.onChange(activa ? '' : opcion.value) : undefined}
       >
         {abreviar(opcion.label, abreviaturas)}
+        {activa && <X className="af-pill-x" aria-hidden="true" />}
       </button>
     );
   };
@@ -816,7 +817,7 @@ export function AdaptiveFilter({
         variant="v2"
         value={c.value}
         onChange={viva ? c.onChange : noop}
-        options={pillsDe(c)}
+        options={[opcionTodas(c), ...c.opciones]}
         placeholder={c.placeholder}
         searchable={viva && c.opciones.length > 8}
       />
@@ -1053,20 +1054,16 @@ export function AdaptiveFilter({
             </Fragment>
           ));
 
-        const conRotuloBarra = rotuloBarra !== null;
         return (
-          <div
-            className={`af-fila${conRotuloBarra ? ' af-fila--rotulada' : ''}`}
-            key={fila.id}
-          >
-            {conRotuloBarra && (
-              // En las filas 2+ la misma marca se repite INVISIBLE para que
-              // los controles arranquen exactamente en la misma X que arriba.
-              <span className="af-marca" aria-hidden={iFila > 0} data-af-fantasma={iFila > 0 ? '' : undefined}>
-                <Icono className="af-ico af-ico--tenue" aria-hidden="true" />
-                <span className="af-label">{rotuloBarra}</span>
-              </span>
-            )}
+          <div className="af-fila af-fila--rotulada" key={fila.id}>
+            {/* El icono del filtro va SIEMPRE adelante (estándar del control);
+                la palabra sólo si la pantalla pasa `label` explícito. En las
+                filas 2+ la misma marca se repite INVISIBLE para que los
+                controles arranquen exactamente en la misma X que arriba. */}
+            <span className="af-marca" aria-hidden={iFila > 0} data-af-fantasma={iFila > 0 ? '' : undefined}>
+              <Icono className="af-ico af-ico--tenue" aria-hidden="true" />
+              {rotuloBarra && <span className="af-label">{rotuloBarra}</span>}
+            </span>
 
             <div
               className="af-cuerpo"
@@ -1198,10 +1195,11 @@ function medirSimple(
     );
     const mas = el.querySelector<HTMLElement>('[data-af-mas]')?.getBoundingClientRect().width ?? 0;
     if (pills.length === 0 || mas === 0) return null;
+    // -1 = sin selección (todas): no hay píldora activa que mantener visible.
     const sel = pillsDe(c).findIndex((o) => o.value === c.value);
     return {
       tipo: 'opciones',
-      sel: sel < 0 ? 0 : sel,
+      sel,
       grupo: { gap: leerGap(el, GAP_PILL_FALLBACK), pills, mas },
     };
   }
