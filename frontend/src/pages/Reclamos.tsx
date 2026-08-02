@@ -96,6 +96,9 @@ const sinDependencia = (r: Reclamo): boolean =>
 /** Agrupaciones de estado del hero — LAS MISMAS que suman los KPIs desde los
  *  conteos del backend, para que el detalle del subtexto hable del mismo
  *  conjunto que el número que tiene arriba. */
+/** Estados aceptados por el deep-link `?filtrar_estado=` (= ids de `tabsEstado`). */
+const ESTADOS_DEEP_LINK = ['recibido', 'en_curso', 'finalizado', 'pospuesto', 'rechazado'];
+
 const ESTADOS_RECIBIDO = new Set(['recibido', 'nuevo', 'asignado']);
 const ESTADOS_EN_CURSO = new Set(['en_curso', 'en_proceso', 'pendiente_confirmacion']);
 
@@ -900,6 +903,23 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     if (cat) setFiltroCategoria(cat.id);
     setSearchParams({}, { replace: true });
   }, [searchParams, categorias, setSearchParams]);
+
+  /**
+   * Deep-link ?filtrar_estado=ESTADO → deja la lista FILTRADA por ese estado.
+   * Mismo criterio que `filtrar_categoria` (verbo adelante). Los valores son
+   * los ids de `tabsEstado` ('recibido' | 'en_curso' | 'finalizado' |
+   * 'pospuesto' | 'rechazado'); cualquier otro se ignora.
+   *
+   * Lo usa el Tablero para que "Ver la cola completa" (sin tomar) y "Ver los N
+   * finalizados" (cerrados) caigan en la lista ya acotada a lo que el usuario
+   * venía mirando, en vez de tirarlo al listado entero.
+   */
+  useEffect(() => {
+    const estado = searchParams.get('filtrar_estado');
+    if (!estado) return;
+    if (ESTADOS_DEEP_LINK.includes(estado)) setFiltroEstado(estado);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Deep-link ?abrir=N → abre el Sheet del reclamo (la vuelta desde una OT: los
   // chips de reclamo en OrdenesTrabajo navegan acá con ?abrir={id}).
