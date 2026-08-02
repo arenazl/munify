@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
+  Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
   History,
 } from 'lucide-react';
@@ -51,9 +51,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   const hasDependencia = typeof userRoleOrOptions === 'object' ? userRoleOrOptions.hasDependencia : false;
   const hasEmpleado = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.hasEmpleado : false;
   const isSuperAdmin = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.isSuperAdmin : false;
-  const abmEnSidebar = typeof userRoleOrOptions === 'object'
-    ? (userRoleOrOptions.abmEnSidebar ?? true)
-    : true;
+  // NOTA: `abmEnSidebar` quedó sin efecto — los 3 ABMs que gateaba (categorías
+  // de reclamo/trámite y tipos de trámite) ya no están en el sidebar, se llega
+  // por Configuración → Catálogos. La prop se mantiene en la interfaz para no
+  // romper a los llamadores que la siguen pasando.
   const hrefsOcultos = (() => {
     if (typeof userRoleOrOptions !== 'object') return new Set<string>();
     const raw = userRoleOrOptions.hrefsOcultos;
@@ -397,33 +398,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Contaduría',
       description: 'OPs vencidas, próximas, top beneficiarios'
     },
-    // === ABMs per-municipio (solo si el modulo correspondiente esta activo) ===
-    {
-      // F2: renombrado 'Reclamos' → 'Categorías' para desambiguar del item
-      // 'Reclamos' del universo (categoría Reclamos) y del ABM de trámites.
-      name: 'Categorías',
-      href: '/gestion/categorias-reclamo',
-      icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('reclamos'),
-      categoria: 'Configuración',
-      description: 'Categorías de reclamos del municipio'
-    },
-    {
-      name: 'Trámites',
-      href: '/gestion/categorias-tramite',
-      icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
-      categoria: 'Configuración',
-      description: 'Categorías de trámites del municipio'
-    },
-    {
-      name: 'Tipos',
-      href: '/gestion/tramites-config',
-      icon: FileText,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
-      categoria: 'Configuración',
-      description: 'Trámites específicos del municipio'
-    },
+    // === ABMs per-municipio ===
+    // 'Categorías' (categorias-reclamo), 'Trámites' (categorias-tramite) y
+    // 'Tipos' (tramites-config) salieron del sidebar: los tres ya están como
+    // tiles en Configuración → Catálogos. El sidebar deja una sola puerta.
     {
       // Si el muni solo tiene Tesoreria activa, "Configuracion" entra
       // directo a la config de Tesoreria (no a la config general que esta vacia).
