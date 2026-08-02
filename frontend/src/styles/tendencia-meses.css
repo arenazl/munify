@@ -200,13 +200,50 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Los meses son la barra de avance del recorrido, no pastillas: se ve en qué
-   punto está y cuánto falta, como el indicador de una historia. */
+/* UNA barra de progreso para todo el recorrido, no una por mes: lo que se
+   está mostrando es un tramo de tres meses, y la barra tiene que leerse como
+   ese tramo. Se va llenando de punta a punta y al llegar al final vuelve a
+   empezar. */
+.tm-progreso {
+  position: relative;
+  height: 3px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-border);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.tm-progreso-avance {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+  /* Escala en vez de ancho: animar `width` obliga a recalcular la caja en
+     cada cuadro; escalar no toca el layout. */
+  transform-origin: left center;
+  transform: scaleX(var(--tm-desde, 0));
+  animation: tm-avance var(--tm-paso, 6000ms) linear forwards;
+}
+
+/* Sólo la pausa EXPLÍCITA la congela. Si también la congelara el hover, no
+   se la vería correr nunca: para mirar la tarjeta hay que tener el mouse
+   encima. El hover sigue frenando el cambio de mes, que es lo que molesta
+   cuando estás leyendo. */
+.tm--pausado .tm-progreso-avance { animation-play-state: paused; }
+
+/* Del punto donde quedó al que le toca: el tramo nuevo arranca justo donde
+   terminó el anterior, así el avance no vuelve a cero en cada mes. */
+@keyframes tm-avance {
+  from { transform: scaleX(var(--tm-desde, 0)); }
+  to { transform: scaleX(var(--tm-hasta, 1)); }
+}
+
+/* Los rótulos, alineados con los tramos de la barra de arriba. */
 .tm-meses {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 8px;
 }
 
 .tm-mes-btn {
@@ -218,48 +255,6 @@
   text-align: left;
   cursor: pointer;
   font-family: var(--pl-font-sans);
-}
-
-.tm-mes-riel {
-  display: block;
-  height: 3px;
-  border-radius: var(--pl-radius-pill);
-  background: var(--pl-border);
-  overflow: hidden;
-}
-.tm-mes-avance {
-  display: block;
-  height: 3px;
-  /* Ancho completo, escalado desde la izquierda: se anima `transform` y no
-     `width`, que en cada cuadro obliga al navegador a recalcular la caja. */
-  width: 100%;
-  transform: scaleX(0);
-  transform-origin: left center;
-  border-radius: var(--pl-radius-pill);
-  background: var(--pl-green);
-}
-
-/* El mes que se está viendo se LLENA durante los segundos que dura, como el
-   indicador de una historia. Que la barra avance sola es lo que hace evidente
-   que el bloque se está reproduciendo y cuánto falta para el próximo mes; al
-   100% de golpe no se distingue de una barra decorativa. */
-.tm-mes-btn--activo .tm-mes-avance {
-  animation: tm-avance var(--tm-paso, 6000ms) linear forwards;
-}
-/* Los meses que ya pasaron quedan llenos: juntos dibujan el recorrido hecho. */
-.tm-mes-btn--visto .tm-mes-avance { transform: scaleX(1); }
-
-/* Sólo la pausa EXPLÍCITA congela la barra.
-   Antes también la congelaba el hover, y eso la hacía parecer rota: para
-   mirar la tarjeta hay que tener el mouse encima, con lo cual la barra
-   estaba siempre detenida y nunca se la veía correr. El hover sigue
-   frenando el CAMBIO de mes —que es lo que molesta cuando estás leyendo—,
-   pero la barra sigue avanzando y al llegar al final espera. */
-.tm--pausado .tm-mes-avance { animation-play-state: paused; }
-
-@keyframes tm-avance {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
 }
 
 .tm-mes-rotulo {
@@ -294,6 +289,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tm-play, .tm-mes-btn { transition: none; }
-  /* Sin barra corriendo: el mes activo se marca lleno y listo. */
-  .tm-mes-btn--activo .tm-mes-avance { animation: none; transform: scaleX(1); }
+  /* Sin barra corriendo: la barra se planta en el tramo que toca. */
+  .tm-progreso-avance { animation: none; transform: scaleX(var(--tm-hasta, 1)); }
 }

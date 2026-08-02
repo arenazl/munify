@@ -314,9 +314,25 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
       </div>
       <div className="tm-eje">{ejes.map((e, i) => <span key={i}>{e}</span>)}</div>
 
-      {/* Los meses no son pastillas: son la barra de avance del recorrido.
-          La del mes que se está viendo se llena; las otras quedan en su riel.
-          Así se ve de un vistazo en qué punto del recorrido está. */}
+      {/* Los meses no son pastillas: son la línea de tiempo del recorrido.
+          Es UNA barra continua que va de punta a punta —del primer mes al
+          último—, no tres barras que se llenan por turno: lo que se está
+          mostrando es un recorrido de tres meses, y la barra tiene que
+          leerse como ese recorrido, no como tres cosas sueltas. */}
+      <div
+        className="tm-progreso"
+        aria-hidden="true"
+        style={{
+          // De dónde a dónde avanza en este tramo. Con el índice adentro, el
+          // salto entre meses es continuo: el tramo nuevo arranca justo donde
+          // terminó el anterior, sin volver a cero.
+          ['--tm-desde' as string]: `${indice / lista.length}`,
+          ['--tm-hasta' as string]: `${(indice + 1) / lista.length}`,
+        }}
+      >
+        <span key={`prog-${indice}`} className="tm-progreso-avance" />
+      </div>
+
       <div className="tm-meses">
         {lista.map((m, i) => (
           <button
@@ -328,14 +344,6 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
             onClick={() => ir(i)}
             aria-current={i === indice}
           >
-            <span className="tm-mes-riel" aria-hidden="true">
-              {/* La `key` lleva el índice activo para que React remonte la
-                  barra en cada cambio: si no, la animación CSS ya estaba
-                  aplicada al nodo y el navegador no la relanza — la barra se
-                  llenaría sólo en la primera vuelta. Mismo motivo que las
-                  fichas del hero. */}
-              <span key={`av-${indice}`} className="tm-mes-avance" />
-            </span>
             <span className="tm-mes-rotulo">{m.label} · {nf(m.entraron)} entraron</span>
           </button>
         ))}
