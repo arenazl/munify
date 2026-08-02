@@ -42,7 +42,10 @@
    ============================================================ */
 
 .af {
-  --af-h: 34px;
+  /* 38 y no 34: al lado de los botones de las tarjetas, con el radio pill
+     los controles de 34 se leen finitos —el redondeo se come la altura
+     visual—. Un solo numero, y todos los tipos de control lo siguen. */
+  --af-h: 38px;
   --af-r: var(--pl-radius-md);
   --af-icono: 15px;
   --af-gap-bloque: 10px;

@@ -206,7 +206,12 @@ export function SemanticHero({
             <p className="sh-frase">
               {frase.segmentos.map((s, j) =>
                 s.veredicto ? (
-                  <SegmentoTablero key={j} texto={s.texto} veredicto={s.veredicto} />
+                  // La `key` lleva el slide activo A PROPÓSITO: al cambiar,
+                  // React remonta la ficha y el navegador vuelve a lanzar la
+                  // animación. Con una key fija (`j`) el nodo se reutiliza, la
+                  // regla CSS ya estaba aplicada y el giro sólo se veía la
+                  // primera vuelta — después el número cambiaba de golpe.
+                  <SegmentoTablero key={`${actual}-${j}`} texto={s.texto} veredicto={s.veredicto} />
                 ) : (
                   <span key={j}>{s.texto}</span>
                 ),
