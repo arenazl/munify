@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ClipboardList, TrendingUp, MapPin, Users, ListChecks, FileCheck,
+  ClipboardList, TrendingUp, MapPin, Users, FileCheck,
   // Iconos de la fila de KPIs, uno por lo que mide cada tarjeta.
-  Inbox, CalendarDays, Clock, FileText, type LucideIcon,
+  Inbox, CalendarDays, Clock, FileText, UserPlus, CheckCircle2, type LucideIcon,
 } from 'lucide-react';
 import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi, calificacionesApi, municipiosApi } from '../lib/api';
 import { DashboardStats } from '../types';
@@ -19,9 +19,7 @@ import { parseFechaLocal } from '../lib/tesoreria-helpers';
 // de calor pasó a FocosRotativos.
 import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { SemanticHero } from '../components/ui/SemanticHero';
-import { BalanceBar } from '../components/ui/BalanceBar';
 import { FocosRotativos, type Foco } from '../components/dashboard/FocosRotativos';
-import { textoBalance } from '../lib/balance';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import {
   resolverUmbrales,
@@ -35,6 +33,7 @@ import { VozDelVecino } from '../components/dashboard/VozDelVecino';
 import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
 import { SectionTitleV2 } from '../components/dashboard/SectionTitleV2';
 import { TendenciaMeses } from '../components/dashboard/TendenciaMeses';
+import { TarjetaCola } from '../components/dashboard/TarjetaCola';
 import { KpiCardV2, type KpiCardV2Props } from '../components/dashboard/KpiCardV2';
 import PresentacionLive from '../components/PresentacionLive';
 import { BRAND } from '../brands';
@@ -911,68 +910,23 @@ export default function Dashboard() {
     return null;
   };
 
-  // ---- Widgets operativos (cola de trabajo) ----
+  // ---- Cola de trabajo: tres pilas, tres acciones ----
+  // Antes esto era un array de cuatro columnas que renderizaban la LISTA de
+  // reclamos. Ahora cada pila es un numero con su motivo y su accion, y el
+  // detalle vive a un clic — que es donde tiene que estar.
   const cambioEf = metricasAccion?.cambio_eficiencia ?? 0;
-  const colaCards: {
-    label: string;
-    sublabel: string;
-    value: number;
-    tone: 'red' | 'amber' | 'blue' | 'green';
-    detailKey: keyof MetricasDetalle;
-    vacio: string;
-    footer: string;
-    /** Solo la tarjeta de cierres: dibuja "entró vs. salió" en vez de la lista. */
-    balance?: { cerrados: number; entrados: number };
-  }[] = [
-    {
-      label: 'Urgentes',
-      sublabel: 'Prioridad alta, +3 días abiertos',
-      value: metricasAccion?.urgentes ?? 0,
-      tone: 'red',
-      detailKey: 'urgentes',
-      vacio: 'Nada urgente pendiente.',
-      footer: 'Ver reclamos',
-    },
-    {
-      label: 'Sin asignar',
-      sublabel: 'Esperando asignación +24 h',
-      value: metricasAccion?.sin_asignar ?? 0,
-      tone: 'amber',
-      detailKey: 'sin_asignar',
-      vacio: 'Todo tiene responsable.',
-      footer: 'Asignar reclamos',
-    },
-    // Antes acá iba "Para hoy" (programados para la jornada). Dependía de que
-    // el municipio cargara la agenda todos los días y en los que no la usan
-    // vivía en cero, ocupando un cuarto del espacio más caro del tablero.
-    // Esta cola, en cambio, es la única que se destraba desde el escritorio:
-    // el trabajo ya está hecho y falta el cierre del supervisor.
-    {
-      label: 'Esperando tu visto bueno',
-      sublabel: 'La cuadrilla ya terminó · falta cerrarlos',
-      value: metricasAccion?.esperando_visto_bueno ?? 0,
-      tone: 'amber',
-      detailKey: 'esperando_visto_bueno',
-      vacio: 'No hay nada esperando cierre.',
-      footer: 'Revisar y cerrar',
-    },
-    {
-      label: 'Resueltos',
-      sublabel: `${cambioEf >= 0 ? '+' : ''}${cambioEf}% vs. semana anterior`,
-      value: metricasAccion?.resueltos_semana ?? 0,
-      tone: 'green',
-      detailKey: 'resueltos',
-      vacio: 'Sin cierres esta semana.',
-      footer: 'Ver cerrados',
-      // Un conteo de resueltos solo no dice nada ("¿6 está bien? ¿contra
-      // qué?"). El balance contra lo que entró en los mismos 7 días sí tiene
-      // veredicto: al día, empatando, o acumulando.
-      balance: {
-        cerrados: metricasAccion?.resueltos_semana ?? 0,
-        entrados: metricasAccion?.entraron_semana ?? 0,
-      },
-    },
-  ];
+  const nUrgentes = metricasAccion?.urgentes ?? 0;
+  const nSinAsignar = metricasAccion?.sin_asignar ?? 0;
+  const nPorCerrar = metricasAccion?.esperando_visto_bueno ?? 0;
+  /** Todo lo que espera una decision. La barra de cada tarjeta es su parte de esto. */
+  const totalCola = nUrgentes + nSinAsignar + nPorCerrar;
+  const porcion = (n: number) => (totalCola > 0 ? n / totalCola : 0);
+
+  /** Cuanto hace que espera el mas viejo sin dueno. Sale del detalle REAL. */
+  const esperaMasViejo = (metricasDetalle?.sin_asignar ?? [])
+    .reduce((may, r) => Math.max(may, r.dias_antiguedad || 0), 0);
+
+  const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
 
   // ---- Filas de KPI v2 — series y deltas SOLO con datos reales cargados ----
   const serieDiariaReclamos = tendencias.map((t) => t.cantidad);
@@ -1053,81 +1007,93 @@ export default function Dashboard() {
       )}
 
       {/* ================= Cola de trabajo ================= */}
-      <SectionTitleV2
-        icon={ListChecks}
-        label="Cola de trabajo"
-        action={{ label: 'Ver reclamos', to: '/gestion/reclamos' }}
-      />
-      <div className="dv2-grid-cola">
-        {colaCards.map((card) => {
-          const reclamos = metricasDetalle?.[card.detailKey] || [];
-          return (
-            <div key={card.label} className={`dv2-card dv2-cola-card dv2-cola-card--${card.tone}`}>
-              <div className="dv2-cola-head">
-                <span className="dv2-cola-dot" aria-hidden="true" />
-                <span className="dv2-cola-label">{card.label}</span>
-                <span className={`dv2-cola-num${card.value === 0 ? ' dv2-cola-num--cero' : ''}`}>
-                  {card.value}
-                </span>
-              </div>
-              <span className="dv2-cola-sub">
-                {card.balance ? textoBalance(card.balance) : card.sublabel}
-              </span>
-              {card.balance ? (
-                /* La tarjeta de cierres muestra el balance Y la lista, igual
-                   que sus vecinas. Con solo la barra quedaba media tarjeta
-                   vacia y ademas era la unica de la fila que no decia QUE se
-                   habia cerrado: el numero sin los casos no deja hacer nada
-                   con el. */
-                <>
-                  <BalanceBar {...card.balance} />
-                  {reclamos.length > 0 && (
-                    <div className="dv2-cola-lista">
-                      {reclamos.slice(0, 2).map((r) => (
-                        <div
-                          key={r.id}
-                          className="dv2-cola-item"
-                          onClick={() => navigate(`/gestion/reclamos/${r.id}`)}
-                        >
-                          <div className="dv2-cola-item-titulo">{r.titulo}</div>
-                          <div className="dv2-cola-item-meta">
-                            {r.categoria}
-                            {r.dias_antiguedad > 0 ? ` · cerrado en ${r.dias_antiguedad} d` : ''}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : reclamos.length > 0 ? (
-                <div className="dv2-cola-lista">
-                  {reclamos.map((r) => (
-                    <div
-                      key={r.id}
-                      className="dv2-cola-item"
-                      onClick={() => navigate(`/gestion/reclamos/${r.id}`)}
-                    >
-                      <div className="dv2-cola-item-titulo">{r.titulo}</div>
-                      <div className="dv2-cola-item-meta">
-                        {r.categoria}
-                        {r.dias_antiguedad > 0 ? ` · ${r.dias_antiguedad} d` : ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="dv2-cola-vacio">{card.vacio}</div>
-              )}
-              <button
-                type="button"
-                className="dv2-cola-link"
-                onClick={() => navigate('/gestion/reclamos')}
-              >
-                {card.footer}
-              </button>
-            </div>
-          );
-        })}
+      <div className="tcola-encabezado">
+        <ClipboardList className="tcola-enc-icono" aria-hidden="true" />
+        <span className="tcola-enc-chip">Reclamos</span>
+        <span className="tcola-enc-titulo">Tu cola de trabajo</span>
+        {totalCola > 0 && (
+          <>
+            <span className="tcola-enc-sep">·</span>
+            <span className="tcola-enc-alcance">
+              <strong>{totalCola} {plural(totalCola, 'reclamo', 'reclamos')}</strong>{' '}
+              {selectedDepNombre ? 'de tu dependencia esperan' : 'esperan'} una decisión tuya
+            </span>
+          </>
+        )}
+        <span className="tcola-enc-linea" />
+      </div>
+
+      <div className="tcola-fila">
+        <TarjetaCola
+          icono={Clock}
+          titulo="Urgentes"
+          valor={nUrgentes}
+          unidad={plural(nUrgentes, 'reclamo vencido', 'reclamos vencidos')}
+          proporcion={porcion(nUrgentes)}
+          tono="rojo"
+          detalle={
+            nUrgentes > 0 ? (
+              <>Prioridad alta y más de 3 días abiertos. <strong>Ya venció su plazo.</strong></>
+            ) : (
+              <>Nada urgente pendiente. <strong>La cola está al día.</strong></>
+            )
+          }
+          accion={{ label: 'Asignar cuadrilla', to: '/gestion/reclamos?vista=urgentes' }}
+        />
+
+        <TarjetaCola
+          icono={UserPlus}
+          titulo="Sin asignar"
+          valor={nSinAsignar}
+          unidad={plural(nSinAsignar, 'reclamo sin dueño', 'reclamos sin dueño')}
+          proporcion={porcion(nSinAsignar)}
+          tono="ambar"
+          detalle={
+            nSinAsignar === 0 ? (
+              <>Todo tiene responsable. <strong>Nada esperando asignación.</strong></>
+            ) : esperaMasViejo > 0 ? (
+              <>Nadie a cargo todavía. El más viejo espera hace{' '}
+                <strong>{esperaMasViejo} {plural(esperaMasViejo, 'día', 'días')}.</strong></>
+            ) : (
+              <>Nadie a cargo todavía. <strong>Entraron hoy.</strong></>
+            )
+          }
+          accion={{ label: 'Asignar en lote', to: '/gestion/reclamos?vista=sin_asignar' }}
+        />
+
+        <TarjetaCola
+          icono={CheckCircle2}
+          titulo="Para cerrar"
+          valor={nPorCerrar}
+          unidad={plural(nPorCerrar, 'reclamo por cerrar', 'reclamos por cerrar')}
+          proporcion={porcion(nPorCerrar)}
+          tono="verde"
+          detalle={
+            nPorCerrar > 0 ? (
+              <>La cuadrilla ya terminó y subió fotos. <strong>Falta tu visto bueno.</strong></>
+            ) : (
+              <>No hay nada esperando cierre. <strong>Todo revisado.</strong></>
+            )
+          }
+          accion={{ label: 'Revisar y cerrar', to: '/gestion/reclamos?vista=esperando_visto_bueno' }}
+        />
+      </div>
+
+      {/* Lo cerrado de la semana ya no ocupa una tarjeta entera: es una linea.
+          Un conteo de resueltos solo no dice nada ("¿6 esta bien? ¿contra
+          que?") — por eso va con la comparacion contra la semana anterior. */}
+      <div className="tcola-pie">
+        <CheckCircle2 className="tcola-pie-icono" aria-hidden="true" />
+        <span>
+          Cerraste <strong>{metricasAccion?.resueltos_semana ?? 0} esta semana</strong>
+          {cambioEf !== 0 && (
+            <>, {Math.abs(cambioEf)}% {cambioEf > 0 ? 'más' : 'menos'} que la anterior</>
+          )}
+          {' · '}entraron {metricasAccion?.entraron_semana ?? 0} en los mismos días
+        </span>
+        <Link to="/gestion/reclamos?estado=finalizado" className="tcola-pie-link">
+          Ver cerrados
+        </Link>
       </div>
 
       {/* ============ Estado + concentración + top categorías ============

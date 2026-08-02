@@ -1,0 +1,231 @@
+/* ============================================================
+   TarjetaCola — el número grande, la razón y la acción.
+
+   Portado del diseño (Rediseño Sidebar y Banner.dc.html, líneas
+   585-660), medida por medida. Los colores salen de tokens
+   --pl-*: el tono elige el juego, y todo lo demás cuelga de ahí.
+   ============================================================ */
+
+.tcola-fila {
+  display: grid;
+  /* Tres mientras entren sus 260px; si no, dos, y al final una. Lo decide
+     el contenedor: la fila sirve igual metida en media pantalla. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.tcola {
+  position: relative;
+  overflow: hidden;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 14px;
+  padding: 18px 18px 16px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--pl-shadow-card);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.tcola:hover { border-color: var(--pl-border-strong); }
+
+/* --- El tono: un solo lugar donde se elige el color de la tarjeta --- */
+.tcola--rojo { --tcola-color: var(--pl-red); --tcola-tenue: var(--pl-red-100); --tcola-fuerte: var(--pl-red-700); }
+.tcola--ambar { --tcola-color: var(--pl-amber); --tcola-tenue: var(--pl-amber-100); --tcola-fuerte: var(--pl-amber-700); }
+.tcola--verde { --tcola-color: var(--pl-green); --tcola-tenue: var(--pl-green-100); --tcola-fuerte: var(--pl-green-700); }
+
+/* El icono en grande, al 5%, flotando. Da carácter sin robarle lectura
+   al número. */
+.tcola-marca {
+  position: absolute;
+  right: -14px;
+  top: -10px;
+  opacity: 0.05;
+  pointer-events: none;
+  color: var(--tcola-color);
+  animation: tcola-flotar 7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.tcola-marca > svg { width: 118px; height: 118px; stroke-width: 1.4; }
+
+.tcola-cab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  position: relative;
+}
+
+.tcola-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--tcola-tenue);
+  color: var(--tcola-color);
+  flex: 0 0 34px;
+}
+.tcola-icono > svg { width: 18px; height: 18px; stroke-width: 1.9; }
+
+.tcola-latido {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  border: 1.5px solid var(--tcola-color);
+  opacity: 0;
+  animation: tcola-latido 3.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.tcola-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--pl-text);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tcola-valor-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 14px 0 0;
+  min-width: 0;
+}
+
+.tcola-valor {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  color: var(--pl-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tcola-unidad {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pl-text-faint);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Qué porción de toda la cola es esta pila. Sin esto, "4 sin asignar" no
+   se sabe si es mucho o poco. */
+.tcola-barra {
+  display: block;
+  height: 3px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface-3, var(--pl-border));
+  margin: 14px 0 12px;
+  overflow: hidden;
+}
+.tcola-barra-lleno {
+  display: block;
+  height: 3px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--tcola-color);
+  transition: width var(--pl-dur-lento, 420ms) var(--pl-ease);
+}
+
+.tcola-detalle {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--pl-text-3);
+  text-wrap: pretty;
+}
+.tcola-detalle strong { font-weight: 600; color: var(--pl-text); }
+
+.tcola-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Empuja la acción al piso: las tres tarjetas terminan parejas aunque el
+     texto de arriba ocupe distinto. */
+  margin-top: auto;
+  padding-top: 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tcola-fuerte);
+  text-decoration: none;
+  white-space: nowrap;
+  align-self: flex-start;
+  transition: gap var(--pl-dur-ui) var(--pl-ease);
+}
+.tcola-accion:hover { gap: 9px; }
+.tcola-flecha { width: 14px; height: 14px; flex: 0 0 14px; }
+
+@keyframes tcola-latido {
+  0% { opacity: 0.5; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes tcola-flotar {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tcola-marca, .tcola-latido { animation: none; }
+  .tcola-barra-lleno, .tcola-accion, .tcola { transition: none; }
+}
+
+/* ---- La barra de arriba: módulo, título y el alcance de la cola ---- */
+.tcola-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 26px 0 10px;
+  flex-wrap: wrap;
+}
+.tcola-enc-icono { width: 16px; height: 16px; color: var(--pl-green); flex: 0 0 16px; }
+.tcola-enc-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  background: var(--pl-green-100);
+  border-radius: var(--pl-radius-pill);
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  color: var(--pl-green-700);
+  flex: 0 0 auto;
+}
+.tcola-enc-titulo { font-size: 12.5px; font-weight: 600; color: var(--pl-text); }
+.tcola-enc-sep { font-size: 12.5px; color: var(--pl-border-strong); }
+.tcola-enc-alcance { font-size: 12.5px; color: var(--pl-text-3); }
+.tcola-enc-alcance strong { font-weight: 600; color: var(--pl-red-700); }
+/* Hairline que se come el sobrante: la fila llega siempre al 100%. */
+.tcola-enc-linea { flex: 1 1 40px; height: 1px; background: var(--pl-border); }
+.tcola-enc-fecha { font-size: 11.5px; color: var(--pl-text-faint); white-space: nowrap; }
+
+/* ---- El pie: lo cerrado de la semana, que ya no ocupa una tarjeta ---- */
+.tcola-pie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--pl-text-3);
+  flex-wrap: wrap;
+}
+.tcola-pie-icono { width: 15px; height: 15px; color: var(--pl-green); flex: 0 0 15px; }
+.tcola-pie strong { font-weight: 600; color: var(--pl-text); }
+.tcola-pie-link {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tcola-pie-link:hover { text-decoration: underline; }
