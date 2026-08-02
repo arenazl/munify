@@ -233,9 +233,28 @@
   width: 0;
   border-radius: var(--pl-radius-pill);
   background: var(--pl-green);
-  transition: width var(--pl-dur-lento, 420ms) var(--pl-ease);
 }
-.tm-mes-btn--activo .tm-mes-avance { width: 100%; }
+
+/* El mes que se está viendo se LLENA durante los segundos que dura, como el
+   indicador de una historia. Que la barra avance sola es lo que hace evidente
+   que el bloque se está reproduciendo y cuánto falta para el próximo mes; al
+   100% de golpe no se distingue de una barra decorativa. */
+.tm-mes-btn--activo .tm-mes-avance {
+  animation: tm-avance var(--tm-paso, 6000ms) linear forwards;
+}
+/* Los meses que ya pasaron quedan llenos: juntos dibujan el recorrido hecho. */
+.tm-mes-btn--visto .tm-mes-avance { width: 100%; }
+
+/* Se congela con el mouse encima y con el botón de pausa: si el bloque no
+   avanza, la barra tampoco puede seguir corriendo. */
+.tm:hover .tm-mes-avance,
+.tm:focus-within .tm-mes-avance,
+.tm--pausado .tm-mes-avance { animation-play-state: paused; }
+
+@keyframes tm-avance {
+  from { width: 0; }
+  to { width: 100%; }
+}
 
 .tm-mes-rotulo {
   display: block;
@@ -268,5 +287,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tm-play, .tm-mes-btn, .tm-mes-avance { transition: none; }
+  .tm-play, .tm-mes-btn { transition: none; }
+  /* Sin barra corriendo: el mes activo se marca lleno y listo. */
+  .tm-mes-btn--activo .tm-mes-avance { animation: none; width: 100%; }
 }

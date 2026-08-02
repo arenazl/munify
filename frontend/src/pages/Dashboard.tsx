@@ -1109,7 +1109,7 @@ export default function Dashboard() {
       <>
       <div className="kse-fila-3">
         <KpiSemantico
-          pregunta="¿Dónde se concentran?"
+          pregunta="¿Dónde hay más reclamos?"
           icono={MapPin}
           tono="bueno"
           valor={zonaTop ? zonaTop.zona : '—'}
@@ -1140,7 +1140,7 @@ export default function Dashboard() {
         />
 
         <KpiSemantico
-          pregunta="¿De qué se quejan?"
+          pregunta="¿Qué es lo que más preocupa?"
           icono={ClipboardList}
           tono="bueno"
           valor={catTop ? `${pctDe(catTop.cantidad)}%` : '—'}
@@ -1176,7 +1176,7 @@ export default function Dashboard() {
         />
 
         <KpiSemantico
-          pregunta="¿Cuánto tardamos?"
+          pregunta="¿En cuánto resolvemos?"
           icono={Clock}
           tono={categoriasSobreMeta > 0 ? 'malo' : 'bueno'}
           valor={tiempoResolucion.length > 0 ? `${categoriasSobreMeta} de ${tiempoResolucion.length}` : '—'}

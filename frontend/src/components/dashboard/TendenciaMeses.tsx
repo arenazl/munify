@@ -20,7 +20,7 @@
  * meses, el bloque no se muestra (no hay recorrido posible con uno solo).
  */
 import { useMemo } from 'react';
-import { Pause, ChevronRight } from 'lucide-react';
+import { Pause, Play, ChevronRight } from 'lucide-react';
 import { useCarruselAuto } from '../../lib/useCarruselAuto';
 
 /** Cada cuánto pasa al mes siguiente. */
@@ -213,7 +213,7 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
 
     return grupos.slice(-meses);
   }, [datos, meses]);
-  const { indice, ir, propsPausa, menosMovimiento } = useCarruselAuto({
+  const { indice, ir, propsPausa, menosMovimiento, pausado, alternarPausa } = useCarruselAuto({
     total: lista.length,
     intervaloMs: INTERVALO_MS,
   });
@@ -243,7 +243,14 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
   });
 
   return (
-    <section className={`tm ${className || ''}`} {...propsPausa} aria-label="Tendencia de reclamos">
+    <section
+      className={`tm ${className || ''}${pausado ? ' tm--pausado' : ''}`}
+      {...propsPausa}
+      // Duración runtime: la barra tarda EXACTAMENTE lo que el carrusel, de un
+      // solo número. Si mañana cambia el intervalo, la barra lo sigue sola.
+      style={{ ['--tm-paso' as string]: `${INTERVALO_MS}ms` }}
+      aria-label="Tendencia de reclamos"
+    >
       <header className="tm-head">
         <h3 className="tm-titulo">Tendencia de reclamos</h3>
         <span className="tm-mes">{mes.label}</span>
@@ -259,11 +266,12 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
           <button
             type="button"
             className="tm-play"
-            onClick={() => ir(indice + 1)}
-            title={menosMovimiento ? 'Ver el mes siguiente' : 'Pausar el recorrido'}
-            aria-label={menosMovimiento ? 'Ver el mes siguiente' : 'Pausar el recorrido'}
+            onClick={menosMovimiento ? () => ir(indice + 1) : alternarPausa}
+            title={menosMovimiento ? 'Ver el mes siguiente' : pausado ? 'Retomar el recorrido' : 'Pausar el recorrido'}
+            aria-label={menosMovimiento ? 'Ver el mes siguiente' : pausado ? 'Retomar el recorrido' : 'Pausar el recorrido'}
           >
-            {menosMovimiento ? <ChevronRight className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+            {menosMovimiento ? <ChevronRight className="h-3 w-3" />
+              : pausado ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
           </button>
         </div>
       </header>
@@ -314,12 +322,19 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
           <button
             key={m.clave}
             type="button"
-            className={`tm-mes-btn ${i === indice ? 'tm-mes-btn--activo' : ''}`}
+            className={`tm-mes-btn ${i === indice ? 'tm-mes-btn--activo' : ''}${
+              i < indice ? ' tm-mes-btn--visto' : ''
+            }`}
             onClick={() => ir(i)}
             aria-current={i === indice}
           >
             <span className="tm-mes-riel" aria-hidden="true">
-              <span className="tm-mes-avance" />
+              {/* La `key` lleva el índice activo para que React remonte la
+                  barra en cada cambio: si no, la animación CSS ya estaba
+                  aplicada al nodo y el navegador no la relanza — la barra se
+                  llenaría sólo en la primera vuelta. Mismo motivo que las
+                  fichas del hero. */}
+              <span key={`av-${indice}`} className="tm-mes-avance" />
             </span>
             <span className="tm-mes-rotulo">{m.label} · {nf(m.entraron)} entraron</span>
           </button>
