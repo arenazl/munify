@@ -49,6 +49,8 @@ export interface PuntoTendencia {
 interface Mes {
   clave: string;
   label: string;
+  /** "jul" — para el eje y el día más cargado, que se leen sueltos. */
+  abrev: string;
   dias: PuntoTendencia[];
   entraron: number;
   resueltos: number;
@@ -61,6 +63,12 @@ interface Mes {
 const NOMBRE_MES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+/** Abreviaturas para el eje: "1 jul" se lee solo; "1" a secas, no. */
+const ABREV_MES = [
+  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+  'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
 ];
 
 const nf = (n: number, dec = 0) =>
@@ -91,6 +99,7 @@ function agruparPorMes(datos: PuntoTendencia[]): Mes[] {
       return {
         clave,
         label: NOMBRE_MES[mes] ?? clave,
+        abrev: ABREV_MES[mes] ?? '',
         dias,
         entraron,
         resueltos,
@@ -120,16 +129,25 @@ function puntos(valores: number[], max: number, ancho: number, alto: number): st
  * No describe la curva: dice qué pasó. Es la línea que un intendente puede
  * repetir en una reunión sin mirar el gráfico.
  */
-function veredictoDelMes(m: Mes, previo: Mes | null): { texto: string; tono: 'bueno' | 'malo' | 'neutro' } {
+interface Veredicto {
+  /** Las dos o tres palabras que califican el mes. Van en color. */
+  etiqueta: string;
+  /** El dato que respalda la etiqueta. Va en gris. */
+  resto: string;
+  tono: 'bueno' | 'malo' | 'neutro';
+}
+
+function veredictoDelMes(m: Mes, previo: Mes | null): Veredicto {
   const pct = Math.round(m.tasa * 100);
   const deCada10 = Math.round(m.tasa * 10);
 
   if (m.entraron === 0) {
-    return { texto: 'No entraron reclamos en el período.', tono: 'neutro' };
+    return { etiqueta: 'Sin movimiento', resto: 'no entraron reclamos en el período.', tono: 'neutro' };
   }
   if (m.tasa >= 1) {
     return {
-      texto: `Se cerró más de lo que entró: ${nf(m.porDia, 1)} por día y ${pct}% resuelto — la cola bajó.`,
+      etiqueta: 'Se cerró más de lo que entró:',
+      resto: `${nf(m.porDia, 1)} por día y ${pct}% resuelto — la cola bajó.`,
       tono: 'bueno',
     };
   }
@@ -142,25 +160,29 @@ function veredictoDelMes(m: Mes, previo: Mes | null): { texto: string; tono: 'bu
 
   if (delta !== null && delta > SALTO) {
     return {
-      texto: `Se achicó la brecha: entraban ${nf(m.porDia, 1)} por día y se cerró el ${pct}% — ${deCada10} de cada 10.`,
+      etiqueta: 'La brecha se está cerrando:',
+      resto: `entraban ${nf(m.porDia, 1)} por día y se cerró el ${pct}% — ${deCada10} de cada 10, contra ${Math.round(previo!.tasa * 100)}% el mes anterior.`,
       tono: 'bueno',
     };
   }
   if (delta !== null && delta < -SALTO) {
     return {
-      texto: `Se perdió terreno: se cerró el ${pct}% contra el ${Math.round(previo!.tasa * 100)}% del mes anterior.`,
+      etiqueta: 'Se perdió terreno:',
+      resto: `se cerró el ${pct}% contra el ${Math.round(previo!.tasa * 100)}% del mes anterior.`,
       tono: 'malo',
     };
   }
   // Sin cambio apreciable: manda el nivel en el que se sostiene.
   if (m.tasa >= 0.75) {
     return {
-      texto: `Se sostuvo el ritmo: entraban ${nf(m.porDia, 1)} por día y se cerró el ${pct}% — ${deCada10} de cada 10.`,
+      etiqueta: 'Se sostuvo el ritmo:',
+      resto: `entraban ${nf(m.porDia, 1)} por día y se cerró el ${pct}% — ${deCada10} de cada 10.`,
       tono: 'bueno',
     };
   }
   return {
-    texto: `Se abría la brecha: entraban ${nf(m.porDia, 1)} por día y se cerraba ${
+    etiqueta: 'Se abría la brecha:',
+    resto: `entraban ${nf(m.porDia, 1)} por día y se cerraba ${
       m.tasa < 0.5 ? 'menos de la mitad' : `el ${pct}%`
     } — ${deCada10} de cada 10.`,
     tono: 'malo',
@@ -213,9 +235,11 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
   const lineaIn = puntos(ins, max, W, H);
   const area = lineaIn ? `0,${H} ${lineaIn} ${W},${H}` : '';
 
+  // "1 jul" y no "1": un número suelto no dice de qué mes es, y el bloque
+  // justamente va cambiando de mes.
   const ejes = [0, 1, 2, 3].map((i) => {
     const d = mes.dias[Math.round((i / 3) * (mes.dias.length - 1))];
-    return d ? `${Number(d.fecha.slice(8, 10))}` : '';
+    return d ? `${Number(d.fecha.slice(8, 10))} ${mes.abrev}` : '';
   });
 
   return (
@@ -245,7 +269,7 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
       </header>
 
       <p className={`tm-veredicto tm-veredicto--${veredicto.tono}`} aria-live="polite">
-        {veredicto.texto}
+        <strong>{veredicto.etiqueta}</strong> {veredicto.resto}
       </p>
 
       <div className="tm-kpis">
@@ -255,7 +279,7 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
         </div>
         <div className="tm-kpi">
           <span className="tm-kpi-et">Resueltos</span>
-          <span className="tm-kpi-va">{nf(mes.resueltos)}</span>
+          <span className="tm-kpi-va tm-kpi-va--bueno">{nf(mes.resueltos)}</span>
         </div>
         <div className="tm-kpi">
           <span className="tm-kpi-et">Tasa de cierre</span>
@@ -264,8 +288,8 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
         <div className="tm-kpi">
           <span className="tm-kpi-et">Día más cargado</span>
           <span className="tm-kpi-va">
-            {mes.pico ? `${mes.pico.dia}` : '—'}
-            {mes.pico && <span className="tm-kpi-nota">{nf(mes.pico.cantidad)}</span>}
+            {mes.pico ? `${mes.pico.dia} ${mes.abrev}` : '—'}
+            {mes.pico && <span className="tm-kpi-nota">· {nf(mes.pico.cantidad)}</span>}
           </span>
         </div>
       </div>
@@ -282,6 +306,9 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
       </div>
       <div className="tm-eje">{ejes.map((e, i) => <span key={i}>{e}</span>)}</div>
 
+      {/* Los meses no son pastillas: son la barra de avance del recorrido.
+          La del mes que se está viendo se llena; las otras quedan en su riel.
+          Así se ve de un vistazo en qué punto del recorrido está. */}
       <div className="tm-meses">
         {lista.map((m, i) => (
           <button
@@ -291,8 +318,10 @@ export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesPr
             onClick={() => ir(i)}
             aria-current={i === indice}
           >
-            <span className="tm-mes-dot" />
-            {m.label} · {nf(m.entraron)} entraron
+            <span className="tm-mes-riel" aria-hidden="true">
+              <span className="tm-mes-avance" />
+            </span>
+            <span className="tm-mes-rotulo">{m.label} · {nf(m.entraron)} entraron</span>
           </button>
         ))}
       </div>

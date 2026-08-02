@@ -165,7 +165,9 @@
 }
 
 .tm-lienzo {
-  height: 150px;
+  /* 260px como el diseño: en 150 la curva se aplasta, y la forma es lo único
+     que una tendencia tiene para decir. */
+  height: 260px;
   margin-top: 12px;
 }
 .tm-lienzo svg { display: block; width: 100%; height: 100%; }
@@ -198,53 +200,73 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Los meses son la barra de avance del recorrido, no pastillas: se ve en qué
+   punto está y cuánto falta, como el indicador de una historia. */
 .tm-meses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px solid var(--pl-border);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .tm-mes-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
-  border-radius: var(--pl-radius-pill);
-  border: 1px solid var(--pl-border);
-  background: var(--pl-surface-2);
-  color: var(--pl-text-3);
-  font-family: var(--pl-font-sans);
-  font-size: var(--pl-fs-micro);
-  font-weight: 600;
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
   cursor: pointer;
-  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
-}
-.tm-mes-btn:hover { background: var(--pl-surface-hover); }
-
-.tm-mes-btn--activo {
-  background: var(--pl-green-100);
-  border-color: var(--pl-green-200);
-  color: var(--pl-green-700);
+  font-family: var(--pl-font-sans);
 }
 
-.tm-mes-dot {
-  width: 6px;
-  height: 6px;
+.tm-mes-riel {
+  display: block;
+  height: 3px;
   border-radius: var(--pl-radius-pill);
-  background: var(--pl-text-disabled);
+  background: var(--pl-border);
+  overflow: hidden;
 }
-.tm-mes-btn--activo .tm-mes-dot { background: var(--pl-green); }
+.tm-mes-avance {
+  display: block;
+  height: 3px;
+  width: 0;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+  transition: width var(--pl-dur-lento, 420ms) var(--pl-ease);
+}
+.tm-mes-btn--activo .tm-mes-avance { width: 100%; }
 
-/* En pantalla angosta los cuatro números pasan a dos filas de dos: en una
-   fila de cuatro no entra ni la etiqueta ni el número. */
-@media (max-width: 560px) {
-  .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
-  .tm-lienzo { height: 120px; }
+.tm-mes-rotulo {
+  display: block;
+  margin-top: 7px;
+  font-size: var(--pl-fs-micro);
+  font-weight: 500;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tm-mes-btn--activo .tm-mes-rotulo { font-weight: 600; color: var(--pl-text); }
+
+/* Angosto: los cuatro números pasan a dos filas de dos —en una fila de cuatro
+   no entra ni la etiqueta— y el lienzo baja, pero sin achatarse tanto que la
+   curva deje de leerse. */
+@media (max-width: 700px) {
+  .tm { padding: 16px; }
+  .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+  .tm-lienzo { height: 190px; }
+  /* El rótulo del mes se parte en dos renglones antes que cortarse. */
+  .tm-mes-rotulo { white-space: normal; line-height: 1.25; }
+}
+
+@media (max-width: 430px) {
+  .tm-lienzo { height: 150px; }
+  .tm-controles { gap: 8px; }
+  /* Con tres columnas los rótulos no entran: pasan a lista. */
+  .tm-meses { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tm-play, .tm-mes-btn { transition: none; }
+  .tm-play, .tm-mes-btn, .tm-mes-avance { transition: none; }
 }
