@@ -35,15 +35,19 @@ relleno le quita credibilidad a los que informan de verdad.
 Reclamos · Trámites · Mapa · Tablero · Planificación · SLA · Órdenes ·
 Inventario (stock que se agota, activos sin devolver) · Agenda · Mostrador ·
 Cobros · Tasas · Gastos · Liquidaciones · Cajas · Conciliación · Personal
-(licencias de hoy, gente sin cuadrilla).
+(licencias de hoy, gente sin cuadrilla) · Horarios (movido acá 2026-08-02:
+el canvas Horarios.dc.html lo trae con hero — el canvas manda sobre esta
+lista cuando difieren).
 
 **SIN hero, sólo título + bajada** — catálogos y configuración, donde el estado
-no cambia solo: Categorías · Zonas · Horarios · Usuarios · Tipos de trabajo ·
+no cambia solo: Categorías · Zonas · Usuarios · Tipos de trabajo ·
 Tipos de POI · todas las pantallas de Configuración.
 
-**Caso intermedio:** si la pantalla tiene 2-3 números útiles pero ninguna
-decisión asociada, van como KPIs sueltos bajo la cabecera, sin frase semántica.
-La frase es lo que exige tener algo que decir.
+**Caso intermedio (actualizado 2026-08-02, mandato del dueño):** los KPIs
+sueltos NO existen más en ninguna pantalla. Si hay 2-3 números útiles sin
+decisión asociada, van igual al strip de KPIs del SemanticHero, con una frase
+mínima FACTUAL (sin veredicto si no hay nada que juzgar). La frase es lo que
+exige tener algo que decir; los números siempre viven dentro del hero.
 
 ## 4. Regla de datos (no negociable)
 
