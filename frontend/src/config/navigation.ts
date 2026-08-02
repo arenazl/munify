@@ -2,8 +2,8 @@ import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
-  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote, Hammer, Boxes,
-  UsersRound, History,
+  CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
+  History,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -146,6 +146,17 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Principal',
       description: 'Resumen y métricas'
     },
+    {
+      // 'Principal' = items sueltos arriba del sidebar (sin acordeón), ver
+      // CATEGORIA_SUELTOS en SidebarV2. Mostrador va acá, debajo de Dashboard:
+      // es la puerta de entrada del funcionario que tiene un vecino adelante.
+      name: 'Mostrador',
+      href: '/gestion/mostrador',
+      icon: ScanLine,
+      show: esFuncionarioMuni && moduloOn('mostrador'),
+      categoria: 'Principal',
+      description: 'Ventanilla asistida — biometría + trámite presencial'
+    },
     // === UNIVERSO RECLAMOS (Reclamos + Mapa + Tablero + Planificación + SLA + Análisis) ===
     // Reagrupación F2/D1 (variante C): las piezas del universo reclamos quedan
     // contiguas y ANTES del bloque financiero. Antes Tablero/Planificación/SLA/
@@ -183,6 +194,17 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Calendario semanal del personal'
     },
     {
+      // Despacho del trabajo que sale de un reclamo → vive con Planificación,
+      // no en 'Campo' (Campo quedó como la vista del operario).
+      name: 'Órdenes',
+      href: '/gestion/ordenes-trabajo',
+      icon: Hammer,
+      // Opt-in por municipio (como tesorería): sin fila en municipio_modulos = oculto
+      show: (isAdminOrSupervisor || userRole === 'empleado') && modulosActivos.has('ordenes_trabajo'),
+      categoria: 'Reclamos',
+      description: 'Órdenes de trabajo de cuadrillas'
+    },
+    {
       name: 'SLA',
       href: '/gestion/sla',
       icon: Clock,
@@ -207,44 +229,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Campo',
       description: 'Mis tareas asignadas en campo'
     },
-    {
-      name: 'Órdenes',
-      href: '/gestion/ordenes-trabajo',
-      icon: Hammer,
-      // Opt-in por municipio (como tesorería): sin fila en municipio_modulos = oculto
-      show: (isAdminOrSupervisor || userRole === 'empleado') && modulosActivos.has('ordenes_trabajo'),
-      categoria: 'Campo',
-      description: 'Órdenes de trabajo de cuadrillas'
-    },
-    {
-      name: 'Inventario',
-      href: '/gestion/inventario',
-      icon: Boxes,
-      // Opt-in por municipio: activos (vehículos, herramientas) + consumibles (materiales)
-      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
-      categoria: 'Campo',
-      description: 'Vehículos, herramientas y materiales'
-    },
-    {
-      // F2/T2: Empleados de campo (tabla `empleados`) — antes solo se llegaba
-      // por tile de Configuración. Gateado por el flag reclamos (son recurso del
-      // universo Reclamos): si el muni no usa reclamos, no ensucian el sidebar.
-      name: 'Personal',
-      href: '/gestion/empleados',
-      icon: Users,
-      show: isAdminOrSupervisor && moduloOn('reclamos'),
-      categoria: 'Campo',
-      description: 'Empleados de campo del municipio'
-    },
-    {
-      // F2/T2: Cuadrillas (grupos de trabajo) — a ellas se asignan reclamos/OTs.
-      name: 'Cuadrillas',
-      href: '/gestion/cuadrillas',
-      icon: UsersRound,
-      show: isAdminOrSupervisor && moduloOn('reclamos'),
-      categoria: 'Campo',
-      description: 'Grupos de trabajo y asignaciones'
-    },
+    // NOTA: 'Inventario' (/gestion/inventario) salió del sidebar — se llega por
+    // el tile de Configuración → Catálogos, al lado de "Categorías Inventario".
+    // NOTA: 'Personal' (/gestion/empleados) y 'Cuadrillas' (/gestion/cuadrillas)
+    // NO van en el sidebar. Ambas son ABMs de ficha — la fila solo cambia si
+    // alguien la edita a mano, no se mueve con el trabajo del día — y ya se
+    // llegan por los tiles de Configuración → "Usuarios y Empleados"
+    // (Configuracion.tsx). Tenerlas acá era una segunda puerta a la misma
+    // pantalla. Lo operacional del personal (carga, disponibilidad, a quién
+    // asignar) vive en Planificación/Tablero/Órdenes, no en esas pantallas.
     {
       // F2/D8: se habilita para el empleado (endpoints abiertos por otro agente).
       name: 'Rendimiento',
@@ -288,27 +281,26 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Trámites',
       description: 'Horarios, cupos y feriados de la agenda de turnos'
     },
+    // La categoría 'Atención al vecino' se eliminó: Mostrador subió a
+    // 'Principal' (arriba, debajo de Dashboard) y Tasas/Cobros quedaron ocultos.
     {
-      name: 'Mostrador',
-      href: '/gestion/mostrador',
-      icon: ScanLine,
-      show: esFuncionarioMuni && moduloOn('mostrador'),
-      categoria: 'Atención al vecino',
-      description: 'Ventanilla asistida — biometría + trámite presencial'
-    },
-    {
+      // Oculto por decisión de producto (2026-08-02). La pantalla y la ruta
+      // siguen vivas; para reactivarlo, restaurar el gate original:
+      //   show: isAdminOrSupervisor && moduloOn('tasas'),
       name: 'Tasas',
       href: '/gestion/tasas',
       icon: Receipt,
-      show: isAdminOrSupervisor && moduloOn('tasas'),
+      show: false,
       categoria: 'Atención al vecino',
       description: 'Partidas del padrón y deudas'
     },
     {
+      // Oculto por decisión de producto (2026-08-02). Gate original:
+      //   show: isAdminOrSupervisor && moduloOn('pagos'),
       name: 'Cobros',
       href: '/gestion/cobros',
       icon: Wallet,
-      show: isAdminOrSupervisor && moduloOn('pagos'),
+      show: false,
       categoria: 'Atención al vecino',
       description: 'Histórico transaccional para contaduría'
     },
@@ -320,14 +312,9 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Tesorería',
       description: 'Gastos cargados del municipio'
     },
-    {
-      name: 'Cajas',
-      href: '/gestion/tesoreria/cajas',
-      icon: PiggyBank,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Saldo de cada caja con ingresos y egresos'
-    },
+    // NOTA: 'Cajas' (/gestion/tesoreria/cajas — saldo de cada caja) salió del
+    // sidebar; se llega por el tile de Configuración → Tesorería, al lado del
+    // ABM de cajas (?tab=cajas), que es otra pantalla.
     {
       name: 'Conciliación',
       href: '/gestion/tesoreria/conciliacion',
@@ -352,32 +339,22 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Tesorería',
       description: 'Mapa de contactos y gastos'
     },
+    // NOTA: 'Contactos' (/gestion/tesoreria/contactos) salió del sidebar — es
+    // el padrón de personas y proveedores (ABM de referencia); se llega por el
+    // tile de Configuración → Tesorería.
     {
-      name: 'Contactos',
-      href: '/gestion/tesoreria/contactos',
-      icon: Users,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Personas y proveedores'
-    },
-    {
+      // Oculto por decisión de producto (2026-08-02). Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       name: 'Reportes',
       href: '/gestion/tesoreria/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      show: false,
       categoria: 'Tesorería',
       description: 'Egresos por caja, top conceptos, evolución'
     },
-    {
-      // Tarjetas de crédito con las que se pagan gastos — vive con Tesorería,
-      // no en Configuración general (movido en la reorg de módulos 2026-07).
-      name: 'Tarjetas',
-      href: '/gestion/tarjetas',
-      icon: Banknote,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Tarjetas de crédito para pagos'
-    },
+    // NOTA: 'Tarjetas' (/gestion/tarjetas) salió del sidebar — es un ABM de
+    // referencia (las tarjetas con las que se pagan gastos), se llega por el
+    // tile de Configuración → pestaña Tesorería.
     // === SUELDOS (flag propio desde la reorg 2026-07; antes cluster 'tesoreria') ===
     {
       name: 'Liquidaciones',

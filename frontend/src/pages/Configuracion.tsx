@@ -4,7 +4,8 @@ import {
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
   Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
   UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
-  Briefcase, PiggyBank, CalendarClock, Trees, Boxes, Hammer, MapPinned,
+  Briefcase, PiggyBank, CalendarClock, Trees, Boxes, Hammer, MapPinned, Package,
+  Banknote,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -647,6 +648,7 @@ export default function Configuracion() {
         { id: 'asignacion-dependencias', label: 'Asignación', description: 'Asignar categorías y tipos de trámite a dependencias', icon: Link2, color: '#f59e0b', link: '/gestion/asignacion-dependencias', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'categorias-reclamo', label: 'Categorías Reclamo', description: 'Tipos de reclamos del municipio: alumbrado, bacheo, etc', icon: FolderTree, color: '#8b5cf6', link: '/gestion/categorias-reclamo', show: isAdminOrSupervisor },
         { id: 'categorias-tramite', label: 'Categorías Trámite', description: 'Categorías de trámites del municipio: Obras, Comercio, etc', icon: FolderTree, color: '#10b981', link: '/gestion/categorias-tramite', show: isAdminOrSupervisor },
+        { id: 'inventario', label: 'Inventario', description: 'Vehículos, herramientas y materiales del municipio', icon: Package, color: '#0ea5e9', link: '/gestion/inventario', show: isAdminOrSupervisor && modulosActivos.includes('inventario') },
         { id: 'categorias-inventario', label: 'Categorías Inventario', description: 'Rubros del inventario: vehículos, herramientas, materiales', icon: Boxes, color: '#3b82f6', link: '/gestion/categorias-inventario', show: isAdminOrSupervisor },
         { id: 'tipos-trabajo', label: 'Tipos de Trabajo', description: 'Clasificación de las órdenes de trabajo: poda, bacheo, etc', icon: Hammer, color: '#8b5cf6', link: '/gestion/tipos-trabajo', show: isAdminOrSupervisor },
         { id: 'poi-tipos', label: 'Tipos de Punto de Interés', description: 'Categorías de puntos en el mapa: hospitales, escuelas, plazas, etc', icon: MapPinned, color: '#ef4444', link: '/gestion/poi-tipos', show: isAdminOrSupervisor && modulosActivos.includes('poi') },
@@ -670,10 +672,13 @@ export default function Configuracion() {
       items: [
         { id: 'tesoreria-conceptos', label: 'Conceptos de gasto', description: 'Lista plana de conceptos disponibles al cargar un gasto', icon: FileText, color: '#3b82f6', link: '/gestion/configuracion/tesoreria?tab=conceptos', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-tipos-empleado', label: 'Tipos de empleado', description: 'Sub-clasificación de empleados: albañil, MMO, arquitecto, jornalizado, etc', icon: UsersRound, color: '#06b6d4', link: '/gestion/configuracion/tesoreria?tab=tipos-empleado', show: isAdminOrSupervisor && !isSuperAdmin },
-        { id: 'tesoreria-cajas', label: 'Cajas / Fondos', description: 'FOFINDE, FODEMEP, FOMEP, Coparticipación. Saldo, ingresos y egresos', icon: PiggyBank, color: '#f59e0b', link: '/gestion/configuracion/tesoreria?tab=cajas', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-cajas', label: 'Cajas / Fondos', description: 'Alta de cajas con su saldo inicial y recargas: FOFINDE, FODEMEP, FOMEP', icon: PiggyBank, color: '#f59e0b', link: '/gestion/configuracion/tesoreria?tab=cajas', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-saldos', label: 'Cajas y Saldos', description: 'Saldo actual de cada caja con sus ingresos y egresos acumulados', icon: Wallet, color: '#f59e0b', link: '/gestion/tesoreria/cajas', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-contactos', label: 'Contactos', description: 'Padrón de personas y proveedores de tesorería', icon: Users, color: '#3b82f6', link: '/gestion/tesoreria/contactos', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-parajes', label: 'Parajes', description: 'Regiones del muni con polígono en el mapa', icon: Trees, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=parajes', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-proyectos', label: 'Proyectos', description: 'Obras e iniciativas que agrupan gastos (con presupuesto y % imputado)', icon: Briefcase, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=proyectos', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-agenda', label: 'Liquidaciones de sueldo', description: 'Sueldos y pagos recurrentes con premios + ejecución 1-click', icon: CalendarClock, color: '#ec4899', link: '/gestion/tesoreria/agenda', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-tarjetas', label: 'Tarjetas', description: 'Tarjetas de crédito con las que se pagan gastos', icon: Banknote, color: '#8b5cf6', link: '/gestion/tarjetas', show: isAdminOrSupervisor && !isSuperAdmin },
       ],
     },
     {
