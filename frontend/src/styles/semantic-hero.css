@@ -146,25 +146,31 @@
 .sh-seg--advertencia { color: var(--pl-amber-700); }
 .sh-seg--malo { color: var(--pl-red-700); }
 
+/* Pie de acciones: bajo el strip de KPIs, cerrando la tarjeta. */
+.sh-pie {
+  margin-top: 14px;
+}
+
 .sh-acciones {
   display: flex;
   gap: 8px;
-  margin-top: 2px;
   flex-wrap: wrap;
 }
 
+/* Estilo del diseño 2026-08-02: secundarias blancas con borde, primaria
+   SÓLIDA en el acento con texto on-brand. */
 .sh-accion {
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 13px;
+  height: 36px;
+  padding: 0 16px;
   border-radius: var(--pl-radius-md);
-  background: var(--pl-surface-2);
-  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
   font-family: var(--pl-font-sans);
   font-size: var(--pl-fs-body-sm);
   font-weight: 600;
-  color: var(--pl-text-3);
+  color: var(--pl-text-2);
   cursor: pointer;
   text-decoration: none;
   transition: background var(--pl-dur-ui) var(--pl-ease);
@@ -172,11 +178,12 @@
 .sh-accion:hover { background: var(--pl-surface-hover); text-decoration: none; }
 
 .sh-accion--primaria {
-  background: var(--pl-green-100);
-  border-color: var(--pl-green-200);
-  color: var(--pl-green-700);
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  color: var(--pl-on-brand);
+  box-shadow: var(--pl-shadow-card);
 }
-.sh-accion--primaria:hover { background: var(--pl-green-200); }
+.sh-accion--primaria:hover { background: var(--pl-green-700); }
 
 /* Strip de KPIs opcional (estilo del hero del mockup de Design: eyebrow en
    caps + numero display tabular, celdas separadas por hairline). */

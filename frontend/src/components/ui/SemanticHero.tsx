@@ -218,26 +218,6 @@ export function SemanticHero({
               )}
             </p>
 
-            {frase.acciones && frase.acciones.length > 0 && (
-              <div className="sh-acciones">
-                {frase.acciones.slice(0, 3).map((a, j) =>
-                  a.to ? (
-                    <Link key={j} to={a.to} className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}>
-                      {a.label}
-                    </Link>
-                  ) : (
-                    <button
-                      key={j}
-                      type="button"
-                      onClick={a.onClick}
-                      className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}
-                    >
-                      {a.label}
-                    </button>
-                  ),
-                )}
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -251,6 +231,43 @@ export function SemanticHero({
                 {k.valor}
               </span>
               {k.sub && <span className="sh-kpi-sub">{k.sub}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Acciones ABAJO del strip de KPIs (diseño 2026-08-02): cierran la
+          tarjeta como fila de CTAs. Son DE la frase activa, así que van en
+          una pila espejada con la de frases — misma celda de grid,
+          visibility para altura estable y fundido al rotar. */}
+      {validas.some((f) => f.acciones && f.acciones.length > 0) && (
+        <div className={`sh-stack sh-stack--${sentido} sh-pie`}>
+          {validas.map((frase, i) => (
+            <div
+              key={i}
+              className={`sh-slide ${i === actual ? 'sh-slide--activo' : ''}`}
+              aria-hidden={i !== actual}
+            >
+              {frase.acciones && frase.acciones.length > 0 && (
+                <div className="sh-acciones">
+                  {frase.acciones.slice(0, 3).map((a, j) =>
+                    a.to ? (
+                      <Link key={j} to={a.to} className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}>
+                        {a.label}
+                      </Link>
+                    ) : (
+                      <button
+                        key={j}
+                        type="button"
+                        onClick={a.onClick}
+                        className={`sh-accion ${a.primaria ? 'sh-accion--primaria' : ''}`}
+                      >
+                        {a.label}
+                      </button>
+                    ),
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
