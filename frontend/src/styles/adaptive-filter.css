@@ -285,6 +285,137 @@
   margin-left: 5px;
 }
 
+/* ---------- control 'multi' (composición fija + panel checkboxes) --- */
+
+/* Count dentro de la píldora: tabular, más tenue que el label. */
+.af-pill-count {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+.af-pill--activa .af-pill-count {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* Botón "+K más": misma piel que una píldora, chevron que gira abierto. */
+.af-pill--vermas[aria-expanded='true'] .af-pill-x {
+  transform: rotate(180deg);
+}
+.af-pill--vermas .af-pill-x {
+  transition: transform var(--pl-dur-ui) var(--pl-ease);
+}
+
+/* Panel de checkboxes: dropdown vertical bajo la fila (no la barra
+   horizontal de los otros paneles). */
+.af-panel--multi {
+  inset: auto auto auto 10px;
+  top: calc(100% - 6px);
+  width: 300px;
+  max-width: calc(100% - 20px);
+  max-height: 340px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px;
+  z-index: 30;
+}
+
+.af-mpanel-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 6px;
+}
+
+.af-mpanel-limpiar {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--pl-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  padding: 2px 4px;
+  border-radius: var(--pl-radius-sm);
+}
+.af-mpanel-limpiar:hover {
+  text-decoration: underline;
+}
+.af-mpanel-limpiar:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: 1px;
+}
+
+.af-mcheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--pl-radius-sm);
+  cursor: pointer;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+  text-align: left;
+}
+.af-mcheck:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+.af-mcheck:focus-visible {
+  outline: 2px solid var(--pl-text-3);
+  outline-offset: -2px;
+}
+
+/* Checkbox propio (los nativos están vetados: rompen el theme). */
+.af-mcheck-caja {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--pl-border-strong);
+  background: var(--pl-surface);
+  color: transparent;
+  transition:
+    background-color var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.af-mcheck-caja > svg {
+  width: 12px;
+  height: 12px;
+}
+.af-mcheck-caja--on {
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  color: var(--pl-on-brand);
+}
+
+.af-mcheck-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.af-mcheck-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+
 /* ---------- control de overflow "+K" ---------- */
 /* Compacto y al contenido: entra al final del grupo cuando alguna píldora
    no llegó a la línea. Su ancho lo MIDE el .tsx en el fantasma (por eso

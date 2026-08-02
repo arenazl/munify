@@ -88,12 +88,15 @@
  * cálculo, mismo resultado.
  */
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Filter, Search, SlidersHorizontal, X, type LucideIcon } from 'lucide-react';
+import { Check, ChevronDown, Filter, Search, SlidersHorizontal, X, type LucideIcon } from 'lucide-react';
 import { ModernSelect } from './ModernSelect';
 
 export interface AdaptiveFilterOption {
   value: string;
   label: string;
+  /** Cantidad asociada (reclamos, registros…). La muestran las píldoras y el
+   *  panel del control 'multi', y define qué opciones son "las importantes". */
+  count?: number;
 }
 
 /** Fila donde vive el control: 1 = superior, 2 = bajo el hairline. */
@@ -123,6 +126,26 @@ export interface AdaptiveControlOpciones extends AdaptiveControlBase {
   /** Valor seleccionado; '' = todas. */
   value: string;
   onChange: (value: string) => void;
+}
+
+/**
+ * Selección MÚLTIPLE con composición FIJA — el control definitivo del filtro
+ * por categorías (2026-08-02): `Todas {total}` + las N opciones más
+ * importantes (mayor `count`) como píldoras SIEMPRE visibles + un botón
+ * `+K más` que abre el panel de checkboxes donde se elige el resto.
+ * El tamaño se conoce de antemano: la fila no se reacomoda por espacio (el
+ * fantasma la mide entera como un bloque). `values` vacío = todas.
+ */
+export interface AdaptiveControlMulti extends AdaptiveControlBase {
+  tipo: 'multi';
+  /** Rótulo del panel (se muestra en caps) y aria del grupo. */
+  placeholder: string;
+  opciones: AdaptiveFilterOption[];
+  /** Valores seleccionados; [] = todas. */
+  values: string[];
+  onChange: (values: string[]) => void;
+  /** Píldoras fijas a la vista (las de mayor count). Default 3. */
+  fijas?: number;
 }
 
 /** 2-4 opciones excluyentes que se ven SIEMPRE juntas (segmented control). */
@@ -170,9 +193,10 @@ export interface AdaptiveControlBusqueda extends AdaptiveControlBase {
   anchoMinimo?: number;
 }
 
-/** Los cinco controles atómicos. Son los únicos que pueden vivir en un grupo. */
+/** Los controles atómicos. Son los únicos que pueden vivir en un grupo. */
 export type AdaptiveControlSimple =
   | AdaptiveControlOpciones
+  | AdaptiveControlMulti
   | AdaptiveControlToggles
   | AdaptiveControlAccion
   | AdaptiveControlIcono
@@ -266,6 +290,20 @@ const opcionTodas = (c: AdaptiveControlOpciones): AdaptiveFilterOption => ({
 /** Píldoras de un grupo: SUS opciones, sin sintéticas. */
 const pillsDe = (c: AdaptiveControlOpciones): AdaptiveFilterOption[] => c.opciones;
 
+/** Píldoras fijas del control 'multi' (default 3: "las más importantes"). */
+const FIJAS_DEFAULT = 3;
+
+/** Opciones del 'multi' por importancia: count desc; sin counts, orden
+ *  natural. El orden decide qué píldoras quedan SIEMPRE visibles. */
+const ordenarMulti = (c: AdaptiveControlMulti): AdaptiveFilterOption[] =>
+  c.opciones.some((o) => typeof o.count === 'number')
+    ? [...c.opciones].sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    : c.opciones;
+
+/** Alterna un valor dentro de la selección del 'multi'. */
+const alternarMulti = (c: AdaptiveControlMulti, v: string) =>
+  c.onChange(c.values.includes(v) ? c.values.filter((x) => x !== v) : [...c.values, v]);
+
 const noop = () => {};
 
 /**
@@ -297,6 +335,7 @@ interface MedidaGrupo {
 /** Medidas de un control, por variante. El grupo etiquetado es recursivo. */
 type MedidaItem =
   | { tipo: 'opciones'; grupo: MedidaGrupo; sel: number }
+  | { tipo: 'multi'; ancho: number }
   | { tipo: 'toggles'; seg: number; combo: number }
   | { tipo: 'accion'; full: number; icono: number }
   | { tipo: 'icono'; ancho: number }
@@ -465,6 +504,10 @@ function anchoFijo(items: MedidaItem[], e: EstadoFila): number {
     switch (it.tipo) {
       case 'opciones':
         break; // lo resuelve `repartirGrupos` con el neto
+      case 'multi':
+        // Composición fija: no degrada, su ancho es conocido de antemano.
+        total += it.ancho;
+        break;
       case 'toggles':
         total += e.toggles === 'seg' ? it.seg : it.combo;
         break;
@@ -560,7 +603,7 @@ const leerGap = (el: Element, fallback: number): number => {
 
 /** Bloques de contexto: entre dos consecutivos va un divisor vertical. */
 const esBloque = (c: AdaptiveControl): boolean =>
-  c.tipo === 'opciones' || c.tipo === 'toggles' || c.tipo === 'grupo';
+  c.tipo === 'opciones' || c.tipo === 'multi' || c.tipo === 'toggles' || c.tipo === 'grupo';
 
 interface ItemFila {
   control: AdaptiveControl;
@@ -679,6 +722,12 @@ export function AdaptiveFilter({
       if (c.tipo === 'opciones' || c.tipo === 'toggles') {
         const etiqueta = c.tipo === 'opciones' ? c.placeholder : (c.etiqueta ?? '');
         return `${base}#${c.value}#${etiqueta}#${c.opciones.map((o) => o.label).join('~')}`;
+      }
+      if (c.tipo === 'multi') {
+        // Los counts pesan en el ancho de las píldoras: van a la firma.
+        return `${base}#${c.values.join(',')}#${c.placeholder}#${c.opciones
+          .map((o) => `${o.label}:${o.count ?? ''}`)
+          .join('~')}`;
       }
       if (c.tipo === 'busqueda') return `${base}#${c.anchoIdeal ?? ''}#${c.anchoMinimo ?? ''}`;
       // 'accion' | 'icono': sólo la acción tiene badge.
@@ -823,6 +872,60 @@ export function AdaptiveFilter({
       />
     </div>
   );
+
+  /** Control 'multi': composición FIJA `Todas {total}` + top-N + `+K más`.
+   *  No degrada: el fantasma lo mide entero como un solo bloque. */
+  const multiControl = (c: AdaptiveControlMulti, viva: boolean, medida?: string) => {
+    const ordenadas = ordenarMulti(c);
+    const fijas = ordenadas.slice(0, Math.max(1, c.fijas ?? FIJAS_DEFAULT));
+    const resto = ordenadas.length - fijas.length;
+    const total = c.opciones.reduce((a, o) => a + (o.count ?? 0), 0);
+    return (
+      <div className="af-grupo af-multi" role="group" aria-label={c.placeholder} data-af-med={medida}>
+        <button
+          type="button"
+          className="af-pill"
+          title={`Todas — limpiar ${c.placeholder.toLowerCase()}`}
+          aria-pressed={c.values.length === 0}
+          tabIndex={viva ? undefined : -1}
+          onClick={viva ? () => c.onChange([]) : undefined}
+        >
+          Todas
+          {total > 0 && <span className="af-pill-count">{total}</span>}
+        </button>
+        {fijas.map((o) => {
+          const activa = c.values.includes(o.value);
+          return (
+            <button
+              key={o.value}
+              type="button"
+              className={`af-pill${activa ? ' af-pill--activa' : ''}`}
+              title={o.label}
+              aria-pressed={activa}
+              tabIndex={viva ? undefined : -1}
+              onClick={viva ? () => alternarMulti(c, o.value) : undefined}
+            >
+              {abreviar(o.label, abreviaturas)}
+              {typeof o.count === 'number' && <span className="af-pill-count">{o.count}</span>}
+            </button>
+          );
+        })}
+        {resto > 0 && (
+          <button
+            type="button"
+            className="af-pill af-pill--vermas"
+            aria-haspopup="true"
+            aria-expanded={viva && panel === c.id}
+            tabIndex={viva ? undefined : -1}
+            onClick={viva ? () => setPanel((a) => (a === c.id ? null : c.id)) : undefined}
+          >
+            +{resto} más
+            <ChevronDown className="af-pill-x" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   const toggles = (c: AdaptiveControlToggles, viva: boolean, medida?: string) => (
     <div className="af-toggles" role="group" aria-label={c.etiqueta || undefined} data-af-med={medida}>
@@ -974,6 +1077,8 @@ export function AdaptiveFilter({
     switch (c.tipo) {
       case 'opciones':
         return p?.modo === 'combo' ? grupoCombo(c, true) : grupoPills(c, p, true);
+      case 'multi':
+        return multiControl(c, true);
       case 'toggles':
         return plan?.toggles === 'combo' ? togglesCombo(c, true) : toggles(c, true);
       case 'accion':
@@ -992,6 +1097,8 @@ export function AdaptiveFilter({
     switch (c.tipo) {
       case 'opciones':
         return grupoPills(c, null, false);
+      case 'multi':
+        return multiControl(c, false, `${c.id}:multi`);
       case 'toggles':
         return (
           <>
@@ -1125,8 +1232,44 @@ export function AdaptiveFilter({
                 de un grupo que colapsó. Es ABSOLUTO, así que no compite por el
                 ancho y no realimenta la medición. */}
             {abierto && filaConPanel?.id === fila.id && (
-              <div className="af-panel" ref={panelRef}>
-                {abierto.tipo === 'busqueda' ? (
+              <div
+                className={`af-panel${abierto.tipo === 'multi' ? ' af-panel--multi' : ''}`}
+                ref={panelRef}
+              >
+                {abierto.tipo === 'multi' ? (
+                  <>
+                    <div className="af-mpanel-cab">
+                      <span className="af-rotulo">{abierto.placeholder}</span>
+                      <button
+                        type="button"
+                        className="af-mpanel-limpiar"
+                        onClick={() => abierto.onChange([])}
+                      >
+                        Limpiar
+                      </button>
+                    </div>
+                    {ordenarMulti(abierto).map((o) => {
+                      const activa = abierto.values.includes(o.value);
+                      return (
+                        <button
+                          key={o.value}
+                          type="button"
+                          className="af-mcheck"
+                          aria-pressed={activa}
+                          onClick={() => alternarMulti(abierto, o.value)}
+                        >
+                          <span className={`af-mcheck-caja${activa ? ' af-mcheck-caja--on' : ''}`}>
+                            {activa && <Check aria-hidden="true" />}
+                          </span>
+                          <span className="af-mcheck-label">{o.label}</span>
+                          {typeof o.count === 'number' && (
+                            <span className="af-mcheck-count">{o.count}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </>
+                ) : abierto.tipo === 'busqueda' ? (
                   <>
                     <Search className="af-ico af-ico--tenue" aria-hidden="true" />
                     <input
@@ -1150,14 +1293,18 @@ export function AdaptiveFilter({
                     ))}
                   </>
                 ) : null}
-                <button
-                  type="button"
-                  className="af-panel-cerrar"
-                  aria-label="Cerrar"
-                  onClick={() => setPanel(null)}
-                >
-                  <X className="af-ico" aria-hidden="true" />
-                </button>
+                {/* El panel del 'multi' no lleva X: se elige de a varios y se
+                    cierra con click afuera; el reset es "Limpiar". */}
+                {abierto.tipo !== 'multi' && (
+                  <button
+                    type="button"
+                    className="af-panel-cerrar"
+                    aria-label="Cerrar"
+                    onClick={() => setPanel(null)}
+                  >
+                    <X className="af-ico" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1202,6 +1349,10 @@ function medirSimple(
       sel,
       grupo: { gap: leerGap(el, GAP_PILL_FALLBACK), pills, mas },
     };
+  }
+  if (c.tipo === 'multi') {
+    const ancho = anchos.get(`${c.id}:multi`) ?? 0;
+    return ancho ? { tipo: 'multi', ancho } : null;
   }
   if (c.tipo === 'toggles') {
     const seg = anchos.get(`${c.id}:seg`) ?? 0;

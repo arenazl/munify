@@ -10,7 +10,7 @@ import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth, type Municipio } from '../contexts/AuthContext';
 import { ChartSkeleton } from '../components/ui/Skeleton';
-import { AdaptiveFilter, type AdaptiveFilterGroup } from '../components/ui/AdaptiveFilter';
+import { AdaptiveFilter, type AdaptiveControl, type AdaptiveFilterGroup } from '../components/ui/AdaptiveFilter';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { FocosRotativos, type Foco } from '../components/dashboard/FocosRotativos';
 import { seg, type HeroFrase } from '../lib/semanticHero';
@@ -288,7 +288,8 @@ export default function Dashboard() {
   // Analytics avanzados
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   /** Categoría elegida en la botonera de Concentración; null = todas. */
-  const [catConcentracion, setCatConcentracion] = useState<string | null>(null);
+  // Multi-selección: [] = todas las categorías (default del control 'multi').
+  const [catsConcentracion, setCatsConcentracion] = useState<string[]>([]);
   const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
   // La lista en si no se muestra: lo que se usa es el conteo del fetch.
   const [, setReclamosSimilares] = useState<ReclamoSimilarGrupo[]>([]);
@@ -685,42 +686,45 @@ export default function Dashboard() {
     return frases;
   }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats]);
 
-  // ---- Concentración: botonera de categorías DINÁMICA por municipio ----
-  // Las de más volumen de ESTE municipio. En uno pesa la basura y en otro el
-  // alumbrado; la botonera se arma sola con lo que cada uno tiene, sin ninguna
-  // lista fija en el código. Se ofrecen SEIS: con menos, un municipio con diez
-  // categorías activas deja casi todas escondidas detrás del "+N". Las que no
-  // entren en el ancho las manda ahí AdaptiveFilter, que para eso mide.
-  const categoriasConcentracion = useMemo(
-    () => porCategoria.slice(0, 6).map((c) => c.categoria),
-    [porCategoria],
-  );
-
-  const gruposConcentracion = useMemo<AdaptiveFilterGroup[]>(
+  // ---- Concentración: filtro de categorías DINÁMICO por municipio ----
+  // Control 'multi' definitivo: van TODAS las categorías del muni con su
+  // count; el control muestra las 3 más importantes como píldoras fijas y el
+  // resto se elige desde el panel "+N más". En un muni pesa la basura y en
+  // otro el alumbrado; se arma solo, sin lista fija en el código.
+  const controlesConcentracion = useMemo<AdaptiveControl[]>(
     () => [
       {
+        tipo: 'multi',
         id: 'concentracion-categoria',
-        placeholder: 'Todas las categorías',
-        options: categoriasConcentracion.map((c) => ({ value: c, label: c })),
-        value: catConcentracion ?? '',
-        onChange: (v) => setCatConcentracion(v || null),
+        placeholder: 'Categorías',
+        opciones: porCategoria.map((c) => ({
+          value: c.categoria,
+          label: c.categoria,
+          count: c.cantidad,
+        })),
+        values: catsConcentracion,
+        onChange: setCatsConcentracion,
       },
     ],
-    [categoriasConcentracion, catConcentracion],
+    [porCategoria, catsConcentracion],
   );
 
   // El heatmap trae la categoría en cada punto, así que el filtro es local:
   // no hace falta ir de nuevo al backend para cambiar de categoría.
   const heatmapFiltrado = useMemo(
-    () => (catConcentracion ? heatmapData.filter((p) => p.categoria === catConcentracion) : heatmapData),
-    [heatmapData, catConcentracion],
+    () =>
+      catsConcentracion.length
+        ? heatmapData.filter((p) => catsConcentracion.includes(p.categoria))
+        : heatmapData,
+    [heatmapData, catsConcentracion],
   );
 
   // Los focos que el mapa RECORRE. Cuatro, como las categorías de la botonera:
   // el listado largo hacía crecer la tarjeta y rompía la simetría de la fila.
   const focosConcentracion = useMemo<Foco[]>(() => {
-    const base = catConcentracion
-      ? recurrentes.filter((r) => r.categorias?.includes(catConcentracion))
+    const filtrando = catsConcentracion.length > 0;
+    const base = filtrando
+      ? recurrentes.filter((r) => r.categorias?.some((c) => catsConcentracion.includes(c)))
       : recurrentes;
     return base.slice(0, 4).map((r) => ({
       direccion: r.direccion,
@@ -728,13 +732,13 @@ export default function Dashboard() {
       cantidad: r.cantidad,
       lat: r.lat,
       lng: r.lng,
-      // Con "todas" seleccionado se aclara qué categoría pesa en esa esquina;
-      // con una categoría ya elegida sería repetir lo mismo.
-      categoriaTop: catConcentracion ? null : r.categoria_top,
-      categoriaTopCantidad: catConcentracion ? undefined : r.categoria_top_cantidad,
+      // Con "todas" se aclara qué categoría pesa en esa esquina; filtrando
+      // por categorías elegidas sería repetir lo mismo.
+      categoriaTop: filtrando ? null : r.categoria_top,
+      categoriaTopCantidad: filtrando ? undefined : r.categoria_top_cantidad,
       diasMasViejo: r.dias_mas_viejo,
     }));
-  }, [recurrentes, catConcentracion]);
+  }, [recurrentes, catsConcentracion]);
 
   // Matices del puente de tokens (--pl-*), leídos del :root: recharts necesita
   // colores concretos, así que los sacamos de los MISMOS tokens que usa el CSS
@@ -1061,15 +1065,18 @@ export default function Dashboard() {
                 "punto" del mapa ni qué hacer con el número. En su lugar, lo
                 que se está mirando, dicho en castellano. */}
             <span className="dv2-card-caption dv2-card-caption--auto">
-              {catConcentracion ?? 'Todas las categorías'}
+              {catsConcentracion.length === 0
+                ? 'Todas las categorías'
+                : catsConcentracion.length === 1
+                  ? catsConcentracion[0]
+                  : `${catsConcentracion.length} categorías`}
             </span>
           </div>
-          {/* Botonera en vez de combo: un combo esconde las opciones y hay
-              que abrirlo para saber qué se puede ver. Las categorías salen
-              del VOLUMEN REAL de este municipio, así que cada uno ve las
-              suyas. Si no entran, AdaptiveFilter las manda al "+N" solo. */}
-          {categoriasConcentracion.length > 0 && (
-            <AdaptiveFilter groups={gruposConcentracion} />
+          {/* Control 'multi' definitivo: las 3 categorías de más volumen del
+              muni como píldoras fijas con su count, el resto se elige en el
+              panel "+N más". Multi-selección; [] = todas. */}
+          {porCategoria.length > 0 && (
+            <AdaptiveFilter controles={controlesConcentracion} />
           )}
           {/* El mapa RECORRE los focos como un reproductor: se centra en cada
               esquina y cuenta qué pasa ahí. Antes iba un listado debajo, que
