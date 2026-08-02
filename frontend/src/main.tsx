@@ -38,6 +38,7 @@ import './styles/kpi-semantico.css'
 // componente del KIT: barra de filtros de una sola línea (pills ⇄ combos)
 import './styles/adaptive-filter.css'
 import './styles/reclamo-sheet.css'
+import './styles/gasto-sheet.css'
 // componente del KIT: carrusel de cards de altura fija (N por vista medido)
 import './styles/card-carousel.css'
 // componente del KIT: promedio + estrellas + distribución de una calificación
