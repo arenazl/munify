@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, FileCheck, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, Camera, Sparkles, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Loader2, Wrench, ExternalLink, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star, RotateCcw } from 'lucide-react';
+import { MapPin, Calendar, CheckCircle, XCircle, Clock, Eye, User, FileCheck, AlertTriangle, AlertCircle, Building2, Camera, Sparkles, Loader2, Wrench, ExternalLink, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star, RotateCcw, ChevronLeft, ChevronRight, X, Check, MoveRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, dashboardApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi, calificacionesApi, poiApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMTextarea, ABMField, ABMInfoPanel, ABMCollapsible } from '../components/ui/ABMPage';
+import { ABMTextarea, ABMInfoPanel, ABMCollapsible } from '../components/ui/ABMPage';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { seg, type HeroAccion, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
@@ -38,13 +38,13 @@ import { haceCuanto, tonoDeEstado } from '../lib/filaLista-helpers';
 // tomando del adaptador {bg,text} de ReclamoCard: el Sheet del monolito accede a `.bg`
 // (el SSoT expone color plano vía estadoColor(); no reescribimos la lógica del monolito acá).
 import { estadoLabels } from '../lib/enums/reclamo';
-import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
+import { CANAL_OPTIONS, canalColors, canalLabel } from '../lib/enums/canal';
 import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
 import { prioridadColor, prioridadLabel, prioridadIcon, PRIORIDAD_OPTIONS, prioridadRankOf, prioridadSeverityColor } from '../lib/enums/prioridad';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
 import { CandidatosAsignacion, type SugerenciaAsignacion, type CandidatoDisponibilidad } from '../components/reclamos/CandidatosAsignacion';
-import type { Reclamo, Empleado, EstadoReclamo, Categoria, OrdenTrabajo, PoiConsolidarResponse } from '../types';
+import type { Reclamo, Empleado, Categoria, OrdenTrabajo, PoiConsolidarResponse } from '../types';
 
 // Fecha de vencimiento estimada de un reclamo = created_at + tiempo_estimado_dias
 // (o el SLA de la categoría, fallback 30 días). Compartida entre el cálculo de
@@ -161,61 +161,7 @@ function CalificacionVecinoPanel({ calificacion }: { calificacion: CalificacionV
   );
 }
 
-// Función para obtener el icono del estado
-const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
-  switch (estado) {
-    case 'nuevo': return <Sparkles className="h-3 w-3" />;
-    case 'recibido': return <CheckCircle2 className="h-3 w-3" />;
-    case 'asignado': return <UserPlus className="h-3 w-3" />;
-    case 'en_curso': return <Play className="h-3 w-3" />;
-    case 'resuelto': return <CheckCircle className="h-3 w-3" />;
-    case 'finalizado': return <CheckCircle className="h-3 w-3" />;
-    case 'pospuesto': return <Clock className="h-3 w-3" />;
-    case 'rechazado': return <XCircle className="h-3 w-3" />;
-    default: return null;
-  }
-};
-
-// Iconos por categoría
-const categoryIcons: Record<string, React.ReactNode> = {
-  'alumbrado': <Zap className="h-5 w-5" />,
-  'bache': <Construction className="h-5 w-5" />,
-  'calle': <Construction className="h-5 w-5" />,
-  'agua': <Droplets className="h-5 w-5" />,
-  'cloaca': <Droplets className="h-5 w-5" />,
-  'desague': <Droplets className="h-5 w-5" />,
-  'arbolado': <TreeDeciduous className="h-5 w-5" />,
-  'espacio': <Leaf className="h-5 w-5" />,
-  'verde': <Leaf className="h-5 w-5" />,
-  'basura': <Trash2 className="h-5 w-5" />,
-  'residuo': <Recycle className="h-5 w-5" />,
-  'recolec': <Recycle className="h-5 w-5" />,
-  'limpieza': <Brush className="h-5 w-5" />,
-  'transito': <Car className="h-5 w-5" />,
-  'señal': <Signpost className="h-5 w-5" />,
-  'plaga': <Bug className="h-5 w-5" />,
-  'edificio': <Building2 className="h-5 w-5" />,
-  'semaforo': <TrafficCone className="h-5 w-5" />,
-  'inundacion': <CloudRain className="h-5 w-5" />,
-  'ruido': <Volume2 className="h-5 w-5" />,
-  'animal': <Dog className="h-5 w-5" />,
-  'obra': <Construction className="h-5 w-5" />,
-  'terreno': <Fence className="h-5 w-5" />,
-  'usurpacion': <Home className="h-5 w-5" />,
-  'vandalismo': <PaintBucket className="h-5 w-5" />,
-  'vereda': <Footprints className="h-5 w-5" />,
-  'default': <AlertTriangle className="h-5 w-5" />,
-};
-
 const DEFAULT_CATEGORY_COLOR = '#64748b'; // Color por defecto - los colores reales vienen de la DB
-
-function getCategoryIcon(nombre: string): React.ReactNode {
-  const key = nombre.toLowerCase();
-  for (const [k, icon] of Object.entries(categoryIcons)) {
-    if (key.includes(k)) return icon;
-  }
-  return categoryIcons.default;
-}
 
 
 // Resuelve el icono lucide de una categoría a partir de su campo `icono` (nombre
@@ -1776,135 +1722,137 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             consolidarlo en LA orden de trabajo de esa zona. Mismo estilo que los
             demás banners de ayuda (deriva de theme.primary, sin hex inline). */}
         {showPoiBanner && poiZona && (
-          <div className="av2-banner-zona">
-            <div className="flex items-start gap-3">
-              <div className="av2-banner-zona-icono">
-                <DynamicIcon name="MapPinned" className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="av2-banner-zona-titulo">
+          <div className="rs-banner">
+            <span className="rs-banner-icono">
+              <span className="rs-latido" />
+              <MapPin className="h-4 w-4" />
+            </span>
+            <span className="rs-banner-cuerpo">
+              <span className="rs-banner-texto">
+                <strong>
                   Está en la zona de {poiZona.nombre}
-                  {poiZona.tipo_nombre ? ` · ${poiZona.tipo_nombre}` : ''}
-                </h3>
-                <p className="av2-banner-zona-texto">
-                  Podés agrupar este reclamo con los demás de la zona en una sola orden de trabajo. Se atienden juntos y no se pierde ninguno.
-                </p>
-                <button
-                  onClick={handleConsolidarPOI}
-                  disabled={consolidandoPOI}
-                  className="av2-btn-primario mt-2.5"
-                >
-                  {consolidandoPOI ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <DynamicIcon name="Layers" className="h-3.5 w-3.5" />
-                  )}
-                  {consolidandoPOI ? 'Consolidando…' : 'Consolidar en OT de zona'}
-                </button>
-              </div>
-            </div>
+                  {poiZona.tipo_nombre ? ` · ${poiZona.tipo_nombre}` : ''}.
+                </strong>{' '}
+                Podés agrupar este reclamo con los demás de la zona en una sola orden: se atienden juntos y no se pierde ninguno.
+              </span>
+              <button
+                type="button"
+                className="rs-banner-accion"
+                onClick={handleConsolidarPOI}
+                disabled={consolidandoPOI}
+              >
+                {consolidandoPOI ? 'Consolidando…' : 'Consolidar en OT de zona'}
+                {consolidandoPOI
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <MoveRight className="h-3.5 w-3.5" />}
+              </button>
+            </span>
           </div>
         )}
 
-        {/* Zona si existe */}
-        {selectedReclamo.zona && (
-          <ABMField
-            label="Zona"
-            value={selectedReclamo.zona.nombre}
-            icon={<MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          />
-        )}
-
-        <ABMField
-          label="Dirección"
-          value={selectedReclamo.referencia ? `${selectedReclamo.direccion} (Ref: ${selectedReclamo.referencia})` : selectedReclamo.direccion}
-          icon={<MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          fullWidth
-        />
-
-        {/* Descripción en su propio panel colapsable */}
-        <ABMCollapsible
-          title="Descripción del Reclamo"
-          icon={<FileText className="h-4 w-4" />}
-          defaultOpen={true}
-        >
-          <p className="text-sm leading-relaxed" style={{ color: theme.text }}>
-            {selectedReclamo.descripcion}
-          </p>
-        </ABMCollapsible>
-
-        {/* Datos del vecino — colapsado por default. El supervisor rara
-            vez necesita los datos personales para avanzar el reclamo;
-            cuando los necesita (llamarlo, mandarle mail) los expande. */}
-        <ABMCollapsible
-          title={`Datos del Vecino · ${selectedReclamo.creador.nombre} ${selectedReclamo.creador.apellido}`}
-          icon={<User className="h-4 w-4" />}
-          defaultOpen={false}
-        >
-          <ABMField
-            label="Email"
-            value={selectedReclamo.creador.email}
-            icon={<Mail className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          />
-          {selectedReclamo.creador.telefono && (
-            <ABMField
-              label="Teléfono"
-              value={selectedReclamo.creador.telefono}
-              icon={<Phone className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-            />
-          )}
-        </ABMCollapsible>
-
-        {/* Dependencia asignada */}
-        {selectedReclamo.dependencia_asignada?.nombre && (
-          <ABMInfoPanel
-            title="Asignado a"
-            icon={
-              <div
-                className="w-6 h-6 rounded flex items-center justify-center"
-                style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
-              >
-                <DynamicIcon
-                  name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
-                  className="h-3.5 w-3.5"
-                  style={{ color: '#ffffff' }}
-                />
-              </div>
-            }
-            variant="info"
-          >
-            <ABMField
-              label="Dependencia"
-              value={selectedReclamo.dependencia_asignada.nombre}
-              icon={
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
+        {/* Qué dice el vecino — la descripción manda; las fotos, abajo. */}
+        <div className="rs-seccion">
+          <span className="rs-seccion-titulo">Qué dice el vecino</span>
+          <p className="rs-parrafo">"{selectedReclamo.descripcion}"</p>
+          {(selectedReclamo.imagenes?.length ?? 0) > 0 && (
+            <div className="rs-fotos">
+              {selectedReclamo.imagenes!.slice(0, 2).map((img, i) => (
+                <a key={i} href={img} target="_blank" rel="noreferrer" className="rs-foto" title="Ver foto">
+                  <img src={img} alt={`Foto ${i + 1} del reclamo`} loading="lazy" />
+                </a>
+              ))}
+              {selectedReclamo.imagenes!.length > 2 && (
+                <a
+                  href={selectedReclamo.imagenes![2]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rs-foto rs-foto--mas"
+                  title="Ver más fotos"
                 >
-                  <DynamicIcon
-                    name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
-                    className="h-3 w-3"
-                    style={{ color: '#ffffff' }}
-                  />
-                </div>
-              }
-            />
-            {/* Mostrar tiempo estimado si ya fue recibido */}
-            {selectedReclamo.estado === 'recibido' && selectedReclamo.fecha_estimada_resolucion && (
-              <ABMField
-                label="Resolución estimada"
-                value={new Date(selectedReclamo.fecha_estimada_resolucion).toLocaleString('es-AR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-                icon={<Clock className="h-4 w-4" style={{ color: theme.primary }} />}
-              />
+                  +{selectedReclamo.imagenes!.length - 2}
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* DÓNDE / QUIÉN LO REPORTÓ — dos columnas, datos reales. */}
+        <div className="rs-grid2">
+          <span className="min-w-0">
+            <span className="rs-mini-eyebrow">Dónde</span>
+            <span className="rs-dato">{selectedReclamo.direccion}</span>
+            {(selectedReclamo.zona || selectedReclamo.referencia) && (
+              <span className="rs-dato-sub">
+                {[selectedReclamo.zona?.nombre, selectedReclamo.referencia ? `Ref: ${selectedReclamo.referencia}` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
             )}
-          </ABMInfoPanel>
-        )}
+            <button
+              type="button"
+              className="rs-mini-link"
+              onClick={() => { closeSheet(); navigate('/gestion/mapa'); }}
+            >
+              Ver en el mapa
+            </button>
+          </span>
+          <span className="min-w-0">
+            <span className="rs-mini-eyebrow">Quién lo reportó</span>
+            <span className="rs-persona">
+              <span className="rs-avatar">
+                {`${selectedReclamo.creador.nombre?.[0] ?? ''}${selectedReclamo.creador.apellido?.[0] ?? ''}`.toUpperCase() || '?'}
+              </span>
+              <span className="rs-persona-datos">
+                <span className="rs-persona-nombre">
+                  {selectedReclamo.creador.nombre} {selectedReclamo.creador.apellido}
+                </span>
+                <span className="rs-dato-sub">
+                  {selectedReclamo.creador.telefono || selectedReclamo.creador.email}
+                </span>
+              </span>
+            </span>
+          </span>
+        </div>
+
+        {/* Por dónde pasó — entrada por canal → responsable actual. */}
+        <div className="rs-seccion">
+          <div className="rs-seccion-cab">
+            <span className="rs-seccion-titulo">Por dónde pasó</span>
+          </div>
+          <div className="mt-3">
+            <div className="rs-tl">
+              <span className="rs-tl-col">
+                <span className="rs-tl-dot" />
+                <span className="rs-tl-linea" />
+              </span>
+              <span className="rs-tl-txt">
+                Ingresó por {(canalLabel(selectedReclamo.canal) || selectedReclamo.canal || 'web').toLowerCase()}
+                <span className="rs-tl-sub">
+                  {new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {new Date(selectedReclamo.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </span>
+            </div>
+            <div className="rs-tl">
+              <span className="rs-tl-col">
+                <span className={`rs-tl-dot${selectedReclamo.dependencia_asignada ? ' rs-tl-dot--actual' : ''}`}>
+                  {selectedReclamo.dependencia_asignada && <span className="rs-latido" />}
+                </span>
+              </span>
+              <span className={`rs-tl-txt${selectedReclamo.dependencia_asignada ? ' rs-tl-txt--actual' : ''}`}>
+                {selectedReclamo.dependencia_asignada?.nombre || 'Sin dependencia asignada todavía'}
+                <span className="rs-tl-sub">
+                  {selectedReclamo.dependencia_asignada
+                    ? (selectedReclamo.estado === 'recibido' && selectedReclamo.fecha_estimada_resolucion
+                        ? `Responsable actual · resolución estimada ${new Date(selectedReclamo.fecha_estimada_resolucion).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`
+                        : 'Responsable actual')
+                    : 'Se asigna desde el selector de acá abajo'}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Asignar responsable — polimórfico (cuadrilla o empleado) + vínculo guiado
             a Orden de Trabajo. Una cuadrilla no tiene campo directo en Reclamo, así
@@ -1944,12 +1892,18 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
               { value: '__nueva__', label: '+ Nueva orden de trabajo' },
             ];
             return (
-              <ABMCollapsible
+              <div
                 key={`resp-${selectedReclamo.id}-${hayAlgo ? 'o' : 'c'}`}
-                title={hayAlgo ? 'Asignar trabajo (opcional)' : 'Asignar trabajo — sin candidatos'}
-                icon={<UserPlus className="h-4 w-4" />}
-                defaultOpen={hayAlgo}
+                className="rs-seccion rs-seccion--ultima"
               >
+                <div className="rs-seccion-cab">
+                  <span className="rs-seccion-titulo">Quién lo va a hacer</span>
+                  <span className="rs-seccion-hint">
+                    {hayAlgo
+                      ? 'falta esto para pasarlo a en curso'
+                      : 'sin candidatos cargados — podés avanzar igual'}
+                  </span>
+                </div>
                 {/* Selector de candidatos (F4): tarjetas con score/razón/carga
                     reales + ausencia + preview de disponibilidad del día. Reemplaza
                     al combo plano de empleados; la lista completa queda de fallback. */}
@@ -2012,7 +1966,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
                     </p>
                   </div>
                 )}
-              </ABMCollapsible>
+              </div>
             );
           })()}
 
@@ -2590,103 +2544,95 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     );
   };
 
-  // Renderizar sticky header para el Sheet (estado + categoría + botón historial)
-  const renderSheetStickyHeader = () => {
-    if (!selectedReclamo) return null;
-
-    const categoryColor = selectedReclamo.categoria.color || DEFAULT_CATEGORY_COLOR;
-    const estadoColor = estadoColors[selectedReclamo.estado]?.bg || '#6366f1';
-
+  // Header propio del Sheet — implementación del diseño "Reclamo Detalle"
+  // (canvas Claude Design): eyebrow + navegación entre los reclamos de la
+  // lista visible + acciones, título display y la fila de meta
+  // (estado · categoría · prioridad · canal · antigüedad).
+  const renderSheetHeader = () => {
+    if (!selectedReclamo) return undefined;
+    const idx = filteredReclamos.findIndex((r) => r.id === selectedReclamo.id);
+    const total = filteredReclamos.length;
+    const irA = (i: number) => {
+      const destino = filteredReclamos[i];
+      if (destino) openViewSheet(destino);
+    };
+    const estadoColor = estadoColors[selectedReclamo.estado]?.bg || theme.primary;
+    const prio = selectedReclamo.prioridad_ot || 'media';
+    const disconforme = selectedReclamo.confirmado_vecino === false;
     return (
-      <div className="flex items-center gap-2">
-        {/* Estado */}
-        <span
-          className="av2-chip"
-          style={{
-            backgroundColor: estadoColor,
-            color: '#ffffff'
-          }}
-        >
-          {getEstadoIcon(selectedReclamo.estado)}
-          {estadoLabels[selectedReclamo.estado]}
-        </span>
-        {/* Categoría */}
-        <span
-          className="av2-chip"
-          style={{
-            backgroundColor: `${categoryColor}15`,
-            color: categoryColor,
-            border: `1px solid ${categoryColor}40`
-          }}
-        >
-          {getCategoryIcon(selectedReclamo.categoria.nombre)}
-          {selectedReclamo.categoria.nombre}
-        </span>
-        {/* Prioridad — badge canónico leído de la OT del reclamo (F6). Fallback
-            'media' si el reclamo todavía no tiene OT (prioridad_ot null). */}
-        {(() => {
-          const prio = selectedReclamo.prioridad_ot || 'media';
-          const pColor = prioridadColor(prio);
-          const PrioIcon = prioridadIcon(prio);
-          return (
-            <span
-              className="av2-chip"
-              style={{ backgroundColor: `${pColor}15`, color: pColor, border: `1px solid ${pColor}40` }}
-              title={`Prioridad ${prioridadLabel(prio)}`}
-            >
-              <PrioIcon className="h-3.5 w-3.5" />
-              {prioridadLabel(prio)}
-            </span>
-          );
-        })()}
-        {/* Canal de ingreso (omnicanalidad) */}
-        {selectedReclamo.canal && (() => {
-          const CanalIcon = canalIcon(selectedReclamo.canal);
-          const cColor = canalColor(selectedReclamo.canal);
-          return (
-            <span
-              className="av2-chip"
-              style={{ backgroundColor: `${cColor}15`, color: cColor, border: `1px solid ${cColor}40` }}
-              title={`Ingresó por ${canalLabel(selectedReclamo.canal)}`}
-            >
-              {CanalIcon && <CanalIcon className="h-3.5 w-3.5" />}
-              {canalLabel(selectedReclamo.canal)}
-            </span>
-          );
-        })()}
-        {/* Historial — con badge inline rojo si el vecino rechazó la resolución */}
-        <button
-          onClick={() => {
-            closeSheet();
-            navigate(`/gestion/reclamos/${selectedReclamo.id}`);
-          }}
-          className="av2-chip"
-          style={{
-            backgroundColor: selectedReclamo.confirmado_vecino === false ? '#ef444415' : theme.backgroundSecondary,
-            color: selectedReclamo.confirmado_vecino === false ? '#ef4444' : theme.primary,
-            border: `1px solid ${selectedReclamo.confirmado_vecino === false ? '#ef444460' : theme.border}`,
-          }}
-          title={selectedReclamo.confirmado_vecino === false
-            ? 'El vecino marcó que el problema persiste — ver historial'
-            : 'Ver historial completo'}
-        >
-          <Clock className="h-3.5 w-3.5" />
-          Historial
-          {selectedReclamo.confirmado_vecino === false && (
-            <span
-              className="inline-flex items-center justify-center w-4 h-4 rounded-full font-bold animate-pulse"
-              style={{
-                backgroundColor: '#ef4444',
-                color: '#ffffff',
-                fontSize: '9px',
-                lineHeight: 1,
-                boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.35)',
-              }}
-            >
-              !
+      <div className="rs-head">
+        <div className="rs-head-fila">
+          <span className="rs-eyebrow">Reclamo #{selectedReclamo.id}</span>
+          {idx >= 0 && total > 1 && (
+            <span className="rs-nav">
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Anterior"
+                disabled={idx <= 0}
+                onClick={() => irA(idx - 1)}
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+              <span className="rs-nav-pos">{idx + 1} de {total} en la lista</span>
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Siguiente"
+                disabled={idx >= total - 1}
+                onClick={() => irA(idx + 1)}
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
             </span>
           )}
-        </button>
+          <span className="rs-head-icos">
+            <button
+              type="button"
+              className="rs-ico-btn"
+              title={disconforme
+                ? 'El vecino marcó que el problema persiste — ver historial'
+                : 'Ver historial completo'}
+              onClick={() => { closeSheet(); navigate(`/gestion/reclamos/${selectedReclamo.id}`); }}
+            >
+              <Clock className="h-4 w-4" />
+              {disconforme && <span className="rs-ico-alerta" />}
+            </button>
+            <button type="button" className="rs-ico-btn" title="Cerrar" aria-label="Cerrar" onClick={closeSheet}>
+              <X className="h-4 w-4" />
+            </button>
+          </span>
+        </div>
+
+        <h2 className="rs-titulo">
+          {selectedReclamo.titulo || selectedReclamo.categoria?.nombre || 'Reclamo'}
+        </h2>
+
+        <div className="rs-meta">
+          <span className="rs-estado" style={{ backgroundColor: `${estadoColor}1c`, color: estadoColor }}>
+            <span className="rs-estado-dot" style={{ backgroundColor: estadoColor }} />
+            {estadoLabels[selectedReclamo.estado] || selectedReclamo.estado}
+          </span>
+          <span className="rs-meta-sep">·</span>
+          <button
+            type="button"
+            className="rs-meta-cat"
+            title="Filtrar la lista por esta categoría"
+            onClick={() => { setFiltroCategoria(selectedReclamo.categoria.id); closeSheet(); }}
+          >
+            {selectedReclamo.categoria.nombre}
+          </button>
+          <span className="rs-meta-sep">·</span>
+          <span>Prioridad {prioridadLabel(prio).toLowerCase()}</span>
+          {selectedReclamo.canal && (
+            <>
+              <span className="rs-meta-sep">·</span>
+              <span>Entró por {(canalLabel(selectedReclamo.canal) || selectedReclamo.canal).toLowerCase()}</span>
+            </>
+          )}
+          <span className="rs-meta-sep">·</span>
+          <span>{haceCuanto(selectedReclamo.created_at)}</span>
+        </div>
       </div>
     );
   };
@@ -2711,9 +2657,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           <textarea
             value={descripcionInicio}
             onChange={(e) => setDescripcionInicio(e.target.value)}
-            placeholder={descripcionInicio.trim() ? 'Descripción del trabajo a realizar...' : 'Descripción del trabajo a realizar (obligatorio para cambiar de estado)...'}
+            placeholder="Qué se va a hacer — queda en el historial y lo ve el vecino"
             rows={2}
-            className={`av2-sheet-nota${descripcionInicio.trim() ? '' : ' av2-sheet-nota--pendiente'}`}
+            className={`rs-pie-nota${descripcionInicio.trim() ? '' : ' rs-pie-nota--pendiente'}`}
           />
         )}
 
@@ -2724,14 +2670,15 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             <button
               onClick={handleRecibir}
               disabled={saving || !descripcionInicio.trim()}
-              className="av2-btn-primario flex-1 justify-center"
+              className="rs-cta flex-1 justify-center"
             >
+              <Check className="h-4 w-4" />
               {saving ? 'Recibiendo...' : 'Recibir'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="av2-btn-peligro"
+                className="rs-btn rs-btn--peligro"
               >
                 Rechazar
               </button>
@@ -2745,14 +2692,15 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             <button
               onClick={handleAsignar}
               disabled={saving || !dependenciaSeleccionada || !descripcionInicio.trim() || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
-              className="av2-btn-primario flex-1 justify-center"
+              className="rs-cta flex-1 justify-center"
             >
+              <Check className="h-4 w-4" />
               {saving ? 'Asignando...' : selectedReclamo.dependencia_asignada ? 'Reasignar' : 'Asignar'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="av2-btn-peligro"
+                className="rs-btn rs-btn--peligro"
               >
                 Rechazar
               </button>
@@ -2766,14 +2714,15 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             <button
               onClick={handleIniciar}
               disabled={saving || !descripcionInicio.trim()}
-              className="av2-btn-primario flex-1 justify-center"
+              className="rs-cta flex-1 justify-center"
             >
-              {saving ? 'Procesando...' : 'En Curso'}
+              <Check className="h-4 w-4" />
+              {saving ? 'Procesando...' : 'Pasar a en curso'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="av2-btn-peligro"
+                className="rs-btn rs-btn--peligro"
               >
                 Rechazar
               </button>
@@ -2786,7 +2735,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           <>
             {/* Foto de cierre: evidencia del trabajo terminado (opcional) */}
             <label
-              className="av2-btn-secundario cursor-pointer"
+              className="rs-btn cursor-pointer"
               title={fotoCierre ? `Foto de cierre: ${fotoCierre.name}` : 'Adjuntar foto del trabajo terminado (opcional)'}
             >
               <Camera className="h-4 w-4" />
@@ -2802,14 +2751,15 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             <button
               onClick={handleFinalizar}
               disabled={saving || !resolucion}
-              className="av2-btn-primario flex-1 justify-center"
+              className="rs-cta flex-1 justify-center"
             >
+              <Check className="h-4 w-4" />
               {saving ? 'Finalizando...' : 'Finalizar'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="av2-btn-peligro"
+                className="rs-btn rs-btn--peligro"
               >
                 Rechazar
               </button>
@@ -2821,14 +2771,14 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             <button
               onClick={handlePosponer}
               disabled={saving || !motivoNoFinalizado}
-              className="av2-btn-primario flex-1 justify-center"
+              className="rs-cta flex-1 justify-center"
             >
               {saving ? 'Posponiendo...' : 'Posponer'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="av2-btn-peligro"
+                className="rs-btn rs-btn--peligro"
               >
                 Rechazar
               </button>
@@ -2836,41 +2786,32 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           </>
         )}
 
-        {/* Estados finales - solo info */}
-        {(['resuelto', 'finalizado', 'rechazado'].includes(selectedReclamo.estado)) && (
-          <div
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
-            style={{
-              backgroundColor: selectedReclamo.estado === 'rechazado' ? `${estadoColors.rechazado.bg}20` : `${estadoColors.finalizado.bg}20`,
-              color: selectedReclamo.estado === 'rechazado' ? estadoColors.rechazado.bg : estadoColors.finalizado.bg,
-              border: `2px solid ${selectedReclamo.estado === 'rechazado' ? estadoColors.rechazado.bg : estadoColors.finalizado.bg}`
-            }}
-          >
-            {selectedReclamo.estado === 'rechazado' ? '✗ Rechazado' : '✓ Finalizado'}
-          </div>
-        )}
+        {/* Estados finales — banda informativa, no disfrazada de botón. El
+            color viene del estado (valor runtime), la piel es del kit. */}
+        {(['resuelto', 'finalizado', 'rechazado'].includes(selectedReclamo.estado)) && (() => {
+          const esRechazo = selectedReclamo.estado === 'rechazado';
+          const c = esRechazo ? estadoColors.rechazado.bg : estadoColors.finalizado.bg;
+          const IconoFinal = esRechazo ? XCircle : CheckCircle;
+          return (
+            <div className="av2-sheet-final" style={{ backgroundColor: `${c}14`, color: c }}>
+              <IconoFinal className="h-4 w-4" />
+              {esRechazo ? 'Rechazado' : 'Finalizado'}
+            </div>
+          );
+        })()}
 
         {/* Estado pospuesto - puede retomar */}
         {selectedReclamo.estado === 'pospuesto' && (
           <div className="flex gap-2">
             <button
               onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(true); closeSheet(); toast.success('Reclamo retomado'); })}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.en_curso.bg}20`,
-                border: `2px solid ${estadoColors.en_curso.bg}`,
-                color: estadoColors.en_curso.bg
-              }}
+              className="rs-cta flex-1 justify-center"
             >
               Retomar
             </button>
             <div
-              className="px-4 py-2.5 rounded-xl font-medium text-center"
-              style={{
-                backgroundColor: `${estadoColors.pospuesto.bg}20`,
-                border: `2px solid ${estadoColors.pospuesto.bg}`,
-                color: estadoColors.pospuesto.bg
-              }}
+              className="av2-sheet-final av2-sheet-final--chip"
+              style={{ backgroundColor: `${estadoColors.pospuesto.bg}14`, color: estadoColors.pospuesto.bg }}
             >
               Pospuesto
             </div>
@@ -2881,26 +2822,20 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         {/* Feedback negativo del vecino — bloque visible con 2 acciones */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') &&
          selectedReclamo.confirmado_vecino === false && (
-          <div
-            className="rounded-xl p-4 space-y-3"
-            style={{
-              backgroundColor: '#ef444412',
-              border: '1.5px solid #ef444460',
-            }}
-          >
+          <div className="av2-sheet-alerta">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: '#ef4444' }} />
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--pl-red)' }} />
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm" style={{ color: '#991b1b' }}>
+                <p className="font-bold text-sm" style={{ color: 'var(--pl-red-700)' }}>
                   El vecino indica que el problema persiste
                 </p>
                 {selectedReclamo.comentario_confirmacion_vecino && (
-                  <p className="text-sm mt-1 italic" style={{ color: '#b91c1c' }}>
+                  <p className="text-sm mt-1 italic" style={{ color: 'var(--pl-red-700)' }}>
                     «{selectedReclamo.comentario_confirmacion_vecino}»
                   </p>
                 )}
                 {selectedReclamo.fecha_confirmacion_vecino && (
-                  <p className="text-xs mt-1 opacity-80" style={{ color: '#ef4444' }}>
+                  <p className="text-xs mt-1 opacity-80" style={{ color: 'var(--pl-red-700)' }}>
                     {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleString('es-AR', {
                       day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
                     })}
@@ -2911,12 +2846,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleReabrirPorFeedback}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-[1.02] active:scale-95"
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#ffffff',
-                  boxShadow: '0 4px 12px #ef444440',
-                }}
+                className="av2-btn-peligro av2-btn-peligro--solido justify-center"
                 title="Devuelve el reclamo a En Curso para retrabajar"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -2924,15 +2854,11 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
               </button>
               <button
                 onClick={handleDescartarFeedback}
-                className="px-3 py-2 rounded-lg font-medium text-sm transition-all hover:scale-[1.02] active:scale-95"
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '1.5px solid #ef444460',
-                  color: '#ef4444',
-                }}
+                className="av2-btn-peligro justify-center"
                 title="Marca el feedback como revisado y deja el caso finalizado"
               >
-                ✓ Descartar comentario
+                <CheckCircle className="h-4 w-4" />
+                Descartar comentario
               </button>
             </div>
           </div>
@@ -2944,12 +2870,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
          ['en_curso', 'pospuesto', 'finalizado', 'rechazado', 'resuelto'].includes(selectedReclamo.estado) && (
           <button
             onClick={handleReasignar}
-            className="w-full px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
-            style={{
-              backgroundColor: `${theme.primary}10`,
-              border: `1.5px dashed ${theme.primary}60`,
-              color: theme.primary,
-            }}
+            className="av2-btn-secundario w-full justify-center"
             title="Devuelve el reclamo a Recibido y libera al empleado para que otro lo pueda tomar"
           >
             <Sparkles className="h-4 w-4" />
@@ -3616,9 +3537,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       <Sheet
         open={sheetMode === 'view'}
         onClose={closeSheet}
-        title={`Reclamo #${selectedReclamo?.id || ''} · ${selectedReclamo ? new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : ''}`}
+        title={`Reclamo #${selectedReclamo?.id || ''}`}
         description={selectedReclamo?.titulo}
-        stickyHeader={renderSheetStickyHeader()}
+        customHeader={renderSheetHeader()}
         stickyFooter={renderSheetFooter()}
       >
         {renderViewContent()}

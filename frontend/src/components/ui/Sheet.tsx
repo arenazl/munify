@@ -28,9 +28,14 @@ interface SheetProps {
   footer?: ReactNode;
   stickyFooter?: ReactNode; // Footer que siempre está fijo abajo
   stickyHeader?: ReactNode; // Header adicional que queda sticky debajo del título
+  /** Header COMPLETO propio del caller (desktop): reemplaza la fila estándar
+   *  título+X — el caller se hace cargo de su propio cierre/acciones.
+   *  Mobile sigue usando MobilePageHeader con title/description. Aditivo:
+   *  sin esta prop, el Sheet se comporta exactamente igual que siempre. */
+  customHeader?: ReactNode;
 }
 
-export function Sheet({ open, onClose, title, description, children, footer, stickyFooter, stickyHeader }: SheetProps) {
+export function Sheet({ open, onClose, title, description, children, footer, stickyFooter, stickyHeader, customHeader }: SheetProps) {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const topOffset = isMobile ? TOPBAR_MOBILE_HEIGHT : 0;
@@ -39,6 +44,10 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
   useEffect(() => {
     if (open) {
+      // Patrón de montaje ANIMADO (montar → doble rAF → animar): el setState
+      // dentro del efecto es deliberado; sin él no hay frame inicial desde el
+      // que transicionar. No convertir a estado derivado.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShouldRender(true);
       // Pequeño delay para que el DOM se renderice antes de animar
       requestAnimationFrame(() => {
@@ -146,6 +155,8 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         >
           {isMobile ? (
             <MobilePageHeader title={title} subtitle={description} onBack={onClose} />
+          ) : customHeader ? (
+            customHeader
           ) : (
             <div
               className="flex items-center justify-between px-5 py-3"
