@@ -20,11 +20,22 @@
  * meses, el bloque no se muestra (no hay recorrido posible con uno solo).
  */
 import { useMemo } from 'react';
-import { Pause, Play, ChevronRight } from 'lucide-react';
+import { Pause, ChevronRight } from 'lucide-react';
 import { useCarruselAuto } from '../../lib/useCarruselAuto';
 
 /** Cada cuánto pasa al mes siguiente. */
 const INTERVALO_MS = 6000;
+
+/**
+ * Días que tiene que llevar el mes en curso para entrar a la comparación.
+ *
+ * Un mes recién empezado no se puede comparar contra uno entero: el 1° de
+ * agosto, "agosto" son unas pocas horas, y al lado de un julio de 31 días
+ * cualquier lectura miente — el promedio por día se dispara y la tasa de
+ * cierre puede pasar el 100% porque se cierran cosas que entraron el mes
+ * pasado. Hasta llegar a este umbral se muestran los meses completos.
+ */
+const DIAS_PARA_CONTAR_EL_MES = 10;
 
 export interface PuntoTendencia {
   /** 'YYYY-MM-DD' */
@@ -122,10 +133,29 @@ function veredictoDelMes(m: Mes, previo: Mes | null): { texto: string; tono: 'bu
       tono: 'bueno',
     };
   }
-  const mejora = previo && m.tasa > previo.tasa + 0.05;
-  if (mejora) {
+
+  // Lo que califica al mes es el CAMBIO contra el anterior, no el número
+  // suelto. Un 84% después de un 79% no es "se abría la brecha" — es que el
+  // ritmo se sostuvo, y decirlo en rojo sería mentir sobre una buena gestión.
+  const delta = previo ? m.tasa - previo.tasa : null;
+  const SALTO = 0.05; // menos de cinco puntos entre meses es ruido, no tendencia
+
+  if (delta !== null && delta > SALTO) {
     return {
       texto: `Se achicó la brecha: entraban ${nf(m.porDia, 1)} por día y se cerró el ${pct}% — ${deCada10} de cada 10.`,
+      tono: 'bueno',
+    };
+  }
+  if (delta !== null && delta < -SALTO) {
+    return {
+      texto: `Se perdió terreno: se cerró el ${pct}% contra el ${Math.round(previo!.tasa * 100)}% del mes anterior.`,
+      tono: 'malo',
+    };
+  }
+  // Sin cambio apreciable: manda el nivel en el que se sostiene.
+  if (m.tasa >= 0.75) {
+    return {
+      texto: `Se sostuvo el ritmo: entraban ${nf(m.porDia, 1)} por día y se cerró el ${pct}% — ${deCada10} de cada 10.`,
       tono: 'bueno',
     };
   }
@@ -145,7 +175,22 @@ interface TendenciaMesesProps {
 }
 
 export function TendenciaMeses({ datos, meses = 3, className }: TendenciaMesesProps) {
-  const lista = useMemo(() => agruparPorMes(datos).slice(-meses), [datos, meses]);
+  const lista = useMemo(() => {
+    const grupos = agruparPorMes(datos);
+
+    // "Hoy" se toma del último día de la serie, no del reloj del navegador:
+    // así la decisión sale de los mismos datos que se están mostrando.
+    const ultima = datos.reduce((may, p) => (p.fecha > may ? p.fecha : may), '');
+    const ultimo = grupos[grupos.length - 1];
+    const enCurso = ultimo && ultimo.clave === ultima.slice(0, 7);
+    const arranca = Number(ultima.slice(8, 10)) < DIAS_PARA_CONTAR_EL_MES;
+
+    // Se descarta sólo si quedan al menos dos meses para comparar: antes que
+    // mostrar un mes suelto, es preferible dejar el parcial.
+    if (enCurso && arranca && grupos.length > 2) grupos.pop();
+
+    return grupos.slice(-meses);
+  }, [datos, meses]);
   const { indice, ir, propsPausa, menosMovimiento } = useCarruselAuto({
     total: lista.length,
     intervaloMs: INTERVALO_MS,
