@@ -59,6 +59,8 @@ interface ReclamoRecurrente {
    *  todavía no las manda, la fila muestra sólo la dirección. */
   categoria_top?: string | null;
   categoria_top_cantidad?: number;
+  /** Antigüedad del reclamo más viejo de esa esquina, en días. */
+  dias_mas_viejo?: number | null;
   /** Centro de la esquina (promedio de sus reclamos), para encuadrar el mapa.
    *  null si esos reclamos no tienen coordenadas: ese foco se saltea. */
   lat?: number | null;
@@ -752,6 +754,7 @@ export default function Dashboard() {
       // con una categoría ya elegida sería repetir lo mismo.
       categoriaTop: catConcentracion ? null : r.categoria_top,
       categoriaTopCantidad: catConcentracion ? undefined : r.categoria_top_cantidad,
+      diasMasViejo: r.dias_mas_viejo,
     }));
   }, [recurrentes, catConcentracion]);
 
@@ -1135,7 +1138,7 @@ export default function Dashboard() {
             focos={focosConcentracion}
             puntos={heatmapFiltrado}
             loading={loadingHeatmap}
-            altura="230px"
+            altura="clamp(300px, 34vh, 430px)"
             onVerFoco={(f) => navigate(`/gestion/mapa?direccion=${encodeURIComponent(f.direccion)}`)}
           />
         </div>

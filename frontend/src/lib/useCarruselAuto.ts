@@ -41,6 +41,10 @@ export function useCarruselAuto({ total, intervaloMs = 10_000, desactivado }: Op
   const [indice, setIndice] = useState(0);
   const [sentido, setSentido] = useState<SentidoCarrusel>('adelante');
   const [detenido, setDetenido] = useState(false);
+  // Pausa que se pide a mano con el botón, distinta de la del hover: esta
+  // sobrevive a que el mouse se vaya. Quien la apretó quiere que se quede
+  // quieto, no que arranque de nuevo al salir de la tarjeta.
+  const [pausado, setPausado] = useState(false);
   // Inicializador perezoso, no useRef: leer `.current` durante el render está
   // prohibido y la preferencia se necesita una sola vez.
   const [menosMovimiento] = useState(usaMenosMovimiento);
@@ -64,13 +68,15 @@ export function useCarruselAuto({ total, intervaloMs = 10_000, desactivado }: Op
 
   // Depende de `indice` a propósito: cada avance reinicia la cuenta.
   useEffect(() => {
-    if (total <= 1 || detenido || desactivado || menosMovimiento) return;
+    if (total <= 1 || detenido || pausado || desactivado || menosMovimiento) return;
     const t = window.setTimeout(() => {
       setSentido('adelante');
       setIndice((i) => (i + 1) % total);
     }, intervaloMs);
     return () => window.clearTimeout(t);
-  }, [indice, total, detenido, desactivado, menosMovimiento, intervaloMs]);
+  }, [indice, total, detenido, pausado, desactivado, menosMovimiento, intervaloMs]);
+
+  const alternarPausa = useCallback(() => setPausado((p) => !p), []);
 
   /** Props para el contenedor: pausan mientras se lo mira o se lo usa. */
   const propsPausa = {
@@ -80,5 +86,16 @@ export function useCarruselAuto({ total, intervaloMs = 10_000, desactivado }: Op
     onBlurCapture: () => setDetenido(false),
   };
 
-  return { indice: seguro, sentido, ir, siguiente, anterior, propsPausa, menosMovimiento };
+  return {
+    indice: seguro,
+    sentido,
+    ir,
+    siguiente,
+    anterior,
+    propsPausa,
+    menosMovimiento,
+    /** ¿Está detenido a mano? (no cuenta la pausa por hover) */
+    pausado,
+    alternarPausa,
+  };
 }

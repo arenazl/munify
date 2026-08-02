@@ -9,6 +9,10 @@
    ============================================================ */
 
 .fr {
+  /* El pie flota SOBRE el mapa (posicionado contra este contenedor), así que
+     el mapa se queda con todo el alto y los controles se apoyan sobre la
+     franja de abajo, que es la que menos información tiene. */
+  position: relative;
   display: flex;
   flex-direction: column;
   /* Aire entre el mapa y el pie. Con poca separación el nombre de la calle
@@ -28,19 +32,44 @@
 }
 
 .fr-pie {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  /* Un respiro extra bajo el mapa, aparte del gap: el pie es texto y el
-     texto necesita más aire del que necesita un bloque. */
-  padding-bottom: 2px;
+  padding: 12px 14px;
+  /* Casi opaco, no translúcido: encima de un mapa de calor con manchas
+     naranjas, un fondo transparente vuelve ilegible el nombre de la calle. */
+  background: color-mix(in srgb, var(--pl-surface) 96%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgb(13 20 18 / 12%);
 }
 
+/* Los tres controles redondos: anterior, pausa y siguiente. */
+.fr-nav {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.fr-nav:hover { background: var(--pl-surface-hover); }
+.fr-nav-icono { width: 14px; height: 14px; }
+
 .fr-puesto {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--pl-radius-sm);
   display: grid;
   place-items: center;
@@ -119,6 +148,7 @@
 .fr-dot {
   width: 6px;
   height: 6px;
+  transition: width var(--pl-dur-ui) var(--pl-ease), background var(--pl-dur-ui) var(--pl-ease);
   border-radius: var(--pl-radius-pill);
   background: var(--pl-text-disabled);
   border: 0;
@@ -127,9 +157,29 @@
   transition: background var(--pl-dur-ui) var(--pl-ease), transform var(--pl-dur-ui) var(--pl-ease);
 }
 .fr-dot:hover { transform: scale(1.3); }
-.fr-dot--activo { background: var(--pl-green); }
+/* El activo se ESTIRA: con cuatro puntos iguales sólo cambiando de color no
+   se ve de un vistazo en cuál estás. */
+.fr-dot--activo { width: 18px; background: var(--pl-green); }
+
+/* Angosto: el pie de un mapa chico no entra con los tres botones, el badge,
+   dos renglones de texto y los puntos. Se van los puntos —el badge y las
+   flechas ya dicen dónde estás— y el pie deja de flotar para no tapar
+   medio mapa. */
+@media (max-width: 560px) {
+  .fr-pie {
+    position: static;
+    margin-top: 10px;
+    padding: 10px 12px;
+    gap: 8px;
+    box-shadow: none;
+    border: 1px solid var(--pl-border);
+  }
+  .fr-dots { display: none; }
+  .fr-puesto { flex: 0 0 30px; width: 30px; height: 30px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
+  .fr-nav, .fr-dot { transition: none; }
   .fr-foco {
     transform: none;
     transition: opacity 120ms linear, visibility 0s linear 120ms;

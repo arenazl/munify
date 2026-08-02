@@ -20,7 +20,7 @@
  * pausa al pasar el mouse o al enfocar algo adentro, y no rota sola si el
  * visitante pidió menos movimiento.
  */
-import { MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import HeatmapWidget from '../ui/HeatmapWidget';
 import { useCarruselAuto } from '../../lib/useCarruselAuto';
 
@@ -39,6 +39,12 @@ export interface Foco {
   /** La categoría que más pesa ahí, y cuántos de sus reclamos son. */
   categoriaTop?: string | null;
   categoriaTopCantidad?: number;
+  /**
+   * Antigüedad del reclamo más viejo de esa esquina, en días. Es lo que
+   * convierte el foco en algo urgente: cuatro reclamos juntos son un dato,
+   * cuatro reclamos juntos hace cuarenta días son un problema.
+   */
+  diasMasViejo?: number | null;
 }
 
 interface HeatPoint {
@@ -68,7 +74,7 @@ export function FocosRotativos({
   // Sin coordenadas no se puede encuadrar: esos focos se saltean en vez de
   // mandar el mapa a un punto inventado.
   const conMapa = focos.filter((f) => typeof f.lat === 'number' && typeof f.lng === 'number');
-  const { indice, ir, propsPausa } = useCarruselAuto({
+  const { indice, ir, siguiente, anterior, propsPausa, menosMovimiento, pausado, alternarPausa } = useCarruselAuto({
     total: conMapa.length,
     intervaloMs: INTERVALO_MS,
   });
@@ -106,8 +112,21 @@ export function FocosRotativos({
         />
       </div>
 
+      {/* El reproductor va FLOTANDO sobre el mapa, no debajo: el mapa se queda
+          con todo el alto y los controles quedan sobre la parte de abajo, que
+          es la que menos información tiene. */}
       <div className="fr-pie">
-        <span className="fr-puesto" aria-hidden="true">{indice + 1}</span>
+        <button
+          type="button"
+          className="fr-nav"
+          onClick={anterior}
+          aria-label="Foco anterior"
+          title="Anterior"
+        >
+          <ChevronLeft className="fr-nav-icono" aria-hidden="true" />
+        </button>
+
+        <span className="fr-puesto" aria-hidden="true">{activo.cantidad}</span>
 
         {/* Pila de altura estable: todos los focos ocupan su lugar y sólo se
             ve el activo, así el pie no cambia de alto entre calles largas y
@@ -121,22 +140,22 @@ export function FocosRotativos({
               aria-hidden={i !== indice}
               onClick={() => onVerFoco?.(f)}
             >
-              <span className="fr-direccion">
-                <MapPin className="fr-icono" aria-hidden="true" />
-                {f.direccion}
-              </span>
+              <span className="fr-direccion">{f.direccion}</span>
               <span className="fr-detalle">
-                <b>{f.cantidad}</b> {f.cantidad === 1 ? 'reclamo' : 'reclamos'}
+                {f.zona ? `${f.zona} · ` : ''}
                 {f.categoriaTop && f.categoriaTopCantidad
-                  ? ` · ${f.categoriaTopCantidad} de ${f.cantidad} son de ${f.categoriaTop}`
-                  : f.zona
-                    ? ` · ${f.zona}`
-                    : ''}
+                  ? `${f.categoriaTopCantidad} de ${f.cantidad} son ${f.categoriaTop.toLowerCase()}`
+                  : `${f.cantidad} ${f.cantidad === 1 ? 'reclamo' : 'reclamos'}`}
+                {f.diasMasViejo != null && f.diasMasViejo > 0
+                  ? ` · el más viejo hace ${f.diasMasViejo} ${f.diasMasViejo === 1 ? 'día' : 'días'}`
+                  : ''}
               </span>
             </button>
           ))}
         </div>
 
+        {/* Los puntos: el activo se estira. Con cuatro focos, cuatro puntos
+            iguales no dicen en cuál estás. */}
         <div className="fr-dots">
           {conMapa.map((f, i) => (
             <button
@@ -149,6 +168,30 @@ export function FocosRotativos({
             />
           ))}
         </div>
+
+        {/* Refleja el estado REAL: si el visitante pidió menos movimiento el
+            recorrido no arranca, y el botón pasa a ser "siguiente". */}
+        <button
+          type="button"
+          className="fr-nav"
+          onClick={menosMovimiento ? siguiente : alternarPausa}
+          aria-label={menosMovimiento ? 'Ver el siguiente' : pausado ? 'Retomar el recorrido' : 'Pausar el recorrido'}
+          title={menosMovimiento ? 'Ver el siguiente' : pausado ? 'Retomar' : 'Pausar'}
+        >
+          {menosMovimiento || pausado
+            ? <Play className="fr-nav-icono" aria-hidden="true" />
+            : <Pause className="fr-nav-icono" aria-hidden="true" />}
+        </button>
+
+        <button
+          type="button"
+          className="fr-nav"
+          onClick={siguiente}
+          aria-label="Foco siguiente"
+          title="Siguiente"
+        >
+          <ChevronRight className="fr-nav-icono" aria-hidden="true" />
+        </button>
       </div>
     </div>
   );

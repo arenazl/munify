@@ -1214,6 +1214,10 @@ async def get_recurrentes(
             # el mapa pueda ENCUADRAR cada foco, no solo listarlo.
             func.avg(Reclamo.latitud).label('lat'),
             func.avg(Reclamo.longitud).label('lng'),
+            # El más antiguo de la esquina. Es lo que convierte un foco en algo
+            # urgente: cuatro reclamos juntos son un dato; cuatro reclamos
+            # juntos desde hace cuarenta días son un problema.
+            func.min(Reclamo.created_at).label('mas_viejo'),
         )
         .where(*sub_filters)
         .group_by(Reclamo.direccion, Reclamo.zona_id)
@@ -1224,7 +1228,7 @@ async def get_recurrentes(
     # Obtener las direcciones con más reclamos
     query = await db.execute(
         select(subquery.c.direccion, subquery.c.zona_id, subquery.c.cantidad,
-               subquery.c.lat, subquery.c.lng)
+               subquery.c.lat, subquery.c.lng, subquery.c.mas_viejo)
         .order_by(subquery.c.cantidad.desc())
         .limit(10)
     )
@@ -1269,9 +1273,11 @@ async def get_recurrentes(
         por_direccion.setdefault(direccion, []).append((nombre_cat, n))
 
     resultado = []
-    for direccion, zona_id, cantidad, lat, lng in filas:
+    hoy_dt = datetime.utcnow()
+    for direccion, zona_id, cantidad, lat, lng, mas_viejo in filas:
         pares = sorted(por_direccion.get(direccion, []), key=lambda x: x[1], reverse=True)
         top_cat, top_n = pares[0] if pares else (None, 0)
+        dias_mas_viejo = (hoy_dt - mas_viejo).days if mas_viejo else None
         resultado.append({
             "direccion": direccion,
             "zona": nombres_zona.get(zona_id, "Sin zona"),
@@ -1284,6 +1290,7 @@ async def get_recurrentes(
             # La que más pesa en esa esquina, con cuántos de los suyos son.
             "categoria_top": top_cat,
             "categoria_top_cantidad": top_n,
+            "dias_mas_viejo": dias_mas_viejo,
         })
 
     return resultado
