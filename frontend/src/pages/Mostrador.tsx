@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileText, CheckCircle2, AlertTriangle, Receipt,
-  ClipboardList, ScanLine, ShieldCheck,
+  FileText, CheckCircle2, AlertTriangle, Check,
+  ClipboardList, ShieldCheck, ArrowRight,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search,
   Sparkles, X, Edit3, IdCard, Smartphone, QrCode,
   Mail, MapPin, Banknote, Clock, CalendarClock,
@@ -11,12 +11,11 @@ import ReservarTurnoSheet from '../components/turnos/ReservarTurnoSheet';
 import { AltaManualVecinoSheet } from '../components/mostrador/AltaManualVecinoSheet';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
-import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { operadorApi, capturaMovilApi, type CapturaMovilEstado } from '../lib/api';
-import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
+import { PageHeader } from '../components/abmv2/PageHeader';
 import { SemanticHero } from '../components/ui/SemanticHero';
-import { seg, type HeroFrase } from '../lib/semanticHero';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 
 interface MostradorMetricas {
@@ -54,17 +53,35 @@ interface VecinoEncontrado {
 
 type Paso = 'identificar' | 'hub';
 
+/** Pasos del flujo de atención. El número lo pinta la POSICIÓN (contrato
+ *  `StepsSpec` de abmv2/types.ts), no viene en los datos. */
+const PASOS: { id: Paso; label: string }[] = [
+  { id: 'identificar', label: 'Identificar al vecino' },
+  { id: 'hub', label: 'Cargar la gestión' },
+];
+
 /**
- * Mostrador — consola de operador de ventanilla (v4, basado en handoff de Claude Design).
+ * Mostrador — consola de operador de ventanilla.
  *
- * Flujo:
- *   1. Elegir modo (DNI / Celular) — 2 cards grandes con kbd hint.
- *   2a. DNI → input compacto + resultados enriquecidos (badges, deuda).
- *   2b. Celular → tarjeta de validación biométrica con QR + steps en vivo.
- *   3. Identificado → franja del vecino + 3 GestionCards + actividad reciente.
+ * MARCO v2 (kit abmv2, referencia del canvas `Mostrador.dc.html`; en esta
+ * pasada se usó la versión anterior de la referencia,
+ * design/handoff-v2/references/mostrador-flujo.dc.html):
+ *   PageHeader → SemanticHero con la stat strip ADENTRO → fila de pasos
+ *   (chips `av2-step`) → cuerpo del paso activo.
+ * Cero KpiCards sueltos, cero hex: todo sobre tokens `--pl-*`.
+ *
+ * FLUJO (intacto):
+ *   1. Identificar: dos columnas a la par — DNI (padrón) | Celular (QR +
+ *      RENAPER + selfie por Didit), más búsqueda libre y alta manual.
+ *   2. Hub: franja del vecino + 4 gestiones (reclamo, trámite, turno, tasas)
+ *      + actividad reciente.
+ *
+ * NOTA: los chips numerados se pintan acá con las clases del kit
+ * (`av2-steps`/`av2-step*`) en lugar de pasar por `ListToolbar`, porque esa
+ * pieza exige `search` + `views` y el Mostrador no tiene ni buscador de lista
+ * ni vistas alternativas: montarlos sería un control que no filtra nada.
  */
 export default function Mostrador() {
-  const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -146,6 +163,21 @@ export default function Mostrador() {
     setPaso('identificar');
   };
 
+  // Click en un chip del flujo. Volver al 1 = cambiar de vecino (limpia el
+  // contexto); saltar al 2 sin vecino no se permite.
+  const irAPaso = (destino: Paso) => {
+    if (destino === paso) return;
+    if (destino === 'identificar') {
+      reset();
+      return;
+    }
+    if (!vecino?.user_id) {
+      toast.error('Primero identificá al vecino');
+      return;
+    }
+    setPaso('hub');
+  };
+
   const operadorLabel = useMemo(
     () => metricas?.operador_nombre || `${user?.nombre || ''} ${user?.apellido || ''}`.trim() || user?.email || '',
     [metricas, user],
@@ -177,63 +209,104 @@ export default function Mostrador() {
     }];
   }, [metricas]);
 
+  // Stat strip DENTRO del hero (estándar v2: nada de KpiCards sueltos arriba).
+  // Solo números que devuelve el backend — nada estimado ni de relleno.
+  const heroKpis = useMemo<HeroKpi[]>(() => {
+    if (!metricas) return [];
+    const u = resolverUmbrales();
+    const recaudadoNum = Number(metricas.monto_hoy);
+    const pendientes = Math.max(0, metricas.tramites_hoy - metricas.pagados_hoy);
+    const pct = metricas.tramites_hoy > 0
+      ? Math.round((metricas.pagados_hoy / metricas.tramites_hoy) * 100)
+      : 0;
+    return [
+      {
+        etiqueta: 'TRÁMITES HOY',
+        valor: metricas.tramites_hoy.toLocaleString('es-AR'),
+        sub: 'iniciados en ventanilla',
+      },
+      {
+        etiqueta: 'PAGADOS',
+        valor: metricas.pagados_hoy.toLocaleString('es-AR'),
+        sub: metricas.tramites_hoy > 0 ? `${pct}% del total` : 'sin trámites todavía',
+        veredicto: metricas.pagados_hoy > 0 ? 'bueno' : undefined,
+      },
+      {
+        etiqueta: 'PENDIENTES DE PAGO',
+        valor: pendientes.toLocaleString('es-AR'),
+        sub: pendientes === 0 ? 'no queda ninguno' : 'esperando cobro',
+        veredicto: veredictoMasEsPeor(pendientes, u.sinAsignar),
+      },
+      {
+        etiqueta: 'COBRADO EN CAJA',
+        valor: Number.isFinite(recaudadoNum)
+          ? `$ ${recaudadoNum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+          : String(metricas.monto_hoy),
+        sub: 'en lo que va del día',
+      },
+    ];
+  }, [metricas]);
+
+  const idxPasoActivo = PASOS.findIndex((p) => p.id === paso);
+
   return (
-    <div className="space-y-4">
-      <SemanticHero etiqueta="MOSTRADOR · VENTANILLA" frases={heroFrases} />
+    <div className="av2-page" data-module="mostrador">
+      {/* 1. Cabecera de módulo: eyebrow + H1 + bajada (arriba de todo). */}
+      <PageHeader
+        eyebrow="Mostrador"
+        title="Atendé al vecino de la ventanilla, de principio a fin"
+        description={
+          'Identificá al vecino por DNI del padrón o validá su identidad con RENAPER desde su celular, y arrancá el reclamo, el trámite, el turno o el pago sin que tenga que volver.'
+          + (operadorLabel ? ` Atiende ${operadorLabel}.` : '')
+        }
+      />
 
-      {/* === Header + Métricas — sticky arriba === */}
-      <div
-        className="sticky top-0 z-20 -mx-4 px-4 pt-2 pb-3 space-y-3 backdrop-blur-md"
-        style={{ backgroundColor: `${theme.background}cc` }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-          >
-            <ScanLine className="w-5 h-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold leading-tight truncate" style={{ color: theme.text }}>
-              Mostrador
-            </h1>
-            <p className="text-xs leading-tight truncate" style={{ color: theme.textSecondary }}>
-              Ventanilla asistida · {operadorLabel}
-            </p>
-          </div>
+      {/* 2. ModuleHero = SemanticHero con la stat strip ADENTRO. */}
+      <div className="av2-hero-wrap">
+        <SemanticHero
+          etiqueta="MOSTRADOR · VENTANILLA ASISTIDA"
+          frases={heroFrases}
+          kpis={heroKpis}
+          className="av2-hero"
+        />
+      </div>
+
+      {/* 3. Fila del flujo: chips numerados (kit) + nota de identidad. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-4">
+        <div className="av2-steps" role="group" aria-label="Pasos de la atención">
+          {PASOS.map((p, i) => {
+            const estado = i === idxPasoActivo ? 'activo' : i < idxPasoActivo ? 'hecho' : 'pendiente';
+            return (
+              <Fragment key={p.id}>
+                {i > 0 && (
+                  <ArrowRight
+                    className="w-3.5 h-3.5 flex-shrink-0"
+                    style={{ color: 'var(--pl-text-faint)' }}
+                    aria-hidden
+                  />
+                )}
+                <button
+                  type="button"
+                  className={`av2-step av2-step--${estado}`}
+                  onClick={() => irAPaso(p.id)}
+                  aria-current={estado === 'activo' ? 'step' : undefined}
+                >
+                  <span className="av2-step-num av2-tnum" aria-hidden>
+                    {estado === 'hecho' ? <Check size={11} strokeWidth={2.6} /> : i + 1}
+                  </span>
+                  {p.label}
+                </button>
+              </Fragment>
+            );
+          })}
         </div>
-
-        {metricas && (() => {
-          const recaudadoNum = Number(metricas.monto_hoy);
-          const kpis: KpiSpec[] = [
-            {
-              label: 'Trámites hoy',
-              value: metricas.tramites_hoy.toLocaleString('es-AR'),
-              icon: FileText,
-              color: theme.primary,
-              highlighted: true,
-            },
-            {
-              label: 'Pagados',
-              value: metricas.pagados_hoy.toLocaleString('es-AR'),
-              icon: CheckCircle2,
-              color: '#22c55e',
-              footnote: metricas.tramites_hoy > 0
-                ? `${((metricas.pagados_hoy / metricas.tramites_hoy) * 100).toFixed(0)}% del total`
-                : undefined,
-              pct: metricas.tramites_hoy > 0 ? (metricas.pagados_hoy / metricas.tramites_hoy) * 100 : 0,
-            },
-            {
-              label: 'Recaudado',
-              value: Number.isFinite(recaudadoNum)
-                ? `$${recaudadoNum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
-                : String(metricas.monto_hoy),
-              icon: Receipt,
-              color: '#8b5cf6',
-            },
-          ];
-          return <KpiRow kpis={kpis} />;
-        })()}
+        <span
+          className="ml-auto inline-flex items-center gap-1.5 text-[11.5px]"
+          style={{ color: 'var(--pl-text-muted)' }}
+        >
+          <ShieldCheck className="w-3.5 h-3.5" aria-hidden />
+          Identidad validada contra RENAPER
+        </span>
       </div>
 
       {/* === Cuerpo === */}
@@ -317,6 +390,28 @@ export default function Mostrador() {
   );
 }
 
+/* ============================================================
+ * Fases del handoff PC ↔ celular. Se declara acá (y no dentro de
+ * PanelCelular) porque el chip de estado vive en la CABECERA de la columna,
+ * que la pinta el padre — la fase sube por callback.
+ * ============================================================ */
+type FaseCelular =
+  | 'idle' | 'creating' | 'awaiting' | 'in_progress'
+  | 'completed' | 'rejected' | 'cancelled' | 'expired' | 'error';
+
+/** Chip de estado de la columna Celular: tono del kit + copy de la fase. */
+const CHIP_FASE: Record<FaseCelular, { tono: string; label: string } | null> = {
+  idle: null,
+  creating: { tono: 'blue', label: 'Generando' },
+  awaiting: { tono: 'blue', label: 'Esperando escaneo' },
+  in_progress: { tono: 'blue', label: 'En progreso' },
+  completed: { tono: 'green', label: 'Validado' },
+  rejected: { tono: 'red', label: 'Rechazada' },
+  cancelled: { tono: 'gray', label: 'Cancelada' },
+  expired: { tono: 'gray', label: 'Expirada' },
+  error: { tono: 'red', label: 'Error' },
+};
+
 // ============================================================
 // PasoIdentificar — 2 columnas 50/50 SIEMPRE visibles (DNI | Celular)
 // Sin tabs, sin cambio de modo: las 2 opciones a la par.
@@ -327,66 +422,59 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual, o
   onCargarManual: (dniPrefill?: string) => void;
   onReclamoAnonimo: () => void;
 }) {
-  const { theme } = useTheme();
   const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
+  const [faseCelular, setFaseCelular] = useState<FaseCelular>('idle');
+  const chip = CHIP_FASE[faseCelular];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 mt-3">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-        {/* Columna izquierda — DNI */}
+        {/* Columna izquierda — DNI (familia verde de la referencia) */}
         <ColumnaModo
-          color={theme.primary}
-          icon={<IdCard className="w-5 h-5" />}
+          color="var(--pl-green)"
+          fondo="var(--pl-green-100)"
+          icon={<IdCard className="w-[17px] h-[17px]" />}
           label="Por DNI"
-          sub="Cliente ya registrado en el padrón municipal"
+          sub="Vecino ya registrado en el padrón"
         >
-          <PanelDni onUsar={onClienteRegistrado} onCargarManual={onCargarManual} />
+          <PanelDni
+            onUsar={onClienteRegistrado}
+            onCargarManual={onCargarManual}
+            onBuscarPorNombre={() => setBusquedaLibreAbierta((v) => !v)}
+          />
         </ColumnaModo>
 
-        {/* Columna derecha — Celular / RENAPER */}
+        {/* Columna derecha — Celular / RENAPER (familia azul de la referencia) */}
         <ColumnaModo
-          color="#22c55e"
-          icon={<Smartphone className="w-5 h-5" />}
-          label="Por celular"
-          sub="Generamos un QR · RENAPER + selfie del lado del vecino"
+          color="var(--pl-blue)"
+          fondo="var(--pl-blue-100)"
+          icon={<Smartphone className="w-[17px] h-[17px]" />}
+          label="Con el celular del vecino"
+          sub="DNI + selfie validados contra RENAPER"
+          chip={chip ? <span className={`av2-chip-estado av2-chip-estado--${chip.tono}`}>{chip.label}</span> : undefined}
         >
-          <PanelCelular onAprobado={onBiometriaOk} onCargarManual={onCargarManual} />
+          <PanelCelular
+            onAprobado={onBiometriaOk}
+            onCargarManual={onCargarManual}
+            onFase={setFaseCelular}
+          />
         </ColumnaModo>
       </div>
 
-      {/* Footer con búsqueda libre y carga manual */}
+      {/* Escape hatch de la pantalla: reclamo sin identificar (solo reclamos). */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
+        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs"
+        style={{
+          backgroundColor: 'var(--pl-surface)',
+          border: '1px solid var(--pl-border)',
+          color: 'var(--pl-text-muted)',
+        }}
       >
-        <div className="flex items-center gap-3 flex-wrap">
-          <span>¿No tenés el dato exacto?</span>
-          <button
-            onClick={() => setBusquedaLibreAbierta((v) => !v)}
-            className="font-semibold hover:underline"
-            style={{ color: theme.primary }}
-          >
-            Buscar por nombre / apellido
-          </button>
-          <span style={{ color: theme.border }}>·</span>
-          <button
-            onClick={() => onCargarManual()}
-            className="font-semibold hover:underline"
-            style={{ color: theme.primary }}
-          >
-            Cargar vecino nuevo
-          </button>
-          <span style={{ color: theme.border }}>·</span>
-          <button
-            onClick={onReclamoAnonimo}
-            className="font-semibold hover:underline"
-            style={{ color: theme.primary }}
-            title="Cargar un reclamo sin identificar al vecino (solo reclamos)"
-          >
-            Reclamo anónimo
-          </button>
-        </div>
-        <span className="opacity-70">Última sincronización RENAPER: hace 2 min</span>
+        <span>Si el vecino no quiere identificarse, sólo se puede cargar un reclamo.</span>
+        <button type="button" onClick={onReclamoAnonimo} className="av2-btn-secundario">
+          <AlertTriangle className="w-3.5 h-3.5" aria-hidden />
+          Reclamo anónimo
+        </button>
       </div>
 
       {busquedaLibreAbierta && (
@@ -399,36 +487,45 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual, o
   );
 }
 
-// ColumnaModo — wrapper de cada columna con header (icono + título + sub)
-// y el contenido del modo dentro. Card unificada con borde + altura 100%.
-function ColumnaModo({ color, icon, label, sub, children }: {
+// ColumnaModo — wrapper de cada columna con header (tile + título + sub +
+// chip opcional) y el contenido del modo dentro. Superficie del kit.
+function ColumnaModo({ color, fondo, icon, label, sub, chip, children }: {
   color: string;
+  fondo: string;
   icon: React.ReactNode;
   label: string;
   sub: string;
+  chip?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const { theme } = useTheme();
   return (
     <div
-      className="rounded-xl p-4 flex flex-col gap-4 h-full"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      className="p-5 flex flex-col gap-4 h-full"
+      style={{
+        backgroundColor: 'var(--pl-surface)',
+        border: '1px solid var(--pl-border)',
+        borderRadius: 'var(--pl-radius-lg)',
+      }}
     >
-      <div className="flex items-start gap-3 pb-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
+      <div className="flex items-center gap-3">
         <span
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${color}15`, color }}
+          className="w-[34px] h-[34px] flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: fondo, color, borderRadius: 'var(--pl-radius-md)' }}
         >
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
+          <div
+            className="text-[15px] font-bold leading-tight"
+            style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+          >
             {label}
           </div>
-          <div className="text-[11px] mt-0.5 leading-snug" style={{ color: theme.textSecondary }}>
+          <div className="text-[11.5px] mt-0.5 leading-snug" style={{ color: 'var(--pl-text-muted)' }}>
             {sub}
           </div>
         </div>
+        {chip}
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
         {children}
@@ -440,11 +537,11 @@ function ColumnaModo({ color, icon, label, sub, children }: {
 // ============================================================
 // PanelDni — input compacto + resultados enriquecidos
 // ============================================================
-function PanelDni({ onUsar, onCargarManual }: {
+function PanelDni({ onUsar, onCargarManual, onBuscarPorNombre }: {
   onUsar: (v: VecinoEncontrado) => void;
   onCargarManual: (dniPrefill?: string) => void;
+  onBuscarPorNombre: () => void;
 }) {
-  const { theme } = useTheme();
   const [dni, setDni] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [resultados, setResultados] = useState<VecinoEncontrado[] | null>(null);
@@ -489,13 +586,17 @@ function PanelDni({ onUsar, onCargarManual }: {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full flex flex-col flex-1">
       <div className="flex items-center gap-2">
         <div
-          className="flex items-center gap-2 px-3 py-2 rounded-lg flex-1 min-w-0"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          className="flex items-center gap-2 px-3 h-9 flex-1 min-w-0"
+          style={{
+            backgroundColor: 'var(--pl-surface)',
+            border: '1px solid var(--pl-border-strong)',
+            borderRadius: 'var(--pl-radius-md)',
+          }}
         >
-          <Search className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+          <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--pl-text-faint)' }} />
           <input
             ref={inputRef}
             type="text"
@@ -504,47 +605,49 @@ function PanelDni({ onUsar, onCargarManual }: {
             onChange={(e) => { setDni(e.target.value.replace(/\D/g, '').slice(0, 9)); setSinResultados(false); }}
             onKeyDown={handleKeyDown}
             placeholder="DNI sin puntos"
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm font-mono tabular-nums tracking-wider"
-            style={{ color: theme.text }}
+            className="av2-tnum flex-1 min-w-0 bg-transparent outline-none text-sm font-semibold tracking-wider"
+            style={{ color: 'var(--pl-text)' }}
             maxLength={9}
           />
           {dni && !buscando && (
             <button
+              type="button"
               onClick={limpiar}
-              className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-black/5 flex-shrink-0"
-              style={{ color: theme.textSecondary }}
+              className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ color: 'var(--pl-text-faint)' }}
               title="Limpiar (ESC)"
+              aria-label="Limpiar"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
         <button
+          type="button"
           onClick={buscar}
           disabled={buscando || !dni.trim()}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 flex-shrink-0"
-          style={{ backgroundColor: theme.primary }}
+          className="av2-btn-primario flex-shrink-0"
         >
           {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           Buscar
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: theme.textSecondary }}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
         <span className="inline-flex items-center gap-1">
-          <Sparkles className="w-3 h-3" style={{ color: theme.primary }} />
-          Si no está en el padrón, validá con RENAPER (modo Celular).
+          <Sparkles className="w-3 h-3" style={{ color: 'var(--pl-green)' }} />
+          Si no está en el padrón, validá con RENAPER (columna de al lado).
         </span>
       </div>
 
       {resultados && resultados.length > 0 && (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+            <p className="av2-eyebrow">
               {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
             </p>
-            <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-              <kbd className="px-1 py-0.5 rounded text-[10px] font-mono" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>↵</kbd> usa el primero
+            <p className="text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
+              <Kbd>↵</Kbd> usa el primero
             </p>
           </div>
           <div className="space-y-2">
@@ -555,92 +658,111 @@ function PanelDni({ onUsar, onCargarManual }: {
         </div>
       )}
 
-      {sinResultados && (
-        <div
-          className="mt-4 flex items-start gap-3 p-3 rounded-xl"
-          style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b40' }}
-        >
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
-          <div className="flex-1 text-xs">
-            <p className="font-semibold" style={{ color: theme.text }}>
-              No encontramos vecino con DNI {dni}
-            </p>
-            <p style={{ color: theme.textSecondary }}>
-              Probá con biometría (cliente nuevo) o cargá los datos a mano.
-            </p>
-            <button
-              onClick={() => onCargarManual(dni)}
-              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
-              style={{ backgroundColor: theme.primary }}
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Cargar a mano con este DNI
-            </button>
-          </div>
-        </div>
-      )}
+      {sinResultados && <AvisoSinPadron dni={dni} onCargarManual={onCargarManual} />}
+
+      {/* Salidas del modo DNI, ancladas al pie de la tarjeta (referencia). */}
+      <div className="flex gap-2 mt-auto pt-4 flex-wrap">
+        <button type="button" onClick={onBuscarPorNombre} className="av2-btn-secundario">
+          Buscar por nombre
+        </button>
+        <button type="button" onClick={() => onCargarManual()} className="av2-btn-secundario">
+          Cargar vecino a mano
+        </button>
+      </div>
     </div>
   );
 }
 
 // ============================================================
-// ResultadoVecino — fila enriquecida (avatar + badges + signal deuda)
+// AvisoSinPadron — bloque ámbar "no está en el padrón" (DRY: lo usan el
+// panel de DNI y la búsqueda libre).
+// ============================================================
+function AvisoSinPadron({ dni, onCargarManual }: {
+  dni?: string;
+  onCargarManual: (dniPrefill?: string) => void;
+}) {
+  return (
+    <div
+      className="mt-4 flex items-start gap-3 p-3"
+      style={{
+        backgroundColor: 'var(--pl-amber-100)',
+        borderRadius: 'var(--pl-radius-md)',
+        color: 'var(--pl-amber-700)',
+      }}
+    >
+      <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden />
+      <div className="flex-1 text-xs">
+        <p className="font-semibold">
+          {dni ? `No hay vecino con el DNI ${dni} en el padrón` : 'Sin coincidencias en el padrón'}
+        </p>
+        <p className="opacity-80 mt-0.5">
+          Validalo con el celular (columna de al lado) o cargá los datos a mano.
+        </p>
+        <button
+          type="button"
+          onClick={() => onCargarManual(dni)}
+          className="av2-btn-secundario mt-2"
+        >
+          <Edit3 className="w-3.5 h-3.5" aria-hidden />
+          {dni ? 'Cargar a mano con este DNI' : 'Cargar a mano'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ResultadoVecino — fila enriquecida (avatar + badges + contacto)
 // ============================================================
 function ResultadoVecino({ vecino: v, selected, onUsar }: {
   vecino: VecinoEncontrado;
   selected?: boolean;
   onUsar: (v: VecinoEncontrado) => void;
 }) {
-  const { theme } = useTheme();
   const verificado = v.nivel_verificacion >= 2;
   const isAssisted = v.kyc_modo === 'assisted';
   return (
     <button
+      type="button"
       onClick={() => onUsar(v)}
-      className="w-full text-left p-3 rounded-xl flex items-center gap-3 transition-all hover:shadow-md"
+      className="w-full text-left p-3 flex items-center gap-3 transition-all hover:shadow-md"
       style={{
-        backgroundColor: theme.backgroundSecondary,
-        border: `1.5px solid ${selected ? `${theme.primary}60` : theme.border}`,
-        boxShadow: selected ? `0 4px 16px ${theme.primary}15` : 'none',
+        backgroundColor: 'var(--pl-surface-2)',
+        border: `1.5px solid ${selected ? 'var(--pl-green-200)' : 'var(--pl-border)'}`,
+        borderRadius: 'var(--pl-radius-lg)',
       }}
     >
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-        style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+        className="w-11 h-11 flex items-center justify-center text-sm font-bold flex-shrink-0"
+        style={{
+          backgroundColor: 'var(--pl-green-100)',
+          color: 'var(--pl-green-700)',
+          borderRadius: 'var(--pl-radius-md)',
+        }}
       >
         {(v.nombre?.[0] || '?')}{(v.apellido?.[0] || '')}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-bold truncate" style={{ color: theme.text }}>
+          <p className="text-sm font-bold truncate" style={{ color: 'var(--pl-text)' }}>
             {v.nombre} {v.apellido}
           </p>
           {verificado && (
-            <span
-              className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-              style={{
-                backgroundColor: isAssisted ? '#8b5cf620' : '#22c55e20',
-                color: isAssisted ? '#8b5cf6' : '#22c55e',
-              }}
-            >
-              <ShieldCheck className="w-3 h-3" />
+            <span className={`av2-chip-estado av2-chip-estado--${isAssisted ? 'blue' : 'green'}`}>
               {isAssisted ? 'Asistido' : 'Verificado'}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[11px] mt-0.5 flex-wrap" style={{ color: theme.textSecondary }}>
-          <span className="inline-flex items-center gap-1"><IdCard className="w-3 h-3" /> <span className="font-mono">{v.dni}</span></span>
+        <div className="flex items-center gap-3 text-[11px] mt-0.5 flex-wrap" style={{ color: 'var(--pl-text-muted)' }}>
+          <span className="inline-flex items-center gap-1"><IdCard className="w-3 h-3" /> <span className="av2-tnum">{v.dni}</span></span>
           {v.telefono && <span className="inline-flex items-center gap-1"><Smartphone className="w-3 h-3" /> {v.telefono}</span>}
           {v.email && <span className="inline-flex items-center gap-1 truncate"><Mail className="w-3 h-3" /> {v.email}</span>}
         </div>
       </div>
-      <div
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white flex-shrink-0"
-        style={{ backgroundColor: theme.primary }}
-      >
+      <span className="av2-btn-primario flex-shrink-0">
         Usar
         <ChevronRight className="w-3.5 h-3.5" />
-      </div>
+      </span>
     </button>
   );
 }
@@ -650,9 +772,8 @@ function ResultadoVecino({ vecino: v, selected, onUsar }: {
 // ============================================================
 function BusquedaLibre({ onUsar, onCargarManual }: {
   onUsar: (v: VecinoEncontrado) => void;
-  onCargarManual: () => void;
+  onCargarManual: (dniPrefill?: string) => void;
 }) {
-  const { theme } = useTheme();
   const [q, setQ] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [resultados, setResultados] = useState<VecinoEncontrado[] | null>(null);
@@ -681,14 +802,21 @@ function BusquedaLibre({ onUsar, onCargarManual }: {
 
   return (
     <div
-      className="rounded-2xl p-4 space-y-3 w-full max-w-xl"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      className="p-5 space-y-3 w-full"
+      style={{
+        backgroundColor: 'var(--pl-surface)',
+        border: '1px solid var(--pl-border)',
+        borderRadius: 'var(--pl-radius-lg)',
+      }}
     >
       <div>
-        <p className="text-sm font-semibold" style={{ color: theme.text }}>
+        <p
+          className="text-[15px] font-bold"
+          style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+        >
           Buscar por nombre, apellido o DNI parcial
         </p>
-        <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+        <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--pl-text-muted)' }}>
           Útil cuando el vecino no se acuerda el DNI completo.
         </p>
       </div>
@@ -700,18 +828,19 @@ function BusquedaLibre({ onUsar, onCargarManual }: {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
           placeholder="Ej: Pérez · Juan · 30217"
-          className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+          className="flex-1 min-w-0 px-3 h-9 text-sm outline-none"
           style={{
-            backgroundColor: theme.backgroundSecondary,
-            color: theme.text,
-            border: `1px solid ${theme.border}`,
+            backgroundColor: 'var(--pl-surface)',
+            color: 'var(--pl-text)',
+            border: '1px solid var(--pl-border-strong)',
+            borderRadius: 'var(--pl-radius-md)',
           }}
         />
         <button
+          type="button"
           onClick={buscar}
           disabled={buscando || q.trim().length < 2}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-          style={{ backgroundColor: theme.primary }}
+          className="av2-btn-primario flex-shrink-0"
         >
           {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           Buscar
@@ -726,32 +855,13 @@ function BusquedaLibre({ onUsar, onCargarManual }: {
         </div>
       )}
 
-      {sinResultados && (
-        <div
-          className="flex items-start gap-3 p-3 rounded-xl"
-          style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b40' }}
-        >
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
-          <div className="flex-1 text-xs">
-            <p className="font-semibold" style={{ color: theme.text }}>Sin coincidencias</p>
-            <p style={{ color: theme.textSecondary }}>Probá otra palabra o cargalo a mano si es nuevo.</p>
-            <button
-              onClick={() => onCargarManual()}
-              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
-              style={{ backgroundColor: theme.primary }}
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Cargar a mano
-            </button>
-          </div>
-        </div>
-      )}
+      {sinResultados && <AvisoSinPadron onCargarManual={onCargarManual} />}
     </div>
   );
 }
 
 // ============================================================
-// Hub — VecinoStrip + 3 GestionCards + RecentActivity
+// Hub — VecinoStrip + 4 GestionCards + RecentActivity
 // ============================================================
 function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTurno, onReset }: {
   vecino: KycDatos;
@@ -762,8 +872,6 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
   onIrTurno: () => void;
   onReset: () => void;
 }) {
-  const { theme } = useTheme();
-
   // Regla de negocio: TRAMITES exigen identidad validada (RENAPER, nivel >= 2
   // o sesion biometrica de esta atencion). RECLAMOS y turnos: alta simple.
   const tramiteHabilitado = (vecino.nivel_verificacion ?? 0) >= 2 || !!kycSessionId;
@@ -793,14 +901,12 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
   }, [onIrReclamo, irTramiteGuard, onIrTasas, onIrTurno, onReset]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 mt-3">
       <VecinoStrip vecino={vecino} kycSessionId={kycSessionId} onReset={onReset} />
 
       <div className="flex items-center justify-between gap-2 px-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-          ¿Qué gestión vamos a iniciar?
-        </span>
-        <span className="hidden sm:flex items-center gap-2 text-[11px]" style={{ color: theme.textSecondary }}>
+        <span className="av2-eyebrow">¿Qué gestión vamos a iniciar?</span>
+        <span className="hidden sm:flex items-center gap-2 text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
           <Kbd>R</Kbd> reclamo
           <Kbd>T</Kbd> trámite
           <Kbd>U</Kbd> turno
@@ -811,47 +917,46 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <GestionCard
-          color="#3b82f6"
+          color="var(--pl-blue)"
+          fondo="var(--pl-blue-100)"
           icon={<AlertTriangle className="w-5 h-5" />}
           kbd="R"
           title="Reclamo"
           subtitle="Reportar problema urbano (bache, alumbrado, residuos, ramas)"
-          contextBadge={{ tone: 'amber', text: '2 abiertos en la zona' }}
           ctaLabel="Cargar reclamo"
           onStart={onIrReclamo}
         />
         <GestionCard
-          color="#22c55e"
+          color="var(--pl-green)"
+          fondo="var(--pl-green-100)"
           icon={<FileText className="w-5 h-5" />}
           kbd="T"
           title="Trámite"
           subtitle={tramiteHabilitado
             ? 'Iniciar trámite. Mandá requisitos por WhatsApp o imprimí el PDF.'
             : 'Requiere validar la identidad del vecino con RENAPER (opción "Por celular").'}
-          contextBadge={tramiteHabilitado
-            ? { tone: 'violet', text: 'AI ayuda a clasificar' }
-            : { tone: 'red', text: 'Requiere RENAPER' }}
+          contextBadge={tramiteHabilitado ? undefined : { tone: 'red', text: 'Requiere RENAPER' }}
           highlighted={tramiteHabilitado}
           ctaLabel={tramiteHabilitado ? 'Iniciar trámite' : 'Falta RENAPER'}
           onStart={irTramiteGuard}
         />
         <GestionCard
-          color="#f59e0b"
+          color="var(--pl-amber)"
+          fondo="var(--pl-amber-100)"
           icon={<CalendarClock className="w-5 h-5" />}
           kbd="U"
           title="Turno"
           subtitle="Tomar turno para un trámite presencial (el vecino se va con día y hora)"
-          contextBadge={{ tone: 'amber', text: 'Turno-first' }}
           ctaLabel="Tomar turno"
           onStart={onIrTurno}
         />
         <GestionCard
-          color="#8b5cf6"
+          color="var(--pl-text-3)"
+          fondo="var(--pl-track)"
           icon={<Banknote className="w-5 h-5" />}
           kbd="D"
           title="Tasas"
           subtitle="Pagar tasas pendientes (ABL, patente, cementerio, multas)"
-          contextBadge={{ tone: 'gray', text: 'Sin deuda registrada' }}
           ctaLabel="Ver deudas"
           onStart={onIrTasas}
         />
@@ -863,14 +968,14 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
-  const { theme } = useTheme();
   return (
     <kbd
-      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold"
+      className="av2-tnum inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold"
       style={{
-        backgroundColor: theme.backgroundSecondary,
-        border: `1px solid ${theme.border}`,
-        color: theme.textSecondary,
+        backgroundColor: 'var(--pl-track)',
+        border: '1px solid var(--pl-border)',
+        borderRadius: 'var(--pl-radius-sm)',
+        color: 'var(--pl-text-3)',
       }}
     >
       {children}
@@ -879,59 +984,56 @@ function Kbd({ children }: { children: React.ReactNode }) {
 }
 
 // ============================================================
-// VecinoStrip — franja con avatar, datos y stats laterales
+// VecinoStrip — franja "identidad validada" con los datos del vecino
 // ============================================================
 function VecinoStrip({ vecino, kycSessionId, onReset }: {
   vecino: KycDatos;
   kycSessionId: string | null;
   onReset: () => void;
 }) {
-  const { theme } = useTheme();
+  const verificado = !!kycSessionId || (vecino.nivel_verificacion ?? 0) >= 2;
   return (
     <div
-      className="rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3"
+      className="p-4 flex flex-wrap items-center justify-between gap-3"
       style={{
-        background: `linear-gradient(135deg, ${theme.primary}10 0%, ${theme.card} 100%)`,
-        border: `1px solid ${theme.primary}30`,
+        backgroundColor: verificado ? 'var(--pl-green-050)' : 'var(--pl-surface)',
+        border: `1px solid ${verificado ? 'var(--pl-green-200)' : 'var(--pl-border)'}`,
+        borderRadius: 'var(--pl-radius-lg)',
       }}
     >
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-base font-bold flex-shrink-0"
-          style={{ backgroundColor: `${theme.primary}25`, color: theme.primary }}
+          className="w-12 h-12 flex items-center justify-center text-base font-bold flex-shrink-0"
+          style={{
+            backgroundColor: 'var(--pl-green-100)',
+            color: 'var(--pl-green-700)',
+            borderRadius: 'var(--pl-radius-md)',
+          }}
         >
           {(vecino.nombre?.[0] || '?')}{(vecino.apellido?.[0] || '')}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-base font-bold truncate" style={{ color: theme.text }}>
+            <p className="text-base font-bold truncate" style={{ color: 'var(--pl-text)' }}>
               {vecino.nombre || '—'} {vecino.apellido || ''}
             </p>
-            {(kycSessionId || (vecino.nivel_verificacion ?? 0) >= 2) && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0"
-                style={{ backgroundColor: '#22c55e20', color: '#22c55e' }}
-              >
-                <ShieldCheck className="w-3 h-3" />
+            {verificado && (
+              <span className="av2-chip-estado av2-chip-estado--green">
                 {kycSessionId ? 'Verificado RENAPER' : 'Identidad verificada'}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 text-[11px] mt-0.5 flex-wrap" style={{ color: theme.textSecondary }}>
-            <span className="inline-flex items-center gap-1"><IdCard className="w-3 h-3" /> DNI <span className="font-mono">{vecino.dni || '—'}</span></span>
+          <div className="flex items-center gap-3 text-[11px] mt-0.5 flex-wrap" style={{ color: 'var(--pl-text-muted)' }}>
+            <span className="inline-flex items-center gap-1"><IdCard className="w-3 h-3" /> DNI <span className="av2-tnum">{vecino.dni || '—'}</span></span>
             {vecino.telefono && <span className="inline-flex items-center gap-1"><Smartphone className="w-3 h-3" /> {vecino.telefono}</span>}
             {vecino.email && <span className="inline-flex items-center gap-1 truncate"><Mail className="w-3 h-3" /> {vecino.email}</span>}
             {vecino.direccion && <span className="inline-flex items-center gap-1 truncate"><MapPin className="w-3 h-3" /> {vecino.direccion}</span>}
           </div>
         </div>
       </div>
-      <button
-        onClick={onReset}
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-105 active:scale-95"
-        style={{ color: theme.textSecondary, backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <RefreshCcw className="w-3 h-3" />
-        Cambiar
+      <button type="button" onClick={onReset} className="av2-btn-secundario flex-shrink-0">
+        <RefreshCcw className="w-3.5 h-3.5" aria-hidden />
+        Cambiar vecino
       </button>
     </div>
   );
@@ -940,79 +1042,60 @@ function VecinoStrip({ vecino, kycSessionId, onReset }: {
 // ============================================================
 // GestionCard — card con context badge, kbd y CTA
 // ============================================================
-function GestionCard({ color, icon, kbd, title, subtitle, contextBadge, highlighted, ctaLabel, onStart }: {
+function GestionCard({ color, fondo, icon, kbd, title, subtitle, contextBadge, highlighted, ctaLabel, onStart }: {
   color: string;
+  fondo: string;
   icon: React.ReactNode;
   kbd: string;
   title: string;
   subtitle: string;
-  contextBadge?: { tone: 'amber' | 'violet' | 'red' | 'gray'; text: string };
+  contextBadge?: { tone: 'amber' | 'blue' | 'red' | 'gray' | 'green'; text: string };
   highlighted?: boolean;
   ctaLabel: string;
   onStart: () => void;
 }) {
-  const { theme } = useTheme();
-  const toneColors: Record<string, { bg: string; fg: string }> = {
-    amber: { bg: '#f59e0b18', fg: '#d97706' },
-    violet: { bg: '#8b5cf618', fg: '#7c3aed' },
-    red: { bg: '#ef444418', fg: '#dc2626' },
-    gray: { bg: `${theme.textSecondary}15`, fg: theme.textSecondary },
-  };
-  const tone = contextBadge ? toneColors[contextBadge.tone] : null;
-
   return (
     <button
+      type="button"
       onClick={onStart}
-      className="text-left rounded-2xl p-4 flex flex-col transition-all hover:scale-[1.02] active:scale-[0.99] hover:shadow-lg"
+      className="text-left p-4 flex flex-col transition-all hover:shadow-lg"
       style={{
-        backgroundColor: theme.card,
-        border: `1.5px solid ${highlighted ? color : color + '40'}`,
-        boxShadow: highlighted ? `0 8px 24px ${color}25` : 'none',
+        backgroundColor: 'var(--pl-surface)',
+        border: '1px solid var(--pl-border)',
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 'var(--pl-radius-lg)',
       }}
     >
       <div className="flex items-center gap-2 mb-3">
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: `${color}20`, color }}
+          className="w-10 h-10 flex items-center justify-center"
+          style={{ backgroundColor: fondo, color, borderRadius: 'var(--pl-radius-md)' }}
         >
           {icon}
         </div>
         {highlighted && (
-          <span
-            className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-            style={{ backgroundColor: `${color}20`, color }}
-          >
-            <Sparkles className="w-3 h-3" /> Sugerido
-          </span>
+          <span className="av2-chip-estado av2-chip-estado--green">Sugerido</span>
         )}
-        <kbd
-          className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold"
-          style={{
-            backgroundColor: theme.backgroundSecondary,
-            border: `1px solid ${theme.border}`,
-            color: theme.textSecondary,
-          }}
-        >
-          {kbd}
-        </kbd>
+        <span className="ml-auto">
+          <Kbd>{kbd}</Kbd>
+        </span>
       </div>
-      <h3 className="text-base font-bold mb-1" style={{ color: theme.text }}>{title}</h3>
-      <p className="text-xs flex-1 mb-3 leading-relaxed" style={{ color: theme.textSecondary }}>
+      <h3
+        className="text-base font-bold mb-1"
+        style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+      >
+        {title}
+      </h3>
+      <p className="text-xs flex-1 mb-3 leading-relaxed" style={{ color: 'var(--pl-text-muted)' }}>
         {subtitle}
       </p>
-      <div className="flex items-center justify-between gap-2 mt-auto">
-        {tone && contextBadge && (
-          <span
-            className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: tone.bg, color: tone.fg }}
-          >
+      <div className="flex items-center justify-between gap-2 mt-auto flex-wrap">
+        {contextBadge && (
+          <span className={`av2-chip-estado av2-chip-estado--${contextBadge.tone}`}>
             {contextBadge.text}
           </span>
         )}
-        <span
-          className="inline-flex items-center gap-1 text-xs font-semibold ml-auto"
-          style={{ color }}
-        >
+        <span className="inline-flex items-center gap-1 text-xs font-semibold ml-auto" style={{ color }}>
           {ctaLabel}
           <ChevronRight className="w-3.5 h-3.5" />
         </span>
@@ -1022,35 +1105,44 @@ function GestionCard({ color, icon, kbd, title, subtitle, contextBadge, highligh
 }
 
 // ============================================================
-// RecentActivity — historial del vecino (mock por ahora, ver TODO)
+// RecentActivity — historial del vecino (ver TODO del endpoint)
 // ============================================================
 function RecentActivity({ vecino }: { vecino: KycDatos }) {
-  const { theme } = useTheme();
   // TODO: conectar a un endpoint /api/operador/historial/{user_id}.
   // Por ahora muestra placeholder vacío en producción (sin datos mock).
   // El layout queda en el componente para cuando llegue el endpoint.
   const nombre = vecino.nombre || 'el vecino';
   return (
     <div
-      className="rounded-2xl p-4"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      className="p-4"
+      style={{
+        backgroundColor: 'var(--pl-surface)',
+        border: '1px solid var(--pl-border)',
+        borderRadius: 'var(--pl-radius-lg)',
+      }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="inline-flex items-center gap-2 text-xs font-semibold" style={{ color: theme.text }}>
-          <Clock className="w-3.5 h-3.5" />
-          Actividad reciente de {nombre}
-        </div>
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <span className="av2-eyebrow inline-flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5" aria-hidden />
+          Gestiones previas de {nombre}
+        </span>
         <button
-          className="inline-flex items-center gap-1 text-[11px] font-medium hover:underline"
-          style={{ color: theme.primary }}
+          type="button"
+          className="inline-flex items-center gap-1 text-[11px] font-semibold hover:underline"
+          style={{ color: 'var(--pl-green-700)' }}
           onClick={() => { /* TODO: navegar a historial completo */ }}
         >
           Ver historial completo <ExternalLink className="w-3 h-3" />
         </button>
       </div>
       <div
-        className="rounded-xl p-6 text-center text-xs"
-        style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px dashed ${theme.border}` }}
+        className="p-6 text-center text-xs"
+        style={{
+          backgroundColor: 'var(--pl-surface-2)',
+          color: 'var(--pl-text-muted)',
+          border: '1px dashed var(--pl-border-strong)',
+          borderRadius: 'var(--pl-radius-md)',
+        }}
       >
         <ClipboardList className="w-5 h-5 mx-auto mb-2 opacity-50" />
         Sin historial cargado todavía
@@ -1062,14 +1154,12 @@ function RecentActivity({ vecino }: { vecino: KycDatos }) {
 // ============================================================
 // PanelCelular — handoff PC ↔ celular: QR + Didit + steps en vivo
 // ============================================================
-function PanelCelular({ onAprobado, onCargarManual }: {
+function PanelCelular({ onAprobado, onCargarManual, onFase }: {
   onAprobado: (datos: KycDatos, sessionId: string) => void;
   onCargarManual: () => void;
+  onFase: (fase: FaseCelular) => void;
 }) {
-  const { theme } = useTheme();
-  const [phase, setPhase] = useState<
-    'idle' | 'creating' | 'awaiting' | 'in_progress' | 'completed' | 'rejected' | 'cancelled' | 'expired' | 'error'
-  >('idle');
+  const [phase, setPhase] = useState<FaseCelular>('idle');
   const [handoffToken, setHandoffToken] = useState<string | null>(null);
   const [qrValue, setQrValue] = useState<string | null>(null);
   const [diditUrl, setDiditUrl] = useState<string | null>(null);
@@ -1080,6 +1170,10 @@ function PanelCelular({ onAprobado, onCargarManual }: {
     datos: KycDatos;
     sessionId: string;
   } | null>(null);
+
+  // El chip de estado vive en la cabecera de la columna (la pinta el padre):
+  // le avisamos cada vez que cambia la fase real del handoff.
+  useEffect(() => { onFase(phase); }, [phase, onFase]);
 
   // Polling de estado
   useEffect(() => {
@@ -1192,41 +1286,47 @@ function PanelCelular({ onAprobado, onCargarManual }: {
     setPhase('idle');
   };
 
+  // Copy del pie de la barra, derivado del avance REAL del polling.
+  const leyendaAvance =
+    stepProgress <= 30 ? 'Paso 1 de 4 · esperando que escanee'
+      : stepProgress <= 60 ? 'Paso 2 de 4 · foto del DNI'
+        : stepProgress <= 85 ? 'Paso 3 de 4 · selfie con prueba de vida'
+          : 'Paso 4 de 4 · validando contra RENAPER';
+
   return (
     <div className="w-full h-full flex flex-col">
       {phase === 'idle' && (
         <div className="text-center space-y-4 flex flex-col items-center justify-center flex-1 py-4">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto"
-            style={{ backgroundColor: '#22c55e15' }}
+            className="inline-flex items-center justify-center w-16 h-16 mx-auto"
+            style={{ backgroundColor: 'var(--pl-blue-100)', borderRadius: 'var(--pl-radius-lg)' }}
           >
-            <Smartphone className="w-8 h-8" style={{ color: '#22c55e' }} />
+            <Smartphone className="w-8 h-8" style={{ color: 'var(--pl-blue)' }} />
           </div>
           <div>
-            <h3 className="text-base font-bold" style={{ color: theme.text }}>
-              Validar identidad con tu celular
+            <h3
+              className="text-base font-bold"
+              style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+            >
+              Validar identidad con el celular
             </h3>
-            <p className="text-sm mt-1 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
+            <p className="text-sm mt-1 max-w-md mx-auto" style={{ color: 'var(--pl-text-muted)' }}>
               Generamos un QR. Lo escaneás con tu celular y validás al vecino con la cámara
               del celu (<b>DNI</b> + <b>selfie</b> + <b>RENAPER</b>). Cuando termina, la PC se completa sola.
             </p>
           </div>
-          <div className="flex items-center justify-center gap-3 text-[11px]" style={{ color: theme.textSecondary }}>
+          <div className="flex items-center justify-center gap-3 text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
             <span className="inline-flex items-center gap-1"><QrCode className="w-3.5 h-3.5" /> QR</span>
             <span>·</span>
             <span className="inline-flex items-center gap-1"><Smartphone className="w-3.5 h-3.5" /> celular</span>
             <span>·</span>
             <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> RENAPER</span>
           </div>
-          <button
-            onClick={generar}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
-            style={{ backgroundColor: '#22c55e' }}
-          >
+          <button type="button" onClick={generar} className="av2-btn-primario">
             <QrCode className="w-4 h-4" />
             Generar QR
           </button>
-          <div className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
+          <div className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
             <ShieldCheck className="w-3 h-3" />
             Validación biométrica oficial · sin tocar la PC de la municipalidad
           </div>
@@ -1235,41 +1335,52 @@ function PanelCelular({ onAprobado, onCargarManual }: {
 
       {phase === 'creating' && (
         <div className="text-center py-6 space-y-3">
-          <Loader2 className="w-10 h-10 mx-auto animate-spin" style={{ color: '#22c55e' }} />
-          <p className="text-sm" style={{ color: theme.textSecondary }}>Generando sesión…</p>
+          <Loader2 className="w-10 h-10 mx-auto animate-spin" style={{ color: 'var(--pl-blue)' }} />
+          <p className="text-sm" style={{ color: 'var(--pl-text-muted)' }}>Generando sesión…</p>
         </div>
       )}
 
       {(phase === 'awaiting' || phase === 'in_progress') && qrValue && (
-        <div className="grid grid-cols-1 md:grid-cols-[220px,1fr] gap-6 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[160px,1fr] gap-5 items-start">
           {/* QR del lado izquierdo */}
           <div className="flex flex-col items-center gap-2">
             <div
-              className="p-3 rounded-2xl bg-white"
-              style={{ border: `2px solid ${phase === 'in_progress' ? '#22c55e' : theme.border}` }}
+              className="p-3 bg-white"
+              style={{
+                border: `2px solid ${phase === 'in_progress' ? 'var(--pl-blue)' : 'var(--pl-border-strong)'}`,
+                borderRadius: 'var(--pl-radius-lg)',
+              }}
             >
               <QRCodeSVG
                 value={qrValue}
-                size={180}
+                size={132}
                 level="M"
                 includeMargin={false}
                 bgColor="#ffffff"
                 fgColor="#0f172a"
               />
             </div>
-            <div className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
+            <div className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
               <RefreshCcw className="w-3 h-3" />
-              <span>Expira en <b style={{ color: theme.text }} className="font-mono tabular-nums">{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</b></span>
+              <span>
+                Expira en{' '}
+                <b className="av2-tnum" style={{ color: 'var(--pl-text)' }}>
+                  {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+                </b>
+              </span>
             </div>
           </div>
 
           {/* Steps + progreso del lado derecho */}
           <div className="space-y-2 min-w-0">
             <div>
-              <h3 className="text-base font-bold" style={{ color: theme.text }}>
+              <h3
+                className="text-base font-bold"
+                style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+              >
                 {phase === 'in_progress' ? 'Capturando en el celular…' : 'Escaneá con tu celular'}
               </h3>
-              <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+              <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--pl-text-muted)' }}>
                 {phase === 'in_progress'
                   ? 'No cierres esta ventana. La PC se completa sola al terminar.'
                   : 'Abrí la cámara del celu y apuntá al QR.'}
@@ -1282,43 +1393,47 @@ function PanelCelular({ onAprobado, onCargarManual }: {
               current={phase === 'in_progress' && stepProgress <= 30}
               index={2}
               label="Foto del DNI"
-              sub="Frente + dorso desde el celu del vecino"
+              sub="Frente y dorso desde el celular"
             />
             <QrStepRow
               done={stepProgress > 60}
               current={phase === 'in_progress' && stepProgress > 30 && stepProgress <= 60}
               index={3}
               label="Selfie con prueba de vida"
-              sub="El vecino mira a la cámara y parpadea"
+              sub="Mira a la cámara y parpadea"
             />
             <QrStepRow
               done={stepProgress > 85}
               current={phase === 'in_progress' && stepProgress > 60}
               index={4}
-              label="Validamos contra RENAPER"
+              label="Validación RENAPER"
               sub="Match biométrico oficial"
             />
 
             {/* Barra de progreso */}
             <div className="pt-2">
               <div
-                className="h-1.5 w-full rounded-full overflow-hidden"
-                style={{ backgroundColor: theme.backgroundSecondary }}
+                className="h-1.5 w-full overflow-hidden"
+                style={{ backgroundColor: 'var(--pl-track)', borderRadius: 'var(--pl-radius-pill)' }}
               >
                 <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${stepProgress}%`, backgroundColor: '#22c55e' }}
+                  className="h-full transition-all duration-500"
+                  style={{
+                    width: `${stepProgress}%`,
+                    backgroundColor: 'var(--pl-blue)',
+                    borderRadius: 'var(--pl-radius-pill)',
+                  }}
                 />
               </div>
-              <div className="flex items-center justify-between mt-1.5">
-                <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: theme.textSecondary }}>
-                  <Sparkles className="w-3 h-3" style={{ color: theme.primary }} />
-                  En progreso · {stepProgress}%
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <span className="text-[11.5px]" style={{ color: 'var(--pl-text-muted)' }}>
+                  {leyendaAvance}
                 </span>
                 <button
+                  type="button"
                   onClick={cancelar}
-                  className="text-[11px] px-2 py-1 rounded-md hover:bg-black/5"
-                  style={{ color: theme.textSecondary }}
+                  className="text-xs font-semibold hover:underline"
+                  style={{ color: 'var(--pl-text-3)' }}
                 >
                   Cancelar
                 </button>
@@ -1327,19 +1442,19 @@ function PanelCelular({ onAprobado, onCargarManual }: {
 
             {diditUrl && (
               <div
-                className="rounded-lg p-2.5 text-[11px] mt-2"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
+                className="flex items-center gap-2 mt-2 text-[11.5px]"
+                style={{ color: 'var(--pl-text-muted)' }}
               >
-                <span className="font-semibold mr-1" style={{ color: theme.text }}>¿No tenés el celu?</span>
+                <span>¿No trajo el celular?</span>
                 <a
                   href={diditUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 hover:underline"
-                  style={{ color: theme.primary }}
+                  className="inline-flex items-center gap-1 font-semibold hover:underline"
+                  style={{ color: 'var(--pl-green-700)' }}
                 >
                   <ExternalLink className="w-3 h-3" />
-                  Abrir en esta PC
+                  Hacerlo en esta PC
                 </a>
               </div>
             )}
@@ -1350,14 +1465,19 @@ function PanelCelular({ onAprobado, onCargarManual }: {
       {phase === 'completed' && (
         <div className="text-center py-4 space-y-3 animate-in fade-in zoom-in-95 duration-300">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto"
-            style={{ backgroundColor: '#22c55e20' }}
+            className="inline-flex items-center justify-center w-16 h-16 mx-auto"
+            style={{ backgroundColor: 'var(--pl-green-100)', borderRadius: 'var(--pl-radius-lg)' }}
           >
-            <CheckCircle2 className="w-9 h-9" style={{ color: '#22c55e' }} />
+            <CheckCircle2 className="w-9 h-9" style={{ color: 'var(--pl-green-700)' }} />
           </div>
           <div>
-            <h3 className="text-base font-bold" style={{ color: '#22c55e' }}>Identidad validada con RENAPER</h3>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
+            <h3
+              className="text-base font-bold"
+              style={{ color: 'var(--pl-green-700)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+            >
+              Identidad validada con RENAPER
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--pl-text-muted)' }}>
               Datos biométricos coinciden. Cargando ficha…
             </p>
           </div>
@@ -1367,26 +1487,23 @@ function PanelCelular({ onAprobado, onCargarManual }: {
       {phase === 'rejected' && (
         <div className="text-center py-6 space-y-3">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto"
-            style={{ backgroundColor: '#ef444420' }}
+            className="inline-flex items-center justify-center w-16 h-16 mx-auto"
+            style={{ backgroundColor: 'var(--pl-red-100)', borderRadius: 'var(--pl-radius-lg)' }}
           >
-            <AlertTriangle className="w-9 h-9" style={{ color: '#ef4444' }} />
+            <AlertTriangle className="w-9 h-9" style={{ color: 'var(--pl-red-700)' }} />
           </div>
-          <h3 className="text-base font-bold" style={{ color: '#ef4444' }}>Verificación rechazada</h3>
-          <p className="text-sm" style={{ color: theme.textSecondary }}>{error}</p>
+          <h3
+            className="text-base font-bold"
+            style={{ color: 'var(--pl-red-700)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+          >
+            Verificación rechazada
+          </h3>
+          <p className="text-sm" style={{ color: 'var(--pl-text-muted)' }}>{error}</p>
           <div className="flex items-center justify-center gap-2 pt-2">
-            <button
-              onClick={() => { reset(); generar(); }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-              style={{ backgroundColor: '#22c55e' }}
-            >
+            <button type="button" onClick={() => { reset(); generar(); }} className="av2-btn-primario">
               <RefreshCcw className="w-3.5 h-3.5" /> Reintentar
             </button>
-            <button
-              onClick={() => onCargarManual()}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-            >
+            <button type="button" onClick={() => onCargarManual()} className="av2-btn-secundario">
               Cargar a mano
             </button>
           </div>
@@ -1396,41 +1513,45 @@ function PanelCelular({ onAprobado, onCargarManual }: {
       {(phase === 'cancelled' || phase === 'expired') && (
         <div className="text-center py-6 space-y-3">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto"
-            style={{ backgroundColor: '#f59e0b20' }}
+            className="inline-flex items-center justify-center w-16 h-16 mx-auto"
+            style={{ backgroundColor: 'var(--pl-amber-100)', borderRadius: 'var(--pl-radius-lg)' }}
           >
-            <AlertTriangle className="w-9 h-9" style={{ color: '#d97706' }} />
+            <AlertTriangle className="w-9 h-9" style={{ color: 'var(--pl-amber-700)' }} />
           </div>
-          <h3 className="text-base font-bold" style={{ color: theme.text }}>
+          <h3
+            className="text-base font-bold"
+            style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
+          >
             {phase === 'cancelled' ? 'Sesión cancelada' : 'Sesión expirada'}
           </h3>
-          <button
-            onClick={() => { reset(); generar(); }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-            style={{ backgroundColor: '#22c55e' }}
-          >
-            <RefreshCcw className="w-3.5 h-3.5" /> Generar nuevo QR
-          </button>
+          <div className="flex justify-center">
+            <button type="button" onClick={() => { reset(); generar(); }} className="av2-btn-primario">
+              <RefreshCcw className="w-3.5 h-3.5" /> Generar nuevo QR
+            </button>
+          </div>
         </div>
       )}
 
       {phase === 'error' && (
         <div className="text-center py-6 space-y-3">
           <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto"
-            style={{ backgroundColor: '#ef444420' }}
+            className="inline-flex items-center justify-center w-16 h-16 mx-auto"
+            style={{ backgroundColor: 'var(--pl-red-100)', borderRadius: 'var(--pl-radius-lg)' }}
           >
-            <AlertTriangle className="w-9 h-9" style={{ color: '#ef4444' }} />
+            <AlertTriangle className="w-9 h-9" style={{ color: 'var(--pl-red-700)' }} />
           </div>
-          <h3 className="text-base font-bold" style={{ color: '#ef4444' }}>No se pudo iniciar</h3>
-          <p className="text-sm" style={{ color: theme.textSecondary }}>{error}</p>
-          <button
-            onClick={() => onCargarManual()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-            style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          <h3
+            className="text-base font-bold"
+            style={{ color: 'var(--pl-red-700)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
           >
-            Seguir con carga manual
-          </button>
+            No se pudo iniciar
+          </h3>
+          <p className="text-sm" style={{ color: 'var(--pl-text-muted)' }}>{error}</p>
+          <div className="flex justify-center">
+            <button type="button" onClick={() => onCargarManual()} className="av2-btn-secundario">
+              Seguir con carga manual
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1447,29 +1568,29 @@ function QrStepRow({ done, current, index, label, sub }: {
   label: string;
   sub: string;
 }) {
-  const { theme } = useTheme();
-  const color = done ? '#22c55e' : current ? '#22c55e' : theme.textSecondary;
   return (
     <div
-      className="flex items-start gap-2.5 p-2 rounded-lg"
+      className="flex items-start gap-2.5 p-2"
       style={{
-        backgroundColor: current ? '#22c55e08' : 'transparent',
-        border: current ? '1px solid #22c55e30' : '1px solid transparent',
+        backgroundColor: current ? 'var(--pl-blue-100)' : 'transparent',
+        border: `1px solid ${current ? 'var(--pl-blue)' : 'transparent'}`,
+        borderRadius: 'var(--pl-radius-md)',
       }}
     >
       <div
-        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
+        className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0 text-[10.5px] font-bold"
         style={{
-          backgroundColor: done ? '#22c55e' : current ? '#22c55e20' : theme.backgroundSecondary,
-          color: done ? '#fff' : color,
-          border: done ? 'none' : `1px solid ${current ? '#22c55e' : theme.border}`,
+          backgroundColor: done ? 'var(--pl-green)' : current ? 'var(--pl-blue-100)' : 'var(--pl-track)',
+          color: done ? 'var(--pl-on-brand)' : current ? 'var(--pl-blue-700)' : 'var(--pl-text-3)',
         }}
       >
-        {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : index}
+        {done ? <Check className="w-3 h-3" strokeWidth={3} /> : index}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold leading-tight" style={{ color: theme.text }}>{label}</div>
-        <div className="text-[10px] leading-tight" style={{ color: theme.textSecondary }}>{sub}</div>
+        <div className="text-[12.5px] font-semibold leading-tight" style={{ color: done || current ? 'var(--pl-text)' : 'var(--pl-text-2)' }}>
+          {label}
+        </div>
+        <div className="text-[11.5px] leading-tight" style={{ color: 'var(--pl-text-muted)' }}>{sub}</div>
       </div>
     </div>
   );
