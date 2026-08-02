@@ -34,6 +34,7 @@ import './styles/fila-lista.css'
 // bloque del dashboard: recorrido de los ultimos meses (reproductor)
 import './styles/tendencia-meses.css'
 import './styles/tarjeta-cola.css'
+import './styles/kpi-semantico.css'
 // componente del KIT: barra de filtros de una sola línea (pills ⇄ combos)
 import './styles/adaptive-filter.css'
 // componente del KIT: carrusel de cards de altura fija (N por vista medido)

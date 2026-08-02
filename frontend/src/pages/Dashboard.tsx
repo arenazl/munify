@@ -11,7 +11,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth, type Municipio } from '../contexts/AuthContext';
 import { ChartSkeleton } from '../components/ui/Skeleton';
 import { AdaptiveFilter, type AdaptiveFilterGroup } from '../components/ui/AdaptiveFilter';
-import { BarList, type BarListItem, type BarListTono } from '../components/ui/BarList';
 import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 import { parseFechaLocal } from '../lib/tesoreria-helpers';
 // Sólo lo que sigue en uso: el donut de estados. La serie de tendencia ya no
@@ -34,6 +33,7 @@ import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBan
 import { SectionTitleV2 } from '../components/dashboard/SectionTitleV2';
 import { TendenciaMeses } from '../components/dashboard/TendenciaMeses';
 import { TarjetaCola } from '../components/dashboard/TarjetaCola';
+import { KpiSemantico } from '../components/ui/KpiSemantico';
 import { KpiCardV2, type KpiCardV2Props } from '../components/dashboard/KpiCardV2';
 import PresentacionLive from '../components/PresentacionLive';
 import { BRAND } from '../brands';
@@ -87,7 +87,6 @@ interface TendenciaData {
   resueltos?: number;
 }
 
-type VistaMetrica = 'barrios' | 'tiempos' | 'recurrentes' | 'categorias';
 
 interface ZonaCobertura {
   zona_nombre: string;
@@ -308,9 +307,9 @@ export default function Dashboard() {
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   /** Categoría elegida en la botonera de Concentración; null = todas. */
   const [catConcentracion, setCatConcentracion] = useState<string | null>(null);
-  const [vistaActiva, setVistaActiva] = useState<VistaMetrica>('barrios');
   const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
-  const [reclamosSimilares, setReclamosSimilares] = useState<ReclamoSimilarGrupo[]>([]);
+  // La lista en si no se muestra: lo que se usa es el conteo del fetch.
+  const [, setReclamosSimilares] = useState<ReclamoSimilarGrupo[]>([]);
   const [tendencias, setTendencias] = useState<TendenciaData[]>([]);
   const [cobertura, setCobertura] = useState<ZonaCobertura[]>([]);
   const [tiempoResolucion, setTiempoResolucion] = useState<TiempoCategoria[]>([]);
@@ -830,7 +829,6 @@ export default function Dashboard() {
 
   const totalCategorias = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
   const maxCategoria = porCategoria.length > 0 ? Math.max(...porCategoria.map(c => c.cantidad)) : 0;
-  const maxZona = porZona.length > 0 ? Math.max(...porZona.map(z => z.cantidad)) : 0;
 
   // ==================================================================
   // Analítica — los umbrales y la meta SIEMPRE salen de lib/veredictos
@@ -839,43 +837,44 @@ export default function Dashboard() {
   const umbrales = resolverUmbrales();
   const metaDias = metaResolucionDias(umbrales);
 
-  /** Top 5 de barrios/zonas por volumen (barra relativa al primero). */
-  const itemsBarrios: BarListItem[] = porZona.slice(0, 5).map((z) => ({
-    id: z.zona,
-    label: z.zona,
-    pct: maxZona > 0 ? (z.cantidad / maxZona) * 100 : 0,
-    valor: z.cantidad,
-  }));
 
-  /** Top 5 de categorías por volumen (barra relativa a la primera). */
-  const itemsCategorias: BarListItem[] = porCategoria.slice(0, 5).map((c) => ({
-    id: c.categoria,
-    label: c.categoria,
-    pct: maxCategoria > 0 ? (c.cantidad / maxCategoria) * 100 : 0,
-    valor: c.cantidad,
-  }));
 
-  /** Cobertura por zona: % de resolución con veredicto + fracción resueltos/total. */
-  const itemsCobertura: BarListItem[] = cobertura.slice(0, 5).map((z) => ({
-    id: z.zona_nombre,
-    label: z.zona_nombre,
-    pct: z.tasa_resolucion,
-    valor: `${z.tasa_resolucion}%`,
-    valorSub: `${z.resueltos}/${z.total_reclamos}`,
-    tono: (veredictoTasa(z.tasa_resolucion, umbrales.tasaResolucion) ?? 'neutro') as BarListTono,
-  }));
 
   // Tiempo de resolución: las que MÁS tardan primero (el resto queda fuera del top 5)
   const tiempoOrdenado = [...tiempoResolucion].sort((a, b) => b.dias_promedio - a.dias_promedio);
-  const maxDias = tiempoOrdenado.length > 0 ? tiempoOrdenado[0].dias_promedio : 0;
-  const itemsTiempo: BarListItem[] = tiempoOrdenado.slice(0, 5).map((t) => ({
-    id: t.categoria,
-    label: t.categoria,
-    pct: maxDias > 0 ? (t.dias_promedio / maxDias) * 100 : 0,
-    valor: `${fmtDias(t.dias_promedio)} d`,
-    tono: (veredictoMenosEsMejor(t.dias_promedio, umbrales.tiempoResolucionDias) ?? 'neutro') as BarListTono,
-  }));
   const categoriasSobreMeta = tiempoResolucion.filter((t) => t.dias_promedio > metaDias).length;
+
+  // ---- Los cinco KPIs semanticos ----
+  // Cada uno reemplaza un grafico por su CONCLUSION. Todas las frases salen
+  // de los mismos datos que dibujaban las barras: nada hardcodeado, y cada
+  // tarjeta tiene su version para cuando no hay datos suficientes.
+  const totalRec = stats.total || 0;
+  const pctDe = (n: number) => (totalRec > 0 ? Math.round((n / totalRec) * 100) : 0);
+
+  /** Donde se concentran: el barrio que mas pesa. */
+  const zonaTop = porZona[0] ?? null;
+  const top5Zonas = porZona.slice(0, 5).reduce((acc, z) => acc + z.cantidad, 0);
+  const seguidoras = porZona.slice(1, 3).map((z) => z.zona);
+
+  /** De que se quejan: la categoria que mas pesa. */
+  const catTop = porCategoria[0] ?? null;
+  const catsSiguen = porCategoria.slice(1, 3);
+  const sumaSiguen = catsSiguen.reduce((acc, c) => acc + c.cantidad, 0);
+
+  /** Cuanto tardamos: la que se pasa de la meta y la mas rapida. */
+  const masLenta = tiempoOrdenado[0] ?? null;
+  const masRapida = tiempoOrdenado.length > 1 ? tiempoOrdenado[tiempoOrdenado.length - 1] : null;
+
+  /** En que terminaron: lo que sigue sin tocarse. */
+  const enRecibido = stats.por_estado?.['recibido'] ?? 0;
+  const finalizados = stats.por_estado?.['finalizado'] ?? 0;
+  const rechazados = stats.por_estado?.['rechazado'] ?? 0;
+
+  /** Llegamos a todos: las zonas que quedaron atras. */
+  const zonasOrdenadas = [...cobertura].sort((a, b) => a.tasa_resolucion - b.tasa_resolucion);
+  const peorZona = zonasOrdenadas[0] ?? null;
+  const mejorZona = zonasOrdenadas.length > 1 ? zonasOrdenadas[zonasOrdenadas.length - 1] : null;
+  const zonasAtras = coberturaResumen?.zonas_criticas ?? 0;
 
   // El eje y la serie de resueltos los resuelve TendenciaMeses por su cuenta,
   // mes a mes: acá no queda nada que preparar para el gráfico.
@@ -1243,228 +1242,144 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ================= Analítica: métricas + cobertura + charts ================= */}
+      {/* ============ Las cinco preguntas ============
+          Reemplazan a los graficos de analitica (ranking de barrios, donut de
+          estados, cobertura por zona, tiempos por categoria). Un grafico
+          obliga a mirar, comparar y sacar la conclusion uno mismo; en una
+          demo —y en la reunion de un intendente— eso no pasa nunca. Cada
+          tarjeta arranca por la pregunta y la contesta con un dato.
+          El detalle crudo sigue estando, a un clic. */}
       <SectionTitleV2 icon={TrendingUp} label="Analítica" />
-      <div className="dv2-grid-2">
-        {/* Panel de métricas con segmented control */}
-        <div className="dv2-card">
-          {/* Segmented control de texto (sin iconos), como la referencia */}
-          <div className="dv2-tabs">
-            {[
-              { id: 'barrios' as VistaMetrica, label: 'Barrios' },
-              { id: 'tiempos' as VistaMetrica, label: 'Tiempos' },
-              { id: 'recurrentes' as VistaMetrica, label: 'Recurrentes' },
-              { id: 'categorias' as VistaMetrica, label: 'Categorías' },
-            ].map((btn) => (
-              <button
-                key={btn.id}
-                type="button"
-                className={`dv2-tab${vistaActiva === btn.id ? ' dv2-tab--activa' : ''}`}
-                onClick={() => setVistaActiva(btn.id)}
-              >
-                {btn.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Vista: Barrios/Zonas */}
-          {vistaActiva === 'barrios' && (
-            <>
-              <div className="dv2-card-head dv2-card-head--bajo-tabs">
-                <h3 className="dv2-card-titulo">Reclamos por barrio</h3>
-                <span className="dv2-card-caption dv2-card-caption--auto">
-                  Top {itemsBarrios.length} de {porZona.length}
-                </span>
-              </div>
-              {itemsBarrios.length > 0 ? (
-                <>
-                  <BarList items={itemsBarrios} tono="rampa" labelWidth={116} valueWidth={32} />
-                  <Link to="/gestion/mapa" className="dv2-card-link">
-                    {porZona.length === 1 ? 'Ver el barrio en el mapa' : `Ver los ${porZona.length} barrios`}
-                  </Link>
-                </>
-              ) : (
-                <p className="dv2-vacio">Sin datos</p>
-              )}
-            </>
-          )}
-
-          {/* Vista: Tiempos de resolución */}
-          {vistaActiva === 'tiempos' && (
-            <>
-              <div className="dv2-card-head dv2-card-head--bajo-tabs">
-                <h3 className="dv2-card-titulo">Tiempo promedio de resolución</h3>
-              </div>
-              {tiempoResolucion.length > 0 ? (
-                <div className="dv2-leyenda">
-                  {tiempoResolucion.slice(0, 6).map((item) => {
-                    // Mismo veredicto que la card "Tiempo de resolución": SSoT en lib/veredictos
-                    const v = veredictoMenosEsMejor(item.dias_promedio, umbrales.tiempoResolucionDias) ?? 'advertencia';
-                    return (
-                      <div key={item.categoria} className="dv2-leyenda-fila">
-                        <span className="dv2-leyenda-label">{item.categoria}</span>
-                        <span className="dv2-leyenda-valor">
-                          <span className={`dv2-chip-dias dv2-chip-dias--${v}`}>{fmtDias(item.dias_promedio)} d</span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="dv2-vacio">Sin datos</p>
-              )}
-            </>
-          )}
-
-          {/* Vista: Reclamos recurrentes */}
-          {vistaActiva === 'recurrentes' && (
-            <div>
-              {reclamosSimilares.length > 0 && (
-                <div className="dv2-bloque">
-                  <h3 className="dv2-subtitulo">
-                    <Users className="dv2-subtitulo-icono" aria-hidden="true" />
-                    Reclamos similares en la zona
-                  </h3>
-                  <div className="dv2-items">
-                    {reclamosSimilares.slice(0, 5).map((item) => (
-                      <div
-                        key={item.id}
-                        className="dv2-item dv2-item--amber"
-                        onClick={() => navigate(`/gestion/reclamos/${item.id}`)}
-                      >
-                        <div className="dv2-item-head">
-                          <span className="dv2-item-titulo">{item.titulo}</span>
-                          <span className="dv2-badge dv2-badge--amber">
-                            <Users className="dv2-badge-icono" aria-hidden="true" />
-                            {item.cantidad_reportes}
-                          </span>
-                        </div>
-                        <div className="dv2-item-meta">
-                          <MapPin className="dv2-item-meta-icono" aria-hidden="true" />
-                          <span className="dv2-item-meta-trunc">{item.direccion}</span>
-                        </div>
-                        <div className="dv2-item-meta">
-                          <span className="dv2-chip-cat">{item.categoria?.nombre || 'Sin categoría'}</span>
-                          {item.zona && <span className="dv2-item-meta-trunc">{item.zona}</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <h3 className="dv2-subtitulo">Direcciones con reclamos recurrentes</h3>
-              {recurrentes.length > 0 ? (
-                <div className="dv2-items">
-                  {recurrentes.slice(0, 5).map((item, index) => (
-                    <div key={index} className="dv2-item">
-                      <div className="dv2-item-head">
-                        <span className="dv2-item-titulo">{item.direccion}</span>
-                        <span className="dv2-badge dv2-badge--red">{item.cantidad}x</span>
-                      </div>
-                      <div className="dv2-item-meta">
-                        <span>{item.zona}</span>
-                        <span>·</span>
-                        <span className="dv2-item-meta-trunc">{item.categorias.join(', ')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="dv2-vacio">No hay reclamos recurrentes</p>
-              )}
-            </div>
-          )}
-
-          {/* Vista: Categorías — misma estructura que Barrios */}
-          {vistaActiva === 'categorias' && (
-            <>
-              <div className="dv2-card-head dv2-card-head--bajo-tabs">
-                <h3 className="dv2-card-titulo">Distribución por categoría</h3>
-                <span className="dv2-card-caption dv2-card-caption--auto">
-                  Top {itemsCategorias.length} de {porCategoria.length}
-                </span>
-              </div>
-              {itemsCategorias.length > 0 ? (
-                <>
-                  <BarList items={itemsCategorias} tono="rampa" labelWidth={116} valueWidth={32} />
-                  <Link to="/gestion/categorias-reclamo" className="dv2-card-link">
-                    {porCategoria.length === 1
-                      ? 'Ver la categoría'
-                      : `Ver las ${porCategoria.length} categorías`}
-                  </Link>
-                </>
-              ) : (
-                <p className="dv2-vacio">Sin datos</p>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Cobertura por zona */}
-        <div className="dv2-card">
-          <div className="dv2-card-head">
-            <h3 className="dv2-card-titulo">Cobertura por zona</h3>
-            <span className="dv2-card-caption dv2-card-caption--auto">Resueltos / recibidos</span>
-          </div>
-          {itemsCobertura.length > 0 ? (
-            <BarList items={itemsCobertura} layout="stacked" />
-          ) : (
-            <p className="dv2-vacio">Sin datos</p>
-          )}
-          {coberturaResumen && (
-            <div className="dv2-card-foot">
-              <span>Zonas críticas</span>
-              {/* Sin zonas críticas no hay por qué pintar el número de rojo */}
-              <span className={`dv2-card-foot-valor${coberturaResumen.zonas_criticas > 0 ? ' dv2-card-foot-valor--malo' : ''}`}>
-                {coberturaResumen.zonas_criticas}
-              </span>
-              <span className="dv2-auto">Resolución global</span>
-              <span
-                className={`dv2-card-foot-valor dv2-card-foot-valor--${
-                  veredictoTasa(coberturaResumen.tasa_resolucion_global, umbrales.tasaResolucion) ?? 'advertencia'
-                }`}
-              >
-                {coberturaResumen.tasa_resolucion_global}%
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
 
       {loadingAnalytics ? (
-        <div className="dv2-grid-2">
-          <ChartSkeleton height={300} />
+        <div className="kse-fila-3">
+          <ChartSkeleton height={200} />
+          <ChartSkeleton height={200} />
+          <ChartSkeleton height={200} />
         </div>
       ) : (
       <>
-      <div className="dv2-grid-2">
-        {/* La tendencia ya no vive acá: subió a compartir fila con el mapa,
-            que es donde el diseño la pone. */}
+      <div className="kse-fila-3">
+        <KpiSemantico
+          pregunta="¿Dónde se concentran?"
+          icono={MapPin}
+          tono="bueno"
+          valor={zonaTop ? zonaTop.zona : '—'}
+          unidad={zonaTop ? `${zonaTop.cantidad} ${zonaTop.cantidad === 1 ? 'reclamo' : 'reclamos'}` : 'sin zonas cargadas'}
+          detalle={
+            zonaTop ? (
+              <>
+                De {porZona.length} {porZona.length === 1 ? 'barrio' : 'barrios'},{' '}
+                <strong>uno solo</strong> explica el {pctDe(zonaTop.cantidad)}% de todo.
+                {seguidoras.length > 0 && <> {seguidoras.join(' y ')} {seguidoras.length === 1 ? 'lo sigue' : 'lo siguen'} de lejos.</>}
+              </>
+            ) : (
+              <>Todavía no hay reclamos con zona cargada.</>
+            )
+          }
+          pie={zonaTop ? `Top 5 = ${top5Zonas} de ${totalRec}` : undefined}
+          accion={{ label: `Ver ${porZona.length > 0 ? `los ${porZona.length} barrios` : 'el mapa'}`, to: '/gestion/mapa' }}
+        />
 
-        {/* Tiempo de resolución por categoría — las que más tardan primero */}
-        <div className="dv2-card">
-          <div className="dv2-card-head">
-            <h3 className="dv2-card-titulo">Tiempo de resolución</h3>
-            <span className="dv2-card-caption dv2-card-caption--auto">Meta {fmtDias(metaDias)} d</span>
-          </div>
-          {itemsTiempo.length > 0 ? (
-            <BarList items={itemsTiempo} labelWidth={130} valueWidth={42} destacarPrimero={false} />
-          ) : (
-            <p className="dv2-vacio">Sin datos</p>
-          )}
-          {tiempoResolucion.length > 0 && (
-            <div className="dv2-card-foot">
-              <span>
-                {categoriasSobreMeta} de {tiempoResolucion.length}{' '}
-                {tiempoResolucion.length === 1 ? 'categoría' : 'categorías'} sobre la meta
-              </span>
-              <Link to="/gestion/sla" className="dv2-card-foot-link">
-                Ver detalle
-              </Link>
-            </div>
-          )}
-        </div>
+        <KpiSemantico
+          pregunta="¿De qué se quejan?"
+          icono={ClipboardList}
+          tono="bueno"
+          valor={catTop ? `${pctDe(catTop.cantidad)}%` : '—'}
+          unidad={catTop ? `es ${catTop.categoria.toLowerCase()}` : 'sin categorías'}
+          detalle={
+            catTop ? (
+              <>
+                <strong>{Math.round(pctDe(catTop.cantidad) / 10)} de cada 10 reclamos</strong>{' '}
+                son {catTop.categoria.toLowerCase()}.
+                {catsSiguen.length > 0 && (
+                  <> {catsSiguen.map((c) => c.categoria).join(' y ')} suman otros {sumaSiguen}{' '}
+                    {catsSiguen.length === 1 ? '' : 'entre las dos'}.</>
+                )}
+              </>
+            ) : (
+              <>Todavía no hay reclamos categorizados.</>
+            )
+          }
+          pie={catTop ? `${catTop.cantidad} de ${totalRec} reclamos` : undefined}
+          accion={{ label: `Ver las ${porCategoria.length} categorías`, to: '/gestion/reclamos' }}
+        />
+
+        <KpiSemantico
+          pregunta="¿Cuánto tardamos?"
+          icono={Clock}
+          tono={categoriasSobreMeta > 0 ? 'malo' : 'bueno'}
+          valor={tiempoResolucion.length > 0 ? `${categoriasSobreMeta} de ${tiempoResolucion.length}` : '—'}
+          unidad={tiempoResolucion.length > 0
+            ? `${tiempoResolucion.length === 1 ? 'categoría' : 'categorías'} fuera de meta`
+            : 'sin cierres todavía'}
+          detalle={
+            tiempoResolucion.length === 0 ? (
+              <>Todavía no se cerró nada: sin cierres no hay tiempo que medir.</>
+            ) : categoriasSobreMeta === 0 ? (
+              <>Todo cierra dentro de la meta de {fmtDias(metaDias)} días. <strong>Ninguna se pasa.</strong></>
+            ) : masLenta ? (
+              <>
+                Dentro de la meta de {fmtDias(metaDias)} días{' '}
+                <strong className="kse-mal">salvo {masLenta.categoria.toLowerCase()}</strong>, que tarda{' '}
+                {fmtDias(masLenta.dias_promedio)}
+                {categoriasSobreMeta === 1 ? ' y es la única fuera' : ` — y hay ${categoriasSobreMeta} fuera`}.
+              </>
+            ) : null
+          }
+          pie={masRapida ? `Más rápida: ${masRapida.categoria.toLowerCase()}, ${fmtDias(masRapida.dias_promedio)} d` : undefined}
+          accion={{ label: 'Ver los tiempos', to: '/gestion/sla' }}
+        />
+      </div>
+
+      <div className="kse-fila-2">
+        <KpiSemantico
+          pregunta="¿En qué terminaron?"
+          icono={FileCheck}
+          tono="info"
+          valor={String(enRecibido)}
+          unidad="siguen en recibido"
+          detalle={
+            totalRec === 0 ? (
+              <>Todavía no entró ningún reclamo.</>
+            ) : (
+              <>
+                De {totalRec} en total, <strong>{enRecibido} nunca se {enRecibido === 1 ? 'tocó' : 'tocaron'}</strong>
+                {finalizados > 0 && (
+                  <> — {enRecibido > finalizados ? 'más' : 'menos'} que los {finalizados} que se finalizaron</>
+                )}.
+              </>
+            )
+          }
+          pie={`Finalizados ${finalizados} · rechazados ${rechazados}`}
+          accion={{ label: 'Ver los pendientes', to: '/gestion/reclamos?estado=recibido' }}
+        />
+
+        <KpiSemantico
+          pregunta="¿Llegamos a todos?"
+          icono={Users}
+          tono={zonasAtras > 0 ? 'advertencia' : 'bueno'}
+          valor={cobertura.length === 0 ? '—' : `${zonasAtras} ${zonasAtras === 1 ? 'zona' : 'zonas'}`}
+          unidad={cobertura.length === 0 ? 'sin zonas medidas' : 'muy por debajo del resto'}
+          detalle={
+            cobertura.length === 0 ? (
+              <>Todavía no hay zonas con reclamos suficientes para comparar.</>
+            ) : zonasAtras === 0 && mejorZona && peorZona ? (
+              <>
+                Ninguna zona quedó atrás: de <strong>{peorZona.tasa_resolucion}%</strong> en{' '}
+                {peorZona.zona_nombre} a {mejorZona.tasa_resolucion}% en {mejorZona.zona_nombre}.
+              </>
+            ) : peorZona ? (
+              <>
+                {peorZona.zona_nombre} cierra <strong className="kse-mal">{peorZona.tasa_resolucion}%</strong>
+                {mejorZona && <>, contra el {mejorZona.tasa_resolucion}% de {mejorZona.zona_nombre}</>}.
+                {zonasAtras > 1 && <> {zonasAtras} zonas quedaron atrás.</>}
+              </>
+            ) : null
+          }
+          pie={coberturaResumen ? `Resolución global: ${coberturaResumen.tasa_resolucion_global}%` : undefined}
+          accion={{ label: `Ver las ${cobertura.length} zonas`, to: '/gestion/mapa' }}
+        />
       </div>
 
       {/* La voz del vecino — promedio + distribución + últimas reseñas

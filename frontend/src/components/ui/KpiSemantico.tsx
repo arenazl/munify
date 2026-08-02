@@ -24,7 +24,11 @@ import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export type TonoKpi = 'bueno' | 'malo' | 'advertencia' | 'neutro';
+/**
+ * El veredicto de la tarjeta. `info` es el caso sin juicio de valor: un dato
+ * que hay que mirar pero que no está ni bien ni mal.
+ */
+export type TonoKpi = 'bueno' | 'malo' | 'advertencia' | 'info' | 'neutro';
 
 export interface KpiSemanticoProps {
   /** La pregunta que contesta la tarjeta. Va en el encabezado. */
