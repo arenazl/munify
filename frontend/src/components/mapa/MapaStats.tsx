@@ -17,14 +17,17 @@ import { dailyTimeline, distribucionEstados } from '../../lib/mapaUtils';
 import { RankedList, type RankedListItem } from '../ui/RankedList';
 
 // Los 4 KPIs que vivían acá arriba se movieron al strip del SemanticHero de
-// Mapa.tsx. Este componente queda con los tres paneles analíticos de abajo del
-// mapa: el RANKING, la distribución por estado y la tendencia.
+// Mapa.tsx. Este componente queda con las TRES TARJETAS de abajo del mapa que
+// pide el canvas (mapa-canvas.dc.html): el ranking de zonas calientes, la
+// distribución por estado y el pulso de ingresos.
 //
-// El ranking NO se calcula acá y tampoco es siempre el mismo: la página manda
-// los items ya armados Y su encabezado, porque cambia con la PREGUNTA elegida
-// arriba (zonas que repiten / los que más esperan / los resueltos más rápido /
-// barrios sin atención). Mismo componente del kit (`RankedList`) para los
-// cuatro — una sola implementación, cuatro contenidos.
+// Las tres comparten el marco del kit (`av2-panel`: superficie, borde, radio y
+// cabecera con título + caption sobre tokens --pl-*). Antes las dos últimas se
+// dibujaban con estilos inline del theme y se leían como piezas de otra
+// pantalla, pegadas al lado de la primera.
+//
+// El ranking NO se calcula acá: la página manda los items ya armados Y su
+// encabezado, con el criterio real (radio y ventana) en el caption.
 interface Props {
   reclamos: Reclamo[];          // ya filtrados por la consulta de arriba
   statusColors: Record<string, string>;
@@ -82,11 +85,8 @@ export default function MapaStats({
   const delta = ultimos7 - previos7;
   const deltaPct = previos7 > 0 ? (delta / previos7) * 100 : 0;
 
-  // Card base style
-  const cardStyle: React.CSSProperties = {
-    backgroundColor: theme.card,
-    border: `1px solid ${theme.border}`,
-  };
+  /** Cuántos reclamos hay dibujados: es el denominador de la distribución. */
+  const totalDist = dist.reduce((s, x) => s + x.count, 0);
 
   return (
     <div className="space-y-4">
@@ -106,15 +106,17 @@ export default function MapaStats({
           )}
         </section>
 
-        {/* Distribución por Estado (Donut) */}
-        <div className="rounded-xl p-4" style={cardStyle}>
-          <h3 className="text-sm font-bold mb-3" style={{ color: theme.text }}>
-            Distribución por estado
-          </h3>
+        {/* Por estado: el donut usa los colores del SSoT de estados (los MISMOS
+            de los pines del mapa), así la tarjeta y el lienzo hablan igual. */}
+        <section className="av2-panel">
+          <div className="av2-panel-head">
+            <h2 className="av2-panel-titulo">Por estado</h2>
+            <span className="av2-panel-caption">
+              {totalDist} {totalDist === 1 ? 'reclamo en el mapa' : 'en el mapa'}
+            </span>
+          </div>
           {dist.length === 0 ? (
-            <p className="text-xs py-6 text-center" style={{ color: theme.textSecondary }}>
-              Sin datos.
-            </p>
+            <p className="av2-panel-vacio">Sin reclamos que distribuir con este filtro.</p>
           ) : (
             <div className="flex items-center gap-2">
               <div className="w-32 h-32 flex-shrink-0">
@@ -153,8 +155,7 @@ export default function MapaStats({
               </div>
               <div className="flex-1 min-w-0 space-y-1">
                 {dist.map((d) => {
-                  const total = dist.reduce((s, x) => s + x.count, 0);
-                  const pct = total > 0 ? (d.count / total) * 100 : 0;
+                  const pct = totalDist > 0 ? (d.count / totalDist) * 100 : 0;
                   return (
                     <div key={d.estado} className="flex items-center gap-2 text-xs">
                       <div
@@ -174,15 +175,21 @@ export default function MapaStats({
               </div>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Tendencia temporal (sparkline 30d) */}
-        <div className="rounded-xl p-4" style={cardStyle}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold" style={{ color: theme.text }}>
-              Últimos 30 días
-            </h3>
-            <div className="flex items-center gap-1">
+        {/* Ingresos en el mapa: cuántos entraron en la última semana contra la
+            anterior. Que entren MENOS es la buena noticia — por eso la flecha
+            hacia arriba va con el matiz de alerta. */}
+        <section className="av2-panel">
+          <div className="av2-panel-head">
+            <h2 className="av2-panel-titulo">Ingresos en el mapa</h2>
+            <span className="av2-panel-caption">últimos 7 días contra los 7 previos</span>
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-2xl font-bold" style={{ color: theme.text }}>
+              {ultimos7}
+            </span>
+            <span className="inline-flex items-center gap-1 self-center">
               {delta >= 0 ? (
                 <TrendingUp className="h-3.5 w-3.5" style={{ color: sem.malo }} />
               ) : (
@@ -195,14 +202,9 @@ export default function MapaStats({
                 {delta >= 0 ? '+' : ''}
                 {deltaPct.toFixed(0)}%
               </span>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-2xl font-bold" style={{ color: theme.text }}>
-              {ultimos7}
             </span>
             <span className="text-xs" style={{ color: theme.textSecondary }}>
-              últimos 7d · {previos7} previos
+              nuevos · {previos7} en el período previo
             </span>
           </div>
           <div className="h-20 -mx-2">
@@ -240,7 +242,7 @@ export default function MapaStats({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
