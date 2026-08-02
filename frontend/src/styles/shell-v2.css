@@ -240,12 +240,14 @@
 
 /* --- Grupos acordeón --------------------------------------------- */
 
+/* Cabecera de módulo = eyebrow del design system: Sora, compacta como la
+   referencia. Gris plegada; toma el acento cuando su grupo está abierto. */
 .sv2-grupo-cab {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 14px 10px 5px;
+  padding: 12px 10px 4px;
   background: transparent;
   border: 0;
   cursor: pointer;
@@ -254,11 +256,16 @@
 }
 
 .sv2-grupo-titulo {
-  font-size: 10px;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-eyebrow);
   font-weight: 700;
   letter-spacing: var(--pl-tracking-eyebrow);
   text-transform: uppercase;
   color: var(--pl-text-muted);
+  transition: color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-grupo-cab:not(.sv2-grupo-cab--cerrado) .sv2-grupo-titulo {
+  color: var(--pl-green);
 }
 
 .sv2-grupo-chevron {
@@ -288,6 +295,117 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Números siempre tabulares (design system): los badges no bailan al
+   cambiar de valor. */
+.sv2-badge,
+.sv2-minibadge {
+  font-feature-settings: 'tnum';
+}
+
+/* Badge agregado de la cabecera plegada: neutro, no compite con los
+   badges verdes/ámbar de los items. */
+.sv2-badge--grupo {
+  margin-left: auto;
+  color: var(--pl-text-2);
+  background: var(--pl-surface-hover);
+}
+
+/* --- Animaciones del design system (referencia handoff-v2) --------- */
+
+@keyframes sv2-flotar {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+@keyframes sv2-latido {
+  0% { opacity: 0.5; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.35); }
+}
+
+/* --- [MOCK] Tarjeta contextual del módulo (sobre el pie) ----------- */
+
+.sv2-ctx {
+  border-top: 1px solid var(--pl-border);
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sv2-ctx-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sv2-ctx-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: var(--pl-radius-sm);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+.sv2-ctx-icono > svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Anillo que late alrededor del icono (latido de la referencia). */
+.sv2-ctx-latido {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--pl-radius-sm);
+  border: 1.5px solid var(--pl-green);
+  opacity: 0;
+  animation: sv2-latido 3.6s var(--pl-ease) infinite;
+}
+
+.sv2-ctx-titulo {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+
+.sv2-ctx-cifra {
+  margin-left: auto;
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-green-700);
+  font-feature-settings: 'tnum';
+}
+
+.sv2-ctx-texto {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}
+
+/* Acción del mock: se ve como link pero todavía no navega. */
+.sv2-ctx-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+}
+.sv2-ctx-link > svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv2-ctx-latido {
+    animation: none;
+  }
 }
 
 /* --- Pie del sidebar: "Ayuda y soporte" (solo expandido) ---------- */

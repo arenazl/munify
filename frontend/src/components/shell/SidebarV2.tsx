@@ -28,9 +28,9 @@
  * Únicos inline permitidos: valores runtime de marca (BRAND.accent,
  * BRAND.nameFont), igual que en el sidebar viejo.
  */
-import { Fragment, useMemo, useState, type ComponentType } from 'react';
+import { Fragment, useMemo, useRef, useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, HelpCircle, MoveRight, Star } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useVecinoBadges } from '../../hooks/useVecinoBadges';
 import { useNavBadges, type NavBadges } from './useNavBadges';
@@ -110,6 +110,24 @@ interface GrupoNav {
   items: ShellNavItem[];
 }
 
+/**
+ * Mantiene la cabecera clickeada QUIETA mientras el acordeón exclusivo pliega
+ * al grupo anterior: si el que se pliega queda arriba, el bloque subiría y la
+ * cabecera se escaparía del cursor. Compensa scrollTop del nav frame a frame
+ * mientras dura la transición (grid-template-rows, --pl-dur-sheet 240ms; el
+ * loop corre 450ms para cubrirla con margen y muere solo).
+ * Llamar ANTES de que el re-render toque el DOM: captura la posición actual.
+ */
+function anclarCabecera(nav: HTMLElement, cab: HTMLElement) {
+  const y0 = cab.getBoundingClientRect().top;
+  const t0 = performance.now();
+  const paso = () => {
+    nav.scrollTop += cab.getBoundingClientRect().top - y0;
+    if (performance.now() - t0 < 450) requestAnimationFrame(paso);
+  };
+  requestAnimationFrame(paso);
+}
+
 interface ItemNavProps {
   item: ShellNavItem;
   activo: boolean;
@@ -179,18 +197,14 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
   const badges = useVecinoBadges();
   const navBadges = useNavBadges();
 
-  // Acordeones: guardamos los CERRADOS (default: todos abiertos), así los
-  // grupos nuevos que aparezcan por flags arrancan abiertos sin migración.
-  const [cerrados, setCerrados] = useState<Set<string>>(() => new Set());
-
-  const toggleGrupo = (id: string) => {
-    setCerrados((prev) => {
-      const sig = new Set(prev);
-      if (sig.has(id)) sig.delete(id);
-      else sig.add(id);
-      return sig;
-    });
-  };
+  // Acordeón EXCLUSIVO: a lo sumo UN grupo abierto — por default el de la
+  // ruta activa, el resto plegado (con munis con muchos módulos activos,
+  // todo abierto no entra en una pantalla; plegado, las categorías son un
+  // índice). La elección manual (abrir otro / plegar el activo) vale para la
+  // ruta donde se hizo: al navegar vuelve a mandar la ruta activa. Modelo
+  // derivado, sin efecto ni estado espejo.
+  const [manual, setManual] = useState<{ ruta: string; id: string | null } | null>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   const { sueltos, grupos } = useMemo(() => {
     const sueltosAcc: ShellNavItem[] = [];
@@ -215,6 +229,19 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
 
   const activo = hrefActivo(location.pathname, items);
   const esActivo = (item: ShellNavItem) => activo !== '' && normalizarHref(item.href) === activo;
+
+  const grupoDeRutaActiva = useMemo(
+    () => grupos.find((g) => g.items.some((it) => normalizarHref(it.href) === activo))?.id ?? null,
+    [grupos, activo],
+  );
+  const abiertoId = manual && manual.ruta === activo ? manual.id : grupoDeRutaActiva;
+
+  // Al abrir un grupo se pliega el anterior; anclarCabecera evita que la
+  // cabecera clickeada se mueva de lugar cuando el plegado ocurre arriba.
+  const toggleGrupo = (id: string, cab?: HTMLElement) => {
+    setManual({ ruta: activo, id: abiertoId === id ? null : id });
+    if (cab && navRef.current) anclarCabecera(navRef.current, cab);
+  };
 
   // Badge de un item:
   //  1) items de vecino → badgeKey contra useVecinoBadges ('turnos' aún no
@@ -314,7 +341,7 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
         </button>
       </div>
 
-      <nav className="sv2-nav" aria-label="Navegación principal">
+      <nav className="sv2-nav" ref={navRef} aria-label="Navegación principal">
         {sueltos.map((item) => {
           const b = badgeDe(item);
           return (
@@ -330,16 +357,22 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
         })}
 
         {grupos.map((grupo) => {
-          const abierto = !cerrados.has(grupo.id);
+          const abierto = abiertoId === grupo.id;
+          // Plegado, la cabecera resume los badges de sus items (suma); al
+          // abrirse el detalle queda a la vista y el agregado sobra.
+          const nGrupo = abierto ? 0 : grupo.items.reduce((acc, it) => acc + badgeDe(it).n, 0);
           return (
             <Fragment key={grupo.id}>
               <button
                 type="button"
                 className={clases('sv2-grupo-cab', !abierto && 'sv2-grupo-cab--cerrado')}
                 aria-expanded={abierto}
-                onClick={() => toggleGrupo(grupo.id)}
+                onClick={(e) => toggleGrupo(grupo.id, e.currentTarget)}
               >
                 <span className="sv2-grupo-titulo">{grupo.titulo}</span>
+                {nGrupo > 0 && (
+                  <span className="sv2-badge sv2-badge--grupo">{nGrupo > 99 ? '99+' : nGrupo}</span>
+                )}
                 <ChevronDown className="sv2-grupo-chevron" />
               </button>
               <div className={clases('sv2-grupo-items', !abierto && 'sv2-grupo-items--cerrado')}>
@@ -362,6 +395,32 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
           );
         })}
       </nav>
+
+      {/* [MOCK] Tarjeta contextual del módulo abierto — cifra, texto y acción
+          son datos de MUESTRA hardcodeados; acá va a vivir la info contextual
+          real del módulo (pendientes, alertas, vencimientos) cuando se cablee
+          al backend. Solo el título sigue al grupo abierto. */}
+      {(() => {
+        const grupoAbierto = grupos.find((g) => g.id === abiertoId) ?? null;
+        const IconoCtx = grupoAbierto?.items[0]?.icon ?? Star;
+        return (
+          <div className="sv2-ctx">
+            <div className="sv2-ctx-cab">
+              <span className="sv2-ctx-icono">
+                <IconoCtx />
+                <span className="sv2-ctx-latido" />
+              </span>
+              <span className="sv2-ctx-titulo">{grupoAbierto ? grupoAbierto.titulo : 'Hoy'}</span>
+              <span className="sv2-ctx-cifra">8 pendientes</span>
+            </div>
+            <p className="sv2-ctx-texto">1 venció su SLA y 4 no tienen cuadrilla asignada.</p>
+            <span className="sv2-ctx-link">
+              Ver el vencido
+              <MoveRight />
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Pie fijo (paridad referencia): "Ayuda y soporte" con hairline
           arriba. Todavía sin destino — inerte, cursor default. */}
