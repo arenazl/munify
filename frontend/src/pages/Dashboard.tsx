@@ -11,12 +11,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth, type Municipio } from '../contexts/AuthContext';
 import { ChartSkeleton } from '../components/ui/Skeleton';
 import { AdaptiveFilter, type AdaptiveFilterGroup } from '../components/ui/AdaptiveFilter';
-import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
-import { parseFechaLocal } from '../lib/tesoreria-helpers';
-// Sólo lo que sigue en uso: el donut de estados. La serie de tendencia ya no
-// se dibuja con recharts —la hace TendenciaMeses con un SVG propio— y el mapa
-// de calor pasó a FocosRotativos.
-import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { FocosRotativos, type Foco } from '../components/dashboard/FocosRotativos';
 import { seg, type HeroFrase } from '../lib/semanticHero';
@@ -156,19 +150,6 @@ const contarAbiertos = (s: DashboardStats | null): number =>
 
 const fmtDias = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 
-/**
- * 'YYYY-MM-DD' → '1 jul' (día + mes corto en minúscula). Parsea LOCAL:
- * `new Date('2026-07-01')` se lee como UTC y en ARG muestra el día anterior.
- */
-const fmtFechaCorta = (iso: string): string => {
-  const d = parseFechaLocal(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d
-    .toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
-    .replace(/\./g, '')
-    .toLowerCase();
-};
-
 /** % de variación redondeado; null si no hay base de comparación. */
 const pctDelta = (actual: number, prev: number): number | null =>
   prev > 0 ? Math.round(((actual - prev) / prev) * 100) : null;
@@ -301,7 +282,6 @@ export default function Dashboard() {
   const [porCategoria, setPorCategoria] = useState<{ categoria: string; cantidad: number }[]>([]);
   const [porZona, setPorZona] = useState<{ zona: string; cantidad: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingCharts, setLoadingCharts] = useState(true);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [loadingHeatmap, setLoadingHeatmap] = useState(true);
 
@@ -508,7 +488,6 @@ export default function Dashboard() {
         } catch (error) {
           console.error('Error cargando gráficos básicos:', error);
         }
-        setLoadingCharts(false);
 
         // Paso 3: Cargar datos para la vista de métricas (livianos)
         // Nota: `reclamosApi.getRecurrentes` es público (no autenticado) y no
@@ -576,7 +555,6 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Error general cargando dashboard:', error);
         setLoading(false);
-        setLoadingCharts(false);
         setLoadingAnalytics(false);
         setRefreshing(false);
       }
@@ -824,14 +802,6 @@ export default function Dashboard() {
     : null;
 
   // ---- Datos derivados para los charts ----
-  const estadosData = Object.entries(stats.por_estado).map(([estado, cantidad]) => ({
-    name: estadoLabel(estado),
-    value: cantidad as number,
-    color: estadoColor(estado),
-  }));
-
-  const totalCategorias = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
-  const maxCategoria = porCategoria.length > 0 ? Math.max(...porCategoria.map(c => c.cantidad)) : 0;
 
   // ==================================================================
   // Analítica — los umbrales y la meta SIEMPRE salen de lib/veredictos
@@ -882,35 +852,6 @@ export default function Dashboard() {
   // El eje y la serie de resueltos los resuelve TendenciaMeses por su cuenta,
   // mes a mes: acá no queda nada que preparar para el gráfico.
 
-  interface TooltipEntry {
-    name?: string;
-    value?: number | string;
-    color?: string;
-    payload?: { color?: string };
-  }
-  const CustomTooltip = ({ active, payload, label }: {
-    active?: boolean;
-    payload?: TooltipEntry[];
-    label?: string | number;
-  }) => {
-    if (active && payload && payload.length) {
-      // Las series temporales traen el label como 'YYYY-MM-DD': lo mostramos corto.
-      const titulo =
-        typeof label === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(label) ? fmtFechaCorta(label) : label;
-      return (
-        <div className="dv2-tooltip">
-          {titulo != null && <p className="dv2-tooltip-titulo">{titulo}</p>}
-          {payload.map((entry, index) => (
-            // color runtime: viene de la serie del chart
-            <p key={index} className="dv2-tooltip-fila" style={{ color: entry.color || entry.payload?.color }}>
-              {entry.name}: {entry.value}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // ---- Cola de trabajo: tres pilas, tres acciones ----
   // Antes esto era un array de cuatro columnas que renderizaban la LISTA de
@@ -1146,108 +1087,12 @@ export default function Dashboard() {
         <TendenciaMeses datos={tendencias} />
       </div>
 
-      {loadingCharts ? (
-        <div className="dv2-grid-principal">
-          <ChartSkeleton height={300} />
-          <ChartSkeleton height={300} />
-        </div>
-      ) : (
-        <div className="dv2-grid-principal">
-          {/* Por estado — donut + leyenda */}
-          <div className="dv2-card">
-            <div className="dv2-card-head">
-              <h3 className="dv2-card-titulo">Por estado</h3>
-            </div>
-            <div className="dv2-donut-wrap">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={estadosData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={54}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {estadosData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="dv2-donut-centro">
-                <span>
-                  <span className="dv2-donut-total">{stats.total}</span>
-                  <span className="dv2-donut-sub">reclamos</span>
-                </span>
-              </div>
-            </div>
-            <div className="dv2-leyenda">
-              {estadosData.map((item) => (
-                <div key={item.name} className="dv2-leyenda-fila">
-                  {/* color runtime: viene del SSoT de estados */}
-                  <span className="dv2-leyenda-dot" style={{ backgroundColor: item.color }} />
-                  <span className="dv2-leyenda-label">{item.name}</span>
-                  <span className="dv2-leyenda-valor">{item.value}</span>
-                  <span className="dv2-leyenda-pct">
-                    {stats.total > 0 ? Math.round((item.value / stats.total) * 100) : 0}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Top categorías */}
-          <div className="dv2-card dv2-card--barras-anchas">
-            <div className="dv2-card-head">
-              <h3 className="dv2-card-titulo">Top categorías</h3>
-              <span className="dv2-card-caption dv2-card-caption--auto">Por volumen</span>
-            </div>
-            {porCategoria.length > 0 ? (
-              <div className="dv2-barras">
-                {porCategoria.slice(0, 5).map((item, index) => {
-                  const pct = totalCategorias > 0 ? Math.round((item.cantidad / totalCategorias) * 100) : 0;
-                  const ancho = maxCategoria > 0 ? (item.cantidad / maxCategoria) * 100 : 0;
-                  // Rampa hasta d4: d5 es el neutro, no un puesto del ranking (igual que BarList)
-                  const rampa = Math.min(index + 1, 4);
-                  return (
-                    <div key={item.categoria} className="dv2-barra-bloque">
-                      <div className="dv2-barra-bloque-head">
-                        <span className="dv2-barra-bloque-nombre">{item.categoria}</span>
-                        <span className="dv2-barra-bloque-pct">{item.cantidad}</span>
-                        <span className="dv2-barra-bloque-frac">{pct}%</span>
-                      </div>
-                      <div className="dv2-barra-track">
-                        <span
-                          className={`dv2-barra-fill dv2-barra-fill--d${rampa}`}
-                          style={{ width: `${ancho}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="dv2-vacio">Sin datos</p>
-            )}
-            {porCategoria.length > 5 && (
-              <div className="dv2-card-foot">
-                <span>Otras {porCategoria.length - 5} categorías</span>
-                <span className="dv2-card-foot-valor dv2-auto">
-                  {totalCategorias - porCategoria.slice(0, 5).reduce((acc, c) => acc + c.cantidad, 0)}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ============ Las cinco preguntas ============
-          Reemplazan a los graficos de analitica (ranking de barrios, donut de
-          estados, cobertura por zona, tiempos por categoria). Un grafico
+          Reemplazan a TODOS los graficos que habia: el donut por estado, el
+          ranking de top categorias, el de barrios, cobertura por zona y
+          tiempos por categoria. Los dos primeros ademas quedaron duplicados
+          —"¿En que terminaron?" dice lo mismo que el donut y "¿De que se
+          quejan?" lo mismo que el ranking—. Un grafico
           obliga a mirar, comparar y sacar la conclusion uno mismo; en una
           demo —y en la reunion de un intendente— eso no pasa nunca. Cada
           tarjeta arranca por la pregunta y la contesta con un dato.
