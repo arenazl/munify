@@ -2119,18 +2119,16 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         {/* Calificación del vecino (T5-F1) — solo si el vecino ya calificó el cierre */}
         {calificacion && <CalificacionVecinoPanel calificacion={calificacion} />}
 
-        {/* Rechazo */}
+        {/* Motivo de rechazo — sección plana con el título en rojo, mismo
+            lenguaje que el resto del sheet (nada de panel verde). */}
         {selectedReclamo.motivo_rechazo && (
-          <ABMInfoPanel
-            title="Motivo de Rechazo"
-            icon={<XCircle className="h-4 w-4" />}
-            variant="danger"
-          >
-            <p className="text-sm font-medium mb-1">{selectedReclamo.motivo_rechazo}</p>
+          <div className="rs-seccion">
+            <span className="rs-seccion-titulo rs-seccion-titulo--malo">Motivo de rechazo</span>
+            <p className="rs-parrafo rs-parrafo--destacado">{selectedReclamo.motivo_rechazo}</p>
             {selectedReclamo.descripcion_rechazo && (
-              <p className="text-sm opacity-90">{selectedReclamo.descripcion_rechazo}</p>
+              <p className="rs-parrafo">{selectedReclamo.descripcion_rechazo}</p>
             )}
-          </ABMInfoPanel>
+          </div>
         )}
 
         {/* Acciones según estado */}
@@ -2596,7 +2594,12 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             </>
           )}
           <span className="rs-meta-sep">·</span>
-          <span>{haceCuanto(selectedReclamo.created_at)}</span>
+          <span>
+            {(() => {
+              const t = haceCuanto(selectedReclamo.created_at);
+              return !t || t === 'recién' ? t : `hace ${t}`;
+            })()}
+          </span>
         </div>
       </div>
     );
@@ -2758,10 +2761,23 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           const c = esRechazo ? estadoColors.rechazado.bg : estadoColors.finalizado.bg;
           const IconoFinal = esRechazo ? XCircle : CheckCircle;
           return (
-            <div className="av2-sheet-final" style={{ backgroundColor: `${c}14`, color: c }}>
-              <IconoFinal className="h-4 w-4" />
-              {esRechazo ? 'Rechazado' : 'Finalizado'}
-            </div>
+            <>
+              <div className="av2-sheet-final" style={{ backgroundColor: `${c}14`, color: c }}>
+                <IconoFinal className="h-4 w-4" />
+                {esRechazo ? 'Rechazado' : 'Finalizado'}
+              </div>
+              {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
+                <button
+                  type="button"
+                  onClick={handleReasignar}
+                  className="rs-btn"
+                  title="Devuelve el reclamo a Recibido y libera al empleado para que otro lo pueda tomar"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Reasignar
+                </button>
+              )}
+            </>
           );
         })()}
 
@@ -2829,13 +2845,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           </div>
         )}
 
-        {/* Botón Reasignar — disponible en cualquier estado posterior a "recibido"
-            para devolver el reclamo y que otro empleado lo pueda tomar */}
+        {/* Botón Reasignar — en curso/pospuesto va acá (ancho completo);
+            en estados finales va INLINE junto a la banda, arriba. */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') &&
-         ['en_curso', 'pospuesto', 'finalizado', 'rechazado', 'resuelto'].includes(selectedReclamo.estado) && (
+         ['en_curso', 'pospuesto'].includes(selectedReclamo.estado) && (
           <button
             onClick={handleReasignar}
-            className="av2-btn-secundario w-full justify-center"
+            className="rs-btn w-full justify-center"
             title="Devuelve el reclamo a Recibido y libera al empleado para que otro lo pueda tomar"
           >
             <Sparkles className="h-4 w-4" />

@@ -259,6 +259,11 @@
   color: var(--pl-text-2);
   text-wrap: pretty;
 }
+.rs-parrafo--destacado {
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.rs-seccion-titulo--malo { color: var(--pl-red-700); }
 
 /* Fotos del vecino: miniaturas fijas + "+N". */
 .rs-fotos {
