@@ -129,12 +129,13 @@ export interface AdaptiveControlOpciones extends AdaptiveControlBase {
 }
 
 /**
- * Selección MÚLTIPLE con composición FIJA — el control definitivo del filtro
- * por categorías (2026-08-02): `Todas {total}` + las N opciones más
- * importantes (mayor `count`) como píldoras SIEMPRE visibles + un botón
- * `+K más` que abre el panel de checkboxes donde se elige el resto.
- * El tamaño se conoce de antemano: la fila no se reacomoda por espacio (el
- * fantasma la mide entera como un bloque). `values` vacío = todas.
+ * Selección MÚLTIPLE — el control definitivo del filtro por categorías
+ * (2026-08-02): `Todas {total}` + las opciones ordenadas por importancia
+ * (mayor `count`) como píldoras, y ENTRAN LAS QUE ENTREN en el container —
+ * el ancho se conoce de antemano por el render fantasma, como todo el
+ * control. Piso garantizado: las `fijas` más importantes (default 3) quedan
+ * SIEMPRE visibles aunque no haya espacio. El resto se elige desde el botón
+ * `Más`, que abre el panel de checkboxes. `values` vacío = todas.
  */
 export interface AdaptiveControlMulti extends AdaptiveControlBase {
   tipo: 'multi';
@@ -144,7 +145,7 @@ export interface AdaptiveControlMulti extends AdaptiveControlBase {
   /** Valores seleccionados; [] = todas. */
   values: string[];
   onChange: (values: string[]) => void;
-  /** Píldoras fijas a la vista (las de mayor count). Default 3. */
+  /** Mínimo de píldoras importantes SIEMPRE visibles. Default 3. */
   fijas?: number;
 }
 
@@ -290,15 +291,25 @@ const opcionTodas = (c: AdaptiveControlOpciones): AdaptiveFilterOption => ({
 /** Píldoras de un grupo: SUS opciones, sin sintéticas. */
 const pillsDe = (c: AdaptiveControlOpciones): AdaptiveFilterOption[] => c.opciones;
 
-/** Píldoras fijas del control 'multi' (default 3: "las más importantes"). */
+/** Piso de píldoras importantes del 'multi' (default 3). */
 const FIJAS_DEFAULT = 3;
 
 /** Opciones del 'multi' por importancia: count desc; sin counts, orden
- *  natural. El orden decide qué píldoras quedan SIEMPRE visibles. */
+ *  natural. El orden decide qué píldoras se ven primero. */
 const ordenarMulti = (c: AdaptiveControlMulti): AdaptiveFilterOption[] =>
   c.opciones.some((o) => typeof o.count === 'number')
     ? [...c.opciones].sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
     : c.opciones;
+
+/** Píldoras del 'multi': "Todas {total}" + opciones por importancia. */
+const pillsMulti = (c: AdaptiveControlMulti): AdaptiveFilterOption[] => {
+  const total = c.opciones.reduce((a, o) => a + (o.count ?? 0), 0);
+  return [{ value: '', label: 'Todas', count: total > 0 ? total : undefined }, ...ordenarMulti(c)];
+};
+
+/** Piso de visibles del 'multi': "Todas" + las `fijas` más importantes. */
+const minPillsMulti = (c: AdaptiveControlMulti): number =>
+  Math.max(1, c.fijas ?? FIJAS_DEFAULT) + 1;
 
 /** Alterna un valor dentro de la selección del 'multi'. */
 const alternarMulti = (c: AdaptiveControlMulti, v: string) =>
@@ -335,7 +346,7 @@ interface MedidaGrupo {
 /** Medidas de un control, por variante. El grupo etiquetado es recursivo. */
 type MedidaItem =
   | { tipo: 'opciones'; grupo: MedidaGrupo; sel: number }
-  | { tipo: 'multi'; ancho: number }
+  | { tipo: 'multi'; grupo: MedidaGrupo; min: number }
   | { tipo: 'toggles'; seg: number; combo: number }
   | { tipo: 'accion'; full: number; icono: number }
   | { tipo: 'icono'; ancho: number }
@@ -399,6 +410,7 @@ function resolverGrupo(
   m: MedidaGrupo,
   seleccionado: number,
   cuota: number,
+  minPills = 1,
 ): { plan: PlanGrupo; usado: number } {
   const total = m.pills.length;
   const natural = m.pills.reduce((a, w) => a + w, 0) + m.gap * (total - 1);
@@ -430,6 +442,20 @@ function resolverGrupo(
     r = acomodar(orden);
   }
 
+  // Piso del 'multi': las primeras `minPills` píldoras van SIEMPRE, entre o
+  // no entre — la regla le gana al espacio (en el peor caso la fila
+  // envuelve). Con minPills=1 (opciones) no aplica y manda el combo.
+  const forzadas = Math.min(minPills, total);
+  if (forzadas > 1 && r.visibles.length < forzadas) {
+    const visibles = indices(forzadas);
+    const ocultas = indices(total).filter((i) => i >= forzadas);
+    const usado =
+      m.pills.slice(0, forzadas).reduce((a, w) => a + w, 0) +
+      m.gap * (forzadas - 1) +
+      (ocultas.length ? m.gap + m.mas : 0);
+    return { plan: { modo: 'pills', visibles, ocultas }, usado };
+  }
+
   // Fallback real: no entra ni la primera píldora ⇒ el grupo entero a combo.
   if (r.visibles.length === 0) {
     return { plan: { modo: 'combo', visibles: [], ocultas: indices(total) }, usado: cuota };
@@ -449,7 +475,7 @@ function resolverGrupo(
  * queda partida.
  */
 function repartirGrupos(
-  medidas: { grupo: MedidaGrupo; sel: number }[],
+  medidas: { grupo: MedidaGrupo; sel: number; min?: number }[],
   disponible: number,
 ): PlanGrupo[] {
   const n = medidas.length;
@@ -470,7 +496,7 @@ function repartirGrupos(
   let sobrante = 0;
   for (let i = 0; i < n; i++) {
     const cuota = (n === 1 ? disponible : (disponible * naturales[i]) / totalNatural) + sobrante;
-    const r = resolverGrupo(medidas[i].grupo, medidas[i].sel, cuota);
+    const r = resolverGrupo(medidas[i].grupo, medidas[i].sel, cuota, medidas[i].min ?? 1);
     sobrante = cuota - r.usado;
     plan.push(r.plan);
   }
@@ -503,11 +529,8 @@ function anchoFijo(items: MedidaItem[], e: EstadoFila): number {
   for (const it of items) {
     switch (it.tipo) {
       case 'opciones':
-        break; // lo resuelve `repartirGrupos` con el neto
       case 'multi':
-        // Composición fija: no degrada, su ancho es conocido de antemano.
-        total += it.ancho;
-        break;
+        break; // los resuelve `repartirGrupos` con el neto
       case 'toggles':
         total += e.toggles === 'seg' ? it.seg : it.combo;
         break;
@@ -542,10 +565,11 @@ function anchoFijo(items: MedidaItem[], e: EstadoFila): number {
 function recolectarOpciones(
   items: MedidaItem[],
   e: EstadoFila,
-): { grupo: MedidaGrupo; sel: number }[] {
-  const out: { grupo: MedidaGrupo; sel: number }[] = [];
+): { grupo: MedidaGrupo; sel: number; min?: number }[] {
+  const out: { grupo: MedidaGrupo; sel: number; min?: number }[] = [];
   for (const it of items) {
     if (it.tipo === 'opciones') out.push({ grupo: it.grupo, sel: it.sel });
+    else if (it.tipo === 'multi') out.push({ grupo: it.grupo, sel: -1, min: it.min });
     else if (it.tipo === 'grupo' && e.grupo === 'abierto') {
       out.push(...recolectarOpciones(it.hijos, e));
     }
@@ -663,12 +687,14 @@ function armarFilas(controles: AdaptiveControl[]): FilaLayout[] {
 function opcionesVivas(
   controles: AdaptiveControl[],
   modoGrupo: ModoGrupo,
-): AdaptiveControlOpciones[] {
-  const out: AdaptiveControlOpciones[] = [];
+): (AdaptiveControlOpciones | AdaptiveControlMulti)[] {
+  const out: (AdaptiveControlOpciones | AdaptiveControlMulti)[] = [];
   for (const c of controles) {
-    if (c.tipo === 'opciones') out.push(c);
+    if (c.tipo === 'opciones' || c.tipo === 'multi') out.push(c);
     else if (c.tipo === 'grupo' && modoGrupo === 'abierto') {
-      for (const h of c.controles) if (h.tipo === 'opciones') out.push(h);
+      for (const h of c.controles) {
+        if (h.tipo === 'opciones' || h.tipo === 'multi') out.push(h);
+      }
     }
   }
   return out;
@@ -873,44 +899,41 @@ export function AdaptiveFilter({
     </div>
   );
 
-  /** Control 'multi': composición FIJA `Todas {total}` + top-N + `+K más`.
-   *  No degrada: el fantasma lo mide entero como un solo bloque. */
-  const multiControl = (c: AdaptiveControlMulti, viva: boolean, medida?: string) => {
-    const ordenadas = ordenarMulti(c);
-    const fijas = ordenadas.slice(0, Math.max(1, c.fijas ?? FIJAS_DEFAULT));
-    const resto = ordenadas.length - fijas.length;
-    const total = c.opciones.reduce((a, o) => a + (o.count ?? 0), 0);
+  /** Control 'multi': píldoras por importancia — ENTRAN LAS QUE ENTREN en el
+   *  container (las mide el fantasma, como todo), con piso `fijas`+Todas.
+   *  El resto se elige desde "Más" (la palabra sola: un `+K` con número
+   *  quedaría feo en un contenedor grande), que abre el panel de checkboxes. */
+  const multiControl = (c: AdaptiveControlMulti, p: PlanGrupo | null, viva: boolean) => {
+    const todas = pillsMulti(c);
+    const visibles = p ? p.visibles : indices(todas.length);
+    const ocultas = p ? p.ocultas.length : c.opciones.length;
     return (
-      <div className="af-grupo af-multi" role="group" aria-label={c.placeholder} data-af-med={medida}>
-        <button
-          type="button"
-          className="af-pill"
-          title={`Todas — limpiar ${c.placeholder.toLowerCase()}`}
-          aria-pressed={c.values.length === 0}
-          tabIndex={viva ? undefined : -1}
-          onClick={viva ? () => c.onChange([]) : undefined}
-        >
-          Todas
-          {total > 0 && <span className="af-pill-count">{total}</span>}
-        </button>
-        {fijas.map((o) => {
-          const activa = c.values.includes(o.value);
+      <div
+        className="af-grupo af-multi"
+        role="group"
+        aria-label={c.placeholder}
+        data-af-grupo={viva ? undefined : ''}
+      >
+        {visibles.filter((idx) => todas[idx]).map((idx) => {
+          const o = todas[idx];
+          const esTodas = idx === 0;
+          const activa = !esTodas && c.values.includes(o.value);
           return (
             <button
-              key={o.value}
+              key={esTodas ? '__todas__' : o.value}
               type="button"
               className={`af-pill${activa ? ' af-pill--activa' : ''}`}
-              title={o.label}
-              aria-pressed={activa}
+              title={esTodas ? `Todas — limpiar ${c.placeholder.toLowerCase()}` : o.label}
+              aria-pressed={esTodas ? c.values.length === 0 : activa}
               tabIndex={viva ? undefined : -1}
-              onClick={viva ? () => alternarMulti(c, o.value) : undefined}
+              onClick={viva ? () => (esTodas ? c.onChange([]) : alternarMulti(c, o.value)) : undefined}
             >
-              {abreviar(o.label, abreviaturas)}
+              {esTodas ? o.label : abreviar(o.label, abreviaturas)}
               {typeof o.count === 'number' && <span className="af-pill-count">{o.count}</span>}
             </button>
           );
         })}
-        {resto > 0 && (
+        {(!viva || ocultas > 0) && (
           <button
             type="button"
             className="af-pill af-pill--vermas"
@@ -919,7 +942,7 @@ export function AdaptiveFilter({
             tabIndex={viva ? undefined : -1}
             onClick={viva ? () => setPanel((a) => (a === c.id ? null : c.id)) : undefined}
           >
-            +{resto} más
+            Más
             <ChevronDown className="af-pill-x" aria-hidden="true" />
           </button>
         )}
@@ -1078,7 +1101,7 @@ export function AdaptiveFilter({
       case 'opciones':
         return p?.modo === 'combo' ? grupoCombo(c, true) : grupoPills(c, p, true);
       case 'multi':
-        return multiControl(c, true);
+        return multiControl(c, p, true);
       case 'toggles':
         return plan?.toggles === 'combo' ? togglesCombo(c, true) : toggles(c, true);
       case 'accion':
@@ -1098,7 +1121,7 @@ export function AdaptiveFilter({
       case 'opciones':
         return grupoPills(c, null, false);
       case 'multi':
-        return multiControl(c, false, `${c.id}:multi`);
+        return multiControl(c, null, false);
       case 'toggles':
         return (
           <>
@@ -1133,13 +1156,13 @@ export function AdaptiveFilter({
         const idxPlan = new Map(
           opcionesVivas(fila.controles, modoGrupo).map((c, i) => [c.id, i]),
         );
-        const planDe = (c: AdaptiveControlOpciones): PlanGrupo | null => {
+        const planDe = (c: AdaptiveControlOpciones | AdaptiveControlMulti): PlanGrupo | null => {
           const i = idxPlan.get(c.id);
           return i === undefined ? null : (plan?.opciones[i] ?? null);
         };
 
         const simple = (c: AdaptiveControlSimple) =>
-          renderSimple(c, plan, c.tipo === 'opciones' ? planDe(c) : null);
+          renderSimple(c, plan, c.tipo === 'opciones' || c.tipo === 'multi' ? planDe(c) : null);
 
         const bloque = (c: AdaptiveControlGrupo) =>
           modoGrupo === 'menu' ? (
@@ -1351,8 +1374,20 @@ function medirSimple(
     };
   }
   if (c.tipo === 'multi') {
-    const ancho = anchos.get(`${c.id}:multi`) ?? 0;
-    return ancho ? { tipo: 'multi', ancho } : null;
+    const el = cur.grupos[cur.i++];
+    if (!el) return null;
+    // El botón "Más" es una píldora más en el DOM: se separa acá — las
+    // opciones van a `pills`, "Más" es el equivalente del `+K`.
+    const pills = Array.from(
+      el.querySelectorAll<HTMLElement>('.af-pill:not(.af-pill--vermas)'),
+    ).map((p) => p.getBoundingClientRect().width);
+    const mas = el.querySelector<HTMLElement>('.af-pill--vermas')?.getBoundingClientRect().width ?? 0;
+    if (pills.length === 0 || mas === 0) return null;
+    return {
+      tipo: 'multi',
+      min: minPillsMulti(c),
+      grupo: { gap: leerGap(el, GAP_PILL_FALLBACK), pills, mas },
+    };
   }
   if (c.tipo === 'toggles') {
     const seg = anchos.get(`${c.id}:seg`) ?? 0;
@@ -1400,7 +1435,11 @@ function medirFila(
   const nGrupos = fila.controles.reduce(
     (n, c) =>
       n +
-      (c.tipo === 'opciones' ? 1 : c.tipo === 'grupo' ? c.controles.filter((h) => h.tipo === 'opciones').length : 0),
+      (c.tipo === 'opciones' || c.tipo === 'multi'
+        ? 1
+        : c.tipo === 'grupo'
+          ? c.controles.filter((h) => h.tipo === 'opciones' || h.tipo === 'multi').length
+          : 0),
     0,
   );
   // Fantasma desincronizado con el plan: mejor no decidir.
