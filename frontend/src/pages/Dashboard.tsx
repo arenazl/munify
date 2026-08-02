@@ -40,6 +40,7 @@ import DashboardLive from '../components/DashboardLive';
 import { VozDelVecino } from '../components/dashboard/VozDelVecino';
 import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
 import { SectionTitleV2 } from '../components/dashboard/SectionTitleV2';
+import { TendenciaMeses } from '../components/dashboard/TendenciaMeses';
 import { KpiCardV2, type KpiCardV2Props } from '../components/dashboard/KpiCardV2';
 import PresentacionLive from '../components/PresentacionLive';
 import { BRAND } from '../brands';
@@ -519,7 +520,8 @@ export default function Dashboard() {
         try {
           const muniId = municipioActual?.id;
           const [tendenciasRes, recurrentesRes, similaresRes] = await Promise.all([
-            dashboardApi.getTendencia(30, depId).catch(() => ({ data: [] })),
+            // 90 dias: el bloque de tendencia compara MESES, no dias sueltos.
+            dashboardApi.getTendencia(90, depId).catch(() => ({ data: [] })),
             dashboardApi.getRecurrentes(90, 2, depId).catch(() => ({ data: [] })),
             muniId ? reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2, municipio_id: muniId }).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
           ]);
@@ -1146,109 +1148,9 @@ export default function Dashboard() {
           <ChartSkeleton height={300} />
           <ChartSkeleton height={300} />
           <ChartSkeleton height={300} />
-        {/* Tendencia: área de ingresados + línea punteada de resueltos.
-            La 2da serie se dibuja SOLO si el backend la manda. */}
-        <div className="dv2-card">
-          <div className="dv2-card-head dv2-card-head--pegado">
-            <h3 className="dv2-card-titulo">Tendencia</h3>
-            <span className="dv2-card-caption">últimos 30 días</span>
-            <span className="dv2-chart-leyenda">
-              <span className="dv2-chart-leyenda-marca dv2-chart-leyenda-marca--acento" aria-hidden="true" />
-              Ingresados
-              {haySerieResueltos && (
-                <>
-                  <span className="dv2-chart-leyenda-marca dv2-chart-leyenda-marca--neutra" aria-hidden="true" />
-                  Resueltos
-                </>
-              )}
-            </span>
-          </div>
-          <div className="dv2-chart-area dv2-chart-area--flex">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={tendencias} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                {/* Grilla SOLO horizontal, sin ejes visibles (el eje X lo dibujamos abajo) */}
-                <CartesianGrid vertical={false} stroke={semColors.track} />
-                <XAxis dataKey="fecha" hide />
-                <YAxis hide />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="cantidad"
-                  name="Ingresados"
-                  stroke={semColors.bueno}
-                  strokeWidth={2.5}
-                  fill={semColors.bueno}
-                  fillOpacity={0.1}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-                {haySerieResueltos && (
-                  <Line
-                    type="monotone"
-                    dataKey="resueltos"
-                    name="Resueltos"
-                    stroke={semColors.data5}
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
-                )}
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          {marcasTendencia.length > 0 && (
-            <div className="dv2-chart-fechas">
-              {marcasTendencia.map((f, i) => (
-                <span key={`${i}-${f}`}>{f}</span>
-              ))}
-            </div>
-          )}
-        </div>
         </div>
       ) : (
         <div className="dv2-grid-principal">
-
-          {/* Concentración — mapa de calor */}
-          <div className="dv2-card">
-            <div className="dv2-card-head dv2-card-head--icono">
-              <MapPin className="dv2-card-head-icono" aria-hidden="true" />
-              <h3 className="dv2-card-titulo">Concentración</h3>
-              <span className="dv2-card-caption">90 días</span>
-              {/* Antes acá iba el conteo de puntos: nadie sabe qué es un
-                  "punto" del mapa ni qué hacer con el número. En su lugar, lo
-                  que se está mirando, dicho en castellano. */}
-              <span className="dv2-card-caption dv2-card-caption--auto">
-                {catConcentracion ?? 'Todas las categorías'}
-              </span>
-            </div>
-            {/* Botonera en vez de combo: un combo esconde las opciones y hay
-                que abrirlo para saber qué se puede ver. Las cuatro categorías
-                salen del VOLUMEN REAL de este municipio, así que cada uno ve
-                las suyas. Si no entran, AdaptiveFilter las manda al "+N" solo. */}
-            {categoriasConcentracion.length > 0 && (
-              <AdaptiveFilter groups={gruposConcentracion} />
-            )}
-            {/* El mapa RECORRE los cuatro focos como un reproductor: se centra
-                en cada esquina y cuenta qué pasa ahí. Antes iba un listado
-                debajo, que crecía con los datos y rompía la simetría de la
-                fila —las tarjetas de al lado quedaban cortas—. Así el alto es
-                fijo y además la pantalla se lee sola en una demo. */}
-            <FocosRotativos
-              focos={focosConcentracion}
-              puntos={heatmapFiltrado}
-              loading={loadingHeatmap}
-              altura="230px"
-              onVerFoco={(f) => navigate(`/gestion/mapa?direccion=${encodeURIComponent(f.direccion)}`)}
-            />
-          </div>
-
-        </div>
-      )}
-
-      {/* ================= Analítica: métricas + cobertura + charts ================= */}
-      <SectionTitleV2 icon={TrendingUp} label="Analítica" />
-      <div className="dv2-grid-3">
           {/* Por estado — donut + leyenda */}
           <div className="dv2-card">
             <div className="dv2-card-head">
@@ -1295,6 +1197,41 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
+          {/* Concentración — mapa de calor */}
+          <div className="dv2-card">
+            <div className="dv2-card-head dv2-card-head--icono">
+              <MapPin className="dv2-card-head-icono" aria-hidden="true" />
+              <h3 className="dv2-card-titulo">Concentración</h3>
+              <span className="dv2-card-caption">90 días</span>
+              {/* Antes acá iba el conteo de puntos: nadie sabe qué es un
+                  "punto" del mapa ni qué hacer con el número. En su lugar, lo
+                  que se está mirando, dicho en castellano. */}
+              <span className="dv2-card-caption dv2-card-caption--auto">
+                {catConcentracion ?? 'Todas las categorías'}
+              </span>
+            </div>
+            {/* Botonera en vez de combo: un combo esconde las opciones y hay
+                que abrirlo para saber qué se puede ver. Las cuatro categorías
+                salen del VOLUMEN REAL de este municipio, así que cada uno ve
+                las suyas. Si no entran, AdaptiveFilter las manda al "+N" solo. */}
+            {categoriasConcentracion.length > 0 && (
+              <AdaptiveFilter groups={gruposConcentracion} />
+            )}
+            {/* El mapa RECORRE los cuatro focos como un reproductor: se centra
+                en cada esquina y cuenta qué pasa ahí. Antes iba un listado
+                debajo, que crecía con los datos y rompía la simetría de la
+                fila —las tarjetas de al lado quedaban cortas—. Así el alto es
+                fijo y además la pantalla se lee sola en una demo. */}
+            <FocosRotativos
+              focos={focosConcentracion}
+              puntos={heatmapFiltrado}
+              loading={loadingHeatmap}
+              altura="230px"
+              onVerFoco={(f) => navigate(`/gestion/mapa?direccion=${encodeURIComponent(f.direccion)}`)}
+            />
+          </div>
+
           {/* Top categorías */}
           <div className="dv2-card">
             <div className="dv2-card-head">
@@ -1337,6 +1274,12 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ================= Analítica: métricas + cobertura + charts ================= */}
+      <SectionTitleV2 icon={TrendingUp} label="Analítica" />
+      <div className="dv2-grid-2">
         {/* Panel de métricas con segmented control */}
         <div className="dv2-card">
           {/* Segmented control de texto (sin iconos), como la referencia */}
@@ -1531,6 +1474,10 @@ export default function Dashboard() {
       ) : (
       <>
       <div className="dv2-grid-2">
+        {/* Recorrido de los ultimos meses. Reemplaza la serie de 30 dias:
+            una linea plana con un pico no dice si el municipio viene
+            ganando o perdiendo — eso solo se ve comparando meses. */}
+        <TendenciaMeses datos={tendencias} />
 
         {/* Tiempo de resolución por categoría — las que más tardan primero */}
         <div className="dv2-card">

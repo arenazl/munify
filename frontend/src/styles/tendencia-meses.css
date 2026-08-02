@@ -1,0 +1,235 @@
+/* ============================================================
+   TendenciaMeses — el recorrido de los últimos meses.
+
+   La frase de arriba es la pieza principal: interpreta lo que
+   pasó ("se abría la brecha") en vez de describir la curva. Los
+   cuatro números la respaldan y el gráfico va último.
+
+   Todo sobre tokens --pl-*: cero colores fijos.
+   ============================================================ */
+
+.tm {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 16px 18px 14px;
+  box-shadow: var(--pl-shadow-card);
+  min-width: 0;
+}
+
+.tm-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.tm-titulo {
+  margin: 0;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  color: var(--pl-text);
+  letter-spacing: -0.01em;
+}
+
+/* El mes activo, como una ficha que va cambiando durante el recorrido. */
+.tm-mes {
+  padding: 2px 9px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+}
+
+.tm-sub {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+}
+
+.tm-controles {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tm-leyenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  white-space: nowrap;
+}
+.tm-punto {
+  width: 13px;
+  height: 3px;
+  border-radius: 2px;
+  display: block;
+}
+.tm-punto--in { background: var(--pl-green); }
+.tm-punto--out { background: var(--pl-border-strong); }
+
+.tm-play {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pl-radius-sm);
+  border: 1px solid var(--pl-border);
+  background: transparent;
+  color: var(--pl-text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.tm-play:hover { background: var(--pl-surface-hover); }
+
+/* La lectura del mes. Es lo que se lee primero y lo único que hace falta
+   entender: los números y la curva están para respaldarla. */
+.tm-veredicto {
+  margin: 10px 0 0;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.45;
+  color: var(--pl-text-3);
+  text-wrap: pretty;
+}
+.tm-veredicto--bueno { color: var(--pl-green-700); }
+.tm-veredicto--malo { color: var(--pl-red-700); }
+
+.tm-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pl-border);
+}
+
+.tm-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tm-kpi-et {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  /* Se lee entero: en cuatro columnas angostas, "DÍA MÁS CARGADO" cortado
+     no dice nada. Baja de renglón. */
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.tm-kpi-va {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--pl-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--pl-text);
+  line-height: 1.2;
+}
+.tm-kpi-va--bueno { color: var(--pl-green-700); }
+.tm-kpi-va--malo { color: var(--pl-red-700); }
+
+.tm-kpi-nota {
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-micro);
+  font-weight: 500;
+  color: var(--pl-text-faint);
+}
+
+.tm-lienzo {
+  height: 150px;
+  margin-top: 12px;
+}
+.tm-lienzo svg { display: block; width: 100%; height: 100%; }
+
+.tm-grilla path {
+  stroke: var(--pl-border);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.tm-area { fill: color-mix(in srgb, var(--pl-green) 12%, transparent); }
+
+.tm-linea {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.tm-linea--in { stroke: var(--pl-green); stroke-width: 2.5; }
+/* Punteada y en gris: lo cerrado acompaña, lo que manda es lo que entra. */
+.tm-linea--out { stroke: var(--pl-border-strong); stroke-width: 2; stroke-dasharray: 5 5; }
+
+.tm-eje {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-meses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--pl-border);
+}
+
+.tm-mes-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: var(--pl-radius-pill);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-2);
+  color: var(--pl-text-3);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.tm-mes-btn:hover { background: var(--pl-surface-hover); }
+
+.tm-mes-btn--activo {
+  background: var(--pl-green-100);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+
+.tm-mes-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-text-disabled);
+}
+.tm-mes-btn--activo .tm-mes-dot { background: var(--pl-green); }
+
+/* En pantalla angosta los cuatro números pasan a dos filas de dos: en una
+   fila de cuatro no entra ni la etiqueta ni el número. */
+@media (max-width: 560px) {
+  .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+  .tm-lienzo { height: 120px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-play, .tm-mes-btn { transition: none; }
+}

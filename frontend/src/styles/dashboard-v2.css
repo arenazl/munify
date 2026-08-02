@@ -421,21 +421,11 @@
   gap: 12px;
   align-items: stretch;
 }
-/* Los DOS gráficos grandes —el mapa y la tendencia— comparten fila.
-   En un escritorio grande van 50 y 50; cuando la pantalla se achica, cada
-   uno pasa a ocupar el ancho completo, porque un mapa o una serie de 30 días
-   apretados a la mitad de una pantalla mediana no se leen.
-   El corte lo decide el CONTENEDOR (flex-basis), no un breakpoint: pide
-   480px cada uno y entran los que quepan. */
 .dv2-grid-principal {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
-}
-.dv2-grid-principal > * {
-  flex: 1 1 480px;
-  min-width: 0;
 }
 .dv2-grid-2 {
   display: grid;
@@ -845,7 +835,7 @@
    Responsive
    ============================================================ */
 @media (max-width: 1100px) {
-
+  .dv2-grid-principal { grid-template-columns: 1fr; }
   .dv2-grid-cola { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Los KPI son chicos: quedan de a 2 hasta mobile inclusive */
   .dv2-grid-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1000,29 +990,33 @@
    tres columnas: son diez categorías, y en una columna angosta
    sólo entraban cinco.
    ============================================================ */
+@media (min-width: 1100px) {
+  .dv2-grid-principal {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+  /* El tercer hijo de la fila (Top categorías) pasa a la fila de abajo,
+     ocupando todo el ancho. */
+  .dv2-grid-principal > .dv2-card:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
 
-
-
-
-/* ============================================================
-   [GRID-3] — fila de tres paneles comparables.
-
-   Los tres rankings de la analítica (categorías, barrios y
-   zonas) van en la MISMA fila y con el MISMO formato: así se
-   leen uno contra otro. Antes categorías vivía en una tira
-   aparte a lo ancho y no se podía comparar con nada.
-
-   Con flex y no con grid: cada panel pide 300px y entran los
-   que quepan — tres en escritorio, dos en tablet, uno en
-   teléfono. Lo decide el contenedor, no un breakpoint.
-   ============================================================ */
-.dv2-grid-3 {
+/* Las barras de Top categorías se reparten en columnas SEGÚN EL ANCHO, con
+   flex: cada bloque pide 260px y el sobrante se reparte entre los que entran.
+   Sin media queries — el propio contenedor decide: en escritorio entran tres,
+   en una tablet dos, en un teléfono una. Diez categorías en una sola columna
+   obligan a cortar en cinco y esconder el resto detrás de un "otras 5". */
+.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  align-items: stretch;
+  gap: 10px 22px;
+  /* Cada bloque mide lo que mide su contenido. Sin esto, flex los ESTIRA a
+     lo alto para llenar la tarjeta y quedan barras separadas por cientos de
+     píxeles de vacío. */
+  align-items: flex-start;
+  align-content: flex-start;
 }
-.dv2-grid-3 > * {
-  flex: 1 1 300px;
+.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barra-bloque {
+  flex: 1 1 260px;
   min-width: 0;
 }
