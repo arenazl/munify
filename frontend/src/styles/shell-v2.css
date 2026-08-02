@@ -259,7 +259,9 @@
   font-family: var(--pl-font-display);
   font-size: var(--pl-fs-eyebrow);
   font-weight: 700;
-  letter-spacing: var(--pl-tracking-eyebrow);
+  /* Tracking más corto que el eyebrow estándar (0.09em): con Sora 700 en
+     mayúsculas quedaba demasiado aireado dentro del sidebar. */
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--pl-text-muted);
   transition: color var(--pl-dur-ui) var(--pl-ease);
