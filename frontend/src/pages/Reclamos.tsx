@@ -1087,6 +1087,24 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     }
   }, [searchParams, categorias, setSearchParams]);
 
+  /**
+   * Deep-link ?filtrar_categoria=NOMBRE → deja la lista FILTRADA por esa
+   * categoría.
+   *
+   * Ojo con el vecino de arriba: `?categoria=NOMBRE` abre el wizard para
+   * CREAR uno de esa categoría (lo usa el chat). Son cosas opuestas y el
+   * nombre se presta a confusión, así que este va con verbo: `filtrar_`.
+   */
+  useEffect(() => {
+    if (categorias.length === 0) return;
+    const nombre = searchParams.get('filtrar_categoria');
+    if (!nombre) return;
+    const buscada = decodeURIComponent(nombre).toLowerCase();
+    const cat = categorias.find((c) => c.nombre.toLowerCase() === buscada);
+    if (cat) setFiltroCategoria(cat.id);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, categorias, setSearchParams]);
+
   // Deep-link ?abrir=N → abre el Sheet del reclamo (la vuelta desde una OT: los
   // chips de reclamo en OrdenesTrabajo navegan acá con ?abrir={id}).
   useEffect(() => {

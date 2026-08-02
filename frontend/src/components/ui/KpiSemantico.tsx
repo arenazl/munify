@@ -51,6 +51,28 @@ export interface KpiSemanticoProps {
   className?: string;
 }
 
+/**
+ * Un dato con entidad propia dentro de la frase: una categoría, un barrio,
+ * una zona.
+ *
+ * No es decoración tipográfica. Estos nombres NO son texto — son registros del
+ * sistema, y el que los lee casi siempre quiere lo mismo: ver esos. Marcarlos
+ * subrayados avisa que se puede, y el link lleva a la lista ya filtrada.
+ *
+ * Sin `to` sigue funcionando como marca visual: es lo correcto cuando el
+ * nombre existe pero todavía no hay pantalla que lo reciba filtrado, y evita
+ * el peor resultado —un link que promete un filtro y lleva a una lista sin
+ * filtrar—.
+ */
+export function TagKpi({ children, to }: { children: ReactNode; to?: string }) {
+  if (!to) return <span className="kse-tag">{children}</span>;
+  return (
+    <Link to={to} className="kse-tag kse-tag--link">
+      {children}
+    </Link>
+  );
+}
+
 export function KpiSemantico({
   pregunta,
   icono: Icono,

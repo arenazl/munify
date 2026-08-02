@@ -27,7 +27,7 @@ import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBan
 import { SectionTitleV2 } from '../components/dashboard/SectionTitleV2';
 import { TendenciaMeses } from '../components/dashboard/TendenciaMeses';
 import { TarjetaCola } from '../components/dashboard/TarjetaCola';
-import { KpiSemantico } from '../components/ui/KpiSemantico';
+import { KpiSemantico, TagKpi } from '../components/ui/KpiSemantico';
 import { KpiCardV2, type KpiCardV2Props } from '../components/dashboard/KpiCardV2';
 import PresentacionLive from '../components/PresentacionLive';
 import { BRAND } from '../brands';
@@ -1119,7 +1119,17 @@ export default function Dashboard() {
               <>
                 De {porZona.length} {porZona.length === 1 ? 'barrio' : 'barrios'},{' '}
                 <strong>uno solo</strong> explica el {pctDe(zonaTop.cantidad)}% de todo.
-                {seguidoras.length > 0 && <> {seguidoras.join(' y ')} {seguidoras.length === 1 ? 'lo sigue' : 'lo siguen'} de lejos.</>}
+                {seguidoras.length > 0 && (
+                  <>{' '}
+                    {seguidoras.map((z, k) => (
+                      <span key={z}>
+                        {k > 0 && ' y '}
+                        <TagKpi>{z}</TagKpi>
+                      </span>
+                    ))}{' '}
+                    {seguidoras.length === 1 ? 'lo sigue' : 'lo siguen'} de lejos.
+                  </>
+                )}
               </>
             ) : (
               <>Todavía no hay reclamos con zona cargada.</>
@@ -1139,10 +1149,22 @@ export default function Dashboard() {
             catTop ? (
               <>
                 <strong>{Math.round(pctDe(catTop.cantidad) / 10)} de cada 10 reclamos</strong>{' '}
-                son {catTop.categoria.toLowerCase()}.
+                son de{' '}
+                <TagKpi to={`/gestion/reclamos?filtrar_categoria=${encodeURIComponent(catTop.categoria)}`}>
+                  {catTop.categoria}
+                </TagKpi>.
                 {catsSiguen.length > 0 && (
-                  <> {catsSiguen.map((c) => c.categoria).join(' y ')} suman otros {sumaSiguen}{' '}
-                    {catsSiguen.length === 1 ? '' : 'entre las dos'}.</>
+                  <>{' '}
+                    {catsSiguen.map((c, k) => (
+                      <span key={c.categoria}>
+                        {k > 0 && ' y '}
+                        <TagKpi to={`/gestion/reclamos?filtrar_categoria=${encodeURIComponent(c.categoria)}`}>
+                          {c.categoria}
+                        </TagKpi>
+                      </span>
+                    ))}{' '}
+                    suman otros {sumaSiguen}{catsSiguen.length > 1 ? ' entre las dos' : ''}.
+                  </>
                 )}
               </>
             ) : (
@@ -1169,13 +1191,15 @@ export default function Dashboard() {
             ) : masLenta ? (
               <>
                 Dentro de la meta de {fmtDias(metaDias)} días{' '}
-                <strong className="kse-mal">salvo {masLenta.categoria.toLowerCase()}</strong>, que tarda{' '}
-                {fmtDias(masLenta.dias_promedio)}
+                salvo{' '}
+                <TagKpi to={`/gestion/reclamos?filtrar_categoria=${encodeURIComponent(masLenta.categoria)}`}>
+                  {masLenta.categoria}
+                </TagKpi>, que <strong className="kse-mal">tarda {fmtDias(masLenta.dias_promedio)}</strong>
                 {categoriasSobreMeta === 1 ? ' y es la única fuera' : ` — y hay ${categoriasSobreMeta} fuera`}.
               </>
             ) : null
           }
-          pie={masRapida ? `Más rápida: ${masRapida.categoria.toLowerCase()}, ${fmtDias(masRapida.dias_promedio)} d` : undefined}
+          pie={masRapida ? `Más rápida: ${masRapida.categoria}, ${fmtDias(masRapida.dias_promedio)} d` : undefined}
           accion={{ label: 'Ver los tiempos', to: '/gestion/sla' }}
         />
       </div>
@@ -1215,12 +1239,24 @@ export default function Dashboard() {
             ) : zonasAtras === 0 && mejorZona && peorZona ? (
               <>
                 Ninguna zona quedó atrás: de <strong>{peorZona.tasa_resolucion}%</strong> en{' '}
-                {peorZona.zona_nombre} a {mejorZona.tasa_resolucion}% en {mejorZona.zona_nombre}.
+                <TagKpi>
+                  {peorZona.zona_nombre}
+                </TagKpi> a {mejorZona.tasa_resolucion}% en{' '}
+                <TagKpi>
+                  {mejorZona.zona_nombre}
+                </TagKpi>.
               </>
             ) : peorZona ? (
               <>
-                {peorZona.zona_nombre} cierra <strong className="kse-mal">{peorZona.tasa_resolucion}%</strong>
-                {mejorZona && <>, contra el {mejorZona.tasa_resolucion}% de {mejorZona.zona_nombre}</>}.
+                <TagKpi>
+                  {peorZona.zona_nombre}
+                </TagKpi> cierra <strong className="kse-mal">{peorZona.tasa_resolucion}%</strong>
+                {mejorZona && (
+                  <>, contra el {mejorZona.tasa_resolucion}% de{' '}
+                    <TagKpi>
+                      {mejorZona.zona_nombre}
+                    </TagKpi></>
+                )}.
                 {zonasAtras > 1 && <> {zonasAtras} zonas quedaron atrás.</>}
               </>
             ) : null

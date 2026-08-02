@@ -143,6 +143,29 @@
 .kse-detalle strong { font-weight: 600; color: var(--pl-text); }
 .kse-detalle .kse-mal { color: var(--pl-red-700); }
 
+/* Los nombres que son ENTIDADES del sistema (una categoría, un barrio, una
+   zona) van subrayados: avisan que eso no es texto, es un registro que se
+   puede abrir. El subrayado va separado de la letra y más fino que el texto
+   para no competir con el resaltado en negrita que lleva el dato. */
+.kse-tag {
+  color: var(--pl-text-2);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--pl-border-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.kse-tag--link {
+  cursor: pointer;
+  transition:
+    color var(--pl-dur-ui) var(--pl-ease),
+    text-decoration-color var(--pl-dur-ui) var(--pl-ease);
+}
+.kse-tag--link:hover {
+  color: var(--pl-green-700);
+  text-decoration-color: var(--pl-green);
+}
+
 .kse-pie {
   display: flex;
   align-items: center;
