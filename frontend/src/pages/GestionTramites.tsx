@@ -14,12 +14,8 @@ import {
   Play,
   Eye,
   User,
-  Phone,
-  Mail,
-  MapPin,
   Send,
   Loader2,
-  Hash,
   CalendarDays,
   Sparkles,
   UserPlus,
@@ -29,10 +25,13 @@ import {
   Copy,
   ArrowUpDown,
   Calendar,
-  FileSearch,
   PlayCircle,
   LayoutList,
   LayoutGrid,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi, categoriasTramiteApi, dependenciasApi, pagosApi } from '../lib/api';
@@ -758,23 +757,104 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const handlePosponer = () => handleDirectStateChange('pospuesto', 'Trámite pospuesto');
 
   // Renderizar footer con botones grandes dockeados (grid 2 col, hasta 2 filas)
+  // Header propio del Sheet — mismo lenguaje que el detalle de Reclamos
+  // (diseño "Reclamo Detalle" del canvas): eyebrow + copiar + navegación
+  // entre los trámites de la lista visible, título display y fila de meta.
+  const renderTramiteHeader = () => {
+    if (!selectedTramite) return undefined;
+    const idx = filteredTramites.findIndex((t) => t.id === selectedTramite.id);
+    const total = filteredTramites.length;
+    const irA = (i: number) => {
+      const destino = filteredTramites[i];
+      if (destino) openTramite(destino);
+    };
+    const cfg = getEstadoConfig(selectedTramite.estado);
+    const tipo =
+      selectedTramite.tramite?.categoria_tramite?.nombre ||
+      selectedTramite.tramite?.nombre ||
+      'Sin tipo';
+    const t = haceCuanto(selectedTramite.created_at);
+    const antiguedad = !t || t === 'recién' ? t : `hace ${t}`;
+    return (
+      <div className="rs-head">
+        <div className="rs-head-fila">
+          <span className="rs-eyebrow">Trámite {selectedTramite.numero_tramite}</span>
+          <button
+            type="button"
+            className="rs-nav-btn"
+            title="Copiar número"
+            aria-label="Copiar número"
+            onClick={() => {
+              navigator.clipboard.writeText(selectedTramite.numero_tramite);
+              toast.success('Número copiado');
+            }}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+          {idx >= 0 && total > 1 && (
+            <span className="rs-nav">
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Anterior"
+                disabled={idx <= 0}
+                onClick={() => irA(idx - 1)}
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+              <span className="rs-nav-pos">{idx + 1} de {total} en la lista</span>
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Siguiente"
+                disabled={idx >= total - 1}
+                onClick={() => irA(idx + 1)}
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          <span className="rs-head-icos">
+            <button type="button" className="rs-ico-btn" title="Cerrar" aria-label="Cerrar" onClick={closeSheet}>
+              <X className="h-4 w-4" />
+            </button>
+          </span>
+        </div>
+
+        <h2 className="rs-titulo">{selectedTramite.asunto}</h2>
+
+        <div className="rs-meta">
+          <span className="rs-estado" style={{ backgroundColor: cfg.bg, color: cfg.color }}>
+            <span className="rs-estado-dot" style={{ backgroundColor: cfg.color }} />
+            {cfg.label}
+          </span>
+          <span className="rs-meta-sep">·</span>
+          <span style={{ fontWeight: 600, color: 'var(--pl-text)' }}>{tipo}</span>
+          {antiguedad && (
+            <>
+              <span className="rs-meta-sep">·</span>
+              <span>{antiguedad}</span>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderTramiteFooter = () => {
     if (!selectedTramite) return null;
 
     const estadoActual = normalizeEstado(selectedTramite.estado);
 
-    // Estados finales - solo info
+    // Estados finales - banda informativa plana (mismo lenguaje que Reclamos)
     if (estadoActual === 'rechazado' || estadoActual === 'finalizado') {
+      const esFinal = estadoActual === 'finalizado';
+      const c = esFinal ? '#059669' : '#ef4444';
+      const IconoFinal = esFinal ? CheckCircle2 : XCircle;
       return (
-        <div
-          className="w-full px-4 py-3 rounded-xl font-semibold text-center"
-          style={{
-            backgroundColor: estadoActual === 'finalizado' ? '#05966920' : '#ef444420',
-            color: estadoActual === 'finalizado' ? '#059669' : '#ef4444',
-            border: `1px solid ${estadoActual === 'finalizado' ? '#05966950' : '#ef444450'}`
-          }}
-        >
-          {estadoActual === 'finalizado' ? '✓ Trámite Finalizado' : '✗ Trámite Rechazado'}
+        <div className="av2-sheet-final" style={{ backgroundColor: `${c}14`, color: c }}>
+          <IconoFinal className="h-4 w-4" />
+          {esFinal ? 'Trámite finalizado' : 'Trámite rechazado'}
         </div>
       );
     }
@@ -789,7 +869,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           className="w-full px-4 py-3 rounded-xl flex items-start gap-2"
           style={{ backgroundColor: '#f59e0b15', color: '#f59e0b', border: '1px solid #f59e0b50' }}
         >
-          <span className="text-lg">💳</span>
+          <CreditCard className="h-5 w-5 flex-shrink-0" />
           <div>
             <p className="font-semibold">Listo para entregar — falta pago</p>
             <p className="text-xs opacity-90 mt-0.5">
@@ -836,21 +916,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             key={a.id}
             onClick={a.handler}
             disabled={saving}
-            className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${a.fullRow ? 'col-span-2' : ''}`}
-            style={
+            className={`${
               a.variant === 'solid'
-                ? {
-                    backgroundColor: a.color,
-                    color: '#ffffff',
-                    boxShadow: `0 4px 14px ${a.color}40`,
-                  }
-                : {
-                    backgroundColor: `${a.color}15`,
-                    border: `1.5px solid ${a.color}60`,
-                    color: a.color,
-                  }
-            }
+                ? 'rs-cta'
+                : a.id === 'rechazado'
+                  ? 'rs-btn rs-btn--peligro'
+                  : 'rs-btn'
+            } w-full justify-center ${a.fullRow ? 'col-span-2' : ''}`}
           >
+            {a.variant === 'solid' && <Check className="h-4 w-4" />}
             {isThisLoading ? a.loadingLabel : a.label}
           </button>
           );
@@ -1950,172 +2024,66 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       )}
 
       {/* Sheet de detalle */}
-      <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite" stickyFooter={renderTramiteFooter()}>
+      <Sheet
+        open={sheetOpen}
+        onClose={closeSheet}
+        title={`Trámite ${selectedTramite?.numero_tramite || ''}`}
+        description={selectedTramite?.asunto}
+        customHeader={renderTramiteHeader()}
+        stickyFooter={renderTramiteFooter()}
+      >
         {selectedTramite && (
           <div className="space-y-3">
-            {/* Número y estado */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className="font-mono text-lg font-bold px-3 py-1 rounded"
-                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.primary }}
-                >
-                  {selectedTramite.numero_tramite}
-                </span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedTramite.numero_tramite);
-                    toast.success('Número copiado');
-                  }}
-                  className="p-1.5 rounded hover:bg-black/5"
-                >
-                  <Copy className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                </button>
+            {/* Qué pide el vecino — el asunto vive en el título del header. */}
+            {selectedTramite.descripcion && (
+              <div className="rs-seccion">
+                <span className="rs-seccion-titulo">Qué pide el vecino</span>
+                <p className="rs-parrafo">"{selectedTramite.descripcion}"</p>
               </div>
-              {(() => {
-                const cfg = getEstadoConfig(selectedTramite.estado);
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium"
-                    style={{ backgroundColor: cfg.bg, color: cfg.color }}
-                  >
-                    {React.createElement(cfg.icon, { className: 'h-4 w-4' })}
-                    {cfg.label}
+            )}
+
+            {/* QUIÉN LO PIDE / DÓNDE — dos columnas, datos reales. */}
+            <div className="rs-grid2">
+              <span className="min-w-0">
+                <span className="rs-mini-eyebrow">Quién lo pide</span>
+                <span className="rs-persona">
+                  <span className="rs-avatar">
+                    {`${selectedTramite.nombre_solicitante?.[0] ?? ''}${selectedTramite.apellido_solicitante?.[0] ?? ''}`.toUpperCase() || '?'}
                   </span>
-                );
-              })()}
-            </div>
-
-            {/* Tipo de trámite */}
-            {(() => {
-              const tipoDetalle = selectedTramite.tramite?.categoria_tramite;
-              const colorDetalle = tipoDetalle?.color || theme.primary;
-              return (
-                <div
-                  className="p-3 rounded-xl"
-                  style={{
-                    backgroundColor: `${colorDetalle}10`,
-                    border: `1px solid ${colorDetalle}30`
-                  }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${colorDetalle}20` }}
-                    >
-                      <DynamicIcon
-                        name={tipoDetalle?.icono || 'FileText'}
-                        className="h-5 w-5"
-                        style={{ color: colorDetalle }}
-                        fallback={<FileText className="h-5 w-5" style={{ color: colorDetalle }} />}
-                      />
-                    </div>
-                    <div className="leading-tight">
-                      <p className="font-medium" style={{ color: theme.text }}>
-                        {tipoDetalle?.nombre || selectedTramite.tramite?.nombre || 'Sin tipo'}
-                      </p>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>
-                        Tipo de trámite
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Asunto y descripción */}
-            <div>
-              <h3 className="text-xs font-medium mb-1 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                Asunto
-              </h3>
-              <p className="font-medium" style={{ color: theme.text }}>
-                {selectedTramite.asunto}
-              </p>
-              {selectedTramite.descripcion && (
-                <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-                  {selectedTramite.descripcion}
-                </p>
-              )}
-            </div>
-
-            {/* Datos del solicitante */}
-            <div
-              className="px-3 py-2.5 rounded-xl"
-              style={{ backgroundColor: theme.backgroundSecondary }}
-            >
-              <h3 className="text-sm font-medium mb-2" style={{ color: theme.text }}>
-                Datos del Solicitante
-              </h3>
-              <div className="space-y-1.5">
-                {(selectedTramite.nombre_solicitante || selectedTramite.apellido_solicitante) && (
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <span className="text-sm" style={{ color: theme.text }}>
+                  <span className="rs-persona-datos">
+                    <span className="rs-persona-nombre">
                       {selectedTramite.nombre_solicitante} {selectedTramite.apellido_solicitante}
                     </span>
-                  </div>
-                )}
-                {selectedTramite.dni_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <Hash className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <span className="text-sm" style={{ color: theme.text }}>
-                      DNI: {selectedTramite.dni_solicitante}
-                    </span>
-                  </div>
-                )}
-                {selectedTramite.email_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <a
-                      href={`mailto:${selectedTramite.email_solicitante}`}
-                      className="text-sm hover:underline"
-                      style={{ color: theme.primary }}
-                    >
-                      {selectedTramite.email_solicitante}
-                    </a>
-                  </div>
-                )}
+                    {selectedTramite.dni_solicitante && (
+                      <span className="rs-dato-sub">DNI {selectedTramite.dni_solicitante}</span>
+                    )}
+                  </span>
+                </span>
                 {selectedTramite.telefono_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <a
-                      href={`tel:${selectedTramite.telefono_solicitante}`}
-                      className="text-sm hover:underline"
-                      style={{ color: theme.primary }}
-                    >
-                      {selectedTramite.telefono_solicitante}
-                    </a>
-                  </div>
+                  <a className="rs-mini-link" href={`tel:${selectedTramite.telefono_solicitante}`}>
+                    {selectedTramite.telefono_solicitante}
+                  </a>
                 )}
-                {selectedTramite.direccion_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <span className="text-sm" style={{ color: theme.text }}>
-                      {selectedTramite.direccion_solicitante}
-                    </span>
-                  </div>
+              </span>
+              <span className="min-w-0">
+                <span className="rs-mini-eyebrow">Dónde</span>
+                <span className="rs-dato">
+                  {selectedTramite.direccion_solicitante || 'Sin dirección cargada'}
+                </span>
+                {selectedTramite.email_solicitante && (
+                  <a className="rs-mini-link" href={`mailto:${selectedTramite.email_solicitante}`}>
+                    {selectedTramite.email_solicitante}
+                  </a>
                 )}
-              </div>
+              </span>
             </div>
 
-            {/* Checklist de verificación de documentos requeridos */}
-            <div className="px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium" style={{ color: theme.text }}>
-                  Verificación de documentos
-                </h3>
+            {/* Documentos — checklist real, con la acción como link de sección. */}
+            <div className="rs-seccion">
+              <div className="rs-seccion-cab">
+                <span className="rs-seccion-titulo">Documentos</span>
                 {user?.rol !== 'vecino' && (checklistData?.total_obligatorios_subidos ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setReviewOpen(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
-                      color: '#fff',
-                      boxShadow: `0 4px 10px ${theme.primary}40`,
-                    }}
-                  >
-                    <FileSearch className="h-4 w-4" />
+                  <button type="button" className="rs-seccion-link" onClick={() => setReviewOpen(true)}>
                     Revisar docs
                   </button>
                 )}
