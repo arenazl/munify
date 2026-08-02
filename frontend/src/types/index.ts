@@ -342,6 +342,48 @@ export interface OTRecurso {
   aplicado: boolean;
 }
 
+/**
+ * Payload del Tablero (GET /reclamos/tablero) — tarjetas livianas + resumen.
+ *
+ * NO es un `Reclamo` recortado: es lo que la tarjeta del kanban pinta y nada
+ * más. `categoria`/`dependencia`/`vecino` vienen planos (strings) porque el
+ * tablero nunca necesitó las entidades completas, y cada nivel anidado costaba
+ * un eager load extra en el backend.
+ */
+export interface TableroItem {
+  id: number;
+  titulo: string;
+  direccion?: string | null;
+  estado: EstadoReclamo;
+  created_at?: string | null;
+  updated_at?: string | null;
+  categoria?: string | null;
+  dependencia?: string | null;
+  vecino?: string | null;
+}
+
+export interface TableroCerradoItem {
+  id: number;
+  titulo: string;
+  estado: EstadoReclamo;
+  dias?: number | null;
+}
+
+export interface TableroPayload {
+  /** Las tres colas de trabajo. Los cerrados NO vienen como filas: son resumen. */
+  abiertos: TableroItem[];
+  cerrados: {
+    finalizados: number;
+    rechazados: number;
+    promedio_dias?: number | null;
+    ultimos: TableroCerradoItem[];
+  };
+  periodo_dias: number;
+  /** Total REAL de abiertos del período (no el largo del array si se truncó). */
+  total_abiertos: number;
+  truncado: boolean;
+}
+
 export interface Reclamo {
   id: number;
   titulo: string;

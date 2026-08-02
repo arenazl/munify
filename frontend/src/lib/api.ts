@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { TableroPayload } from '../types';
 
 const getApiUrl = () => {
   // Si hay URL completa configurada, usarla (override explícito).
@@ -306,6 +307,11 @@ export const authApi = {
 // Reclamos
 export const reclamosApi = {
   getAll: (params?: Record<string, string | number>) => api.get('/reclamos', { params }),
+  // Payload del kanban en UNA lectura (tarjetas livianas + resumen de cerrados
+  // agregado en SQL). No usar getAll paginado para el tablero: son 6 requests
+  // encadenados y ~875 kB para pintar ocho campos por tarjeta.
+  getTablero: (params?: { dias?: number }) =>
+    api.get<TableroPayload>('/reclamos/tablero', { params }),
   getMisReclamos: (params?: { skip?: number; limit?: number }) => api.get('/reclamos/mis-reclamos', { params }),
   getMisEstadisticas: () => api.get('/reclamos/mis-estadisticas'),
   getRevisionIA: (force = false) => api.get('/reclamos/revision-ia', { params: { force } }),

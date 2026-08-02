@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, case
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from pydantic import BaseModel
@@ -848,6 +848,197 @@ async def get_reclamos(
     await set_prioridad_ot(db, reclamos)
     await set_poi(db, reclamos)
     return reclamos
+
+class TableroItem(BaseModel):
+    """Tarjeta del kanban: SOLO los campos que la tarjeta pinta.
+
+    Deliberadamente plano (categoria/dependencia/vecino son strings, no objetos
+    anidados): el tablero no necesita las entidades completas y cada nivel de
+    anidamiento es un selectinload más en el backend.
+    """
+    id: int
+    titulo: str
+    direccion: Optional[str] = None
+    estado: EstadoReclamo
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    categoria: Optional[str] = None
+    dependencia: Optional[str] = None
+    vecino: Optional[str] = None
+
+
+class TableroCerradoItem(BaseModel):
+    id: int
+    titulo: str
+    estado: EstadoReclamo
+    dias: Optional[int] = None
+
+
+class TableroCerrados(BaseModel):
+    finalizados: int
+    rechazados: int
+    promedio_dias: Optional[float] = None
+    ultimos: List[TableroCerradoItem]
+
+
+class TableroResponse(BaseModel):
+    abiertos: List[TableroItem]
+    cerrados: TableroCerrados
+    periodo_dias: int
+    total_abiertos: int
+    truncado: bool
+
+
+# Tope de seguridad: lo ABIERTO de un municipio es acotado por naturaleza, pero
+# un tenant con una cola desbordada no puede tumbar la pantalla. Si se alcanza,
+# `truncado` lo dice y `total_abiertos` sigue siendo el número REAL — el tablero
+# nunca reporta un conteo recortado como si fuera el total.
+TABLERO_MAX_ABIERTOS = 2000
+
+
+@router.get("/tablero", response_model=TableroResponse)
+async def get_tablero(
+    request: Request,
+    dias: int = Query(30, ge=0, le=3650, description="Ventana en días sobre created_at. 0 = todo el histórico."),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
+):
+    """Payload del Tablero (kanban) en UNA sola lectura.
+
+    Reemplaza al patrón anterior del front: seis GET /reclamos encadenados de
+    100 filas cada uno (~875 kB, ~60 queries entre eager loads, prioridad de OT
+    y POIs) para pintar tarjetas que usan ocho campos. Acá son tres queries y
+    el payload baja un orden de magnitud.
+
+    Dos bloques con criterios distintos a propósito:
+    - `abiertos`: las tarjetas de las tres colas de trabajo. Se define por
+      EXCLUSIÓN de los estados cerrados, así un estado nuevo del enum entra como
+      abierto en vez de desaparecer del tablero.
+    - `cerrados`: agregación, NO la lista. La columna Cerrados es un resumen (no
+      es droppable), así que traer sus filas era pura transferencia de más.
+
+    El período se filtra en SQL: antes se bajaba el histórico entero y el
+    navegador descartaba lo que no entraba en la ventana.
+    """
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
+    from models.dependencia import Dependencia
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    base = [Reclamo.municipio_id == municipio_id]
+    # Mismo criterio que el listado: el empleado con dependencia asignada ve la
+    # suya; sin dependencia, todo el municipio.
+    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+        base.append(Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id)
+
+    if dias > 0:
+        # Comparación directa contra la columna (no func.date): así el filtro
+        # puede apoyarse en un índice de created_at en vez de forzar un scan.
+        desde = datetime.now(timezone.utc) - timedelta(days=dias)
+        base.append(Reclamo.created_at >= desde)
+
+    CERRADOS = [EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO, EstadoReclamo.RECHAZADO]
+
+    # --- 1) Abiertos: una query, columnas justas, joins planos --------------
+    filas = (await db.execute(
+        select(
+            Reclamo.id,
+            Reclamo.titulo,
+            Reclamo.direccion,
+            Reclamo.estado,
+            Reclamo.created_at,
+            Reclamo.updated_at,
+            Categoria.nombre,
+            Dependencia.nombre,
+            User.nombre,
+            User.apellido,
+        )
+        .select_from(Reclamo)
+        .outerjoin(Categoria, Reclamo.categoria_id == Categoria.id)
+        .outerjoin(MunicipioDependencia, Reclamo.municipio_dependencia_id == MunicipioDependencia.id)
+        .outerjoin(Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
+        .outerjoin(User, Reclamo.creador_id == User.id)
+        .where(*base, Reclamo.estado.notin_(CERRADOS))
+        .order_by(Reclamo.created_at.desc())
+        .limit(TABLERO_MAX_ABIERTOS)
+    )).all()
+
+    abiertos = [
+        TableroItem(
+            id=f[0], titulo=f[1], direccion=f[2], estado=f[3],
+            created_at=f[4], updated_at=f[5],
+            categoria=f[6], dependencia=f[7],
+            vecino=" ".join(p for p in (f[8], f[9]) if p) or None,
+        )
+        for f in filas
+    ]
+
+    truncado = len(abiertos) == TABLERO_MAX_ABIERTOS
+    total_abiertos = len(abiertos)
+    if truncado:
+        total_abiertos = (await db.execute(
+            select(func.count(Reclamo.id)).where(*base, Reclamo.estado.notin_(CERRADOS))
+        )).scalar() or total_abiertos
+
+    # --- 2) Cerrados: agregación, no filas ----------------------------------
+    # El promedio sale sobre los que tienen cierre real y coherente
+    # (fecha_resolucion no nula y posterior a la creación): un reclamo migrado
+    # sin fecha no puede empujar el promedio a cero.
+    agg = (await db.execute(
+        select(
+            func.sum(case((Reclamo.estado == EstadoReclamo.RECHAZADO, 0), else_=1)),
+            func.sum(case((Reclamo.estado == EstadoReclamo.RECHAZADO, 1), else_=0)),
+            func.avg(
+                case(
+                    (
+                        Reclamo.fecha_resolucion >= Reclamo.created_at,
+                        func.datediff(Reclamo.fecha_resolucion, Reclamo.created_at),
+                    ),
+                    else_=None,
+                )
+            ),
+        ).where(*base, Reclamo.estado.in_(CERRADOS))
+    )).one()
+
+    finalizados = int(agg[0] or 0)
+    rechazados = int(agg[1] or 0)
+    promedio = round(float(agg[2]), 1) if agg[2] is not None else None
+
+    # --- 3) Los últimos cerrados (la lista corta del resumen) ---------------
+    cierre = func.coalesce(Reclamo.fecha_resolucion, Reclamo.updated_at, Reclamo.created_at)
+    ultimos_filas = (await db.execute(
+        select(
+            Reclamo.id,
+            Reclamo.titulo,
+            Reclamo.estado,
+            func.datediff(cierre, Reclamo.created_at),
+        )
+        .where(*base, Reclamo.estado.in_(CERRADOS))
+        .order_by(cierre.desc())
+        .limit(4)
+    )).all()
+
+    ultimos = [
+        TableroCerradoItem(
+            id=f[0], titulo=f[1], estado=f[2],
+            dias=int(f[3]) if f[3] is not None and f[3] >= 0 else None,
+        )
+        for f in ultimos_filas
+    ]
+
+    return TableroResponse(
+        abiertos=abiertos,
+        cerrados=TableroCerrados(
+            finalizados=finalizados,
+            rechazados=rechazados,
+            promedio_dias=promedio,
+            ultimos=ultimos,
+        ),
+        periodo_dias=dias,
+        total_abiertos=total_abiertos,
+        truncado=truncado,
+    )
+
 
 @router.get("/mis-reclamos", response_model=List[ReclamoResponse])
 async def get_mis_reclamos(

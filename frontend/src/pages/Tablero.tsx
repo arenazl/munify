@@ -4,7 +4,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { ArrowRight, BarChart3, CalendarDays, Clock, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, ordenesTrabajoApi } from '../lib/api';
-import { Reclamo, EstadoReclamo } from '../types';
+import { TableroItem, TableroPayload, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { resolverUmbrales } from '../lib/veredictos';
@@ -23,6 +23,13 @@ import { resolverUmbrales } from '../lib/veredictos';
  * SEMÁNTICOS del sistema (--pl-red / --pl-amber / --pl-green / grises) y no de
  * `estadoColors` — ese SSoT pinta la CARA de un estado suelto (pills, cards del
  * vecino), que es otra pregunta. Cero hex nuevo acá.
+ *
+ * DATOS: un solo GET /reclamos/tablero. Antes eran seis GET /reclamos
+ * encadenados de 100 filas (~875 kB, ~10 s medidos) que bajaban el reclamo
+ * COMPLETO — documentos, creador, barrio — para pintar ocho campos, y que de
+ * paso saturaban el vCPU del backend y hacían lento al resto de la pantalla.
+ * El período se filtra en SQL, no en el navegador, y los cerrados vienen como
+ * resumen agregado porque esa columna no es una cola: no se le suelta nada.
  */
 
 // ---------------------------------------------------------------------------
@@ -32,9 +39,8 @@ import { resolverUmbrales } from '../lib/veredictos';
 const ESTADOS_SIN_TOMAR: EstadoReclamo[] = ['recibido', 'nuevo', 'asignado'];
 const ESTADOS_EN_CURSO: EstadoReclamo[] = ['en_curso', 'en_proceso', 'pendiente_confirmacion'];
 const ESTADOS_POSPUESTO: EstadoReclamo[] = ['pospuesto'];
-const ESTADOS_CERRADO: EstadoReclamo[] = ['finalizado', 'resuelto', 'rechazado'];
 
-const enGrupo = (r: Reclamo, grupo: EstadoReclamo[]) => grupo.includes(r.estado);
+const enGrupo = (r: TableroItem, grupo: EstadoReclamo[]) => grupo.includes(r.estado);
 
 /**
  * Transiciones permitidas — ESPEJO de `TRANSICIONES_VALIDAS` de
@@ -101,7 +107,7 @@ const diasDesde = (iso?: string | null): number | null => {
 };
 
 /** Último movimiento conocido del reclamo (lo que la lista tiene). */
-const ultimoMovimiento = (r: Reclamo): string => r.updated_at || r.created_at;
+const ultimoMovimiento = (r: TableroItem): string | null | undefined => r.updated_at || r.created_at;
 
 const esHoy = (iso?: string | null): boolean => {
   const t = ms(iso);
@@ -169,12 +175,12 @@ function TarjetaReclamo({
   notaTono,
   pie,
 }: {
-  reclamo: Reclamo;
+  reclamo: TableroItem;
   nota: string;
   notaTono: Tono;
   pie?: React.ReactNode;
 }) {
-  const area = reclamo.dependencia_asignada?.nombre || reclamo.categoria?.nombre || 'Sin área';
+  const area = reclamo.dependencia || reclamo.categoria || 'Sin área';
   return (
     <>
       <Link
@@ -224,8 +230,8 @@ interface OtLite {
 type MapaResponsables = Record<number, string>;
 
 /** Etiqueta de responsable: primero la OT (empleado / cuadrilla), si no la dependencia. */
-const responsableDe = (r: Reclamo, mapa: MapaResponsables): string | null =>
-  mapa[r.id] || r.dependencia_asignada?.nombre || null;
+const responsableDe = (r: TableroItem, mapa: MapaResponsables): string | null =>
+  mapa[r.id] || r.dependencia || null;
 
 // ---------------------------------------------------------------------------
 // Período
@@ -238,45 +244,54 @@ const PERIODOS: { value: string; label: string; frase: string }[] = [
   { value: '0', label: 'Todo el histórico', frase: 'en todo el histórico' },
 ];
 
-// Paginado: el endpoint devuelve 20 por defecto y 100 como máximo. El tablero
-// necesita el período COMPLETO (los conteos de la frase y del resumen de
-// cerrados serían mentira con una página suelta), así que trae hasta 6 páginas.
-const PAGINA = 100;
-const MAX_PAGINAS = 6;
+const CERRADOS_VACIO: TableroPayload['cerrados'] = {
+  finalizados: 0,
+  rechazados: 0,
+  promedio_dias: null,
+  ultimos: [],
+};
 
 export default function Tablero() {
-  const [reclamos, setReclamos] = useState<Reclamo[]>([]);
+  const [abiertos, setAbiertos] = useState<TableroItem[]>([]);
+  const [cerrados, setCerrados] = useState<TableroPayload['cerrados']>(CERRADOS_VACIO);
+  const [truncado, setTruncado] = useState(false);
   const [responsables, setResponsables] = useState<MapaResponsables>({});
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [periodo, setPeriodo] = useState('30');
-  const [arrastrando, setArrastrando] = useState<Reclamo | null>(null);
+  const [arrastrando, setArrastrando] = useState<TableroItem | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
   const umbrales = useMemo(() => resolverUmbrales(), []);
 
-  const fetchReclamos = useCallback(async () => {
-    try {
-      const acumulado: Reclamo[] = [];
-      for (let p = 0; p < MAX_PAGINAS; p++) {
-        const res = await reclamosApi.getAll({ skip: p * PAGINA, limit: PAGINA });
-        const lote: Reclamo[] = res.data || [];
-        acumulado.push(...lote);
-        if (lote.length < PAGINA) break;
-      }
-      setReclamos(acumulado);
-    } catch (error) {
-      console.error('Error cargando reclamos:', error);
-      toast.error('Error al cargar reclamos');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // El período viaja al backend: filtrar en SQL es lo que evita bajar el
+  // histórico entero para descartarlo en el navegador.
+  useEffect(() => {
+    let vigente = true;
+    reclamosApi
+      .getTablero({ dias: parseInt(periodo, 10) || 0 })
+      .then((res) => {
+        if (!vigente) return; // respuesta de un período que el usuario ya cambió
+        setAbiertos(res.data.abiertos || []);
+        setCerrados(res.data.cerrados || CERRADOS_VACIO);
+        setTruncado(Boolean(res.data.truncado));
+      })
+      .catch((error) => {
+        if (!vigente) return;
+        console.error('Error cargando el tablero:', error);
+        toast.error('Error al cargar el tablero');
+      })
+      .finally(() => {
+        if (vigente) setLoading(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [periodo]);
 
   useEffect(() => {
-    fetchReclamos();
     // El responsable de campo (empleado/cuadrilla) NO viaja en la fila del
     // listado: vive en la orden de trabajo. Se pide aparte y, si falla o el
     // muni no usa OTs formales, la tarjeta cae a la dependencia asignada.
@@ -295,42 +310,36 @@ export default function Tablero() {
         setResponsables(mapa);
       })
       .catch(() => setResponsables({}));
-  }, [fetchReclamos]);
+  }, []);
 
-  // ---- Filtrado (período + hallazgo) --------------------------------------
+  // ---- Filtrado (solo hallazgo: el período ya vino filtrado del backend) ---
 
   const visibles = useMemo(() => {
-    const dias = parseInt(periodo, 10) || 0;
-    const desde = dias > 0 ? Date.now() - dias * DIA_MS : null;
     const term = busqueda.trim().toLowerCase();
+    if (!term) return abiertos;
     const soloNum = term.replace(/\D/g, '');
 
-    return reclamos.filter((r) => {
-      if (desde != null) {
-        const creado = ms(r.created_at);
-        if (creado == null || creado < desde) return false;
-      }
-      if (!term) return true;
+    return abiertos.filter((r) => {
       if (soloNum && String(r.id).includes(soloNum)) return true;
-      const vecino = `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`.toLowerCase();
       return (
         (r.direccion || '').toLowerCase().includes(term) ||
-        vecino.includes(term) ||
+        (r.vecino || '').toLowerCase().includes(term) ||
         (r.titulo || '').toLowerCase().includes(term) ||
-        (r.categoria?.nombre || '').toLowerCase().includes(term) ||
-        (r.dependencia_asignada?.nombre || '').toLowerCase().includes(term)
+        (r.categoria || '').toLowerCase().includes(term) ||
+        (r.dependencia || '').toLowerCase().includes(term)
       );
     });
-  }, [reclamos, periodo, busqueda]);
+  }, [abiertos, busqueda]);
 
   const sinTomar = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_SIN_TOMAR)), [visibles]);
   const enCurso = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_EN_CURSO)), [visibles]);
   const pospuestos = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_POSPUESTO)), [visibles]);
-  const cerrados = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_CERRADO)), [visibles]);
+
+  const totalCerrados = cerrados.finalizados + cerrados.rechazados;
 
   /** Trabado = en curso y sin novedades hace más de N días (umbral del sistema). */
   const esTrabado = useCallback(
-    (r: Reclamo) => (diasDesde(ultimoMovimiento(r)) ?? 0) >= umbrales.diasSinActividad.advertencia,
+    (r: TableroItem) => (diasDesde(ultimoMovimiento(r)) ?? 0) >= umbrales.diasSinActividad.advertencia,
     [umbrales],
   );
 
@@ -350,44 +359,16 @@ export default function Tablero() {
     return dias.length ? Math.max(...dias) : 0;
   }, [pospuestos]);
 
-  // ---- Resumen de cerrados ------------------------------------------------
-
-  const resumenCerrados = useMemo(() => {
-    const finalizados = cerrados.filter((r) => r.estado !== 'rechazado').length;
-    const rechazados = cerrados.filter((r) => r.estado === 'rechazado').length;
-
-    // Promedio de cierre: solo sobre los que tienen fecha de resolución real.
-    const duraciones = cerrados
-      .map((r) => {
-        const fin = ms(r.fecha_resolucion);
-        const ini = ms(r.created_at);
-        if (fin == null || ini == null || fin < ini) return null;
-        return (fin - ini) / DIA_MS;
-      })
-      .filter((d): d is number => d != null);
-    const promedio = duraciones.length
-      ? Math.round((duraciones.reduce((a, b) => a + b, 0) / duraciones.length) * 10) / 10
-      : null;
-
-    const ultimos = [...cerrados]
-      .sort((a, b) => (ms(b.fecha_resolucion || ultimoMovimiento(b)) || 0) - (ms(a.fecha_resolucion || ultimoMovimiento(a)) || 0))
-      .slice(0, 4)
-      .map((r) => {
-        const fin = ms(r.fecha_resolucion || ultimoMovimiento(r));
-        const ini = ms(r.created_at);
-        const dias = fin != null && ini != null && fin >= ini ? Math.round((fin - ini) / DIA_MS) : null;
-        return { reclamo: r, dias };
-      });
-
-    return { finalizados, rechazados, promedio, ultimos };
-  }, [cerrados]);
+  // El resumen de cerrados (conteos, promedio de cierre y los últimos cuatro)
+  // se calcula en SQL: es una agregación sobre TODO el período, no sobre las
+  // filas que alcanzó a bajar el navegador.
 
   const fraseperiodo = PERIODOS.find((p) => p.value === periodo)?.frase || '';
 
   // ---- Drag & drop --------------------------------------------------------
 
   const handleDragStart = (start: { draggableId: string }) => {
-    const r = reclamos.find((x) => x.id === parseInt(start.draggableId, 10)) || null;
+    const r = abiertos.find((x) => x.id === parseInt(start.draggableId, 10)) || null;
     setArrastrando(r);
   };
 
@@ -397,7 +378,7 @@ export default function Tablero() {
     if (!destination) return;
 
     const reclamoId = parseInt(draggableId, 10);
-    const reclamo = reclamos.find((r) => r.id === reclamoId);
+    const reclamo = abiertos.find((r) => r.id === reclamoId);
     if (!reclamo) return;
 
     const nuevoEstado = destination.droppableId as EstadoReclamo;
@@ -412,13 +393,13 @@ export default function Tablero() {
       return;
     }
 
-    setReclamos((prev) => prev.map((r) => (r.id === reclamoId ? { ...r, estado: nuevoEstado } : r)));
+    setAbiertos((prev) => prev.map((r) => (r.id === reclamoId ? { ...r, estado: nuevoEstado } : r)));
 
     try {
       await reclamosApi.cambiarEstado(reclamoId, nuevoEstado);
       toast.success('Estado actualizado');
     } catch (error: unknown) {
-      setReclamos((prev) => prev.map((r) => (r.id === reclamoId ? { ...r, estado: estadoAnterior } : r)));
+      setAbiertos((prev) => prev.map((r) => (r.id === reclamoId ? { ...r, estado: estadoAnterior } : r)));
       console.error('Error al cambiar estado:', error);
       const detalle =
         (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
@@ -567,7 +548,7 @@ export default function Tablero() {
           lineHeight: 1.4,
         }}
       >
-        {visibles.length === 0 ? (
+        {visibles.length === 0 && totalCerrados === 0 ? (
           <span style={{ color: 'var(--pl-text-2)' }}>
             No hay reclamos {fraseperiodo}. Cambiá el período o la búsqueda para ver más.
           </span>
@@ -590,6 +571,13 @@ export default function Tablero() {
             <span style={{ color: 'var(--pl-text-2)' }}>
               {canDrag ? '. Arrastrá una tarjeta para cambiarle el estado.' : '.'}
             </span>
+            {/* Si la cola excede el tope del endpoint, se dice — un tablero que
+                recorta en silencio hace tomar decisiones sobre datos parciales. */}
+            {truncado && (
+              <span style={{ color: 'var(--pl-amber-700)' }}>
+                {' '}La cola es muy larga: se muestran las tarjetas más recientes.
+              </span>
+            )}
           </>
         )}
       </p>
@@ -775,40 +763,40 @@ export default function Tablero() {
 
           {/* ===== Cerrados (resumen, NO es una cola) ===== */}
           <section style={{ ...columnaShell, backgroundColor: 'var(--pl-surface-2)' }}>
-            <CabeceraColumna tono="verde" titulo="Cerrados" conteo={cerrados.length} sub={fraseperiodo} />
+            <CabeceraColumna tono="verde" titulo="Cerrados" conteo={totalCerrados} sub={fraseperiodo} />
             <div className="p-3 flex flex-col gap-3">
               <p className="text-[12px]" style={{ color: 'var(--pl-text-2)', lineHeight: 1.5 }}>
-                {`${resumenCerrados.finalizados} ${resumenCerrados.finalizados === 1 ? 'finalizado' : 'finalizados'} y ${resumenCerrados.rechazados} ${resumenCerrados.rechazados === 1 ? 'rechazado' : 'rechazados'} ${fraseperiodo}.`}
-                {resumenCerrados.promedio != null && ` Promedio de cierre: ${resumenCerrados.promedio} días.`}
+                {`${cerrados.finalizados} ${cerrados.finalizados === 1 ? 'finalizado' : 'finalizados'} y ${cerrados.rechazados} ${cerrados.rechazados === 1 ? 'rechazado' : 'rechazados'} ${fraseperiodo}.`}
+                {cerrados.promedio_dias != null && ` Promedio de cierre: ${cerrados.promedio_dias} días.`}
               </p>
 
-              {resumenCerrados.ultimos.length > 0 && (
+              {cerrados.ultimos.length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                  {resumenCerrados.ultimos.map(({ reclamo, dias }) => (
-                    <div key={reclamo.id} className="flex items-center gap-2 min-w-0">
+                  {cerrados.ultimos.map((cerrado) => (
+                    <div key={cerrado.id} className="flex items-center gap-2 min-w-0">
                       <span
                         className="rounded-full flex-shrink-0"
                         style={{
                           width: 6,
                           height: 6,
                           backgroundColor:
-                            reclamo.estado === 'rechazado' ? 'var(--pl-red)' : 'var(--pl-green)',
+                            cerrado.estado === 'rechazado' ? 'var(--pl-red)' : 'var(--pl-green)',
                         }}
                       />
                       <Link
-                        to={`/gestion/reclamos/${reclamo.id}`}
+                        to={`/gestion/reclamos/${cerrado.id}`}
                         className="text-[11.5px] truncate hover:underline"
                         style={{ color: 'var(--pl-text-2)' }}
-                        title={reclamo.titulo}
+                        title={cerrado.titulo}
                       >
-                        {reclamo.titulo}
+                        {cerrado.titulo}
                       </Link>
-                      {dias != null && (
+                      {cerrado.dias != null && (
                         <span
                           className="ml-auto text-[11px] tabular-nums flex-shrink-0"
                           style={{ color: 'var(--pl-text-faint)' }}
                         >
-                          {dias} d
+                          {cerrado.dias} d
                         </span>
                       )}
                     </div>
@@ -816,13 +804,13 @@ export default function Tablero() {
                 </div>
               )}
 
-              {resumenCerrados.finalizados > 0 && (
+              {cerrados.finalizados > 0 && (
                 <Link
                   to="/gestion/reclamos?filtrar_estado=finalizado"
                   className="text-[11.5px] font-semibold hover:underline"
                   style={{ color: 'var(--pl-green-700)' }}
                 >
-                  {`Ver los ${resumenCerrados.finalizados} finalizados`}
+                  {`Ver los ${cerrados.finalizados} finalizados`}
                 </Link>
               )}
             </div>
