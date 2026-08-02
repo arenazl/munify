@@ -241,6 +241,19 @@
   margin-top: 10px;
 }
 
+/* ---------- Pie: CTA de pago ----------
+   `min-width: max-content` + `nowrap`: el botón nunca se comprime por debajo
+   de su texto — si falta espacio, es la fila la que baja de línea (rs-pie-fila
+   ya es flex-wrap). Sin esto el label caía en dos renglones dentro de un botón
+   de alto fijo. */
+
+.gs-cta-pago {
+  flex: 1 1 auto;
+  min-width: max-content;
+  justify-content: center;
+  white-space: nowrap;
+}
+
 /* ---------- Observaciones ---------- */
 
 .gs-obs-acciones {

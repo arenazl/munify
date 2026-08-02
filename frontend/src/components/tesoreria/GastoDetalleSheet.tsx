@@ -535,15 +535,12 @@ export function GastoDetalleSheet({
         return (
           <button
             type="button"
-            className="rs-cta"
-            style={{ flex: 1, minWidth: 180, justifyContent: 'center' }}
+            className="rs-cta gs-cta-pago"
             onClick={handleToggleEstado}
             disabled={togglingEstado}
             title={isPend ? 'Marcar como concretado' : 'Marcar como pendiente'}
           >
-            {togglingEstado
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <span className="rs-estado-dot" style={{ background: 'currentColor' }} />}
+            {togglingEstado && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {isPend ? 'Marcar como pagado' : 'Marcar como pendiente'}
           </button>
         );
