@@ -22,6 +22,7 @@ import {
   Tag,
   Clock,
   Navigation,
+  Square,
   FileDown,
   Flame,
   Pencil,
@@ -31,12 +32,13 @@ import {
   MapPinOff,
   Eraser,
   Building2,
-  Eye,
-  Layers,
   LocateFixed,
   MapPinned,
   Pause,
   Play,
+  AlarmClock,
+  CheckCircle2,
+  type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -49,7 +51,7 @@ import { reclamosApi, poiApi, modulosApi, zonasApi } from '../lib/api';
 import { PageHeader } from '../components/abmv2/PageHeader';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
-import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
+import { resolverUmbrales, veredictoMasEsPeor, veredictoMenosEsMejor } from '../lib/veredictos';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Slider } from '../components/ui/Slider';
@@ -59,11 +61,15 @@ import { ModernSelect } from '../components/ui/ModernSelect';
 // + FilterBar propios): ahora los controles del Mapa se DECLARAN y el
 // componente decide solo cómo presentarlos según el ancho.
 import { AdaptiveFilter, type AdaptiveControl } from '../components/ui/AdaptiveFilter';
-// La ORACIÓN del kit: el bloque "sobre qué reclamos" del diseño no es una
-// grilla de campos, es una frase en castellano con los filtros adentro. Se usa
-// SIN preguntas (el canvas las sacó): sólo el rótulo, la oración y la salida
-// para quitar los filtros.
-import { ConsultaGuiada, type ConsultaFiltro } from '../components/ui/ConsultaGuiada';
+// LA consulta guiada del kit: la pantalla no ofrece herramientas con nombre
+// técnico, ofrece PREGUNTAS en castellano y arma sola la oración con los
+// filtros adentro. Agnóstica: no sabe nada de mapas ni de reclamos.
+import {
+  ConsultaGuiada,
+  type ConsultaAccion,
+  type ConsultaFiltro,
+  type ConsultaSegmento,
+} from '../components/ui/ConsultaGuiada';
 import type { RankedListItem } from '../components/ui/RankedList';
 import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
 import {
@@ -84,6 +90,7 @@ import {
   convexHull,
   reclamosInBBox,
   isResuelto,
+  isAbierto,
   computeKPIs,
   topZonas,
   Hotspot,
@@ -157,8 +164,8 @@ const MAPA_ALTO_MIN = 420;
 const MAPA_AIRE_INFERIOR = 96;
 
 /** Ancla de la sección del ranking (la acción del hero scrollea acá). El id
- *  del DOM se mantiene estable: es la dirección a la que apuntan los
- *  deep-links y las verificaciones. */
+ *  del DOM se mantiene estable aunque el ranking cambie de contenido con la
+ *  pregunta: es la dirección a la que apuntan deep-links y verificaciones. */
 const ID_RANKING = 'mapa-zonas-calientes';
 
 /** Opciones del filtro Período. El label es lo que se LEE dentro de la
@@ -175,34 +182,116 @@ const PERIODOS = [
 const DIA_MS = 24 * 60 * 60 * 1000;
 
 // =====================================================================
-// LOS CONTROLES DEL MAPA (diseño canónico: mapa-canvas.dc.html)
+// CONSULTA GUIADA — las cuatro preguntas del mapa
 // =====================================================================
-// El canvas ordena la botonera en cuatro bloques numerados, y ése es el orden
-// en que se leen:
-//   1 · QUÉ SE VE           → la CAPA: reclamos o puntos de interés.
-//   2 · CÓMO SE VE          → la VISTA: pins, calor o ambos superpuestos.
-//   3 · AYUDAS              → lo que se resalta ENCIMA: zonas calientes, la
-//                             evolución (time-lapse) y dibujar un área.
-//   4 · SOBRE QUÉ RECLAMOS  → la oración con los filtros adentro.
-// Los tres primeros son la botonera del kit (AdaptiveFilter, con un grupo
-// etiquetado por bloque); el cuarto es la oración del kit (ConsultaGuiada sin
-// preguntas). Cero controles a mano.
+// Cambio de paradigma: la pantalla NO ofrece herramientas con nombre técnico
+// (pins, calor, hotspots, capa, time-lapse) — nadie fuera del que la construyó
+// sabe qué hace cada una. Ofrece PREGUNTAS en castellano y decide sola con qué
+// las contesta. Cada pregunta define, en un solo lugar:
+//   · la ORACIÓN que se lee arriba (con los filtros embebidos),
+//   · el ALCANCE de los datos (qué reclamos entran),
+//   · cómo se DIBUJA el lienzo (densidad o pines, y de qué color),
+//   · si van los círculos de repetición,
+//   · si el filtro de período significa algo para esa pregunta.
+// El ranking de abajo y la línea de respuesta se derivan de la misma elección.
 
-/** Cómo se dibuja el lienzo. `ambos` superpone los pines sobre la mancha. */
-type VistaMapa = 'pins' | 'calor' | 'ambos';
+/** Id de pregunta; '' = "ver todo" (sin pregunta activa). */
+type PreguntaId = 'repiten' | 'atrasado' | 'resolvimos' | 'sinllegar';
+type ConsultaId = PreguntaId | '';
 
-/** Opciones del bloque "2 · CÓMO SE VE", en el orden del canvas. */
-const VISTAS: { value: VistaMapa; label: string }[] = [
-  { value: 'pins', label: 'Pins' },
-  { value: 'calor', label: 'Calor' },
-  { value: 'ambos', label: 'Ambos' },
+/** Días abiertos a partir de los cuales un reclamo cuenta como atrasado.
+ *  Mismo umbral que el KPI "Abiertos > 30 días" del hero y del Dashboard: un
+ *  solo idioma en toda la app. */
+const DIAS_ATRASO = 30;
+
+interface PreguntaConfig {
+  id: PreguntaId;
+  /** Lo que se lee en la píldora. */
+  etiqueta: string;
+  /** Lo mismo, pero como suena EN MEDIO de la oración (minúscula). */
+  enfasis: string;
+  plantilla: string;
+  ayuda: string;
+  icono: LucideIcon;
+  /** Con qué se contesta: mancha de densidad o reclamos uno por uno. */
+  dibujo: 'densidad' | 'puntos';
+  /** Círculos sobre las esquinas que repiten. */
+  repeticiones: boolean;
+  /** Tinte fijo de los puntos; sin esto se pintan por estado. */
+  tinte?: 'malo' | 'bueno' | 'tenue';
+  /** ¿El período significa algo para esta pregunta? "Lo atrasado" es viejo por
+   *  definición: acotarlo a "los últimos 7 días" daría siempre cero. */
+  usaPeriodo: boolean;
+}
+
+const PREGUNTAS: PreguntaConfig[] = [
+  {
+    id: 'repiten',
+    etiqueta: 'Dónde se repiten',
+    enfasis: 'dónde se repiten',
+    plantilla:
+      'Mostrame {pregunta} los reclamos de {dependencia}, del tipo {categoria}, en {periodo}.',
+    ayuda: 'Las esquinas donde vuelve a aparecer el mismo problema.',
+    icono: Flame,
+    dibujo: 'densidad',
+    repeticiones: true,
+    usaPeriodo: true,
+  },
+  {
+    id: 'atrasado',
+    etiqueta: 'Lo atrasado',
+    enfasis: 'lo atrasado',
+    plantilla:
+      'Mostrame {pregunta} de {dependencia}, del tipo {categoria}: los que llevan más de 30 días abiertos.',
+    ayuda: 'Reclamos todavía abiertos con más de 30 días encima.',
+    icono: AlarmClock,
+    dibujo: 'puntos',
+    repeticiones: false,
+    tinte: 'malo',
+    usaPeriodo: false,
+  },
+  {
+    id: 'resolvimos',
+    etiqueta: 'Qué resolvimos',
+    enfasis: 'qué resolvimos',
+    plantilla:
+      'Mostrame {pregunta} en {periodo}: los reclamos de {dependencia}, del tipo {categoria}, ya cerrados.',
+    ayuda: 'Los reclamos que se cerraron dentro del período elegido.',
+    icono: CheckCircle2,
+    dibujo: 'puntos',
+    repeticiones: false,
+    tinte: 'bueno',
+    usaPeriodo: true,
+  },
+  {
+    id: 'sinllegar',
+    etiqueta: 'Dónde no llegamos',
+    enfasis: 'dónde no llegamos',
+    plantilla:
+      'Mostrame {pregunta}: los barrios que no registran ningún reclamo en {periodo}.',
+    ayuda: 'Barrios del municipio sin un solo reclamo en el período.',
+    icono: MapPinOff,
+    // Con la mancha se ve de un vistazo hasta dónde SÍ llegamos, y los huecos
+    // quedan rotulados con el nombre del barrio. Con un pin por reclamo (acá
+    // son cientos) el mapa se llena justo de lo que la pregunta NO mira.
+    dibujo: 'densidad',
+    repeticiones: false,
+    usaPeriodo: true,
+  },
 ];
 
-/** La oración del bloque 4. Los `{marcadores}` son los filtros; `{pregunta}`
- *  es el sujeto fijo de la frase (acá ya no hay preguntas que elegir). */
-const CONSULTA_PLANTILLA =
-  'Estás viendo {pregunta} de {categoria}, en {periodo}, con estado {estado} y a cargo de {dependencia}.';
-const CONSULTA_SUJETO = 'los reclamos';
+/** Salida discreta al costado de las preguntas. Es el ÚNICO lugar donde el
+ *  estado es un filtro suelto: cada pregunta ya declara qué estados mira. */
+const VER_TODO = {
+  label: 'ver todo',
+  enfasis: 'todos los reclamos',
+  plantilla:
+    'Mostrame {pregunta} de {categoria} en {periodo}, a cargo de {dependencia}, con estado {estado}.',
+};
+
+/** Días transcurridos desde una fecha ISO (piso, nunca negativo). */
+const diasDesde = (iso: string) =>
+  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DIA_MS));
 
 /** Días que tardó en cerrarse un reclamo; null si no tiene fecha de cierre
  *  cargada — sin el dato no se estima nada. */
@@ -561,12 +650,7 @@ function InvalidarAlRedimensionar() {
   return null;
 }
 
-/**
- * Círculos sobre las esquinas que repiten. El color NO es un hex fijo: llega
- * resuelto desde el token de alerta del theme (Leaflet dibuja con valores
- * concretos, no con custom properties).
- */
-function HotspotLayer({ hotspots, color }: { hotspots: Hotspot[]; color: string }) {
+function HotspotLayer({ hotspots }: { hotspots: Hotspot[] }) {
   return (
     <>
       {hotspots.map((h, idx) => (
@@ -575,9 +659,9 @@ function HotspotLayer({ hotspots, color }: { hotspots: Hotspot[]; color: string 
           center={[h.centerLat, h.centerLng]}
           radius={Math.min(8 + h.recientes * 2, 22)}
           pathOptions={{
-            color,
+            color: '#ef4444',
             weight: 2,
-            fillColor: color,
+            fillColor: '#ef4444',
             fillOpacity: 0.25,
             className: 'hotspot-pulse',
           }}
@@ -605,9 +689,10 @@ interface RotuloMapa {
 }
 
 /**
- * El mapa ESCRIBE SOBRE SÍ MISMO: además de pintar, rotula las zonas calientes
- * con lo que se repite ahí ("10 reclamos · higiene urbana"). Son POCAS a
- * propósito (4): la gracia es que se lean de un vistazo, no tapar el mapa.
+ * El mapa ESCRIBE SOBRE SÍ MISMO: además de pintar, rotula las zonas que
+ * contestan la pregunta elegida ("10 reclamos · higiene urbana", "sin
+ * reclamos hace 120 días"). Son POCAS a propósito (3-4): la gracia es que se
+ * lean de un vistazo, no tapar el mapa.
  *
  * Se resuelven con tooltips PERMANENTES de Leaflet colgados de un punto
  * invisible — más liviano que un marker y sin sumar una capa nueva. El estilo
@@ -798,11 +883,11 @@ function FitBoundsToLatLngs({ points, signal }: { points: Array<[number, number]
 // =====================================================================
 // ViewMode y TimePreset se importan desde MapaFiltrosPanel
 
-// v4: la botonera del canvas volvió a declarar QUÉ SE VE / CÓMO SE VE /
-// AYUDAS, así que lo que se recuerda es la VISTA elegida y si las zonas
-// calientes están encendidas (antes se derivaban de la "pregunta" activa, que
-// el diseño sacó). Versionar la key descarta los shapes viejos sin migrarlos.
-const FILTROS_STORAGE_KEY = 'mapa_filtros_v4';
+// v3: la pantalla pasó de herramientas a CONSULTA GUIADA. `viewMode` y
+// `showHotspots` dejaron de existir como preferencia del usuario (los deriva
+// la pregunta elegida) y en su lugar se persiste `pregunta`. Versionar la key
+// descarta los shapes viejos sin tener que migrarlos.
+const FILTROS_STORAGE_KEY = 'mapa_filtros_v3';
 
 type MapMode = 'reclamos' | 'puntos';
 
@@ -813,8 +898,7 @@ interface FiltrosPersistidos {
   showCoverage: boolean;
   showPois: boolean;
   mapMode: MapMode;
-  vista: VistaMapa;
-  showHotspots: boolean;
+  pregunta: ConsultaId;
 }
 
 const DEFAULT_FILTROS: FiltrosPersistidos = {
@@ -822,16 +906,15 @@ const DEFAULT_FILTROS: FiltrosPersistidos = {
   filtroDependencia: null,
   timePreset: 'all',
   // APAGADA por defecto: el polígono de cobertura es un velo que cubre toda
-  // la ciudad y tiñe los pines que están debajo (los verdes de los reclamos
-  // cerrados se veían marrones). Es una capa de consulta puntual, no algo
+  // la ciudad y tiñe los pines que están debajo (los verdes de "qué
+  // resolvimos" se veían marrones). Es una capa de consulta puntual, no algo
   // que tenga que estar prendido al entrar.
   showCoverage: false,
   showPois: false,
   mapMode: 'reclamos',
-  // La pantalla ABRE YA CONTESTADA (mismo default del canvas): la mancha de
-  // densidad con las zonas calientes marcadas encima.
-  vista: 'calor',
-  showHotspots: true,
+  // La pantalla ABRE YA CONTESTADA: nadie tiene que elegir entre cosas que
+  // todavía no conoce para ver algo.
+  pregunta: 'repiten',
 };
 
 function loadFiltrosFromStorage(): FiltrosPersistidos {
@@ -852,13 +935,10 @@ function loadFiltrosFromStorage(): FiltrosPersistidos {
       timePreset: ['7', '30', '90', '365', 'all'].includes(parsed.timePreset)
         ? (parsed.timePreset as TimePreset)
         : DEFAULT_FILTROS.timePreset,
-      vista: VISTAS.some((v) => v.value === parsed.vista)
-        ? (parsed.vista as VistaMapa)
-        : DEFAULT_FILTROS.vista,
-      showHotspots:
-        typeof parsed.showHotspots === 'boolean'
-          ? parsed.showHotspots
-          : DEFAULT_FILTROS.showHotspots,
+      pregunta:
+        parsed.pregunta === '' || PREGUNTAS.some((p) => p.id === parsed.pregunta)
+          ? (parsed.pregunta as ConsultaId)
+          : DEFAULT_FILTROS.pregunta,
       showCoverage:
         typeof parsed.showCoverage === 'boolean'
           ? parsed.showCoverage
@@ -943,12 +1023,10 @@ export default function Mapa() {
   const [filtroDependencia, setFiltroDependencia] = useState<number | null>(initialFiltros.filtroDependencia);
   const [timePreset, setTimePreset] = useState<TimePreset>(initialFiltros.timePreset);
 
-  // Bloque "2 · CÓMO SE VE" del canvas: con qué se dibuja el lienzo (mancha de
-  // densidad, un pin por reclamo, o los dos superpuestos).
-  const [vista, setVista] = useState<VistaMapa>(initialFiltros.vista);
-
-  // Bloque "3 · AYUDAS": los círculos sobre las esquinas que repiten.
-  const [showHotspots, setShowHotspots] = useState(initialFiltros.showHotspots);
+  // La PREGUNTA activa manda sobre casi todo lo demás: qué reclamos entran,
+  // cómo se dibuja el mapa, qué dice la respuesta y qué rankea la lista de
+  // abajo. '' = "ver todo" (sin pregunta).
+  const [pregunta, setPregunta] = useState<ConsultaId>(initialFiltros.pregunta);
 
   const [showCoverage, setShowCoverage] = useState(initialFiltros.showCoverage);
 
@@ -968,19 +1046,9 @@ export default function Mapa() {
       showCoverage,
       showPois,
       mapMode,
-      vista,
-      showHotspots,
+      pregunta,
     });
-  }, [
-    filtroEstado,
-    filtroDependencia,
-    timePreset,
-    showCoverage,
-    showPois,
-    mapMode,
-    vista,
-    showHotspots,
-  ]);
+  }, [filtroEstado, filtroDependencia, timePreset, showCoverage, showPois, mapMode, pregunta]);
 
   // =================================================================
   // MODO PUNTOS (POI) — gate por módulo activo + rol admin/supervisor
@@ -1206,13 +1274,19 @@ export default function Mapa() {
     };
   }, [theme.primary]);
 
-  /** El matiz de ALERTA en color CONCRETO: Leaflet dibuja con valores, no con
-   *  custom properties. Sale del MISMO token que el CSS, así los círculos de
-   *  las zonas calientes siguen al theme en vez de quedar clavados en un hex. */
-  const colorAlerta = useMemo(() => {
+  /** Los matices de veredicto en color CONCRETO: Leaflet dibuja con valores,
+   *  no con custom properties. Salen de los MISMOS tokens que el CSS, así el
+   *  mapa sigue al theme y a la marca en vez de quedar clavado en un hex. */
+  const tintesMapa = useMemo(() => {
     const cs = getComputedStyle(document.documentElement);
-    return cs.getPropertyValue('--pl-red').trim() || theme.primary;
-  }, [theme.primary]);
+    const leer = (token: string, fallback: string) =>
+      cs.getPropertyValue(token).trim() || fallback;
+    return {
+      malo: leer('--pl-red', theme.primary),
+      bueno: leer('--pl-green', theme.primary),
+      tenue: leer('--pl-text-muted', theme.textSecondary),
+    };
+  }, [theme.primary, theme.textSecondary]);
 
   // =================================================================
   // Universos derivados
@@ -1247,6 +1321,14 @@ export default function Mapa() {
   // =================================================================
   // Pipeline de filtros
   // =================================================================
+  // La pregunta activa (null = "ver todo") y lo que decide de la pantalla.
+  const preguntaConfig = useMemo(
+    () => PREGUNTAS.find((p) => p.id === pregunta) ?? null,
+    [pregunta],
+  );
+  /** En "ver todo" el período siempre aplica; en una pregunta, lo dice ella. */
+  const preguntaUsaPeriodo = preguntaConfig ? preguntaConfig.usaPeriodo : true;
+
   // ---- Recorrido temporal: rango visible + plan + ventana ----
   /**
    * PERÍODO QUE SE ESTÁ MIRANDO. Es el rango del dataset RECORTADO por el
@@ -1257,13 +1339,13 @@ export default function Mapa() {
    */
   const rangoVisible = useMemo(() => {
     if (!dateRange) return null;
-    if (timePreset === 'all') return dateRange;
+    if (!preguntaUsaPeriodo || timePreset === 'all') return dateRange;
     const desde = Date.now() - parseInt(timePreset, 10) * DIA_MS;
     // Nunca se inventa historia hacia atrás del primer reclamo, ni se deja un
     // rango vacío si el período elegido no alcanza a los datos.
     const min = Math.min(Math.max(dateRange.min, desde), dateRange.max - DIA_MS);
     return { min, max: dateRange.max };
-  }, [dateRange, timePreset]);
+  }, [dateRange, preguntaUsaPeriodo, timePreset]);
 
   const timelapsePlan = useMemo(
     () => (rangoVisible ? planificarTimelapse(rangoVisible) : null),
@@ -1280,11 +1362,20 @@ export default function Mapa() {
     return { desde: hasta - timelapsePlan.ventanaDias * DIA_MS, hasta };
   }, [tlActivo, rangoVisible, timelapsePlan, animationDay]);
 
-  /** Qué capas dibuja el lienzo, según el bloque "2 · CÓMO SE VE". `ambos`
-   *  superpone los pines sobre la mancha (el canvas: "los pines sobre las
-   *  manchas"), así se ve dónde se amontona Y qué es cada punto. */
-  const dibujaCalor = vista !== 'pins';
-  const dibujaPins = vista !== 'calor';
+  /** Con qué se dibuja el lienzo. Sin pregunta ("ver todo") se muestran los
+   *  reclamos uno por uno: es la vista donde se va a buscar un caso puntual. */
+  const dibujoMapa: 'densidad' | 'puntos' = preguntaConfig?.dibujo ?? 'puntos';
+
+  /**
+   * Color de cada pin. Por defecto el del ESTADO (el SSoT de lib/enums), pero
+   * hay preguntas que se contestan mejor con un solo tinte: en "lo atrasado"
+   * todo es alerta y en "qué resolvimos" todo es éxito — repetir ahí la paleta
+   * de estados sería ruido, porque el estado ya lo fijó la pregunta.
+   */
+  const colorDelPin = useCallback(
+    (r: Reclamo) => (preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado)),
+    [preguntaConfig, tintesMapa],
+  );
 
   // 1) Categoría
   const reclamosPorCategoria = useMemo(() => {
@@ -1298,21 +1389,37 @@ export default function Mapa() {
     return reclamosPorCategoria.filter(r => r.dependencia_asignada?.id === filtroDependencia);
   }, [reclamosPorCategoria, filtroDependencia]);
 
-  // 3) ESTADO (sin mirar el tiempo). Es el tercer combo de la oración del
-  //    bloque 4: el estado es un filtro más, a la vista, nunca un recorte
-  //    invisible por detrás.
-  const reclamosPorEstado = useMemo(
-    () =>
-      filtroEstado
-        ? reclamosPorDependencia.filter((r) => r.estado === filtroEstado)
-        : reclamosPorDependencia,
-    [reclamosPorDependencia, filtroEstado],
-  );
+  // 3) ALCANCE DE LA PREGUNTA (sin mirar el tiempo). Es lo que reemplaza al
+  //    viejo filtro de estado suelto: cada pregunta ya declara qué estados le
+  //    importan. Sólo en "ver todo" manda el combo de estado de la oración —
+  //    así nunca queda un filtro invisible recortando por detrás.
+  const reclamosAlcance = useMemo(() => {
+    const base = reclamosPorDependencia;
+    switch (pregunta) {
+      case 'atrasado':
+        return base.filter(
+          (r) => isAbierto(r.estado) && diasDesde(r.created_at) > DIAS_ATRASO,
+        );
+      case 'resolvimos':
+        return base.filter((r) => isResuelto(r.estado));
+      case 'repiten':
+      case 'sinllegar':
+        return base;
+      default:
+        return filtroEstado ? base.filter((r) => r.estado === filtroEstado) : base;
+    }
+  }, [reclamosPorDependencia, pregunta, filtroEstado]);
 
-  // 4) TIEMPO. El time-lapse (ventana móvil) MANDA sobre el preset del combo
-  //    de período: mientras el recorrido corre, la ventana es la verdad.
+  // 4) TIEMPO. El time-lapse (ventana móvil) MANDA sobre el preset, y hay
+  //    preguntas donde el período no significa nada ("lo atrasado" es viejo por
+  //    definición): ahí no se aplica ni se muestra el combo.
   const aplicarTiempo = useCallback(
     (lista: Reclamo[]) => {
+      // ORDEN IMPORTANTE: si la pregunta NO usa período, nada recorta por
+      // tiempo — tampoco el recorrido. Al revés, la ventana móvil de 30 días
+      // vaciaba "lo atrasado", que por definición tiene MÁS de 30 días: la
+      // pantalla decía "nada que dibujar" con 81 atrasados cargados.
+      if (!preguntaUsaPeriodo) return lista;
       if (ventanaTimelapse) {
         return enVentana(lista, ventanaTimelapse.desde, ventanaTimelapse.hasta);
       }
@@ -1320,20 +1427,20 @@ export default function Mapa() {
       const cutoff = Date.now() - parseInt(timePreset, 10) * DIA_MS;
       return lista.filter((r) => new Date(r.created_at).getTime() >= cutoff);
     },
-    [ventanaTimelapse, timePreset],
+    [ventanaTimelapse, timePreset, preguntaUsaPeriodo],
   );
 
   // Lo que finalmente se dibuja.
   const reclamosFiltrados = useMemo(
-    () => aplicarTiempo(reclamosPorEstado),
-    [aplicarTiempo, reclamosPorEstado],
+    () => aplicarTiempo(reclamosAlcance),
+    [aplicarTiempo, reclamosAlcance],
   );
 
-  // Universo del time-lapse: los mismos reclamos SIN el corte temporal. La
-  // ventana móvil recorta sobre esto y el remate compara la primera ventana
+  // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
+  // La ventana móvil recorta sobre esto y el remate compara la primera ventana
   // contra la última sobre esto mismo — el remate habla exactamente del mismo
   // universo que se estuvo viendo.
-  const reclamosSinTiempo = reclamosPorEstado;
+  const reclamosSinTiempo = reclamosAlcance;
 
   // =================================================================
   // ELECTRO — el pulso del municipio dentro del período visible
@@ -1471,8 +1578,8 @@ export default function Mapa() {
   }, [electroDatos, hitoElectro, rangoVisible]);
 
   // Universo para los CONTEOS de los combos de la oración: mismo recorte
-  // temporal pero SIN el filtro de estado (si no, el combo de estado mostraría
-  // ceros en todos los estados que él mismo acaba de descartar).
+  // temporal pero sin el alcance de la pregunta (si no, el combo de estado
+  // mostraría ceros en todo lo que la pregunta ya descartó).
   const reclamosPorTiempo = useMemo(
     () => aplicarTiempo(reclamosPorDependencia),
     [aplicarTiempo, reclamosPorDependencia],
@@ -1514,7 +1621,7 @@ export default function Mapa() {
     // universo. Sin él, el combo "Tipo" quedaba congelado con las 10 categorías
     // del municipio aunque se eligiera un área, y se podían armar combinaciones
     // que no existen ("Tránsito y señalización a cargo de Zoonosis") que siempre
-    // devolvían cero -> "Nada que dibujar con estos filtros".
+    // devolvían cero -> "Nada que dibujar para esta consulta".
   }, [reclamos, filtroDependencia, theme.textSecondary]);
 
   const conteosPorEstado = useMemo(() => {
@@ -1572,6 +1679,70 @@ export default function Mapa() {
     return set;
   }, [reclamosFiltrados]);
 
+  // ---- "Dónde no llegamos": el catálogo de barrios contra los datos ----
+  /**
+   * Centro de cada barrio. Primero el que cargó el municipio en la zona; si no
+   * lo tiene, el centroide de sus propios reclamos históricos. Un barrio sin
+   * ninguna de las dos cosas NO se puede rotular en el mapa (aparece sólo en la
+   * lista de abajo): no se inventa una coordenada.
+   */
+  const centrosBarrio = useMemo(() => {
+    const centros = new Map<string, { lat: number; lng: number }>();
+    for (const z of zonasMunicipio) {
+      if (z.latitud_centro != null && z.longitud_centro != null) {
+        centros.set(z.nombre.trim(), { lat: z.latitud_centro, lng: z.longitud_centro });
+      }
+    }
+    const acum = new Map<string, { lat: number; lng: number; n: number }>();
+    for (const r of reclamos) {
+      const nombre = r.zona?.nombre?.trim();
+      if (!nombre || centros.has(nombre) || r.latitud == null || r.longitud == null) continue;
+      const a = acum.get(nombre) || { lat: 0, lng: 0, n: 0 };
+      a.lat += r.latitud;
+      a.lng += r.longitud;
+      a.n += 1;
+      acum.set(nombre, a);
+    }
+    for (const [nombre, a] of acum) centros.set(nombre, { lat: a.lat / a.n, lng: a.lng / a.n });
+    return centros;
+  }, [reclamos, zonasMunicipio]);
+
+  /**
+   * Barrios del catálogo que NO aparecen en lo que se está mirando, con su
+   * historia real: cuántos reclamos tuvieron alguna vez y hace cuánto fue el
+   * último. Es la materia prima de la pregunta "dónde no llegamos" — para la
+   * respuesta, los rótulos del mapa y el ranking de abajo.
+   */
+  const barriosSinCobertura = useMemo(() => {
+    if (zonasMunicipio.length === 0) return [];
+    const historico = new Map<string, { total: number; ultimo: number }>();
+    for (const r of reclamos) {
+      const nombre = r.zona?.nombre?.trim();
+      if (!nombre) continue;
+      const t = new Date(r.created_at).getTime();
+      const h = historico.get(nombre);
+      if (h) {
+        h.total += 1;
+        h.ultimo = Math.max(h.ultimo, t);
+      } else {
+        historico.set(nombre, { total: 1, ultimo: t });
+      }
+    }
+    return zonasMunicipio
+      .map((z) => {
+        const nombre = z.nombre.trim();
+        const h = historico.get(nombre);
+        return {
+          nombre,
+          total: h?.total ?? 0,
+          diasSinReclamos: h ? Math.max(0, Math.floor((Date.now() - h.ultimo) / DIA_MS)) : null,
+          centro: centrosBarrio.get(nombre) ?? null,
+        };
+      })
+      .filter((z) => !barriosAlcanzados.has(z.nombre))
+      .sort((a, b) => b.total - a.total);
+  }, [zonasMunicipio, reclamos, centrosBarrio, barriosAlcanzados]);
+
   // Barrio que más creció: se parte el rango de fechas OBSERVADO en el filtro
   // por la mitad y se compara cuántos reclamos tuvo cada barrio en cada mitad.
   // Mismo criterio que usa `computeKPIs` para su tendencia — un solo idioma.
@@ -1591,43 +1762,372 @@ export default function Mapa() {
   }, [reclamosFiltrados]);
 
   // =================================================================
-  // La lista de abajo del mapa: las zonas calientes
+  // Cada pregunta reconfigura TAMBIÉN la lista de abajo del mapa
   // =================================================================
-  // El canvas fija UNA lista debajo del mapa —"Zonas calientes", con el radio
-  // a la vista— y ésa es la que se arma acá, con el componente del kit
-  // (`RankedList`). El encabezado se declara junto a los items para que el
-  // criterio (radio y ventana reales, no los del mockup) viaje con el dato.
-  const ranking = useMemo(
-    () => ({
-      titulo: 'Zonas calientes',
-      caption: `radio ${HOTSPOT_PARAMS.radiusMeters} m · últimos ${HOTSPOT_PARAMS.daysBack} días`,
-      icono: Flame,
-      tono: 'malo' as const,
-      vacio: 'Ninguna esquina repite reclamos con este filtro.',
-      items: zonasCalientesItems,
-    }),
-    [zonasCalientesItems],
+  // Mismo componente (`RankedList`), otro contenido y otro encabezado. Los tres
+  // rankings de abajo se arman con lo que el reclamo trae DE VERDAD; lo que no
+  // existe (una fecha de cierre sin cargar, un barrio sin coordenada) se dice,
+  // no se estima.
+
+  /** "Lo atrasado": los que más tiempo llevan esperando. */
+  const atrasadosItems = useMemo<RankedListItem[]>(
+    () =>
+      [...reclamosFiltrados]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .slice(0, 8)
+        .map((r) => {
+          const dias = diasDesde(r.created_at);
+          const detalle = [r.direccion || r.zona?.nombre, r.categoria?.nombre]
+            .filter(Boolean)
+            .join(' · ');
+          return {
+            id: `atrasado-${r.id}`,
+            titulo: r.titulo,
+            detalle: detalle || undefined,
+            valor: dias,
+            valorSub: 'días abiertos',
+            tono:
+              veredictoMasEsPeor(dias, {
+                advertencia: DIAS_ATRASO,
+                malo: DIAS_ATRASO * 3,
+              }) ?? 'malo',
+            onClick: () => {
+              if (r.latitud != null && r.longitud != null) {
+                setMapTarget({ lat: r.latitud, lng: r.longitud, zoom: 17 });
+              }
+              setSelected(r);
+              setSidebarOpen(true);
+            },
+          };
+        }),
+    [reclamosFiltrados],
   );
 
+  /** "Qué resolvimos": los que se cerraron más rápido. Si el municipio no carga
+   *  la fecha de cierre no se inventa un tiempo: se rankea por categoría, que
+   *  es un dato que sí existe. */
+  const resueltosItems = useMemo<RankedListItem[]>(() => {
+    const u = resolverUmbrales();
+    const conTiempo = reclamosFiltrados
+      .map((r) => ({ r, dias: diasResolucion(r) }))
+      .filter((x): x is { r: Reclamo; dias: number } => x.dias != null)
+      .sort((a, b) => a.dias - b.dias)
+      .slice(0, 8);
+
+    if (conTiempo.length > 0) {
+      return conTiempo.map(({ r, dias }) => {
+        const detalle = [r.direccion || r.zona?.nombre, r.categoria?.nombre]
+          .filter(Boolean)
+          .join(' · ');
+        return {
+          id: `resuelto-${r.id}`,
+          titulo: r.titulo,
+          detalle: detalle || undefined,
+          valor: dias < 1 ? '<1' : Math.round(dias),
+          valorSub: 'días en cerrar',
+          tono: veredictoMenosEsMejor(dias, u.tiempoResolucionDias) ?? 'bueno',
+          onClick: () => {
+            if (r.latitud != null && r.longitud != null) {
+              setMapTarget({ lat: r.latitud, lng: r.longitud, zoom: 17 });
+            }
+            setSelected(r);
+            setSidebarOpen(true);
+          },
+        };
+      });
+    }
+
+    const porCategoria = new Map<string, number>();
+    for (const r of reclamosFiltrados) {
+      const k = r.categoria?.nombre || 'Sin categoría';
+      porCategoria.set(k, (porCategoria.get(k) || 0) + 1);
+    }
+    return [...porCategoria.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([nombre, n]) => ({
+        id: `resuelto-cat-${nombre}`,
+        titulo: nombre,
+        detalle: 'sin fecha de cierre cargada',
+        valor: n,
+        valorSub: n === 1 ? 'cerrado' : 'cerrados',
+        tono: 'bueno' as const,
+      }));
+  }, [reclamosFiltrados]);
+
+  /** "Dónde no llegamos": los barrios sin atención, con su historia real. */
+  const sinCoberturaItems = useMemo<RankedListItem[]>(
+    () =>
+      barriosSinCobertura.slice(0, 8).map((b) => {
+        const centro = b.centro;
+        return {
+          id: `sincobertura-${b.nombre}`,
+          titulo: b.nombre,
+          detalle:
+            b.diasSinReclamos == null
+              ? 'nunca registró un reclamo'
+              : `último reclamo hace ${b.diasSinReclamos} ${b.diasSinReclamos === 1 ? 'día' : 'días'}`,
+          valor: b.total,
+          valorSub: b.total === 1 ? 'histórico' : 'históricos',
+          tono: b.total === 0 ? ('malo' as const) : ('advertencia' as const),
+          onClick: centro
+            ? () => setMapTarget({ lat: centro.lat, lng: centro.lng, zoom: 14 })
+            : undefined,
+        };
+      }),
+    [barriosSinCobertura],
+  );
+
+  /** La lista de abajo, ya resuelta para la pregunta activa. */
+  const ranking = useMemo(() => {
+    switch (pregunta) {
+      case 'atrasado':
+        return {
+          titulo: 'Los que más esperan',
+          caption: `abiertos hace más de ${DIAS_ATRASO} días`,
+          icono: AlarmClock,
+          tono: 'malo' as const,
+          vacio: 'Ningún reclamo lleva más de 30 días abierto con este filtro.',
+          items: atrasadosItems,
+        };
+      case 'resolvimos':
+        return {
+          titulo: 'Los que resolvimos más rápido',
+          caption: 'cerrados dentro del período',
+          icono: CheckCircle2,
+          tono: 'bueno' as const,
+          vacio: 'Todavía no se cerró ningún reclamo en este período.',
+          items: resueltosItems,
+        };
+      case 'sinllegar':
+        return {
+          titulo: 'Barrios sin atención',
+          caption:
+            zonasMunicipio.length > 0
+              ? `sobre los ${zonasMunicipio.length} barrios del municipio`
+              : 'el municipio no tiene barrios cargados',
+          icono: MapPinOff,
+          tono: 'advertencia' as const,
+          vacio: 'Todos los barrios del municipio registran reclamos en el período.',
+          items: sinCoberturaItems,
+        };
+      default:
+        return {
+          titulo: 'Dónde más se repite',
+          caption: `radio ${HOTSPOT_PARAMS.radiusMeters} m · últimos ${HOTSPOT_PARAMS.daysBack} días`,
+          icono: Flame,
+          tono: 'malo' as const,
+          vacio: 'Ninguna esquina repite reclamos con este filtro.',
+          items: zonasCalientesItems,
+        };
+    }
+  }, [
+    pregunta,
+    atrasadosItems,
+    resueltosItems,
+    sinCoberturaItems,
+    zonasCalientesItems,
+    zonasMunicipio.length,
+  ]);
+
   // =================================================================
-  // El mapa escribe sobre sí mismo: rótulos de las zonas calientes
+  // El mapa escribe sobre sí mismo: rótulos de la pregunta activa
   // =================================================================
-  // Pocos (4) y sólo cuando la ayuda "Zonas calientes" está encendida: son la
-  // lectura de esos círculos ("10 reclamos · higiene urbana"), no un adorno.
-  // Todos con datos reales del propio cluster.
+  // Pocos (3-4) y sobre lo que contesta la pregunta. Todos con datos reales.
   const rotulos = useMemo<RotuloMapa[]>(() => {
-    if (!showHotspots) return [];
-    return hotspots.slice(0, 4).map((h, i) => {
-      const categoria = masRepetido(h.reclamos.map((r) => r.categoria?.nombre));
-      return {
-        id: `rot-repite-${i}-${h.centerLat.toFixed(4)}`,
-        lat: h.centerLat,
-        lng: h.centerLng,
-        texto: `${h.recientes} reclamos${categoria ? ` · ${categoria}` : ''}`,
-        tono: 'malo' as const,
-      };
-    });
-  }, [showHotspots, hotspots]);
+    switch (pregunta) {
+      case 'atrasado':
+        return [...reclamosFiltrados]
+          .filter((r) => r.latitud != null && r.longitud != null)
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .slice(0, 3)
+          .map((r) => ({
+            id: `rot-atrasado-${r.id}`,
+            lat: r.latitud!,
+            lng: r.longitud!,
+            texto: `${diasDesde(r.created_at)} días sin resolver`,
+            tono: 'malo' as const,
+          }));
+      case 'resolvimos':
+        return topZonas(reclamosFiltrados, 3, 150).map((z, i) => ({
+          id: `rot-resuelto-${i}-${z.centerLat.toFixed(4)}`,
+          lat: z.centerLat,
+          lng: z.centerLng,
+          texto: `${z.reclamos.length} ${z.reclamos.length === 1 ? 'resuelto' : 'resueltos'}`,
+          tono: 'bueno' as const,
+        }));
+      case 'sinllegar':
+        return barriosSinCobertura
+          .filter((b) => b.centro)
+          .slice(0, 4)
+          .map((b) => ({
+            id: `rot-sincobertura-${b.nombre}`,
+            lat: b.centro!.lat,
+            lng: b.centro!.lng,
+            texto:
+              b.diasSinReclamos == null
+                ? `${b.nombre} · sin reclamos registrados`
+                : `${b.nombre} · sin reclamos hace ${b.diasSinReclamos} días`,
+            tono: 'advertencia' as const,
+          }));
+      case 'repiten':
+        return hotspots.slice(0, 4).map((h, i) => {
+          const categoria = masRepetido(h.reclamos.map((r) => r.categoria?.nombre));
+          return {
+            id: `rot-repite-${i}-${h.centerLat.toFixed(4)}`,
+            lat: h.centerLat,
+            lng: h.centerLng,
+            texto: `${h.recientes} reclamos${categoria ? ` · ${categoria}` : ''}`,
+            tono: 'malo' as const,
+          };
+        });
+      default:
+        return [];
+    }
+  }, [pregunta, reclamosFiltrados, hotspots, barriosSinCobertura]);
+
+  // =================================================================
+  // La RESPUESTA: una línea corta, en el mismo idioma de la pregunta
+  // =================================================================
+  // Cada número sale de lo que la pantalla ya calculó. Si no hay con qué
+  // contestar, la línea lo DICE — nunca se completa con un número inventado.
+  const respuestaConsulta = useMemo<ConsultaSegmento[]>(() => {
+    if (loading || reclamos.length === 0) return [];
+    const u = resolverUmbrales();
+    const total = reclamosFiltrados.length;
+
+    switch (pregunta) {
+      case 'repiten': {
+        if (total === 0) return [{ texto: 'No hay reclamos que mirar con este filtro.' }];
+        if (hotspots.length === 0) {
+          return [
+            { texto: 'Ninguna esquina repite reclamos', tono: 'bueno' },
+            { texto: `: los ${total} están dispersos por el municipio.` },
+          ];
+        }
+        const deCada10 = Math.round((enZonasCalientes / total) * 10);
+        return [
+          {
+            texto: `${hotspots.length} ${hotspots.length === 1 ? 'esquina concentra' : 'esquinas concentran'} ${enZonasCalientes} ${enZonasCalientes === 1 ? 'reclamo' : 'reclamos'}`,
+            tono: veredictoMasEsPeor(hotspots.length, u.slaRiesgo) ?? 'neutro',
+          },
+          { texto: `: ${deCada10} de cada 10 de los que estás viendo.` },
+        ];
+      }
+      case 'atrasado': {
+        if (total === 0) {
+          return [
+            { texto: `Ningún reclamo lleva más de ${DIAS_ATRASO} días abierto`, tono: 'bueno' },
+            { texto: ': todo dentro del plazo.' },
+          ];
+        }
+        const maxDias = Math.max(...reclamosFiltrados.map((r) => diasDesde(r.created_at)));
+        const tramos: ConsultaSegmento[] = [
+          {
+            texto: `${total} ${total === 1 ? 'reclamo lleva' : 'reclamos llevan'} más de ${DIAS_ATRASO} días abiertos`,
+            tono: veredictoMasEsPeor(total, u.vencidos) ?? 'neutro',
+          },
+          { texto: `, el más viejo hace ${maxDias} días` },
+        ];
+        const top = barrioDominante(reclamosFiltrados);
+        if (top) tramos.push({ texto: `; ${top.count} de ellos en ${top.nombre}` });
+        tramos.push({ texto: '.' });
+        return tramos;
+      }
+      case 'resolvimos': {
+        if (total === 0) {
+          return [
+            { texto: 'Todavía no se cerró ningún reclamo en este período', tono: 'advertencia' },
+            { texto: '.' },
+          ];
+        }
+        const tiempos = reclamosFiltrados
+          .map((r) => diasResolucion(r))
+          .filter((d): d is number => d != null);
+        const tramos: ConsultaSegmento[] = [
+          {
+            texto: `${total} ${total === 1 ? 'reclamo cerrado' : 'reclamos cerrados'}`,
+            tono: 'bueno',
+          },
+        ];
+        if (tiempos.length > 0) {
+          const promedio = tiempos.reduce((a, b) => a + b, 0) / tiempos.length;
+          tramos.push({ texto: ', en promedio a los ' });
+          tramos.push({
+            texto: `${promedio.toFixed(0)} días`,
+            tono: veredictoMenosEsMejor(promedio, u.tiempoResolucionDias) ?? 'neutro',
+          });
+          if (tiempos.length < total) {
+            tramos.push({ texto: ` (sobre ${tiempos.length} con fecha de cierre cargada)` });
+          }
+        } else {
+          tramos.push({ texto: ', sin fecha de cierre cargada para saber cuánto tardaron' });
+        }
+        tramos.push({ texto: '.' });
+        return tramos;
+      }
+      case 'sinllegar': {
+        if (zonasMunicipio.length === 0) {
+          return [
+            {
+              texto: 'El municipio todavía no tiene barrios cargados',
+              tono: 'advertencia',
+            },
+            { texto: ': sin ese listado no se puede decir a dónde no llegamos.' },
+          ];
+        }
+        const sin = barriosSinCobertura.length;
+        if (sin === 0) {
+          return [
+            {
+              texto: `Los ${zonasMunicipio.length} barrios del municipio registran reclamos`,
+              tono: 'bueno',
+            },
+            { texto: ' en el período.' },
+          ];
+        }
+        const nunca = barriosSinCobertura.filter((b) => b.total === 0).length;
+        const tramos: ConsultaSegmento[] = [
+          {
+            texto: `${sin} de ${zonasMunicipio.length} barrios sin ningún reclamo en el período`,
+            tono: veredictoMasEsPeor(sin, u.sinAsignar) ?? 'advertencia',
+          },
+        ];
+        if (nunca > 0) {
+          tramos.push({
+            texto: `, y ${nunca} ${nunca === 1 ? 'nunca registró' : 'nunca registraron'} uno`,
+          });
+        }
+        tramos.push({ texto: '.' });
+        return tramos;
+      }
+      default: {
+        if (total === 0) return [{ texto: 'Ningún reclamo entra en este filtro.' }];
+        const tramos: ConsultaSegmento[] = [
+          { texto: `${total} ${total === 1 ? 'reclamo' : 'reclamos'} sobre el mapa` },
+        ];
+        if (zonasMunicipio.length > 0) {
+          tramos.push({ texto: ', repartidos en ' });
+          tramos.push({
+            texto: `${barriosAlcanzados.size} de ${zonasMunicipio.length} barrios`,
+            tono: barriosAlcanzados.size === zonasMunicipio.length ? 'bueno' : 'advertencia',
+          });
+        }
+        tramos.push({ texto: '.' });
+        return tramos;
+      }
+    }
+  }, [
+    loading,
+    reclamos.length,
+    pregunta,
+    reclamosFiltrados,
+    hotspots,
+    enZonasCalientes,
+    zonasMunicipio.length,
+    barriosSinCobertura,
+    barriosAlcanzados,
+  ]);
 
   // ---- Datos de la NARRACIÓN del time-lapse (todos reales, de la ventana) ----
 
@@ -1732,10 +2232,9 @@ export default function Mapa() {
   // Reclamos que la API devolvió SIN coordenada: el mapa no los puede dibujar.
   const sinCoordenada = Math.max(0, totalCargados - reclamos.length);
 
-  // Acción del hero ("Ver las N zonas calientes", como en el canvas): prende
-  // la ayuda que las marca sobre el mapa y baja a la lista de abajo.
+  // Acción del hero: contesta "dónde se repiten" y baja a la lista.
   const irAZonasCalientes = useCallback(() => {
-    setShowHotspots(true);
+    setPregunta('repiten');
     document
       .getElementById(ID_RANKING)
       ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2129,8 +2628,12 @@ export default function Mapa() {
   }, [tlEstado, tlBucle, timelapsePlan, tlVelocidad]);
 
   /* La barra de progreso murió con la banda vieja: ahora el avance se lee
-     en el electro (el cursor sobre la línea dice dónde va el recorrido), y el
-     rango de la ventana lo rotula la propia banda (`rangoVentanaLabel`). */
+     en el electro (el cursor sobre la línea dice dónde va el recorrido). */
+
+  /** Etiqueta del botón mientras el time-lapse está activo ("8 jul – 7 ago"). */
+  const rangoTimelapseLabel = ventanaTimelapse
+    ? `${fechaCorta(ventanaTimelapse.desde)} – ${fechaCorta(ventanaTimelapse.hasta)}`
+    : null;
 
   // =================================================================
   // Handlers
@@ -2160,17 +2663,33 @@ export default function Mapa() {
   const handleDrawCancel = useCallback(() => setDrawMode(false), []);
   const clearDrawnBBox = () => setDrawnBBox(null);
 
-  /**
-   * "Quitar los filtros" del bloque 4: limpia lo que ACOTA (tipo, área, estado
-   * y período) y corta el recorrido, que también recorta por tiempo. NO toca
-   * la vista ni las ayudas: son cómo se mira, no qué se mira.
-   */
   const handleClearAllFiltros = () => {
     setSearchParams({});
     setFiltroEstado(null);
     setFiltroDependencia(null);
     setTimePreset('all');
+    setPregunta(DEFAULT_FILTROS.pregunta);
+    setShowCoverage(true);
+    setShowPois(false);
     timelapseReset();
+  };
+
+  /**
+   * Elegir una pregunta reconfigura TODA la pantalla (mapa, respuesta, lista).
+   * El filtro de estado se limpia al entrar en una pregunta: cada una ya dice
+   * qué estados mira, y un estado invisible recortando por detrás es
+   * exactamente lo que esta pantalla vino a eliminar.
+   */
+  const handlePreguntaChange = (id: string) => {
+    const siguiente = (PREGUNTAS.some((p) => p.id === id) ? id : '') as ConsultaId;
+    setPregunta(siguiente);
+    if (siguiente !== '') setFiltroEstado(null);
+    // "Cómo fue apareciendo" ES el recorrido: elegirla lo arranca, y salir de
+    // ella lo apaga. Sin esto habría que elegir la pregunta Y ADEMÁS buscar un
+    // play escondido para que pase algo.
+    // Cambiar de pregunta corta el recorrido: el time-lapse acompaña a UNA
+    // consulta, y seguir corriendo sobre otra mostraría datos de la anterior.
+    if (tlEstado !== 'inactivo') timelapseReset();
   };
 
   /** El preset de período y el time-lapse compiten por el eje temporal: elegir
@@ -2473,11 +2992,11 @@ export default function Mapa() {
     return [lat, lng];
   };
 
-  // Cambió alguno de los filtros del bloque 4: el universo dibujado es otro,
-  // así que se vuelve a encuadrar el mapa.
+  // Cambió la consulta (la pregunta o alguno de sus filtros): el universo
+  // dibujado es otro, así que se vuelve a encuadrar el mapa.
   useEffect(() => {
     setFitSignal(s => s + 1);
-  }, [filtroCategoria, filtroDependencia, filtroEstado, timePreset]);
+  }, [pregunta, filtroCategoria, filtroDependencia, filtroEstado, timePreset]);
 
   // En modo Puntos no bloqueamos por la carga de reclamos (el panel de POIs
   // tiene su propio loading). El spinner global es solo para el modo Reclamos.
@@ -2510,106 +3029,28 @@ export default function Mapa() {
         eyebrow: 'Mapa',
         title: 'Dónde se concentran los reclamos del municipio',
         description:
-          'Cada reclamo georreferenciado sobre el mapa, con su categoría, su dependencia y su estado. Los filtros acotan qué se dibuja y las zonas calientes marcan dónde se repite el mismo problema.',
+          'Elegí una pregunta y el mapa te la contesta: dónde se repite el mismo problema, qué quedó atrasado, qué se resolvió y a qué barrios no estamos llegando.',
       };
 
   // =================================================================
-  // La botonera: los bloques 1, 2 y 3 del canvas
+  // Los controles: qué SUPERFICIE se mira (botonera) y qué se PREGUNTA
   // =================================================================
-  // Un GRUPO ETIQUETADO del kit por bloque, en el orden del diseño. El
-  // AdaptiveFilter decide solo cómo presentarlos según el ancho (segmented →
-  // combo, acción → icono, grupo → botón compacto): acá sólo se DECLARA qué
-  // hace cada control. Si el municipio no tiene el módulo de puntos no existe
-  // el bloque 1 (no hay entre qué elegir), y en el mapa de puntos no existen
-  // ni la vista ni las ayudas: son del mapa de reclamos.
+  // La botonera del kit queda para lo único que no es una consulta: elegir
+  // entre el mapa de reclamos y el de puntos de interés (dos trabajos
+  // distintos, con paneles distintos). Si el municipio no tiene el módulo de
+  // puntos, no hay botonera: la pantalla arranca directo en la pregunta.
   const controlesMapa: AdaptiveControl[] = [];
   if (canUsePoi) {
     controlesMapa.push({
-      tipo: 'grupo',
-      id: 'que-se-ve',
-      etiqueta: 'Qué se ve',
-      icono: Layers,
-      controles: [
-        {
-          tipo: 'toggles',
-          id: 'superficie',
-          opciones: [
-            { value: 'reclamos', label: 'Reclamos' },
-            { value: 'puntos', label: 'Puntos de interés' },
-          ],
-          value: mapMode,
-          onChange: (v) => setMapMode(v as MapMode),
-        },
+      tipo: 'toggles',
+      id: 'superficie',
+      etiqueta: 'MAPA DE',
+      opciones: [
+        { value: 'reclamos', label: 'Reclamos' },
+        { value: 'puntos', label: 'Puntos de interés' },
       ],
-    });
-  }
-  if (!isPuntos) {
-    controlesMapa.push({
-      tipo: 'grupo',
-      id: 'como-se-ve',
-      etiqueta: 'Cómo se ve',
-      icono: Eye,
-      controles: [
-        {
-          tipo: 'toggles',
-          id: 'vista',
-          opciones: VISTAS,
-          value: vista,
-          onChange: (v) => setVista(v as VistaMapa),
-        },
-      ],
-    });
-    controlesMapa.push({
-      tipo: 'grupo',
-      id: 'ayudas',
-      etiqueta: 'Ayudas',
-      lado: 'fin',
-      icono: Flame,
-      controles: [
-        {
-          tipo: 'accion',
-          id: 'hot',
-          label: 'Zonas calientes',
-          icono: Flame,
-          // El badge es el dato real del cluster: cuántas esquinas repiten con
-          // el filtro puesto. Sin zonas que marcar no se ofrece la ayuda.
-          badge: hotspots.length > 0 ? hotspots.length : undefined,
-          // Sin zonas que marcar la ayuda no se ofrece: ni encendida ni
-          // clickeable (prenderla no cambiaría nada en el mapa).
-          activo: showHotspots && hotspots.length > 0,
-          disabled: hotspots.length === 0,
-          onClick: () => setShowHotspots((s) => !s),
-        },
-        {
-          tipo: 'accion',
-          id: 'evolucion',
-          // El LABEL es fijo a propósito. Mientras el recorrido corre, el rango
-          // visible cambia varias veces por segundo: meterlo acá obligaría a la
-          // botonera a re-medirse en cada cuadro (lee estilos computados) para
-          // decidir si el texto entra. Ese dato ya se lee, quieto, en la banda
-          // del recorrido debajo del mapa. Acá basta el icono y el encendido.
-          label: 'Ver la evolución',
-          icono: tlEstado === 'reproduciendo' ? Pause : Play,
-          activo: tlActivo,
-          disabled: timelapsePlan == null,
-          onClick: timelapseToggle,
-        },
-        {
-          tipo: 'accion',
-          id: 'dibujo',
-          label: 'Dibujar una zona',
-          icono: Pencil,
-          activo: drawMode || drawnBBox != null,
-          onClick: handleToggleDraw,
-        },
-        {
-          tipo: 'icono',
-          id: 'centrar',
-          label: 'Centrar el mapa',
-          icono: LocateFixed,
-          onClick: () => setFitSignal((s) => s + 1),
-        },
-      ],
+      value: mapMode,
+      onChange: (v) => setMapMode(v as MapMode),
     });
   }
 
@@ -2680,14 +3121,37 @@ export default function Mapa() {
     },
   ];
 
-  // NOTA: la oración del bloque 4 queda LIMPIA — sólo la frase y sus filtros.
-  // Todo lo que no acota vive donde se lo busca:
-  //   · vista, zonas calientes, evolución, dibujo y centrar → la BOTONERA de
-  //     arriba (bloques 1-3), que es donde el canvas los puso;
-  //   · puntos de interés / cobertura → FLOTAN SOBRE EL MAPA, al lado del
-  //     zoom, porque son capas del lienzo y ahí las busca todo el mundo;
+  // NOTA: la fila de la consulta queda LIMPIA — sólo la pregunta, la respuesta
+  // y la oración. Las herramientas se repartieron por naturaleza, que es como
+  // se navegan:
+  //   · centrar / puntos de interés / cobertura → FLOTAN SOBRE EL MAPA, al
+  //     lado del zoom, que es donde todo el mundo los busca (más abajo, en el
+  //     lienzo);
   //   · el informe de una zona → PANEL PROPIO abajo, junto a los resultados:
   //     no es un control del mapa, es una acción que produce un documento.
+
+  // --- El play CONTINÚA la oración: se aplica a la vista elegida ---
+  // No es una pregunta más ni una herramienta suelta: reproduce, con ventana
+  // móvil, LO QUE ESTÉ SELECCIONADO. Mientras corre muestra el rango real.
+  const continuacionConsulta: ConsultaAccion = {
+    id: 'timelapse',
+    // En reposo el botón queda REDONDO, sólo con el play: con texto competía
+    // con la oración y en tablet se le encimaba. Mientras reproduce sí hay
+    // algo que decir —el rango que se está viendo— y ahí vuelve el texto.
+    label: tlEstado === 'reproduciendo' ? (rangoTimelapseLabel ?? 'Pausar') : '',
+    titulo:
+      tlEstado === 'reproduciendo'
+        ? 'Pausar'
+        : tlEstado === 'pausado'
+          ? 'Seguir'
+          : tlEstado === 'finalizado'
+            ? 'Verlo de nuevo'
+            : 'Ver la evolución',
+    icono: tlEstado === 'reproduciendo' ? Pause : Play,
+    activo: tlActivo,
+    disabled: timelapsePlan == null,
+    onClick: timelapseToggle,
+  };
 
   return (
     <div className="av2-page" data-module="mapa">
@@ -2720,10 +3184,11 @@ export default function Mapa() {
         />
       </div>
 
-      {/* 3. LOS CONTROLES, en el orden del canvas: arriba la botonera con los
-          bloques 1-3 (qué se ve · cómo se ve · ayudas) y debajo el bloque 4,
-          que no es una grilla de campos sino la ORACIÓN de lo que se está
-          mirando, con los filtros adentro y la salida para quitarlos. */}
+      {/* 3. La CONSULTA GUIADA. La pantalla ya no ofrece herramientas con
+          nombre técnico: ofrece PREGUNTAS, arma sola la oración con los
+          filtros adentro y contesta abajo con datos reales. La botonera del
+          kit queda arriba sólo para elegir la superficie (reclamos / puntos
+          de interés), que no es una consulta sino otro trabajo. */}
       <div className="av2-controles">
         {controlesMapa.length > 0 && (
           <AdaptiveFilter
@@ -2735,21 +3200,18 @@ export default function Mapa() {
 
         {!isPuntos && (
           <ConsultaGuiada
-            titulo="Sobre qué reclamos"
-            /* Sin preguntas: el canvas las sacó. Queda el rótulo del bloque,
-               la oración con los filtros y "Quitar los filtros" al costado
-               (el `verTodo` del kit, que es exactamente esa salida). */
-            preguntas={[]}
-            valor=""
-            onChange={handleClearAllFiltros}
+            titulo="¿Qué querés ver en el mapa?"
+            preguntas={PREGUNTAS}
+            valor={pregunta}
+            onChange={handlePreguntaChange}
             filtros={filtrosConsulta}
-            verTodo={{
-              label: 'Quitar los filtros',
-              plantilla: CONSULTA_PLANTILLA,
-              enfasis: CONSULTA_SUJETO,
-            }}
+            respuesta={respuestaConsulta.length > 0 ? respuestaConsulta : undefined}
+            continuacion={continuacionConsulta}
+            verTodo={VER_TODO}
           />
         )}
+
+
       </div>
 
       {/* ============================ MODO RECLAMOS ============================ */}
@@ -2814,19 +3276,20 @@ export default function Mapa() {
                 );
               })}
 
-            {/* Bloque "2 · CÓMO SE VE": la mancha para ver dónde se amontona,
-                un pin por reclamo con el color de su estado, o las dos capas
-                superpuestas. El orden importa: la mancha va DEBAJO. */}
-            {dibujaCalor && (
+            {/* CÓMO se contesta la pregunta. No lo elige el usuario en un
+                combo con nombres técnicos: lo decide la pregunta.
+                  · densidad → la mancha, para ver dónde se amontona;
+                  · puntos   → un reclamo por pin, con su color. */}
+            {dibujoMapa === 'densidad' && (
               <HeatLayer reclamos={reclamosFiltrados} rampa={rampaDensidad} />
             )}
 
-            {dibujaPins &&
+            {dibujoMapa === 'puntos' &&
               reclamosFiltrados.map(r => (
                 <Marker
                   key={r.id}
                   position={[r.latitud!, r.longitud!]}
-                  icon={createPinIcon(estadoColor(r.estado))}
+                  icon={createPinIcon(colorDelPin(r))}
                   eventHandlers={{ click: () => handleMarkerClick(r) }}
                 >
                   <Tooltip direction="top" offset={[0, -42]} permanent={false}>
@@ -2836,17 +3299,15 @@ export default function Mapa() {
                 </Marker>
               ))}
 
-            {/* Ayuda "Zonas calientes": los círculos sobre las esquinas que
-                repiten el mismo problema. */}
-            {showHotspots && <HotspotLayer hotspots={hotspots} color={colorAlerta} />}
+            {/* Círculos sobre las esquinas que repiten (sólo esa pregunta). */}
+            {preguntaConfig?.repeticiones && <HotspotLayer hotspots={hotspots} />}
 
-            {/* El mapa se rotula a sí mismo: qué se repite en cada zona
-                caliente. La `key` REMONTA la capa cuando la ayuda se apaga o
-                se prende: sin eso Leaflet dejaba burbujas vacías de los
-                rótulos anteriores flotando sobre el mapa (los tooltips
-                permanentes no se reciclan bien cuando cambia todo el
-                conjunto). */}
-            <RotulosLayer key={`rotulos-${showHotspots ? 'hot' : 'off'}`} rotulos={rotulos} />
+            {/* El mapa se rotula a sí mismo con lo que contesta la pregunta.
+                La `key` por pregunta lo REMONTA al cambiar: sin eso Leaflet
+                dejaba burbujas vacías de los rótulos anteriores flotando sobre
+                el mapa (los tooltips permanentes no se reciclan bien cuando
+                cambia todo el conjunto). */}
+            <RotulosLayer key={`rotulos-${pregunta || 'todo'}`} rotulos={rotulos} />
 
             {/* Drawn rectangle */}
             {drawnBBox && (
@@ -2873,14 +3334,20 @@ export default function Mapa() {
           </MapContainer>
         </div>
 
-        {/* CAPAS del canvas, flotando sobre el mapa al lado del zoom: en
+        {/* Controles del CANVAS, flotando sobre el mapa al lado del zoom: en
             cualquier mapa que la gente haya usado en su vida están ahí, no en
             una barra arriba. Mismo tratamiento visual que la leyenda de
-            densidad (superficie, borde y sombra flotante de los tokens).
-            Centrar el mapa NO está acá: vive en las ayudas de la botonera,
-            como en el diseño. */}
-        {(canUsePoi || filtroDependencia != null) && (
+            densidad (superficie, borde y sombra flotante de los tokens). */}
         <div className="av2-mapa-controles">
+          <button
+            type="button"
+            className="av2-mapa-ctrl"
+            onClick={() => setFitSignal((s) => s + 1)}
+            title="Centrar el mapa"
+            aria-label="Centrar el mapa"
+          >
+            <LocateFixed size={16} strokeWidth={2} aria-hidden />
+          </button>
           {canUsePoi && (
             <button
               type="button"
@@ -2906,14 +3373,13 @@ export default function Mapa() {
             </button>
           )}
         </div>
-        )}
 
         {/* Leyenda de densidad: sólo tiene sentido con la mancha de calor
             encendida. La rampa son los 3 matices de veredicto del theme —
             los MISMOS que pinta el heatmap, así la leyenda no miente.
             No se rotula "1 · 10+": la intensidad de leaflet.heat está
             normalizada, no equivale a una cantidad de reclamos. */}
-        {dibujaCalor && reclamosFiltrados.length > 0 && (
+        {dibujoMapa === 'densidad' && reclamosFiltrados.length > 0 && (
           <div className="av2-mapa-leyenda">
             <span className="av2-mapa-leyenda-titulo">Densidad</span>
             <span className="av2-mapa-leyenda-extremo">menos</span>
@@ -2927,10 +3393,10 @@ export default function Mapa() {
           <div className="av2-mapa-vacio">
             <div className="av2-mapa-vacio-card">
               <MapPinOff size={26} strokeWidth={1.6} aria-hidden />
-              <p className="av2-mapa-vacio-titulo">Nada que dibujar con estos filtros</p>
+              <p className="av2-mapa-vacio-titulo">Nada que dibujar para esta consulta</p>
               <p className="av2-mapa-vacio-texto">
                 {reclamos.length > 0
-                  ? `Hay ${reclamos.length.toLocaleString('es-AR')} reclamos ubicados en el mapa, pero ninguno entra en lo que estás filtrando.`
+                  ? `Hay ${reclamos.length.toLocaleString('es-AR')} reclamos ubicados en el mapa, pero ninguno entra en lo que preguntaste.`
                   : 'Todavía no hay reclamos con coordenada para dibujar en el mapa.'}
               </p>
               {reclamos.length > 0 && (
@@ -2986,12 +3452,9 @@ export default function Mapa() {
           />
         )}
 
-      {/* === Informe de una zona: aparece CUANDO SE LO PIDE (la ayuda "Dibujar
-             una zona" de la botonera). No es un control del mapa, es una acción
-             que produce un DOCUMENTO: por eso tiene panel propio, con el nombre
-             de lo que genera y el resumen de lo que va a entrar adentro. En
-             reposo no ocupa lugar — el canvas no lo muestra. === */}
-      {(drawMode || drawnBBox) && (
+      {/* === Informe de una zona: no es un control del mapa, es una acción que
+             PRODUCE UN DOCUMENTO. Por eso tiene panel propio, con el nombre de
+             lo que genera y el resumen de lo que va a entrar adentro. === */}
       <section className="av2-panel av2-informe">
         <div className="av2-panel-head">
           <FileDown size={16} strokeWidth={2} aria-hidden />
@@ -3002,14 +3465,18 @@ export default function Mapa() {
           {!drawnBBox ? (
             <>
               <p className="av2-informe-texto">
-                Arrastrá sobre el mapa para marcar el área y descargás el detalle de
-                esos reclamos en PDF: los indicadores del área, las cinco zonas que
-                más repiten y el listado reclamo por reclamo.
+                Marcá un área del mapa y descargás el detalle de esos reclamos en PDF:
+                los indicadores del área, las cinco zonas que más repiten y el listado
+                reclamo por reclamo.
               </p>
               <div className="av2-informe-acciones">
-                <button type="button" className="av2-btn-secundario" onClick={handleToggleDraw}>
-                  <X size={14} strokeWidth={2} aria-hidden />
-                  Cancelar el marcado
+                <button
+                  type="button"
+                  className={`av2-btn-secundario${drawMode ? ' av2-btn-secundario--activo' : ''}`}
+                  onClick={handleToggleDraw}
+                >
+                  <Square size={14} strokeWidth={2} aria-hidden />
+                  {drawMode ? 'Cancelar el marcado' : 'Marcar el área en el mapa'}
                 </button>
               </div>
             </>
@@ -3047,10 +3514,11 @@ export default function Mapa() {
           )}
         </div>
       </section>
-      )}
 
-      {/* === Las tres tarjetas de abajo del mapa (canvas): las zonas calientes,
-             la distribución por estado y el pulso de ingresos. === */}
+      {/* === Sección de análisis debajo del mapa. El ranking NO es fijo:
+             cambia con la pregunta (mismo componente, otro contenido y otro
+             encabezado) y va acompañado de los paneles de estado y
+             tendencia. === */}
       <MapaStats
         reclamos={reclamosFiltrados}
         statusColors={ESTADO_COLORS_LISTA}
