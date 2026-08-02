@@ -3380,7 +3380,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
                 onChange: (v) => setFiltroCanal(v || null),
               },
             ]}
-            statusTabs={tabsEstado}
+            /* En vista tabla las tabs viven ARRIBA de la tarjeta de la tabla
+               (diseño canvas); en tarjetas/guiada siguen acá como segmented. */
+            statusTabs={activeView === 'table' ? [] : tabsEstado}
             activeStatus={filtroEstado}
             onStatusChange={(id) => setFiltroEstado(id)}
             /* Un foco puesto desde el hero NUNCA queda invisible: se anuncia
@@ -3454,6 +3456,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
                 rowKey={(r) => r.id}
                 rowActions={accionesFila}
                 onRowClick={(r) => openViewSheet(r)}
+                statusTabs={tabsEstado}
+                activeStatus={filtroEstado}
+                onStatusChange={(id) => setFiltroEstado(id)}
                 footer={{
                   showing: `Mostrando ${filteredReclamos.length.toLocaleString('es-AR')} de ${totalConteos.toLocaleString('es-AR')}`,
                   action: hasMore

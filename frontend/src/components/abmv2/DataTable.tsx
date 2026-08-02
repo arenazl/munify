@@ -313,6 +313,9 @@ export function DataTable<Row>({
   tableMinWidth = 940,
   loading = false,
   emptyMessage,
+  statusTabs,
+  activeStatus,
+  onStatusChange,
 }: DataTableProps<Row>) {
   const [menu, setMenu] = useState<MenuAbierto | null>(null);
   const cerrarMenu = useCallback(() => setMenu(null), []);
@@ -508,6 +511,30 @@ export function DataTable<Row>({
 
   return (
     <section className="av2-tabla">
+      {/* Tabs de estado subrayadas (diseño canvas): viven en el tope de la
+          tarjeta de la tabla, no en la FilterBar. */}
+      {statusTabs && statusTabs.length > 0 && (
+        <div className="av2-ttabs" role="tablist" aria-label="Filtrar por estado">
+          {statusTabs.map((tab) => {
+            const cero = tab.count === 0;
+            const activo = tab.id === activeStatus;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activo}
+                disabled={cero}
+                className={`av2-ttab${activo ? ' av2-ttab--activo' : ''}${cero ? ' av2-ttab--cero' : ''}`}
+                onClick={cero || !onStatusChange ? undefined : () => onStatusChange(tab.id)}
+              >
+                {tab.label}
+                <span className="av2-ttab-n">{tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="av2-tabla-scroll" role="table" aria-busy={loading || undefined} style={estiloGrid}>
         {/* Encabezado eyebrow */}
         <div className="av2-tabla-grid av2-tabla-encabezado" role="row">

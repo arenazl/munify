@@ -381,6 +381,14 @@ export interface DataTableFooter {
 
 export interface DataTableProps<Row = unknown> {
   kind: ListKind;
+  /** [v2.3 — canvas Reclamos] Tabs de estado SUBRAYADAS en el tope de la
+   *  tarjeta ("Todos 49 · Recibidos 21…"): label + conteo, count 0 ⇒ apagada
+   *  y no clickeable. Opcionales: sin tabs la tarjeta arranca directo en el
+   *  encabezado (compat con todas las pantallas actuales). Cuando la página
+   *  las pasa acá, NO las pase también a la FilterBar (quedarían dobles). */
+  statusTabs?: StatusTab[];
+  activeStatus?: string;
+  onStatusChange?: (id: string) => void;
   columns: ColumnSpec<Row>[];
   /** 'date' (money/plain con fecha) · 'hour' (schedule) · 'none'. */
   groupBy?: 'date' | 'hour' | 'none';

@@ -323,6 +323,96 @@
 .av2-btn-peligro:hover { background: var(--pl-red-100); }
 .av2-btn-peligro:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Peligro SÓLIDO: solo para la acción destructiva protagonista de un
+   bloque de alerta (ej. "Reabrir caso"). */
+.av2-btn-peligro--solido {
+  background: var(--pl-red);
+  border-color: var(--pl-red);
+  color: var(--pl-on-brand);
+}
+.av2-btn-peligro--solido:hover { background: var(--pl-red-700); }
+
+/* Banda de estado final del sheet (Finalizado/Rechazado/Pospuesto):
+   informativa, no disfrazada de botón. Color por estado, inline runtime. */
+.av2-sheet-final {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  height: 36px;
+  border-radius: var(--pl-radius-md);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+}
+.av2-sheet-final--chip {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+
+/* Bloque de alerta del sheet (feedback negativo del vecino). */
+.av2-sheet-alerta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--pl-radius-lg);
+  background: var(--pl-red-100);
+  border: 1px solid var(--pl-red);
+}
+
+/* ============================================================
+   [TABS DE ESTADO v2.3] — subrayadas en el tope de la tarjeta de
+   la tabla (canvas Reclamos): "Todos 49 · Recibidos 21 …".
+   ============================================================ */
+
+.av2-ttabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 18px 0;
+  border-bottom: 1px solid var(--pl-border);
+  overflow-x: auto;
+}
+
+.av2-ttab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px 11px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-ttab:hover { color: var(--pl-text); }
+
+.av2-ttab--activo {
+  font-weight: 600;
+  color: var(--pl-text);
+  border-bottom-color: var(--pl-green);
+}
+
+.av2-ttab--cero,
+.av2-ttab--cero:hover {
+  color: var(--pl-text-disabled);
+  cursor: default;
+}
+
+.av2-ttab-n {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+.av2-ttab--cero .av2-ttab-n { color: var(--pl-text-disabled); }
+
 /* ============================================================
    [SHEET DETALLE v2.2] — chips de contexto, banner de zona y pie
    del sheet de detalle (Reclamos y los que sigan).
