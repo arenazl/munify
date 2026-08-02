@@ -45,14 +45,13 @@ import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../co
 import { FilaLista, type FilaListaItem } from '../components/ui/FilaLista';
 import { useEsAngosto } from '../hooks/useEsAngosto';
 import { haceCuanto, tonoDeEstado } from '../lib/filaLista-helpers';
-import type { KpiSpec } from '../components/ui/KpiCard';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { useIaTramites } from '../hooks/useIaHabilitada';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { SemanticHero } from '../components/ui/SemanticHero';
-import { seg, type HeroFrase } from '../lib/semanticHero';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor, veredictoTasa } from '../lib/veredictos';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -1810,48 +1809,24 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   // KPIs arriba del ABMPage (mismo patrón que Tesorería).
   // Lee de resumen.por_estado que viene del backend en loadData().
-  const kpisSpec: KpiSpec[] = useMemo(() => {
-    const porEstado = resumen?.por_estado || {};
-    const total = resumen?.total || 0;
-    const recibidos = porEstado['recibido'] || 0;
+  // KPIs del módulo: viven ADENTRO del hero (strip del SemanticHero, como
+  // Reclamos). Los KpiCards sueltos murieron — regla del dueño: cero KPIs
+  // sueltos, todas las pantallas con las mismas piezas del kit.
+  const heroKpis: HeroKpi[] = useMemo(() => {
+    if (!resumen) return [];
+    const porEstado = resumen.por_estado || {};
+    const total = resumen.total || 0;
+    const recibidos = (porEstado['recibido'] || 0) + (porEstado['iniciado'] || 0);
     const enCurso = porEstado['en_curso'] || 0;
     const finalizados = porEstado['finalizado'] || 0;
-    const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
     return [
-      {
-        label: 'Total Trámites',
-        value: total.toLocaleString('es-AR'),
-        icon: FileText,
-        color: theme.primary,
-        footnote: `${resumen?.hoy || 0} hoy`,
-        highlighted: true,
-      },
-      {
-        label: 'Recibidos',
-        value: recibidos.toLocaleString('es-AR'),
-        icon: Inbox,
-        color: '#3b82f6',
-        footnote: `${pct(recibidos).toFixed(1)}% del total`,
-        pct: pct(recibidos),
-      },
-      {
-        label: 'En Curso',
-        value: enCurso.toLocaleString('es-AR'),
-        icon: PlayCircle,
-        color: '#f59e0b',
-        footnote: `${pct(enCurso).toFixed(1)}% del total`,
-        pct: pct(enCurso),
-      },
-      {
-        label: 'Finalizados',
-        value: finalizados.toLocaleString('es-AR'),
-        icon: CheckCircle2,
-        color: '#22c55e',
-        footnote: `${pct(finalizados).toFixed(1)}% del total`,
-        pct: pct(finalizados),
-      },
+      { etiqueta: 'TOTAL', valor: total.toLocaleString('es-AR'), sub: `${resumen.hoy || 0} hoy` },
+      { etiqueta: 'RECIBIDOS', valor: recibidos.toLocaleString('es-AR'), sub: `${pct(recibidos)}% del total` },
+      { etiqueta: 'EN CURSO', valor: enCurso.toLocaleString('es-AR'), sub: `${pct(enCurso)}% del total` },
+      { etiqueta: 'FINALIZADOS', valor: finalizados.toLocaleString('es-AR'), sub: `${pct(finalizados)}% del total` },
     ];
-  }, [resumen, theme.primary]);
+  }, [resumen]);
 
   // Hero semántico (reemplaza el hint estático): frases con datos REALES de
   // `resumen`. Si el resumen todavía no cargó, no se genera ninguna frase y
@@ -1903,12 +1878,11 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   return (
     <PullToRefresh onRefresh={async () => { await loadData(); }}>
-      <SemanticHero etiqueta="TRÁMITES · HOY" frases={heroFrases} />
+      <SemanticHero etiqueta="TRÁMITES · HOY" frases={heroFrases} kpis={heroKpis} />
       <ABMPage
         title="Trámites"
         buttonLabel="Nuevo Trámite"
         onAdd={() => setWizardOpen(true)}
-        kpis={kpisSpec}
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
