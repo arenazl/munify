@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi, calificacionesApi, poiApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -3519,37 +3519,23 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             consolidarlo en LA orden de trabajo de esa zona. Mismo estilo que los
             demás banners de ayuda (deriva de theme.primary, sin hex inline). */}
         {showPoiBanner && poiZona && (
-          <div
-            className="relative overflow-hidden rounded-xl p-3.5"
-            style={{
-              background: `linear-gradient(135deg, ${theme.primary}12 0%, ${theme.primary}06 60%, ${theme.card} 100%)`,
-              border: `1px solid ${theme.primary}30`,
-            }}
-          >
-            <div className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: theme.primary }} />
+          <div className="av2-banner-zona">
             <div className="flex items-start gap-3">
-              <div
-                className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: `${theme.primary}25`, color: theme.primary }}
-              >
+              <div className="av2-banner-zona-icono">
                 <DynamicIcon name="MapPinned" className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold leading-tight" style={{ color: theme.text }}>
+                <h3 className="av2-banner-zona-titulo">
                   Está en la zona de {poiZona.nombre}
                   {poiZona.tipo_nombre ? ` · ${poiZona.tipo_nombre}` : ''}
                 </h3>
-                <p className="text-xs leading-relaxed mt-0.5" style={{ color: theme.textSecondary }}>
+                <p className="av2-banner-zona-texto">
                   Podés agrupar este reclamo con los demás de la zona en una sola orden de trabajo. Se atienden juntos y no se pierde ninguno.
                 </p>
                 <button
                   onClick={handleConsolidarPOI}
                   disabled={consolidandoPOI}
-                  className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                  style={{
-                    background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}dd)`,
-                    color: theme.primaryText || theme.card,
-                  }}
+                  className="av2-btn-primario mt-2.5"
                 >
                   {consolidandoPOI ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -4364,7 +4350,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       <div className="flex items-center gap-2">
         {/* Estado */}
         <span
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full"
+          className="av2-chip"
           style={{
             backgroundColor: estadoColor,
             color: '#ffffff'
@@ -4375,7 +4361,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         </span>
         {/* Categoría */}
         <span
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+          className="av2-chip"
           style={{
             backgroundColor: `${categoryColor}15`,
             color: categoryColor,
@@ -4393,7 +4379,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           const PrioIcon = prioridadIcon(prio);
           return (
             <span
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+              className="av2-chip"
               style={{ backgroundColor: `${pColor}15`, color: pColor, border: `1px solid ${pColor}40` }}
               title={`Prioridad ${prioridadLabel(prio)}`}
             >
@@ -4408,7 +4394,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           const cColor = canalColor(selectedReclamo.canal);
           return (
             <span
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+              className="av2-chip"
               style={{ backgroundColor: `${cColor}15`, color: cColor, border: `1px solid ${cColor}40` }}
               title={`Ingresó por ${canalLabel(selectedReclamo.canal)}`}
             >
@@ -4423,7 +4409,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             closeSheet();
             navigate(`/gestion/reclamos/${selectedReclamo.id}`);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
+          className="av2-chip"
           style={{
             backgroundColor: selectedReclamo.confirmado_vecino === false ? '#ef444415' : theme.backgroundSecondary,
             color: selectedReclamo.confirmado_vecino === false ? '#ef4444' : theme.primary,
@@ -4476,12 +4462,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             onChange={(e) => setDescripcionInicio(e.target.value)}
             placeholder={descripcionInicio.trim() ? 'Descripción del trabajo a realizar...' : 'Descripción del trabajo a realizar (obligatorio para cambiar de estado)...'}
             rows={2}
-            className="w-full px-3 py-1.5 rounded-xl text-sm resize-none transition-colors"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${descripcionInicio.trim() ? theme.primary : '#f59e0b80'}`,
-              color: theme.text,
-            }}
+            className={`av2-sheet-nota${descripcionInicio.trim() ? '' : ' av2-sheet-nota--pendiente'}`}
           />
         )}
 
@@ -4492,24 +4473,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleRecibir}
               disabled={saving || !descripcionInicio.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
-              style={{
-                backgroundColor: descripcionInicio.trim() ? '#16a34a' : theme.border,
-                color: descripcionInicio.trim() ? '#ffffff' : theme.textSecondary,
-                boxShadow: descripcionInicio.trim() ? '0 4px 14px rgba(22, 163, 74, 0.4)' : 'none'
-              }}
+              className="av2-btn-primario flex-1 justify-center"
             >
               {saving ? 'Recibiendo...' : 'Recibir'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: `${estadoColors.rechazado.bg}20`,
-                  border: `2px solid ${estadoColors.rechazado.bg}`,
-                  color: estadoColors.rechazado.bg
-                }}
+                className="av2-btn-peligro"
               >
                 Rechazar
               </button>
@@ -4523,24 +4494,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleAsignar}
               disabled={saving || !dependenciaSeleccionada || !descripcionInicio.trim() || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
-              style={{
-                backgroundColor: (dependenciaSeleccionada && descripcionInicio.trim()) ? theme.primary : theme.border,
-                color: (dependenciaSeleccionada && descripcionInicio.trim()) ? '#ffffff' : theme.textSecondary,
-                boxShadow: (dependenciaSeleccionada && descripcionInicio.trim()) ? `0 4px 14px ${theme.primary}40` : 'none'
-              }}
+              className="av2-btn-primario flex-1 justify-center"
             >
               {saving ? 'Asignando...' : selectedReclamo.dependencia_asignada ? 'Reasignar' : 'Asignar'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: `${estadoColors.rechazado.bg}20`,
-                  border: `2px solid ${estadoColors.rechazado.bg}`,
-                  color: estadoColors.rechazado.bg
-                }}
+                className="av2-btn-peligro"
               >
                 Rechazar
               </button>
@@ -4554,24 +4515,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleIniciar}
               disabled={saving || !descripcionInicio.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-              style={{
-                backgroundColor: descripcionInicio.trim() ? `${estadoColors.en_curso.bg}20` : 'transparent',
-                border: `2px solid ${descripcionInicio.trim() ? estadoColors.en_curso.bg : theme.border}`,
-                color: descripcionInicio.trim() ? estadoColors.en_curso.bg : theme.textSecondary,
-              }}
+              className="av2-btn-primario flex-1 justify-center"
             >
               {saving ? 'Procesando...' : 'En Curso'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: `${estadoColors.rechazado.bg}20`,
-                  border: `2px solid ${estadoColors.rechazado.bg}`,
-                  color: estadoColors.rechazado.bg
-                }}
+                className="av2-btn-peligro"
               >
                 Rechazar
               </button>
@@ -4584,12 +4535,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <>
             {/* Foto de cierre: evidencia del trabajo terminado (opcional) */}
             <label
-              className="px-3 py-2.5 rounded-xl font-medium cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5"
-              style={{
-                backgroundColor: fotoCierre ? `${estadoColors.finalizado.bg}20` : theme.backgroundSecondary,
-                border: `2px dashed ${fotoCierre ? estadoColors.finalizado.bg : theme.border}`,
-                color: fotoCierre ? estadoColors.finalizado.bg : theme.textSecondary,
-              }}
+              className="av2-btn-secundario cursor-pointer"
               title={fotoCierre ? `Foto de cierre: ${fotoCierre.name}` : 'Adjuntar foto del trabajo terminado (opcional)'}
             >
               <Camera className="h-4 w-4" />
@@ -4605,24 +4551,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleFinalizar}
               disabled={saving || !resolucion}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: `${estadoColors.finalizado.bg}20`,
-                border: `2px solid ${estadoColors.finalizado.bg}`,
-                color: estadoColors.finalizado.bg,
-              }}
+              className="av2-btn-primario flex-1 justify-center"
             >
               {saving ? 'Finalizando...' : 'Finalizar'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: `${estadoColors.rechazado.bg}20`,
-                  border: `2px solid ${estadoColors.rechazado.bg}`,
-                  color: estadoColors.rechazado.bg
-                }}
+                className="av2-btn-peligro"
               >
                 Rechazar
               </button>
@@ -4634,24 +4570,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handlePosponer}
               disabled={saving || !motivoNoFinalizado}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: `${estadoColors.pospuesto.bg}20`,
-                border: `2px solid ${estadoColors.pospuesto.bg}`,
-                color: estadoColors.pospuesto.bg
-              }}
+              className="av2-btn-primario flex-1 justify-center"
             >
               {saving ? 'Posponiendo...' : 'Posponer'}
             </button>
             {user?.rol !== 'empleado' && (
               <button
                 onClick={() => setMotivoRechazo('otro')}
-                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: `${estadoColors.rechazado.bg}20`,
-                  border: `2px solid ${estadoColors.rechazado.bg}`,
-                  color: estadoColors.rechazado.bg
-                }}
+                className="av2-btn-peligro"
               >
                 Rechazar
               </button>
@@ -4712,7 +4638,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             }}
           >
             <div className="flex items-start gap-2">
-              <span className="text-xl flex-shrink-0">⚠️</span>
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: '#ef4444' }} />
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm" style={{ color: '#991b1b' }}>
                   El vecino indica que el problema persiste
@@ -4734,7 +4660,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleReabrirPorFeedback}
-                className="px-3 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-[1.02] active:scale-95"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-[1.02] active:scale-95"
                 style={{
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: '#ffffff',
@@ -4742,7 +4668,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 }}
                 title="Devuelve el reclamo a En Curso para retrabajar"
               >
-                🔄 Reabrir caso
+                <RotateCcw className="h-4 w-4" />
+                Reabrir caso
               </button>
               <button
                 onClick={handleDescartarFeedback}

@@ -191,7 +191,9 @@
   min-width: 0;
   height: 36px;
   padding: 0 12px;
-  background: var(--pl-surface-2);
+  /* Fondo claro (surface, no surface-2): el gris se sentía pesado en la
+     fila del toolbar; el borde alcanza para delimitarlo. */
+  background: var(--pl-surface);
   border: 1px solid var(--pl-border);
   border-radius: var(--pl-radius-md);
   transition: border-color var(--pl-dur-ui) var(--pl-ease);
@@ -298,6 +300,120 @@
   color: var(--pl-text-disabled);
   cursor: not-allowed;
 }
+
+/* Variante peligro (Rechazar): delineada, nunca sólida — la acción
+   destructiva se ve pero no compite con el CTA. */
+.av2-btn-peligro {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  background: transparent;
+  border: 1px solid var(--pl-red);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-red-700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-btn-peligro:hover { background: var(--pl-red-100); }
+.av2-btn-peligro:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ============================================================
+   [SHEET DETALLE v2.2] — chips de contexto, banner de zona y pie
+   del sheet de detalle (Reclamos y los que sigan).
+   ============================================================ */
+
+/* Chip de contexto (categoría/prioridad/canal/historial). El COLOR es
+   dinámico del dato (categoría, prioridad) y va inline como valor
+   runtime; acá vive la piel: alto, radio, tipografía. */
+.av2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--pl-radius-pill);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+button.av2-chip {
+  cursor: pointer;
+  transition: opacity var(--pl-dur-ui) var(--pl-ease);
+}
+button.av2-chip:hover { opacity: 0.85; }
+
+/* Banner "está en la zona de un POI": lavado sutil del kit + CTA. */
+.av2-banner-zona {
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-green);
+  border-radius: var(--pl-radius-lg);
+}
+.av2-banner-zona::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--pl-lavado-acento-sutil);
+}
+.av2-banner-zona > * { position: relative; }
+
+.av2-banner-zona-icono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
+.av2-banner-zona-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+
+.av2-banner-zona-texto {
+  margin: 3px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+}
+
+/* Textarea del pie (nota obligatoria para cambiar de estado).
+   16px: los inputs nunca disparan zoom en mobile. */
+.av2-sheet-nota {
+  width: 100%;
+  padding: 10px 12px;
+  resize: none;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-input);
+  color: var(--pl-text);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sheet-nota::placeholder { color: var(--pl-text-faint); }
+.av2-sheet-nota:focus { outline: none; border-color: var(--pl-green); }
+/* Obligatoria y todavía vacía: el borde avisa en ámbar. */
+.av2-sheet-nota--pendiente { border-color: var(--pl-amber-strong); }
 
 /* ============================================================
    [FILTERBAR] — FilterBar
