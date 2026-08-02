@@ -994,11 +994,15 @@
   .dv2-grid-principal {
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   }
-  /* El tercer hijo de la fila (Top categorías) pasa a la fila de abajo,
-     ocupando todo el ancho. */
-  .dv2-grid-principal > .dv2-card:nth-child(3) {
-    grid-column: 1 / -1;
-  }
+}
+
+/* Mapa y tendencia, mitad y mitad — las dos piezas grandes de la pantalla.
+   Con `auto-fit` la fila se parte sola: dos columnas mientras cada una tenga
+   sus 420px, una sola cuando no. Sin media query: lo decide el contenedor,
+   así el bloque sirve igual dentro de una pantalla angosta. */
+.dv2-grid-2--mapa {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  align-items: start;
 }
 
 /* Las barras de Top categorías se reparten en columnas SEGÚN EL ANCHO, con
@@ -1006,8 +1010,12 @@
    Sin media queries — el propio contenedor decide: en escritorio entran tres,
    en una tablet dos, en un teléfono una. Diez categorías en una sola columna
    obligan a cortar en cinco y esconder el resto detrás de un "otras 5". */
-.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barras {
+.dv2-card--barras-anchas .dv2-barras {
   display: flex;
+  /* EXPLÍCITO y no se saca: la regla base de .dv2-barras es `column`, y sin
+     este reset el `flex: 1 1 260px` de abajo se aplica al ALTO — cada barra
+     reserva 260px verticales y quedan separadas por huecos enormes. */
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 10px 22px;
   /* Cada bloque mide lo que mide su contenido. Sin esto, flex los ESTIRA a
@@ -1016,7 +1024,7 @@
   align-items: flex-start;
   align-content: flex-start;
 }
-.dv2-grid-principal > .dv2-card:nth-child(3) .dv2-barra-bloque {
+.dv2-card--barras-anchas .dv2-barra-bloque {
   flex: 1 1 260px;
   min-width: 0;
 }

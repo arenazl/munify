@@ -10,20 +10,10 @@ import { AdaptiveFilter, type AdaptiveFilterGroup } from '../components/ui/Adapt
 import { BarList, type BarListItem, type BarListTono } from '../components/ui/BarList';
 import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 import { parseFechaLocal } from '../lib/tesoreria-helpers';
-import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  ComposedChart,
-  Area,
-  Line,
-} from 'recharts';
-import HeatmapWidget from '../components/ui/HeatmapWidget';
+// Sólo lo que sigue en uso: el donut de estados. La serie de tendencia ya no
+// se dibuja con recharts —la hace TendenciaMeses con un SVG propio— y el mapa
+// de calor pasó a FocosRotativos.
+import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { BalanceBar } from '../components/ui/BalanceBar';
 import { FocosRotativos, type Foco } from '../components/dashboard/FocosRotativos';
@@ -336,10 +326,6 @@ export default function Dashboard() {
   // Calificaciones del vecino (la voz del vecino, lado muni) — GET /calificaciones/estadisticas
   const [califStats, setCalifStats] = useState<CalifEstadisticas | null>(null);
 
-  // Callback para navegar al mapa cuando se hace click en una categoría del heatmap
-  const handleCategoryClick = useCallback((categoryKey: string) => {
-    navigate(`/gestion/mapa?categoria=${encodeURIComponent(categoryKey)}`);
-  }, [navigate]);
 
   // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
   const [liveMode, setLiveMode] = useState(false);
@@ -882,15 +868,8 @@ export default function Dashboard() {
   }));
   const categoriasSobreMeta = tiempoResolucion.filter((t) => t.dias_promedio > metaDias).length;
 
-  // Tendencia: la serie de resueltos es OPCIONAL (backend viejo no la manda)
-  const haySerieResueltos = tendencias.some((t) => t.resueltos != null);
-  /** 4 marcas de tiempo (primera, ~1/3, ~2/3, última) — el eje X lo dibujamos nosotros. */
-  const marcasTendencia = (() => {
-    const n = tendencias.length;
-    if (n === 0) return [];
-    const idx = [0, Math.round((n - 1) / 3), Math.round(((n - 1) * 2) / 3), n - 1];
-    return [...new Set(idx)].map((i) => fmtFechaCorta(tendencias[i].fecha));
-  })();
+  // El eje y la serie de resueltos los resuelve TendenciaMeses por su cuenta,
+  // mes a mes: acá no queda nada que preparar para el gráfico.
 
   interface TooltipEntry {
     name?: string;
@@ -1143,9 +1122,52 @@ export default function Dashboard() {
           (sin título de sección: en la referencia esta grilla sigue directo
           a la cola de trabajo, y el título "Reclamos" ya vive en la fila de
           KPIs de arriba — evitamos duplicarlo) */}
+      {/* ============ Mapa y tendencia, mitad y mitad ============
+          Las dos piezas grandes de la pantalla comparten fila, como en el
+          diseño. Van FUERA de los dos loaders (`loadingCharts` para el mapa,
+          `loadingAnalytics` para la serie): cada una ya resuelve su propia
+          espera —FocosRotativos recibe `loading`, y TendenciaMeses no dibuja
+          nada mientras no haya dos meses que comparar—. Mezclarlas en un
+          ternario ajeno fue lo que dejó la tendencia colgada del esqueleto de
+          carga, visible sólo mientras cargaba. */}
+      <div className="dv2-grid-2 dv2-grid-2--mapa">
+        <div className="dv2-card">
+          <div className="dv2-card-head dv2-card-head--icono">
+            <MapPin className="dv2-card-head-icono" aria-hidden="true" />
+            <h3 className="dv2-card-titulo">Dónde se repiten los reclamos</h3>
+            <span className="dv2-card-caption">90 días</span>
+            {/* Antes acá iba el conteo de puntos: nadie sabe qué es un
+                "punto" del mapa ni qué hacer con el número. En su lugar, lo
+                que se está mirando, dicho en castellano. */}
+            <span className="dv2-card-caption dv2-card-caption--auto">
+              {catConcentracion ?? 'Todas las categorías'}
+            </span>
+          </div>
+          {/* Botonera en vez de combo: un combo esconde las opciones y hay
+              que abrirlo para saber qué se puede ver. Las categorías salen
+              del VOLUMEN REAL de este municipio, así que cada uno ve las
+              suyas. Si no entran, AdaptiveFilter las manda al "+N" solo. */}
+          {categoriasConcentracion.length > 0 && (
+            <AdaptiveFilter groups={gruposConcentracion} />
+          )}
+          {/* El mapa RECORRE los focos como un reproductor: se centra en cada
+              esquina y cuenta qué pasa ahí. Antes iba un listado debajo, que
+              crecía con los datos y rompía la simetría de la fila. Así el
+              alto es fijo y además la pantalla se lee sola en una demo. */}
+          <FocosRotativos
+            focos={focosConcentracion}
+            puntos={heatmapFiltrado}
+            loading={loadingHeatmap}
+            altura="230px"
+            onVerFoco={(f) => navigate(`/gestion/mapa?direccion=${encodeURIComponent(f.direccion)}`)}
+          />
+        </div>
+
+        <TendenciaMeses datos={tendencias} />
+      </div>
+
       {loadingCharts ? (
         <div className="dv2-grid-principal">
-          <ChartSkeleton height={300} />
           <ChartSkeleton height={300} />
           <ChartSkeleton height={300} />
         </div>
@@ -1198,42 +1220,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Concentración — mapa de calor */}
-          <div className="dv2-card">
-            <div className="dv2-card-head dv2-card-head--icono">
-              <MapPin className="dv2-card-head-icono" aria-hidden="true" />
-              <h3 className="dv2-card-titulo">Concentración</h3>
-              <span className="dv2-card-caption">90 días</span>
-              {/* Antes acá iba el conteo de puntos: nadie sabe qué es un
-                  "punto" del mapa ni qué hacer con el número. En su lugar, lo
-                  que se está mirando, dicho en castellano. */}
-              <span className="dv2-card-caption dv2-card-caption--auto">
-                {catConcentracion ?? 'Todas las categorías'}
-              </span>
-            </div>
-            {/* Botonera en vez de combo: un combo esconde las opciones y hay
-                que abrirlo para saber qué se puede ver. Las cuatro categorías
-                salen del VOLUMEN REAL de este municipio, así que cada uno ve
-                las suyas. Si no entran, AdaptiveFilter las manda al "+N" solo. */}
-            {categoriasConcentracion.length > 0 && (
-              <AdaptiveFilter groups={gruposConcentracion} />
-            )}
-            {/* El mapa RECORRE los cuatro focos como un reproductor: se centra
-                en cada esquina y cuenta qué pasa ahí. Antes iba un listado
-                debajo, que crecía con los datos y rompía la simetría de la
-                fila —las tarjetas de al lado quedaban cortas—. Así el alto es
-                fijo y además la pantalla se lee sola en una demo. */}
-            <FocosRotativos
-              focos={focosConcentracion}
-              puntos={heatmapFiltrado}
-              loading={loadingHeatmap}
-              altura="230px"
-              onVerFoco={(f) => navigate(`/gestion/mapa?direccion=${encodeURIComponent(f.direccion)}`)}
-            />
-          </div>
-
           {/* Top categorías */}
-          <div className="dv2-card">
+          <div className="dv2-card dv2-card--barras-anchas">
             <div className="dv2-card-head">
               <h3 className="dv2-card-titulo">Top categorías</h3>
               <span className="dv2-card-caption dv2-card-caption--auto">Por volumen</span>
@@ -1469,15 +1457,12 @@ export default function Dashboard() {
       {loadingAnalytics ? (
         <div className="dv2-grid-2">
           <ChartSkeleton height={300} />
-          <ChartSkeleton height={300} />
         </div>
       ) : (
       <>
       <div className="dv2-grid-2">
-        {/* Recorrido de los ultimos meses. Reemplaza la serie de 30 dias:
-            una linea plana con un pico no dice si el municipio viene
-            ganando o perdiendo — eso solo se ve comparando meses. */}
-        <TendenciaMeses datos={tendencias} />
+        {/* La tendencia ya no vive acá: subió a compartir fila con el mapa,
+            que es donde el diseño la pone. */}
 
         {/* Tiempo de resolución por categoría — las que más tardan primero */}
         <div className="dv2-card">

@@ -12,9 +12,11 @@
   background: var(--pl-surface);
   border: 1px solid var(--pl-border);
   border-radius: var(--pl-radius-lg);
-  padding: 16px 18px 14px;
+  padding: 20px 22px;
   box-shadow: var(--pl-shadow-card);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tm-head {
@@ -33,14 +35,20 @@
   letter-spacing: -0.01em;
 }
 
-/* El mes activo, como una ficha que va cambiando durante el recorrido. */
+/* El mes activo, como una ficha que va cambiando durante el recorrido.
+   Neutra a propósito: el color de esta tarjeta lo pone el veredicto, y una
+   ficha verde fija competiría con él. */
 .tm-mes {
-  padding: 2px 9px;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 11px;
   border-radius: var(--pl-radius-pill);
-  background: var(--pl-green-100);
-  color: var(--pl-green-700);
+  background: var(--pl-surface-2);
+  color: var(--pl-text);
   font-size: var(--pl-fs-micro);
-  font-weight: 700;
+  font-weight: 600;
+  flex: 0 0 auto;
 }
 
 .tm-sub {
@@ -73,21 +81,26 @@
 .tm-punto--out { background: var(--pl-border-strong); }
 
 .tm-play {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--pl-radius-sm);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--pl-radius-pill);
   border: 1px solid var(--pl-border);
   background: transparent;
   color: var(--pl-text-3);
   display: grid;
   place-items: center;
   cursor: pointer;
+  flex: 0 0 auto;
   transition: background var(--pl-dur-ui) var(--pl-ease);
 }
 .tm-play:hover { background: var(--pl-surface-hover); }
 
 /* La lectura del mes. Es lo que se lee primero y lo único que hace falta
-   entender: los números y la curva están para respaldarla. */
+   entender: los números y la curva están para respaldarla.
+
+   El párrafo va en gris y SÓLO la etiqueta inicial lleva color. Pintar la
+   frase entera de rojo la convierte en una alarma y se pierde el dato que
+   viene después; el color tiene que marcar el veredicto, no gritar. */
 .tm-veredicto {
   margin: 10px 0 0;
   font-family: var(--pl-font-sans);
@@ -96,16 +109,18 @@
   color: var(--pl-text-3);
   text-wrap: pretty;
 }
-.tm-veredicto--bueno { color: var(--pl-green-700); }
-.tm-veredicto--malo { color: var(--pl-red-700); }
+.tm-veredicto strong { font-weight: 600; }
+.tm-veredicto--bueno strong { color: var(--pl-green-700); }
+.tm-veredicto--malo strong { color: var(--pl-red-700); }
 
 .tm-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-  padding-top: 12px;
+  gap: 12px;
+  margin: 16px 0 4px;
+  padding: 14px 0;
   border-top: 1px solid var(--pl-border);
+  border-bottom: 1px solid var(--pl-border);
 }
 
 .tm-kpi {
