@@ -28,12 +28,13 @@
  * Únicos inline permitidos: valores runtime de marca (BRAND.accent,
  * BRAND.nameFont), igual que en el sidebar viejo.
  */
-import { Fragment, useMemo, useRef, useState, type ComponentType } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, HelpCircle, MoveRight, Star } from 'lucide-react';
+import { ChevronDown, ChevronLeft, HelpCircle, MoveRight, Star } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useVecinoBadges } from '../../hooks/useVecinoBadges';
 import { useNavBadges, type NavBadges } from './useNavBadges';
+import { ICONO_CATEGORIA } from '../../config/navigation';
 import { BrandMark } from '../../brands/BrandMark';
 import { BRAND } from '../../brands';
 
@@ -108,7 +109,18 @@ interface GrupoNav {
   id: string;
   titulo: string;
   items: ShellNavItem[];
+  /** Icono de la categoría para el rail colapsado (fallback: el del 1er item). */
+  icono: ComponentType<{ className?: string }>;
 }
+
+/**
+ * Flyout del rail: abre con demora corta y cierra con demora un poco mayor.
+ * El delay de cierre es lo que permite cruzar el hueco entre el icono y el
+ * panel sin que parpadee; el de apertura evita que barrer el rail con el mouse
+ * dispare cuatro paneles seguidos.
+ */
+const FLY_ABRIR_MS = 120;
+const FLY_CERRAR_MS = 200;
 
 /**
  * Mantiene la cabecera clickeada QUIETA mientras el acordeón exclusivo pliega
@@ -191,6 +203,56 @@ function ItemColapsado({
   );
 }
 
+/**
+ * Icono de GRUPO en el rail colapsado. Reemplaza al listado plano de items:
+ * colapsado se ve un icono por categoría (4-6), no los ~24 items sueltos que
+ * no dejaban saber a qué grupo pertenecía cada uno. Los items salen en el
+ * flyout, al pasar el mouse.
+ *
+ * Es <button> y no <Link> a propósito: no navega a ningún lado — abre el panel.
+ * Navegar es tarea de los items de adentro.
+ */
+function GrupoColapsado({
+  grupo,
+  marcado,
+  contieneActivo,
+  badge,
+  onAbrir,
+  onCerrar,
+}: {
+  grupo: GrupoNav;
+  /** Grupo que quedó abierto en modo expandido: se recuerda al colapsar. */
+  marcado: boolean;
+  contieneActivo: boolean;
+  badge: number;
+  onAbrir: (el: HTMLElement) => void;
+  onCerrar: () => void;
+}) {
+  const Icon = grupo.icono;
+  return (
+    <button
+      type="button"
+      title={grupo.titulo}
+      aria-label={grupo.titulo}
+      aria-haspopup="menu"
+      className={clases(
+        'sv2-cgrupo',
+        contieneActivo && 'sv2-cgrupo--activo',
+        marcado && !contieneActivo && 'sv2-cgrupo--marcado',
+      )}
+      onMouseEnter={(e) => onAbrir(e.currentTarget)}
+      onMouseLeave={onCerrar}
+      onFocus={(e) => onAbrir(e.currentTarget)}
+      onClick={(e) => onAbrir(e.currentTarget)}
+    >
+      <span className="sv2-item-icono">
+        <Icon />
+      </span>
+      {badge > 0 && <span className="sv2-minibadge">{badge > 99 ? '99+' : badge}</span>}
+    </button>
+  );
+}
+
 export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Props) {
   const location = useLocation();
   const { user, municipioActual } = useAuth();
@@ -205,6 +267,62 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
   // derivado, sin efecto ni estado espejo.
   const [manual, setManual] = useState<{ ruta: string; id: string | null } | null>(null);
   const navRef = useRef<HTMLElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Flyout del rail colapsado: qué grupo y a qué altura. `top` se mide contra
+  // el aside (no contra la ventana) para que el panel salga alineado al icono
+  // aunque el rail esté scrolleado.
+  const [flyout, setFlyout] = useState<{ id: string; top: number } | null>(null);
+  const flyTimer = useRef<number | undefined>(undefined);
+
+  const cancelarTimer = () => {
+    if (flyTimer.current !== undefined) {
+      window.clearTimeout(flyTimer.current);
+      flyTimer.current = undefined;
+    }
+  };
+
+  const abrirFlyout = useCallback((id: string, el: HTMLElement) => {
+    cancelarTimer();
+    const aside = asideRef.current;
+    if (!aside) return;
+    const top = el.getBoundingClientRect().top - aside.getBoundingClientRect().top;
+    flyTimer.current = window.setTimeout(() => setFlyout({ id, top }), FLY_ABRIR_MS);
+  }, []);
+
+  const cerrarFlyout = useCallback(() => {
+    cancelarTimer();
+    flyTimer.current = window.setTimeout(() => setFlyout(null), FLY_CERRAR_MS);
+  }, []);
+
+  useEffect(() => cancelarTimer, []);
+
+  // El flyout sólo existe colapsado: se DERIVA en vez de sincronizarse con un
+  // effect, así no queda un panel huérfano flotando sobre la nav expandida.
+  const flyActivo = colapsado ? flyout : null;
+
+  // Alternar SIEMPRE por acá (botón y teclado): cierra el panel abierto en el
+  // mismo gesto, para que al volver a colapsar no reaparezca uno viejo sin
+  // que el usuario haya pasado el mouse.
+  const alternarColapso = useCallback(() => {
+    cancelarTimer();
+    setFlyout(null);
+    onToggleColapsado();
+  }, [onToggleColapsado]);
+
+  // Atajo "[": alterna el colapso. Se ignora mientras se escribe, si no
+  // tipear un corchete en un campo plegaría el menú.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '[' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      alternarColapso();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [alternarColapso]);
 
   const { sueltos, grupos } = useMemo(() => {
     const sueltosAcc: ShellNavItem[] = [];
@@ -218,7 +336,9 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
       }
       let grupo = porCategoria.get(cat);
       if (!grupo) {
-        grupo = { id: cat, titulo: cat, items: [] };
+        // Icono de la categoría; si no está mapeada, el del primer item que la
+        // estrena — así una categoría nueva entra al rail sin tocar el mapa.
+        grupo = { id: cat, titulo: cat, items: [], icono: ICONO_CATEGORIA[cat] ?? item.icon };
         porCategoria.set(cat, grupo);
         gruposAcc.push(grupo);
       }
@@ -262,10 +382,28 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
   const [nombreBase, nombreAcento] = partirNombreMarca();
   const subtitulo = user?.municipio_id && municipioActual ? municipioActual.nombre : undefined;
 
-  // ---- Modo colapsado: tile de marca + solo iconos con title ----
+  // Botón ÚNICO de colapso, anclado al borde a la altura del logo. Antes eran
+  // dos (uno en el header para cerrar, otro al pie para abrir): el control
+  // cambiaba de lugar según el estado, así que había que buscarlo. Ahora no se
+  // mueve nunca y sólo gira la flecha.
+  const botonToggle = (
+    <button
+      type="button"
+      className="sv2-toggle"
+      title={`${colapsado ? 'Expandir' : 'Colapsar'} el menú  [`}
+      aria-label={colapsado ? 'Expandir el menú' : 'Colapsar el menú'}
+      aria-expanded={!colapsado}
+      onClick={alternarColapso}
+    >
+      <ChevronLeft className="sv2-chev" />
+    </button>
+  );
+
+  // ---- Modo colapsado: rail de GRUPOS (no de items) + flyout ----
   if (colapsado) {
+    const grupoFly = flyActivo ? grupos.find((g) => g.id === flyActivo.id) ?? null : null;
     return (
-      <aside className="sv2 sv2--colapsado">
+      <aside className="sv2 sv2--colapsado" ref={asideRef}>
         <Link to="/gestion" className="sv2-logo sv2-logo--tile" title={BRAND.name}>
           <BrandMark size={26} variant="sidebar" />
         </Link>
@@ -282,41 +420,70 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
               />
             );
           })}
-          {grupos.map((grupo, i) => (
-            <Fragment key={grupo.id}>
-              {(sueltos.length > 0 || i > 0) && <span className="sv2-cseparador" role="separator" />}
-              {grupo.items.map((item) => {
-                const b = badgeDe(item);
-                return (
-                  <ItemColapsado
-                    key={item.href}
-                    item={item}
-                    activo={esActivo(item)}
-                    badge={b.n}
-                    badgeAlerta={b.alerta}
-                  />
-                );
-              })}
-            </Fragment>
+          {sueltos.length > 0 && grupos.length > 0 && (
+            <span className="sv2-cseparador" role="separator" />
+          )}
+          {grupos.map((grupo) => (
+            <GrupoColapsado
+              key={grupo.id}
+              grupo={grupo}
+              marcado={abiertoId === grupo.id}
+              contieneActivo={grupo.items.some(esActivo)}
+              badge={grupo.items.reduce((acc, it) => acc + badgeDe(it).n, 0)}
+              onAbrir={(el) => abrirFlyout(grupo.id, el)}
+              onCerrar={cerrarFlyout}
+            />
           ))}
         </nav>
-        <span className="sv2-cespaciador" />
-        <button
-          type="button"
-          className="sv2-expandir"
-          title="Expandir menú"
-          aria-label="Expandir menú"
-          onClick={onToggleColapsado}
-        >
-          <ChevronRight className="sv2-chev" />
-        </button>
+
+        {grupoFly && (
+          <div
+            className="sv2-flyout"
+            role="menu"
+            aria-label={grupoFly.titulo}
+            style={{ top: flyActivo?.top }}
+            onMouseEnter={cancelarTimer}
+            onMouseLeave={cerrarFlyout}
+          >
+            <div className="sv2-flyout-cab">
+              <span className="sv2-flyout-titulo">{grupoFly.titulo}</span>
+            </div>
+            <div className="sv2-flyout-items">
+              {grupoFly.items.map((item) => {
+                const b = badgeDe(item);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    role="menuitem"
+                    className={clases('sv2-flyout-item', esActivo(item) && 'sv2-flyout-item--activo')}
+                    onClick={() => setFlyout(null)}
+                  >
+                    <span className="sv2-item-icono">
+                      <Icon />
+                    </span>
+                    <span className="sv2-item-label">{item.name}</span>
+                    {b.n > 0 && (
+                      <span className={clases('sv2-badge', b.alerta && 'sv2-badge--alerta')}>
+                        {b.n > 99 ? '99+' : b.n}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {botonToggle}
       </aside>
     );
   }
 
   // ---- Modo expandido ----
   return (
-    <aside className="sv2">
+    <aside className="sv2" ref={asideRef}>
       <div className="sv2-marca">
         <Link to="/gestion" className="sv2-logo" title={BRAND.name}>
           <BrandMark size={26} variant="sidebar" />
@@ -330,16 +497,8 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
           </span>
           {subtitulo && <span className="sv2-subtitulo">{subtitulo}</span>}
         </div>
-        <button
-          type="button"
-          className="sv2-colapsar"
-          title="Colapsar menú"
-          aria-label="Colapsar menú"
-          onClick={onToggleColapsado}
-        >
-          <ChevronLeft className="sv2-chev" />
-        </button>
       </div>
+      {botonToggle}
 
       <nav className="sv2-nav" ref={navRef} aria-label="Navegación principal">
         {sueltos.map((item) => {

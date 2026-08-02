@@ -106,23 +106,37 @@
   text-overflow: ellipsis;
 }
 
-.sv2-colapsar {
-  margin-left: auto;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  border-radius: var(--pl-radius-sm);
+/* Control ÚNICO de colapso, montado sobre el borde derecho a la altura del
+   logo. Vive fuera del flujo para que no se mueva entre estados: expandido y
+   colapsado comparten posición y sólo gira la flecha. */
+.sv2-toggle {
+  position: absolute;
+  top: 26px;
+  right: -13px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--pl-radius-pill);
   border: 1px solid var(--pl-border-strong);
-  background: transparent;
-  color: var(--pl-text-3);
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
   display: grid;
   place-items: center;
   cursor: pointer;
   padding: 0;
-  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+  box-shadow: var(--pl-shadow-card);
+  transition:
+    background-color var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
 }
-.sv2-colapsar:hover {
+.sv2-toggle:hover {
   background: var(--pl-surface-hover);
+  border-color: var(--pl-green);
+}
+
+/* Un solo giro para los dos estados: el icono es siempre el mismo. */
+.sv2--colapsado .sv2-toggle .sv2-chev {
+  transform: rotate(180deg);
 }
 
 /* El sidebar NO tiene buscador: el que había era inerte y se borró. La
@@ -133,6 +147,7 @@
   width: 16px;
   height: 16px;
   flex: none;
+  transition: transform var(--pl-dur-sheet) var(--pl-ease);
 }
 
 /* --- Navegación (expandido) -------------------------------------- */
@@ -288,8 +303,19 @@
   grid-template-rows: 1fr;
   transition: grid-template-rows var(--pl-dur-sheet) var(--pl-ease);
 }
+/* `visibility: hidden` y no sólo overflow: sin esto los items de un grupo
+   plegado siguen en el orden de tabulación y el foco se va a links que no se
+   ven. La visibilidad se demora hasta que termina el plegado para no cortar
+   la animación de salida. */
 .sv2-grupo-items--cerrado {
   grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    grid-template-rows var(--pl-dur-sheet) var(--pl-ease),
+    opacity var(--pl-dur-ui) var(--pl-ease),
+    visibility 0s linear var(--pl-dur-sheet);
 }
 .sv2-grupo-items-int {
   overflow: hidden;
@@ -484,6 +510,111 @@
   margin: 7px 0;
 }
 
+/* --- Rail colapsado: un icono por GRUPO ---------------------------- */
+
+/* Hereda la caja de .sv2-citem pero es <button>: abre el flyout, no navega. */
+.sv2-cgrupo {
+  position: relative;
+  width: 42px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  border-radius: var(--pl-radius-md);
+  background: transparent;
+  color: var(--pl-text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-cgrupo:hover {
+  background: var(--pl-surface-hover);
+}
+
+/* El grupo de la ruta actual: mismo tratamiento que un item activo. */
+.sv2-cgrupo--activo,
+.sv2-cgrupo--activo:hover {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+.sv2-cgrupo--activo .sv2-item-icono {
+  color: inherit;
+}
+
+/* El grupo que quedaba abierto en modo expandido: se recuerda al colapsar,
+   marcado más suave para no competir con el activo. */
+.sv2-cgrupo--marcado {
+  background: var(--pl-green-050);
+  color: var(--pl-green-700);
+}
+
+/* --- Flyout del rail ----------------------------------------------- */
+
+/* `top` lo fija el componente (posición del icono): valor runtime. */
+.sv2-flyout {
+  position: absolute;
+  left: calc(var(--pl-sidebar-w-collapsed) + 6px);
+  z-index: 3;
+  width: 230px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-float);
+  animation: sv2-fly-in var(--pl-dur-ui) var(--pl-ease) both;
+}
+
+@keyframes sv2-fly-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.sv2-flyout-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 8px;
+}
+
+.sv2-flyout-titulo {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--pl-green-700);
+}
+
+.sv2-flyout-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sv2-flyout-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 33px;
+  padding: 0 8px;
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-2);
+  text-decoration: none;
+  transition: background-color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-flyout-item:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+.sv2-flyout-item--activo,
+.sv2-flyout-item--activo:hover {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
 /* Mini badge del modo colapsado */
 .sv2-minibadge {
   position: absolute;
@@ -506,27 +637,9 @@
   color: var(--pl-on-brand);
 }
 
-.sv2-cespaciador {
-  flex: 1;
-}
-
-.sv2-expandir {
-  width: 42px;
-  height: 38px;
-  flex: 0 0 auto;
-  border-radius: var(--pl-radius-md);
-  border: 1px solid var(--pl-border-strong);
-  background: transparent;
-  color: var(--pl-text-3);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  padding: 0;
-  transition: background-color var(--pl-dur-ui) var(--pl-ease);
-}
-.sv2-expandir:hover {
-  background: var(--pl-surface-hover);
-}
+/* .sv2-cespaciador / .sv2-expandir / .sv2-colapsar: eliminados. El control de
+   colapso dejó de ser dos botones (uno arriba para cerrar, otro al pie para
+   abrir) y pasó a ser uno solo anclado al borde → .sv2-toggle. */
 
 /* ============================================================
    TopbarV2 — CONTEXTO a la izquierda, PERSONA a la derecha.
@@ -1071,10 +1184,11 @@
 
 .sv2-item:focus-visible,
 .sv2-citem:focus-visible,
+.sv2-cgrupo:focus-visible,
+.sv2-flyout-item:focus-visible,
 .sv2-grupo-cab:focus-visible,
 .sv2-logo:focus-visible,
-.sv2-colapsar:focus-visible,
-.sv2-expandir:focus-visible,
+.sv2-toggle:focus-visible,
 .tv2-iconbtn:focus-visible,
 .tv2-persona-btn:focus-visible,
 .tv2-menu-item:focus-visible {
@@ -1095,8 +1209,10 @@
   .sv2,
   .sv2-item,
   .sv2-citem,
-  .sv2-colapsar,
-  .sv2-expandir,
+  .sv2-cgrupo,
+  .sv2-flyout,
+  .sv2-chev,
+  .sv2-toggle,
   .sv2-grupo-chevron,
   .sv2-grupo-items,
   .sv2-pie-item,

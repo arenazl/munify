@@ -475,9 +475,14 @@ export default function Layout() {
   );
 
   // Anchos dinámicos con medidas relativas para mejor responsividad.
-  // Desktop = shell v2: 16rem/4.5rem (= --pl-sidebar-w 256px / 72px).
+  // Desktop = shell v2. El ancho sale de los MISMOS tokens que usa el sidebar
+  // (--pl-sidebar-w / --pl-sidebar-w-collapsed): antes estaba duplicado como
+  // '16rem'/'4.5rem' y cualquier cambio del token dejaba el padding del
+  // contenido desfasado del ancho real de la barra.
   // Mobile mantiene el drawer compacto de siempre (12rem).
-  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4.5rem' : '16rem');
+  const sidebarWidth = isMobile
+    ? '12rem'
+    : (sidebarCollapsed ? 'var(--pl-sidebar-w-collapsed)' : 'var(--pl-sidebar-w)');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;

@@ -4,7 +4,33 @@ import {
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
   History,
+  type LucideIcon,
 } from 'lucide-react';
+
+/**
+ * Icono que representa a una CATEGORÍA entera (no a un item).
+ *
+ * Lo usa el rail del sidebar colapsado: ahí no entran los ~24 items sueltos,
+ * entra un icono por grupo y sus items salen en un flyout. Vive acá, con la
+ * config de navegación, y no en el componente: la categoría es un dato de
+ * navegación, no una decisión de pintura.
+ *
+ * Resiliente a propósito: una categoría que no esté en el mapa NO rompe ni
+ * queda sin icono — el sidebar cae al icono de su primer item.
+ */
+export const ICONO_CATEGORIA: Record<string, LucideIcon> = {
+  'Reclamos': ClipboardList,
+  'Trámites': FileCheck,
+  'Tesorería': Wallet,
+  'Sueldos': Banknote,
+  'Contaduría': Receipt,
+  'Campo': Hammer,
+  'Mi Área': Layers,
+  'Atención al vecino': Building2,
+  'Configuración': Settings,
+  'Mi cuenta': Users,
+  'Super Admin': Activity,
+};
 
 interface NavigationOptions {
   userRole: string;

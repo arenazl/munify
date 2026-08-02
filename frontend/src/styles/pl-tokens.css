@@ -52,7 +52,8 @@
 
   /* --- Layout --- */
   --pl-sidebar-w: 256px;
-  --pl-sidebar-w-collapsed: 72px;
+  /* 68px: el rail dejó de listar items sueltos y pasó a un icono por grupo. */
+  --pl-sidebar-w-collapsed: 68px;
   --pl-drawer-w: 480px;
   --pl-topbar-h: 46px;
 
