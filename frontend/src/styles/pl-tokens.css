@@ -83,12 +83,14 @@
    en su color sin tocar una línea.
    ============================================================ */
 :root {
-  /* Pieza protagonista (hero semántico). Suavizado 2026-08-02 a pedido del
-     dueño: sigue por encima del sutil, pero ya no compite con el texto. */
+  /* Pieza protagonista (hero semántico). MUY suave a pedido del dueño
+     (2026-08-02, dos vueltas): una insinuación, no un fondo — quedó incluso
+     por debajo del sutil; la jerarquía del hero la dan la barra de acento,
+     la frase y los CTAs, no el lavado. */
   --pl-lavado-acento: linear-gradient(
     115deg,
-    color-mix(in srgb, var(--pl-green) 5.5%, transparent) 0%,
-    color-mix(in srgb, var(--pl-green) 1.8%, transparent) 38%,
+    color-mix(in srgb, var(--pl-green) 2%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 0.6%, transparent) 38%,
     transparent 72%
   );
   /* Superficies de apoyo (tarjetas, paneles): se percibe, no se mira. */
