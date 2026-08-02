@@ -332,19 +332,84 @@
    El COLOR de la serie del sparkline es runtime (lo pasa la
    página desde los tokens computados); el resto sale de --pl-*.
    ============================================================ */
-.dv2-kpi-card { padding: 16px; gap: 10px; }
+.dv2-kpi-card {
+  padding: 16px;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Rótulo con su icono. El rótulo NO va en versalitas grises: en la referencia
+   es texto de verdad, en la tipografía de display y del color del texto — lo
+   que se lee primero es qué mide la tarjeta, no el número suelto. */
+.dv2-kpi-cab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  position: relative;
+}
 
 .dv2-kpi-eyebrow {
-  font-size: var(--pl-fs-eyebrow);
-  font-weight: 700;
-  letter-spacing: var(--pl-tracking-eyebrow);
-  text-transform: uppercase;
-  color: var(--pl-text-3);
+  font-family: var(--pl-font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--pl-text);
   /* El rotulo se lee ENTERO: si no entra en una linea, baja a dos. Cortar
-     "RESOLUCION PROME..." deja al usuario adivinando de que es el numero. */
+     "Resolucion prome..." deja al usuario adivinando de que es el numero. */
   white-space: normal;
   overflow-wrap: anywhere;
   line-height: 1.25;
+}
+
+.dv2-kpi-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--pl-green-100);
+  color: var(--pl-green);
+  flex: 0 0 30px;
+}
+.dv2-kpi-icono > svg { width: 16px; height: 16px; stroke-width: 1.9; }
+
+/* Anillo que late: dice que el número es de ahora y no una foto vieja. */
+.dv2-kpi-latido {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  border: 1.5px solid var(--pl-green);
+  opacity: 0;
+  animation: dv2-latido 3.6s var(--pl-ease-suave, cubic-bezier(0.2, 0.8, 0.2, 1)) infinite;
+}
+
+/* El mismo icono en grande, apenas visible, flotando. Le da carácter a una
+   fila que si no son cuatro cajas blancas iguales. */
+.dv2-kpi-marca {
+  position: absolute;
+  right: -12px;
+  top: -12px;
+  opacity: 0.05;
+  pointer-events: none;
+  color: var(--pl-green);
+  animation: dv2-flotar 7s var(--pl-ease-suave, cubic-bezier(0.2, 0.8, 0.2, 1)) infinite;
+}
+.dv2-kpi-marca > svg { width: 104px; height: 104px; stroke-width: 1.4; }
+
+@keyframes dv2-latido {
+  0% { opacity: 0.5; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes dv2-flotar {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+/* Quien pidió menos movimiento no ve ninguna de las dos. */
+@media (prefers-reduced-motion: reduce) {
+  .dv2-kpi-latido, .dv2-kpi-marca { animation: none; }
 }
 
 .dv2-kpi-fila {

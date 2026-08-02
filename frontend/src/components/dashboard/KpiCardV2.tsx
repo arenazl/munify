@@ -11,7 +11,7 @@
  * Inline SOLO valores runtime (color de la serie, que la página lee de
  * los tokens computados — mismo patrón que los charts del Dashboard).
  */
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, type LucideIcon } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, YAxis } from 'recharts';
 
 export type KpiVeredicto = 'bueno' | 'advertencia' | 'malo';
@@ -25,8 +25,14 @@ export interface KpiDelta {
 }
 
 export interface KpiCardV2Props {
-  /** Etiqueta del KPI (ej: "Total reclamos") — las caps las pone el CSS. */
+  /** Etiqueta del KPI (ej: "Total reclamos"). */
   eyebrow: string;
+  /**
+   * Icono del rótulo, en su cuadrito. Sin él la fila de KPIs es una tira de
+   * números iguales y hay que leer cada rótulo para distinguirlos; con él se
+   * reconoce cuál es cuál de un vistazo.
+   */
+  icono?: LucideIcon;
   valor: string | number;
   /** Unidad chica debajo del número (ej: "días"). */
   unidad?: string;
@@ -40,7 +46,7 @@ export interface KpiCardV2Props {
   sub?: string;
 }
 
-export function KpiCardV2({ eyebrow, valor, unidad, atenuado, serie, serieColor, delta, sub }: KpiCardV2Props) {
+export function KpiCardV2({ eyebrow, icono: Icono, valor, unidad, atenuado, serie, serieColor, delta, sub }: KpiCardV2Props) {
   const puntos = serie && serie.length >= 2 ? serie.map((v, i) => ({ i, v })) : null;
   const ultimo = puntos ? puntos.length - 1 : -1;
 
@@ -57,7 +63,25 @@ export function KpiCardV2({ eyebrow, valor, unidad, atenuado, serie, serieColor,
 
   return (
     <div className="dv2-card dv2-kpi-card">
-      <span className="dv2-kpi-eyebrow">{eyebrow}</span>
+      {/* Marca de agua: el mismo icono en grande, al 5%, flotando despacio.
+          No aporta dato — le da vida a una fila que si no son cuatro cajas
+          blancas iguales. */}
+      {Icono && (
+        <span className="dv2-kpi-marca" aria-hidden="true">
+          <Icono />
+        </span>
+      )}
+
+      <div className="dv2-kpi-cab">
+        {Icono && (
+          <span className="dv2-kpi-icono">
+            {/* Anillo que late: marca que el número es de ahora. */}
+            <span className="dv2-kpi-latido" aria-hidden="true" />
+            <Icono aria-hidden="true" />
+          </span>
+        )}
+        <span className="dv2-kpi-eyebrow">{eyebrow}</span>
+      </div>
 
       <div className="dv2-kpi-fila">
         {unidad ? (
@@ -74,14 +98,15 @@ export function KpiCardV2({ eyebrow, valor, unidad, atenuado, serie, serieColor,
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={puntos} margin={{ top: 3, right: 4, bottom: 3, left: 4 }}>
                 <YAxis hide domain={['dataMin', 'dataMax']} />
+                {/* Línea sola, sin relleno: en 28px de alto el área tapa la
+                    forma de la serie en vez de mostrarla. */}
                 <Area
                   type="monotone"
                   dataKey="v"
                   baseValue="dataMin"
                   stroke={serieColor}
                   strokeWidth={2}
-                  fill={serieColor}
-                  fillOpacity={0.12}
+                  fill="none"
                   dot={dotUltimo}
                   isAnimationActive={false}
                 />

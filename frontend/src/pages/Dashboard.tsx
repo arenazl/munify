@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, TrendingUp, MapPin, Users, ListChecks, FileCheck } from 'lucide-react';
+import {
+  ClipboardList, TrendingUp, MapPin, Users, ListChecks, FileCheck,
+  // Iconos de la fila de KPIs, uno por lo que mide cada tarjeta.
+  Inbox, CalendarDays, Clock, FileText, type LucideIcon,
+} from 'lucide-react';
 import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi, calificacionesApi, municipiosApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -181,6 +185,8 @@ const seriePorSemana = (diaria: number[]): number[] => {
 const buildKpisPeriodo = (opts: {
   stats: DashboardStats;
   etiquetaTotal: string;
+  /** Icono del total — lo único que cambia entre reclamos y trámites. */
+  iconoTotal: LucideIcon;
   /** Serie diaria real de ingresos (ej: tendencia 30 días de reclamos). */
   serieDiaria?: number[];
   color: string;
@@ -198,6 +204,7 @@ const buildKpisPeriodo = (opts: {
   const pctMes = t ? pctDelta(t.creados_30d, t.creados_30d_prev) : null;
   const total: KpiCardV2Props = {
     eyebrow: opts.etiquetaTotal,
+    icono: opts.iconoTotal,
     valor: s.total,
     atenuado: s.total === 0,
     serie: diaria ?? (t ? [t.creados_30d_prev, t.creados_30d] : undefined),
@@ -217,6 +224,7 @@ const buildKpisPeriodo = (opts: {
 
   const nuevosHoy: KpiCardV2Props = {
     eyebrow: 'Nuevos hoy',
+    icono: Inbox,
     valor: s.hoy,
     atenuado: s.hoy === 0,
     serie: diaria ? diaria.slice(-7) : (t ? [t.ayer, s.hoy] : undefined),
@@ -226,6 +234,7 @@ const buildKpisPeriodo = (opts: {
   const pctSemana = t ? pctDelta(s.semana, t.semana_pasada) : null;
   const estaSemana: KpiCardV2Props = {
     eyebrow: 'Esta semana',
+    icono: CalendarDays,
     valor: s.semana,
     atenuado: s.semana === 0,
     serie: diaria ? seriePorSemana(diaria) : (t ? [t.semana_pasada, s.semana] : undefined),
@@ -254,6 +263,7 @@ const buildKpisPeriodo = (opts: {
   const serieResolucion = serieResolucionCruda.length >= 3 ? serieResolucionCruda : null;
   const resolucion: KpiCardV2Props = {
     eyebrow: 'Resolución promedio',
+    icono: Clock,
     valor: t30 != null ? fmtDias(t30) : '—',
     unidad: t30 != null ? 'días' : undefined,
     atenuado: t30 == null,
@@ -969,6 +979,7 @@ export default function Dashboard() {
   const kpisReclamos = buildKpisPeriodo({
     stats,
     etiquetaTotal: 'Total reclamos',
+    iconoTotal: ClipboardList,
     serieDiaria: serieDiariaReclamos,
     color: semColors.bueno,
     colorNeutro: semColors.neutro,
@@ -980,6 +991,7 @@ export default function Dashboard() {
     ? buildKpisPeriodo({
         stats: tramitesStats,
         etiquetaTotal: 'Total trámites',
+        iconoTotal: FileText,
         color: semColors.azul,
         colorNeutro: semColors.neutro,
         msgSinCierres: 'Sin trámites cerrados todavía',
