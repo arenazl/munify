@@ -148,8 +148,10 @@
    puede abrir. El subrayado va separado de la letra y más fino que el texto
    para no competir con el resaltado en negrita que lleva el dato. */
 .kse-tag {
-  color: var(--pl-text-2);
-  font-weight: 500;
+  color: var(--pl-text);
+  /* En negrita: el nombre de la entidad pesa tanto como el numero. Con peso
+     normal el subrayado solo se leia como un enfasis timido. */
+  font-weight: 600;
   text-decoration: underline;
   text-decoration-color: var(--pl-border-strong);
   text-decoration-thickness: 1px;
