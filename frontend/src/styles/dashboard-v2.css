@@ -1067,8 +1067,15 @@
    así el bloque sirve igual dentro de una pantalla angosta. */
 .dv2-grid-2--mapa {
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  align-items: start;
+  /* Las dos tarjetas terminan a la MISMA altura. Con `start` cada una tomaba
+     su alto natural y quedaban desparejas, que es lo que se nota primero en
+     una fila de dos. La que sobra estira su contenido, no deja hueco. */
+  align-items: stretch;
 }
+/* El mapa se come el alto sobrante para llegar al piso de la fila. */
+.dv2-grid-2--mapa > .dv2-card { display: flex; flex-direction: column; }
+.dv2-grid-2--mapa .fr { flex: 1; min-height: 0; }
+.dv2-grid-2--mapa .fr-mapa { flex: 1; min-height: 0; }
 
 /* Las barras de Top categorías se reparten en columnas SEGÚN EL ANCHO, con
    flex: cada bloque pide 260px y el sobrante se reparte entre los que entran.
