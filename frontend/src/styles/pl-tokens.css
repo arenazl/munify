@@ -87,11 +87,13 @@
      (2026-08-02, dos vueltas): una insinuación, no un fondo — quedó incluso
      por debajo del sutil; la jerarquía del hero la dan la barra de acento,
      la frase y los CTAs, no el lavado. */
+  /* Se disuelve TEMPRANO (transparente a mitad de camino): el color vive
+     pegado al borde izquierdo y el resto de la tarjeta queda limpio. */
   --pl-lavado-acento: linear-gradient(
     115deg,
     color-mix(in srgb, var(--pl-green) 2%, transparent) 0%,
-    color-mix(in srgb, var(--pl-green) 0.6%, transparent) 38%,
-    transparent 72%
+    color-mix(in srgb, var(--pl-green) 0.5%, transparent) 22%,
+    transparent 45%
   );
   /* Superficies de apoyo (tarjetas, paneles): se percibe, no se mira. */
   --pl-lavado-acento-sutil: linear-gradient(
