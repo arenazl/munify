@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
+  Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
   History,
@@ -205,14 +205,9 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Reclamos',
       description: 'Órdenes de trabajo de cuadrillas'
     },
-    {
-      name: 'SLA',
-      href: '/gestion/sla',
-      icon: Clock,
-      show: isAdminOrSupervisor && moduloOn('sla'),
-      categoria: 'Reclamos',
-      description: 'Gestión de SLA'
-    },
+    // 'SLA' (/gestion/sla) salió del sidebar: no es laburo diario sino el
+    // catálogo de plazos comprometidos — se define una vez y se consulta poco.
+    // Vive como tile en Configuración → Catálogos, con el mismo gate de módulo.
     {
       name: 'Análisis',
       href: '/gestion/panel-bi',
