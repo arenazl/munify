@@ -3,6 +3,7 @@ import { Search, Plus, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { PrimaryButton } from './PrimaryButton';
+import { useEmbed } from '../abmv2/useEmbed';
 
 interface StickyPageHeaderProps {
   /** Icono del título (ReactNode, ej: <FileText className="h-5 w-5" />) */
@@ -69,6 +70,10 @@ export function StickyPageHeader({
   children,
   onRefresh,
 }: StickyPageHeaderProps) {
+  // Embebida en el panel de Configuración: el contenedor ya puso el título,
+  // y este header es sticky/fixed — flotaría sobre el panel. No se renderiza.
+  const { embedded } = useEmbed();
+
   const { theme } = useTheme();
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -144,6 +149,8 @@ export function StickyPageHeader({
   const useCustomMode = !!children;
 
   // Usar position sticky - se queda fijo cuando llega al top
+  if (embedded) return null;
+
   return (
     <>
       {/* Pull-to-refresh indicator */}

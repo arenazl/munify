@@ -592,7 +592,7 @@ export function ABMPage({
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
           {/* BackLink + Icono + Título - se oculta cuando el search está enfocado en mobile */}
           <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
-            {backLink && (
+            {backLink && !embedded && (
               <Link
                 to={backLink}
                 className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
