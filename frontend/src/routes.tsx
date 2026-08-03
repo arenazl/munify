@@ -92,7 +92,7 @@ import TesoreriaContactos from './pages/TesoreriaContactos';
 import TesoreriaMapa from './pages/TesoreriaMapa';
 import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
 import TesoreriaProyectos from './pages/TesoreriaProyectos';
-import TesoreriaAgenda from './pages/TesoreriaAgenda';
+import PagosProgramados from './pages/PagosProgramados';
 import TesoreriaCuracionBartolo from './pages/TesoreriaCuracionBartolo';
 import ConfiguracionTesoreria from './pages/ConfiguracionTesoreria';
 import OrdenesPago from './pages/OrdenesPago';
@@ -252,7 +252,10 @@ export const router = createBrowserRouter([
       { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
       { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
       { path: 'tesoreria/proyectos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyectos /></ProtectedRoute> },
-      { path: 'tesoreria/agenda', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaAgenda /></ProtectedRoute> },
+      { path: 'tesoreria/pagos-programados', element: <ProtectedRoute roles={['admin', 'supervisor']}><PagosProgramados /></ProtectedRoute> },
+      // La ruta vieja ('agenda') queda redirigiendo: hay deep-links guardados y
+      // los CTA de los hints apuntaban ahí.
+      { path: 'tesoreria/agenda', element: <Navigate to="/gestion/tesoreria/pagos-programados" replace /> },
       { path: 'contaduria/ordenes-pago', element: <ProtectedRoute roles={['admin', 'supervisor']}><OrdenesPago /></ProtectedRoute> },
       { path: 'tesoreria/cajas', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaCajas /></ProtectedRoute> },
       { path: 'tesoreria/conciliacion', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaConciliacion /></ProtectedRoute> },

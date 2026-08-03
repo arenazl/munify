@@ -587,7 +587,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
         description:
           'Cada empleado tiene su sueldo mensual + premios independientes: presentismo se paga todos los VIERNES, incentivo el DÍA 15. Cada uno con su propio botón Pagar. Si un viernes el empleado no se ganó el presentismo, simplemente no se le ejecuta.',
         icon: 'Users',
-        cta: { label: 'Ir a Liquidaciones', href: '/gestion/tesoreria/agenda' },
+        cta: { label: 'Ir a Pagos programados', href: '/gestion/tesoreria/pagos-programados' },
       },
       {
         title: '6) Reportes y Portal de Transparencia',

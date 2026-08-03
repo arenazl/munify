@@ -377,29 +377,39 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     // NOTA: 'Tarjetas' (/gestion/tarjetas) salió del sidebar — es un ABM de
     // referencia (las tarjetas con las que se pagan gastos), se llega por el
     // tile de Configuración → pestaña Tesorería.
-    // === SUELDOS (flag propio desde la reorg 2026-07; antes cluster 'tesoreria') ===
+    // === SUELDOS: la categoría se disolvió (2026-08-02) ===
+    // Sus dos pantallas vivas pasan a Tesorería, que es donde corresponden: lo
+    // que se paga todos los meses es un egreso de caja, no un módulo aparte.
+    // Conservan el gate del módulo 'sueldos' — mueven de lugar en el menú, no
+    // cambian de visibilidad.
     {
-      name: 'Liquidaciones',
-      href: '/gestion/tesoreria/agenda',
+      // "Programados", no "Liquidaciones": la pantalla NO liquida sueldos (no
+      // hay básico, antigüedad, aportes ni recibo en el modelo) — agenda pagos
+      // que se repiten, y el alquiler del depósito es uno de ellos.
+      name: 'Programados',
+      href: '/gestion/tesoreria/pagos-programados',
       icon: CalendarClock,
       show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Sueldos',
-      description: 'Pago de sueldos y recurrentes con premios'
+      categoria: 'Tesorería',
+      description: 'Pagos que se repiten: sueldos, honorarios, alquileres'
     },
     {
       name: 'Empleados',
       href: '/gestion/sueldos/empleados',
       icon: Users,
       show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Sueldos',
+      categoria: 'Tesorería',
       description: 'Personal del muni con sueldo asignado'
     },
     {
+      // Oculto por decisión de producto (2026-08-02): los reportes por módulo
+      // no aportan; se rehacen como módulo propio. Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
       name: 'Reportes',
       href: '/gestion/sueldos/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Sueldos',
+      show: false,
+      categoria: 'Tesorería',
       description: 'Masa salarial, top sueldos, próximos pagos'
     },
     // === CONTADURÍA (flag propio desde la reorg 2026-07; apagado por default) ===
@@ -412,10 +422,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Autorización formal de pagos'
     },
     {
+      // Oculto por decisión de producto (2026-08-02): los reportes por módulo
+      // no aportan; se rehacen como módulo propio. Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('contaduria'),
       name: 'Reportes',
       href: '/gestion/contaduria/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('contaduria'),
+      show: false,
       categoria: 'Contaduría',
       description: 'OPs vencidas, próximas, top beneficiarios'
     },

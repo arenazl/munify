@@ -195,7 +195,7 @@ function agruparPorDia<T>(
 
 /* ---------- Pantalla ---------- */
 
-export default function TesoreriaAgenda() {
+export default function PagosProgramados() {
   const { theme } = useTheme();
   const { user } = useAuth();
 

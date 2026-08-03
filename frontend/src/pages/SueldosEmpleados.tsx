@@ -221,7 +221,7 @@ export default function SueldosEmpleados() {
               ) : (
                 <div className="hidden sm:block flex-shrink-0">
                   <Link
-                    to="/gestion/tesoreria/agenda"
+                    to="/gestion/tesoreria/pagos-programados"
                     className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md transition-all hover:scale-105"
                     style={{
                       backgroundColor: `${theme.primary}15`,

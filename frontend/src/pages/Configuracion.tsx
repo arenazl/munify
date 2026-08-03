@@ -4,7 +4,7 @@ import {
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
   Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
   UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
-  Briefcase, PiggyBank, CalendarClock, Trees, Boxes, Hammer, MapPinned, Package,
+  Briefcase, PiggyBank, Trees, Boxes, Hammer, MapPinned, Package,
   Banknote, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -678,7 +678,6 @@ export default function Configuracion() {
         { id: 'tesoreria-contactos', label: 'Contactos', description: 'Padrón de personas y proveedores de tesorería', icon: Users, color: '#3b82f6', link: '/gestion/tesoreria/contactos', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-parajes', label: 'Parajes', description: 'Regiones del muni con polígono en el mapa', icon: Trees, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=parajes', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-proyectos', label: 'Proyectos', description: 'Obras e iniciativas que agrupan gastos (con presupuesto y % imputado)', icon: Briefcase, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=proyectos', show: isAdminOrSupervisor && !isSuperAdmin },
-        { id: 'tesoreria-agenda', label: 'Liquidaciones de sueldo', description: 'Sueldos y pagos recurrentes con premios + ejecución 1-click', icon: CalendarClock, color: '#ec4899', link: '/gestion/tesoreria/agenda', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-tarjetas', label: 'Tarjetas', description: 'Tarjetas de crédito con las que se pagan gastos', icon: Banknote, color: '#8b5cf6', link: '/gestion/tarjetas', show: isAdminOrSupervisor && !isSuperAdmin },
       ],
     },

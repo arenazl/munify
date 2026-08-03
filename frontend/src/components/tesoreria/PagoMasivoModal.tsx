@@ -8,7 +8,7 @@ import { agendaPagosApi } from '../../lib/api';
 import type { PagoProgramado } from '../../types';
 import '../../styles/liquidaciones.css';
 
-// Helpers locales (no dependemos de los de TesoreriaAgenda, que no se exportan).
+// Helpers locales (no dependemos de los de PagosProgramados, que no se exportan).
 function parseLocalDate(f: string): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || '');
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(f || '');
