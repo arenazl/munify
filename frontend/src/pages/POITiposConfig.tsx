@@ -46,8 +46,16 @@ function aItem(t: PoiTipo): CategoriaItem {
 export default function POITiposConfig() {
   return (
     <CategoriaConfigBase
+      eyebrow="Atención al vecino · Catálogo"
       title="Tipos de punto de interés"
+      descripcion="Plazas, escuelas y paradas: dónde se ponen los carteles con QR."
       entidad="tipo"
+      regla="El tipo con puntos cargados no se borra: primero hay que reasignar esos puntos."
+      pista={{
+        titulo: 'El radio decide qué reclamo se asocia al punto',
+        texto:
+          'Cuando el vecino carga un reclamo cerca de un punto de interés, el sistema lo asocia solo si cae dentro del radio de ese tipo. Un radio grande junta reclamos de otra cuadra; uno chico deja el punto sin usar.',
+      }}
       api={{
         getAll: async () => {
           const res = await poiApi.listTipos();

@@ -59,7 +59,29 @@ async def listar_categorias_reclamo(
     query = query.order_by(CategoriaReclamo.orden, CategoriaReclamo.nombre)
 
     result = await db.execute(query)
-    return result.scalars().all()
+    categorias = result.scalars().all()
+
+    # Uso de cada categoría (cuántos reclamos la referencian). UNA sola query
+    # agrupada para todas, no una por fila: con 17 categorías, la versión
+    # ingenua son 17 viajes a una base que está en otro continente.
+    #
+    # Lo consume la pantalla de Configuración: es lo que dice si una categoría
+    # se puede borrar y cuál concentra el trabajo. Sin este dato, la pantalla
+    # muestra "—" en vez de estimar (un número inventado ahí termina en
+    # alguien borrando algo que sí se usaba).
+    if categorias:
+        conteo = await db.execute(
+            select(Reclamo.categoria_id, func.count(Reclamo.id))
+            .where(Reclamo.categoria_id.in_([c.id for c in categorias]))
+            .group_by(Reclamo.categoria_id)
+        )
+        usos = dict(conteo.all())
+        for cat in categorias:
+            # Atributo suelto: el schema lo lee con from_attributes y el modelo
+            # no necesita una columna que no existe en la base.
+            cat.en_uso = usos.get(cat.id, 0)
+
+    return categorias
 
 
 @router.get("/{categoria_id}", response_model=CategoriaReclamoResponse)

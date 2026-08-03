@@ -40,6 +40,8 @@ import { EntityCell, ChipEstado } from '../abmv2/DataTable';
 import { MetricCell, ScalePicker, SegmentedControl, Switch } from '../abmv2/Controls';
 import { IconColorPicker } from '../abmv2/IconColorPicker';
 import type { ColumnSpec, MetricCellData, ScaleStep, ViewKind } from '../abmv2/types';
+import { seg } from '../../lib/semanticHero';
+import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
 import type { ReactNode } from 'react';
 
 export interface CategoriaItem {
@@ -53,6 +55,9 @@ export interface CategoriaItem {
   color?: string;
   orden: number;
   activo: boolean;
+  /** Cuántos registros referencian esta entrada. Lo calcula el backend; si
+   *  no viene, los KPIs de uso muestran '—' en vez de un número inventado. */
+  en_uso?: number;
   // Solo aplica a Categoría de Reclamo (showReclamoFields).
   tiempo_resolucion_estimado?: number;
   prioridad_default?: number;
@@ -97,6 +102,17 @@ interface Props {
    * si mañana entra un catálogo con tres campos raros, no se toca este
    * archivo.
    */
+  /**
+   * Identidad del ABM en el canvas: el eyebrow del hero ("CATÁLOGOS ·
+   * TERRITORIO") y la bajada. Cada catálogo trae la suya del `abmSpec` del
+   * diseño; el componente no la inventa.
+   */
+  eyebrow?: string;
+  descripcion?: string;
+  /** La REGLA de la entidad, al pie de la tabla (por qué no se puede borrar). */
+  regla?: string;
+  /** PISTA: cómo funciona la cosa. Ver SemanticAbmPageProps.pista. */
+  pista?: { titulo: string; texto: string };
   extras?: {
     /** Valores iniciales de los campos propios. `null` = alta. */
     inicial: (item: CategoriaItem | null) => Record<string, unknown>;
@@ -109,6 +125,10 @@ interface Props {
     columnas?: ColumnSpec<CategoriaItem>[];
     /** Cifra de la tarjeta en la vista de tarjetas. */
     metrica?: (item: CategoriaItem) => MetricCellData | undefined;
+    /** KPIs propios del catálogo, que se suman a los del núcleo. */
+    kpis?: (items: CategoriaItem[]) => HeroKpi[];
+    /** Frases propias, que se suman a la del núcleo. */
+    frases?: (items: CategoriaItem[]) => HeroFrase[];
   };
 }
 
@@ -190,6 +210,10 @@ export function CategoriaConfigBase({
   enableSugerencias = false,
   showInternaField = false,
   entidad = 'categoría',
+  eyebrow,
+  descripcion,
+  regla,
+  pista,
   extras,
 }: Props) {
   const { theme } = useTheme();
@@ -427,6 +451,137 @@ export function CategoriaConfigBase({
 
   const activas = useMemo(() => items.filter((i) => i.activo).length, [items]);
 
+
+  /* --- Hero semántico -------------------------------------------------
+   * Los cinco KPIs y el veredicto son los que declara el canvas para el cuerpo
+   * `catalogo` (heroCat en Configuracion.dc.html): EN EL CATÁLOGO · ACTIVAS ·
+   * SIN USAR · MÁS USADA · SE PISAN.
+   *
+   * Dos de ellos necesitan el USO de cada entrada (cuántos registros la
+   * referencian). El listado lo trae en `en_uso` cuando el backend lo calcula;
+   * cuando no viene, el KPI muestra "—" y la frase no lo menciona. No se
+   * estima ni se cuenta lo visible en pantalla: un número inventado acá
+   * termina en una decisión de borrar algo que sí se usaba.
+   * ------------------------------------------------------------------ */
+
+  const hayUso = items.some((i) => typeof i.en_uso === 'number');
+  const usoDe = (i: CategoriaItem) => (typeof i.en_uso === 'number' ? i.en_uso : 0);
+
+  /** Nombres que se solapan: el vecino no sabe cuál elegir y el mismo problema
+   *  entra por dos lados. Se compara sobre el nombre normalizado (sin tildes,
+   *  sin plural, sin palabras vacías): "Arbolado" vs "Árboles y poda" caen
+   *  juntas, que es el caso que el canvas quiere marcar. */
+  const sePisan = useMemo(() => {
+    const clave = (s: string) =>
+      s.toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\b(y|de|del|la|el|los|las|en|por)\b/g, ' ')
+        .replace(/[^a-z0-9 ]/g, ' ')
+        .split(/\s+/).filter(Boolean)
+        .map((w) => w.replace(/(es|s)$/, ''))
+        .sort().join(' ');
+    const vistos = new Map<string, number>();
+    let n = 0;
+    for (const it of items) {
+      const k = clave(it.nombre);
+      if (!k) continue;
+      const antes = vistos.get(k) ?? 0;
+      if (antes === 1) n += 2; // el par entero, la primera vez que se detecta
+      else if (antes > 1) n += 1;
+      vistos.set(k, antes + 1);
+    }
+    return n;
+  }, [items]);
+
+  const masUsada = useMemo(() => {
+    if (!hayUso || items.length === 0) return null;
+    return items.slice().sort((a, b) => usoDe(b) - usoDe(a))[0] ?? null;
+  }, [items, hayUso]);
+
+  const sinUsar = useMemo(
+    () => (hayUso ? items.filter((i) => usoDe(i) === 0).length : 0),
+    [items, hayUso],
+  );
+
+  const heroKpis = useMemo<HeroKpi[]>(() => {
+    if (loading || items.length === 0) return [];
+    const base: HeroKpi[] = [
+      { etiqueta: 'En el catálogo', valor: items.length, sub: 'entradas cargadas' },
+      { etiqueta: 'Activas', valor: activas, sub: 'se ofrecen en la app' },
+      {
+        etiqueta: 'Sin usar',
+        valor: hayUso ? sinUsar : '—',
+        sub: !hayUso ? 'sin dato de uso' : sinUsar ? 'se pueden borrar' : 'todas tienen uso',
+        veredicto: hayUso && sinUsar > 0 ? 'advertencia' : undefined,
+      },
+      {
+        etiqueta: 'Más usada',
+        valor: masUsada ? usoDe(masUsada) : '—',
+        sub: masUsada ? masUsada.nombre : 'sin dato de uso',
+      },
+      {
+        etiqueta: 'Se pisan',
+        valor: sePisan,
+        sub: sePisan ? 'nombres parecidos' : 'ninguna se repite',
+        veredicto: sePisan > 0 ? 'advertencia' : undefined,
+      },
+    ];
+    const propias = extras?.kpis?.(items) ?? [];
+    return propias.length ? [...base.slice(0, 2), ...propias, ...base.slice(2)] : base;
+  }, [loading, items, activas, hayUso, sinUsar, masUsada, sePisan, extras]);
+
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading) return [];
+    if (items.length === 0) {
+      return [{
+        segmentos: [
+          seg(`Todavía no hay ${entidad}s cargadas`, 'malo'),
+          seg(': hasta que exista al menos una, la app no tiene con qué clasificar.'),
+        ],
+        acciones: [{ label: `Crear la primera ${entidad}`, onClick: abrirNuevo, primaria: true }],
+      }];
+    }
+
+    // Frase 1: el veredicto del canvas — cuántas hay, cuál concentra el uso y
+    // cuántas nunca se usaron. Sin dato de uso, dice sólo lo que sabe.
+    const primera = [
+      seg(`${items.length} en el catálogo, ${activas} activa${activas === 1 ? '' : 's'}.`, 'bueno'),
+    ];
+    if (masUsada && usoDe(masUsada) > 0) {
+      primera.push(seg(` «${masUsada.nombre}» concentra ${usoDe(masUsada)} usos`));
+      if (sinUsar > 0) primera.push(seg(` y ${sinUsar} no se usaron nunca`, 'advertencia'));
+      primera.push(seg('.'));
+    } else {
+      primera.push(seg(' El orden de la lista es el que ve el vecino al elegir.'));
+    }
+    const frases: HeroFrase[] = [{ segmentos: primera }];
+
+    if (sePisan > 0) {
+      frases.push({
+        segmentos: [
+          seg(`${sePisan} entradas se solapan con otra`, 'advertencia'),
+          seg(': ahí el vecino elige mal y el mismo problema entra por dos lados.'),
+        ],
+      });
+    }
+
+    const sinDescripcion = items.filter((i) => !(i.descripcion ?? '').trim()).length;
+    if (sinDescripcion > 0) {
+      frases.push({
+        segmentos: [
+          seg('Hay '),
+          seg(`${sinDescripcion} sin descripción`,
+            sinDescripcion > items.length / 3 ? 'malo' : 'advertencia'),
+          seg(' — es el texto que el vecino lee para elegir, así que sin él elige a ciegas.'),
+        ],
+      });
+    }
+
+    const propias = extras?.frases?.(items) ?? [];
+    return [...frases, ...propias];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, items, activas, masUsada, sinUsar, sePisan, entidad, extras]);
+
   const visibles = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((it) => {
@@ -555,8 +710,11 @@ export function CategoriaConfigBase({
     <>
       <SemanticAbmPage<CategoriaItem>
         moduleKey="catalogo"
+        eyebrow={eyebrow}
         title={title}
-        description={`Las ${entidad}s que usa toda la app. El orden es el que ve el vecino.`}
+        description={descripcion ?? `Las ${entidad}s que usa toda la app. El orden es el que ve el vecino.`}
+        hero={{ etiqueta: eyebrow ?? title.toUpperCase(), frases: heroFrases, kpis: heroKpis }}
+        pista={pista}
         searchPlaceholder={`Buscar ${entidad}…`}
         views={['table', 'cards']}
         activeView={vista}
@@ -593,7 +751,7 @@ export function CategoriaConfigBase({
             ? `Ninguna ${entidad} coincide con "${search.trim()}".`
             : `Todavía no hay ${entidad}s. Creá la primera con el botón de arriba.`
         }
-        footer={{ showing: `Mostrando ${visibles.length} de ${items.length}` }}
+        footer={{ showing: `Mostrando ${visibles.length} de ${items.length}`, note: regla }}
         reorder={{ active: ordenando, onReorder: (filas) => reordenar(filas) }}
         viewSlots={{
           cards: (

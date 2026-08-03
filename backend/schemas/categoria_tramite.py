@@ -30,6 +30,8 @@ class CategoriaTramiteResponse(BaseModel):
     orden: int
     activo: bool
     created_at: datetime
+    # Cuantos tramites cuelgan de esta categoria. Ver el listado.
+    en_uso: Optional[int] = None
 
     class Config:
         from_attributes = True

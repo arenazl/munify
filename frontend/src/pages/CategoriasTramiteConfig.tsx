@@ -35,9 +35,12 @@ export default function CategoriasTramiteConfig() {
       </div>
 
       <CategoriaConfigBase
+        eyebrow="Atención al vecino · Catálogo"
         title="Categorías de trámite"
+        descripcion="Las carpetas generales de trámites: Obras, Comercio, Catastro."
         api={categoriasTramiteApi}
         entidad="categoría"
+        regla="La categoría con trámites adentro no se puede borrar: primero hay que moverlos a otra."
       />
     </>
   );

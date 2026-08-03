@@ -423,6 +423,15 @@ export interface DataTableFooter {
   total?: { label: string; value: string };
   /** Acción del pie en listas sin importes ("Cargar más"). */
   action?: Action;
+  /**
+   * [v2.5] La REGLA de la entidad, al pie de la tarjeta: "El empleado con
+   * reclamos asignados no se puede borrar: primero hay que reasignarlos".
+   *
+   * Sale del canvas de Configuración, donde cada ABM cierra con la suya. Va
+   * acá y no en un tooltip del botón porque explica por qué el sistema va a
+   * decir que no ANTES de que el usuario lo intente — que es cuando sirve.
+   */
+  note?: string;
 }
 
 export interface DataTableProps<Row = unknown> {
@@ -565,6 +574,16 @@ export interface SemanticAbmPageProps<Row = unknown> {
    * es perder la única pieza que dice cómo viene el mes.
    */
   hero?: ModuleHeroProps;
+  /**
+   * [v2.5] PISTA: la banda de ayuda entre el hero y los controles ("Los plazos
+   * se cuentan en días hábiles", "El CBU es lo que habilita el pago masivo").
+   *
+   * Sale del canvas de Configuración. Es distinta del hero: el hero dice CÓMO
+   * VIENE la cosa (números de hoy), la pista explica CÓMO FUNCIONA (una regla
+   * que no cambia). Por eso no se mezclan — y por eso la pista no lleva
+   * números: si los llevara, envejecería sin que nadie la actualice.
+   */
+  pista?: { titulo: string; texto: string; accion?: Action };
   /** Borde izquierdo del hero: token CSS (`var(--pl-green)` por defecto,
    *  `var(--pl-red)` cuando el módulo está en alerta). NUNCA un hex literal. */
   accentColor?: string;

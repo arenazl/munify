@@ -40,8 +40,11 @@ const NATURALEZAS: NaturalezaInventario[] = ['activo', 'consumible'];
 export default function InventarioCategoriasConfig() {
   return (
     <CategoriaConfigBase
+      eyebrow="Inventario · Catálogo"
       title="Categorías de inventario"
+      descripcion="Las familias en las que se agrupa el depósito."
       entidad="categoría"
+      regla="La categoría con artículos cargados no se borra: primero hay que moverlos a otra familia."
       api={{
         getAll: async () => {
           const res = await inventarioApi.listCategorias();

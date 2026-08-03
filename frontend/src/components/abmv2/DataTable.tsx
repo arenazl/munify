@@ -669,6 +669,10 @@ export function DataTable<Row>({
         )}
         {!footer.total && footer.action && renderPieAccion(footer.action)}
       </div>
+
+      {/* [v2.5] La regla de la entidad: por qué el sistema va a decir que no.
+          Renglón propio bajo el pie, para que no compita con el conteo. */}
+      {footer.note && <p className="av2-tabla-regla">{footer.note}</p>}
     </section>
   );
 }

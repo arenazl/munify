@@ -3703,6 +3703,17 @@ button.av2-chip:hover { opacity: 0.85; }
 
 .av2-card--skel { gap: 8px; }
 
+/* Regla de la entidad al pie de la tabla (DataTableFooter.note): por qué el
+   sistema va a decir que no, dicho ANTES de que el usuario lo intente. Fuera
+   de la tarjeta y en muted: acompaña, no compite con el conteo. */
+.av2-tabla-regla {
+  margin: 8px 2px 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
 /* --- Campos propios de un catálogo (Props.extras del ABM genérico) ---
    Viven acá y no en cada pantalla para que los siete catálogos escriban sus
    campos extra con el mismo lenguaje que el resto del drawer. */

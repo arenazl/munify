@@ -56,6 +56,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { SemanticHero } from '../ui/SemanticHero';
 import { PageHeader } from './PageHeader';
 import { ListToolbar } from './ListToolbar';
@@ -128,6 +130,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     title,
     description,
     hero,
+    pista,
     accentColor,
     /* toolbar */
     searchPlaceholder,
@@ -301,6 +304,31 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
             kpis={hero.kpis}
             className={hero.className ? `av2-hero ${hero.className}` : 'av2-hero'}
           />
+        </div>
+      )}
+
+      {/* 2-bis. [v2.5] PISTA: cómo FUNCIONA la cosa (regla que no cambia),
+          debajo del hero que dice cómo VIENE (números de hoy). Sin números
+          adentro: una pista con cifras envejece sin que nadie la actualice. */}
+      {pista && (
+        <div className="av2-nota av2-nota--ok av2-nota--con-accion">
+          <Sparkles className="av2-nota-ico" aria-hidden />
+          <span className="av2-nota-txt">
+            <span className="av2-nota-eyebrow">{pista.titulo}</span>
+            {pista.texto}
+          </span>
+          {pista.accion &&
+            (pista.accion.to ? (
+              <Link className="av2-btn-secundario" to={pista.accion.to}>
+                {pista.accion.label}
+                <ArrowRight size={15} strokeWidth={2} />
+              </Link>
+            ) : (
+              <button type="button" className="av2-btn-secundario" onClick={pista.accion.onClick}>
+                {pista.accion.label}
+                <ArrowRight size={15} strokeWidth={2} />
+              </button>
+            ))}
         </div>
       )}
 

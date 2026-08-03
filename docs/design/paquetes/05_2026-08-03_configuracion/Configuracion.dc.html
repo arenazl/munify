@@ -79,23 +79,62 @@
         </sc-if>
       </div>
 
+      <sc-if value="{{ hayHero }}" hint-placeholder-val="{{ true }}">
+        <div style="position: relative; margin-top: 14px; padding: 18px 20px; background: linear-gradient(180deg, {{ heroTinte }} 0%, #FFFFFF 62%); border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow: hidden;">
+          <span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{ heroAcento }};"></span>
+          <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.11em; color: #7A8783;">{{ heroEyebrow }}</span>
+          <p style="margin: 9px 0 0; font-family: Sora, sans-serif; font-size: 17px; font-weight: 600; line-height: 1.42; letter-spacing: -0.02em; color: #0D1412; text-wrap: pretty; max-width: 90ch;">{{ heroVeredicto }}</p>
+
+          <div style="display: grid; grid-template-columns: repeat({{ nKpis }}, minmax(0, 1fr)); gap: 1px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(13,20,18,0.07);">
+            <sc-for list="{{ heroKpis }}" as="k" hint-placeholder-count="5">
+              <div style="min-width: 0; padding-left: {{ k.pad }}; border-left: 1px solid {{ k.linea }};">
+                <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; line-height: 1.3;">{{ k.label }}</span>
+                <span style="display: block; font-family: Sora, sans-serif; font-weight: 700; font-size: 24px; line-height: 1; letter-spacing: -0.03em; margin-top: 8px; color: {{ k.color }}; white-space: nowrap; font-feature-settings: 'tnum';">{{ k.valor }}</span>
+                <span style="display: block; font-size: 10.5px; color: #98A3A0; margin-top: 5px; line-height: 1.35;">{{ k.nota }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ hayPista }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 13px 16px; background: #F7FBF9; border: 1px solid #C9EBDD; border-left: 3px solid #00B37E; border-radius: 11px; flex-wrap: wrap; row-gap: 10px;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 17px;"><path d="m12 3 2.2 5.9 6.3.4-4.9 4 1.7 6.1-5.3-3.4-5.3 3.4 1.7-6.1-4.9-4 6.3-.4z" /></svg>
+          <span style="min-width: 0; flex: 1 1 320px;">
+            <span style="display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #00794F;">{{ pistaTitulo }}</span>
+            <span style="display: block; font-size: 12.5px; line-height: 1.5; color: #3D4945; margin-top: 4px; text-wrap: pretty;">{{ pistaTexto }}</span>
+          </span>
+          <span onClick="{{ sinSalto }}" style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4; background: #F2FBF7;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #00794F;">{{ pistaCta }}</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+          </span>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ esCatalogo }}" hint-placeholder-val="{{ true }}">
         <div style="margin-top: 16px;">
 
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px;">
-            <span style="display: flex; align-items: center; gap: 8px; flex: 1 1 240px; min-width: 0; height: 34px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px;">
+            <span style="display: flex; align-items: center; gap: 8px; flex: 1 1 240px; min-width: 0; height: 36px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 15px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-              <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar por nombre</span>
+              <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ buscarCat }}</span>
             </span>
+            <sc-for list="{{ filtrosSelect }}" as="sl" hint-placeholder-count="2">
+              <span onClick="{{ sinSalto }}" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
+                <span style="font-size: 12.5px; color: #7A8783;">{{ sl.label }}</span>
+                <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">{{ sl.valor }}</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+              </span>
+            </sc-for>
             <span style="display: flex; gap: 2px; padding: 3px; background: #E8ECEA; border-radius: 10px; flex: 0 0 auto;">
-              <span onClick="{{ verTabla }}" title="Tabla" style="display: grid; place-items: center; width: 32px; height: 28px; border-radius: 7px; background: {{ bgTabla }}; box-shadow: {{ shTabla }}; cursor: pointer;">
+              <span onClick="{{ verTabla }}" title="Tabla" style="display: grid; place-items: center; width: 32px; height: 30px; border-radius: 7px; background: {{ bgTabla }}; box-shadow: {{ shTabla }}; cursor: pointer;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colTabla }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M9 10v9" /></svg>
               </span>
-              <span onClick="{{ verTarjetas }}" title="Tarjetas" style="display: grid; place-items: center; width: 32px; height: 28px; border-radius: 7px; background: {{ bgTarjetas }}; box-shadow: {{ shTarjetas }}; cursor: pointer;">
+              <span onClick="{{ verTarjetas }}" title="Tarjetas" style="display: grid; place-items: center; width: 32px; height: 30px; border-radius: 7px; background: {{ bgTarjetas }}; box-shadow: {{ shTarjetas }}; cursor: pointer;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colTarjetas }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>
               </span>
             </span>
-            <span onClick="{{ reordenar }}" style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border: 1px solid {{ bdOrden }}; border-radius: 10px; background: {{ bgOrden }}; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
+            <span onClick="{{ reordenar }}" style="display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; border: 1px solid {{ bdOrden }}; border-radius: 10px; background: {{ bgOrden }}; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colOrden }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 15px;"><path d="M8 6h13M8 12h13M8 18h13M4 6h.01M4 12h.01M4 18h.01" /></svg>
               <span style="font-size: 12.5px; font-weight: 600; color: {{ colOrden }};">{{ labelOrden }}</span>
             </span>
@@ -630,11 +669,240 @@
         </div>
       </sc-if>
 
+      <sc-if value="{{ esPuente }}" hint-placeholder-val="{{ false }}">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start;">
+
+          <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px 20px; min-width: 0; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 9px;">
+              <span style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: #E7F6F0; flex: 0 0 28px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+              </span>
+              <span style="font-family: Sora, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: -0.02em;">Se configura acá</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1px; margin-top: 12px;">
+              <sc-for list="{{ puenteAca }}" as="p" hint-placeholder-count="3">
+                <span onClick="{{ p.ir }}" style="display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 9px; margin: 0 -9px; border-radius: 9px; cursor: pointer;" style-hover="background: #F4F7F6;">
+                  <span style="width: 6px; height: 6px; border-radius: 999px; background: #00B37E; flex: 0 0 6px;"></span>
+                  <span style="min-width: 0; flex: 1;">
+                    <span style="display: block; font-size: 12.5px; font-weight: 600; color: #0D1412;">{{ p.label }}</span>
+                    <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 2px; line-height: 1.4;">{{ p.nota }}</span>
+                  </span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C6CFCB" stroke-width="2" stroke-linecap="round" style="flex: 0 0 14px;"><path d="m9 6 6 6-6 6" /></svg>
+                </span>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background: #FAFBFA; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px 20px; min-width: 0; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 9px;">
+              <span style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: #EDF1EF; flex: 0 0 28px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M10 5H5v14h14v-5" /></svg>
+              </span>
+              <span style="font-family: Sora, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: -0.02em; color: #3D4945;">{{ puenteTituloAlla }}</span>
+            </div>
+            <p style="margin: 12px 0 0; font-size: 12.5px; line-height: 1.55; color: #5B6764; text-wrap: pretty;">{{ puenteMotivo }}</p>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+              <sc-for list="{{ puenteAlla }}" as="p" hint-placeholder-count="3">
+                <span style="display: flex; align-items: baseline; gap: 8px; min-width: 0;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 12px; margin-top: 3px;"><path d="m4 12 5 5L20 6" /></svg>
+                  <span style="font-size: 12.5px; line-height: 1.45; color: #3D4945; min-width: 0;">{{ p.label }}</span>
+                </span>
+              </sc-for>
+            </div>
+            <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; margin-top: 16px; border: 0; border-radius: 11px; background: #00B37E; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="background: #008F63;">
+              {{ puenteCta }}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 11px 16px; background: #FAFBFA; border-bottom: 1px solid rgba(13,20,18,0.06); flex-wrap: wrap;">
+            <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">{{ puenteMuestraTitulo }}</span>
+            <span style="display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; background: #EDF1EF; border-radius: 999px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="2.4" /></svg>
+              <span style="font-size: 10px; font-weight: 700; color: #7A8783;">SOLO LECTURA</span>
+            </span>
+            <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0;">{{ puenteMuestraNota }}</span>
+          </div>
+          <sc-for list="{{ puenteMuestra }}" as="r" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(13,20,18,0.05); min-width: 0;">
+              <span style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: {{ r.radio }}; background: {{ r.tinte }}; flex: 0 0 28px;">
+                <span style="font-size: 10px; font-weight: 700; color: {{ r.colorIcono }};">{{ r.iniciales }}</span>
+              </span>
+              <span style="min-width: 0; flex: 1;">
+                <span style="display: block; font-size: 12.5px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.nombre }}</span>
+                <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.sub }}</span>
+              </span>
+              <span style="font-size: 11.5px; color: #7A8783; white-space: nowrap;">{{ r.dato }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ esAbmCompleto }}" hint-placeholder-val="{{ false }}">
-        <div style="margin-top: 16px; padding: 22px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-left: 3px solid #3B82F6; border-radius: 12px; background: linear-gradient(180deg, #F7FAFE 0%, #FFFFFF 58%);">
-          <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #1D6FD1;">USA EL ABM COMPLETO, NO EL CATÁLOGO SIMPLE</span>
-          <p style="margin: 10px 0 0; font-family: Sora, sans-serif; font-size: 16px; font-weight: 600; line-height: 1.45; letter-spacing: -0.02em; text-wrap: pretty; max-width: 76ch;">{{ notaAbm }}</p>
-          <p style="margin: 10px 0 0; font-size: 13px; line-height: 1.55; color: #5B6764; text-wrap: pretty; max-width: 76ch;">Entra la misma pieza que Gastos o Liquidaciones —hero semántico con KPIs, barra de filtros y tabla con agrupadores— pero pelada: el título lo pone esta pantalla, no el componente.</p>
+        <div style="margin-top: 14px;">
+
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px;">
+            <span style="display: flex; align-items: center; gap: 8px; flex: 1 1 240px; min-width: 0; height: 36px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 15px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ abmBuscar }}</span>
+            </span>
+            <sc-for list="{{ filtrosSelect }}" as="sl" hint-placeholder-count="2">
+              <span onClick="{{ sinSalto }}" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
+                <span style="font-size: 12.5px; color: #7A8783;">{{ sl.label }}</span>
+                <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">{{ sl.valor }}</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+              </span>
+            </sc-for>
+            <sc-if value="{{ hayEdicion }}" hint-placeholder-val="{{ true }}">
+              <span style="display: flex; gap: 2px; padding: 3px; background: #E8ECEA; border-radius: 10px; flex: 0 0 auto;">
+                <span onClick="{{ verTabla }}" title="Tabla" style="display: grid; place-items: center; width: 32px; height: 30px; border-radius: 7px; background: {{ bgTabla }}; box-shadow: {{ shTabla }}; cursor: pointer;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colTabla }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M9 10v9" /></svg>
+                </span>
+                <span onClick="{{ verTarjetas }}" title="Tarjetas" style="display: grid; place-items: center; width: 32px; height: 30px; border-radius: 7px; background: {{ bgTarjetas }}; box-shadow: {{ shTarjetas }}; cursor: pointer;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colTarjetas }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>
+                </span>
+              </span>
+              <span onClick="{{ reordenar }}" style="display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; border: 1px solid {{ bdOrden }}; border-radius: 10px; background: {{ bgOrden }}; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colOrden }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 15px;"><path d="M8 6h13M8 12h13M8 18h13M4 6h.01M4 12h.01M4 18h.01" /></svg>
+                <span style="font-size: 12.5px; font-weight: 600; color: {{ colOrden }};">{{ labelOrden }}</span>
+              </span>
+            </sc-if>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; row-gap: 8px;">
+            <sc-for list="{{ abmChips }}" as="e" hint-placeholder-count="3">
+              <span onClick="{{ e.ir }}" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid {{ e.bd }}; background: {{ e.bg }}; cursor: pointer; white-space: nowrap;">
+                <span style="font-size: 12.5px; font-weight: 600; color: {{ e.col }};">{{ e.label }}</span>
+                <span style="font-size: 11.5px; font-weight: 600; color: {{ e.sub }}; font-feature-settings: 'tnum';">{{ e.n }}</span>
+              </span>
+            </sc-for>
+            <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0; white-space: nowrap;">{{ abmResumen }}</span>
+          </div>
+
+          <sc-if value="{{ modoTabla }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow-x: auto; overflow-y: hidden;">
+            <div style="box-sizing: border-box; display: grid; min-width: {{ abmMin }}; grid-template-columns: {{ abmCols }}; align-items: center; gap: 12px; padding: 10px 16px; background: #FAFBFA; border-bottom: 1px solid rgba(13,20,18,0.06);">
+              <sc-for list="{{ abmHeads }}" as="h" hint-placeholder-count="6">
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: {{ h.align }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ h.label }}</span>
+              </sc-for>
+            </div>
+
+            <sc-for list="{{ abmFilas }}" as="r" hint-placeholder-count="8">
+              <div style="box-sizing: border-box; display: grid; min-width: {{ abmMin }}; grid-template-columns: {{ abmCols }}; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(13,20,18,0.05); background: {{ r.fondo }};" style-hover="background: #FAFBFA;">
+                <span style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                  <sc-if value="{{ r.hayAvatar }}" hint-placeholder-val="{{ true }}">
+                    <span style="display: grid; place-items: center; width: 30px; height: 30px; border-radius: {{ r.radio }}; background: {{ r.tinte }}; flex: 0 0 30px;">
+                      <sc-if value="{{ r.hayGlifo }}" hint-placeholder-val="{{ false }}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ r.colorIcono }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.glifo }}" /></svg>
+                      </sc-if>
+                      <sc-if value="{{ r.hayIniciales }}" hint-placeholder-val="{{ true }}">
+                        <span style="font-size: 10px; font-weight: 700; color: {{ r.colorIcono }};">{{ r.iniciales }}</span>
+                      </sc-if>
+                    </span>
+                  </sc-if>
+                  <span style="min-width: 0;">
+                    <span style="display: block; font-size: 13px; font-weight: 600; color: {{ r.colorNombre }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.nombre }}</span>
+                    <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: {{ r.fuenteSub }};">{{ r.sub }}</span>
+                  </span>
+                </span>
+
+                <sc-for list="{{ r.celdas }}" as="c" hint-placeholder-count="4">
+                  <span style="min-width: 0; text-align: {{ c.align }};">
+                    <sc-if value="{{ c.esChip }}" hint-placeholder-val="{{ false }}">
+                      <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; background: {{ c.chipBg }}; border-radius: 999px; white-space: nowrap;">
+                        <span style="width: 6px; height: 6px; border-radius: 999px; background: {{ c.chipCol }};"></span>
+                        <span style="font-size: 11px; font-weight: 600; color: {{ c.chipCol }};">{{ c.texto }}</span>
+                      </span>
+                    </sc-if>
+                    <sc-if value="{{ c.esTexto }}" hint-placeholder-val="{{ true }}">
+                      <span style="display: flex; align-items: center; gap: 7px; justify-content: {{ c.just }}; min-width: 0;">
+                        <sc-if value="{{ c.hayPunto }}" hint-placeholder-val="{{ false }}">
+                          <span style="width: 7px; height: 7px; border-radius: 999px; background: {{ c.punto }}; flex: 0 0 7px;"></span>
+                        </sc-if>
+                        <span style="font-family: {{ c.fuente }}; font-size: {{ c.tam }}; font-weight: {{ c.peso }}; color: {{ c.color }}; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-feature-settings: 'tnum';">{{ c.texto }}</span>
+                      </span>
+                      <sc-if value="{{ c.haySub }}" hint-placeholder-val="{{ false }}">
+                        <span style="display: block; font-size: 10.5px; color: {{ c.subCol }}; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.sub }}</span>
+                      </sc-if>
+                    </sc-if>
+                  </span>
+                </sc-for>
+
+                <span style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                  <sc-if value="{{ r.editable }}" hint-placeholder-val="{{ true }}">
+                    <span onClick="{{ r.alternar }}" title="{{ r.estado }}" style="position: relative; width: 32px; height: 18px; border-radius: 999px; background: {{ r.pistaBg }}; flex: 0 0 32px; cursor: pointer; transition: background 160ms cubic-bezier(0.2,0.8,0.2,1);">
+                      <span style="position: absolute; top: 2px; left: {{ r.perilla }}; width: 14px; height: 14px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.2); transition: left 160ms cubic-bezier(0.2,0.8,0.2,1);"></span>
+                    </span>
+                    <span title="Editar" style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;" style-hover="background: #EDF1EF;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+                    </span>
+                    <span title="{{ r.tituloBorrar }}" style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: {{ r.cursorBorrar }}; opacity: {{ r.opBorrar }};" style-hover="background: #FDF4F4;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ r.colBorrar }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12" /></svg>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{ r.soloLectura }}" hint-placeholder-val="{{ false }}">
+                    <span title="Ver el detalle del registro" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid rgba(13,20,18,0.12); border-radius: 8px; cursor: pointer; white-space: nowrap;" style-hover="background: #F4F7F6;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="2.4" /></svg>
+                      <span style="font-size: 11.5px; font-weight: 600; color: #5B6764;">Ver</span>
+                    </span>
+                  </sc-if>
+                </span>
+              </div>
+            </sc-for>
+
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #FAFBFA; flex-wrap: wrap;">
+              <span style="font-size: 11.5px; color: #7A8783;">{{ abmPie }}</span>
+              <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0; white-space: nowrap;">{{ abmMostrando }}</span>
+              <a href="#" onClick="{{ sinSalto }}" style="font-size: 12px; white-space: nowrap;">Exportar</a>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ modoTarjetas }}" hint-placeholder-val="{{ false }}">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px;">
+              <sc-for list="{{ abmFilas }}" as="r" hint-placeholder-count="6">
+                <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 14px; min-width: 0; display: flex; flex-direction: column; background: {{ r.fondo }};">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                    <span style="display: grid; place-items: center; width: 34px; height: 34px; border-radius: {{ r.radio }}; background: {{ r.tinte }}; flex: 0 0 34px;">
+                      <sc-if value="{{ r.hayGlifo }}" hint-placeholder-val="{{ false }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ r.colorIcono }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.glifo }}" /></svg>
+                      </sc-if>
+                      <sc-if value="{{ r.hayIniciales }}" hint-placeholder-val="{{ true }}">
+                        <span style="font-size: 11px; font-weight: 700; color: {{ r.colorIcono }};">{{ r.iniciales }}</span>
+                      </sc-if>
+                    </span>
+                    <span style="min-width: 0; flex: 1;">
+                      <span style="display: block; font-size: 13.5px; font-weight: 600; color: {{ r.colorNombre }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.nombre }}</span>
+                      <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.sub }}</span>
+                    </span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 13px;">
+                    <sc-for list="{{ r.celdas }}" as="c" hint-placeholder-count="3">
+                      <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+                        <sc-if value="{{ c.hayPunto }}" hint-placeholder-val="{{ false }}">
+                          <span style="width: 7px; height: 7px; border-radius: 999px; background: {{ c.punto }}; flex: 0 0 7px;"></span>
+                        </sc-if>
+                        <span style="font-size: 12px; color: {{ c.color }}; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-feature-settings: 'tnum';">{{ c.texto }}</span>
+                      </span>
+                    </sc-for>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 13px; padding-top: 12px; border-top: 1px solid rgba(13,20,18,0.06);">
+                    <span onClick="{{ r.alternar }}" style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <span style="position: relative; width: 32px; height: 18px; border-radius: 999px; background: {{ r.pistaBg }}; flex: 0 0 32px; transition: background 160ms cubic-bezier(0.2,0.8,0.2,1);">
+                        <span style="position: absolute; top: 2px; left: {{ r.perilla }}; width: 14px; height: 14px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.2); transition: left 160ms cubic-bezier(0.2,0.8,0.2,1);"></span>
+                      </span>
+                      <span style="font-size: 11.5px; font-weight: 600; color: #5B6764;">{{ r.estado }}</span>
+                    </span>
+                    <span title="Editar" style="margin-left: auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;" style-hover="background: #EDF1EF;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+                    </span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
         </div>
       </sc-if>
     </div>
@@ -1141,6 +1409,509 @@ class Component extends DCLogic {
     };
   }
 
+  // ---- Motor del ABM semántico -------------------------------------------
+  // Cada entidad declara hero, pista, filtros, columnas y filas. La pantalla
+  // no sabe de qué entidad se trata: arma todo desde este spec.
+  miles(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+  cel(texto, o) {
+    o = o || {};
+    return {
+      texto: texto,
+      esChip: !!o.chip, esTexto: !o.chip,
+      chipBg: o.chip ? o.chip[0] : '', chipCol: o.chip ? o.chip[1] : '',
+      hayPunto: !!o.punto, punto: o.punto || '',
+      haySub: !!o.sub, sub: o.sub || '', subCol: o.subFuerte ? '#B4560F' : '#98A3A0',
+      align: o.align || 'left', just: o.align === 'right' ? 'flex-end' : 'flex-start',
+      peso: o.peso || 500, tam: o.tam || '12.5px',
+      color: o.color || '#3D4945',
+      fuente: o.sora ? 'Sora, sans-serif' : 'Inter, sans-serif',
+    };
+  }
+
+  descripcion(id) {
+    const D = {
+      empleados: 'Administradores, supervisores y operarios del municipio.',
+      cuadrillas: 'Los equipos que salen a resolver las órdenes de trabajo.',
+      ausencias: 'Licencias, vacaciones y francos del personal.',
+      vecinos: 'El padrón de vecinos que usan la app y el mostrador.',
+      sla: 'Cuántos días promete el municipio para resolver cada categoría.',
+      dependencias: 'Las secretarías y direcciones que atienden reclamos y trámites.',
+      zonas: 'Cómo se divide el municipio para repartir el trabajo.',
+      inv: 'Los artículos del depósito, el corralón y el vivero.',
+      cajas: 'Las cajas y fondos con los que se paga.',
+      retenciones: 'Lo que se le retiene a cada pago de proveedor.',
+      proyectos: 'Las obras con presupuesto propio.',
+      tarjetas: 'Las tarjetas corporativas del municipio.',
+      contactos: 'Proveedores y empleados a los que se les paga.',
+      tasas: 'Lo que el municipio cobra y con qué cálculo.',
+      pagos: 'Por dónde entran los cobros del vecino.',
+      auditoria: 'Quién hizo cada cosa dentro de la app.',
+      suscripciones: 'Los municipios que usan la app y el plan de cada uno.',
+      'cat-reclamo': 'Lo que el vecino puede elegir cuando carga un reclamo.',
+      'cat-tramite': 'Las carpetas generales de trámites: Obras, Comercio, Catastro.',
+      'tipos-tramite': 'Cada trámite concreto con sus prerrequisitos.',
+      'tipos-poi': 'Plazas, escuelas y paradas: dónde se ponen los carteles con QR.',
+      'tipos-empleado': 'Planta, contratado o jornalero: define cómo se liquida.',
+      parajes: 'Los parajes con los que se imputa cada gasto.',
+      'cat-inv': 'Las familias en las que se agrupa el depósito.',
+      conceptos: 'A qué partida imputa cada movimiento de dinero.',
+      'conceptos-liq': 'Los conceptos con los que se arma cada liquidación.',
+    };
+    return D[id] || '';
+  }
+
+  puenteSpec(id) {
+    const P = {
+      vecinos: {
+        alla: 'Vive en Atención al vecino',
+        motivo: 'El padrón se carga solo: cada reclamo nuevo da de alta al vecino. Editar 3.412 fichas desde Configuración es la forma más lenta de hacerlo.',
+        aca: [
+          ['Tipos de documento', 'CI, RUC o pasaporte para el mostrador', 'tipos-empleado'],
+          ['Categorías de reclamo', 'lo que el vecino puede elegir al reclamar', 'cat-reclamo'],
+          ['Zonas', 'de qué barrio es cada vecino', 'zonas'],
+        ],
+        allaLista: ['Alta, edición y bloqueo de cada vecino', 'Historial de reclamos y calificaciones', 'Fusionar fichas duplicadas'],
+        cta: 'Abrir el padrón de vecinos',
+        muestraTitulo: 'LOS QUE MÁS RECLAMAN', muestraNota: 'para editarlos hay que abrir el módulo',
+        muestra: [
+          ['MA', '#FDECEC', '#C93A3E', 'Mirta Beatriz Ayala', 'Villa Morra · CI 3.482.117', '7 reclamos · 4 abiertos'],
+          ['RV', '#FDF1DF', '#B4560F', 'Ramón Villalba', 'Sajonia · CI 2.104.882', '4 reclamos · 2 abiertos'],
+          ['ER', '#E7F6F0', '#00794F', 'Estela Noemí Rojas', 'Microcentro · CI 4.771.203', '3 reclamos · cerrados'],
+        ],
+      },
+      inv: {
+        alla: 'Vive en Operaciones',
+        motivo: 'El stock se mueve todos los días con cada orden de trabajo. Acá se define cómo está organizado el depósito, no cuánto queda de cada cosa.',
+        aca: [
+          ['Categorías de inventario', 'las 8 familias en las que se agrupa', 'cat-inv'],
+          ['Depósitos', 'central, corralón y vivero', 'zonas'],
+        ],
+        allaLista: ['Entradas, salidas y ajustes de stock', 'Alta de artículos y códigos', 'Órdenes de compra y reposición'],
+        cta: 'Abrir el inventario',
+        muestraTitulo: 'LO QUE ESTÁ BAJO EL MÍNIMO', muestraNota: 'reponer se hace desde el módulo',
+        muestra: [
+          ['LE', '#FDECEC', '#C93A3E', 'Luminaria LED 60 W', 'ART-0208 · Central', 'sin stock · mínimo 15'],
+          ['CP', '#FDECEC', '#C93A3E', 'Cemento Portland 50 kg', 'ART-0114 · Central', '6 · mínimo 20'],
+          ['MA', '#FDF1DF', '#B4560F', 'Mezcla asfáltica en frío', 'ART-0131 · Corralón', '18 · mínimo 18'],
+        ],
+      },
+      contactos: {
+        alla: 'Vive en Tesorería',
+        motivo: 'Un contacto se crea cuando entra la primera factura y arrastra deuda, pagos y retenciones. Acá se definen las listas con las que se clasifica.',
+        aca: [
+          ['Conceptos', 'a qué partida imputa cada movimiento', 'conceptos'],
+          ['Retenciones', 'qué se le retiene a cada tipo de contacto', 'retenciones'],
+          ['Tipos de empleado', 'para los contactos que son personal', 'tipos-empleado'],
+        ],
+        allaLista: ['Alta y edición de proveedores y empleados', 'CBU, condición fiscal y deuda', 'Fusionar contactos con el mismo RUC'],
+        cta: 'Abrir contactos de Tesorería',
+        muestraTitulo: 'LOS QUE NO ENTRAN AL PAGO MASIVO', muestraNota: '23 contactos sin CBU cargado',
+        muestra: [
+          ['CJ', '#FDF1DF', '#B4560F', 'Consultora Jara y Asociados', 'RUC 80099117-2 · sin CBU', 'debe $ 1.600.000'],
+          ['FG', '#FDF1DF', '#B4560F', 'Ferretería Guaraní S.R.L.', 'RUC 80031885-1 · sin CBU', 'debe $ 7.400.000'],
+          ['LÑ', '#FDECEC', '#C93A3E', 'Limpieza Integral Ñanduti', 'RUC 80077412-9 · duplicado', 'debe $ 9.600.000'],
+        ],
+      },
+      ausencias: {
+        alla: 'Vive en la Agenda',
+        motivo: 'Una ausencia es un rango de fechas que choca con otras: eso se ve en un calendario, no en una grilla. Acá se definen los motivos que se pueden elegir.',
+        aca: [
+          ['Motivos de ausencia', 'licencia, vacaciones, franco', 'tipos-empleado'],
+          ['Cuadrillas', 'quién cubre a quién cuando falta', 'cuadrillas'],
+        ],
+        allaLista: ['Cargar y cerrar ausencias sobre el calendario', 'Ver los solapamientos antes de aprobar', 'Reasignar la cuadrilla del que falta'],
+        cta: 'Abrir la agenda de personal',
+        muestraTitulo: 'LO QUE SE SOLAPA ESTE MES', muestraNota: '14 de agosto, Servicios Públicos',
+        muestra: [
+          ['DC', '#FDECEC', '#C93A3E', 'Derlis Cardozo', 'Licencia médica · Higiene urbana', '12 al 16 ago'],
+          ['ND', '#FDECEC', '#C93A3E', 'Nelson Duarte', 'Licencia médica · Higiene urbana', '14 al 15 ago'],
+          ['PS', '#E7F6F0', '#00794F', 'Perla Sanabria', 'Vacaciones · Administración', '18 al 29 ago'],
+        ],
+      },
+    };
+    return P[id] || null;
+  }
+
+  abmSpec(id) {
+    const V = '#00B37E', A = '#F59E0B', AZ = '#3B82F6', R = '#E5484D', VI = '#8B5CF6', CI = '#06B6D4', G = '#98A3A0';
+    const tV = '#E7F6F0', tA = '#FDF1DF', tAZ = '#E8F1FE', tR = '#FDECEC', tVI = '#F1EBFE', tCI = '#E4F7FB', tG = '#F3F7F5';
+    const c = (t, o) => this.cel(t, o);
+    const num = (t, o) => this.cel(t, Object.assign({ align: 'right', peso: 700, tam: '13px', sora: true, color: '#0D1412' }, o || {}));
+    const chipOp = ['#F3F7F5', '#3D4945'], chipAdm = [tAZ, '#1D6FD1'];
+    const g = {
+      dep: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6',
+      zona: 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11zM12 8v4',
+      caja: 'M3 7h18v12H3zM3 11h18M7 15h4',
+      doc: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      caj: 'M4 8h16v12H4zM4 8l3-4h10l3 4M9 12h6',
+      cuad: 'M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c2.9.4 5 2.3 5 4.5',
+      tar: 'M3 6h18v12H3zM3 10h18M7 14h3',
+      pro: 'M4 20V6l7-3 7 3v14M4 20h16M9 20v-5h6v5',
+      log: 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3',
+      reloj: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3 1.8',
+      tasa: 'M9 7h6M9 12h6M9 17h3M5 3h14v18H5z',
+      pago: 'M3 7h18v12H3zM7 15h2M16 11h2',
+    };
+
+    const S = {
+      empleados: {
+        eyebrow: 'PERSONAL · PLANTEL', acento: R, tinte: '#FDF6F6',
+        ver: 'Tenés <strong>10 empleados activos</strong>, 9 operarios y 1 administrativo. <strong style="color: #C93A3E;">10 especialidades dependen de una sola persona</strong>: si esa persona falta, nadie la cubre.',
+        kpis: [['ACTIVOS', '10', '9 operarios · 1 administrativo', ''], ['ESPECIALIDADES', '10', 'de 17 categorías', ''], ['SIN RESPALDO', '10', 'una sola persona cada una', R], ['SIN ZONA', '0', 'de 18 zonas', ''], ['INACTIVOS', '0', 'fuera del plantel', '']],
+        pista: null,
+        buscar: 'Buscar por nombre, apellido o especialidad…', cta: 'Nuevo empleado',
+        selects: [['Tipo', 'Todos'], ['Especialidad', 'Todas'], ['Zona', 'Todas']],
+        chips: [['Todos', 10], ['Operarios', 9], ['Administrativos', 1], ['Inactivos', 0]],
+        heads: [['EMPLEADO', 'left'], ['TIPO', 'left'], ['ESPECIALIDAD', 'left'], ['ZONA', 'left'], ['DEPENDENCIA', 'left'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.5fr) 128px minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.3fr) 104px', min: '1000px',
+        filas: [
+          { n: 'Carolina Franco', s: '+595 971 100010', i: 'CF', t: tR, cc: '#C93A3E', cel: [c('Administrativo', { chip: chipAdm }), c('Ruidos y convivencia', { punto: R }), c('Microcentro', { punto: G, color: '#7A8783' }), c('Secretaría de Seguridad', { punto: R })] },
+          { n: 'Cristhian Ojeda', s: '+595 971 100004', i: 'CO', t: tV, cc: '#00794F', cel: [c('Operario', { chip: chipOp }), c('Arbolado y espacios verdes', { punto: V }), c('Villa Morra', { punto: G, color: '#7A8783' }), c('Secretaría de Servicios P…', { punto: V })] },
+          { n: 'Derlis Cardozo', s: '+595 971 100002', i: 'DC', t: tV, cc: '#00794F', cel: [c('Operario', { chip: chipOp }), c('Recolección de residuos', { punto: V }), c('Microcentro', { punto: G, color: '#7A8783' }), c('Secretaría de Servicios P…', { punto: V })] },
+          { n: 'Fabián Gauto', s: '+595 971 100009', i: 'FG', t: tVI, cc: '#6D3FD4', cel: [c('Operario', { chip: chipOp }), c('Animales sueltos', { punto: VI }), c('Zeballos Cué', { punto: G, color: '#7A8783' }), c('Dirección de Zoonosis y …', { punto: VI })] },
+          { n: 'Gustavo Benítez', s: '+595 971 100003', i: 'GB', t: tA, cc: '#B4560F', cel: [c('Operario', { chip: chipOp }), c('Alumbrado público', { punto: A }), c('Santísima Trinidad', { punto: G, color: '#7A8783' }), c('Secretaría de Servicios P…', { punto: V })] },
+          { n: 'Hugo Espínola', s: '+595 971 100006', i: 'HE', t: tAZ, cc: '#1D6FD1', cel: [c('Operario', { chip: chipOp }), c('Agua y cloacas', { punto: AZ }), c('Microcentro', { punto: G, color: '#7A8783' }), c('Secretaría de Servicios P…', { punto: V })] },
+          { n: 'Nelson Duarte', s: '+595 971 100005', i: 'ND', t: tCI, cc: '#0E7490', cel: [c('Operario', { chip: chipOp }), c('Higiene urbana', { punto: CI }), c('Chacarita', { punto: G, color: '#7A8783' }), c('Secretaría de Servicios P…', { punto: V })] },
+          { n: 'Óscar Cabral', s: '+595 971 100007', i: 'ÓC', t: tR, cc: '#C93A3E', cel: [c('Operario', { chip: chipOp }), c('Tránsito y señalización', { punto: R }), c('Villa Morra', { punto: G, color: '#7A8783' }), c('Dirección de Tránsito y S…', { punto: R })] },
+        ],
+        pie: 'El empleado con reclamos asignados no se puede borrar: primero hay que reasignarlos.',
+      },
+
+      cuadrillas: {
+        eyebrow: 'PERSONAL · CAMPO', acento: A, tinte: '#FDFAF3',
+        ver: '<strong>7 cuadrillas</strong> para 18 zonas. <strong style="color: #B4560F;">La Cuadrilla 2 tiene 6 órdenes abiertas</strong> y las otras seis no pasan de dos: el trabajo no está repartido.',
+        kpis: [['CUADRILLAS', '7', '6 activas · 1 de licencia', ''], ['INTEGRANTES', '9', 'operarios asignados', ''], ['ÓRDENES ABIERTAS', '12', 'sobre las 7 cuadrillas', ''], ['MÁS CARGADA', '6', 'Cuadrilla 2', A], ['SIN ZONA', '1', 'Cuadrilla 7', A]],
+        pista: null,
+        buscar: 'Buscar cuadrilla o responsable…', cta: 'Nueva cuadrilla',
+        selects: [['Zona', 'Todas'], ['Estado', 'Todos']],
+        chips: [['Todas', 7], ['Con órdenes', 5], ['Libres', 2]],
+        heads: [['CUADRILLA', 'left'], ['RESPONSABLE', 'left'], ['INTEGRANTES', 'right'], ['ZONA', 'left'], ['ÓRDENES', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.3fr) minmax(0, 1.2fr) 108px minmax(0, 1.1fr) 108px 104px', min: '960px',
+        filas: [
+          { n: 'Cuadrilla 1', s: 'Bacheo y calles', gl: g.cuad, t: tA, cc: '#B4560F', cel: [c('Silvio Ramírez', { punto: A }), num('3'), c('Sajonia', { punto: G, color: '#7A8783' }), num('2')] },
+          { n: 'Cuadrilla 2', s: 'Higiene urbana', gl: g.cuad, t: tR, cc: '#C93A3E', cel: [c('Derlis Cardozo', { punto: CI }), num('2'), c('Microcentro', { punto: G, color: '#7A8783' }), num('6', { color: '#C93A3E' })] },
+          { n: 'Cuadrilla 3', s: 'Alumbrado público', gl: g.cuad, t: tA, cc: '#B4560F', cel: [c('Gustavo Benítez', { punto: A }), num('2'), c('Santísima Trinidad', { punto: G, color: '#7A8783' }), num('2')] },
+          { n: 'Cuadrilla 4', s: 'Espacios verdes', gl: g.cuad, t: tV, cc: '#00794F', cel: [c('Cristhian Ojeda', { punto: V }), num('1'), c('Villa Morra', { punto: G, color: '#7A8783' }), num('1')] },
+          { n: 'Cuadrilla 5', s: 'Agua y cloacas', gl: g.cuad, t: tAZ, cc: '#1D6FD1', cel: [c('Hugo Espínola', { punto: AZ }), num('1'), c('Chacarita', { punto: G, color: '#7A8783' }), num('1')] },
+          { n: 'Cuadrilla 6', s: 'Zoonosis', gl: g.cuad, t: tVI, cc: '#6D3FD4', cel: [c('Fabián Gauto', { punto: VI }), num('1'), c('Zeballos Cué', { punto: G, color: '#7A8783' }), num('0', { color: '#98A3A0' })] },
+          { n: 'Cuadrilla 7', s: 'Sin especialidad fija', gl: g.cuad, t: tG, cc: '#7A8783', off: true, del: true, cel: [c('Sin responsable', { punto: G, color: '#98A3A0' }), num('0', { color: '#98A3A0' }), c('Sin asignar', { punto: G, color: '#98A3A0' }), num('0', { color: '#98A3A0' })] },
+        ],
+        pie: 'La cuadrilla con órdenes abiertas no se puede borrar: primero hay que cerrarlas o reasignarlas.',
+      },
+
+      ausencias: {
+        eyebrow: 'PERSONAL · DISPONIBILIDAD', acento: A, tinte: '#FDFAF3',
+        ver: '<strong>12 ausencias</strong> cargadas este mes. <strong style="color: #B4560F;">Dos se solapan el 14 de agosto en Servicios Públicos</strong>: ese día la cuadrilla queda con un solo operario.',
+        kpis: [['DEL MES', '12', 'sobre 10 empleados', ''], ['EN CURSO', '2', 'hoy fuera del plantel', ''], ['SE SOLAPAN', '2', '14 de agosto', A], ['SIN JUSTIFICAR', '1', 'falta el certificado', A], ['DÍAS PERDIDOS', '31', 'acumulados en el mes', '']],
+        pista: null,
+        buscar: 'Buscar por empleado…', cta: 'Nueva ausencia',
+        selects: [['Tipo', 'Todos'], ['Mes', 'Agosto 2026']],
+        chips: [['Todas', 12], ['En curso', 2], ['Programadas', 9], ['Cerradas', 1]],
+        heads: [['EMPLEADO', 'left'], ['MOTIVO', 'left'], ['DESDE', 'left'], ['HASTA', 'left'], ['DÍAS', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.4fr) minmax(0, 1.2fr) 104px 104px 84px 104px', min: '940px',
+        filas: [
+          { n: 'Derlis Cardozo', s: 'Higiene urbana', i: 'DC', t: tR, cc: '#C93A3E', cel: [c('Licencia médica', { punto: R }), c('12 ago'), c('16 ago'), num('5', { color: '#C93A3E' })] },
+          { n: 'Nelson Duarte', s: 'Higiene urbana', i: 'ND', t: tR, cc: '#C93A3E', cel: [c('Licencia médica', { punto: R }), c('14 ago'), c('15 ago'), num('2', { color: '#C93A3E' })] },
+          { n: 'Perla Sanabria', s: 'Administración', i: 'PS', t: tV, cc: '#00794F', cel: [c('Vacaciones', { punto: V }), c('18 ago'), c('29 ago'), num('12')] },
+          { n: 'Gustavo Benítez', s: 'Alumbrado público', i: 'GB', t: tA, cc: '#B4560F', cel: [c('Día de estudio', { punto: A }), c('20 ago'), c('20 ago'), num('1')] },
+          { n: 'Hugo Espínola', s: 'Agua y cloacas', i: 'HE', t: tAZ, cc: '#1D6FD1', cel: [c('Franco compensatorio', { punto: AZ }), c('22 ago'), c('22 ago'), num('1')] },
+          { n: 'Óscar Cabral', s: 'Tránsito', i: 'ÓC', t: tG, cc: '#7A8783', cel: [c('Sin justificar', { punto: A, sub: 'falta el certificado', subFuerte: true }), c('5 ago'), c('5 ago'), num('1')] },
+        ],
+        pie: 'La ausencia en curso no se puede borrar: se cierra con la fecha real de vuelta.',
+      },
+
+      vecinos: {
+        eyebrow: 'ATENCIÓN AL VECINO · PADRÓN', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>3.412 vecinos</strong> registrados y <strong>1.284 reclamaron alguna vez</strong>. <strong style="color: #B4560F;">47 tienen tres reclamos o más sin resolver</strong>: son los que van a volver al mostrador.',
+        kpis: [['REGISTRADOS', '3.412', 'con teléfono verificado', ''], ['CON RECLAMOS', '1.284', '38% del padrón', ''], ['REINCIDENTES', '47', '3 o más sin resolver', A], ['CALIFICACIÓN', '4,2', 'promedio de 892 votos', ''], ['BLOQUEADOS', '3', 'por uso indebido', '']],
+        pista: null,
+        buscar: 'Buscar por nombre, cédula o teléfono…', cta: 'Nuevo vecino',
+        selects: [['Barrio', 'Todos'], ['Estado', 'Todos']],
+        chips: [['Todos', 3412], ['Con reclamos', 1284], ['Reincidentes', 47], ['Bloqueados', 3]],
+        heads: [['VECINO', 'left'], ['CONTACTO', 'left'], ['BARRIO', 'left'], ['RECLAMOS', 'right'], ['CALIFICACIÓN', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1fr) 104px 116px 104px', min: '980px',
+        filas: [
+          { n: 'Mirta Beatriz Ayala', s: 'CI 3.482.117', i: 'MA', t: tR, cc: '#C93A3E', cel: [c('+595 981 442 310', { sub: 'WhatsApp' }), c('Villa Morra', { punto: G, color: '#7A8783' }), num('7', { color: '#C93A3E', sub: '4 abiertos' }), num('2,1', { color: '#C93A3E' })] },
+          { n: 'Ramón Villalba', s: 'CI 2.104.882', i: 'RV', t: tA, cc: '#B4560F', cel: [c('+595 971 208 114', { sub: 'WhatsApp' }), c('Sajonia', { punto: G, color: '#7A8783' }), num('4', { sub: '2 abiertos' }), num('3,4')] },
+          { n: 'Estela Noemí Rojas', s: 'CI 4.771.203', i: 'ER', t: tV, cc: '#00794F', cel: [c('+595 985 610 774', { sub: 'app del vecino' }), c('Microcentro', { punto: G, color: '#7A8783' }), num('3', { sub: 'todos cerrados' }), num('4,7')] },
+          { n: 'Julio César Benítez', s: 'CI 1.998.410', i: 'JB', t: tV, cc: '#00794F', cel: [c('+595 972 118 903', { sub: 'mostrador' }), c('Chacarita', { punto: G, color: '#7A8783' }), num('2', { sub: 'todos cerrados' }), num('5,0')] },
+          { n: 'Lourdes Giménez', s: 'CI 5.220.664', i: 'LG', t: tV, cc: '#00794F', cel: [c('+595 983 774 201', { sub: 'app del vecino' }), c('Recoleta', { punto: G, color: '#7A8783' }), num('1', { sub: 'cerrado' }), num('4,0')] },
+          { n: 'Anónimo · 0981 100 442', s: 'sin cédula cargada', i: '?', t: tG, cc: '#7A8783', off: true, cel: [c('+595 981 100 442', { sub: 'sin verificar', subFuerte: true }), c('Sin barrio', { punto: G, color: '#98A3A0' }), num('1', { color: '#98A3A0' }), c('—', { align: 'right', color: '#98A3A0' })] },
+        ],
+        pie: 'El vecino con reclamos cargados no se borra: se bloquea, y su historial queda.',
+      },
+
+      sla: {
+        eyebrow: 'ATENCIÓN AL VECINO · PLAZOS', acento: A, tinte: '#FDFAF3',
+        ver: '<strong>9 categorías tienen plazo definido</strong> de las 17 que existen. <strong style="color: #C93A3E;">Bacheo cumple el 38%</strong>: prometés 7 días y tardás 19.',
+        kpis: [['CON PLAZO', '9', 'de 17 categorías', ''], ['SIN PLAZO', '8', 'no prometen nada', A], ['CUMPLIMIENTO', '61%', 'promedio ponderado', ''], ['PEOR CATEGORÍA', '38%', 'Bacheo y calles', R], ['VENCIDOS HOY', '3', 'ya fuera de plazo', R]],
+        pista: ['LOS PLAZOS SE CUENTAN EN DÍAS HÁBILES', 'El reloj arranca cuando el reclamo se deriva a la dependencia, no cuando el vecino lo carga. Los feriados municipales no cuentan.', 'Ver el calendario'],
+        buscar: 'Buscar categoría…', cta: 'Nuevo plazo',
+        selects: [['Dependencia', 'Todas'], ['Cumplimiento', 'Todos']],
+        chips: [['Todos', 9], ['Cumplen', 5], ['No cumplen', 4]],
+        heads: [['CATEGORÍA', 'left'], ['DEPENDENCIA', 'left'], ['PLAZO', 'right'], ['REAL', 'right'], ['CUMPLIMIENTO', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.4fr) minmax(0, 1.3fr) 96px 96px 128px 104px', min: '1000px',
+        filas: [
+          { n: 'Bacheo y calles', s: '97 reclamos en el período', gl: g.caj, t: tR, cc: '#C93A3E', cel: [c('Obras Públicas', { punto: A }), num('7 d'), num('19 d', { color: '#C93A3E' }), num('38%', { color: '#C93A3E', sub: '37 de 97' })] },
+          { n: 'Alumbrado público', s: '62 reclamos', gl: g.caj, t: tA, cc: '#B4560F', cel: [c('Servicios Públicos', { punto: V }), num('5 d'), num('8 d', { color: '#B4560F' }), num('54%', { color: '#B4560F', sub: '33 de 62' })] },
+          { n: 'Higiene urbana', s: '48 reclamos', gl: g.caj, t: tCI, cc: '#0E7490', cel: [c('Servicios Públicos', { punto: V }), num('3 d'), num('2 d'), num('88%', { color: '#00794F', sub: '42 de 48' })] },
+          { n: 'Agua y cloacas', s: '34 reclamos', gl: g.caj, t: tAZ, cc: '#1D6FD1', cel: [c('Obras Públicas', { punto: A }), num('2 d'), num('2 d'), num('76%', { color: '#00794F', sub: '26 de 34' })] },
+          { n: 'Zoonosis', s: '19 reclamos', gl: g.caj, t: tVI, cc: '#6D3FD4', cel: [c('Dirección de Zoonosis', { punto: VI }), num('2 d'), num('4 d', { color: '#B4560F' }), num('47%', { color: '#B4560F', sub: '9 de 19' })] },
+          { n: 'Semáforos', s: '12 reclamos', gl: g.caj, t: tR, cc: '#C93A3E', cel: [c('Tránsito', { punto: R }), num('1 d'), num('1 d'), num('92%', { color: '#00794F', sub: '11 de 12' })] },
+        ],
+        pie: 'Bajar un plazo no reordena la cola: la prioridad se define en Asignación.',
+      },
+
+      dependencias: {
+        eyebrow: 'CATÁLOGOS · ORGANIGRAMA', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>11 dependencias</strong> atienden las 17 categorías. <strong style="color: #C93A3E;">Servicios Públicos concentra 6 categorías y 210 reclamos</strong>; tres dependencias no reciben nada.',
+        kpis: [['DEPENDENCIAS', '11', '10 activas · 1 inactiva', ''], ['CON CATEGORÍAS', '8', 'las otras 3 no reciben', A], ['MÁS CARGADA', '210', 'Servicios Públicos', R], ['SIN RESPONSABLE', '2', 'nadie a cargo', A], ['EN COLA', '244', 'reclamos repartidos', '']],
+        pista: null,
+        buscar: 'Buscar dependencia o responsable…', cta: 'Nueva dependencia',
+        selects: [['Tipo', 'Todas'], ['Estado', 'Todos']],
+        chips: [['Todas', 11], ['Con cola', 8], ['Sin trabajo', 3]],
+        heads: [['DEPENDENCIA', 'left'], ['RESPONSABLE', 'left'], ['CATEGORÍAS', 'right'], ['EN COLA', 'right'], ['CUADRILLAS', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.6fr) minmax(0, 1.2fr) 112px 104px 112px 104px', min: '1020px',
+        filas: [
+          { n: 'Secretaría de Servicios Públicos', s: 'Higiene, alumbrado y verde', gl: g.dep, t: tV, cc: '#00794F', cel: [c('Rocío Giménez', { punto: V }), num('6'), num('210', { color: '#C93A3E' }), num('4')] },
+          { n: 'Secretaría de Obras Públicas', s: 'Bacheo, agua y cloacas', gl: g.dep, t: tA, cc: '#B4560F', cel: [c('Arnaldo Cantero', { punto: A }), num('4'), num('131')  , num('2')] },
+          { n: 'Dirección de Tránsito y Seguridad Vial', s: 'Semáforos y señalización', gl: g.dep, t: tR, cc: '#C93A3E', cel: [c('Néstor Ayala', { punto: R }), num('3'), num('71'), num('1')] },
+          { n: 'Dirección de Zoonosis y Bromatología', s: 'Animales y plagas', gl: g.dep, t: tVI, cc: '#6D3FD4', cel: [c('Graciela Espínola', { punto: VI }), num('2'), num('19'), num('1')] },
+          { n: 'Secretaría de Seguridad', s: 'Ruidos y convivencia', gl: g.dep, t: tAZ, cc: '#1D6FD1', cel: [c('Carolina Franco', { punto: AZ }), num('1'), num('9'), num('0')] },
+          { n: 'Dirección de Catastro', s: 'Sin categorías asignadas', gl: g.dep, t: tG, cc: '#7A8783', del: true, cel: [c('Sin responsable', { punto: A, color: '#B4560F' }), num('0', { color: '#98A3A0' }), num('0', { color: '#98A3A0' }), num('0', { color: '#98A3A0' })] },
+        ],
+        pie: 'La dependencia con reclamos en cola no se puede borrar: primero hay que reasignar sus categorías.',
+      },
+
+      zonas: {
+        eyebrow: 'CATÁLOGOS · TERRITORIO', acento: AZ, tinte: '#F5F8FD',
+        ver: '<strong>18 zonas</strong> cubren los 24 barrios. <strong style="color: #B4560F;">Seis barrios no están en ninguna zona</strong>: los reclamos de ahí entran sin cuadrilla asignada.',
+        kpis: [['ZONAS', '18', 'sobre 24 barrios', ''], ['BARRIOS CUBIERTOS', '18', '75% del municipio', ''], ['SIN COBERTURA', '6', 'sin cuadrilla asignada', A], ['CON CUADRILLA', '13', 'de las 18 zonas', ''], ['RECLAMOS', '244', 'georreferenciados', '']],
+        pista: ['LAS ZONAS SE DIBUJAN EN EL MAPA', 'Acá se editan el nombre, la cuadrilla y el estado. El polígono de cada zona se ajusta sobre el mapa, no en esta grilla.', 'Abrir el mapa de zonas'],
+        buscar: 'Buscar zona o barrio…', cta: 'Nueva zona',
+        selects: [['Cuadrilla', 'Todas'], ['Cobertura', 'Todas']],
+        chips: [['Todas', 18], ['Con cuadrilla', 13], ['Sin cuadrilla', 5]],
+        heads: [['ZONA', 'left'], ['BARRIOS', 'left'], ['CUADRILLA', 'left'], ['RECLAMOS', 'right'], ['RESUELTOS', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.1fr) 104px 112px 104px', min: '1000px',
+        filas: [
+          { n: 'Zona 1 · Centro', s: 'Radio céntrico', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Microcentro, Catedral', { color: '#7A8783' }), c('Cuadrilla 2', { punto: CI }), num('63'), num('68%', { color: '#00794F' })] },
+          { n: 'Zona 2 · Villa Morra', s: 'Corredor este', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Villa Morra, Recoleta', { color: '#7A8783' }), c('Cuadrilla 4', { punto: V }), num('52'), num('54%', { color: '#00794F' })] },
+          { n: 'Zona 3 · Sajonia', s: 'Franja sur', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Sajonia, Tacumbú', { color: '#7A8783' }), c('Cuadrilla 1', { punto: A }), num('41'), num('38%', { color: '#B4560F' })] },
+          { n: 'Zona 4 · Trinidad', s: 'Franja norte', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Santísima Trinidad', { color: '#7A8783' }), c('Cuadrilla 3', { punto: A }), num('34'), num('31%', { color: '#B4560F' })] },
+          { n: 'Zona 5 · Zeballos Cué', s: 'Periferia norte', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Zeballos Cué, Loma Pytã', { color: '#7A8783' }), c('Cuadrilla 6', { punto: VI }), num('22'), num('18%', { color: '#C93A3E' })] },
+          { n: 'Zona 18 · Chacarita', s: 'Sin cuadrilla', gl: g.zona, t: tG, cc: '#7A8783', cel: [c('Chacarita Alta y Baja', { color: '#7A8783' }), c('Sin asignar', { punto: A, color: '#B4560F' }), num('19'), num('0%', { color: '#C93A3E' })] },
+        ],
+        pie: 'Borrar una zona deja sus barrios sin cobertura: los reclamos entran sin cuadrilla.',
+      },
+
+      inv: {
+        eyebrow: 'INVENTARIO · DEPÓSITO', acento: A, tinte: '#FDFAF3',
+        ver: '<strong>240 artículos</strong> en tres depósitos. <strong style="color: #C93A3E;">14 están bajo el mínimo</strong> y cuatro de ellos son de bacheo, la categoría con más trabajo abierto.',
+        kpis: [['ARTÍCULOS', '240', 'en 8 categorías', ''], ['BAJO MÍNIMO', '14', 'hay que reponer', R], ['SIN STOCK', '5', 'no se puede usar', R], ['MOVIMIENTOS DEL MES', '312', 'entradas y salidas', ''], ['SIN MOVIMIENTO', '38', 'hace más de 90 días', A]],
+        pista: null,
+        buscar: 'Buscar artículo o código…', cta: 'Nuevo artículo',
+        selects: [['Categoría', 'Todas'], ['Depósito', 'Todos'], ['Stock', 'Todos']],
+        chips: [['Todos', 240], ['Bajo mínimo', 14], ['Sin stock', 5], ['Quietos', 38]],
+        heads: [['ARTÍCULO', 'left'], ['CATEGORÍA', 'left'], ['DEPÓSITO', 'left'], ['STOCK', 'right'], ['MÍNIMO', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1fr) 108px 96px 104px', min: '1000px',
+        filas: [
+          { n: 'Cemento Portland 50 kg', s: 'ART-0114', gl: g.caja, t: tR, cc: '#C93A3E', cel: [c('Áridos y cemento', { punto: A }), c('Central', { color: '#7A8783' }), num('6', { color: '#C93A3E', sub: 'bajo mínimo' }), num('20')] },
+          { n: 'Luminaria LED 60 W', s: 'ART-0208', gl: g.caja, t: tR, cc: '#C93A3E', cel: [c('Luminarias', { punto: A }), c('Central', { color: '#7A8783' }), num('0', { color: '#C93A3E', sub: 'sin stock' }), num('15')] },
+          { n: 'Mezcla asfáltica en frío', s: 'ART-0131', gl: g.caja, t: tA, cc: '#B4560F', cel: [c('Áridos y cemento', { punto: A }), c('Corralón', { color: '#7A8783' }), num('18', { color: '#B4560F', sub: 'al límite' }), num('18')] },
+          { n: 'Guantes de trabajo', s: 'ART-0402', gl: g.caja, t: tV, cc: '#00794F', cel: [c('Herramientas', { punto: V }), c('Corralón', { color: '#7A8783' }), num('84'), num('30')] },
+          { n: 'Bolsas de residuos 120 L', s: 'ART-0311', gl: g.caja, t: tV, cc: '#00794F', cel: [c('Limpieza', { punto: V }), c('Central', { color: '#7A8783' }), num('1.240'), num('400')] },
+          { n: 'Cartel de obra reflectivo', s: 'ART-0509', gl: g.caja, t: tG, cc: '#7A8783', cel: [c('Señalización', { punto: AZ }), c('Corralón', { color: '#7A8783' }), num('22', { sub: 'sin movimiento 4 m', }), num('10')] },
+        ],
+        pie: 'El artículo con movimientos no se borra: se da de baja y su historial queda.',
+      },
+
+      cajas: {
+        eyebrow: 'TESORERÍA · FONDOS', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>4 cajas abiertas</strong> con $ 8.412.900 en total. <strong style="color: #B4560F;">La caja chica de Obras no se arquea desde hace 23 días</strong>: la regla dice cada 7.',
+        kpis: [['CAJAS', '4', '3 chicas · 1 fondo fijo', ''], ['SALDO TOTAL', '$ 8.412.900', 'suma de las 4', ''], ['SIN ARQUEO', '1', 'hace 23 días', A], ['MOVIMIENTOS DEL MES', '96', 'ingresos y egresos', ''], ['DIFERENCIAS', '$ 0', 'último arqueo', '']],
+        pista: null,
+        buscar: 'Buscar caja o responsable…', cta: 'Nueva caja',
+        selects: [['Tipo', 'Todas'], ['Estado', 'Todas']],
+        chips: [['Todas', 4], ['Al día', 3], ['Sin arqueo', 1]],
+        heads: [['CAJA', 'left'], ['RESPONSABLE', 'left'], ['SALDO', 'right'], ['ÚLTIMO ARQUEO', 'right'], ['MOVIMIENTOS', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.4fr) minmax(0, 1.1fr) 136px 128px 116px 104px', min: '1040px',
+        filas: [
+          { n: 'Tesorería central', s: 'Fondo fijo', gl: g.caja, t: tV, cc: '#00794F', cel: [c('Perla Sanabria', { punto: V }), num('$ 6.820.400'), num('hace 2 d', { color: '#00794F' }), num('54')] },
+          { n: 'Caja chica · Obras Públicas', s: 'Rendición mensual', gl: g.caja, t: tA, cc: '#B4560F', cel: [c('Arnaldo Cantero', { punto: A }), num('$ 940.500'), num('hace 23 d', { color: '#B4560F', sub: 'la regla dice 7' }), num('22')] },
+          { n: 'Caja chica · Servicios Públicos', s: 'Rendición mensual', gl: g.caja, t: tV, cc: '#00794F', cel: [c('Rocío Giménez', { punto: V }), num('$ 512.000'), num('hace 4 d', { color: '#00794F' }), num('14')] },
+          { n: 'Caja de mostrador', s: 'Cobros del día', gl: g.caja, t: tV, cc: '#00794F', cel: [c('Dionisia Franco', { punto: V }), num('$ 140.000'), num('hoy', { color: '#00794F' }), num('6')] },
+        ],
+        pie: 'La caja con movimientos del mes no se cierra hasta que se arquee.',
+      },
+
+      retenciones: {
+        eyebrow: 'TESORERÍA · IMPUESTOS', acento: AZ, tinte: '#F5F8FD',
+        ver: '<strong>6 retenciones vigentes</strong> se aplican a los pagos a proveedores. <strong style="color: #B4560F;">Dos vencen el 31 de diciembre</strong> y hay que renovar la alícuota.',
+        kpis: [['VIGENTES', '6', 'de 8 configuradas', ''], ['VENCEN ESTE AÑO', '2', '31 de diciembre', A], ['APLICADAS EN JULIO', '$ 1.412.800', 'sobre 12 pagos', ''], ['SIN USO', '2', 'nunca se aplicaron', ''], ['MÁS APLICADA', 'IVA 21%', '9 de 12 pagos', '']],
+        pista: null,
+        buscar: 'Buscar retención…', cta: 'Nueva retención',
+        selects: [['Base', 'Todas'], ['Vigencia', 'Vigentes']],
+        chips: [['Todas', 8], ['Vigentes', 6], ['Vencidas', 2]],
+        heads: [['RETENCIÓN', 'left'], ['BASE DE CÁLCULO', 'left'], ['ALÍCUOTA', 'right'], ['VIGENCIA', 'right'], ['APLICADA', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.3fr) minmax(0, 1.3fr) 104px 128px 116px 104px', min: '1020px',
+        filas: [
+          { n: 'IVA', s: 'Retención general', gl: g.tasa, t: tAZ, cc: '#1D6FD1', cel: [c('Neto gravado', { color: '#7A8783' }), num('21%'), num('sin vencer', { color: '#00794F' }), num('9 pagos')] },
+          { n: 'Ganancias', s: 'Servicios profesionales', gl: g.tasa, t: tAZ, cc: '#1D6FD1', cel: [c('Total menos mínimo', { color: '#7A8783' }), num('6%'), num('31 dic 2026', { color: '#B4560F' }), num('4 pagos')] },
+          { n: 'Ingresos brutos', s: 'Jurisdicción municipal', gl: g.tasa, t: tAZ, cc: '#1D6FD1', cel: [c('Total facturado', { color: '#7A8783' }), num('2,5%'), num('31 dic 2026', { color: '#B4560F' }), num('7 pagos')] },
+          { n: 'SUSS', s: 'Contratistas de obra', gl: g.tasa, t: tAZ, cc: '#1D6FD1', cel: [c('Mano de obra', { color: '#7A8783' }), num('1,2%'), num('sin vencer', { color: '#00794F' }), num('2 pagos')] },
+          { n: 'Sellos', s: 'Contratos', gl: g.tasa, t: tG, cc: '#7A8783', off: true, del: true, cel: [c('Monto del contrato', { color: '#7A8783' }), num('1%', { color: '#98A3A0' }), num('vencida', { color: '#C93A3E' }), num('—', { color: '#98A3A0' })] },
+        ],
+        pie: 'La retención ya aplicada no se borra: se le pone fecha de fin y deja de calcularse.',
+      },
+
+      proyectos: {
+        eyebrow: 'TESORERÍA · OBRAS', acento: A, tinte: '#FDFAF3',
+        ver: '<strong>8 proyectos abiertos</strong> por $ 184.200.000. <strong style="color: #C93A3E;">La repavimentación de Eusebio Ayala ya ejecutó el 94% del presupuesto</strong> y le queda un tercio de obra.',
+        kpis: [['ABIERTOS', '8', '3 con obra en curso', ''], ['PRESUPUESTADO', '$ 184.200.000', 'ejercicio 2026', ''], ['EJECUTADO', '61%', '$ 112.400.000', ''], ['EN RIESGO', '1', 'gasto sobre avance', R], ['SIN MOVIMIENTO', '2', 'hace más de 60 días', A]],
+        pista: null,
+        buscar: 'Buscar proyecto…', cta: 'Nuevo proyecto',
+        selects: [['Estado', 'Todos'], ['Ejercicio', '2026']],
+        chips: [['Todos', 8], ['En curso', 3], ['En riesgo', 1], ['Cerrados', 4]],
+        heads: [['PROYECTO', 'left'], ['PRESUPUESTO', 'right'], ['EJECUTADO', 'right'], ['AVANCE DE OBRA', 'right'], ['ÚLTIMO GASTO', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.6fr) 140px 140px 128px 116px 104px', min: '1100px',
+        filas: [
+          { n: 'Repavimentación Eusebio Ayala', s: 'Obras Públicas · 2026', gl: g.pro, t: tR, cc: '#C93A3E', cel: [num('$ 62.000.000'), num('$ 58.280.000', { color: '#C93A3E', sub: '94% del total' }), num('68%', { color: '#C93A3E' }), num('hace 3 d')] },
+          { n: 'Recambio a luminarias LED', s: 'Servicios Públicos · 2026', gl: g.pro, t: tA, cc: '#B4560F', cel: [num('$ 48.400.000'), num('$ 31.460.000', { sub: '65% del total' }), num('71%', { color: '#00794F' }), num('hace 1 d')] },
+          { n: 'Plaza Uruguaya · puesta en valor', s: 'Servicios Públicos · 2026', gl: g.pro, t: tV, cc: '#00794F', cel: [num('$ 28.800.000'), num('$ 12.100.000', { sub: '42% del total' }), num('45%', { color: '#00794F' }), num('hace 8 d')] },
+          { n: 'Desagüe pluvial Sajonia', s: 'Obras Públicas · 2026', gl: g.pro, t: tA, cc: '#B4560F', cel: [num('$ 24.000.000'), num('$ 6.400.000', { sub: '27% del total' }), num('30%', { color: '#00794F' }), num('hace 62 d', { color: '#B4560F' })] },
+          { n: 'Señalización de escuelas', s: 'Tránsito · 2026', gl: g.pro, t: tG, cc: '#7A8783', cel: [num('$ 12.000.000'), num('$ 2.160.000', { sub: '18% del total' }), num('20%'), num('hace 74 d', { color: '#B4560F' })] },
+        ],
+        pie: 'El proyecto con gastos imputados no se borra: se cierra y sus gastos quedan atados.',
+      },
+
+      tarjetas: {
+        eyebrow: 'TESORERÍA · MEDIOS DE PAGO', acento: AZ, tinte: '#F5F8FD',
+        ver: '<strong>3 tarjetas corporativas</strong> con $ 2.104.700 de consumo sin rendir. <strong style="color: #B4560F;">La de Obras cierra en 4 días</strong> y tiene 11 consumos sin comprobante.',
+        kpis: [['TARJETAS', '3', 'dos bancos', ''], ['CONSUMO SIN RENDIR', '$ 2.104.700', 'en el ciclo actual', ''], ['CIERRA PRONTO', '1', 'en 4 días', A], ['SIN COMPROBANTE', '11', 'consumos a rendir', A], ['LÍMITE USADO', '38%', 'del total disponible', '']],
+        pista: null,
+        buscar: 'Buscar tarjeta…', cta: 'Nueva tarjeta',
+        selects: [['Banco', 'Todos'], ['Estado', 'Todas']],
+        chips: [['Todas', 3], ['Al día', 2], ['A rendir', 1]],
+        heads: [['TARJETA', 'left'], ['RESPONSABLE', 'left'], ['CONSUMO', 'right'], ['CIERRE', 'right'], ['VENCIMIENTO', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.3fr) minmax(0, 1.1fr) 132px 112px 124px 104px', min: '1020px',
+        filas: [
+          { n: 'Visa Corporate · 4417', s: 'Banco Continental', gl: g.tar, t: tA, cc: '#B4560F', cel: [c('Arnaldo Cantero', { punto: A }), num('$ 1.284.200', { sub: '11 sin comprobante', }), num('en 4 d', { color: '#B4560F' }), num('20 ago')] },
+          { n: 'Mastercard · 8802', s: 'Banco Itaú', gl: g.tar, t: tV, cc: '#00794F', cel: [c('Perla Sanabria', { punto: V }), num('$ 620.500'), num('en 18 d', { color: '#00794F' }), num('3 sep')] },
+          { n: 'Visa Débito · 1109', s: 'Banco Continental', gl: g.tar, t: tV, cc: '#00794F', cel: [c('Dionisia Franco', { punto: V }), num('$ 200.000'), num('sin ciclo', { color: '#98A3A0' }), num('—', { color: '#98A3A0' })] },
+        ],
+        pie: 'La tarjeta con consumos sin rendir no se da de baja hasta cerrar el ciclo.',
+      },
+
+      contactos: {
+        eyebrow: 'TESORERÍA · TERCEROS', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>148 contactos</strong> entre proveedores y empleados. <strong style="color: #B4560F;">23 no tienen CBU cargado</strong>: a esos hay que pagarles por fuera del sistema.',
+        kpis: [['CONTACTOS', '148', '112 proveedores · 36 empleados', ''], ['SIN CBU', '23', 'no entran al pago masivo', A], ['CON DEUDA', '14', '$ 43.048.905', ''], ['SIN MOVIMIENTO', '61', 'hace más de 6 meses', ''], ['DUPLICADOS', '2', 'mismo RUC', R]],
+        pista: ['EL CBU ES LO QUE HABILITA EL PAGO MASIVO', 'Un contacto sin CBU se puede facturar igual, pero queda afuera de la transferencia en lote: hay que pagarle a mano.', 'Ver los 23 sin CBU'],
+        buscar: 'Buscar por nombre, RUC o CBU…', cta: 'Nuevo contacto',
+        selects: [['Tipo', 'Todos'], ['Categoría', 'Todas'], ['CBU', 'Todos']],
+        chips: [['Todos', 148], ['Proveedores', 112], ['Empleados', 36], ['Sin CBU', 23]],
+        heads: [['CONTACTO', 'left'], ['TIPO', 'left'], ['RUC', 'left'], ['DEUDA', 'right'], ['ÚLTIMO MOVIMIENTO', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.5fr) 132px minmax(0, 1fr) 128px 140px 104px', min: '1060px',
+        filas: [
+          { n: 'Corralón Itá Enramada', s: 'CBU cargado', i: 'CI', t: tV, cc: '#00794F', cel: [c('Proveedor', { chip: [tV, '#00794F'] }), c('80048291-4', { color: '#7A8783' }), num('$ 11.900.000'), num('hace 3 d')] },
+          { n: 'Seguros La Consolidada S.A.', s: 'CBU cargado', i: 'SC', t: tV, cc: '#00794F', cel: [c('Proveedor', { chip: [tV, '#00794F'] }), c('80012004-7', { color: '#7A8783' }), num('$ 15.200.000', { color: '#C93A3E', sub: 'vencido' }), num('hace 22 d')] },
+          { n: 'Consultora Jara y Asociados', s: 'sin CBU', i: 'CJ', t: tA, cc: '#B4560F', cel: [c('Servicio profesional', { chip: [tA, '#B4560F'] }), c('80099117-2', { color: '#7A8783' }), num('$ 1.600.000'), num('hace 9 d')] },
+          { n: 'Perla Sanabria', s: 'CBU cargado', i: 'PS', t: tAZ, cc: '#1D6FD1', cel: [c('Empleado', { chip: chipAdm }), c('4.882.104', { color: '#7A8783' }), num('$ 3.000.000'), num('hace 1 d')] },
+          { n: 'Limpieza Integral Ñanduti', s: 'CBU cargado · RUC duplicado', i: 'LÑ', t: tR, cc: '#C93A3E', cel: [c('Proveedor', { chip: [tV, '#00794F'] }), c('80077412-9', { color: '#C93A3E', sub: 'se repite en 2 contactos', subFuerte: true }), num('$ 9.600.000'), num('hace 14 d')] },
+          { n: 'Ferretería Guaraní S.R.L.', s: 'sin CBU', i: 'FG', t: tA, cc: '#B4560F', cel: [c('Proveedor', { chip: [tV, '#00794F'] }), c('80031885-1', { color: '#7A8783' }), num('$ 7.400.000'), num('hace 6 d')] },
+        ],
+        pie: 'El contacto con movimientos no se borra: se da de baja y su historial queda.',
+      },
+
+      tasas: {
+        eyebrow: 'TESORERÍA · INGRESOS', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>31 tasas en el catálogo</strong> y <strong>24 se cobraron este año</strong>. <strong style="color: #B4560F;">Siete tienen importe de 2024</strong>: se están cobrando desactualizadas.',
+        kpis: [['EN CATÁLOGO', '31', '24 se cobran', ''], ['DESACTUALIZADAS', '7', 'importe de 2024', A], ['RECAUDADO', '$ 84.120.400', 'en el año', ''], ['MÁS COBRADA', 'ABL', '1.284 boletas', ''], ['SIN COBRAR', '7', 'nunca se emitieron', '']],
+        pista: null,
+        buscar: 'Buscar tasa…', cta: 'Nueva tasa',
+        selects: [['Categoría', 'Todas'], ['Cálculo', 'Todos'], ['Vigencia', 'Todas']],
+        chips: [['Todas', 31], ['Vigentes', 24], ['Desactualizadas', 7]],
+        heads: [['TASA', 'left'], ['CÁLCULO', 'left'], ['IMPORTE', 'right'], ['ACTUALIZADA', 'right'], ['RECAUDADO', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.5fr) minmax(0, 1.1fr) 124px 124px 140px 104px', min: '1080px',
+        filas: [
+          { n: 'ABL · Alumbrado, barrido y limpieza', s: 'Bimestral', gl: g.tasa, t: tV, cc: '#00794F', cel: [c('Por m² del inmueble', { color: '#7A8783' }), num('$ 12.400'), num('jul 2026', { color: '#00794F' }), num('$ 41.208.400')] },
+          { n: 'Habilitación comercial', s: 'Por trámite', gl: g.tasa, t: tV, cc: '#00794F', cel: [c('Monto fijo por rubro', { color: '#7A8783' }), num('$ 84.000'), num('may 2026', { color: '#00794F' }), num('$ 18.480.000')] },
+          { n: 'Permiso de obra', s: 'Por trámite', gl: g.tasa, t: tA, cc: '#B4560F', cel: [c('Por m² a construir', { color: '#7A8783' }), num('$ 3.200'), num('nov 2024', { color: '#B4560F', sub: 'sin actualizar' }), num('$ 9.120.000')] },
+          { n: 'Ocupación de vía pública', s: 'Mensual', gl: g.tasa, t: tA, cc: '#B4560F', cel: [c('Por m² y por día', { color: '#7A8783' }), num('$ 1.800'), num('nov 2024', { color: '#B4560F', sub: 'sin actualizar' }), num('$ 6.240.000')] },
+          { n: 'Libre deuda', s: 'Por certificado', gl: g.tasa, t: tV, cc: '#00794F', cel: [c('Monto fijo', { color: '#7A8783' }), num('$ 14.000'), num('jul 2026', { color: '#00794F' }), num('$ 4.032.000')] },
+          { n: 'Cementerio · traslado', s: 'Por trámite', gl: g.tasa, t: tG, cc: '#7A8783', del: true, cel: [c('Monto fijo', { color: '#7A8783' }), num('$ 22.000', { color: '#98A3A0' }), num('nov 2024', { color: '#B4560F' }), num('—', { color: '#98A3A0' })] },
+        ],
+        pie: 'La tasa con boletas emitidas no se borra: se le pone fecha de fin de vigencia.',
+      },
+
+      pagos: {
+        eyebrow: 'INTEGRACIONES · COBROS', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>2 proveedores de pago conectados</strong>. <strong style="color: #00794F;">El 71% de los cobros del mes entró por Bancard</strong>; la pasarela de billeteras está en prueba y no cobra todavía.',
+        kpis: [['CONECTADOS', '2', 'de 4 disponibles', ''], ['COBRADO ESTE MES', '$ 24.180.400', 'por los dos medios', ''], ['COMISIÓN PROMEDIO', '2,8%', '$ 677.050 del mes', ''], ['FALLIDOS', '14', 'de 892 intentos', A], ['EN PRUEBA', '1', 'no cobra todavía', '']],
+        pista: ['LAS CREDENCIALES NO SE MUESTRAN', 'Una vez guardada, la clave privada queda cifrada y solo se ve el prefijo. Para rotarla hay que cargarla de nuevo, no se puede leer.', 'Cómo rotar una credencial'],
+        buscar: 'Buscar proveedor…', cta: 'Conectar proveedor',
+        selects: [['Modo', 'Todos'], ['Estado', 'Todos']],
+        chips: [['Todos', 4], ['Conectados', 2], ['En prueba', 1], ['Sin conectar', 1]],
+        heads: [['PROVEEDOR', 'left'], ['MODO', 'left'], ['COMISIÓN', 'right'], ['COBRADO', 'right'], ['ÚLTIMA CONEXIÓN', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.4fr) 128px 108px 136px 140px 104px', min: '1060px',
+        filas: [
+          { n: 'Bancard', s: 'Tarjetas y débito', gl: g.pago, t: tV, cc: '#00794F', cel: [c('Producción', { chip: [tV, '#00794F'] }), num('2,4%'), num('$ 17.168.100'), num('hace 3 min', { color: '#00794F' })] },
+          { n: 'Pago Móvil Tigo', s: 'Billetera', gl: g.pago, t: tV, cc: '#00794F', cel: [c('Producción', { chip: [tV, '#00794F'] }), num('3,2%'), num('$ 7.012.300'), num('hace 12 min', { color: '#00794F' })] },
+          { n: 'Billetera Personal', s: 'Billetera', gl: g.pago, t: tA, cc: '#B4560F', cel: [c('Prueba', { chip: [tA, '#B4560F'] }), num('3,0%'), num('$ 0', { color: '#98A3A0' }), num('hace 2 d', { color: '#B4560F' })] },
+          { n: 'Transferencia bancaria', s: 'Sin credenciales cargadas', gl: g.pago, t: tG, cc: '#7A8783', off: true, del: true, cel: [c('Sin conectar', { chip: [tG, '#7A8783'] }), num('—', { color: '#98A3A0' }), num('—', { color: '#98A3A0' }), num('nunca', { color: '#98A3A0' })] },
+        ],
+        pie: 'Desconectar un proveedor no borra los cobros que ya entraron por él.',
+      },
+
+      auditoria: {
+        modo: 'lectura',
+        eyebrow: 'SUPER ADMIN · TRAZA', acento: AZ, tinte: '#F5F8FD',
+        ver: '<strong>1.284 acciones registradas</strong> en los últimos 30 días. <strong style="color: #B4560F;">Tres borrados de registros</strong> los hizo el mismo usuario en un lapso de once minutos.',
+        kpis: [['ACCIONES · 30 D', '1.284', 'de 12 usuarios', ''], ['BORRADOS', '3', 'mismo usuario', A], ['CAMBIOS DE CONFIG', '41', 'sobre 9 catálogos', ''], ['DESDE FUERA', '2', 'IP no municipal', R], ['USUARIO MÁS ACTIVO', '412', 'Rocío Giménez', '']],
+        pista: null,
+        buscar: 'Buscar por usuario, entidad o acción…', cta: 'Exportar la traza',
+        selects: [['Usuario', 'Todos'], ['Acción', 'Todas'], ['Período', 'Últimos 30 días']],
+        chips: [['Todas', 1284], ['Borrados', 3], ['Config', 41], ['Ingresos', 208]],
+        heads: [['CUÁNDO', 'left'], ['USUARIO', 'left'], ['ACCIÓN', 'left'], ['ENTIDAD', 'left'], ['ORIGEN', 'left'], ['DETALLE', 'right']],
+        cols: 'minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1fr) 104px', min: '1100px',
+        filas: [
+          { n: 'Hoy 09:41', s: 'hace 12 minutos', gl: g.log, t: tR, cc: '#C93A3E', cel: [c('Néstor Ayala', { punto: R }), c('Borró un registro', { punto: R, color: '#C93A3E' }), c('Tasa · Cementerio', { color: '#7A8783' }), c('190.128.44.2', { color: '#98A3A0', sub: 'IP no municipal', subFuerte: true })] },
+          { n: 'Hoy 09:36', s: 'hace 17 minutos', gl: g.log, t: tR, cc: '#C93A3E', cel: [c('Néstor Ayala', { punto: R }), c('Borró un registro', { punto: R, color: '#C93A3E' }), c('Tasa · Exhumación', { color: '#7A8783' }), c('190.128.44.2', { color: '#98A3A0' })] },
+          { n: 'Hoy 09:30', s: 'hace 23 minutos', gl: g.log, t: tA, cc: '#B4560F', cel: [c('Rocío Giménez', { punto: V }), c('Cambió un plazo', { punto: A, color: '#B4560F' }), c('SLA · Bacheo 7 d → 5 d', { color: '#7A8783' }), c('Red municipal', { color: '#98A3A0' })] },
+          { n: 'Hoy 08:14', s: 'hace 1 hora', gl: g.log, t: tV, cc: '#00794F', cel: [c('Perla Sanabria', { punto: V }), c('Aprobó un pago', { punto: V }), c('OP-2026-0009', { color: '#7A8783' }), c('Red municipal', { color: '#98A3A0' })] },
+          { n: 'Ayer 17:52', s: '2 ago', gl: g.log, t: tV, cc: '#00794F', cel: [c('Arnaldo Cantero', { punto: A }), c('Creó una cuadrilla', { punto: V }), c('Cuadrilla 7', { color: '#7A8783' }), c('Red municipal', { color: '#98A3A0' })] },
+        ],
+        pie: 'La traza no se edita ni se borra: es el respaldo de lo que pasó en la app.',
+      },
+
+      suscripciones: {
+        eyebrow: 'SUPER ADMIN · CLIENTES', acento: V, tinte: '#F5FBF8',
+        ver: '<strong>6 municipios</strong> con plan activo. <strong style="color: #B4560F;">Dos vencen este mes</strong> y uno de ellos todavía usa el plan de prueba con 3 módulos.',
+        kpis: [['MUNICIPIOS', '6', '5 activos · 1 en prueba', ''], ['VENCEN ESTE MES', '2', 'renovación pendiente', A], ['FACTURACIÓN MENSUAL', '$ 8.400.000', 'suma de los planes', ''], ['MÓDULOS PROMEDIO', '6,2', 'de 8 disponibles', ''], ['EN PRUEBA', '1', 'vence en 9 días', A]],
+        pista: null,
+        buscar: 'Buscar municipio…', cta: 'Nueva suscripción',
+        selects: [['Plan', 'Todos'], ['Estado', 'Todos']],
+        chips: [['Todos', 6], ['Activos', 5], ['En prueba', 1], ['Por vencer', 2]],
+        heads: [['MUNICIPIO', 'left'], ['PLAN', 'left'], ['MÓDULOS', 'right'], ['MENSUAL', 'right'], ['VENCE', 'right'], ['ACCIONES', 'right']],
+        cols: 'minmax(0, 1.5fr) 132px 108px 132px 128px 104px', min: '1040px',
+        filas: [
+          { n: 'Municipalidad de Asunción', s: 'Paraguay Limpio', gl: g.dep, t: tV, cc: '#00794F', cel: [c('Completo', { chip: [tV, '#00794F'] }), num('8'), num('$ 2.400.000'), num('31 dic 2026', { color: '#00794F' })] },
+          { n: 'Municipalidad de Luque', s: 'Luque Limpio', gl: g.dep, t: tA, cc: '#B4560F', cel: [c('Completo', { chip: [tV, '#00794F'] }), num('8'), num('$ 1.800.000'), num('en 12 d', { color: '#B4560F' })] },
+          { n: 'Municipalidad de San Lorenzo', s: 'Mi San Lorenzo', gl: g.dep, t: tV, cc: '#00794F', cel: [c('Operativo', { chip: [tAZ, '#1D6FD1'] }), num('6'), num('$ 1.600.000'), num('30 jun 2027', { color: '#00794F' })] },
+          { n: 'Municipalidad de Capiatá', s: 'Capiatá Responde', gl: g.dep, t: tA, cc: '#B4560F', cel: [c('Operativo', { chip: [tAZ, '#1D6FD1'] }), num('6'), num('$ 1.400.000'), num('en 21 d', { color: '#B4560F' })] },
+          { n: 'Municipalidad de Areguá', s: 'Areguá Cuida', gl: g.dep, t: tV, cc: '#00794F', cel: [c('Reclamos', { chip: [tG, '#3D4945'] }), num('4'), num('$ 1.200.000'), num('30 sep 2026', { color: '#00794F' })] },
+          { n: 'Municipalidad de Itauguá', s: 'sin marca definida', gl: g.dep, t: tG, cc: '#7A8783', cel: [c('Prueba', { chip: [tA, '#B4560F'] }), num('3'), num('$ 0', { color: '#98A3A0' }), num('en 9 d', { color: '#C93A3E' })] },
+        ],
+        pie: 'Dar de baja una suscripción no borra los datos del municipio: quedan en solo lectura.',
+      },
+    };
+
+    const base = S[id];
+    if (!base) return null;
+    return base;
+  }
+
   renderVals() {
     const acento = this.state.marca || '#00B37E';
     const contratados = String(this.props.contratados ?? 'general,personal,vecino,catalogos,inventario,tesoreria,integraciones,super')
@@ -1170,6 +1941,22 @@ class Component extends DCLogic {
 
     const totalUso = d.filas.reduce((t, x) => t + x.uso, 0);
     const pisadas = d.filas.filter((x) => x.pisa).length;
+    const pnt = hijo && hijo.tipo === 'abm' ? this.puenteSpec(hijo.id) : null;
+    const spec = hijo && hijo.tipo === 'abm' && !pnt ? this.abmSpec(hijo.id) : null;
+    const heroInfo = pnt ? this.abmSpec(hijo.id) : null;
+    const heroCat = {
+      ver: top
+        ? '<strong>' + d.filas.length + ' en el catálogo, ' + activas.length + ' activas.</strong> «' + top.nombre + '» concentra ' + top.uso + ' ' + d.unidad
+          + (sinUso.length ? ', y <strong style="color: #B4560F;">' + sinUso.length + ' no se usaron nunca</strong>: esas se pueden borrar.' : '.')
+        : 'Todavía no hay nada cargado en este catálogo.',
+      kpis: [
+        ['EN EL CATÁLOGO', String(d.filas.length), 'entradas cargadas', ''],
+        ['ACTIVAS', String(activas.length), 'se ofrecen al vecino', ''],
+        ['SIN USAR', String(sinUso.length), sinUso.length ? 'se pueden borrar' : 'todas tienen uso', sinUso.length ? '#B4560F' : ''],
+        ['MÁS USADA', top ? String(top.uso) : '—', top ? top.nombre : 'sin datos', ''],
+        ['SE PISAN', String(pisadas), pisadas ? 'nombres parecidos' : 'ninguna se repite', pisadas ? '#B4560F' : ''],
+      ],
+    };
     const veredictoCatalogo = top
       ? React.createElement('span', { dangerouslySetInnerHTML: { __html:
           '<strong style="font-weight: 600; color: #0D1412;">' + d.filas.length + ' en el catálogo, ' + activas.length + ' activas.</strong> '
@@ -1396,7 +2183,7 @@ class Component extends DCLogic {
     return {
       sinSalto: (e) => { if (e && e.preventDefault) e.preventDefault(); },
       arbol: nodos,
-      hayCta: !!hijo && (hijo.tipo === 'catalogo' || hijo.tipo === 'arbol'),
+      hayCta: (!!spec && !pnt) || !!hijo && (hijo.tipo === 'catalogo' || hijo.tipo === 'arbol'),
       pieArbol: 'Los dos catálogos anidados: cada categoría con sus tipos, y cada tipo con lo que le pide al vecino.',
       expandirTodo: () => this.setState((st) => ({ abiertoArbol: st.abiertoArbol === 'todo' ? null : 'todo' })),
       labelExpandir: this.state.abiertoArbol === 'todo' ? 'Colapsar todo' : 'Expandir todo',
@@ -1580,8 +2367,10 @@ class Component extends DCLogic {
       }),
       tituloRiel: padre ? padre.label.toUpperCase() : '',
       hijos: hijos.map((h) => {
+        const sp = h.tipo === 'abm' ? this.abmSpec(h.id) : null;
+        const nSpec = sp ? this.miles(sp.chips[0][1]) : '';
         const on = hijo && h.id === hijo.id;
-        return { label: h.label, n: this.conteoDe(h), ir: () => this.setState({ hijo: h.id, filtro: 'todos' }),
+        return { label: h.label, n: nSpec || this.conteoDe(h), ir: () => this.setState({ hijo: h.id, filtro: 'todos' }),
           bg: on ? '#E7F6F0' : 'transparent', bgHover: on ? '#E7F6F0' : '#EAEEEC',
           peso: on ? 600 : 500, color: on ? '#00794F' : '#3D4945', subColor: on ? '#4FB894' : '#B4BDBA' };
       }),
@@ -1593,7 +2382,82 @@ class Component extends DCLogic {
       esAsignacion: !!hijo && hijo.tipo === 'asignacion',
       esTramites: !!hijo && hijo.tipo === 'tramites',
       esArbol: !!hijo && hijo.tipo === 'arbol',
-      esAbmCompleto: !!hijo && hijo.tipo === 'abm',
+      esPuente: !!pnt,
+      puenteTituloAlla: pnt ? pnt.alla : '',
+      puenteMotivo: pnt ? pnt.motivo : '',
+      puenteCta: pnt ? pnt.cta : '',
+      puenteAca: pnt ? pnt.aca.map((x) => ({ label: x[0], nota: x[1], ir: () => this.setState({ hijo: x[2], filtro: 'todos', chipAbm: 0 }) })) : [],
+      puenteAlla: pnt ? pnt.allaLista.map((x) => ({ label: x })) : [],
+      puenteMuestraTitulo: pnt ? pnt.muestraTitulo : '',
+      puenteMuestraNota: pnt ? pnt.muestraNota : '',
+      puenteMuestra: pnt ? pnt.muestra.map((m) => ({ iniciales: m[0], tinte: m[1], colorIcono: m[2], nombre: m[3], sub: m[4], dato: m[5], radio: '999px' })) : [],
+
+      // ---- Hero, pista y grilla del ABM -----------------------------------
+      hayHero: !!(hijo && (hijo.tipo === 'catalogo' || hijo.tipo === 'abm')),
+      heroEyebrow: (spec || heroInfo) ? (spec || heroInfo).eyebrow : (padre ? padre.label.toUpperCase() + ' · CATÁLOGO' : ''),
+      heroAcento: (spec || heroInfo) ? (spec || heroInfo).acento : '#00B37E',
+      heroTinte: (spec || heroInfo) ? (spec || heroInfo).tinte : '#F5FBF8',
+      heroVeredicto: React.createElement('span', { dangerouslySetInnerHTML: { __html: (spec || heroInfo) ? (spec || heroInfo).ver : heroCat.ver } }),
+      nKpis: ((spec || heroInfo) ? (spec || heroInfo).kpis : heroCat.kpis).length,
+      heroKpis: ((spec || heroInfo) ? (spec || heroInfo).kpis : heroCat.kpis).map((k, i) => ({
+        label: k[0], valor: k[1], nota: k[2],
+        color: k[3] || '#0D1412',
+        pad: i === 0 ? '0px' : '18px',
+        linea: i === 0 ? 'transparent' : 'rgba(13,20,18,0.08)',
+      })),
+      hayPista: !!(spec && spec.pista),
+      pistaTitulo: spec && spec.pista ? spec.pista[0] : '',
+      pistaTexto: spec && spec.pista ? spec.pista[1] : '',
+      pistaCta: spec && spec.pista ? spec.pista[2] : '',
+
+      buscarCat: 'Buscar en el catálogo…',
+      filtrosSelect: spec ? spec.selects.map((x) => ({ label: x[0], valor: x[1] })) : [],
+      abmBuscar: spec ? spec.buscar : '',
+      abmSelects: spec ? spec.selects.map((x) => ({ label: x[0], valor: x[1] })) : [],
+      hayEdicion: !spec || spec.modo !== 'lectura',
+      abmChips: spec ? spec.chips.map((x, i) => {
+        const on = (this.state.chipAbm || 0) === i;
+        return { label: x[0], n: this.miles(x[1]), ir: () => this.setState({ chipAbm: i }),
+          bg: on ? '#FFFFFF' : '#F6F8F7', bd: on ? 'rgba(13,20,18,0.18)' : 'rgba(13,20,18,0.07)',
+          col: on ? '#0D1412' : '#3D4945', sub: on ? '#5B6764' : '#98A3A0' };
+      }) : [],
+      abmResumen: spec ? spec.filas.length + ' en pantalla' : '',
+      abmCols: spec ? spec.cols : '',
+      abmMin: spec ? spec.min : '900px',
+      abmHeads: spec ? spec.heads.map((h) => ({ label: h[0], align: h[1] })) : [],
+      abmPie: spec ? spec.pie : '',
+      abmMostrando: spec ? 'Mostrando ' + spec.filas.length + ' de ' + this.miles(spec.chips[0][1]) : '',
+      abmFilas: spec ? spec.filas.map((r) => {
+        const soloLectura = spec.modo === 'lectura';
+        const off = r.off || (this.state.apagados || []).indexOf(r.n) > -1;
+        return {
+          nombre: r.n, sub: r.s || '',
+          hayAvatar: true,
+          hayGlifo: !!r.gl, glifo: r.gl || '',
+          hayIniciales: !r.gl, iniciales: r.i || '',
+          radio: r.i && !r.gl ? '999px' : '9px',
+          tinte: off ? '#F3F7F5' : r.t, colorIcono: off ? '#98A3A0' : r.cc,
+          colorNombre: off ? '#7A8783' : '#0D1412',
+          fondo: off ? '#FCFDFC' : '#FFFFFF',
+          fuenteSub: 'Inter, sans-serif',
+          celdas: r.cel,
+          editable: !soloLectura,
+          soloLectura: soloLectura,
+          estado: off ? 'Inactivo' : 'Activo',
+          pistaBg: off ? '#D5DDDA' : '#00B37E',
+          perilla: off ? '2px' : '16px',
+          alternar: () => this.setState((st) => ({
+            apagados: (st.apagados || []).indexOf(r.n) > -1
+              ? st.apagados.filter((x) => x !== r.n)
+              : (st.apagados || []).concat([r.n]),
+          })),
+          colBorrar: r.del ? '#C93A3E' : '#D5DDDA',
+          opBorrar: r.del ? 1 : 0.5,
+          cursorBorrar: r.del ? 'pointer' : 'not-allowed',
+          tituloBorrar: r.del ? 'Borrar' : 'No se puede borrar: tiene movimientos asociados',
+        };
+      }) : [],
+      esAbmCompleto: !!spec,
       notaAbm: (hijo && notasAbm[hijo.id]) || 'Esta pestaña necesita el ABM completo, no el catálogo simple.',
       veredicto: hijo && hijo.tipo === 'arbol' ? React.createElement('span', { dangerouslySetInnerHTML: { __html:
           '<strong style="font-weight: 600; color: #0D1412;">' + this.datosDe('cat-tramite').filas.length + ' categorías y ' + tram.length + ' tipos</strong> en una sola vista, '
@@ -1608,9 +2472,8 @@ class Component extends DCLogic {
               + 'Por esas entraron <strong style="font-weight: 600; color: #0D1412;">' + enRiesgo + ' de los ' + totalRec + ' ' + (ladoAsig === 'tramites' ? 'trámites' : 'reclamos') + '</strong> históricos, y cada uno hubo que derivarlo a mano.'
             : '<strong style="font-weight: 600; color: #00794F;">Las ' + catsRec.length + ' categorías de ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' tienen dependencia.</strong> '
               + 'Todo ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' que entra se deriva solo, sin que nadie lo toque.' } })
-        : hijo && hijo.tipo === 'catalogo' ? veredictoCatalogo
-        : (hijo && veredictos[hijo.id]) || 'Se edita con la misma pieza que el resto de la app.',
-      ctaNuevo: (hijo && hijo.tipo === 'arbol') ? 'Nueva dependencia' : d.nuevo,
+        : (hijo && this.descripcion(hijo.id)) || (hijo && veredictos[hijo.id]) || '',
+      ctaNuevo: spec ? spec.cta : (hijo && hijo.tipo === 'arbol') ? 'Nueva dependencia' : d.nuevo,
       cols: cols,
       colRespuesta: (hijo && hijo.id === 'cat-reclamo') ? 'PLAZO Y PRIORIDAD' : 'PLAZO',
       colOrdenLabel: this.state.orden ? 'ARRASTRÁ' : 'ORDEN',

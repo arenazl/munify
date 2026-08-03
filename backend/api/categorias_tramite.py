@@ -49,7 +49,23 @@ async def listar_categorias_tramite(
     query = query.order_by(CategoriaTramite.orden, CategoriaTramite.nombre)
 
     result = await db.execute(query)
-    return result.scalars().all()
+    categorias = result.scalars().all()
+
+    # Uso de cada categoria: cuantos tramites cuelgan de ella. UNA query
+    # agrupada para todas. Lo consume la pantalla de Configuracion para decir
+    # cual concentra el catalogo y cuales no se usaron nunca (esas se pueden
+    # borrar). Sin el dato, la pantalla muestra "-" en vez de estimar.
+    if categorias:
+        conteo = await db.execute(
+            select(Tramite.categoria_tramite_id, func.count(Tramite.id))
+            .where(Tramite.categoria_tramite_id.in_([c.id for c in categorias]))
+            .group_by(Tramite.categoria_tramite_id)
+        )
+        usos = dict(conteo.all())
+        for cat in categorias:
+            cat.en_uso = usos.get(cat.id, 0)
+
+    return categorias
 
 
 @router.get("/{categoria_id}", response_model=CategoriaTramiteResponse)
