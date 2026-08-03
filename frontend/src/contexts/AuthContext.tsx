@@ -27,8 +27,11 @@ export interface Municipio {
   abm_en_sidebar?: boolean;
   // Configuración de tema
   tema_config?: {
-    // Nuevo sistema de presets
+    // Apariencia: los 3 ejes (fondo / acento / barra lateral)
     presetId?: string;
+    accentId?: string;
+    sidebarMode?: string;
+    /** @deprecated eje viejo (tonalidad del sidebar). Se sigue leyendo. */
     variant?: string;
     // Campos legacy (para compatibilidad)
     theme?: string;

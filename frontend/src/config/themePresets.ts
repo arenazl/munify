@@ -1,31 +1,38 @@
 /**
- * Sistema de Temas Predefinidos - Munify
+ * Sistema de Temas — Munify
  *
- * 12 paletas de colores inspiradas en colorhunt.co
- * Cada tema tiene 3 variantes: clásico, vintage, vibrante
- * TODAS las variantes se generan automáticamente con generateVariants()
+ * Un tema se define con lo MÍNIMO: un color BASE + un MODO (claro/oscuro).
+ * TODO lo demás se deriva. Son tres ejes INDEPENDIENTES que se combinan
+ * libremente (cualquier acento sobre cualquier fondo es válido):
+ *
+ *   1. TEMA DE FONDO  → `bgThemes` (3 claros + 3 oscuros). Aporta `base` y `modo`.
+ *   2. ACENTO         → `accents`. Transversal: pinta botones, activos, detalles.
+ *   3. BARRA LATERAL  → `sidebarModes`. Cómo se arma el fondo del sidebar
+ *                       (sigue al tema / teñido del acento / claro siempre).
+ *
+ * ANTES cada combinación fondo×acento tenía que nacer como preset nuevo —
+ * por eso la colección se había desbordado a 40 paletas con duplicados
+ * ("Verde Oscuro" y "Verde Claro" = mismo acento, distinto fondo; "Papel" y
+ * "Tinta" = el mismo neutro invertido). Separando los ejes, 6 fondos × 7
+ * acentos × 3 sidebars = 126 apariencias con 16 valores declarados.
+ *
+ * Los 13 campos de `ThemeColors` salen de `buildThemeColors()`. El segundo
+ * tono (backgroundSecondary / card / border) NO se declara: es el `base` con
+ * un escalón de luminosidad.
  */
 
+export type ThemeMode = 'claro' | 'oscuro';
+
+/** Cómo se arma el fondo de la barra lateral (eje 3). */
+export type SidebarMode = 'organico' | 'tinte' | 'claro';
+
+/**
+ * @deprecated Eje viejo (tonalidad del sidebar: clasico/vintage/vibrante).
+ * Se mantiene el TIPO porque `brands/` lo declara y porque hay preferencias
+ * guardadas en localStorage con estos valores. Se traduce a `SidebarMode`
+ * en `resolveSidebarMode()`. No usar en código nuevo.
+ */
 export type ThemeVariant = 'clasico' | 'vintage' | 'vibrante';
-
-
-export interface ThemePreset {
-  id: string;
-  name: string;
-  // Colores de la paleta (4 colores como en colorhunt.co)
-  palette: [string, string, string, string];
-  variants: {
-    clasico: ThemeColors;
-    vintage: ThemeColors;
-    vibrante: ThemeColors;
-  };
-  /** Familia del tema: 'light' (suaves), 'azul' (SaaS modernos), 'dark' (carbón VS Code) */
-  family?: 'light' | 'azul' | 'dark';
-  /** Si true, el tema NO aparece en el selector pero sigue funcionando
-   * si algun usuario lo tiene guardado en localStorage. Se usa para
-   * desactivar gradualmente la coleccion vieja sin romper sesiones. */
-  archived?: boolean;
-}
 
 export interface ThemeColors {
   // Fondos
@@ -53,12 +60,43 @@ export interface ThemeColors {
 
   /** Fondo con un lavado MUY sutil del acento (gradiente), para contenedores
    *  "agrupación" (header de ABMPage, tabla, cards, Sheet). Opcional — si no
-   *  está definido, los componentes caen a `card` (flat, comportamiento
-   *  histórico). En evaluación 2026-07-03 solo para niebla/marfil/perla. */
+   *  está definido, los componentes caen a `card` (flat). Se aplica en los
+   *  temas de modo CLARO. */
   cardAccentBg?: string;
 }
 
+/** Un tema de fondo: lo único declarado a mano es `base` + `modo`. */
+export interface BgTheme {
+  id: string;
+  name: string;
+  modo: ThemeMode;
+  /** Color base del fondo. TODO el resto de las superficies sale de acá. */
+  base: string;
+  /** ID del acento que se aplica al elegir este tema, mientras el usuario no
+   *  haya elegido uno propio (si eligió, esa elección manda). */
+  acentoRecomendado: string;
+}
+
+/** Un acento del catálogo transversal. */
+export interface AccentOption {
+  id: string;
+  name: string;
+  /** Un hex fijo, o un hex POR MODO. El "Neutro" usa la segunda forma: sobre
+   *  fondo oscuro resuelve a blanco y sobre fondo claro a negro — es el mismo
+   *  acento, no dos (reemplaza al par de presets Papel/Tinta). */
+  color: string | Record<ThemeMode, string>;
+}
+
+export interface SidebarModeOption {
+  id: SidebarMode;
+  name: string;
+  description: string;
+}
+
+// ============================================================
 // Funciones auxiliares de color
+// ============================================================
+
 const darken = (hex: string, percent: number): string => {
   const num = parseInt(hex.replace('#', ''), 16);
   const amt = Math.round(2.55 * percent);
@@ -86,35 +124,58 @@ const mixColors = (hex1: string, hex2: string, ratio: number): string => {
   return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
 };
 
-// Calcular si un color es claro u oscuro (para determinar texto sobre primary)
-const isLightColor = (hex: string): boolean => {
+// Luminancia relativa (0 oscuro → 1 claro) y su lectura binaria, para decidir
+// textos por contraste.
+const luminanciaDe = (hex: string): number => {
   const num = parseInt(hex.replace('#', ''), 16);
-  const R = num >> 16;
-  const G = (num >> 8) & 0x00ff;
-  const B = num & 0x0000ff;
-  // Fórmula de luminancia relativa
-  const luminance = (0.299 * R + 0.587 * G + 0.114 * B) / 255;
-  return luminance > 0.5;
+  return ((num >> 16) * 0.299 + ((num >> 8) & 0xff) * 0.587 + (num & 0xff) * 0.114) / 255;
 };
 
-// Función para generar colores de una variante
-function generateColors(
-  palette: [string, string, string, string],
-  bgIndex: number,
-  sidebarIndex: number,
-  primaryIndex: number
-): ThemeColors {
-  const rawBg = palette[bgIndex];
-  const sidebar = palette[sidebarIndex];
-  const primary = palette[primaryIndex];
+const isLightColor = (hex: string): boolean => luminanciaDe(hex) > 0.5;
 
-  // Si el preset elige un fondo MUY claro (blanco puro, casi-blanco,
-  // crema, etc.), lo reemplazamos por un gris suave (#e8eef5) para que
-  // las cards resalten. Cards quedan en blanco/cremita para los light.
-  const rawNum = parseInt(rawBg.replace('#', ''), 16);
-  const lum = ((rawNum >> 16) * 0.299 + ((rawNum >> 8) & 0xff) * 0.587 + (rawNum & 0xff) * 0.114) / 255;
-  const isCasiBlanco = lum > 0.92;
-  const bg = isCasiBlanco ? '#e8eef5' : rawBg;
+// Los dos "tintas" que la app usa sobre superficies de color.
+const TINTA_OSCURA = '#1e293b';
+const TINTA_CLARA = '#ffffff';
+
+/** Luminancia WCAG (sRGB linealizado) — sólo para decidir contrastes. */
+const luminanciaWcag = (hex: string): number => {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const canal = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * canal(num >> 16) + 0.7152 * canal((num >> 8) & 0xff) + 0.0722 * canal(num & 0xff);
+};
+
+const contraste = (a: string, b: string): number => {
+  const [alto, bajo] = [luminanciaWcag(a), luminanciaWcag(b)].sort((x, y) => y - x);
+  return (alto + 0.05) / (bajo + 0.05);
+};
+
+/**
+ * Texto sobre una superficie de color (el acento): el que MÁS contraste da.
+ * Se decide por contraste real y no por un umbral de luminancia, porque los
+ * acentos que caen justo en el límite (el olivo, por ejemplo) quedaban con
+ * texto blanco a 3.1:1 — ilegible. Así siempre gana la tinta correcta.
+ */
+const tintaSobre = (fondo: string): string =>
+  contraste(TINTA_CLARA, fondo) >= contraste(TINTA_OSCURA, fondo) ? TINTA_CLARA : TINTA_OSCURA;
+
+/**
+ * Deriva los 13 campos de `ThemeColors` a partir de tres colores.
+ *
+ * Es el motor de siempre (ex `generateColors()` / el `buildWith()` interno de
+ * `genCuratedVariants()`), con la misma matemática: el segundo tono es el base
+ * con un escalón de luminosidad, y los textos se eligen por contraste.
+ */
+function derivarColores(rawBg: string, sidebar: string, acento: string): ThemeColors {
+  // Si el tema elige un fondo MUY claro (blanco puro, casi-blanco, crema),
+  // el FONDO baja un escalón para que las cards resalten, y las cards se
+  // quedan con el color original (blanco/cremita).
+  // El escalón sale del propio base (antes era un gris azulado fijo, que le
+  // robaba la temperatura a los temas cálidos: Marfil terminaba con fondo frío).
+  const isCasiBlanco = luminanciaDe(rawBg) > 0.92;
+  const bg = isCasiBlanco ? darken(rawBg, 6) : rawBg;
 
   const bgIsLight = isLightColor(bg);
   const sidebarIsLight = isLightColor(sidebar);
@@ -123,635 +184,199 @@ function generateColors(
     background: bg,
     backgroundSecondary: bgIsLight ? darken(bg, 3) : lighten(bg, 3),
     contentBackground: bg,
-    // Cards: si el bg original era casi-blanco, las dejamos en el
-    // color original (blanco o crema) para que resalten contra el gris.
     card: isCasiBlanco ? rawBg : lighten(bg, 5),
     sidebar: sidebar,
-    sidebarText: sidebarIsLight ? '#1e293b' : '#ffffff',
+    sidebarText: sidebarIsLight ? TINTA_OSCURA : TINTA_CLARA,
     sidebarTextSecondary: sidebarIsLight ? '#475569' : '#94a3b8',
-    text: bgIsLight ? '#1e293b' : '#ffffff',
+    text: bgIsLight ? TINTA_OSCURA : TINTA_CLARA,
     textSecondary: bgIsLight ? '#475569' : '#94a3b8',
-    primary: primary,
-    primaryHover: darken(primary, 12),
-    primaryText: isLightColor(primary) ? '#1e293b' : '#ffffff',
+    primary: acento,
+    primaryHover: darken(acento, 12),
+    primaryText: tintaSobre(acento),
     border: bgIsLight ? darken(bg, 10) : lighten(bg, 10),
   };
 }
 
-// Función auxiliar para generar las 3 variantes de un tema
-interface VariantConfig {
-  bgIndex: number;
-  sidebarIndex: number;
-  primaryIndex: number;
-}
-
-function generateVariants(
-  palette: [string, string, string, string],
-  config: {
-    clasico: VariantConfig;
-    vintage: VariantConfig;
-    vibrante: VariantConfig;
-  }
-): ThemePreset['variants'] {
-  return {
-    clasico: generateColors(palette, config.clasico.bgIndex, config.clasico.sidebarIndex, config.clasico.primaryIndex),
-    vintage: generateColors(palette, config.vintage.bgIndex, config.vintage.sidebarIndex, config.vintage.primaryIndex),
-    vibrante: generateColors(palette, config.vibrante.bgIndex, config.vibrante.sidebarIndex, config.vibrante.primaryIndex),
-  };
-}
-
-/**
- * Para los 9 temas curados: las 3 variantes (clasico/vintage/vibrante)
- * funcionan como "Clara / Media / Oscura" del SIDEBAR, manteniendo el
- * mismo bg y primary que el tema. Asi el user puede elegir la tonalidad
- * del sidebar que prefiera sin salirse del tema.
- *
- * sidebars: [clara, media, oscura] — todas en el mismo hue del tema,
- * pero con distinta luma.
- */
-function genCuratedVariants(
-  palette: [string, string, string, string],
-  bgIndex: number,
-  primaryIndex: number,
-  sidebars: [string, string, string],
-): ThemePreset['variants'] {
-  const bg = palette[bgIndex];
-  const primary = palette[primaryIndex];
-  const buildWith = (sidebar: string): ThemeColors => {
-    const fakePalette: [string, string, string, string] = [bg, sidebar, primary, primary];
-    return generateColors(fakePalette, 0, 1, 2);
-  };
-  return {
-    clasico: buildWith(sidebars[0]),   // Sidebar CLARA
-    vintage: buildWith(sidebars[1]),   // Sidebar MEDIA
-    vibrante: buildWith(sidebars[2]),  // Sidebar OSCURA
-  };
-}
-
-// Lavado sutil del acento sobre el card — diagonal, se disuelve rápido para
-// no competir con el contenido. EXPERIMENTO 2026-07-03: solo se aplica a
-// niebla/marfil/perla vía `withAccentWash` (no toca generateColors ni el
-// resto de los temas, que siguen con `card` flat).
+/** Lavado sutil del acento sobre el card — diagonal, se disuelve rápido para
+ *  no competir con el contenido. */
 const accentWash = (card: string, primary: string): string =>
   `linear-gradient(160deg, ${mixColors(card, primary, 0.07)} 0%, ${card} 60%)`;
 
-function withAccentWash(variants: ThemePreset['variants']): ThemePreset['variants'] {
-  const tint = (c: ThemeColors): ThemeColors => ({ ...c, cardAccentBg: accentWash(c.card, c.primary) });
-  return {
-    clasico: tint(variants.clasico),
-    vintage: tint(variants.vintage),
-    vibrante: tint(variants.vibrante),
-  };
-}
-
 // ============================================================
-// COLECCION CURADA — 9 temas oficiales (3 light suaves + 3 azul SaaS + 3 dark VS Code)
-// El resto de los temas (Midnight, Forest, Sunset, etc.) estan `archived: true`:
-// siguen funcionando si alguien los tiene seleccionados pero no aparecen en el
-// selector. Para reactivar uno viejo, sacarle el flag `archived`.
+// EJE 1 — TEMAS DE FONDO (3 claros + 3 oscuros)
+// Los `base` son los de los mejores temas de la colección anterior; lo que se
+// fue es la paleta de 4 colores con el acento adentro.
 // ============================================================
-export const themePresets: ThemePreset[] = [
 
-  // ---- LIGHT (blancos suaves, NUNCA blanco puro) ----
-  // Variantes = tonalidad del sidebar: Clara / Media / Oscura.
+export const bgThemes: BgTheme[] = [
+  // ---- CLAROS (blancos suaves, NUNCA blanco puro) ----
+  { id: 'niebla', name: 'Niebla', modo: 'claro', base: '#f4f6fa', acentoRecomendado: 'indigo' },
+  { id: 'marfil', name: 'Marfil', modo: 'claro', base: '#faf8f3', acentoRecomendado: 'olivo' },
+  { id: 'perla', name: 'Perla', modo: 'claro', base: '#f1f5f9', acentoRecomendado: 'celeste' },
 
-  // 1. Niebla — blanco grisaceo suave, acento indigo. Linear-style.
-  {
-    id: 'niebla',
-    name: 'Niebla',
-    family: 'light',
-    palette: ['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'],
-    variants: withAccentWash(genCuratedVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'], 0, 3,
-      ['#e7ebf3', '#475569', '#1e293b'])),
-  },
-
-  // 2. Marfil — beige calido, acento verde olivo. Editorial/civic.
-  {
-    id: 'marfil',
-    name: 'Marfil',
-    family: 'light',
-    palette: ['#faf8f3', '#efece4', '#1f2937', '#65a30d'],
-    variants: withAccentWash(genCuratedVariants(['#faf8f3', '#efece4', '#1f2937', '#65a30d'], 0, 3,
-      ['#efece4', '#57534e', '#292524'])),
-  },
-
-  // 3. Perla — gris perlado limpio, acento azul acero. Escandinavo.
-  {
-    id: 'perla',
-    name: 'Perla',
-    family: 'light',
-    palette: ['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'],
-    variants: withAccentWash(genCuratedVariants(['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'], 0, 3,
-      ['#e2e8f0', '#475569', '#0f172a'])),
-  },
-
-  // ---- AZUL (SaaS modernos, fondo azul-grisaceo) ----
-
-  // 4. Indigo — fondo slate-900 oscuro, acento indigo brillante. Premium SaaS.
-  {
-    id: 'indigo',
-    name: 'Indigo',
-    family: 'azul',
-    palette: ['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'],
-    variants: genCuratedVariants(['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'], 0, 2,
-      ['#334155', '#1e293b', '#0b1426']),
-  },
-
-  // 5. Cobalto — fondo navy, sidebar azul-grisaceo, acento celeste.
-  {
-    id: 'cobalto',
-    name: 'Cobalto',
-    family: 'azul',
-    palette: ['#0b1426', '#172033', '#3b82f6', '#93c5fd'],
-    variants: genCuratedVariants(['#0b1426', '#172033', '#3b82f6', '#93c5fd'], 0, 2,
-      ['#2a3b5a', '#172033', '#070d18']),
-  },
-
-  // 6. Acero — fondo gris-azulado, acento azul electrico.
-  {
-    id: 'acero',
-    name: 'Acero',
-    family: 'azul',
-    palette: ['#111827', '#1f2937', '#2563eb', '#60a5fa'],
-    variants: genCuratedVariants(['#111827', '#1f2937', '#2563eb', '#60a5fa'], 0, 2,
-      ['#374151', '#1f2937', '#0c1220']),
-  },
-
-  // ---- DARK (gris carbon VS Code, NUNCA negro puro) ----
-
-  // 7. Carbon VSC — replica el dark de VS Code (#1e1e1e + #252526).
-  {
-    id: 'carbon-vsc',
-    name: 'Carbon',
-    family: 'dark',
-    palette: ['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'],
-    variants: genCuratedVariants(['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'], 0, 2,
-      ['#3a3a3a', '#252526', '#161616']),
-  },
-
-  // 8. Grafito — gris carbon mas neutro, acento ambar.
-  {
-    id: 'grafito',
-    name: 'Grafito',
-    family: 'dark',
-    palette: ['#1f2024', '#2a2c31', '#404249', '#f59e0b'],
-    variants: genCuratedVariants(['#1f2024', '#2a2c31', '#404249', '#f59e0b'], 0, 3,
-      ['#3f4147', '#2a2c31', '#15161a']),
-  },
-
-  // 9. Onix — el mas oscuro del set, casi negro pero NO negro puro.
-  {
-    id: 'onix',
-    name: 'Onix',
-    family: 'dark',
-    palette: ['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'],
-    variants: genCuratedVariants(['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'], 0, 3,
-      ['#3a3a40', '#222226', '#101012']),
-  },
-
-  // 9.bis PAR VERDE de marca (white-label): mismo acento #1b7a3d (= BRAND.primary,
-  // el verde del logo) en dos fondos — OSCURO (clon de Onix, casi-negro) y CLARO
-  // (fondo blanco). `archived: true` a propósito: NO ensucian el selector de
-  // Munify, pero una marca con `fixedTheme` los ofrece via `themePresetIds` para
-  // que el usuario alterne blanco/negro. El primary coincide con el del shell
-  // (applyBrand) → toda la app queda con un ÚNICO verde coherente.
-  {
-    id: 'onix-verde',
-    name: 'Verde Oscuro',
-    family: 'dark',
-    archived: true,
-    palette: ['#1a1a1d', '#222226', '#2d2d33', '#1b7a3d'],
-    variants: genCuratedVariants(['#1a1a1d', '#222226', '#2d2d33', '#1b7a3d'], 0, 3,
-      ['#3a3a40', '#222226', '#101012']),
-  },
-
-  // 9.ter Verde Claro — gemelo claro del anterior: fondo blanco-grisáceo, mismo
-  // acento verde. Estructura idéntica a los light curados (niebla/marfil/perla).
-  {
-    id: 'nieve-verde',
-    name: 'Verde Claro',
-    family: 'light',
-    archived: true,
-    palette: ['#f4f6fa', '#e7ebf3', '#1e293b', '#1b7a3d'],
-    variants: withAccentWash(genCuratedVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#1b7a3d'], 0, 3,
-      ['#e7ebf3', '#475569', '#1e293b'])),
-  },
-
-  // ---- SOBRIOS (escala de grises pura, sin color) ----
-
-  // 10. Papel — light sobrio. Blanco crudo + grises + acento negro.
-  // Para usuarios que prefieren neutralidad absoluta sin colores vibrantes.
-  {
-    id: 'papel',
-    name: 'Papel',
-    family: 'light',
-    palette: ['#f5f5f5', '#e5e5e5', '#404040', '#171717'],
-    variants: genCuratedVariants(['#f5f5f5', '#e5e5e5', '#404040', '#171717'], 0, 3,
-      ['#e5e5e5', '#525252', '#171717']),
-  },
-
-  // 11. Tinta — dark sobrio. Negros + grises carbon + acento blanco roto.
-  {
-    id: 'tinta',
-    name: 'Tinta',
-    family: 'dark',
-    palette: ['#0a0a0a', '#171717', '#262626', '#fafafa'],
-    variants: genCuratedVariants(['#0a0a0a', '#171717', '#262626', '#fafafa'], 0, 3,
-      ['#404040', '#171717', '#000000']),
-  },
-
-  // ============================================================
-  // TEMAS LEGACY — desactivados (archived: true). Quedan por compatibilidad
-  // con usuarios que los tengan en localStorage. NO aparecen en el selector.
-  // ============================================================
-
-  // 1. Midnight Blue - Elegante y profesional
-  {
-    id: 'midnight',
-    name: 'Midnight',
-    archived: true,
-    palette: ['#0a0f1a', '#1a2744', '#3b82f6', '#60a5fa'],
-    variants: generateVariants(['#0a0f1a', '#1a2744', '#3b82f6', '#60a5fa'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 2. Forest - Verde naturaleza
-  {
-    id: 'forest',
-    name: 'Forest',
-    archived: true,
-    palette: ['#0d1f12', '#1a3d22', '#22c55e', '#86efac'],
-    variants: generateVariants(['#0d1f12', '#1a3d22', '#22c55e', '#86efac'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 3. Sunset - Cálido naranja/rojo
-  {
-    id: 'sunset',
-    name: 'Sunset',
-    archived: true,
-    palette: ['#1a0f0a', '#3d1f12', '#f97316', '#fdba74'],
-    variants: generateVariants(['#1a0f0a', '#3d1f12', '#f97316', '#fdba74'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 4. Ocean - Azul marino profundo
-  {
-    id: 'ocean',
-    name: 'Ocean',
-    archived: true,
-    palette: ['#0c1929', '#132f4c', '#0ea5e9', '#7dd3fc'],
-    variants: generateVariants(['#0c1929', '#132f4c', '#0ea5e9', '#7dd3fc'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 5. Lavender - Púrpura suave
-  {
-    id: 'lavender',
-    name: 'Lavender',
-    archived: true,
-    palette: ['#1a0f2e', '#2d1b4e', '#a855f7', '#d8b4fe'],
-    variants: generateVariants(['#1a0f2e', '#2d1b4e', '#a855f7', '#d8b4fe'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 6. Rose - Rosa elegante
-  {
-    id: 'rose',
-    name: 'Rose',
-    archived: true,
-    palette: ['#1f0a14', '#3d1428', '#ec4899', '#f9a8d4'],
-    variants: generateVariants(['#1f0a14', '#3d1428', '#ec4899', '#f9a8d4'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 7. Sand - Beige/Arena cálido (tema claro)
-  {
-    id: 'sand',
-    name: 'Sand',
-    archived: true,
-    palette: ['#f5f0e8', '#e8e0d5', '#a67c52', '#8b6642'],
-    variants: generateVariants(['#f5f0e8', '#e8e0d5', '#a67c52', '#8b6642'], {
-      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar oscuro para contraste
-      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Sidebar claro
-    }),
-  },
-
-  // 8. Arctic - Gris azulado frío (tema claro)
-  {
-    id: 'arctic',
-    name: 'Arctic',
-    archived: true,
-    palette: ['#f8fafc', '#e2e8f0', '#3b82f6', '#1e40af'],
-    variants: generateVariants(['#f8fafc', '#e2e8f0', '#3b82f6', '#1e40af'], {
-      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar azul oscuro
-      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Sidebar gris claro
-    }),
-  },
-
-  // 9. Slate - Gris neutro oscuro
-  {
-    id: 'slate',
-    name: 'Slate',
-    archived: true,
-    palette: ['#0f172a', '#1e293b', '#64748b', '#94a3b8'],
-    variants: generateVariants(['#0f172a', '#1e293b', '#64748b', '#94a3b8'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 10. Monochrome - Escala de grises pura
-  {
-    id: 'monochrome',
-    name: 'Monochrome',
-    archived: true,
-    palette: ['#0a0a0a', '#1a1a1a', '#666666', '#e0e0e0'],
-    variants: generateVariants(['#0a0a0a', '#1a1a1a', '#666666', '#e0e0e0'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // 11. Ember - Tonos carbón cálidos con rojo
-  {
-    id: 'ember',
-    name: 'Ember',
-    archived: true,
-    palette: ['#1c1917', '#292524', '#dc2626', '#fca5a5'],
-    variants: generateVariants(['#1c1917', '#292524', '#dc2626', '#fca5a5'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar rojo
-    }),
-  },
-
-  // 12. Graphite - Gris grafito profesional
-  {
-    id: 'graphite',
-    name: 'Graphite',
-    archived: true,
-    palette: ['#18181b', '#27272a', '#52525b', '#a1a1aa'],
-    variants: generateVariants(['#18181b', '#27272a', '#52525b', '#a1a1aa'], {
-      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // 13. MindfulSpace - Neumorphic pastel (tema claro)
-  {
-    id: 'mindful',
-    name: 'MindfulSpace',
-    archived: true,
-    palette: ['#E8EEF5', '#c5ccd6', '#34d399', '#22d3ee'],
-    variants: generateVariants(['#E8EEF5', '#c5ccd6', '#34d399', '#22d3ee'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // 14. Sales CRM - Profesional azul/verde (tema claro)
-  {
-    id: 'salescrm',
-    name: 'Sales CRM',
-    archived: true,
-    palette: ['#f1f5f9', '#1e3a5f', '#2563eb', '#16a34a'],
-    variants: generateVariants(['#f1f5f9', '#1e3a5f', '#2563eb', '#16a34a'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // 15. AI Writer - Minimal neutral + AI black + blue accent (tema claro)
-  {
-    id: 'aiwriter',
-    name: 'AI Writer',
-    archived: true,
-    palette: ['#F5F5F5', '#E5E5E5', '#18181B', '#3B82F6'],
-    variants: generateVariants(['#F5F5F5', '#E5E5E5', '#18181B', '#3B82F6'], {
-      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Fondo neutral, sidebar AI black, acento blue
-      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },  // Fondo gris, sidebar AI black
-      vibrante: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar blue, acento black
-    }),
-  },
-
-  // 16. Generative Art - Canvas neutral oscuro con acentos vibrantes (Web3/NFT/AI Art)
-  {
-    id: 'generative',
-    name: 'Generative Art',
-    archived: true,
-    palette: ['#121212', '#1A1A1A', '#8B5CF6', '#EC4899'],
-    variants: generateVariants(['#121212', '#1A1A1A', '#8B5CF6', '#EC4899'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Fondo canvas, sidebar charcoal, acento purple
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },  // Fondo charcoal, sidebar canvas, acento pink
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar purple, acento neon pink
-    }),
-  },
-
-  // 17. AI Image Gen - Dark mode creativo con acentos vibrantes (AI art generation)
-  {
-    id: 'aimagegen',
-    name: 'AI Image Gen',
-    archived: true,
-    palette: ['#0F0F0F', '#1C1C1E', '#06B6D4', '#F59E0B'],
-    variants: generateVariants(['#0F0F0F', '#1C1C1E', '#06B6D4', '#F59E0B'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Fondo deep black, sidebar dark, acento cyan
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },  // Fondo dark, sidebar black, acento amber
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar cyan, acento amber vibrante
-    }),
-  },
-
-  // ====================================================================
-  // PALETAS SOBRIAS Y PROFESIONALES (gobierno / corporativo / institucional)
-  // ====================================================================
-
-  // 18. Onyx - Negro profundo con acento dorado sobrio (corporativo premium)
-  {
-    id: 'onyx',
-    name: 'Onyx',
-    archived: true,
-    palette: ['#0a0a0a', '#1a1a1a', '#9b8755', '#d4b986'],
-    variants: generateVariants(['#0a0a0a', '#1a1a1a', '#9b8755', '#d4b986'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 19. Pearl - Blancos cálidos + navy (institucional clean)
-  {
-    id: 'pearl',
-    name: 'Pearl',
-    archived: true,
-    palette: ['#fafaf9', '#f0eee8', '#1e3a5f', '#475569'],
-    variants: generateVariants(['#fafaf9', '#f0eee8', '#1e3a5f', '#475569'], {
-      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 2 },  // Sidebar navy oscuro
-      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Sidebar claro
-    }),
-  },
-
-  // 20. Espresso - Café tostado + crema (cálido pro)
-  {
-    id: 'espresso',
-    name: 'Espresso',
-    archived: true,
-    palette: ['#1c1410', '#2e211a', '#8b5a3c', '#c9a878'],
-    variants: generateVariants(['#1c1410', '#2e211a', '#8b5a3c', '#c9a878'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 21. Steel - Acero industrial + cyan sobrio (tech/SaaS pro)
-  {
-    id: 'steel',
-    name: 'Steel',
-    archived: true,
-    palette: ['#111418', '#1f2937', '#334155', '#0891b2'],
-    variants: generateVariants(['#111418', '#1f2937', '#334155', '#0891b2'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // 22. Sage - Verde salvia apagado + crema (calmo / juridico)
-  {
-    id: 'sage',
-    name: 'Sage',
-    archived: true,
-    palette: ['#f5f5f0', '#e7e5dc', '#5a6e58', '#3d5a4f'],
-    variants: generateVariants(['#f5f5f0', '#e7e5dc', '#5a6e58', '#3d5a4f'], {
-      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar verde oscuro
-      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
-
-  // 23. Bordeaux - Vino oscuro + nude (sofisticado / institucional)
-  {
-    id: 'bordeaux',
-    name: 'Bordeaux',
-    archived: true,
-    palette: ['#1a0d0f', '#2e1418', '#8b1e3f', '#c9a097'],
-    variants: generateVariants(['#1a0d0f', '#2e1418', '#8b1e3f', '#c9a097'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // ====================================================================
-  // PALETAS B&N / GRISES (minimalistas, neutras, editoriales)
-  // ====================================================================
-
-  // 24. Paper - Blanco papel editorial con tipografía negra (tema claro)
-  {
-    id: 'paper',
-    name: 'Paper',
-    archived: true,
-    palette: ['#ffffff', '#f4f4f4', '#8a8a8a', '#1a1a1a'],
-    variants: generateVariants(['#ffffff', '#f4f4f4', '#8a8a8a', '#1a1a1a'], {
-      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 3 },  // Fondo puro, sidebar negro
-      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 3 },  // Fondo crudo
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Sidebar gris claro
-    }),
-  },
-
-  // 25. Ink - Negro tinta profundo + blanco roto (editorial dark)
-  {
-    id: 'ink',
-    name: 'Ink',
-    archived: true,
-    palette: ['#000000', '#121212', '#a3a3a3', '#ffffff'],
-    variants: generateVariants(['#000000', '#121212', '#a3a3a3', '#ffffff'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Negro puro + acento blanco
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 2 },  // Acento gris
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar gris claro
-    }),
-  },
-
-  // 26. Concrete - Gris cemento medio (neutro industrial)
-  {
-    id: 'concrete',
-    name: 'Concrete',
-    archived: true,
-    palette: ['#2a2a2a', '#3d3d3d', '#6b6b6b', '#cfcfcf'],
-    variants: generateVariants(['#2a2a2a', '#3d3d3d', '#6b6b6b', '#cfcfcf'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
-  },
-
-  // 27. Platinum - Gris plateado claro + carbón (tema claro profesional)
-  {
-    id: 'platinum',
-    name: 'Platinum',
-    archived: true,
-    palette: ['#f5f5f7', '#e5e5ea', '#86868b', '#1d1d1f'],
-    variants: generateVariants(['#f5f5f7', '#e5e5ea', '#86868b', '#1d1d1f'], {
-      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 3 },  // Fondo platino, sidebar carbón
-      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
-  },
+  // ---- OSCUROS (gris carbón / navy, NUNCA negro puro) ----
+  { id: 'carbon', name: 'Carbon', modo: 'oscuro', base: '#1e1e1e', acentoRecomendado: 'celeste' },
+  { id: 'onix', name: 'Onix', modo: 'oscuro', base: '#1a1a1d', acentoRecomendado: 'turquesa' },
+  { id: 'midnight', name: 'Midnight', modo: 'oscuro', base: '#0a0f1a', acentoRecomendado: 'indigo' },
 ];
 
-// Helper para obtener un tema por ID y variante
-export function getThemeColors(presetId: string, variant: ThemeVariant): ThemeColors | null {
-  const preset = themePresets.find(p => p.id === presetId);
-  if (!preset) return null;
-  return preset.variants[variant];
-}
+// ============================================================
+// EJE 2 — ACENTOS (transversales: cualquiera sobre cualquier fondo)
+// Son los acentos que ya usaban los presets viejos, ahora como eje propio.
+// ============================================================
 
-// Helper para obtener los presets activos (no archivados) — los unicos
-// que aparecen en el selector. Los archivados siguen disponibles via
-// getThemeColors() para no romper sesiones con tema viejo seleccionado.
-export function getActivePresets(): ThemePreset[] {
-  return themePresets.filter(p => !p.archived);
-}
+export const accents: AccentOption[] = [
+  { id: 'indigo', name: 'Índigo', color: '#4f46e5' },
+  { id: 'olivo', name: 'Olivo', color: '#65a30d' },
+  { id: 'celeste', name: 'Celeste', color: '#0369a1' },
+  { id: 'ambar', name: 'Ámbar', color: '#f59e0b' },
+  { id: 'turquesa', name: 'Turquesa', color: '#14b8a6' },
+  { id: 'verde', name: 'Verde', color: '#1b7a3d' },
+  // Se resuelve por MODO: blanco sobre oscuro, negro sobre claro.
+  { id: 'neutro', name: 'Neutro', color: { oscuro: '#fafafa', claro: '#171717' } },
+];
 
-// Helper para obtener todos los presets como opciones (solo activos).
-export function getPresetOptions() {
-  return getActivePresets().map(preset => ({
-    id: preset.id,
-    name: preset.name,
-    family: preset.family,
-    palette: preset.palette,
-  }));
-}
+// ============================================================
+// EJE 3 — FONDO DE LA BARRA LATERAL
+// ============================================================
 
-// Configuracion por defecto — tema dark estilo VS Code
+export const sidebarModes: SidebarModeOption[] = [
+  { id: 'organico', name: 'Orgánico', description: 'Sigue al tema de fondo' },
+  { id: 'tinte', name: 'Tinte', description: 'Lavado del color de acento' },
+  { id: 'claro', name: 'Claro', description: 'Barra clara siempre' },
+];
+
+// Configuración por defecto — tema oscuro estilo VS Code, sin acento elegido
+// (usa el `acentoRecomendado` del tema) y sidebar siguiendo al tema.
 export const defaultThemeConfig = {
-  presetId: 'carbon-vsc',
-  variant: 'clasico' as ThemeVariant,
+  presetId: 'carbon',
+  sidebarMode: 'organico' as SidebarMode,
 };
 
+// ============================================================
+// Resolución + derivación
+// ============================================================
+
+/** Tema de fondo por id. TOLERANTE: un id desconocido cae al default. */
+export function getBgTheme(id: string | null | undefined): BgTheme {
+  return (
+    bgThemes.find((t) => t.id === id) ||
+    bgThemes.find((t) => t.id === defaultThemeConfig.presetId) ||
+    bgThemes[0]
+  );
+}
+
+/** Color final de un acento para un modo dado (resuelve el Neutro). */
+export function resolveAccentColor(accentId: string | null | undefined, modo: ThemeMode): string {
+  const acento = accents.find((a) => a.id === accentId) || accents[0];
+  return typeof acento.color === 'string' ? acento.color : acento.color[modo];
+}
+
+/** Fondo del sidebar según el eje 3, derivado del tema y del acento activo. */
+function sidebarColor(tema: BgTheme, acento: string, modo: SidebarMode): string {
+  const claro = tema.modo === 'claro';
+  switch (modo) {
+    case 'tinte':
+      // Lavado del acento sobre la base, conservando la luminosidad del modo.
+      return mixColors(tema.base, acento, claro ? 0.22 : 0.3);
+    case 'claro':
+      // Barra clara SIEMPRE, incluso con tema oscuro. Mezcla contra blanco
+      // (no un gris fijo) para conservar la temperatura del tema.
+      return mixColors(tema.base, '#ffffff', claro ? 0.6 : 0.9);
+    case 'organico':
+    default:
+      // Sigue al tema: el segundo tono del base. En claro baja DOS escalones
+      // (el fondo ya bajó uno) para que quede la jerarquía sidebar < fondo <
+      // card; con un solo escalón la barra daba exactamente el color del fondo
+      // y la opción no se distinguía de las otras dos.
+      return claro ? darken(tema.base, 10) : lighten(tema.base, 5);
+  }
+}
+
+/**
+ * Arma los 13 campos del tema activo desde los 3 ejes.
+ * Es la ÚNICA función que produce `ThemeColors`.
+ */
+export function buildThemeColors(
+  bgId: string | null | undefined,
+  accentId: string | null | undefined,
+  sidebarMode: SidebarMode,
+): ThemeColors {
+  const tema = getBgTheme(bgId);
+  const acento = resolveAccentColor(accentId ?? tema.acentoRecomendado, tema.modo);
+  const colores = derivarColores(tema.base, sidebarColor(tema, acento, sidebarMode), acento);
+  // El lavado de acento en las cards es para los temas claros (en los oscuros
+  // ensucia el contraste del contenido).
+  return tema.modo === 'claro'
+    ? { ...colores, cardAccentBg: accentWash(colores.card, colores.primary) }
+    : colores;
+}
+
+// ============================================================
+// COMPATIBILIDAD con la colección vieja
+// Un usuario con un preset viejo guardado (o una marca que lo declara) NO
+// tiene que romperse: se traduce al par (fondo, acento) equivalente, y lo
+// desconocido cae al default sin tirar error.
+// ============================================================
+
+interface LegacySelection {
+  bgId: string;
+  /** Acento EXPLÍCITO heredado del preset viejo (null = seguir la
+   *  recomendación del tema). */
+  accentId: string | null;
+}
+
+const LEGACY_PRESETS: Record<string, LegacySelection> = {
+  // Curados que se mantienen (mismo id) pero traían el acento adentro.
+  'carbon-vsc': { bgId: 'carbon', accentId: 'celeste' },
+  grafito: { bgId: 'carbon', accentId: 'ambar' },
+  // El par sobrio Papel/Tinta era exactamente "acento neutro por modo".
+  tinta: { bgId: 'onix', accentId: 'neutro' },
+  papel: { bgId: 'perla', accentId: 'neutro' },
+  // Los tres "azul SaaS" compartían fondo navy y cambiaban el azul.
+  indigo: { bgId: 'midnight', accentId: 'indigo' },
+  cobalto: { bgId: 'midnight', accentId: 'celeste' },
+  acero: { bgId: 'midnight', accentId: 'celeste' },
+  // Par verde de marca (white-label): mismo acento, dos fondos.
+  'onix-verde': { bgId: 'onix', accentId: 'verde' },
+  'nieve-verde': { bgId: 'niebla', accentId: 'verde' },
+};
+
+/**
+ * Traduce un id de preset guardado (nuevo o viejo) al par (fondo, acento).
+ * Cualquier id desconocido —'sunset', 'forest', un tema borrado— cae al
+ * default sin excepción.
+ */
+export function resolveSavedPreset(id: string | null | undefined): LegacySelection {
+  if (id) {
+    if (bgThemes.some((t) => t.id === id)) return { bgId: id, accentId: null };
+    const legacy = LEGACY_PRESETS[id];
+    if (legacy) return legacy;
+  }
+  return { bgId: defaultThemeConfig.presetId, accentId: null };
+}
+
+/** Acento guardado → id válido, o null (= seguir la recomendación del tema). */
+export function resolveSavedAccent(id: string | null | undefined): string | null {
+  return id && accents.some((a) => a.id === id) ? id : null;
+}
+
+/**
+ * Modo de sidebar tolerante: acepta los valores nuevos y los del eje viejo
+ * (clasico = sidebar clara, vintage/vibrante = seguía al tema).
+ */
+export function resolveSidebarMode(value: string | null | undefined): SidebarMode {
+  switch (value) {
+    case 'organico':
+    case 'tinte':
+    case 'claro':
+      return value;
+    case 'clasico':
+      return 'claro';
+    case 'vintage':
+    case 'vibrante':
+      return 'organico';
+    default:
+      return defaultThemeConfig.sidebarMode;
+  }
+}

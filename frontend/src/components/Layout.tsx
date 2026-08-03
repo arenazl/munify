@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp, Radio } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
+import { useTheme, type BgTheme } from '../contexts/ThemeContext';
+import { buildThemeColors } from '../config/themePresets';
 // alpha()/lighten() entienden cualquier formato de color; pegar dígitos al
 // final de un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
 import { alpha, lighten } from '../lib/colorUtils';
@@ -76,16 +77,6 @@ const getMobileTabs = (userRole: string, modulosActivos: string[] = []) => {
   ];
 };
 
-// Nombres de variantes en español
-// Cada tema curado tiene 3 variantes que controlan la TONALIDAD del sidebar.
-// El id interno se mantiene (clasico/vintage/vibrante) por compatibilidad con
-// sesiones guardadas, pero el label visible es Clara/Media/Oscura.
-const variantLabels: Record<ThemeVariant, string> = {
-  clasico: 'Clara',
-  vintage: 'Media',
-  vibrante: 'Oscura',
-};
-
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -133,9 +124,14 @@ export default function Layout() {
   const {
     theme,
     currentPresetId,
-    currentVariant,
     setPreset,
+    currentAccentId,
+    setAccent,
+    currentSidebarMode,
+    setSidebarMode,
     presets,
+    accents,
+    sidebarOptions,
     sidebarBgImage,
     setSidebarBgImage,
     sidebarBgOpacity,
@@ -148,6 +144,18 @@ export default function Layout() {
     setFont,
   } = useTheme();
   const location = useLocation();
+
+  // Mini-muestras del selector: los colores REALES que produce cada opción,
+  // derivados con los otros dos ejes en su valor actual (antes se pintaba una
+  // paleta declarada a mano que no siempre era lo que se terminaba viendo).
+  const muestraDelTema = (t: BgTheme) => {
+    const c = buildThemeColors(t.id, currentAccentId, currentSidebarMode);
+    return [c.background, c.card, c.sidebar, c.primary];
+  };
+  const muestraDelAcento = (accentId: string) => {
+    const c = buildThemeColors(currentPresetId, accentId, currentSidebarMode);
+    return { color: c.primary, tinta: c.primaryText };
+  };
 
   // Badges de items pendientes (reclamos/tramites/tasas) — solo aplica a vecinos.
 
@@ -285,7 +293,8 @@ export default function Layout() {
     try {
       const temaConfig = {
         presetId: currentPresetId,
-        variant: currentVariant,
+        accentId: currentAccentId,
+        sidebarMode: currentSidebarMode,
         sidebarBgImage,
         sidebarBgOpacity,
         contentBgImage,
@@ -1065,7 +1074,7 @@ export default function Layout() {
                             return (
                               <button
                                 key={preset.id}
-                                onClick={() => setPreset(preset.id, currentVariant)}
+                                onClick={() => setPreset(preset.id)}
                                 className="relative p-2 rounded-lg transition-all duration-200 hover:scale-[1.02]"
                                 style={{
                                   backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
@@ -1073,7 +1082,7 @@ export default function Layout() {
                                 }}
                               >
                                 <div className="flex h-6 rounded-md overflow-hidden mb-1.5">
-                                  {preset.palette.map((color, i) => (
+                                  {muestraDelTema(preset).map((color, i) => (
                                     <div key={i} className="flex-1" style={{ backgroundColor: color }} />
                                   ))}
                                 </div>
@@ -1090,22 +1099,50 @@ export default function Layout() {
                           })}
                         </div>
                       </div>
+                      {accents.length > 1 && (
+                        <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
+                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Acento</span>
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {accents.map((acento) => {
+                              const muestra = muestraDelAcento(acento.id);
+                              const isSelected = currentAccentId === acento.id;
+                              return (
+                                <button
+                                  key={acento.id}
+                                  onClick={() => setAccent(acento.id)}
+                                  title={acento.name}
+                                  aria-label={acento.name}
+                                  type="button"
+                                  className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+                                  style={{
+                                    backgroundColor: muestra.color,
+                                    boxShadow: isSelected ? `0 0 0 2px ${theme.card}, 0 0 0 4px ${muestra.color}` : 'none',
+                                  }}
+                                >
+                                  {isSelected && <Check className="w-3.5 h-3.5" style={{ color: muestra.tinta }} />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                       <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Tono sidebar</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Barra lateral</span>
                         <div className="flex gap-2 mt-2">
-                          {(['clasico', 'vintage', 'vibrante'] as ThemeVariant[]).map((variant) => {
-                            const isSelected = currentVariant === variant;
+                          {sidebarOptions.map((opcion) => {
+                            const isSelected = currentSidebarMode === opcion.id;
                             return (
                               <button
-                                key={variant}
-                                onClick={() => setPreset(currentPresetId, variant)}
+                                key={opcion.id}
+                                onClick={() => setSidebarMode(opcion.id)}
+                                title={opcion.description}
                                 className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all"
                                 style={{
                                   backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
-                                  color: isSelected ? '#ffffff' : theme.text,
+                                  color: isSelected ? theme.primaryText : theme.text,
                                 }}
                               >
-                                {variantLabels[variant]}
+                                {opcion.name}
                               </button>
                             );
                           })}

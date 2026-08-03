@@ -842,7 +842,10 @@ button.av2-chip:hover { opacity: 0.85; }
   justify-content: center;
   width: 42px;
   height: 38px;
-  background: var(--pl-surface-2);
+  /* Superficie PRINCIPAL, no la secundaria: la franja de la cabecera de grupo
+     ya es --pl-surface-2, así que una insignia del mismo tono se funde con el
+     fondo y deja de leerse como almanaque. En claro esto la deja blanca. */
+  background: var(--pl-surface);
   border: 1px solid var(--pl-border);
   border-radius: 9px;
   flex: 0 0 42px;

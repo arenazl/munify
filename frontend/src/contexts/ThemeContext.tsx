@@ -1,38 +1,64 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useMemo, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import {
-  themePresets,
-  ThemePreset,
+  bgThemes,
+  accents as accentCatalog,
+  sidebarModes,
+  BgTheme,
+  AccentOption,
+  SidebarMode,
+  SidebarModeOption,
   ThemeColors,
+  ThemeMode,
   ThemeVariant,
-  defaultThemeConfig,
-  getThemeColors,
-  getActivePresets,
+  buildThemeColors,
+  getBgTheme,
+  resolveSavedAccent,
+  resolveSavedPreset,
+  resolveSidebarMode,
 } from '../config/themePresets';
 import { DEFAULT_FONT_ID } from '../config/fontPresets';
 import { applyFontFamily } from '../lib/fontLoader';
 import { mix, lighten, darken, alpha, isLight } from '../lib/colorUtils';
 import { BRAND } from '../brands';
 
-// Preset/variante por defecto de la MARCA activa: sólo si la marca declara
+// Selección por defecto de la MARCA activa: sólo si la marca declara
 // `fixedTheme` (identidad de color fija). Munify no lo setea → undefined, y el
 // tema sigue saliendo del municipio / default global, como siempre.
-const brandDefaultPreset = BRAND.fixedTheme ? BRAND.themePresetId : undefined;
-const brandDefaultVariant = BRAND.fixedTheme ? BRAND.themeVariant : undefined;
+// El preset que declara la marca es de la colección vieja (traía el acento
+// adentro), así que se traduce al par (fondo, acento) del modelo nuevo.
+const brandDefault =
+  BRAND.fixedTheme && BRAND.themePresetId ? resolveSavedPreset(BRAND.themePresetId) : null;
+const brandDefaultPreset = brandDefault?.bgId;
+const brandDefaultAccent = brandDefault?.accentId ?? null;
+const brandDefaultSidebar = BRAND.fixedTheme ? resolveSidebarMode(BRAND.themeVariant) : undefined;
 
-// Presets que ofrece el selector: si la marca declara los suyos (fixedTheme),
-// se muestran ESOS (p.ej. el par verde claro/oscuro); si no, la colección de
-// Munify. Munify no setea themePresetIds → getActivePresets(), como siempre.
-const selectorPresets: ThemePreset[] =
-  BRAND.fixedTheme && BRAND.themePresetIds?.length
-    ? (BRAND.themePresetIds
-        .map((id) => themePresets.find((p) => p.id === id))
-        .filter(Boolean) as ThemePreset[])
-    : getActivePresets();
+// Temas de fondo que ofrece el selector: si la marca declara los suyos
+// (fixedTheme), se muestran ESOS (p.ej. el par verde claro/oscuro, que ahora
+// es el mismo acento sobre dos fondos); si no, la colección de Munify.
+const selectorPresets: BgTheme[] = (() => {
+  if (!BRAND.fixedTheme || !BRAND.themePresetIds?.length) return bgThemes;
+  const ids = BRAND.themePresetIds.map((id) => resolveSavedPreset(id).bgId);
+  return bgThemes.filter((t) => ids.includes(t.id));
+})();
+
+// Una marca con identidad de color FIJA no ofrece la paleta de acentos: su
+// acento ES el de la marca (el usuario alterna el fondo, no el color).
+const selectorAccents: AccentOption[] = brandDefaultAccent
+  ? accentCatalog.filter((a) => a.id === brandDefaultAccent)
+  : accentCatalog;
 
 // Exportar tipos necesarios
-export type { ThemePreset, ThemeColors, ThemeVariant };
-export { themePresets };
+export type {
+  BgTheme,
+  AccentOption,
+  ThemeColors,
+  ThemeMode,
+  ThemeVariant,
+  SidebarMode,
+  SidebarModeOption,
+};
+export { bgThemes };
 
 // Interfaz del tema activo (combina colors + metadata)
 export interface Theme extends ThemeColors {
@@ -44,10 +70,24 @@ interface ThemeContextType {
   // Tema actual (colores + metadata)
   theme: Theme;
 
-  // Selección de preset y variante
+  // --- Apariencia: 3 ejes independientes (ver config/themePresets.ts) ---
+
+  /** Eje 1 — tema de fondo. Conserva el nombre `currentPresetId` porque es la
+   *  clave con la que se persiste desde siempre. */
   currentPresetId: string;
-  currentVariant: ThemeVariant;
-  setPreset: (presetId: string, variant: ThemeVariant) => void;
+  setPreset: (presetId: string) => void;
+  /** Modo del tema de fondo activo. Es lo que hay que mirar para saber si la
+   *  app está en claro u oscuro (no adivinar por el id ni por el color). */
+  currentMode: ThemeMode;
+
+  /** Eje 2 — acento activo: el que eligió el usuario, o el `acentoRecomendado`
+   *  del tema de fondo mientras no haya elegido ninguno. */
+  currentAccentId: string;
+  setAccent: (accentId: string) => void;
+
+  /** Eje 3 — cómo se arma el fondo de la barra lateral. */
+  currentSidebarMode: SidebarMode;
+  setSidebarMode: (mode: SidebarMode) => void;
 
   // Imágenes de fondo
   sidebarBgImage: string | null;
@@ -63,8 +103,10 @@ interface ThemeContextType {
   currentFontId: string;
   setFont: (fontId: string) => void;
 
-  // Lista de presets disponibles (solo activos, sin archivados)
-  presets: ThemePreset[];
+  // Catálogos que ofrece el selector (filtrados por la marca activa)
+  presets: BgTheme[];
+  accents: AccentOption[];
+  sidebarOptions: SidebarModeOption[];
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -77,14 +119,60 @@ const userScopedKey = (userId: number | undefined, key: string) =>
 
 const readTheme = (userId: number | undefined) => {
   const preset = localStorage.getItem(userScopedKey(userId, 'themePresetId'));
-  const variant = localStorage.getItem(userScopedKey(userId, 'themeVariant')) as ThemeVariant | null;
+  const accent = localStorage.getItem(userScopedKey(userId, 'themeAccentId'));
+  const sidebarMode = localStorage.getItem(userScopedKey(userId, 'themeSidebarMode'));
+  // Eje viejo (tonalidad del sidebar). Se lee sólo para migrar las sesiones
+  // que lo tengan guardado; no se escribe más.
+  const variant = localStorage.getItem(userScopedKey(userId, 'themeVariant'));
   const sidebarBg = localStorage.getItem(userScopedKey(userId, 'sidebarBgImage'));
   const sidebarOp = localStorage.getItem(userScopedKey(userId, 'sidebarBgOpacity'));
   const contentBg = localStorage.getItem(userScopedKey(userId, 'contentBgImage'));
   const contentOp = localStorage.getItem(userScopedKey(userId, 'contentBgOpacity'));
   const fontId = localStorage.getItem(userScopedKey(userId, 'fontId'));
-  return { preset, variant, sidebarBg, sidebarOp, contentBg, contentOp, fontId };
+  return { preset, accent, sidebarMode, variant, sidebarBg, sidebarOp, contentBg, contentOp, fontId };
 };
+
+/** Lo que el municipio deja guardado como apariencia por defecto. */
+interface TemaMunicipio {
+  presetId?: string;
+  accentId?: string;
+  sidebarMode?: string;
+  variant?: string;
+}
+
+/** La selección de apariencia, ya normalizada a los 3 ejes. */
+interface SeleccionApariencia {
+  bgId: string;
+  /** null = seguir el `acentoRecomendado` del tema de fondo. */
+  accentId: string | null;
+  sidebarMode: SidebarMode;
+}
+
+/**
+ * Resuelve la apariencia efectiva. TOLERANTE por diseño: cualquier valor
+ * guardado que ya no exista (un preset de la colección vieja, un acento
+ * borrado, una variante del eje anterior) cae al default sin tirar error.
+ *
+ * Prioridad: lo guardado por el usuario > la marca > el municipio > el default.
+ */
+function resolverApariencia(
+  saved: ReturnType<typeof readTheme>,
+  muni?: TemaMunicipio | null,
+): SeleccionApariencia {
+  const preset = resolveSavedPreset(saved.preset || brandDefaultPreset || muni?.presetId);
+  // El acento elegido por el usuario MANDA. Si no eligió, hereda el de la
+  // marca o el del municipio, y si tampoco hay, queda en null → se usa el
+  // recomendado del tema de fondo (o el que traía adentro un preset viejo).
+  const accentId =
+    resolveSavedAccent(saved.accent) ??
+    brandDefaultAccent ??
+    resolveSavedAccent(muni?.accentId) ??
+    preset.accentId;
+  const sidebarMode = resolveSidebarMode(
+    saved.sidebarMode || brandDefaultSidebar || saved.variant || muni?.sidebarMode || muni?.variant,
+  );
+  return { bgId: preset.bgId, accentId, sidebarMode };
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // Get user + municipio from AuthContext to load per-user theme config
@@ -93,12 +181,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Estado del preset y variante seleccionados — inicialmente desde el usuario
   // actual (si ya hay sesión) o las claves globales como fallback
   const initial = readTheme(user?.id);
+  const inicialApariencia = resolverApariencia(initial);
 
-  const [currentPresetId, setCurrentPresetId] = useState<string>(
-    initial.preset || brandDefaultPreset || defaultThemeConfig.presetId
-  );
-  const [currentVariant, setCurrentVariant] = useState<ThemeVariant>(
-    initial.variant || brandDefaultVariant || defaultThemeConfig.variant
+  const [currentPresetId, setCurrentPresetId] = useState<string>(inicialApariencia.bgId);
+  // null = seguir el acento recomendado del tema; un id = elección del usuario.
+  const [accentOverride, setAccentOverride] = useState<string | null>(inicialApariencia.accentId);
+  const [currentSidebarMode, setCurrentSidebarMode] = useState<SidebarMode>(
+    inicialApariencia.sidebarMode
   );
   const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(
     initial.sidebarBg && initial.sidebarBg !== 'null' ? initial.sidebarBg : null
@@ -128,8 +217,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const saved = readTheme(user?.id);
     const muniConfig = municipioActual?.tema_config;
 
-    const preset = saved.preset || brandDefaultPreset || muniConfig?.presetId || defaultThemeConfig.presetId;
-    const variant = (saved.variant || brandDefaultVariant || (muniConfig?.variant as ThemeVariant) || defaultThemeConfig.variant) as ThemeVariant;
+    const apariencia = resolverApariencia(saved, muniConfig);
 
     const sidebarBg = saved.sidebarBg !== null
       ? (saved.sidebarBg && saved.sidebarBg !== 'null' ? saved.sidebarBg : null)
@@ -144,8 +232,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       ? parseFloat(saved.contentOp)
       : (muniConfig?.contentBgOpacity ?? 0.1);
 
-    setCurrentPresetId(preset);
-    setCurrentVariant(variant);
+    setCurrentPresetId(apariencia.bgId);
+    setAccentOverride(apariencia.accentId);
+    setCurrentSidebarMode(apariencia.sidebarMode);
     setSidebarBgImageState(sidebarBg);
     setSidebarBgOpacityState(sidebarOp);
     setContentBgImageState(contentBg);
@@ -162,20 +251,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(t);
   }, [user?.id, municipioActual]);
 
-  // Obtener los colores del tema actual
-  const themeColors = getThemeColors(currentPresetId, currentVariant);
-  const currentPreset = themePresets.find(p => p.id === currentPresetId);
+  // Tema de fondo activo. `getBgTheme` es tolerante: un id que ya no exista
+  // (preset viejo, tema borrado) devuelve el default en vez de romper.
+  const bgTheme = getBgTheme(currentPresetId);
+  const currentAccentId = accentOverride ?? bgTheme.acentoRecomendado;
 
-  // Fallback a carbon/clasico si no se encuentra el preset
-  const fallbackColors = getThemeColors('carbon', 'clasico')!;
-  const activeColors = themeColors || fallbackColors;
-
-  // Construir el objeto tema completo
-  const theme: Theme = {
-    ...activeColors,
-    name: currentPresetId,
-    label: currentPreset?.name || 'Carbon',
-  };
+  // Los 13 colores se DERIVAN de los 3 ejes. Memorizado: sin esto se
+  // recalcularía la paleta entera —y se re-dispararía el efecto que escribe
+  // ~40 CSS vars— en cada render del árbol.
+  const theme: Theme = useMemo(
+    () => ({
+      ...buildThemeColors(bgTheme.id, currentAccentId, currentSidebarMode),
+      name: bgTheme.id,
+      label: bgTheme.name,
+    }),
+    [bgTheme.id, bgTheme.name, currentAccentId, currentSidebarMode]
+  );
 
   // Aplicar CSS variables cuando cambia el tema
   useEffect(() => {
@@ -295,10 +386,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(userScopedKey(user?.id, 'themePresetId'), currentPresetId);
   }, [currentPresetId, user?.id]);
 
+  // El acento se guarda SÓLO si el usuario eligió uno: sin la clave, cada tema
+  // de fondo aplica su `acentoRecomendado`.
   useEffect(() => {
     if (hydratingRef.current) return;
-    localStorage.setItem(userScopedKey(user?.id, 'themeVariant'), currentVariant);
-  }, [currentVariant, user?.id]);
+    const key = userScopedKey(user?.id, 'themeAccentId');
+    if (accentOverride) {
+      localStorage.setItem(key, accentOverride);
+    } else {
+      localStorage.removeItem(key);
+    }
+  }, [accentOverride, user?.id]);
+
+  useEffect(() => {
+    if (hydratingRef.current) return;
+    localStorage.setItem(userScopedKey(user?.id, 'themeSidebarMode'), currentSidebarMode);
+  }, [currentSidebarMode, user?.id]);
 
   useEffect(() => {
     if (hydratingRef.current) return;
@@ -338,10 +441,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(userScopedKey(user?.id, 'fontId'), currentFontId);
   }, [currentFontId, user?.id]);
 
-  // Función para cambiar preset y variante
-  const setPreset = (presetId: string, variant: ThemeVariant) => {
+  // Eje 1: el tema de fondo. No pisa el acento — si el usuario ya eligió uno,
+  // esa elección manda sobre el recomendado del tema nuevo.
+  const setPreset = (presetId: string) => {
     setCurrentPresetId(presetId);
-    setCurrentVariant(variant);
+  };
+
+  // Eje 2: a partir de acá el acento es una elección explícita del usuario.
+  const setAccent = (accentId: string) => {
+    setAccentOverride(accentId);
+  };
+
+  // Eje 3: fondo de la barra lateral.
+  const setSidebarMode = (mode: SidebarMode) => {
+    setCurrentSidebarMode(mode);
   };
 
   const setSidebarBgImage = (url: string | null) => {
@@ -369,8 +482,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       value={{
         theme,
         currentPresetId,
-        currentVariant,
         setPreset,
+        currentMode: bgTheme.modo,
+        currentAccentId,
+        setAccent,
+        currentSidebarMode,
+        setSidebarMode,
         sidebarBgImage,
         setSidebarBgImage,
         sidebarBgOpacity,
@@ -382,6 +499,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         currentFontId,
         setFont,
         presets: selectorPresets,
+        accents: selectorAccents,
+        sidebarOptions: sidebarModes,
       }}
     >
       {children}

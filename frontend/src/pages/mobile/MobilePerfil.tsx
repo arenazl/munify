@@ -17,16 +17,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import NotificationSettings from '../../components/NotificationSettings';
 
 export default function MobilePerfil() {
-  const { theme, currentPresetId, currentVariant, setPreset } = useTheme();
-  // Detectar si el tema actual es "oscuro" basándose en el background
-  const isDarkMode = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const { theme, currentMode, setPreset } = useTheme();
+  // El modo lo declara el tema de fondo activo (antes se adivinaba con una
+  // lista de ids, y el toggle apuntaba a presets que ya no existían).
+  const isDarkMode = currentMode === 'oscuro';
   const toggleDarkMode = () => {
-    // Alternar entre arctic (claro) y carbon (oscuro)
-    if (isDarkMode) {
-      setPreset('arctic', currentVariant);
-    } else {
-      setPreset('carbon', currentVariant);
-    }
+    setPreset(isDarkMode ? 'niebla' : 'carbon');
   };
   const { user, logout } = useAuth();
   const navigate = useNavigate();

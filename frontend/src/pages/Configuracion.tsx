@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload,
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
@@ -11,9 +11,11 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi, modulosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { buildThemeColors } from '../config/themePresets';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
 import { QRCarteleria } from '../components/ui/QRCarteleria';
+import { AppearanceSettings } from '../components/ui/AppearanceSettings';
 import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
 import NotificationPreferences from '../components/NotificationPreferences';
 import { BRAND } from '../brands';
@@ -77,7 +79,18 @@ const BRAND_COLORS = [
 ];
 
 export default function Configuracion() {
-  const { theme } = useTheme();
+  const {
+    theme,
+    currentPresetId,
+    setPreset,
+    currentAccentId,
+    setAccent,
+    currentSidebarMode,
+    setSidebarMode,
+    presets,
+    accents: acentosDisponibles,
+    sidebarOptions,
+  } = useTheme();
   const { municipioActual, loadMunicipios, user } = useAuth();
   // Tabs: General (datos muni + branding) / Usuarios / Catalogos / Cobranzas / Tesoreria / Super Admin
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -594,6 +607,35 @@ export default function Configuracion() {
 
   // Filtrar configs para excluir las del municipio y registro en la tabla general
   const otherConfigs = configs.filter(c => !MUNICIPIO_KEYS.includes(c.clave) && !REGISTRO_KEYS.includes(c.clave));
+
+  // Apariencia: cada muestra se DERIVA con el mismo motor que pinta la app, con
+  // los otros dos ejes en su valor actual — el preview ES lo que se va a ver.
+  const bgPresetsMeta = useMemo(
+    () =>
+      presets.map(t => {
+        const c = buildThemeColors(t.id, currentAccentId, currentSidebarMode);
+        return { key: t.id, label: t.name, swatch: c.background, chip: c.sidebar };
+      }),
+    [presets, currentAccentId, currentSidebarMode],
+  );
+  const accentsMeta = useMemo(
+    () =>
+      acentosDisponibles.map(a => {
+        // El acento "Neutro" no tiene color propio: se resuelve por el modo del
+        // tema activo (blanco sobre oscuro, negro sobre claro).
+        const c = buildThemeColors(currentPresetId, a.id, currentSidebarMode);
+        return { key: a.id, label: a.name, color: c.primary, ink: c.primaryText };
+      }),
+    [acentosDisponibles, currentPresetId, currentSidebarMode],
+  );
+  const sidebarMeta = useMemo(
+    () =>
+      sidebarOptions.map(o => {
+        const c = buildThemeColors(currentPresetId, currentAccentId, o.id);
+        return { key: o.id, label: o.name, swatch: c.background, chip: c.sidebar };
+      }),
+    [sidebarOptions, currentPresetId, currentAccentId],
+  );
 
   if (loading) {
     return (
@@ -1454,6 +1496,38 @@ export default function Configuracion() {
         </table>
       </div>
       )}
+
+      {/* Apariencia — 3 ejes del tema: fondo, acento y barra lateral */}
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${theme.primary}20` }}
+          >
+            <Palette className="h-5 w-5" style={{ color: theme.primary }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: theme.text }}>
+              Apariencia
+            </h2>
+            <p className="text-sm" style={{ color: theme.textSecondary }}>
+              Cómo se ve el panel para vos
+            </p>
+          </div>
+        </div>
+        <AppearanceSettings
+          bgPresets={bgPresetsMeta}
+          accents={accentsMeta}
+          activeBg={currentPresetId}
+          activeAccent={currentAccentId}
+          onBgChange={setPreset}
+          onAccentChange={setAccent}
+          sidebarOptions={sidebarMeta}
+          activeSidebar={currentSidebarMode}
+          onSidebarChange={key => setSidebarMode(key as typeof currentSidebarMode)}
+          footnote="La apariencia se guarda en este dispositivo y para tu usuario: nadie más del municipio ve estos cambios. Lo que sí ven todos —la imagen de portada y el filtro de cabecera— se configura más arriba, en esta misma pestaña."
+        />
+      </div>
         </div>
       )}
 
