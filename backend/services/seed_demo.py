@@ -1307,9 +1307,9 @@ async def seed_demo_completo(
     from services.inventario_seed import seed_inventario
     inv_res = await seed_inventario(db, municipio_id, incluir_demo=True)
 
-    # Tipos de trabajo (template configurable, para el formato de la OT).
-    from services.ot_tipos_seed import seed_tipos_trabajo
-    await seed_tipos_trabajo(db, municipio_id)
+    # La OT ya no tiene catálogo propio de "tipos de trabajo": clasifica con las
+    # categorías de reclamo del muni (sembradas en categorias_seed), así que acá
+    # no hay nada extra que sembrar.
 
     # Activar los módulos opt-in en los munis demo, así la demo muestra el
     # circuito completo (campo + inventario + sueldos + contaduría). El seed

@@ -32,22 +32,14 @@
 .sh-card--advertencia { --pl-tono: var(--pl-amber-strong); }
 .sh-card--malo { --pl-tono: var(--pl-red); }
 
-/* Gradiente que NACE ARRIBA y se disuelve antes de llegar al texto (diseño
-   2026-08-02). Antes entraba en diagonal desde el borde izquierdo y siempre
-   en el color de la marca; ahora baja desde el techo de la tarjeta y lleva el
-   color del VEREDICTO, así el estado se lee de un vistazo aunque no llegues a
-   leer la frase.
-   Va MUY bajo a propósito — si el fondo levanta, compite con el color del
-   veredicto dentro de la frase y "113 cerrados" deja de leerse como bueno.
-   La fórmula y su intensidad viven en [LAVADO POR TONO] de pl-tokens.css, una
-   sola vez para todo el kit. */
-.sh-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: var(--pl-lavado-tono);
-}
+/* El gradiente que NACE ARRIBA en el color del veredicto lo pone la clase
+   utilitaria `.pl-tinte-tono` ([TINTE POR TONO] en pl-tokens.css), que el
+   componente agrega junto a `sh-card`. Antes entraba en diagonal desde el
+   borde izquierdo y siempre en el color de la marca; ahora baja desde el
+   techo y lleva el estado, así se lee de un vistazo aunque no llegues a leer
+   la frase.
+   No se declara acá para no tener dos fórmulas del mismo lavado: la
+   intensidad se toca en un solo lugar y cambia en todo el kit. */
 /* Todo el contenido por encima del lavado. */
 .sh-card > * { position: relative; }
 

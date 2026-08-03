@@ -4,8 +4,10 @@ los municipios.
 Para cada muni:
   - Siembra el template de categorías de inventario (SIN ítems demo — solo los
     rubros, para que arranque con la estructura y cargue sus propios ítems).
-  - Siembra el template de tipos de trabajo.
   - Activa el flag `inventario`.
+
+(La OT ya no tiene catálogo propio de tipos de trabajo: clasifica con las
+categorías de reclamo del muni, así que este script dejó de sembrarlo.)
 
 100% ADITIVO e idempotente. NO siembra ítems demo (eso es solo para las demos).
 Ejecutar con `--activar` para que efectivamente prenda el flag; sin flag hace
@@ -25,7 +27,6 @@ from sqlalchemy import select  # noqa: E402
 from core.database import AsyncSessionLocal  # noqa: E402
 from models import Municipio  # noqa: E402
 from services.inventario_seed import seed_inventario, activar_modulo_inventario  # noqa: E402
-from services.ot_tipos_seed import seed_tipos_trabajo  # noqa: E402
 
 
 async def run(aplicar: bool):
@@ -33,21 +34,19 @@ async def run(aplicar: bool):
         munis = (await db.execute(select(Municipio.id, Municipio.nombre).order_by(Municipio.id))).all()
         print(f"Municipios: {len(munis)} | modo: {'APLICAR' if aplicar else 'DRY-RUN'}\n")
 
-        total_cats = total_tipos = 0
+        total_cats = 0
         for mid, nombre in munis:
             if not aplicar:
                 print(f"  [dry] {mid}: {nombre}")
                 continue
             cats = (await seed_inventario(db, mid, incluir_demo=False))["categorias"]
-            tipos = await seed_tipos_trabajo(db, mid)
             await activar_modulo_inventario(db, mid)
             await db.commit()
             total_cats += cats
-            total_tipos += tipos
-            print(f"  OK {mid}: {nombre} — +{cats} categorías, +{tipos} tipos, flag inventario activo")
+            print(f"  OK {mid}: {nombre} — +{cats} categorías, flag inventario activo")
 
         if aplicar:
-            print(f"\nListo. Categorías creadas: {total_cats}, tipos creados: {total_tipos}.")
+            print(f"\nListo. Categorías de inventario creadas: {total_cats}.")
         else:
             print("\nDry-run: no se tocó nada. Corré con --activar para aplicar.")
 

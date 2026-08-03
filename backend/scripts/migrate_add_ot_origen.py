@@ -79,7 +79,18 @@ async def migrar_schema(conn):
     else:
         print("SKIP: ordenes_trabajo.prioridad ya existe")
 
-    if not await _col_existe(conn, "ordenes_trabajo", "tipo_trabajo_id"):
+    # OBSOLETO: `tipo_trabajo_id` y su catálogo `ot_tipos_trabajo` los ELIMINA
+    # scripts/migrate_ot_categoria_unificada.py (la OT clasifica con las
+    # categorías de reclamo). Este bloque sólo revive en un ambiente que quedó
+    # atrás y todavía tiene la tabla; si ya no está, no se recrea nada (la FK
+    # apuntaría a una tabla inexistente y el ALTER fallaría).
+    tabla_tipos = bool((await conn.execute(text(
+        "SELECT COUNT(*) FROM information_schema.tables "
+        "WHERE table_schema = DATABASE() AND table_name = 'ot_tipos_trabajo'"
+    ))).scalar())
+    if not tabla_tipos:
+        print("SKIP: ot_tipos_trabajo ya no existe (catálogo unificado en categorias_reclamo)")
+    elif not await _col_existe(conn, "ordenes_trabajo", "tipo_trabajo_id"):
         await conn.execute(text(
             "ALTER TABLE ordenes_trabajo ADD COLUMN tipo_trabajo_id INT NULL AFTER prioridad, "
             "ADD KEY ix_ot_tipo_trabajo (tipo_trabajo_id), "

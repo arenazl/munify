@@ -99,7 +99,7 @@ export function imprimirOrdenTrabajo(ot: OrdenTrabajo, municipioNombre: string):
   <div class="grid">
     ${fila('Estado', esc(otEstadoLabels[ot.estado] || ot.estado))}
     ${fila('Prioridad', esc(prioridadLabels[ot.prioridad] || ot.prioridad))}
-    ${fila('Tipo', esc(ot.tipo_trabajo_nombre || '—'))}
+    ${fila('Categoría', esc(ot.categoria_nombre || '—'))}
     ${fila('Programada', fecha(ot.fecha_programada))}
     ${fila('Responsable', responsable)}
     ${fila('Horario', horario)}

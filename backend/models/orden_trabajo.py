@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Date, Time, Text, Float, Enum,
+    Column, Integer, String, DateTime, Date, Time, Text, Float, Enum,
     ForeignKey, JSON, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -60,11 +60,16 @@ class OrdenTrabajo(Base):
         Enum(PrioridadOT, values_callable=lambda x: [e.value for e in x]),
         default=PrioridadOT.MEDIA, nullable=False, index=True,
     )
-    # Tipo de trabajo del catálogo configurable por muni (Poda, Bacheo, ...)
-    tipo_trabajo_id = Column(
-        Integer, ForeignKey("ot_tipos_trabajo.id", ondelete="SET NULL"), nullable=True, index=True
+    # Clasificación de la OT = catálogo ÚNICO de categorías de reclamo. Antes
+    # existía un `ot_tipos_trabajo` propio que duplicaba 6 de las 10 categorías
+    # (Bacheo/Bacheo y calles, Alumbrado/Alumbrado público, ...) y obligaba a
+    # reclasificar a mano una OT nacida de un reclamo ya clasificado. Las
+    # categorías que no se le ofrecen al vecino (Preventivo, Mantenimiento,
+    # Obra) viven en el mismo catálogo con `interna=True`.
+    categoria_id = Column(
+        Integer, ForeignKey("categorias_reclamo.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    tipo_trabajo = relationship("OrdenTrabajoTipo")
+    categoria = relationship("CategoriaReclamo")
 
     # Punto de interés de la OT consolidada de zona (F6 · Etapa B). Solo se
     # setea en OTs origen='consolidada_poi' (una vigente por POI). SET NULL si
@@ -114,30 +119,6 @@ class OrdenTrabajo(Base):
         cascade="all, delete-orphan",
         overlaps="orden",
     )
-
-
-class OrdenTrabajoTipo(Base):
-    """Tipo de trabajo por municipio (catálogo configurable — template).
-
-    Clasifica la OT en la planilla (Poda, Bacheo, Alumbrado, ...). Se siembra
-    un set genérico que el municipio customiza, mismo criterio que las
-    categorías de reclamo / inventario.
-    """
-    __tablename__ = "ot_tipos_trabajo"
-    __table_args__ = (
-        UniqueConstraint("municipio_id", "nombre", name="uq_ot_tipo_muni_nombre"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    municipio_id = Column(Integer, ForeignKey("municipios.id", ondelete="CASCADE"), nullable=False, index=True)
-    nombre = Column(String(100), nullable=False)
-    icono = Column(String(50), nullable=True)
-    color = Column(String(20), nullable=True)
-    activo = Column(Boolean, default=True, nullable=False)
-    orden = Column(Integer, default=0)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class OrdenTrabajoReclamo(Base):

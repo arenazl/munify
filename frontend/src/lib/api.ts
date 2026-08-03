@@ -1426,15 +1426,6 @@ export const ordenesTrabajoApi = {
   cancelar: (id: number, motivo: string) => api.post(`/ordenes-trabajo/${id}/cancelar`, { motivo }),
 };
 
-// Tipos de trabajo de OT (catálogo configurable — template)
-export const otTiposTrabajoApi = {
-  list: (params?: Record<string, string | number | boolean>) =>
-    api.get('/ot-tipos-trabajo', { params }),
-  create: (data: Record<string, unknown>) => api.post('/ot-tipos-trabajo', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/ot-tipos-trabajo/${id}`, data),
-  delete: (id: number) => api.delete(`/ot-tipos-trabajo/${id}`),
-};
-
 // Puntos de Interés (POI) — F6. Tipos (catálogo) + puntos (mapa) + consolidación.
 // Endpoints con prefijo /poi (OJO: /poi/tipos y /poi/puntos, NO /poi-tipos).
 export const poiApi = {

@@ -930,8 +930,15 @@ CUANDO PIDAN VER TRÁMITES (mostrar HTML completo):
 {tramites_html}"""
 
 
-async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
-    """Obtiene las categorías de reclamo activas del municipio."""
+async def get_categorias_municipio(db: AsyncSession, municipio_id: int,
+                                   incluir_internas: bool = False) -> list[dict]:
+    """Obtiene las categorías de reclamo activas del municipio.
+
+    Por defecto excluye las `interna=True` (Preventivo, Mantenimiento, Obra):
+    clasifican trabajo interno del municipio y no son un reclamo que el vecino
+    pueda cargar, así que no van en el prompt del chat del vecino. El asistente
+    de gestión (admin/supervisor) pide `incluir_internas=True` para ver el
+    catálogo completo."""
     query = (
         select(Categoria)
         .where(
@@ -940,6 +947,8 @@ async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[
         )
         .order_by(Categoria.orden, Categoria.nombre)
     )
+    if not incluir_internas:
+        query = query.where(Categoria.interna == False)
     result = await db.execute(query)
     categorias = result.scalars().all()
     return [{"id": c.id, "nombre": c.nombre, "icono": c.icono or "folder"} for c in categorias]
@@ -2653,7 +2662,7 @@ async def chat_asistente(
     municipio_id = current_user.municipio_id
 
     # Obtener datos en paralelo para construir contexto rico
-    categorias = await get_categorias_municipio(db, municipio_id)
+    categorias = await get_categorias_municipio(db, municipio_id, incluir_internas=True)
     stats_reclamos = await get_estadisticas_reclamos(db, municipio_id)
     stats_tramites = await get_estadisticas_tramites(db, municipio_id)
     stats_temporales = await get_estadisticas_temporales(db, municipio_id)

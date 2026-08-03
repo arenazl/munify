@@ -33,6 +33,14 @@ class CategoriaReclamo(Base):
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)
 
+    # Categoría de uso INTERNO: clasifica trabajo del municipio (Preventivo,
+    # Mantenimiento, Obra) pero NO se le ofrece al vecino cuando carga un
+    # reclamo. El ABM de admin las muestra todas; los listados que alimentan
+    # el formulario del vecino / portal público / salesbot filtran interna=False.
+    # Nace del unificado de catálogos: la OT dejó de tener `ot_tipos_trabajo`
+    # propio y clasifica con estas mismas categorías.
+    interna = Column(Boolean, nullable=False, default=False, server_default="0")
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

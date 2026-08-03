@@ -4,7 +4,7 @@ import {
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
   Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
   UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
-  Briefcase, PiggyBank, Trees, Boxes, Hammer, MapPinned, Package,
+  Briefcase, PiggyBank, Trees, Boxes, MapPinned, Package,
   Banknote, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -650,7 +650,6 @@ export default function Configuracion() {
         { id: 'categorias-tramite', label: 'Categorías Trámite', description: 'Categorías de trámites del municipio: Obras, Comercio, etc', icon: FolderTree, color: '#10b981', link: '/gestion/categorias-tramite', show: isAdminOrSupervisor },
         { id: 'inventario', label: 'Inventario', description: 'Vehículos, herramientas y materiales del municipio', icon: Package, color: '#0ea5e9', link: '/gestion/inventario', show: isAdminOrSupervisor && modulosActivos.includes('inventario') },
         { id: 'categorias-inventario', label: 'Categorías Inventario', description: 'Rubros del inventario: vehículos, herramientas, materiales', icon: Boxes, color: '#3b82f6', link: '/gestion/categorias-inventario', show: isAdminOrSupervisor },
-        { id: 'tipos-trabajo', label: 'Tipos de Trabajo', description: 'Clasificación de las órdenes de trabajo: poda, bacheo, etc', icon: Hammer, color: '#8b5cf6', link: '/gestion/tipos-trabajo', show: isAdminOrSupervisor },
         { id: 'sla', label: 'SLA', description: 'Plazos de respuesta y resolución comprometidos por categoría', icon: Clock, color: '#f59e0b', link: '/gestion/sla', show: isAdminOrSupervisor && modulosActivos.includes('sla') },
         { id: 'poi-tipos', label: 'Tipos de Punto de Interés', description: 'Categorías de puntos en el mapa: hospitales, escuelas, plazas, etc', icon: MapPinned, color: '#ef4444', link: '/gestion/poi-tipos', show: isAdminOrSupervisor && modulosActivos.includes('poi') },
         { id: 'tramites-config', label: 'Tipos de Trámite', description: 'Trámites específicos del municipio (ej: Licencia de Conducir)', icon: FileText, color: '#6366f1', link: '/gestion/tramites-config', show: isAdminOrSupervisor },

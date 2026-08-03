@@ -991,9 +991,16 @@ async def send_welcome_message(phone: str):
 
 
 async def send_categorias(phone: str, db: AsyncSession):
-    """Envía lista de categorías disponibles"""
+    """Envía lista de categorías disponibles.
+
+    Es el formulario del vecino por WhatsApp: excluye las `interna=True`
+    (trabajo interno del municipio). El mismo filtro va en `find_categoria`,
+    que resuelve la opción por ÍNDICE de esta lista — si los dos filtros no
+    coinciden, el vecino elige una categoría y le cae otra."""
     result = await db.execute(
-        select(Categoria).where(Categoria.activo == True).order_by(Categoria.nombre)
+        select(Categoria)
+        .where(Categoria.activo == True, Categoria.interna == False)
+        .order_by(Categoria.nombre)
     )
     categorias = result.scalars().all()
 
@@ -1033,9 +1040,14 @@ def get_categoria_emoji(nombre: str) -> str:
 
 
 async def find_categoria(text: str, db: AsyncSession) -> Optional[Categoria]:
-    """Busca categoría por número o nombre"""
+    """Busca categoría por número o nombre.
+
+    MISMA lista (mismo filtro y mismo orden) que `send_categorias`: el número
+    que manda el vecino es el índice de aquella."""
     result = await db.execute(
-        select(Categoria).where(Categoria.activo == True).order_by(Categoria.nombre)
+        select(Categoria)
+        .where(Categoria.activo == True, Categoria.interna == False)
+        .order_by(Categoria.nombre)
     )
     categorias = result.scalars().all()
 

@@ -23,7 +23,7 @@ from .notificacion import Notificacion
 from .sla import SLAConfig, SLAViolacion
 from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
-from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo
+from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
 from .historial_orden_trabajo import HistorialOrdenTrabajo
 from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
 from .poi import PoiTipo, PuntoInteres
@@ -89,7 +89,6 @@ __all__ = [
     # Órdenes de trabajo (campo)
     "OrdenTrabajo",
     "OrdenTrabajoReclamo",
-    "OrdenTrabajoTipo",
     "HistorialOrdenTrabajo",
     "EstadoOrdenTrabajo",
     "PrioridadOT",

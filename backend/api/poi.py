@@ -2,8 +2,8 @@
 
 Dos catálogos + la consolidación en OT de zona:
 
-  - `/poi/tipos`   CRUD del catálogo de tipos (Hospital, Escuela, ...). Clon de
-                   `ot_tipos_trabajo.py` (DELETE inteligente soft/hard).
+  - `/poi/tipos`   CRUD del catálogo de tipos (Hospital, Escuela, ...), con
+                   DELETE inteligente soft/hard (soft si el tipo está en uso).
   - `/poi/puntos`  CRUD de los POIs concretos (lat/long + radio). Al crear/editar/
                    borrar un POI o cambiar su radio -> recálculo batch del matching
                    reclamo<->POI del muni (`services.poi_matching`).

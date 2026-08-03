@@ -9,13 +9,13 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
-import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi, otTiposTrabajoApi } from '../lib/api';
+import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi, categoriasReclamoApi } from '../lib/api';
 import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels, OT_MOTIVO_BLOQUEO_OPTIONS, type MotivoBloqueoOT } from '../lib/enums/ordenTrabajo';
 import { naturalezaColors, naturalezaIcons } from '../lib/enums/inventario';
 import { prioridadLabels, prioridadColor, prioridadIcons, PRIORIDAD_OPTIONS } from '../lib/enums/prioridadOT';
 import { getEstadoInfo } from '../lib/estadoConfig';
 import { imprimirOrdenTrabajo } from '../lib/printOrdenTrabajo';
-import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario, OTTipoTrabajo, PrioridadOT } from '../types';
+import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario, CategoriaReclamo, PrioridadOT } from '../types';
 
 // Recurso de inventario en el form de la OT (activo reservado o consumible planeado).
 type RecursoForm = {
@@ -37,7 +37,7 @@ type FormState = {
   titulo: string;
   descripcion: string;
   prioridad: PrioridadOT;
-  tipo_trabajo_id: string;
+  categoria_id: string;
   cuadrilla_id: string;
   empleado_id: string;
   fecha_programada: string;
@@ -48,7 +48,7 @@ type FormState = {
 };
 
 const FORM_VACIO: FormState = {
-  titulo: '', descripcion: '', prioridad: 'media', tipo_trabajo_id: '',
+  titulo: '', descripcion: '', prioridad: 'media', categoria_id: '',
   cuadrilla_id: '', empleado_id: '',
   fecha_programada: '', horas_estimadas: '', materiales: [], recursos: [], reclamo_ids: [],
 };
@@ -89,7 +89,10 @@ export default function OrdenesTrabajo() {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [reclamosActivos, setReclamosActivos] = useState<Reclamo[]>([]);
   const [itemsDisponibles, setItemsDisponibles] = useState<InventarioItem[]>([]);
-  const [tiposTrabajo, setTiposTrabajo] = useState<OTTipoTrabajo[]>([]);
+  // Categorías de Reclamo: clasifican la OT. Incluye las `interna: true`
+  // (Preventivo, Mantenimiento, Obra) — acá SÍ se ofrecen, a diferencia del
+  // alta de reclamo del vecino.
+  const [categorias, setCategorias] = useState<CategoriaReclamo[]>([]);
   // Nuevo material (form inline)
   const [nuevoMaterial, setNuevoMaterial] = useState('');
 
@@ -146,11 +149,11 @@ export default function OrdenesTrabajo() {
         const iRes = await inventarioApi.listItems({ solo_disponibles: true, limit: 300 });
         setItemsDisponibles(iRes.data || []);
       } catch { /* inventario no activo: sin recursos */ }
-      // Tipos de trabajo (para el selector del formato)
+      // Categorías de Reclamo (para el selector de clasificación de la OT)
       try {
-        const tRes = await otTiposTrabajoApi.list({ activo: true });
-        setTiposTrabajo(tRes.data || []);
-      } catch { /* sin tipos: el selector queda vacío */ }
+        const catRes = await categoriasReclamoApi.getAll(true);
+        setCategorias(catRes.data || []);
+      } catch { /* sin categorías: el selector queda vacío */ }
     })();
   }, [esGestor]);
 
@@ -199,7 +202,7 @@ export default function OrdenesTrabajo() {
       titulo: ot.titulo,
       descripcion: ot.descripcion || '',
       prioridad: ot.prioridad || 'media',
-      tipo_trabajo_id: ot.tipo_trabajo_id ? String(ot.tipo_trabajo_id) : '',
+      categoria_id: ot.categoria_id ? String(ot.categoria_id) : '',
       cuadrilla_id: ot.cuadrilla_id ? String(ot.cuadrilla_id) : '',
       empleado_id: ot.empleado_id ? String(ot.empleado_id) : '',
       fecha_programada: ot.fecha_programada || '',
@@ -232,7 +235,7 @@ export default function OrdenesTrabajo() {
     titulo: form.titulo.trim(),
     descripcion: form.descripcion.trim() || null,
     prioridad: form.prioridad,
-    tipo_trabajo_id: form.tipo_trabajo_id ? Number(form.tipo_trabajo_id) : null,
+    categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
     cuadrilla_id: form.cuadrilla_id ? Number(form.cuadrilla_id) : null,
     empleado_id: form.empleado_id ? Number(form.empleado_id) : null,
     fecha_programada: form.fecha_programada || null,
@@ -358,10 +361,10 @@ export default function OrdenesTrabajo() {
     ...empleados.map(e => ({ value: String(e.id), label: `${e.nombre} ${e.apellido || ''}`.trim() })),
   ]), [empleados]);
 
-  const tipoTrabajoOptions: SelectOption[] = useMemo(() => ([
+  const categoriaOptions: SelectOption[] = useMemo(() => ([
     { value: '', label: 'Sin clasificar' },
-    ...tiposTrabajo.map(t => ({ value: String(t.id), label: t.nombre })),
-  ]), [tiposTrabajo]);
+    ...categorias.map(c => ({ value: String(c.id), label: c.nombre })),
+  ]), [categorias]);
 
   const reclamoOptions: SelectOption[] = useMemo(() =>
     reclamosActivos
@@ -574,9 +577,9 @@ export default function OrdenesTrabajo() {
                   </span>
                 </div>
               </div>
-              {ot.tipo_trabajo_nombre && (
-                <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full mb-1.5" style={{ backgroundColor: `${ot.tipo_trabajo_color || theme.primary}15`, color: ot.tipo_trabajo_color || theme.primary }}>
-                  {ot.tipo_trabajo_nombre}
+              {ot.categoria_nombre && (
+                <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full mb-1.5" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+                  {ot.categoria_nombre}
                 </span>
               )}
               <h3 className="font-bold mb-1 line-clamp-2" style={{ color: theme.text }}>{ot.titulo}</h3>
@@ -718,11 +721,11 @@ export default function OrdenesTrabajo() {
               />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Tipo de trabajo</p>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Categoría</p>
               <ModernSelect
-                value={form.tipo_trabajo_id}
-                onChange={(v) => setForm({ ...form, tipo_trabajo_id: v })}
-                options={tipoTrabajoOptions}
+                value={form.categoria_id}
+                onChange={(v) => setForm({ ...form, categoria_id: v })}
+                options={categoriaOptions}
                 disabled={!esGestor || !esEditable}
                 searchable
               />

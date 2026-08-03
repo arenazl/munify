@@ -155,7 +155,11 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       try {
         const catsRes = await categoriasReclamoApi.getAll(true);
         if (!cancelled) {
-          setCategorias(catsRes.data || []);
+          // Defensa en profundidad: las categorías `interna: true` (Preventivo,
+          // Mantenimiento, Obra) clasifican trabajo de campo (OT) pero no se
+          // le ofrecen al vecino al crear un reclamo. El backend ya filtra;
+          // igual filtramos acá por si algún caller pasa `interna` sin querer.
+          setCategorias((catsRes.data || []).filter((c: CategoriaReclamo) => !c.interna));
         }
       } catch (err) {
         console.error('Error cargando datos del wizard', err);

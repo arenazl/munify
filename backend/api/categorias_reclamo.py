@@ -37,6 +37,13 @@ async def listar_categorias_reclamo(
 ):
     """Lista las categorías de reclamo del municipio actual.
     En modo Global (superadmin sin muni) devuelve [] sin 400.
+
+    Catálogo único (OT + reclamos): las categorías `interna=True` (Preventivo,
+    Mantenimiento, Obra) clasifican trabajo del municipio pero NO se le ofrecen
+    al vecino. Este endpoint es de doble uso — lo consume el ABM de admin y el
+    formulario del vecino logueado — así que bifurca por rol: el VECINO recibe
+    solo las públicas; gestión (admin/supervisor/empleado) las ve todas, que es
+    lo que necesita el Sheet de la OT para clasificar trabajo interno.
     """
     municipio_id = resolve_municipio_id(request, current_user)
     if not municipio_id:
@@ -45,6 +52,8 @@ async def listar_categorias_reclamo(
     query = select(CategoriaReclamo).where(
         CategoriaReclamo.municipio_id == municipio_id
     )
+    if current_user.rol == RolUsuario.VECINO:
+        query = query.where(CategoriaReclamo.interna == False)  # noqa: E712
     if activo is not None:
         query = query.where(CategoriaReclamo.activo == activo)
     query = query.order_by(CategoriaReclamo.orden, CategoriaReclamo.nombre)
@@ -105,6 +114,7 @@ async def crear_categoria_reclamo(
         tiempo_resolucion_estimado=data.tiempo_resolucion_estimado,
         prioridad_default=data.prioridad_default,
         orden=data.orden,
+        interna=data.interna,
         activo=True,
     )
     db.add(nueva)

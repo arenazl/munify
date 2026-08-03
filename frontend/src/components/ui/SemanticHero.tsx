@@ -165,7 +165,7 @@ export function SemanticHero({
 
   return (
     <section
-      className={`sh-card ${tono ? `sh-card--${tono}` : ''} ${className || ''}`}
+      className={`sh-card pl-tinte-tono ${tono ? `sh-card--${tono}` : ''} ${className || ''}`}
       aria-label={etiqueta}
       onMouseEnter={() => setDetenido(true)}
       onMouseLeave={() => setDetenido(false)}

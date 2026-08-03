@@ -12,6 +12,7 @@ export default function CategoriasReclamoConfig() {
           api={categoriasReclamoApi as any}
           showReclamoFields
           enableSugerencias
+          showInternaField
         />
       </div>
     </div>

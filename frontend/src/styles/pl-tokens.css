@@ -104,24 +104,14 @@
     transparent 74%
   );
 
-  /* [LAVADO POR TONO] Gradiente mínimo que NACE ARRIBA y muere antes de
-     llegar al contenido. El color sale de --pl-tono, que cada pieza define
-     según su VEREDICTO (bueno / advertencia / malo); si nadie lo define cae
-     al acento del theme. Es la misma fórmula para el hero, las cabeceras de
-     grupo y cualquier superficie que tenga que declarar un estado — una sola
-     definición, un solo lugar donde cambiar la intensidad.
-     Las custom properties se resuelven en el punto de uso: alcanza con que el
-     elemento (o un ancestro) declare --pl-tono para que el gradiente lo tome.
-     INTENSIDAD: arranca en 4.5% y se disuelve a mitad de camino. Es a
-     propósito una insinuación — el estado lo declaran la barra izquierda y la
-     frase; el gradiente sólo lo acompaña. Si hay que moverlo, se toca ACÁ y
-     cambia en todo el kit a la vez. */
-  --pl-lavado-tono: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 4.5%, transparent) 0%,
-    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 1.2%, transparent) 34%,
-    transparent 62%
-  );
+  /* [LAVADO POR TONO] — la fórmula NO vive acá, y no es un descuido.
+     Un token de :root que adentro tenga var(--pl-tono) se computa EN :root:
+     como ahí --pl-tono no existe, resuelve contra su fallback y lo que se
+     hereda hacia abajo es un gradiente con el color ya fijado. Un hero en
+     veredicto 'malo' terminaba con la barra roja y el gradiente verde.
+     Por eso el gradiente por tono se escribe en la MISMA regla donde el
+     elemento declara su --pl-tono. Está en [TINTE POR TONO], al final de
+     este archivo, como clase utilitaria. */
 }
 
 /* ============================================================
@@ -141,3 +131,39 @@
    el alto cambia con el área segura del teléfono y con el tamaño de fuente
    del sistema, así que un número fijo queda corto justo en los aparatos
    donde más molesta. Este 0 es sólo el default de arranque. */
+
+/* ============================================================
+   [TINTE POR TONO] — gradiente mínimo que nace ARRIBA y muere
+   antes de llegar al contenido, en el color del VEREDICTO.
+
+   Se aplica con la clase `.pl-tinte-tono` sobre cualquier pieza
+   que declare su propio `--pl-tono` (el hero lo saca del
+   veredicto de la frase activa). Sin `--pl-tono` cae al acento
+   del theme, así que una pantalla que sólo informa se tiñe de la
+   marca y no de rojo.
+
+   POR QUÉ ES UNA CLASE Y NO UN TOKEN DE :root — un token con
+   var(--pl-tono) adentro se computa EN :root, donde --pl-tono no
+   existe: resuelve contra el fallback y lo que hereda cada pieza
+   es un gradiente con el color ya fijado. Se ve como un hero con
+   la barra roja y el gradiente verde. Acá el var() se resuelve
+   en el elemento, que es el que sabe su estado.
+
+   INTENSIDAD: 4.5%, disuelto a mitad de camino. Es una
+   insinuación a propósito — el estado lo declaran la barra
+   izquierda y la frase; el gradiente sólo los acompaña. Un solo
+   lugar para moverlo en todo el kit.
+   ============================================================ */
+.pl-tinte-tono { position: relative; }
+.pl-tinte-tono::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 4.5%, transparent) 0%,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 1.2%, transparent) 34%,
+    transparent 62%
+  );
+}

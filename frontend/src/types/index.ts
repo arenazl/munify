@@ -52,6 +52,9 @@ export interface CategoriaReclamo {
   orden: number;
   activo: boolean;
   created_at: string;
+  // Categoría de uso interno (Preventivo, Mantenimiento, Obra...): clasifica
+  // trabajo de campo (OT) pero NO se le ofrece al vecino al crear un reclamo.
+  interna?: boolean;
 }
 
 export interface CategoriaTramite {
@@ -171,15 +174,6 @@ export interface OTReclamoMini {
 
 export type PrioridadOT = 'baja' | 'media' | 'alta' | 'urgente';
 
-export interface OTTipoTrabajo {
-  id: number;
-  nombre: string;
-  icono?: string | null;
-  color?: string | null;
-  activo: boolean;
-  orden: number;
-}
-
 // ============ Puntos de Interés (POI) ============
 
 // Catálogo de tipos de POI (Hospital, Escuela, ...). ABM en Configuración.
@@ -264,10 +258,11 @@ export interface OrdenTrabajo {
   numero: string;
   estado: EstadoOrdenTrabajo;
   prioridad: PrioridadOT;
-  tipo_trabajo_id?: number | null;
-  tipo_trabajo_nombre?: string | null;
-  tipo_trabajo_color?: string | null;
-  tipo_trabajo_icono?: string | null;
+  // Clasificación de la OT: ahora es la Categoría de Reclamo (incluye las
+  // `interna: true` — Preventivo, Mantenimiento, Obra — que no se le ofrecen
+  // al vecino pero sí sirven para clasificar trabajo de campo).
+  categoria_id?: number | null;
+  categoria_nombre?: string | null;
   titulo: string;
   descripcion?: string | null;
   cuadrilla_id?: number | null;

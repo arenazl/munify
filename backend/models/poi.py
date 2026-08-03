@@ -24,7 +24,7 @@ from core.database import Base
 class PoiTipo(Base):
     """Tipo de punto de interés por municipio (catálogo configurable — template).
 
-    Mismo patrón que OrdenTrabajoTipo: se siembra un set genérico (Hospital,
+    Mismo patrón que los catálogos por muni: se siembra un set genérico (Hospital,
     Escuela, Bomberos, ...) que el municipio customiza. `radio_default_metros`
     es el radio sugerido al crear un POI de este tipo (editable por POI).
     """

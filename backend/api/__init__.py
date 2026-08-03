@@ -68,7 +68,6 @@ from .tesoreria_conciliacion import router as tesoreria_conciliacion_router
 from .tesoreria_conceptos_liquidacion import router as tesoreria_conceptos_liquidacion_router
 from .ordenes_pago import router as ordenes_pago_router
 from .ordenes_trabajo import router as ordenes_trabajo_router
-from .ot_tipos_trabajo import router as ot_tipos_trabajo_router
 from .poi import router as poi_router
 from .inventario import router as inventario_router
 from .contaduria_retenciones import router as contaduria_retenciones_router
@@ -117,7 +116,6 @@ api_router.include_router(tramites_sugeridos_router, prefix="/tramites-sugeridos
 api_router.include_router(push_router, tags=["Push Notifications"])
 api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
 api_router.include_router(ordenes_trabajo_router, prefix="/ordenes-trabajo", tags=["Ordenes de Trabajo"])
-api_router.include_router(ot_tipos_trabajo_router, prefix="/ot-tipos-trabajo", tags=["Ordenes de Trabajo - Tipos"])
 api_router.include_router(poi_router, prefix="/poi", tags=["Puntos de Interes (F6 B)"])
 api_router.include_router(inventario_router, prefix="/inventario", tags=["Inventario"])
 api_router.include_router(planificacion_router, prefix="/planificacion", tags=["Planificación"])

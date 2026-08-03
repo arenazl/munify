@@ -16,6 +16,9 @@ export interface CategoriaItem {
   color?: string;
   orden: number;
   activo: boolean;
+  // Solo aplica a Categoría de Reclamo (showInternaField). Clasifica trabajo
+  // interno (OT) que NO se le ofrece al vecino al crear un reclamo.
+  interna?: boolean;
 }
 
 interface CategoriaApi {
@@ -36,6 +39,12 @@ interface Props {
    * aplica a categorías de reclamo (no hay catálogo global de trámite).
    */
   enableSugerencias?: boolean;
+  /**
+   * Si `true`, muestra el toggle "Interna" (clasifica trabajo interno —
+   * Preventivo, Mantenimiento, Obra — sin ofrecérselo al vecino). Solo
+   * aplica a Categoría de Reclamo.
+   */
+  showInternaField?: boolean;
 }
 
 interface CategoriaSugerida {
@@ -63,7 +72,7 @@ const COLORES_DISPONIBLES = [
   '#8b5cf6', '#0ea5e9', '#6366f1', '#64748b',
 ];
 
-export function CategoriaConfigBase({ title, api, showReclamoFields = false, enableSugerencias = false }: Props) {
+export function CategoriaConfigBase({ title, api, showReclamoFields = false, enableSugerencias = false, showInternaField = false }: Props) {
   const { theme } = useTheme();
   const [items, setItems] = useState<CategoriaItem[]>([]);
 
@@ -87,6 +96,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
     orden: 0,
     tiempo_resolucion_estimado: 48,
     prioridad_default: 3,
+    interna: false,
   });
 
   const cargar = async () => {
@@ -117,6 +127,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
       orden: items.length + 1,
       tiempo_resolucion_estimado: 48,
       prioridad_default: 3,
+      interna: false,
     });
     setSugerencias([]);
     setMostrarSugerencias(false);
@@ -169,6 +180,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
       orden: items.length + 1,
       tiempo_resolucion_estimado: s.tiempo_resolucion_estimado ?? 48,
       prioridad_default: s.prioridad_default ?? 3,
+      interna: false,
     });
     setMostrarSugerencias(false);
   };
@@ -183,6 +195,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
       orden: item.orden,
       tiempo_resolucion_estimado: (item as any).tiempo_resolucion_estimado ?? 48,
       prioridad_default: (item as any).prioridad_default ?? 3,
+      interna: item.interna ?? false,
     });
     setSheetOpen(true);
   };
@@ -204,6 +217,9 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
       if (showReclamoFields) {
         payload.tiempo_resolucion_estimado = form.tiempo_resolucion_estimado;
         payload.prioridad_default = form.prioridad_default;
+      }
+      if (showInternaField) {
+        payload.interna = form.interna;
       }
 
       if (editing) {
@@ -278,11 +294,18 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
                   {item.descripcion && (
                     <p className="text-xs mt-1 line-clamp-2" style={{ color: theme.textSecondary }}>{item.descripcion}</p>
                   )}
-                  {!item.activo && (
-                    <span className="inline-block mt-2 px-2 py-0.5 rounded text-xs" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
-                      Inactiva
-                    </span>
-                  )}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {showInternaField && item.interna && (
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: `${theme.textSecondary}20`, color: theme.textSecondary }}>
+                        Interna
+                      </span>
+                    )}
+                    {!item.activo && (
+                      <span className="inline-block px-2 py-0.5 rounded text-xs" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+                        Inactiva
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-1 flex-shrink-0">
                   <button
@@ -511,6 +534,25 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
                   style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
                 />
               </div>
+            </div>
+          )}
+
+          {showInternaField && (
+            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+              <input
+                type="checkbox"
+                id="categoria-interna"
+                checked={form.interna}
+                onChange={e => setForm({ ...form, interna: e.target.checked })}
+                className="h-4 w-4 rounded mt-0.5 flex-shrink-0"
+                style={{ accentColor: theme.primary }}
+              />
+              <label htmlFor="categoria-interna" className="cursor-pointer select-none">
+                <span className="block text-sm font-medium" style={{ color: theme.text }}>Interna</span>
+                <span className="block text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+                  No se le ofrece al vecino al crear un reclamo; sirve para clasificar trabajo interno (preventivo, mantenimiento, obra).
+                </span>
+              </label>
             </div>
           )}
 

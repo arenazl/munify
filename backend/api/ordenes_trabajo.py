@@ -22,7 +22,7 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
-    OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo, EstadoOrdenTrabajo, PrioridadOT,
+    OrdenTrabajo, OrdenTrabajoReclamo, EstadoOrdenTrabajo, PrioridadOT,
     OrigenOT, Reclamo, CategoriaReclamo, HistorialReclamo, HistorialOrdenTrabajo,
     Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
@@ -80,7 +80,9 @@ class OTCreate(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
     prioridad: PrioridadOT = PrioridadOT.MEDIA
-    tipo_trabajo_id: Optional[int] = None
+    # Catálogo ÚNICO: la OT se clasifica con las categorías de reclamo del muni
+    # (incluidas las `interna=True`, que existen solo para trabajo interno).
+    categoria_id: Optional[int] = None
     reclamo_ids: List[int] = []
     cuadrilla_id: Optional[int] = None
     empleado_id: Optional[int] = None
@@ -96,7 +98,7 @@ class OTUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
     prioridad: Optional[PrioridadOT] = None
-    tipo_trabajo_id: Optional[int] = None
+    categoria_id: Optional[int] = None
     reclamo_ids: Optional[List[int]] = None  # None = no tocar vínculos
     cuadrilla_id: Optional[int] = None
     empleado_id: Optional[int] = None
@@ -159,10 +161,12 @@ class OTResponse(BaseModel):
     numero: str
     estado: EstadoOrdenTrabajo
     prioridad: PrioridadOT = PrioridadOT.MEDIA
-    tipo_trabajo_id: Optional[int] = None
-    tipo_trabajo_nombre: Optional[str] = None
-    tipo_trabajo_color: Optional[str] = None
-    tipo_trabajo_icono: Optional[str] = None
+    # Clasificación resuelta: el front recibe el nombre/color/icono ya
+    # materializados y no tiene que ir a buscar la categoría aparte.
+    categoria_id: Optional[int] = None
+    categoria_nombre: Optional[str] = None
+    categoria_color: Optional[str] = None
+    categoria_icono: Optional[str] = None
     titulo: str
     descripcion: Optional[str] = None
     cuadrilla_id: Optional[int] = None
@@ -216,7 +220,7 @@ def _query_base():
     return select(OrdenTrabajo).options(
         selectinload(OrdenTrabajo.cuadrilla),
         selectinload(OrdenTrabajo.empleado),
-        selectinload(OrdenTrabajo.tipo_trabajo),
+        selectinload(OrdenTrabajo.categoria),
         selectinload(OrdenTrabajo.reclamos_vinculados).selectinload(OrdenTrabajoReclamo.reclamo),
         selectinload(OrdenTrabajo.recursos).selectinload(OrdenTrabajoRecurso.item),
     )
@@ -241,10 +245,10 @@ def _to_response(ot: OrdenTrabajo) -> OTResponse:
         resp.cuadrilla_nombre = f"{ot.cuadrilla.nombre} {ot.cuadrilla.apellido or ''}".strip()
     if ot.empleado:
         resp.empleado_nombre = f"{ot.empleado.nombre} {ot.empleado.apellido or ''}".strip()
-    if ot.tipo_trabajo:
-        resp.tipo_trabajo_nombre = ot.tipo_trabajo.nombre
-        resp.tipo_trabajo_color = ot.tipo_trabajo.color
-        resp.tipo_trabajo_icono = ot.tipo_trabajo.icono
+    if ot.categoria:
+        resp.categoria_nombre = ot.categoria.nombre
+        resp.categoria_color = ot.categoria.color
+        resp.categoria_icono = ot.categoria.icono
     resp.reclamos = [
         ReclamoMini(
             id=link.reclamo.id,
@@ -297,15 +301,18 @@ async def _validar_recursos(db: AsyncSession, municipio_id: int,
             raise HTTPException(status_code=400, detail="Empleado inválido para este municipio")
 
 
-async def _validar_tipo_trabajo(db: AsyncSession, municipio_id: int, tipo_trabajo_id: Optional[int]):
-    """El tipo de trabajo debe pertenecer al mismo municipio (anti cross-tenant)."""
-    if not tipo_trabajo_id:
+async def _validar_categoria(db: AsyncSession, municipio_id: int, categoria_id: Optional[int]):
+    """La categoría debe existir Y ser del mismo municipio (anti cross-tenant).
+
+    Acepta tanto las públicas como las `interna=True`: una OT es trabajo interno
+    y puede clasificarse con cualquiera del catálogo del muni."""
+    if not categoria_id:
         return
-    ok = (await db.execute(select(OrdenTrabajoTipo.id).where(
-        OrdenTrabajoTipo.id == tipo_trabajo_id, OrdenTrabajoTipo.municipio_id == municipio_id,
+    ok = (await db.execute(select(CategoriaReclamo.id).where(
+        CategoriaReclamo.id == categoria_id, CategoriaReclamo.municipio_id == municipio_id,
     ))).scalar_one_or_none()
     if not ok:
-        raise HTTPException(status_code=400, detail="Tipo de trabajo inválido para este municipio")
+        raise HTTPException(status_code=400, detail="Categoría inválida para este municipio")
 
 
 async def _vincular_reclamos(db: AsyncSession, ot: OrdenTrabajo, reclamo_ids: List[int],
@@ -638,10 +645,33 @@ async def _prioridad_inicial_ot(db: AsyncSession, reclamo_ids: List[int],
     return _prioridad_default_a_ot(valor)
 
 
+async def _categoria_inicial_ot(db: AsyncSession, reclamo_ids: List[int],
+                                municipio_id: int) -> Optional[int]:
+    """Categoría heredada de los reclamos que originan la OT: la del reclamo más
+    antiguo (menor id) que tenga categoría. Multi-tenant: filtra por municipio.
+    Un solo query, sin N+1. None si no hay reclamos o ninguno tiene categoría.
+
+    Es el mismo criterio que usa la migración para rellenar el histórico, así el
+    dato viejo y el nuevo se derivan igual."""
+    ids = [rid for rid in reclamo_ids if rid is not None]
+    if not ids:
+        return None
+    return (await db.execute(
+        select(Reclamo.categoria_id)
+        .where(
+            Reclamo.id.in_(ids),
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.categoria_id.isnot(None),
+        )
+        .order_by(Reclamo.id.asc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+
 async def crear_ot_core(
     db: AsyncSession, *, municipio_id: int, creador_id: int, titulo: str,
     descripcion: Optional[str] = None, prioridad: Optional[PrioridadOT] = None,
-    tipo_trabajo_id: Optional[int] = None, reclamo_ids: Optional[List[int]] = None,
+    categoria_id: Optional[int] = None, reclamo_ids: Optional[List[int]] = None,
     cuadrilla_id: Optional[int] = None, empleado_id: Optional[int] = None,
     fecha_programada: Optional[date] = None, hora_inicio: Optional[time] = None,
     hora_fin: Optional[time] = None, materiales=None,
@@ -658,10 +688,21 @@ async def crear_ot_core(
 
     `prioridad=None` (default): se deriva del `prioridad_default` de la categoría de
     los reclamos vinculados (F6·A6); sin categoría/valor cae a MEDIA. Los callers
-    que fijan una prioridad explícita (create manual desde el Sheet) la respetan."""
+    que fijan una prioridad explícita (create manual desde el Sheet) la respetan.
+
+    `categoria_id=None` (default): la OT HEREDA la categoría del reclamo que la
+    origina (el más antiguo de los vinculados). Ese es el punto del catálogo
+    único — una OT nacida de un reclamo ya clasificado no se reclasifica a mano.
+    Un `categoria_id` explícito (create manual) siempre gana.
+
+    PRECONDICIÓN del caller: si pasa `categoria_id` explícito, ya lo validó
+    contra el municipio (`_validar_categoria`). La categoría heredada no
+    necesita validación: sale de un reclamo del mismo municipio."""
     numero = await _siguiente_numero(db, municipio_id)
     if prioridad is None:
         prioridad = await _prioridad_inicial_ot(db, reclamo_ids or [], municipio_id)
+    if categoria_id is None:
+        categoria_id = await _categoria_inicial_ot(db, reclamo_ids or [], municipio_id)
     estado = (
         EstadoOrdenTrabajo.ASIGNADA
         if (cuadrilla_id or empleado_id)
@@ -670,7 +711,7 @@ async def crear_ot_core(
     ot = OrdenTrabajo(
         municipio_id=municipio_id, numero=numero, estado=estado, origen=origen,
         titulo=titulo, descripcion=descripcion, prioridad=prioridad,
-        tipo_trabajo_id=tipo_trabajo_id, cuadrilla_id=cuadrilla_id, empleado_id=empleado_id,
+        categoria_id=categoria_id, cuadrilla_id=cuadrilla_id, empleado_id=empleado_id,
         fecha_programada=fecha_programada, hora_inicio=hora_inicio, hora_fin=hora_fin,
         materiales=materiales, horas_estimadas=horas_estimadas, creador_id=creador_id,
     )
@@ -709,6 +750,10 @@ async def _upsert_ot_implicita_core(db: AsyncSession, reclamo: Reclamo,
         ot, _ = await crear_ot_core(
             db, municipio_id=reclamo.municipio_id, creador_id=creador_id,
             titulo=reclamo.titulo, descripcion=reclamo.descripcion,
+            # La OT implícita HEREDA la clasificación del reclamo que la origina
+            # (catálogo único). Se pasa explícito y no por `_categoria_inicial_ot`
+            # para ahorrar un query en el hot path de la asignación.
+            categoria_id=reclamo.categoria_id,
             reclamo_ids=[reclamo.id], empleado_id=empleado_id,
             fecha_programada=reclamo.fecha_programada, hora_inicio=reclamo.hora_inicio,
             hora_fin=reclamo.hora_fin, origen=OrigenOT.IMPLICITA,
@@ -718,6 +763,11 @@ async def _upsert_ot_implicita_core(db: AsyncSession, reclamo: Reclamo,
         ot.fecha_programada = reclamo.fecha_programada
         ot.hora_inicio = reclamo.hora_inicio
         ot.hora_fin = reclamo.hora_fin
+        # Espejo 1:1: si el reclamo tiene categoría, la OT implícita la refleja
+        # (igual que fecha/hora/empleado). Si el reclamo quedó sin categoría, se
+        # conserva la que ya tenía la OT en vez de desclasificarla.
+        if reclamo.categoria_id:
+            ot.categoria_id = reclamo.categoria_id
     # Estado de la OT = espejo del reclamo, o ASIGNADA si el reclamo no mapea.
     ot.estado = _ESPEJO_ESTADO_OT.get(reclamo.estado, EstadoOrdenTrabajo.ASIGNADA)
     return ot
@@ -895,12 +945,12 @@ async def crear_orden(
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
-    await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
+    await _validar_categoria(db, municipio_id, data.categoria_id)
 
     ot, reclamos = await crear_ot_core(
         db, municipio_id=municipio_id, creador_id=current_user.id,
         titulo=data.titulo, descripcion=data.descripcion, prioridad=data.prioridad,
-        tipo_trabajo_id=data.tipo_trabajo_id, reclamo_ids=data.reclamo_ids,
+        categoria_id=data.categoria_id, reclamo_ids=data.reclamo_ids,
         cuadrilla_id=data.cuadrilla_id, empleado_id=data.empleado_id,
         fecha_programada=data.fecha_programada, hora_inicio=data.hora_inicio,
         hora_fin=data.hora_fin,
@@ -950,10 +1000,10 @@ async def actualizar_orden(
         raise HTTPException(status_code=400, detail="No se puede editar una OT completada o cancelada")
 
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
-    if "tipo_trabajo_id" in data.model_dump(exclude_unset=True):
-        await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
+    if "categoria_id" in data.model_dump(exclude_unset=True):
+        await _validar_categoria(db, municipio_id, data.categoria_id)
 
-    # prioridad/tipo_trabajo_id son escalares → se setean acá directo.
+    # prioridad/categoria_id son escalares → se setean acá directo.
     # reclamo_ids/materiales/recursos se manejan aparte (no son columnas simples).
     campos = data.model_dump(exclude_unset=True, exclude={"reclamo_ids", "materiales", "recursos"})
     for k, v in campos.items():

@@ -68,7 +68,6 @@ import GestionCuadrillas from './pages/GestionCuadrillas';
 import OrdenesTrabajo from './pages/OrdenesTrabajo';
 import Inventario from './pages/Inventario';
 import InventarioCategoriasConfig from './pages/InventarioCategoriasConfig';
-import OTTiposTrabajoConfig from './pages/OTTiposTrabajoConfig';
 import POITiposConfig from './pages/POITiposConfig';
 import CatalogoTramites from './pages/CatalogoTramites';
 import GestionAusencias from './pages/GestionAusencias';
@@ -316,10 +315,6 @@ export const router = createBrowserRouter([
       {
         path: 'categorias-inventario',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioCategoriasConfig /></ProtectedRoute>
-      },
-      {
-        path: 'tipos-trabajo',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><OTTiposTrabajoConfig /></ProtectedRoute>
       },
       {
         path: 'poi-tipos',
