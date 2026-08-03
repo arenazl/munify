@@ -900,6 +900,16 @@ export default function Configuracion() {
       onItemChange={setActiveItem}
       panelTitle={activeTab === 'general' ? itemGeneral.label : (ajusteActivo?.label ?? grupoActivo?.label ?? '')}
       panelNota={activeTab === 'general' ? itemGeneral.description : ajusteActivo?.description}
+      panelAviso={
+        activeTab !== 'general' && ajusteActivo
+          && !PANTALLA_DE_AJUSTE[ajusteActivo.id] && !TAB_TESORERIA[ajusteActivo.id]
+          ? {
+              eyebrow: 'Se abre en su propia pantalla',
+              texto: <>Este ajuste todavía no se muestra acá adentro. <strong>Entrá con el acceso</strong> y volvés con el navegador.</>,
+              tono: 'alerta' as const,
+            }
+          : undefined
+      }
       primaryAction={activeTab !== 'general' && ajusteActivo
         ? { label: 'Abrir', onClick: () => navigate(ajusteActivo.link) }
         : undefined}

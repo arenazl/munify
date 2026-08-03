@@ -2925,3 +2925,54 @@ button.av2-chip:hover { opacity: 0.85; }
    que se migren. */
 .av2-set-panel-cuerpo .av2-pagehead { display: none; }
 .av2-set-panel-cuerpo .av2-page { padding: 0; }
+
+/* ---------- Nota destacada (patrón del canvas) ----------
+   Bloque con barra de color a la izquierda y lavado en degradé. Tres tonos:
+   info (acento), ok (verde) y alerta (ámbar). Se usa para explicar qué es un
+   ajuste o avisar algo antes de que el usuario toque nada. */
+
+.av2-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-tono, var(--pl-green));
+  border-radius: 11px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 7%, var(--pl-surface)) 0%,
+    var(--pl-surface) 62%
+  );
+}
+.av2-nota--ok { --pl-tono: var(--pl-green); }
+.av2-nota--alerta { --pl-tono: var(--pl-amber-strong); }
+.av2-nota--malo { --pl-tono: var(--pl-red); }
+
+.av2-nota-ico {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--pl-tono, var(--pl-green));
+}
+
+.av2-nota-txt {
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.55;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+}
+.av2-nota-txt strong { font-weight: 600; color: var(--pl-text); }
+
+.av2-nota-eyebrow {
+  display: block;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-tono, var(--pl-green));
+  margin-bottom: 4px;
+}

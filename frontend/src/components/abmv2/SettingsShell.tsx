@@ -31,7 +31,7 @@
  *  - Estados vacíos: sin ítems, el riel no se renderiza y el panel ocupa todo.
  */
 import type { ReactNode } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import { PageHeader } from './PageHeader';
 import type { Veredicto } from '../../lib/semanticHero';
 
@@ -75,6 +75,12 @@ export interface SettingsShellProps {
 
   /** Cabecera del panel derecho. */
   panelTitle: string;
+  /**
+   * Nota destacada del panel (patrón del canvas: barra de color a la
+   * izquierda + lavado). Para explicar qué es el ajuste o avisar algo antes
+   * de que el usuario toque nada.
+   */
+  panelAviso?: { eyebrow?: string; texto: ReactNode; tono?: 'ok' | 'alerta' | 'malo' };
   /** Bajada del panel: qué es y cómo está. Acepta veredicto. */
   panelNota?: string;
   panelVeredicto?: Veredicto;
@@ -89,7 +95,7 @@ export function SettingsShell({
   search, onSearchChange, searchPlaceholder = 'Buscar un ajuste…',
   groups, activeGroup, onGroupChange,
   railTitle, items, activeItem, onItemChange,
-  panelTitle, panelNota, panelVeredicto, primaryAction,
+  panelTitle, panelNota, panelVeredicto, panelAviso, primaryAction,
   children,
 }: SettingsShellProps) {
   return (
@@ -165,7 +171,18 @@ export function SettingsShell({
               </button>
             )}
           </div>
-          <div className="av2-set-panel-cuerpo">{children}</div>
+          <div className="av2-set-panel-cuerpo">
+            {panelAviso && (
+              <div className={`av2-nota av2-nota--${panelAviso.tono ?? 'ok'}`}>
+                <Sparkles className="av2-nota-ico" aria-hidden />
+                <span className="av2-nota-txt">
+                  {panelAviso.eyebrow && <span className="av2-nota-eyebrow">{panelAviso.eyebrow}</span>}
+                  {panelAviso.texto}
+                </span>
+              </div>
+            )}
+            {children}
+          </div>
         </section>
       </div>
     </div>
