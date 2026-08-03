@@ -754,6 +754,17 @@ export default function Configuracion() {
     'tramites-pago': 'integraciones',
     municipios: 'super-admin', 'dashboard-config': 'super-admin', exportar: 'super-admin',
   };
+  // El grupo General no sale de `cardSections`: son las pantallas propias de
+  // esta página. Cada una es un ítem del riel, como en el canvas.
+  const AJUSTES_GENERAL = [
+    { id: 'identidad', label: 'Identidad', description: 'Nombre, ubicación y el contacto que ve el vecino.' },
+    { id: 'portada', label: 'Portada del tablero', description: 'La imagen de fondo del tablero y el filtro de su cabecera.' },
+    { id: 'apariencia', label: 'Apariencia', description: 'Tema del panel, color de acento y fondo de la barra lateral. Se guarda por dispositivo y usuario.' },
+    { id: 'carteleria', label: 'Cartelería', description: 'El QR para imprimir y pegar en el municipio.' },
+    ...(otherConfigs.length > 0 ? [{ id: 'avanzado', label: 'Avanzado', description: 'Otras claves de configuración del sistema.' }] : []),
+    ...(isSuperAdmin ? [{ id: 'modulos', label: 'Módulos', description: 'Qué módulos tiene activos este municipio.' }] : []),
+  ];
+
   const GRUPOS: { id: string; label: string }[] = [
     { id: 'general', label: 'General' },
     { id: 'personal', label: 'Personal' },
@@ -787,6 +798,7 @@ export default function Configuracion() {
   const ajustesDelGrupo = ajustesFiltrados.filter(i => i.grupo === activeTab);
   const ajusteActivo = ajustesDelGrupo.find(i => i.id === activeItem) ?? ajustesDelGrupo[0];
   const grupoActivo = gruposVisibles.find(g => g.id === activeTab);
+  const itemGeneral = AJUSTES_GENERAL.find(i => i.id === activeItem) ?? AJUSTES_GENERAL[0];
 
   return (
     <SettingsShell
@@ -799,13 +811,13 @@ export default function Configuracion() {
       activeGroup={activeTab}
       onGroupChange={(id) => { setTab(id); setActiveItem(null); }}
       railTitle={grupoActivo?.label}
-      items={activeTab === 'general' ? [] : ajustesDelGrupo.map(i => ({ id: i.id, label: i.label }))}
-      activeItem={ajusteActivo?.id}
+      items={activeTab === 'general'
+        ? AJUSTES_GENERAL.map(i => ({ id: i.id, label: i.label }))
+        : ajustesDelGrupo.map(i => ({ id: i.id, label: i.label }))}
+      activeItem={activeTab === 'general' ? itemGeneral.id : ajusteActivo?.id}
       onItemChange={setActiveItem}
-      panelTitle={activeTab === 'general' ? 'Datos del municipio' : (ajusteActivo?.label ?? grupoActivo?.label ?? '')}
-      panelNota={activeTab === 'general'
-        ? 'Identidad, contacto que ve el vecino, portada del tablero y apariencia del panel.'
-        : ajusteActivo?.description}
+      panelTitle={activeTab === 'general' ? itemGeneral.label : (ajusteActivo?.label ?? grupoActivo?.label ?? '')}
+      panelNota={activeTab === 'general' ? itemGeneral.description : ajusteActivo?.description}
       primaryAction={activeTab !== 'general' && ajusteActivo
         ? { label: 'Abrir', onClick: () => navigate(ajusteActivo.link) }
         : undefined}
@@ -814,12 +826,13 @@ export default function Configuracion() {
       {activeTab === 'general' && (
         <div className="space-y-6">
       {/* Modulos activables — solo super admin */}
-      {isSuperAdmin && <ModulosToggle />}
+      {itemGeneral.id === 'modulos' && isSuperAdmin && <ModulosToggle />}
 
       {/* QR fijo de cartelería: acceso directo al muni (/{codigo}) */}
-      <QRCarteleria />
+      {itemGeneral.id === 'carteleria' && <QRCarteleria />}
 
       {/* Sección Datos del Municipio */}
+      {itemGeneral.id === 'identidad' && (
       <div
         className="rounded-xl p-5"
         style={{
@@ -1027,8 +1040,10 @@ export default function Configuracion() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Sección Filtro de Cabecera */}
+      {itemGeneral.id === 'portada' && (
       <div
         className="rounded-xl p-5"
         style={{
@@ -1174,8 +1189,10 @@ export default function Configuracion() {
           </button>
         )}
       </div>
+      )}
 
       {/* Sección Imagen de Portada */}
+      {itemGeneral.id === 'portada' && (
       <div
         className="rounded-xl p-5"
         style={{
@@ -1409,9 +1426,10 @@ export default function Configuracion() {
           </div>
         )}
       </div>
+      )}
 
       {/* Tabla de otras configuraciones */}
-      {otherConfigs.length > 0 && (
+      {itemGeneral.id === 'avanzado' && otherConfigs.length > 0 && (
       <div
         className="rounded-xl overflow-hidden"
         style={{
@@ -1533,6 +1551,7 @@ export default function Configuracion() {
       )}
 
       {/* Apariencia — 3 ejes del tema: fondo, acento y barra lateral */}
+      {itemGeneral.id === 'apariencia' && (
       <div>
         <div className="flex items-center gap-3 mb-4">
           <div
@@ -1563,6 +1582,7 @@ export default function Configuracion() {
           footnote="La apariencia se guarda en este dispositivo y para tu usuario: nadie más del municipio ve estos cambios. Lo que sí ven todos —la imagen de portada y el filtro de cabecera— se configura más arriba, en esta misma pestaña."
         />
       </div>
+      )}
         </div>
       )}
 
