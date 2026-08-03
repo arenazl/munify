@@ -91,6 +91,18 @@ const BRAND_COLORS = [
  * Un ajuste sin entrada acá cae a la ficha con acceso — así se puede ir
  * enchufando de a una sin romper las demás.
  * ============================================================ */
+const ConfigTesoreria = lazy(() => import('./ConfiguracionTesoreria'));
+
+/** Los ajustes de Tesorería son tabs de UNA misma pantalla: se monta la misma
+ *  con el tab que corresponde, en vez de sacar al usuario a otra ruta. */
+const TAB_TESORERIA: Record<string, string> = {
+  'tesoreria-conceptos': 'conceptos',
+  'tesoreria-tipos-empleado': 'tipos-empleado',
+  'tesoreria-cajas': 'cajas',
+  'tesoreria-parajes': 'parajes',
+  'tesoreria-proyectos': 'proyectos',
+};
+
 const PANTALLA_DE_AJUSTE: Record<string, LazyExoticComponent<ComponentType>> = {
   // Personal
   empleados: lazy(() => import('./Empleados')),
@@ -118,10 +130,17 @@ const PANTALLA_DE_AJUSTE: Record<string, LazyExoticComponent<ComponentType>> = {
   // Integraciones
   'whatsapp-config': lazy(() => import('./WhatsAppConfig')),
   'proveedores-pago': lazy(() => import('./ProveedoresPago')),
+  // Trámites / cobranzas
+  'importar-padron': lazy(() => import('./ImportarPadron')),
+  'tramites-pago': lazy(() => import('./TramitesConfig')),
   // Super Admin
   municipios: lazy(() => import('./Municipios')),
   'dashboard-config': lazy(() => import('./ConfigDashboard')),
   exportar: lazy(() => import('./Exportar')),
+  'sidebar-config': lazy(() => import('./SidebarConfig')),
+  'configuracion-ia': lazy(() => import('./ConfiguracionIA')),
+  'audit-logs': lazy(() => import('./admin/AuditLogs')),
+  suscripciones: lazy(() => import('./admin/Suscripciones')),
 };
 
 export default function Configuracion() {
@@ -1661,7 +1680,17 @@ export default function Configuracion() {
       {/* Panel del ajuste elegido: la pantalla real embebida si está
           registrada; si no, su ficha con el acceso a la ruta. */}
       {activeTab !== 'general' && (
-        ajusteActivo && PANTALLA_DE_AJUSTE[ajusteActivo.id] ? (
+        ajusteActivo && TAB_TESORERIA[ajusteActivo.id] ? (
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} />
+            </div>
+          }>
+            <EmbedProvider slotId={ajusteActivo.id} reportarTotal={reportarTotal}>
+              <ConfigTesoreria tabInicial={TAB_TESORERIA[ajusteActivo.id]} />
+            </EmbedProvider>
+          </Suspense>
+        ) : ajusteActivo && PANTALLA_DE_AJUSTE[ajusteActivo.id] ? (
           <Suspense fallback={
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} />

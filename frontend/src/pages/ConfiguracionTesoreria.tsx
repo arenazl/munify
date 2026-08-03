@@ -19,20 +19,24 @@ import TesoreriaProyectos from './TesoreriaProyectos';
 
 type Tab = 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos' | 'premios' | 'retenciones' | 'conceptos-liq';
 
-export default function ConfiguracionTesoreria() {
+/** `tabInicial` permite montarla embebida (panel de Configuración), donde no
+ *  hay query param del que leer el tab. Sin la prop se comporta igual que
+ *  siempre: manda el `?tab=` de la URL. */
+export default function ConfiguracionTesoreria({ tabInicial }: { tabInicial?: string } = {}) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   // 'tipos' eliminado del selector (los tipos siguen existiendo en DB
   // pero ya no se gestionan desde acá — el ABM es solo de conceptos planos).
-  const requested = searchParams.get('tab') as string | null;
+  const requested = (tabInicial ?? searchParams.get('tab')) as string | null;
   const initialTab: Tab = (requested && ['conceptos','tipos-empleado','cajas','parajes','proyectos','premios','retenciones','conceptos-liq'].includes(requested))
     ? (requested as Tab)
     : 'conceptos';
   const [tab, setTabState] = useState<Tab>(initialTab);
   const setTab = (t: Tab) => {
     setTabState(t);
-    setSearchParams({ tab: t }, { replace: true });
+    // Embebida (tabInicial): no toca la URL — la ruta es la de Configuración.
+    if (!tabInicial) setSearchParams({ tab: t }, { replace: true });
   };
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
