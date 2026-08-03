@@ -41,6 +41,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
 | Consolidar tesorería / entender el plan Persona + prueba de paridad | [`tesoreria/01-consolidacion-analisis.md`](tesoreria/01-consolidacion-analisis.md) |
+| **Reordenar Configuración/Catálogos y acotar Apariencia (especificado, sin implementar)** | [`handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md`](handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md) — 5 grupos por FK real; temas de 40 a 6 + acento independiente; topbar solo luna/sol |
 | **Retomar el rollout v2 del canvas (ola 1: 8 pantallas en qa, validaciones a ojo, huecos de backend)** | [`handoffs/2026-08-02_rollout-v2-canvas-ola1.md`](handoffs/2026-08-02_rollout-v2-canvas-ola1.md) |
 | Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
 | **Promover a prod la Tarjeta de crédito como caja (qué necesita Infra)** | [`handoffs/2026-07-23_promocion-tarjeta-credito.md`](handoffs/2026-07-23_promocion-tarjeta-credito.md) — sin migración; único paso manual = crear la caja con `codigo=TARJETA` |
