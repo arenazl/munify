@@ -58,6 +58,17 @@ export interface SidebarV2Props {
 const CATEGORIA_SUELTOS = 'Principal';
 
 /**
+ * Categoría que va suelta ABAJO de todo, después de los acordeones.
+ *
+ * Existe porque "Configuración" era un grupo desplegable con UN solo item que
+ * se llamaba igual que el grupo: abrirlo mostraba "Configuración >
+ * Configuración". Un acordeón de un elemento no agrupa nada, sólo agrega un
+ * click. Como el destino es el cierre del menú —lo último que se toca—, va
+ * suelto al pie, no arriba con Dashboard y Mostrador.
+ */
+const CATEGORIA_SUELTOS_PIE = 'Configuración';
+
+/**
  * Badges de gestión (admin/supervisor): href del item → campo de NavBadges.
  * Los items de vecino siguen resolviendo por su `badgeKey` (useVecinoBadges).
  */
@@ -324,14 +335,19 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
     return () => window.removeEventListener('keydown', onKey);
   }, [alternarColapso]);
 
-  const { sueltos, grupos } = useMemo(() => {
+  const { sueltos, sueltosPie, grupos } = useMemo(() => {
     const sueltosAcc: ShellNavItem[] = [];
+    const sueltosPieAcc: ShellNavItem[] = [];
     const gruposAcc: GrupoNav[] = [];
     const porCategoria = new Map<string, GrupoNav>();
     for (const item of items) {
       const cat = item.categoria;
       if (!cat || cat === CATEGORIA_SUELTOS) {
         sueltosAcc.push(item);
+        continue;
+      }
+      if (cat === CATEGORIA_SUELTOS_PIE) {
+        sueltosPieAcc.push(item);
         continue;
       }
       let grupo = porCategoria.get(cat);
@@ -344,7 +360,7 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
       }
       grupo.items.push(item);
     }
-    return { sueltos: sueltosAcc, grupos: gruposAcc };
+    return { sueltos: sueltosAcc, sueltosPie: sueltosPieAcc, grupos: gruposAcc };
   }, [items]);
 
   const activo = hrefActivo(location.pathname, items);
@@ -434,6 +450,23 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
               onCerrar={cerrarFlyout}
             />
           ))}
+          {sueltosPie.length > 0 && (
+            <>
+              {grupos.length > 0 && <span className="sv2-cseparador" role="separator" />}
+              {sueltosPie.map((item) => {
+                const b = badgeDe(item);
+                return (
+                  <ItemColapsado
+                    key={item.href}
+                    item={item}
+                    activo={esActivo(item)}
+                    badge={b.n}
+                    badgeAlerta={b.alerta}
+                  />
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {grupoFly && (
@@ -501,19 +534,26 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
       {botonToggle}
 
       <nav className="sv2-nav" ref={navRef} aria-label="Navegación principal">
-        {sueltos.map((item) => {
-          const b = badgeDe(item);
-          return (
-            <ItemNav
-              key={item.href}
-              item={item}
-              activo={esActivo(item)}
-              badge={b.n}
-              badgeAlerta={b.alerta}
-              suelto
-            />
-          );
-        })}
+        {/* Los sueltos van en su propio bloque con una hairline abajo: sin ella
+            quedaban flotando contra el primer título de grupo y se leían como
+            un grupo más al que le faltaba la cabecera. */}
+        {sueltos.length > 0 && (
+          <div className="sv2-sueltos">
+            {sueltos.map((item) => {
+              const b = badgeDe(item);
+              return (
+                <ItemNav
+                  key={item.href}
+                  item={item}
+                  activo={esActivo(item)}
+                  badge={b.n}
+                  badgeAlerta={b.alerta}
+                  suelto
+                />
+              );
+            })}
+          </div>
+        )}
 
         {grupos.map((grupo) => {
           const abierto = abiertoId === grupo.id;
@@ -553,6 +593,26 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
             </Fragment>
           );
         })}
+
+        {/* Cierre del menú: suelto al pie, con su hairline arriba. Antes era un
+            acordeón de un solo item llamado igual que el grupo. */}
+        {sueltosPie.length > 0 && (
+          <div className="sv2-sueltos sv2-sueltos--pie">
+            {sueltosPie.map((item) => {
+              const b = badgeDe(item);
+              return (
+                <ItemNav
+                  key={item.href}
+                  item={item}
+                  activo={esActivo(item)}
+                  badge={b.n}
+                  badgeAlerta={b.alerta}
+                  suelto
+                />
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* [MOCK] Tarjeta contextual del módulo abierto — cifra, texto y acción

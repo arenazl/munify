@@ -190,6 +190,33 @@
 .sv2-item--suelto {
   height: 36px;
   font-weight: 600;
+  color: var(--pl-text);
+}
+
+/* Bloque de sueltos: los que no cuelgan de ningún acordeón (Dashboard,
+   Mostrador arriba; Configuración al pie).
+   Van con una hairline que los cierra porque, pegados al primer título de
+   grupo, se leían como un grupo al que le faltaba la cabecera. La línea dice
+   "esto termina acá" sin sumar un título de sección que no aporta. */
+.sv2-sueltos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--pl-border);
+}
+
+/* Al pie la línea va ARRIBA: separa del último acordeón, y abajo no hay nada
+   de qué separarse. Queda pegado al último grupo y no empujado al fondo del
+   panel: es "el último de la lista", no una barra de estado. */
+.sv2-sueltos--pie {
+  margin-top: 6px;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  padding-top: 8px;
+  border-bottom: 0;
+  border-top: 1px solid var(--pl-border);
 }
 
 .sv2-item--activo,
