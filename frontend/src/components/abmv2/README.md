@@ -34,7 +34,33 @@ lo importa, no lo duplica. Las frases se arman con `seg()` de `lib/semanticHero`
    `rowActions` no se renderizan.
 6. Los grupos (`groups`) los precomputa y formatea la página (fechas, subtotales, cupos);
    el `DataTable` solo pinta.
-7. `kind='board'` (Planificación) está **pendiente**: en dev tira error, no lo uses todavía.
+7. **El `veredicto` es transversal al kit.** Donde una pieza pueda declarar un
+   estado, lo declara con `'bueno' | 'advertencia' | 'malo'` y el CSS lo traduce
+   a color vía `--pl-tono`. Cuando NO aplica —una lista de pagos que ya se
+   hicieron no tiene nada que avisar— se omite y todo cae al acento del theme.
+   Hoy lo usan el hero (gradiente + barra izquierda, sale de la frase activa) y
+   la cabecera de grupo (insignia + renglón chico).
+8. `kind='board'` (Planificación) está **pendiente**: en dev tira error, no lo uses todavía.
+
+### Cabecera de grupo: dos renglones
+
+`TableGroup` tiene `title` (la fecha escrita entera, en negrita) y `label` (qué
+hay adentro). El **sustantivo del `label` lo pone la página**, que es la que sabe
+qué lista es: `"3 movimientos"` en Gastos, `"5 pagos · venció hace 1 día"` en
+Liquidaciones, `"4 de 4 cupos"` en Agenda. `title` es opcional: sin él la
+cabecera queda de una sola línea, como antes de 2026-08-02.
+
+```tsx
+{
+  key: '2026-08-01',
+  badge: { top: '1', bottom: 'AGO' },
+  title: '1 de agosto',                        // renglón fuerte
+  label: '5 pagos · venció hace 1 día',        // renglón chico
+  veredicto: 'malo',                           // tiñe insignia + renglón chico
+  subtotal: '$ 23.500.000',
+  rows,
+}
+```
 
 ## Cómo instanciar
 

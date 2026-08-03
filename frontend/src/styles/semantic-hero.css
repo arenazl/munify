@@ -8,34 +8,45 @@
    ============================================================ */
 
 .sh-card {
+  /* TONO de la card: lo define el veredicto de la frase activa (ver los
+     modificadores de abajo). Sin veredicto queda el acento del theme, así
+     que una pantalla que sólo informa —"pagaste 12 facturas"— no se pinta
+     de rojo ni de ámbar: se pinta de la marca. */
+  --pl-tono: var(--pl-green);
   position: relative;
   overflow: hidden;
   margin: 0 0 16px;
   padding: 18px 20px;
   background: var(--pl-surface);
   border: 1px solid var(--pl-border);
-  border-left: 3px solid var(--pl-green);
+  border-left: 3px solid var(--pl-tono);
   border-radius: var(--pl-radius-lg);
   box-shadow: var(--pl-shadow-card);
 }
 
-/* Lavado de acento en diagonal, NACIENDO en el borde izquierdo: el color
-   entra por donde está la barra de acento y se disuelve antes de llegar al
-   texto. Así el borde deja de ser un apéndice suelto y tiñe lo que toca.
-   Va MUY bajo a propósito — si el fondo levanta, compite con el verde del
-   veredicto y "113 cerrados" deja de leerse como bueno. Sale del token de
-   acento, así que cada marca lo hereda en su color. */
+/* El veredicto tiñe TODO lo que sale de --pl-tono de una sola vez: el
+   gradiente de arriba y la barra izquierda. Antes el color de la barra se
+   pasaba a mano desde cada página (--av2-hero-accent) y el gradiente iba
+   siempre en el acento; ahora los dos salen del mismo dato. */
+.sh-card--bueno { --pl-tono: var(--pl-green); }
+.sh-card--advertencia { --pl-tono: var(--pl-amber-strong); }
+.sh-card--malo { --pl-tono: var(--pl-red); }
+
+/* Gradiente que NACE ARRIBA y se disuelve antes de llegar al texto (diseño
+   2026-08-02). Antes entraba en diagonal desde el borde izquierdo y siempre
+   en el color de la marca; ahora baja desde el techo de la tarjeta y lleva el
+   color del VEREDICTO, así el estado se lee de un vistazo aunque no llegues a
+   leer la frase.
+   Va MUY bajo a propósito — si el fondo levanta, compite con el color del
+   veredicto dentro de la frase y "113 cerrados" deja de leerse como bueno.
+   La fórmula y su intensidad viven en [LAVADO POR TONO] de pl-tokens.css, una
+   sola vez para todo el kit. */
 .sh-card::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  /* Una sola definición del lavado, con la intensidad como variable: acá va
-     la fuerte porque el hero es la pieza que habla. El resto de las
-     superficies usa la misma fórmula más baja (ver [LAVADO] en
-     pl-tokens.css), así todo el kit comparte el patrón sin que todo compita
-     por la misma atención. */
-  background: var(--pl-lavado-acento);
+  background: var(--pl-lavado-tono);
 }
 /* Todo el contenido por encima del lavado. */
 .sh-card > * { position: relative; }

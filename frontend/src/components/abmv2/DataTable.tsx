@@ -49,6 +49,7 @@ import { Link } from 'react-router-dom';
 import { MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { estadoLabel } from '../../lib/enums/reclamo';
+import type { Veredicto } from '../../lib/semanticHero';
 import type {
   Action,
   ChipTone,
@@ -153,12 +154,38 @@ export function DotCell({ label, dotColor }: DotCellData) {
   );
 }
 
-/** Insignia 42×38 de los grupos: día sobre mes ("15"/"OCT") u hora ("09"/"HS"). */
-export function Insignia({ top, bottom }: { top: string; bottom: string }) {
+/** Insignia 42×38 de los grupos: día sobre mes ("15"/"OCT") u hora ("09"/"HS").
+ *  El `veredicto` la tiñe entera —día y mes— para que un día con vencidos se
+ *  vea rojo de lejos. Sin veredicto queda el día en texto y el mes en el
+ *  acento del theme. */
+export function Insignia({
+  top,
+  bottom,
+  veredicto,
+}: {
+  top: string;
+  bottom: string;
+  veredicto?: Veredicto;
+}) {
   return (
-    <span className="av2-tabla-insignia">
+    <span className={`av2-tabla-insignia ${veredicto ? `av2-tabla-insignia--${veredicto}` : ''}`}>
       <span className="av2-tabla-insignia-dia av2-tnum">{top}</span>
       <span className="av2-tabla-insignia-mes">{bottom}</span>
+    </span>
+  );
+}
+
+/** Cabecera de un grupo: insignia + título fuerte con su renglón chico.
+ *  Con `title` son dos renglones; sin él queda el label solo, que es como
+ *  venían todas las pantallas antes de este cambio. */
+function GrupoTexto<Row>({ g }: { g: TableGroup<Row> }) {
+  if (!g.title) return <span className="av2-tabla-grupo-label">{g.label}</span>;
+  return (
+    <span className="av2-tabla-grupo-texto">
+      <span className="av2-tabla-grupo-titulo">{g.title}</span>
+      <span className={`av2-tabla-grupo-label ${g.veredicto ? `av2-tabla-grupo-label--${g.veredicto}` : ''}`}>
+        {g.label}
+      </span>
     </span>
   );
 }
@@ -440,9 +467,13 @@ export function DataTable<Row>({
     if (conSubtotal) {
       return (
         <div key={g.key} role="rowgroup">
-          <div className="av2-tabla-grid av2-tabla-grupo" role="row" aria-label={g.label}>
-            <span>{g.badge && <Insignia top={g.badge.top} bottom={g.badge.bottom} />}</span>
-            <span className="av2-tabla-grupo-label">{g.label}</span>
+          <div className="av2-tabla-grid av2-tabla-grupo" role="row" aria-label={g.title || g.label}>
+            <span>
+              {g.badge && (
+                <Insignia top={g.badge.top} bottom={g.badge.bottom} veredicto={g.veredicto} />
+              )}
+            </span>
+            <GrupoTexto g={g} />
             {/* Anclado a la columna del importe (posición runtime). */}
             <span className="av2-tabla-subtotal" style={{ gridColumn: colSubtotal }}>
               <span className="av2-tabla-subtotal-eyebrow">SUBTOTAL</span>
@@ -455,9 +486,13 @@ export function DataTable<Row>({
     }
     return (
       <div key={g.key} role="rowgroup">
-        <div className="av2-tabla-grupo av2-tabla-grupo--flex" role="row" aria-label={g.label}>
-          {g.badge && <Insignia top={g.badge.top} bottom={g.badge.bottom} />}
-          <span className="av2-tabla-grupo-label">{g.label}</span>
+        <div
+          className="av2-tabla-grupo av2-tabla-grupo--flex"
+          role="row"
+          aria-label={g.title || g.label}
+        >
+          {g.badge && <Insignia top={g.badge.top} bottom={g.badge.bottom} veredicto={g.veredicto} />}
+          <GrupoTexto g={g} />
           <span className="av2-tabla-grupo-linea" aria-hidden="true" />
         </div>
         {g.rows.map(renderFila)}

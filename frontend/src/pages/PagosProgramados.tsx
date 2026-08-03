@@ -37,7 +37,7 @@ import { ChipEstado, DataTable, DotCell, EntityCell } from '../components/abmv2/
 import type {
   ChipTone, ColumnSpec, RowAction, SelectSpec, StatusTab, TableGroup, ViewKind,
 } from '../components/abmv2/types';
-import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
+import { seg, type HeroFrase, type HeroKpi, type Veredicto } from '../lib/semanticHero';
 import { conceptoIcon } from '../lib/conceptoIcons';
 import {
   contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS_SINGULAR,
@@ -159,13 +159,16 @@ function msgError(e: unknown, fallback: string): string {
   return typeof detalle === 'string' && detalle ? detalle : fallback;
 }
 
-/** Agrupa por día y arma el TableGroup del kit (insignia día/mes + etiqueta +
- *  subtotal ya formateado). La página agrupa, el DataTable sólo pinta. */
+/** Agrupa por día y arma el TableGroup del kit (insignia día/mes + dos
+ *  renglones + subtotal ya formateado). La página agrupa, el DataTable sólo
+ *  pinta.
+ *  El título del grupo es SIEMPRE la fecha escrita entera; `detalle` aporta el
+ *  renglón chico y —cuando corresponde— el veredicto que tiñe la insignia. */
 function agruparPorDia<T>(
   items: T[],
   getFecha: (item: T) => string,
   getMonto: (item: T) => number,
-  etiqueta: (rows: T[], dias: number, iso: string) => string,
+  detalle: (rows: T[], dias: number, iso: string) => { label: string; veredicto?: Veredicto },
   desc: boolean,
 ): TableGroup<T>[] {
   const porDia = new Map<string, T[]>();
@@ -178,13 +181,16 @@ function agruparPorDia<T>(
     .sort((a, b) => (desc ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0])))
     .map(([k, rows]) => {
       const d = parseLocalDate(k);
+      const { label, veredicto } = detalle(rows, diasDesdeHoy(k), k);
       return {
         key: k,
         badge: {
           top: String(d.getDate()),
           bottom: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').toUpperCase(),
         },
-        label: etiqueta(rows, diasDesdeHoy(k), k),
+        title: tituloDia(k),
+        label,
+        veredicto,
         subtotal: fmtMoney(rows.reduce((s, r) => s + getMonto(r), 0)),
         rows,
       };
@@ -745,8 +751,14 @@ export default function PagosProgramados() {
   const grupos = useMemo(
     () => agruparPorDia<PagoProgramado>(
       filtered, (p) => p.proximo_pago, (p) => parseFloat(p.monto_pesos || '0'),
-      // "1 de agosto · 4 pagos · venció hace 2 días" — un día = una transferencia.
-      (rows, dias, iso) => `${tituloDia(iso)} · ${plural(rows.length, 'pago', 'pagos')} · ${estadoDia(dias)}`,
+      // "1 de agosto" arriba y "5 pagos · venció hace 1 día" abajo — un día =
+      // una transferencia. El día que ya venció va en rojo (insignia incluida);
+      // el que vence hoy, en ámbar. Los de más adelante quedan neutros: no hay
+      // nada que avisar todavía.
+      (rows, dias) => ({
+        label: `${plural(rows.length, 'pago', 'pagos')} · ${estadoDia(dias)}`,
+        veredicto: dias < 0 ? 'malo' : dias === 0 ? 'advertencia' : undefined,
+      }),
       false,
     ),
     [filtered]);
@@ -784,7 +796,9 @@ export default function PagosProgramados() {
       rows={[]}
       groups={agruparPorDia<PagoEjecutadoHistorial>(
         itemsHistorial, (h) => h.fecha, (h) => parseFloat(h.monto_pesos || '0'),
-        (rows, _dias, iso) => `${tituloDia(iso)} · ${plural(rows.length, 'pago', 'pagos')}`,
+        // Historial: plata que ya salió. No hay veredicto que dar — la insignia
+        // queda neutra con el mes en el acento.
+        (rows) => ({ label: plural(rows.length, 'pago', 'pagos') }),
         // realizados: más reciente arriba; adelantados: más próximo arriba.
         estadoFiltro === 'realizados',
       )}

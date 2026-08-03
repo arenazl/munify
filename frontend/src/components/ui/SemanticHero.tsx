@@ -157,9 +157,15 @@ export function SemanticHero({
 
   const actual = Math.min(idx, total - 1);
 
+  // TONO de la card = veredicto de la frase que se está leyendo. Tiñe el
+  // gradiente de arriba y la barra izquierda, y cambia al rotar el carrusel:
+  // si la frase que entra habla de vencidos, el hero entero se pone en rojo.
+  // Sin veredicto la card no lleva clase y el CSS cae al acento del theme.
+  const tono = veredictoDominante(validas[actual]);
+
   return (
     <section
-      className={`sh-card ${className || ''}`}
+      className={`sh-card ${tono ? `sh-card--${tono}` : ''} ${className || ''}`}
       aria-label={etiqueta}
       onMouseEnter={() => setDetenido(true)}
       onMouseLeave={() => setDetenido(false)}

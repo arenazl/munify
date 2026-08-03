@@ -103,6 +103,25 @@
     color-mix(in srgb, var(--pl-green) 1.2%, transparent) 40%,
     transparent 74%
   );
+
+  /* [LAVADO POR TONO] Gradiente mínimo que NACE ARRIBA y muere antes de
+     llegar al contenido. El color sale de --pl-tono, que cada pieza define
+     según su VEREDICTO (bueno / advertencia / malo); si nadie lo define cae
+     al acento del theme. Es la misma fórmula para el hero, las cabeceras de
+     grupo y cualquier superficie que tenga que declarar un estado — una sola
+     definición, un solo lugar donde cambiar la intensidad.
+     Las custom properties se resuelven en el punto de uso: alcanza con que el
+     elemento (o un ancestro) declare --pl-tono para que el gradiente lo tome.
+     INTENSIDAD: arranca en 4.5% y se disuelve a mitad de camino. Es a
+     propósito una insinuación — el estado lo declaran la barra izquierda y la
+     frase; el gradiente sólo lo acompaña. Si hay que moverlo, se toca ACÁ y
+     cambia en todo el kit a la vez. */
+  --pl-lavado-tono: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 4.5%, transparent) 0%,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 1.2%, transparent) 34%,
+    transparent 62%
+  );
 }
 
 /* ============================================================

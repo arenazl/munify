@@ -370,16 +370,6 @@ export default function Tesoreria() {
     return { totalPesos, totalImputado, totalUsd, conUsd, cantidad: filtered.length };
   }, [filtered]);
 
-  const totalMes = useMemo(() => {
-    const ahora = new Date();
-    return gastos
-      .filter(g => {
-        const d = new Date(g.fecha);
-        return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
-      })
-      .reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0);
-  }, [gastos]);
-
   // Buckets por tipo de concepto: top por monto (alimentan la stat strip del hero).
   const kpisData = useMemo(() => {
     type Bucket = { nombre: string; color: string; total: number; count: number };
@@ -817,6 +807,9 @@ export default function Tesoreria() {
         return {
           key: k,
           badge: { top: String(d.getDate()), bottom: mes },
+          // Dos renglones: la fecha entera arriba, qué hay adentro abajo. El
+          // sustantivo lo pone la pantalla — acá son movimientos de caja.
+          title: `${d.getDate()} de ${d.toLocaleDateString('es-AR', { month: 'long' })}`,
           label: `${items.length} ${items.length === 1 ? 'movimiento' : 'movimientos'}`,
           subtotal: fmtMoney(sub),
           rows: items,

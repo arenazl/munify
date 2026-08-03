@@ -33,7 +33,7 @@
  */
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
+import type { HeroFrase, HeroKpi, Veredicto } from '../../lib/semanticHero';
 
 /* ============================================================
  * Básicos compartidos
@@ -371,8 +371,19 @@ export interface TableGroup<Row = unknown> {
   key: string;
   /** Insignia 42×38: día sobre mes ("15"/"OCT") u hora ("09"/"HS"). */
   badge?: { top: string; bottom: string };
-  /** "3 movimientos" · "4 de 4 cupos" · "1 cupo libre". */
+  /** Renglón fuerte del grupo: la fecha escrita entera ("15 de octubre",
+   *  "Lunes 3"). Opcional — sin él la cabecera queda de UNA línea, como
+   *  siempre, y no se toca ninguna pantalla existente. */
+  title?: string;
+  /** Renglón chico, debajo del title: qué hay adentro del grupo. El
+   *  SUSTANTIVO lo pone la página, que es la que sabe qué lista es —
+   *  "3 movimientos", "4 gastos", "1 pago · venció hace 2 d",
+   *  "4 de 4 cupos". El kit no sabe de dominios. */
   label: string;
+  /** Estado del grupo. Tiñe la insignia y el renglón chico: un día con
+   *  pagos vencidos se lee en rojo sin abrir nada. Sin veredicto la
+   *  cabecera queda neutra con el mes en el acento del theme. */
+  veredicto?: Veredicto;
   /** Subtotal YA formateado; se muestra si showGroupSubtotal (kind='money'). */
   subtotal?: string;
   rows: Row[];
