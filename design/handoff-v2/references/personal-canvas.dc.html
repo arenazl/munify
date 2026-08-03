@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+<script src="./image-slot.js"></script>
+<style>
+  body { margin: 0; background: #F1F4F2; font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #00B37E; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); } 70% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+</style>
+</helmet>
+
+<div style="display: flex; min-height: 1000px; background: #F1F4F2; color: #0D1412;">
+
+  <sc-if value="{{ colapsada }}" hint-placeholder-val="{{ false }}">
+    <aside style="width: 72px; flex: 0 0 72px; background: #FFFFFF; border-right: 1px solid rgba(13,20,18,0.07); display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 18px 0; position: sticky; top: 0; align-self: flex-start; height: 100vh;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(150deg, #FDF3D6 0%, #E4F5EC 60%, #D3F0E3 100%); border: 1px solid rgba(13,20,18,0.06); display: grid; place-items: center; margin-bottom: 12px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="8.6" cy="7.4" r="3.1" fill="#FFB800" /><g stroke="#FFB800" stroke-width="1.6" stroke-linecap="round"><path d="M8.6 1.6v1.4M8.6 11.8v1.4M2.8 7.4h1.4M13 7.4h1.4M4.5 3.3l1 1M12.2 10.5l1 1M12.7 3.3l-1 1M5.5 10.5l-1 1" /></g><path d="M3.2 21c0-5.2 4-9.4 9.2-9.4h7.4v3.1c0 3.5-2.9 6.3-6.4 6.3z" fill="#00B37E" /></svg>
+      </div>
+      <div title="Dashboard" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: #E7F6F0; color: #00794F; cursor: pointer;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z" /><path d="M9 21v-6h6v6" /></svg></div>
+      <div title="Reclamos" style="position: relative; width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg><span style="position: absolute; top: 3px; right: 2px; min-width: 16px; height: 15px; padding: 0 3px; border-radius: 999px; background: #00B37E; color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: center;">49</span></div>
+      <div title="Mapa" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg></div>
+      <div title="SLA" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg></div>
+      <span style="width: 26px; height: 1px; background: rgba(13,20,18,0.08); margin: 7px 0;"></span>
+      <div title="Órdenes" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4" /><path d="M14 4h6v6" /></svg></div>
+      <div title="Cuadrillas" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3" /><circle cx="17" cy="9" r="3" /><path d="M2 19c0-2.8 2.7-5 6-5s6 2.2 6 5" /><path d="M15 14.5c2.9.4 5 2.3 5 4.5" /></svg></div>
+      <div title="Trámites" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg></div>
+      <div title="Cobros" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg></div>
+      <div style="flex: 1;"></div>
+      <div onClick="{{ toggleColapso }}" title="Expandir menú" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; border: 1px solid rgba(13,20,18,0.08);" style-hover="background: #F4F7F6;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ expandida }}" hint-placeholder-val="{{ true }}">
+  <aside style="width: 256px; flex: 0 0 256px; background: #FFFFFF; border-right: 1px solid rgba(13,20,18,0.07); display: flex; flex-direction: column; position: sticky; top: 0; align-self: flex-start; height: 100vh;">
+
+    <div style="display: flex; align-items: center; gap: 10px; padding: 18px 16px 14px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(150deg, #FDF3D6 0%, #E4F5EC 60%, #D3F0E3 100%); border: 1px solid rgba(13,20,18,0.06); display: grid; place-items: center; flex: 0 0 36px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="8.6" cy="7.4" r="3.1" fill="#FFB800" />
+          <g stroke="#FFB800" stroke-width="1.6" stroke-linecap="round">
+            <path d="M8.6 1.6v1.4M8.6 11.8v1.4M2.8 7.4h1.4M13 7.4h1.4M4.5 3.3l1 1M12.2 10.5l1 1M12.7 3.3l-1 1M5.5 10.5l-1 1" />
+          </g>
+          <path d="M3.2 21c0-5.2 4-9.4 9.2-9.4h7.4v3.1c0 3.5-2.9 6.3-6.4 6.3z" fill="#00B37E" />
+          <path d="M6.4 21c1.6-3.4 4.6-5.6 8.4-6.3" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" opacity="0.75" />
+        </svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+        <div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -0.02em;">Paraguay <span style="color: #00B37E;">Limpio</span></div>
+        <div style="font-size: 11px; color: #7A8783;">Asunción, Dpto. Central</div>
+      </div>
+      <sc-if value="{{ colapsoHeader }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ toggleColapso }}" title="Colapsar menú" style="margin-left: auto; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(13,20,18,0.08); display: grid; place-items: center; cursor: pointer; flex: 0 0 28px;" style-hover="background: #F4F7F6;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+        </div>
+      </sc-if>
+    </div>
+    <sc-if value="{{ colapsoBorde }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleColapso }}" title="Colapsar menú" style="position: absolute; top: 76px; right: -13px; width: 26px; height: 26px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.10); box-shadow: 0 2px 6px rgba(13,20,18,0.10); display: grid; place-items: center; cursor: pointer; z-index: 3;" style-hover="background: #E7F6F0; border-color: #9BDCC4;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+      </div>
+    </sc-if>
+
+    <div style="padding: 0 12px 12px;">
+      <div onClick="{{ abrirBuscador }}" style="display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 11px; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.08); border-radius: 11px; cursor: text;" style-hover="background: #EDF3F0; border-color: #9BDCC4;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" style="flex: 0 0 17px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span style="font-size: 13.5px; color: #7A8783; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar reclamo, vecino…</span>
+        <span style="margin-left: auto; font-size: 10.5px; font-weight: 600; color: #7A8783; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.1); border-radius: 6px; padding: 2px 5px; flex: 0 0 auto;">⌘K</span>
+      </div>
+    </div>
+
+    <nav style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 2px;">
+
+      <a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z" /><path d="M9 21v-6h6v6" /></svg>
+        Dashboard
+      </a>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleReclamos }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">RECLAMOS</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevReclamos }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openReclamos }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9z" /><path d="M9 12h6M9 16h4" /></svg>
+            Reclamos
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #00794F; background: #E7F6F0; border-radius: 999px; padding: 1px 7px;">49</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg>
+            Mapa
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
+            Tablero
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+            Planificación
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
+            SLA
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #B4560F; background: #FDF1DF; border-radius: 999px; padding: 1px 7px;">3</span>
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleCampo }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">CAMPO</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevCampo }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openCampo }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4" /><path d="M14 4h6v6" /></svg>
+            Órdenes
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #00794F; background: #E7F6F0; border-radius: 999px; padding: 1px 7px;">12</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="13" y="13" width="8" height="8" rx="1.5" /><rect x="8" y="3" width="8" height="8" rx="1.5" /></svg>
+            Inventario
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; background: #E7F6F0; color: #00794F; font-size: 13.5px; font-weight: 600; position: relative;">
+            <span style="position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: #00B37E;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M17 8.5a3 3 0 0 1 0 5" /></svg>
+            Personal
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3" /><circle cx="17" cy="9" r="3" /><path d="M2 19c0-2.8 2.7-5 6-5s6 2.2 6 5" /><path d="M15 14.5c2.9.4 5 2.3 5 4.5" /></svg>
+            Cuadrillas
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleTramites }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">TRÁMITES</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevTramites }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openTramites }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+            Trámites
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #00794F; background: #E7F6F0; border-radius: 999px; padding: 1px 7px;">10</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /><circle cx="12" cy="15" r="2" /></svg>
+            Agenda
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.5" /><path d="M12 9.5V13l2.5 1.5M9 2h6" /></svg>
+            Horarios
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleVecino }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">ATENCIÓN AL VECINO</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevVecino }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openVecino }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="11" rx="2" /><path d="M8 20h8" /></svg>
+            Mostrador
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M12 7v10M14.5 9.5c0-1.1-1.1-1.7-2.5-1.7s-2.5.6-2.5 1.7 1.2 1.5 2.5 1.8 2.5.7 2.5 1.8-1.1 1.7-2.5 1.7-2.5-.6-2.5-1.7" /></svg>
+            Tasas
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg>
+            Cobros
+          </a>
+        </div>
+      </sc-if>
+    </nav>
+
+    <div style="border-top: 1px solid rgba(13,20,18,0.07); padding: 10px 12px;">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #5B6764; font-size: 13px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.7" /><path d="M12 17h.01" /></svg>
+        Ayuda y soporte
+      </a>
+    </div>
+  </aside>
+  </sc-if>
+
+  <main style="flex: 1; min-width: 0; padding: 14px 20px 40px;">
+
+    <div style="position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 14px; margin: -14px -20px 0; padding: 14px 24px 12px; background: #F1F4F2; flex-wrap: wrap; row-gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #7A8783; min-width: 0; flex: 1 1 auto; overflow: hidden;">
+        <sc-if value="{{ enDependencia }}" hint-placeholder-val="{{ true }}">
+          <span style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; background: #E7F6F0; border: 1px solid #C9EBDD; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: #00794F; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" /></svg>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Dirección de Habilitaciones Comerciales</span>
+          </span>
+        </sc-if>
+        <sc-if value="{{ esAdmin }}" hint-placeholder-val="{{ false }}">
+          <span style="position: relative; display: inline-flex; min-width: 0;">
+            <button onClick="{{ toggleDep }}" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 999px; cursor: pointer; font-family: Inter, sans-serif; min-width: 0;" style-hover="border-color: #9BDCC4; background: #F7FCFA;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" /></svg>
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Todas las dependencias</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+            </button>
+            <sc-if value="{{ depAbierto }}" hint-placeholder-val="{{ false }}">
+              <div style="position: absolute; top: 38px; left: 0; width: 340px; max-height: 380px; overflow: auto; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.08); border-radius: 12px; box-shadow: 0 6px 20px rgba(13,20,18,0.10), 0 2px 6px rgba(13,20,18,0.06); z-index: 20; padding: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #F3F7F5; border-radius: 9px; margin-bottom: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                  <input type="text" placeholder="Buscar dependencia…" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-family: Inter, sans-serif; font-size: 13px; color: #0D1412;" />
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 9px; background: #E7F6F0; cursor: pointer;">
+                  <span style="font-size: 13px; font-weight: 600; color: #00794F;">Todas las dependencias</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto;"><path d="m5 13 4 4L19 7" /></svg>
+                </div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE OBRAS Y SERVICIOS PÚBLICOS</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Redes Pluviales</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Alumbrado Público</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Defensa Civil</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE MOVILIDAD</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Tránsito</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Transporte</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Monitoreo</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE HACIENDA</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Ingresos Públicos</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Compras y Suministros</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Tesorería</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE GOBIERNO</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Habilitaciones Comerciales</div>
+              </div>
+            </sc-if>
+          </span>
+        </sc-if>
+        <span style="color: #C6CFCB;">/</span>
+        <span style="color: #0D1412; font-weight: 600;">Personal</span>
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto;">
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E8ECEA;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="1.2" fill="#5B6764" /><circle cx="14.5" cy="9.5" r="1.2" fill="#5B6764" /></svg>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer; position: relative;" style-hover="background: #E8ECEA;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z" /><path d="M10 18.5a2 2 0 0 0 4 0" /></svg>
+          <span style="position: absolute; top: 6px; right: 7px; width: 6px; height: 6px; border-radius: 999px; background: #E5484D; border: 1.5px solid #F1F4F2;"></span>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E8ECEA;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M4.6 7.5l1.7 1M17.7 15.5l1.7 1M4.6 16.5l1.7-1M17.7 8.5l1.7-1" /></svg>
+        </div>
+        <span style="width: 1px; height: 22px; background: rgba(13,20,18,0.10); margin: 0 4px;"></span>
+        <button style="display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 6px 0 4px; background: transparent; border: 0; border-radius: 999px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="background: #E8ECEA;">
+          <span style="width: 28px; height: 28px; border-radius: 999px; background: #0D1412; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 600;">RG</span>
+          <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 0px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; line-height: 1.2;">Rocío Giménez</span>
+            <span style="font-size: 10.5px; color: #7A8783; line-height: 1.2;">Supervisora de área</span>
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <section style="padding: 20px 22px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-left: 3px solid #00B37E; border-radius: 12px;">
+      <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7A8783;">PERSONAL · CAMPO</span>
+      <p style="margin: 8px 0 16px; font-family: Sora, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; color: #0D1412; text-wrap: pretty;">Tenés <span style="color: #0D1412;">10 empleados activos</span>, pero <span style="color: #C93A3E;">2 concentran 9 de las 15 tareas</span> de la semana y <span style="color: #B4560F;">4 no tienen ninguna</span>. Tres especialidades dependen de una sola persona.</p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); padding-top: 16px; row-gap: 18px; border-top: 1px solid rgba(13,20,18,0.06);">
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-right: 18px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">ACTIVOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #0D1412; font-feature-settings: 'tnum';">10</span>
+          <span style="font-size: 11px; color: #98A3A0;">9 operarios · 1 administrativo</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(13,20,18,0.06);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">CON TAREAS HOY</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #0D1412; font-feature-settings: 'tnum';">6</span>
+          <span style="font-size: 11px; color: #98A3A0;">60% del plantel</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(13,20,18,0.06);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">SOBRECARGADOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #C93A3E; font-feature-settings: 'tnum';">2</span>
+          <span style="font-size: 11px; color: #98A3A0;">5 o más tareas</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(13,20,18,0.06);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">SIN CARGA</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #B4560F; font-feature-settings: 'tnum';">4</span>
+          <span style="font-size: 11px; color: #98A3A0;">disponibles ahora</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(13,20,18,0.06);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">ESPECIALIDAD ÚNICA</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #B4560F; font-feature-settings: 'tnum';">3</span>
+          <span style="font-size: 11px; color: #98A3A0;">sin respaldo si faltan</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #E7F6F0; border: 1px solid #C9EBDD; font-size: 12.5px; font-weight: 600; color: #00794F;">Balancear cargas</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.07); font-size: 12.5px; font-weight: 600; color: #5B6764;">Ver los 4 disponibles</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.07); font-size: 12.5px; font-weight: 600; color: #5B6764;">Cubrir especialidades</a>
+      </div>
+    </section>
+
+    <div style="display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+      <h1 style="margin: 0; font-family: Sora, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.025em;">Empleados</h1>
+      <span style="font-size: 12px; font-weight: 600; color: #5B6764; background: #EDF1EF; border-radius: 999px; padding: 3px 10px; font-feature-settings: 'tnum';">10</span>
+      <div style="display: flex; align-items: center; gap: 9px; flex: 1; min-width: 200px; max-width: 380px; height: 36px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 16px;"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span style="font-size: 13px; color: #9AA5A1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar por nombre, legajo o especialidad…</span>
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; flex: 0 0 auto;">
+        <div style="display: flex; gap: 2px; padding: 3px; background: #EDF1EF; border-radius: 10px;">
+          <span title="Tarjetas" style="width: 30px; height: 28px; border-radius: 7px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E2E9E6;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+          <span title="Tabla" style="width: 30px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.06); cursor: pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+        </div>
+        <button style="display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 15px; background: #00B37E; border: 0; border-radius: 10px; font-family: Inter, sans-serif; font-size: 12.5px; font-weight: 600; color: #FFFFFF; cursor: pointer;" style-hover="background: #008F63;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Nuevo empleado
+        </button>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; flex-wrap: wrap;">
+      <button style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4;">
+        <span style="font-size: 12.5px; color: #7A8783;">Especialidad</span><span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Todas</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5"/></svg>
+      </button>
+      <button style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4;">
+        <span style="font-size: 12.5px; color: #7A8783;">Zona</span><span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Todas</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5"/></svg>
+      </button>
+      <span style="width: 1px; height: 22px; background: rgba(13,20,18,0.10); margin: 0 2px;"></span>
+      <div style="display: flex; gap: 2px; padding: 3px; background: #F3F7F5; border-radius: 999px; flex-wrap: wrap;">
+        <span style="padding: 6px 13px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.06); font-size: 12px; font-weight: 600; color: #0D1412; cursor: pointer;">Todos <span style="color: #98A3A0;">10</span></span>
+        <span style="padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 500; color: #5B6764; cursor: pointer;" style-hover="background: #EAF0ED;">Operarios <span style="color: #98A3A0;">9</span></span>
+        <span style="padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 500; color: #5B6764; cursor: pointer;" style-hover="background: #EAF0ED;">Administrativos <span style="color: #98A3A0;">1</span></span>
+        <span style="padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 500; color: #5B6764; cursor: pointer;" style-hover="background: #EAF0ED;">Supervisores <span style="color: #98A3A0;">2</span></span>
+        <span style="padding: 6px 13px; border-radius: 999px; font-size: 12px; font-weight: 500; color: #C6CFCB;">Inactivos 0</span>
+      </div>
+      <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0;">15 tareas repartidas esta semana</span>
+    </div>
+
+    <div style="margin-top: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow-x: auto; overflow-y: hidden;">
+      <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 12px 18px;">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: left;">EMPLEADO</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: left;">TIPO</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: left;">ESPECIALIDAD</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: left;">ZONA</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: left;">CARGA</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: left;">ESTADO</span><span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: right;">ACCIONES</span>
+      </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">CF</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Carolina Franco</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1042</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #EAF1FD; border-radius: 999px; font-size: 11px; font-weight: 600; color: #2563EB; white-space: nowrap;">Administrativo</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #E5484D; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ruidos y convivencia</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Microcentro</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #98A3A0; white-space: nowrap;">Sin tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">ÓC</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Óscar Cabral</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1008</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #E5484D; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tránsito y señalización</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Villa Morra</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #C93A3E; white-space: nowrap;">5 tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">WA</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Wilson Ayala</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1011</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #F59E0B; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Bacheo y calles</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tacumbú</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #B4560F; white-space: nowrap;">4 tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">HE</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Hugo Espínola</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1006</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #3B82F6; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Agua y cloacas</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Microcentro</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #B4560F; white-space: nowrap;">3 tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">GB</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gustavo Benítez</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1005</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #FFB800; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Alumbrado público</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Santísima Trinidad</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #00794F; white-space: nowrap;">2 tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">DC</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Derlis Cardozo</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1003</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #00B37E; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Recolección de residuos</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Microcentro</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #00794F; white-space: nowrap;">1 tarea</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">CO</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Cristhian Ojeda</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1002</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #34C596; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Arbolado y espacios verdes</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Villa Morra</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #98A3A0; white-space: nowrap;">Sin tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">FG</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Fabián Gauto</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1004</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #8B6BD9; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Animales sueltos</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Zeballos Cué</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #98A3A0; white-space: nowrap;">Sin tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">ND</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nelson Duarte</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1007</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #00B37E; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Higiene urbana</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Chacarita</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #98A3A0; white-space: nowrap;">Sin tareas</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #E7F6F0; border-radius: 999px; font-size: 11px; font-weight: 600; color: #00794F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Activo</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+
+        <div style="display: grid; min-width: 940px; grid-template-columns: minmax(180px, 1.5fr) minmax(90px, 110px) minmax(160px, 1.4fr) minmax(110px, 1fr) minmax(72px, 92px) minmax(84px, 96px) 62px; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F8FAF9;">
+          <span style="display: flex; align-items: center; gap: 11px; min-width: 0;">
+            <span style="width: 32px; height: 32px; border-radius: 999px; background: #F3F7F5; color: #5B6764; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: 0 0 32px;">RV</span>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Rubén Villalba</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; font-feature-settings: 'tnum';">Legajo 1009</span>
+            </span>
+          </span>
+          <span><span style="display: inline-flex; align-items: center; height: 22px; padding: 0 9px; background: #F3F7F5; border-radius: 999px; font-size: 11px; font-weight: 600; color: #5B6764; white-space: nowrap;">Operario</span></span>
+          <span style="display: flex; align-items: center; gap: 7px; min-width: 0;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #8B6BD9; flex: 0 0 7px;"></span>
+            <span style="font-size: 12.5px; color: #3D4945; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Plagas y control</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>
+            <span style="font-size: 12px; color: #5B6764; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tacumbú</span>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #00794F; white-space: nowrap;">1 tarea</span>
+          <span><span style="display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: #FEF7E8; border-radius: 999px; font-size: 11px; font-weight: 600; color: #B4560F; white-space: nowrap;"><span style="width: 5px; height: 5px; border-radius: 999px; background: currentColor;"></span>Licencia</span></span>
+          <span style="display: flex; gap: 2px; justify-content: flex-end;">
+            <span title="Ver" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #EDF1EF; color: #5B6764;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
+            <span title="Eliminar" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: #98A3A0;" style-hover="background: #FDF4F4; color: #C93A3E;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z"/><path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12"/><path d="M10.5 11v6M13.5 11v6"/></svg></span>
+          </span>
+        </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid rgba(13,20,18,0.06); background: #F8FAF9;">
+        <span style="font-size: 11.5px; color: #98A3A0;">Mostrando 10 de 10</span>
+        <a href="#" style="margin-left: auto; font-size: 12px; font-weight: 600;">Exportar plantel</a>
+      </div>
+    </div>
+
+  </main>
+
+  <sc-if value="{{ buscadorAbierto }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ cerrarBuscador }}" style="position: fixed; inset: 0; background: rgba(13,20,18,0.4); display: flex; justify-content: flex-end; z-index: 40;">
+      <div style="width: min(480px, 94vw); height: 100%; background: #FFFFFF; box-shadow: 0 6px 20px rgba(13,20,18,0.10), 0 2px 6px rgba(13,20,18,0.06); overflow: auto; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 18px; border-bottom: 1px solid rgba(13,20,18,0.07);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" style="flex: 0 0 20px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input type="text" placeholder="Buscar reclamo, trámite, vecino…" style="flex: 1; min-width: 0; border: 0; outline: none; font-family: Inter, sans-serif; font-size: 16px; color: #0D1412; background: transparent;" />
+          <span onClick="{{ cerrarBuscador }}" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: 0 0 28px;" style-hover="background: #F4F7F6;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg></span>
+        </div>
+        <div style="padding: 10px 10px 14px;">
+          <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 8px 10px 6px;">SUGERENCIAS</div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #E7F6F0; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 12h6M9 16h4" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Bache profundo sobre Eusebio Ayala</span>
+              <span style="display: block; font-size: 11.5px; color: #98A3A0;">Reclamo #1042 · Bacheo y calles · 3 días</span>
+            </span>
+            <span style="font-size: 11px; font-weight: 600; color: #B4560F; background: #FEF3E2; border-radius: 999px; padding: 3px 9px; flex: 0 0 auto;">Urgente</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #EAF1FD; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Habilitación comercial — Av. Mcal. López 2340</span>
+              <span style="display: block; font-size: 11.5px; color: #98A3A0;">Trámite #778 · En revisión</span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #F1F4F2; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Ramona Escobar</span>
+              <span style="display: block; font-size: 11.5px; color: #98A3A0;">Vecina · 4 reclamos · Barrio Centro</span>
+            </span>
+          </div>
+          <div style="display: flex; gap: 8px; padding: 12px 10px 2px; border-top: 1px solid rgba(13,20,18,0.06); margin-top: 8px;">
+            <span style="font-size: 11.5px; color: #98A3A0;">Filtrá con</span>
+            <span style="font-size: 11px; font-weight: 600; color: #5B6764; background: #F3F7F5; border-radius: 6px; padding: 2px 7px;">#reclamo</span>
+            <span style="font-size: 11px; font-weight: 600; color: #5B6764; background: #F3F7F5; border-radius: 6px; padding: 2px 7px;">@vecino</span>
+            <span style="font-size: 11px; font-weight: 600; color: #5B6764; background: #F3F7F5; border-radius: 6px; padding: 2px 7px;">zona:</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;conFoto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Banner&quot;},&quot;colapso&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;header&quot;,&quot;borde&quot;],&quot;default&quot;:&quot;header&quot;,&quot;tsType&quot;:&quot;'header' | 'borde'&quot;,&quot;section&quot;:&quot;Sidebar&quot;},&quot;perfil&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dependencia&quot;,&quot;admin&quot;],&quot;default&quot;:&quot;dependencia&quot;,&quot;tsType&quot;:&quot;'dependencia' | 'admin'&quot;,&quot;section&quot;:&quot;Previsualizar sesión&quot;},&quot;modulos&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;reclamos,tramites&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Previsualizar sesión&quot;}}">
+class Component extends DCLogic {
+  state = { reclamos: true, campo: true, tramites: true, vecino: true, colapsada: false, buscador: false, dep: false, slide: 0, rango: false, unidad: 'mes' };
+  componentDidMount() {
+    this._onKey = (e) => {
+      if (e.key === 'Escape') this.setState({ buscador: false });
+      if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this.setState(s => ({ buscador: !s.buscador })); }
+    };
+    window.addEventListener('keydown', this._onKey);
+    this._rot = setInterval(() => this.setState(s => ({ slide: s.slide + 1 })), 10000);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._onKey); clearInterval(this._rot); }
+  // Un resumen por módulo habilitado; el carrusel se arma solo con los que vienen en la sesión.
+  modulos() {
+    const V = '#00794F', A = '#B4560F', R = '#C93A3E', N = '#0D1412';
+    return [
+      { clave: 'reclamos', etiqueta: 'RECLAMOS · JULIO 2026', accionA: 'Ver los 4 en riesgo', accionB: 'Asignar cuadrillas',
+        frase: [ {texto: 'Resolviste el ', color: N}, {texto: '61%', color: V}, {texto: ' de julio: ', color: N}, {texto: '113 cerrados', color: V}, {texto: ' y ', color: N}, {texto: '96 abiertos', color: A}, {texto: ', de los cuales ', color: N}, {texto: '4 están en riesgo de SLA', color: R}, {texto: ' y ', color: N}, {texto: '9 sin cuadrilla', color: A}, {texto: '.', color: N} ] },
+      { clave: 'tramites', etiqueta: 'TRÁMITES · JULIO 2026', accionA: 'Revisar los 7 en curso', accionB: 'Ver vencimientos',
+        frase: [ {texto: 'Entraron ', color: N}, {texto: '10 trámites', color: N}, {texto: ' este mes: ', color: N}, {texto: '3 finalizados', color: V}, {texto: ', ', color: N}, {texto: '7 en curso', color: A}, {texto: ' y ', color: N}, {texto: '2 con documentación vencida', color: R}, {texto: '.', color: N} ] },
+      { clave: 'cobros', etiqueta: 'TASAS Y COBROS · JULIO 2026', accionA: 'Ver morosos', accionB: 'Emitir recordatorios',
+        frase: [ {texto: 'Cobraste el ', color: N}, {texto: '67%', color: V}, {texto: ' de lo emitido: ', color: N}, {texto: '$ 25,9 M en caja', color: V}, {texto: ' y ', color: N}, {texto: '$ 12,7 M pendientes', color: A}, {texto: ' en ', color: N}, {texto: '52 cuentas', color: A}, {texto: '.', color: N} ] },
+      { clave: 'campo', etiqueta: 'CAMPO Y CUADRILLAS · HOY', accionA: 'Ver órdenes de hoy', accionB: 'Reprogramar',
+        frase: [ {texto: 'Hay ', color: N}, {texto: '12 órdenes activas', color: N}, {texto: ' con ', color: N}, {texto: '5 cuadrillas en calle', color: V}, {texto: '; ', color: N}, {texto: '3 quedaron sin cerrar de ayer', color: R}, {texto: '.', color: N} ] },
+    ];
+  }
+  renderVals() {
+    const activos = this.props.modulos ?? 'reclamos,tramites';
+    const claves = String(activos).split(',').map(s => s.trim());
+    const mods = this.modulos().filter(m => claves.includes(m.clave));
+    const idx = ((this.state.slide % mods.length) + mods.length) % mods.length;
+    const mod = mods[idx] || this.modulos()[0];
+    const chev = (open) => (open ? 'rotate(0deg)' : 'rotate(-90deg)');
+    const t = (k) => () => this.setState(s => ({ [k]: !s[k] }));
+    return {
+      conFoto: this.props.conFoto ?? true,
+      moduloEtiqueta: mod.etiqueta,
+      frase: mod.frase,
+      accionA: mod.accionA,
+      accionB: mod.accionB,
+      puntos: mods.map((m, i) => ({ color: i === idx ? '#00B37E' : '#D5DDDA', ir: () => this.setState({ slide: i }) })),
+      anterior: () => this.setState({ slide: (idx - 1 + mods.length) % mods.length }),
+      siguiente: () => this.setState({ slide: (idx + 1) % mods.length }),
+      rangoAbierto: !!this.state.rango,
+      rangoCerrado: !this.state.rango,
+      abrirRango: () => this.setState({ rango: true }),
+      cerrarRango: () => this.setState({ rango: false }),
+      verMes: () => this.setState({ unidad: 'mes' }),
+      verAnio: () => this.setState({ unidad: 'anio' }),
+      desde: (this.state.unidad === 'anio') ? '2026' : 'Julio 2026',
+      hasta: (this.state.unidad === 'anio') ? '2027' : 'Septiembre 2026',
+      mesBg: (this.state.unidad !== 'anio') ? '#FFFFFF' : 'transparent',
+      mesColor: (this.state.unidad !== 'anio') ? '#0D1412' : '#5B6764',
+      mesShadow: (this.state.unidad !== 'anio') ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+      anioBg: (this.state.unidad === 'anio') ? '#FFFFFF' : 'transparent',
+      anioColor: (this.state.unidad === 'anio') ? '#0D1412' : '#5B6764',
+      anioShadow: (this.state.unidad === 'anio') ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+      enDependencia: (this.props.perfil ?? 'dependencia') === 'dependencia',
+      esAdmin: (this.props.perfil ?? 'dependencia') === 'admin',
+      depAbierto: this.state.dep,
+      toggleDep: () => this.setState(s => ({ dep: !s.dep })),
+      buscadorAbierto: this.state.buscador,
+      abrirBuscador: () => this.setState({ buscador: true }),
+      cerrarBuscador: () => this.setState({ buscador: false }),
+      colapsada: this.state.colapsada,
+      expandida: !this.state.colapsada,
+      colapsoHeader: (this.props.colapso ?? 'header') === 'header',
+      colapsoBorde: (this.props.colapso ?? 'header') === 'borde',
+      toggleColapso: () => this.setState(s => ({ colapsada: !s.colapsada })),
+      openReclamos: this.state.reclamos,
+      openCampo: this.state.campo,
+      openTramites: this.state.tramites,
+      openVecino: this.state.vecino,
+      chevReclamos: chev(this.state.reclamos),
+      chevCampo: chev(this.state.campo),
+      chevTramites: chev(this.state.tramites),
+      chevVecino: chev(this.state.vecino),
+      toggleReclamos: t('reclamos'),
+      toggleCampo: t('campo'),
+      toggleTramites: t('tramites'),
+      toggleVecino: t('vecino'),
+    };
+  }
+}
+</script>
+</body>
+</html>
