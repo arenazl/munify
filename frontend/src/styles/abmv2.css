@@ -3345,6 +3345,11 @@ button.av2-chip:hover { opacity: 0.85; }
   gap: 14px;
   padding: 10px 16px;
 }
+/* Sin métrica en ninguna fila, la columna del medio desaparece y el destino
+   se lleva el aire. */
+.av2-asig-grid--sin-metrica {
+  grid-template-columns: minmax(180px, 1.5fr) minmax(190px, 1.35fr);
+}
 .av2-asig-encabezado {
   background: var(--pl-surface-3);
   border-bottom: 1px solid var(--pl-border);
@@ -3459,6 +3464,16 @@ button.av2-chip:hover { opacity: 0.85; }
   background: var(--pl-surface-3);
   flex-wrap: wrap;
 }
+/* Acciones de mantenimiento del panel (desasignar todo, actualizar): abajo y
+   secundarias. Arriba, al lado del CTA, competían con la acción principal. */
+.av2-asig-acciones-pie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
 .av2-asig-pie-txt { font-size: var(--pl-fs-caption); color: var(--pl-text-3); min-width: 0; }
 .av2-asig-pie-dato {
   margin-left: auto;

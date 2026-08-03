@@ -1,22 +1,56 @@
-import { useEffect, useState, useCallback } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import {
-  Building2, FolderKanban, FileText, Save, RefreshCw,
-  AlertCircle, BookOpen, GripVertical, Check, ChevronDown, ChevronRight, Wand2, Trash2
-} from 'lucide-react';
+/**
+ * Asignación · quién atiende cada cosa.
+ *
+ * Es el cuerpo `tipo: 'asignacion'` de "Configuracion.dc.html" (canvas Claude
+ * Design, 2026-08-03), implementado con la pieza del kit `AssignmentPanel`.
+ *
+ * [2026-08-03] Reescrita. Antes era un tablero de dos columnas con drag & drop
+ * (@hello-pangea/dnd): se arrastraba una categoría desde "Disponibles" hasta
+ * la tarjeta de una dependencia, los cambios quedaban en un borrador y había
+ * que apretar "Guardar" en una barra flotante.
+ *
+ * Qué cambió y por qué:
+ *
+ *  - **Se lee al revés.** La pregunta real del municipio es "¿quién atiende
+ *    esta categoría?" y no "¿qué le cuelgo a esta dependencia?". La fila pasó
+ *    a ser la categoría y el destino un combo. De paso desaparece el problema
+ *    de fondo del tablero: con 20 categorías y 11 dependencias, encontrar
+ *    dónde soltar exigía scrollear las dos columnas a la vez.
+ *
+ *  - **Sin borrador.** Cada cambio se guarda solo. El borrador existía porque
+ *    arrastrar es impreciso y convenía poder deshacer; con un combo, elegir
+ *    ES la decisión. La barra flotante "hay cambios sin guardar" era además
+ *    una forma segura de perder trabajo al navegar.
+ *
+ *  - **Lo que faltaba y ahora está**: buscador, filtro por estado y el número
+ *    de lo que falta arriba de todo. El tablero sólo dejaba mirar.
+ *
+ *  - **Trámites se asignan de a uno.** El modelo persiste trámites concretos
+ *    (`MunicipioDependenciaTramite`); el "tipo de trámite" era andamiaje
+ *    visual del tablero viejo — el propio código lo aclaraba: "el estado
+ *    local `tipos_tramite` se usa solo como helper visual, no se persiste".
+ *
+ * Se conservan las dos acciones que sí sumaban: auto-asignar con IA (ahora es
+ * el CTA del panel) y desasignar todo el lado activo.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, FileText, FolderKanban, RefreshCw, Trash2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  dependenciasApi,
   categoriasReclamoApi,
   categoriasTramiteApi,
+  dependenciasApi,
   tramitesApi,
 } from '../lib/api';
-import { useTheme } from '../contexts/ThemeContext';
 import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { PageHeader } from '../components/abmv2/PageHeader';
+import { AssignmentPanel } from '../components/abmv2/AssignmentPanel';
+import { useEmbed, useReportarTotal } from '../components/abmv2/useEmbed';
+import type { AssignGroup, AssignRow, AssignTarget } from '../components/abmv2/types';
 
-type TabType = 'reclamos' | 'tramites';
+type Lado = 'reclamos' | 'tramites';
 
 interface MunicipioDependencia {
   id: number;
@@ -29,104 +63,65 @@ interface MunicipioDependencia {
   orden: number;
   color?: string;
   icono?: string;
-  categorias_count: number;
-  tipos_tramite_count: number;
-  tramites_count: number;
-  // Asignaciones incluidas con include_assignments=true
-  categorias?: { id: number; nombre: string; icono?: string; color?: string }[];
-  tipos_tramite?: { id: number; nombre: string; icono?: string; color?: string }[];
-  tramites?: { id: number; nombre: string; tipo_tramite_id: number; icono?: string; color?: string }[];
+  categorias?: { id: number; nombre: string }[];
+  tramites?: { id: number; nombre: string }[];
 }
 
-interface Categoria {
+interface ItemAsignable {
   id: number;
   nombre: string;
-  icono: string;
-  color: string;
-}
-
-interface TipoTramite {
-  id: number;
-  nombre: string;
-  icono: string;
-  color: string;
-}
-
-interface Tramite {
-  id: number;
-  nombre: string;
-  tipo_tramite_id: number;
   icono?: string;
   color?: string;
 }
 
-interface AsignacionState {
-  [dependenciaId: number]: {
-    categorias: number[];
-    tipos_tramite: number[];
-    tramites: number[];
-  };
-}
+/** Índice item → dependencia que lo atiende. El modelo permite N:M pero la
+ *  operación es 1:1 (una categoría la atiende una dependencia), que es como
+ *  ya lo usaba el tablero viejo: al soltarla en otra, la sacaba de la
+ *  anterior. */
+type Duenio = Record<number, number>;
 
 export default function AsignacionDependencias() {
-  const { theme } = useTheme();
   const { isSuperAdmin } = useSuperAdmin();
+  const { embedded } = useEmbed();
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('reclamos');
+  const [lado, setLado] = useState<Lado>('reclamos');
+  const [search, setSearch] = useState('');
+  const [filtro, setFiltro] = useState('todos');
+  const [limpiando, setLimpiando] = useState(false);
+  const [pidiendoLimpieza, setPidiendoLimpieza] = useState(false);
 
   const [dependencias, setDependencias] = useState<MunicipioDependencia[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [tiposTramite, setTiposTramite] = useState<TipoTramite[]>([]);
-  const [tramitesCatalogo, setTramitesCatalogo] = useState<Tramite[]>([]);
+  const [categorias, setCategorias] = useState<ItemAsignable[]>([]);
+  const [tramites, setTramites] = useState<ItemAsignable[]>([]);
+  // Dueño actual de cada item, por lado.
+  const [duenioCategoria, setDuenioCategoria] = useState<Duenio>({});
+  const [duenioTramite, setDuenioTramite] = useState<Duenio>({});
 
-  const [asignaciones, setAsignaciones] = useState<AsignacionState>({});
-  const [asignacionesOriginales, setAsignacionesOriginales] = useState<AsignacionState>({});
-
-  // Dependencia expandida para ver/editar trámites específicos
-  const [expandedDepId, setExpandedDepId] = useState<number | null>(null);
-  const [expandedTipoId, setExpandedTipoId] = useState<number | null>(null);
-
-  const fetchData = useCallback(async () => {
+  const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      // Cargar categorías y trámites per-municipio (modelo nuevo)
-      const [depsRes, catsReclamoRes, catsTramiteRes, tramitesRes] = await Promise.all([
+      const [depsRes, catsRes, tramitesRes] = await Promise.all([
         dependenciasApi.getMunicipio({ activo: true, include_assignments: true }),
         categoriasReclamoApi.getAll(),
-        categoriasTramiteApi.getAll(),
         tramitesApi.getAll(),
       ]);
 
-      const deps: MunicipioDependencia[] = depsRes.data;
+      const deps: MunicipioDependencia[] = depsRes.data || [];
       setDependencias(deps);
-      setCategorias(catsReclamoRes.data);
-      setTiposTramite(catsTramiteRes.data);
+      setCategorias(catsRes.data || []);
+      setTramites(tramitesRes.data || []);
 
-      // Shim: el UI todavía habla en términos de tipo_tramite_id.
-      // Mapeamos categoria_tramite_id del modelo nuevo a tipo_tramite_id
-      // para no reescribir toda la lógica de drag-drop.
-      const tramitesShim = (tramitesRes.data || []).map((t: any) => ({
-        ...t,
-        tipo_tramite_id: t.categoria_tramite_id,
-      }));
-      setTramitesCatalogo(tramitesShim);
-
-      // Extraer asignaciones directamente de la respuesta (ya vienen incluidas)
-      const asignacionesIniciales: AsignacionState = {};
+      const dc: Duenio = {};
+      const dt: Duenio = {};
       for (const dep of deps) {
-        asignacionesIniciales[dep.id] = {
-          categorias: dep.categorias?.map(c => c.id) || [],
-          tipos_tramite: dep.tipos_tramite?.map(t => t.id) || [],
-          tramites: dep.tramites?.map(t => t.id) || [],
-        };
+        (dep.categorias || []).forEach((c) => { dc[c.id] = dep.id; });
+        (dep.tramites || []).forEach((t) => { dt[t.id] = dep.id; });
       }
-
-      setAsignaciones(asignacionesIniciales);
-      setAsignacionesOriginales(JSON.parse(JSON.stringify(asignacionesIniciales)));
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
+      setDuenioCategoria(dc);
+      setDuenioTramite(dt);
+    } catch (err) {
+      console.error('Error al cargar la asignación:', err);
       toast.error('Error al cargar la configuración');
     } finally {
       setLoading(false);
@@ -134,670 +129,297 @@ export default function AsignacionDependencias() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    cargar();
+  }, [cargar]);
 
-  const dependenciasFiltradas = dependencias.filter(d => {
-    if (activeTab === 'reclamos') {
-      return d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS';
-    } else {
-      return d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS';
-    }
-  });
+  /* --- Derivados ------------------------------------------------------ */
 
-  const hasChanges = () => {
-    return JSON.stringify(asignaciones) !== JSON.stringify(asignacionesOriginales);
-  };
+  const esDeReclamos = lado === 'reclamos';
+  const items = esDeReclamos ? categorias : tramites;
+  const duenios = esDeReclamos ? duenioCategoria : duenioTramite;
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const promises: Promise<unknown>[] = [];
+  const depsDelLado = useMemo(
+    () =>
+      dependencias.filter((d) =>
+        esDeReclamos
+          ? d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS'
+          : d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS',
+      ),
+    [dependencias, esDeReclamos],
+  );
 
-      for (const dependenciaId of Object.keys(asignaciones)) {
-        const depId = Number(dependenciaId);
-        const current = asignaciones[depId];
-        const original = asignacionesOriginales[depId] || { categorias: [], tipos_tramite: [], tramites: [] };
-        const dep = dependencias.find(d => d.id === depId);
+  const targets: AssignTarget[] = useMemo(
+    () => depsDelLado.map((d) => ({ value: String(d.id), label: d.nombre, dotColor: d.color })),
+    [depsDelLado],
+  );
 
-        if (dep && (dep.tipo_gestion === 'RECLAMO' || dep.tipo_gestion === 'AMBOS')) {
-          if (JSON.stringify([...current.categorias].sort()) !== JSON.stringify([...original.categorias].sort())) {
-            promises.push(dependenciasApi.asignarCategorias(depId, current.categorias));
-          }
-        }
+  const sinAsignarCategorias = categorias.filter((c) => !duenioCategoria[c.id]).length;
+  const sinAsignarTramites = tramites.filter((t) => !duenioTramite[t.id]).length;
+  const sinAsignar = esDeReclamos ? sinAsignarCategorias : sinAsignarTramites;
 
-        if (dep && (dep.tipo_gestion === 'TRAMITE' || dep.tipo_gestion === 'AMBOS')) {
-          // Nota: en el modelo nuevo ya no se asigna "por tipo/categoría" a una
-          // dependencia; sólo se asignan trámites concretos (vía
-          // MunicipioDependenciaTramite). El estado local `tipos_tramite` se
-          // usa solo como helper visual para expandir/colapsar, pero no se
-          // persiste directamente.
-          if (JSON.stringify([...current.tramites].sort()) !== JSON.stringify([...original.tramites].sort())) {
-            promises.push(dependenciasApi.asignarTramites(depId, current.tramites));
-          }
-        }
-      }
+  // El riel de Configuración muestra lo que FALTA, no el total: en esta
+  // pantalla el número que importa es cuántas quedaron huérfanas.
+  useReportarTotal(sinAsignar);
 
-      await Promise.all(promises);
-      setAsignacionesOriginales(JSON.parse(JSON.stringify(asignaciones)));
-      toast.success('Configuración guardada correctamente');
-    } catch (error) {
-      console.error('Error al guardar:', error);
-      toast.error('Error al guardar la configuración');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDiscard = () => {
-    setAsignaciones(JSON.parse(JSON.stringify(asignacionesOriginales)));
-    toast.info('Cambios descartados');
-  };
-
-  // Items disponibles (no asignados a ninguna dependencia)
-  const getItemsDisponibles = () => {
-    if (activeTab === 'reclamos') {
-      // Categorías no asignadas a ninguna dependencia
-      const todasAsignadas = new Set<number>();
-      dependenciasFiltradas.forEach(dep => {
-        (asignaciones[dep.id]?.categorias || []).forEach(id => todasAsignadas.add(id));
-      });
-      return categorias.filter(c => !todasAsignadas.has(c.id));
-    } else {
-      // Tipos de trámite no asignados a ninguna dependencia
-      const todosAsignados = new Set<number>();
-      dependenciasFiltradas.forEach(dep => {
-        (asignaciones[dep.id]?.tipos_tramite || []).forEach(id => todosAsignados.add(id));
-      });
-      return tiposTramite.filter(t => !todosAsignados.has(t.id));
-    }
-  };
-
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-
-    const { source, destination, draggableId } = result;
-    // El draggableId ahora puede ser "disponible-3" o "dep-7-3". Sacamos
-    // el itemId del último segmento numérico para soportar ambos formatos.
-    const idMatch = draggableId.match(/-(\d+)$/);
-    const itemId = idMatch ? parseInt(idMatch[1]) : NaN;
-    if (Number.isNaN(itemId)) return;
-
-    // Identificar origen y destino
-    const sourceDepId = source.droppableId === 'disponibles' ? null : parseInt(source.droppableId.replace('dep-', ''));
-    const destDepId = destination.droppableId === 'disponibles' ? null : parseInt(destination.droppableId.replace('dep-', ''));
-
-    // Si es el mismo lugar, no hacer nada
-    if (sourceDepId === destDepId) return;
-
-    setAsignaciones(prev => {
-      const newState = JSON.parse(JSON.stringify(prev));
-
-      if (activeTab === 'reclamos') {
-        // Quitar del origen
-        if (sourceDepId !== null && newState[sourceDepId]) {
-          newState[sourceDepId].categorias = newState[sourceDepId].categorias.filter((id: number) => id !== itemId);
-        }
-        // Agregar al destino
-        if (destDepId !== null) {
-          if (!newState[destDepId]) {
-            newState[destDepId] = { categorias: [], tipos_tramite: [], tramites: [] };
-          }
-          if (!newState[destDepId].categorias.includes(itemId)) {
-            newState[destDepId].categorias.push(itemId);
-          }
-        }
-      } else {
-        // Quitar del origen (tipo)
-        if (sourceDepId !== null && newState[sourceDepId]) {
-          newState[sourceDepId].tipos_tramite = newState[sourceDepId].tipos_tramite.filter((id: number) => id !== itemId);
-          // También quitar los trámites de ese tipo
-          const tramitesDelTipo = tramitesCatalogo.filter(t => t.tipo_tramite_id === itemId).map(t => t.id);
-          newState[sourceDepId].tramites = newState[sourceDepId].tramites.filter((id: number) => !tramitesDelTipo.includes(id));
-        }
-        // Agregar al destino
-        if (destDepId !== null) {
-          if (!newState[destDepId]) {
-            newState[destDepId] = { categorias: [], tipos_tramite: [], tramites: [] };
-          }
-          if (!newState[destDepId].tipos_tramite.includes(itemId)) {
-            newState[destDepId].tipos_tramite.push(itemId);
-            // Activar todos los trámites del tipo por defecto
-            const tramitesDelTipo = tramitesCatalogo.filter(t => t.tipo_tramite_id === itemId);
-            tramitesDelTipo.forEach(t => {
-              if (!newState[destDepId].tramites.includes(t.id)) {
-                newState[destDepId].tramites.push(t.id);
-              }
-            });
-          }
-        }
-      }
-
-      return newState;
+  const visibles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((it) => {
+      const asignado = !!duenios[it.id];
+      if (filtro === 'sin' && asignado) return false;
+      if (filtro === 'con' && !asignado) return false;
+      if (!q) return true;
+      const dep = asignado ? dependencias.find((d) => d.id === duenios[it.id]) : null;
+      return (
+        it.nombre.toLowerCase().includes(q) ||
+        (dep?.nombre ?? '').toLowerCase().includes(q)
+      );
     });
-  };
+  }, [items, duenios, filtro, search, dependencias]);
 
-  const toggleTramite = (depId: number, tramiteId: number) => {
-    setAsignaciones(prev => {
-      const newState = JSON.parse(JSON.stringify(prev));
-      if (!newState[depId]) {
-        newState[depId] = { categorias: [], tipos_tramite: [], tramites: [] };
-      }
-
-      const index = newState[depId].tramites.indexOf(tramiteId);
-      if (index > -1) {
-        newState[depId].tramites.splice(index, 1);
-      } else {
-        newState[depId].tramites.push(tramiteId);
-      }
-
-      return newState;
+  const groups: AssignGroup[] = useMemo(() => {
+    const aFila = (it: ItemAsignable): AssignRow => ({
+      id: it.id,
+      label: it.nombre,
+      icon: it.icono ? <DynamicIcon name={it.icono} size={16} strokeWidth={1.9} /> : undefined,
+      tileColor: it.color,
+      assignedTo: duenios[it.id] ? String(duenios[it.id]) : null,
     });
-  };
 
-  const getCategoriasAsignadas = (depId: number) => {
-    const ids = asignaciones[depId]?.categorias || [];
-    return categorias.filter(c => ids.includes(c.id));
-  };
+    const huerfanos = visibles.filter((it) => !duenios[it.id]);
+    const cubiertos = visibles.filter((it) => duenios[it.id]);
+    const nombre = esDeReclamos ? 'categoría' : 'trámite';
 
-  const getTiposAsignados = (depId: number) => {
-    const ids = asignaciones[depId]?.tipos_tramite || [];
-    return tiposTramite.filter(t => ids.includes(t.id));
-  };
-
-  const getTramitesDelTipo = (tipoId: number) => {
-    return tramitesCatalogo.filter(t => t.tipo_tramite_id === tipoId);
-  };
-
-  const isTramiteActivo = (depId: number, tramiteId: number) => {
-    return asignaciones[depId]?.tramites?.includes(tramiteId) || false;
-  };
-
-  const getTramitesActivosCount = (depId: number, tipoId: number) => {
-    const tramitesDelTipo = getTramitesDelTipo(tipoId);
-    return tramitesDelTipo.filter(t => isTramiteActivo(depId, t.id)).length;
-  };
-
-  // Desasignar todo según el tab activo
-  const desasignarTodo = async () => {
-    try {
-      if (activeTab === 'reclamos') {
-        await dependenciasApi.limpiarAsignacionesCategorias();
-        // Limpiar solo categorías del estado local
-        setAsignaciones(prev => {
-          const newState: AsignacionState = {};
-          Object.keys(prev).forEach(depId => {
-            newState[parseInt(depId)] = {
-              ...prev[parseInt(depId)],
-              categorias: []
-            };
-          });
-          return newState;
-        });
-        toast.success('Se desasignaron todas las categorías');
-      } else {
-        // Ya no existe un endpoint para limpiar "tipos" (el concepto
-        // desapareció). Limpiamos el estado local y grabamos con el save
-        // normal: el backend borra todas las asignaciones de trámites al
-        // mandar un array vacío por cada dependencia.
-        const depsTramite = dependencias.filter(
-          d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS'
-        );
-        await Promise.all(
-          depsTramite.map(d => dependenciasApi.asignarTramites(d.id, []))
-        );
-        setAsignaciones(prev => {
-          const newState: AsignacionState = {};
-          Object.keys(prev).forEach(depId => {
-            newState[parseInt(depId)] = {
-              ...prev[parseInt(depId)],
-              tipos_tramite: [],
-              tramites: [],
-            };
-          });
-          return newState;
-        });
-        toast.success('Se desasignaron todos los trámites');
-      }
-      // Recargar datos
-      fetchData();
-    } catch (error) {
-      console.error('Error al desasignar:', error);
-      toast.error('Error al desasignar');
+    const gs: AssignGroup[] = [];
+    // Lo que falta va PRIMERO: es la única razón para entrar a esta pantalla.
+    if (huerfanos.length) {
+      gs.push({
+        key: 'sin',
+        title: 'Sin atender',
+        detail:
+          huerfanos.length === 1
+            ? `1 ${nombre} no le llega a nadie`
+            : `${huerfanos.length} ${nombre}s no le llegan a nadie`,
+        veredicto: 'advertencia',
+        rows: huerfanos.map(aFila),
+      });
     }
-  };
+    if (cubiertos.length) {
+      gs.push({
+        key: 'con',
+        title: 'Con responsable',
+        detail: `${cubiertos.length} de ${items.length}`,
+        veredicto: 'bueno',
+        rows: cubiertos.map(aFila),
+      });
+    }
+    return gs;
+  }, [visibles, duenios, esDeReclamos, items.length]);
 
-  // Auto-asignación inteligente usando IA
+  /* --- Asignar / quitar ----------------------------------------------- */
+
+  /**
+   * Guarda la asignación de UN item. El backend recibe la lista completa de
+   * cada dependencia (`asignarCategorias(dep, [ids])`), así que un cambio
+   * toca la dependencia nueva y —si el item ya tenía dueño— también la vieja.
+   *
+   * Optimista con rollback: el combo tiene que responder en el acto, y si el
+   * PUT falla se vuelve al estado anterior y se avisa. Mostrar un valor que
+   * el backend no tiene es peor que perder el cambio.
+   */
+  const guardarAsignacion = useCallback(
+    async (itemId: number, depNueva: number | null) => {
+      const previos = esDeReclamos ? duenioCategoria : duenioTramite;
+      const depVieja = previos[itemId] ?? null;
+      if (depVieja === depNueva) return;
+
+      const siguientes: Duenio = { ...previos };
+      if (depNueva === null) delete siguientes[itemId];
+      else siguientes[itemId] = depNueva;
+
+      const aplicar = esDeReclamos ? setDuenioCategoria : setDuenioTramite;
+      aplicar(siguientes);
+
+      const idsDe = (depId: number) =>
+        Object.entries(siguientes)
+          .filter(([, dep]) => dep === depId)
+          .map(([id]) => Number(id));
+
+      const guardar = esDeReclamos
+        ? dependenciasApi.asignarCategorias
+        : dependenciasApi.asignarTramites;
+
+      try {
+        const llamadas: Promise<unknown>[] = [];
+        if (depNueva !== null) llamadas.push(guardar(depNueva, idsDe(depNueva)));
+        if (depVieja !== null) llamadas.push(guardar(depVieja, idsDe(depVieja)));
+        await Promise.all(llamadas);
+      } catch (err) {
+        console.error('Error guardando la asignación:', err);
+        aplicar(previos);
+        toast.error('No se pudo guardar la asignación');
+      }
+    },
+    [esDeReclamos, duenioCategoria, duenioTramite],
+  );
+
+  /* --- Acciones del lado ---------------------------------------------- */
+
   const autoAsignar = async () => {
+    const aviso = toast.loading('Analizando con IA…');
     try {
-      toast.loading('Analizando con IA...');
-
-      if (activeTab === 'reclamos') {
-        // Obtener dependencias tipo RECLAMO o AMBOS
-        const depsReclamo = dependencias.filter(d => d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS');
-
-        const response = await dependenciasApi.autoAsignarCategoriasIA(
-          categorias.map(c => ({ id: c.id, nombre: c.nombre })),
-          depsReclamo.map(d => ({ id: d.dependencia_id, nombre: d.nombre, descripcion: undefined }))
+      if (esDeReclamos) {
+        const res = await dependenciasApi.autoAsignarCategoriasIA(
+          categorias.map((c) => ({ id: c.id, nombre: c.nombre })),
+          depsDelLado.map((d) => ({ id: d.dependencia_id, nombre: d.nombre })),
         );
-
-        toast.dismiss();
-        toast.success(`IA asignó ${response.data.total} categorías automáticamente`);
+        toast.dismiss(aviso);
+        toast.success(`La IA asignó ${res.data.total} categorías`);
       } else {
-        // Obtener dependencias tipo TRAMITE o AMBOS
-        const depsTramite = dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS');
-
-        // Nuevo endpoint: auto-asignar por CATEGORÍAS de trámite. Cada
-        // categoría asignada arrastra todos sus trámites concretos
-        // automáticamente en el backend.
-        const response = await dependenciasApi.autoAsignarCategoriasTramiteIA(
-          tiposTramite.map(t => ({ id: t.id, nombre: t.nombre })),
-          depsTramite.map(d => ({ id: d.dependencia_id, nombre: d.nombre, descripcion: undefined }))
+        const cats = await categoriasTramiteApi.getAll();
+        const res = await dependenciasApi.autoAsignarCategoriasTramiteIA(
+          (cats.data || []).map((t: ItemAsignable) => ({ id: t.id, nombre: t.nombre })),
+          depsDelLado.map((d) => ({ id: d.dependencia_id, nombre: d.nombre })),
         );
-
-        toast.dismiss();
-        const total = response.data.total_tramites ?? response.data.total_categorias ?? 0;
-        toast.success(`IA asignó ${total} trámites automáticamente`);
+        toast.dismiss(aviso);
+        const total = res.data.total_tramites ?? res.data.total_categorias ?? 0;
+        toast.success(`La IA asignó ${total} trámites`);
       }
-
-      // Recargar datos para ver las nuevas asignaciones
-      fetchData();
-    } catch (error: unknown) {
-      toast.dismiss();
-      console.error('Error en auto-asignación:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      toast.error(`Error al auto-asignar: ${errorMessage}`);
+      await cargar();
+    } catch (err) {
+      toast.dismiss(aviso);
+      console.error('Error en auto-asignación:', err);
+      toast.error('No se pudo auto-asignar');
     }
   };
 
-  const itemsDisponibles = getItemsDisponibles();
+  const desasignarTodo = async () => {
+    setLimpiando(true);
+    try {
+      if (esDeReclamos) {
+        await dependenciasApi.limpiarAsignacionesCategorias();
+      } else {
+        // No hay endpoint de limpieza para trámites: se manda la lista vacía
+        // por dependencia, que es lo mismo que hacía el guardado del tablero.
+        await Promise.all(depsDelLado.map((d) => dependenciasApi.asignarTramites(d.id, [])));
+      }
+      toast.success(esDeReclamos ? 'Se desasignaron las categorías' : 'Se desasignaron los trámites');
+      setPidiendoLimpieza(false);
+      await cargar();
+    } catch (err) {
+      console.error('Error al desasignar:', err);
+      toast.error('No se pudo desasignar');
+    } finally {
+      setLimpiando(false);
+    }
+  };
 
-  // Calcular items sin asignar para cada tab (independiente del activeTab)
-  const categoriasNoAsignadas = (() => {
-    const depsReclamo = dependencias.filter(d => d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS');
-    const todasAsignadas = new Set<number>();
-    depsReclamo.forEach(dep => {
-      (asignaciones[dep.id]?.categorias || []).forEach(id => todasAsignadas.add(id));
-    });
-    return categorias.filter(c => !todasAsignadas.has(c.id)).length;
-  })();
-
-  const tiposNoAsignados = (() => {
-    const depsTramite = dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS');
-    const todosAsignados = new Set<number>();
-    depsTramite.forEach(dep => {
-      (asignaciones[dep.id]?.tipos_tramite || []).forEach(id => todosAsignados.add(id));
-    });
-    return tiposTramite.filter(t => !todosAsignados.has(t.id)).length;
-  })();
-
-  const filterChips: FilterChip[] = [
-    {
-      key: 'reclamos',
-      label: 'Reclamos',
-      icon: <FolderKanban className="h-4 w-4" />,
-      count: categoriasNoAsignadas,
-    },
-    {
-      key: 'tramites',
-      label: 'Trámites',
-      icon: <FileText className="h-4 w-4" />,
-      count: tiposNoAsignados,
-    },
-  ];
+  /* --- Guardas (después de TODOS los hooks) --------------------------- */
 
   if (isSuperAdmin) {
     return (
-      <div className="min-h-screen p-6" style={{ backgroundColor: theme.background }}>
-        <div
-          className="max-w-2xl mx-auto p-8 rounded-2xl text-center"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: theme.primary }} />
-          <h2 className="text-xl font-bold mb-2" style={{ color: theme.text }}>Acceso restringido</h2>
-          <p style={{ color: theme.textSecondary }}>Esta pantalla es solo para supervisores de municipio.</p>
+      <div className="av2-page">
+        <div className="av2-nota av2-nota--alerta">
+          <AlertCircle className="av2-nota-ico" aria-hidden />
+          <span className="av2-nota-txt">
+            <span className="av2-nota-eyebrow">Acceso restringido</span>
+            Esta pantalla es del municipio: entrá con un usuario de municipio para asignar
+            categorías y trámites a sus dependencias.
+          </span>
         </div>
       </div>
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: theme.background }}>
-        <RefreshCw className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
-      </div>
-    );
-  }
+  const nombreItem = esDeReclamos ? 'categoría' : 'trámite';
 
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: theme.background }}>
-      <div className="px-3 sm:px-6 pt-3">
-      </div>
-      <StickyPageHeader
-        icon={<BookOpen className="h-5 w-5" />}
-        title="Asignación de Dependencias"
-        backLink="/gestion/configuracion"
-        filterPanel={
-          <FilterChipRow
-            chips={filterChips}
-            activeKey={activeTab}
-            onChipClick={(key) => {
-              setActiveTab((key as TabType) || 'reclamos');
-              setExpandedDepId(null);
-              setExpandedTipoId(null);
-            }}
-            showAllButton={false}
-          />
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={desasignarTodo}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
-              style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Desasignar
-            </button>
-            <button
-              onClick={autoAsignar}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all hover:scale-105"
-              style={{ backgroundColor: theme.primary }}
-            >
-              <Wand2 className="h-4 w-4" />
-              Auto-asignar
-            </button>
-          </div>
-        }
-      />
-
-      {hasChanges() && (
-        <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 rounded-2xl shadow-2xl"
-          style={{ backgroundColor: theme.card, border: `2px solid ${theme.primary}` }}
-        >
-          <span className="text-sm font-medium" style={{ color: theme.text }}>Hay cambios sin guardar</span>
-          <button
-            onClick={handleDiscard}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-          >
-            Descartar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium text-white"
-            style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}
-          >
-            {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Guardando...' : 'Guardar'}
-          </button>
-        </div>
+    <div className="av2-page">
+      {!embedded && (
+        <PageHeader
+          eyebrow="Configuración"
+          title="Quién atiende cada cosa"
+          description="Cada categoría de reclamo y cada trámite le llega a una dependencia. Lo que queda sin asignar no le llega a nadie."
+        />
       )}
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="px-3 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Columna Izquierda: Items Disponibles */}
-            <div
-              className="rounded-2xl overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div
-                className="p-4"
-                style={{ borderBottom: `1px solid ${theme.border}` }}
-              >
-                <h3 className="font-bold" style={{ color: theme.text }}>
-                  {activeTab === 'reclamos' ? 'Categorías' : 'Tipos de Trámite'} Disponibles
-                </h3>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  {itemsDisponibles.length} sin asignar - Arrastrá a una dependencia
-                </p>
-              </div>
+      <AssignmentPanel
+        sides={[
+          { id: 'reclamos', label: 'Reclamos', icon: FolderKanban, count: sinAsignarCategorias },
+          { id: 'tramites', label: 'Trámites', icon: FileText, count: sinAsignarTramites },
+        ]}
+        activeSide={lado}
+        onSideChange={(id) => {
+          setLado(id as Lado);
+          setFiltro('todos');
+        }}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder={`Buscar ${nombreItem} o dependencia`}
+        bulkAction={
+          sinAsignar > 0
+            ? { label: `Auto-asignar ${sinAsignar} con IA`, icon: Wand2, onClick: autoAsignar }
+            : undefined
+        }
+        filters={[
+          { id: 'todos', label: 'Todos', count: items.length },
+          { id: 'sin', label: 'Sin asignar', count: sinAsignar, veredicto: 'advertencia' },
+          { id: 'con', label: 'Asignados', count: items.length - sinAsignar, veredicto: 'bueno' },
+        ]}
+        activeFilter={filtro}
+        onFilterChange={setFiltro}
+        columnLabels={{
+          entity: esDeReclamos ? 'Categoría' : 'Trámite',
+          target: esDeReclamos ? 'Quién los atiende' : 'Quién lo gestiona',
+        }}
+        targets={targets}
+        groups={groups}
+        loading={loading}
+        onAssign={(id, value) => guardarAsignacion(Number(id), Number(value))}
+        onClear={(id) => guardarAsignacion(Number(id), null)}
+        emptyMessage={
+          search.trim()
+            ? `Ningún ${nombreItem} coincide con "${search.trim()}".`
+            : `No hay ${nombreItem}s cargados todavía.`
+        }
+        footer={{
+          left:
+            sinAsignar === 0
+              ? 'Todo tiene responsable.'
+              : `${sinAsignar} sin asignar de ${items.length}`,
+          right: `${targets.length} dependencias activas`,
+        }}
+      />
 
-              <Droppable droppableId="disponibles">
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="p-3 space-y-2"
-                    style={{
-                      backgroundColor: snapshot.isDraggingOver ? `${theme.primary}10` : 'transparent',
-                    }}
-                  >
-                    {itemsDisponibles.map((item, index) => (
-                      <Draggable
-                        key={`disponible-${item.id}`}
-                        draggableId={`disponible-${item.id}`}
-                        index={index}
-                      >
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className="flex items-center gap-3 p-3 rounded-xl cursor-grab active:cursor-grabbing"
-                            style={{
-                              backgroundColor: snapshot.isDragging ? `${item.color}30` : theme.backgroundSecondary,
-                              border: `1px solid ${snapshot.isDragging ? item.color : theme.border}`,
-                              ...provided.draggableProps.style,
-                            }}
-                          >
-                            <GripVertical className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-                            <div
-                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: item.color }}
-                            >
-                              <DynamicIcon name={item.icono} className="h-4 w-4 text-white" />
-                            </div>
-                            <span className="font-medium text-sm truncate" style={{ color: theme.text }}>
-                              {item.nombre}
-                            </span>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                    {itemsDisponibles.length === 0 && (
-                      <div className="text-center py-8" style={{ color: theme.textSecondary }}>
-                        Todos asignados
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Droppable>
-            </div>
+      {/* Acción destructiva del lado: abajo y con confirmación, no arriba
+          junto al CTA. */}
+      <div className="av2-asig-acciones-pie">
+        <button
+          type="button"
+          className="av2-btn-secundario"
+          onClick={() => setPidiendoLimpieza(true)}
+          disabled={loading || items.length === 0}
+        >
+          <Trash2 size={15} strokeWidth={1.9} />
+          Desasignar todo
+        </button>
+        <button type="button" className="av2-btn-secundario" onClick={cargar} disabled={loading}>
+          <RefreshCw size={15} strokeWidth={1.9} />
+          Actualizar
+        </button>
+      </div>
 
-            {/* Columna Derecha: Dependencias con sus asignaciones */}
-            <div className="space-y-3">
-              {dependenciasFiltradas.map(dep => {
-                const itemsAsignados = activeTab === 'reclamos'
-                  ? getCategoriasAsignadas(dep.id)
-                  : getTiposAsignados(dep.id);
-                const isExpanded = expandedDepId === dep.id;
-
-                return (
-                  <Droppable key={dep.id} droppableId={`dep-${dep.id}`}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="rounded-2xl transition-all flex-shrink-0"
-                        style={{
-                          backgroundColor: snapshot.isDraggingOver ? `${theme.primary}15` : theme.card,
-                          border: snapshot.isDraggingOver
-                            ? `2px solid ${theme.primary}`
-                            : `1px solid ${theme.border}`,
-                        }}
-                      >
-                        {/* Header de la dependencia */}
-                        <div
-                          className="p-4 flex items-center gap-3"
-                          style={{ borderBottom: itemsAsignados.length > 0 ? `1px solid ${theme.border}` : 'none' }}
-                        >
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${dep.color || theme.primary}20` }}
-                          >
-                            <DynamicIcon name={dep.icono || 'Building2'} className="h-5 w-5" style={{ color: dep.color || theme.primary }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold truncate" style={{ color: theme.text }}>{dep.nombre}</h4>
-                            <span
-                              className="text-xs"
-                              style={{ color: theme.textSecondary }}
-                            >
-                              {itemsAsignados.length} {activeTab === 'reclamos' ? 'categorías' : 'tipos'} asignados
-                            </span>
-                          </div>
-                          {activeTab === 'tramites' && itemsAsignados.length > 0 && (
-                            <button
-                              onClick={() => setExpandedDepId(isExpanded ? null : dep.id)}
-                              className="px-3 py-1 rounded-lg text-xs font-medium"
-                              style={{ backgroundColor: theme.backgroundSecondary, color: theme.primary }}
-                            >
-                              {isExpanded ? 'Ocultar' : 'Ver trámites'}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Items asignados */}
-                        {itemsAsignados.length > 0 && (
-                          <div className="p-3 space-y-2">
-                            {itemsAsignados.map((item, index) => {
-                              const tramitesDelTipo = activeTab === 'tramites' ? getTramitesDelTipo(item.id) : [];
-                              const tramitesActivos = activeTab === 'tramites' ? getTramitesActivosCount(dep.id, item.id) : 0;
-                              const isTipoExpanded = expandedTipoId === item.id && expandedDepId === dep.id;
-
-                              return (
-                                <div key={item.id}>
-                                  <Draggable
-                                    draggableId={`dep-${dep.id}-${item.id}`}
-                                    index={index}
-                                  >
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        className="flex items-center gap-3 p-3 rounded-xl cursor-grab active:cursor-grabbing"
-                                        style={{
-                                          backgroundColor: snapshot.isDragging ? `${item.color}30` : `${item.color}15`,
-                                          border: `2px solid ${item.color}`,
-                                          ...provided.draggableProps.style,
-                                        }}
-                                      >
-                                        <GripVertical className="h-4 w-4 flex-shrink-0" style={{ color: item.color }} />
-                                        <div
-                                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                                          style={{ backgroundColor: item.color }}
-                                        >
-                                          <DynamicIcon name={item.icono} className="h-4 w-4 text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <span className="font-medium text-sm block truncate" style={{ color: item.color }}>
-                                            {item.nombre}
-                                          </span>
-                                          {activeTab === 'tramites' && (
-                                            <span className="text-xs" style={{ color: theme.textSecondary }}>
-                                              {tramitesActivos}/{tramitesDelTipo.length} trámites
-                                            </span>
-                                          )}
-                                        </div>
-                                        {activeTab === 'tramites' && isExpanded && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setExpandedTipoId(isTipoExpanded ? null : item.id);
-                                            }}
-                                            className="p-1"
-                                          >
-                                            {isTipoExpanded ? (
-                                              <ChevronDown className="h-4 w-4" style={{ color: item.color }} />
-                                            ) : (
-                                              <ChevronRight className="h-4 w-4" style={{ color: item.color }} />
-                                            )}
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </Draggable>
-
-                                  {/* Trámites del tipo expandido */}
-                                  {activeTab === 'tramites' && isExpanded && isTipoExpanded && (
-                                    <div className="ml-6 mt-2 space-y-1">
-                                      {tramitesDelTipo.map(tramite => {
-                                        const isActivo = isTramiteActivo(dep.id, tramite.id);
-                                        const color = tramite.color || item.color;
-
-                                        return (
-                                          <button
-                                            key={tramite.id}
-                                            onClick={() => toggleTramite(dep.id, tramite.id)}
-                                            className="w-full flex items-center gap-2 p-2 rounded-lg transition-all text-left"
-                                            style={{
-                                              backgroundColor: isActivo ? `${color}15` : theme.backgroundSecondary,
-                                              border: `1px solid ${isActivo ? color : theme.border}`,
-                                            }}
-                                          >
-                                            <div
-                                              className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                                              style={{
-                                                backgroundColor: isActivo ? color : 'transparent',
-                                                border: `1px solid ${isActivo ? color : theme.border}`,
-                                              }}
-                                            >
-                                              {isActivo && <Check className="h-3 w-3 text-white" />}
-                                            </div>
-                                            <span
-                                              className="text-sm truncate"
-                                              style={{ color: isActivo ? color : theme.text }}
-                                            >
-                                              {tramite.nombre}
-                                            </span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Placeholder para drop */}
-                        {itemsAsignados.length === 0 && (
-                          <div
-                            className="p-4 text-center text-sm"
-                            style={{ color: theme.textSecondary }}
-                          >
-                            Arrastrá {activeTab === 'reclamos' ? 'categorías' : 'tipos'} aquí
-                          </div>
-                        )}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                );
-              })}
-
-              {dependenciasFiltradas.length === 0 && (
-                <div
-                  className="p-8 rounded-2xl text-center"
-                  style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-                >
-                  <AlertCircle className="h-10 w-10 mx-auto mb-3" style={{ color: theme.textSecondary }} />
-                  <p style={{ color: theme.textSecondary }}>
-                    No hay dependencias de tipo "{activeTab === 'reclamos' ? 'Reclamo' : 'Trámite'}" habilitadas.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </DragDropContext>
+      <ConfirmModal
+        isOpen={pidiendoLimpieza}
+        onClose={() => setPidiendoLimpieza(false)}
+        onConfirm={desasignarTodo}
+        loading={limpiando}
+        variant="danger"
+        title={`Desasignar todos los ${nombreItem}s`}
+        message={`Se van a soltar los ${items.length} ${nombreItem}s de sus dependencias. Nadie va a recibir ${
+          esDeReclamos ? 'reclamos nuevos' : 'trámites nuevos'
+        } hasta que los vuelvas a asignar.`}
+        confirmText="Desasignar todo"
+      />
     </div>
   );
 }

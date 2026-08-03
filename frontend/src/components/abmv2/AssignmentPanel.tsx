@@ -75,6 +75,12 @@ export function AssignmentPanel({
 }: AssignmentPanelProps) {
   const totalFilas = groups.reduce((n, g) => n + g.rows.length, 0);
 
+  // Componente inteligente: si NINGUNA fila trae métrica, la columna del medio
+  // no se dibuja. Un encabezado "EN USO" sobre una columna vacía es peor que
+  // no tenerla — el usuario lee que le falta un dato que nadie prometió.
+  const hayMetrica = groups.some((g) => g.rows.some((r) => r.metric));
+  const clsGrid = `av2-asig-grid${hayMetrica ? '' : ' av2-asig-grid--sin-metrica'}`;
+
   // Opciones del combo. La opción vacía sólo existe si la página acepta
   // desasignar: ofrecer "—" sin handler sería un control que miente.
   const opcionesCombo = onClear
@@ -170,7 +176,11 @@ export function AssignmentPanel({
               disabled={bulkAction.disabled}
               title={bulkAction.disabled ? bulkAction.disabledReason : undefined}
             >
-              <Sparkles size={15} strokeWidth={2} />
+              {bulkAction.icon ? (
+                <bulkAction.icon size={15} strokeWidth={2} />
+              ) : (
+                <Sparkles size={15} strokeWidth={2} />
+              )}
               {bulkAction.label}
             </button>
           )}
@@ -185,16 +195,18 @@ export function AssignmentPanel({
 
       {/* --- Tabla de asignación --- */}
       <div className="av2-asig-tabla">
-        <div className="av2-asig-grid av2-asig-encabezado" role="row">
+        <div className={`${clsGrid} av2-asig-encabezado`} role="row">
           <span className="av2-eyebrow">{columnLabels?.entity ?? 'Entidad'}</span>
-          <span className="av2-eyebrow av2-al-der">{columnLabels?.metric ?? 'En uso'}</span>
+          {hayMetrica && (
+            <span className="av2-eyebrow av2-al-der">{columnLabels?.metric ?? 'En uso'}</span>
+          )}
           <span className="av2-eyebrow">{columnLabels?.target ?? 'Asignado a'}</span>
         </div>
 
         {loading ? (
           <div aria-hidden="true">
             {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className="av2-asig-grid av2-asig-fila" role="presentation">
+              <div key={i} className={`${clsGrid} av2-asig-fila`} role="presentation">
                 <span className="av2-skel-entidad">
                   <span className="av2-skeleton av2-skeleton--tile" />
                   <span className="av2-skel-lineas">
@@ -219,14 +231,16 @@ export function AssignmentPanel({
                 {g.detail && <span className="av2-asig-grupo-detalle">{g.detail}</span>}
               </div>
               {g.rows.map((fila) => (
-                <div key={fila.id} className="av2-asig-grid av2-asig-fila" role="row">
+                <div key={fila.id} className={`${clsGrid} av2-asig-fila`} role="row">
                   <span className="av2-asig-entidad">
                     <IconoEntidad icon={fila.icon} color={fila.tileColor} />
                     <span className="av2-asig-nombre">{fila.label}</span>
                   </span>
-                  <span className="av2-celda av2-al-der">
-                    {fila.metric ? <MetricCell {...fila.metric} /> : null}
-                  </span>
+                  {hayMetrica && (
+                    <span className="av2-celda av2-al-der">
+                      {fila.metric ? <MetricCell {...fila.metric} /> : null}
+                    </span>
+                  )}
                   <span className="av2-asig-celda-destino">
                     {renderDestino(fila)}
                     {/* La × sólo aparece con destino puesto: es "deshacer lo
