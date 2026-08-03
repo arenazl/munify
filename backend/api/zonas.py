@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import List
 
 from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.zona import Zona
+from models.reclamo import Reclamo
+from models.cuadrilla import Cuadrilla
 from models.user import User
-from models.enums import RolUsuario
 from schemas.zona import ZonaCreate, ZonaUpdate, ZonaResponse
 
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id  # noqa: E402
@@ -28,7 +29,30 @@ async def get_zonas(
         query = query.where(Zona.activo == activo)
     query = query.order_by(Zona.nombre)
     result = await db.execute(query)
-    return result.scalars().all()
+    zonas = result.scalars().all()
+
+    # Peso de cada zona: reclamos recibidos y cuadrillas asignadas. DOS queries
+    # agrupadas para todas las zonas, no dos por zona: la base esta en otro
+    # continente y el listado se abre en cada visita a Configuracion.
+    if zonas:
+        ids = [z.id for z in zonas]
+        rec = await db.execute(
+            select(Reclamo.zona_id, func.count(Reclamo.id))
+            .where(Reclamo.zona_id.in_(ids))
+            .group_by(Reclamo.zona_id)
+        )
+        por_reclamos = dict(rec.all())
+        cua = await db.execute(
+            select(Cuadrilla.zona_id, func.count(Cuadrilla.id))
+            .where(Cuadrilla.zona_id.in_(ids))
+            .group_by(Cuadrilla.zona_id)
+        )
+        por_cuadrillas = dict(cua.all())
+        for z in zonas:
+            z.reclamos_count = por_reclamos.get(z.id, 0)
+            z.cuadrillas_count = por_cuadrillas.get(z.id, 0)
+
+    return zonas
 
 @router.get("/{zona_id}", response_model=ZonaResponse)
 async def get_zona(

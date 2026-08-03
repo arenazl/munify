@@ -1,12 +1,40 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Edit, MapPin, Navigation, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown, Map } from 'lucide-react';
+/**
+ * Zonas — cómo se divide el municipio para repartir el trabajo.
+ *
+ * ABM semántico del canvas de Configuración (`abmSpec.zonas`): eyebrow
+ * "CATÁLOGOS · TERRITORIO", veredicto sobre la cobertura, cinco KPIs, la pista
+ * de que el polígono se dibuja en el mapa, y la regla al pie.
+ *
+ * [2026-08-03] Migrada del `ABMPage` viejo (693 líneas con grilla de tarjetas,
+ * sección de deshabilitados desplegable, paginación propia y tiles de
+ * OpenStreetMap por tarjeta) al kit v2.
+ *
+ * Los números del hero salen de datos REALES que el listado ahora trae:
+ * `reclamos_count` y `cuadrillas_count`, dos COUNT agrupados que se agregaron
+ * al endpoint. El canvas pedía además "barrios cubiertos"; en el modelo un
+ * barrio no cuelga de una zona, así que ese KPI no se dibuja en vez de
+ * inventarlo — cuando exista la relación, entra sin tocar el layout.
+ *
+ * Se conserva lo que la pantalla vieja hacía bien: la validación de duplicados
+ * con IA al escribir el nombre de una zona nueva.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle, Loader2, Map, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { zonasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import { Sheet } from '../components/ui/Sheet';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
+import { EntityCell } from '../components/abmv2/DataTable';
+import { MetricCell, Switch } from '../components/abmv2/Controls';
+import { useEmbed, useReportarTotal } from '../components/abmv2/useEmbed';
+import { seg } from '../lib/semanticHero';
+import type { HeroFrase, HeroKpi } from '../lib/semanticHero';
+import type { ColumnSpec, ViewKind } from '../components/abmv2/types';
 import type { Zona } from '../types';
 
-// Tipo para la respuesta de validación de duplicados
+/** Respuesta de la validación de duplicados (endpoint /chat/validar-duplicado). */
 interface ValidacionDuplicado {
   es_duplicado: boolean;
   similar_a: string | null;
@@ -14,85 +42,73 @@ interface ValidacionDuplicado {
   sugerencia: string;
 }
 
-// Colores para las zonas (se asignan cíclicamente)
-const ZONE_COLORS = [
-  '#10b981', // emerald
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#06b6d4', // cyan
-  '#ec4899', // pink
-  '#84cc16', // lime
-];
+/** El listado agrega estos dos conteos (ver schemas/zona.py). */
+interface ZonaConPeso extends Zona {
+  reclamos_count?: number | null;
+  cuadrillas_count?: number | null;
+}
 
-// Genera URL de imagen estática de mapa basada en coordenadas
-const getMapImageUrl = (lat: number | null | undefined, lng: number | null | undefined): string | null => {
-  if (!lat || !lng) return null;
-  // Usando OpenStreetMap static tiles
-  const zoom = 14;
-  const n = Math.pow(2, zoom);
-  const xtile = Math.floor((lng + 180) / 360 * n);
-  const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-  return `https://tile.openstreetmap.org/${zoom}/${xtile}/${ytile}.png`;
+const FORM_VACIO = {
+  nombre: '',
+  codigo: '',
+  descripcion: '',
+  latitud_centro: '',
+  longitud_centro: '',
 };
 
 export default function Zonas() {
   const { theme } = useTheme();
-  const [zonas, setZonas] = useState<Zona[]>([]);
+  const { embedded } = useEmbed();
+
+  const [zonas, setZonas] = useState<ZonaConPeso[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [vista, setVista] = useState<ViewKind>('table');
+  const [estadoTab, setEstadoTab] = useState('todos');
+
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedZona, setSelectedZona] = useState<Zona | null>(null);
-  // Estado para animación staggered (solo la primera vez)
-  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
-  const [animationDone, setAnimationDone] = useState(false);
-  // Estado para validación de duplicados con IA
+  const [formData, setFormData] = useState(FORM_VACIO);
+
   const [validando, setValidando] = useState(false);
   const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
-  // Estado para sección de deshabilitados
-  const [showDeshabilitados, setShowDeshabilitados] = useState(false);
-  const [formData, setFormData] = useState({
-    nombre: '',
-    codigo: '',
-    descripcion: '',
-    latitud_centro: '',
-    longitud_centro: ''
-  });
-  // Paginación client-side (50 items por página)
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
 
-  useEffect(() => {
-    fetchZonas();
-  }, []);
+  const [aBorrar, setABorrar] = useState<Zona | null>(null);
+  const [borrando, setBorrando] = useState(false);
 
-  const fetchZonas = async () => {
+  useReportarTotal(zonas.length);
+
+  const fetchZonas = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await zonasApi.getAll();
-      setZonas(response.data);
-      setVisibleCards(new Set());
+      setZonas(response.data || []);
     } catch (error) {
       toast.error('Error al cargar zonas');
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Validar duplicado con IA antes de crear
+  useEffect(() => {
+    fetchZonas();
+  }, [fetchZonas]);
+
+  /* --- Alta / edición ------------------------------------------------- */
+
+  /** Validación de duplicados con IA: sólo al crear, no al editar. */
   const validarDuplicado = async (nombre: string) => {
     if (!nombre.trim() || selectedZona) {
       setValidacion(null);
       return;
     }
-
     setValidando(true);
     try {
       const response = await api.post('/chat/validar-duplicado', {
         nombre: nombre.trim(),
-        tipo: 'zona'
+        tipo: 'zona',
       });
       setValidacion(response.data);
     } catch (error) {
@@ -104,39 +120,30 @@ export default function Zonas() {
   };
 
   const openSheet = (zona: Zona | null = null) => {
-    // Limpiar validación al abrir
     setValidacion(null);
     setValidando(false);
-
-    if (zona) {
-      setFormData({
-        nombre: zona.nombre,
-        codigo: zona.codigo || '',
-        descripcion: zona.descripcion || '',
-        latitud_centro: zona.latitud_centro?.toString() || '',
-        longitud_centro: zona.longitud_centro?.toString() || ''
-      });
-      setSelectedZona(zona);
-    } else {
-      setFormData({
-        nombre: '',
-        codigo: '',
-        descripcion: '',
-        latitud_centro: '',
-        longitud_centro: ''
-      });
-      setSelectedZona(null);
-    }
+    setSelectedZona(zona);
+    setFormData(
+      zona
+        ? {
+            nombre: zona.nombre,
+            codigo: zona.codigo || '',
+            descripcion: zona.descripcion || '',
+            latitud_centro: zona.latitud_centro?.toString() || '',
+            longitud_centro: zona.longitud_centro?.toString() || '',
+          }
+        : FORM_VACIO,
+    );
     setSheetOpen(true);
   };
 
-  const closeSheet = () => {
-    setSheetOpen(false);
-    setSelectedZona(null);
-  };
-
   const handleSubmit = async () => {
-    // Si estamos creando y hay un duplicado detectado con confianza alta, advertir
+    if (!formData.nombre.trim()) {
+      toast.error('El nombre es obligatorio');
+      return;
+    }
+    // Un duplicado con confianza alta se frena: dos zonas con el mismo nombre
+    // parten los reclamos del mismo barrio en dos colas.
     if (!selectedZona && validacion?.es_duplicado && validacion.confianza === 'alta') {
       toast.error(`Ya existe una zona similar: "${validacion.similar_a}"`);
       return;
@@ -148,19 +155,20 @@ export default function Zonas() {
       codigo: formData.codigo || null,
       descripcion: formData.descripcion || null,
       latitud_centro: formData.latitud_centro ? parseFloat(formData.latitud_centro) : null,
-      longitud_centro: formData.longitud_centro ? parseFloat(formData.longitud_centro) : null
+      longitud_centro: formData.longitud_centro ? parseFloat(formData.longitud_centro) : null,
     };
 
     try {
       if (selectedZona) {
         await zonasApi.update(selectedZona.id, payload);
-        toast.success('Zona actualizada correctamente');
+        toast.success('Zona actualizada');
       } else {
         await zonasApi.create(payload);
-        toast.success('Zona creada correctamente');
+        toast.success('Zona creada');
       }
-      fetchZonas();
-      closeSheet();
+      await fetchZonas();
+      setSheetOpen(false);
+      setSelectedZona(null);
     } catch (error) {
       toast.error('Error al guardar la zona');
       console.error('Error:', error);
@@ -169,525 +177,414 @@ export default function Zonas() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const confirmarBorrado = async () => {
+    if (!aBorrar) return;
+    setBorrando(true);
     try {
-      await zonasApi.delete(id);
-      toast.success('Zona desactivada');
-      fetchZonas();
+      await zonasApi.delete(aBorrar.id);
+      toast.success('Zona eliminada');
+      setABorrar(null);
+      await fetchZonas();
     } catch (error) {
-      toast.error('Error al desactivar la zona');
-      console.error('Error:', error);
+      const detalle = (error as { response?: { data?: { detail?: string } } })?.response?.data
+        ?.detail;
+      toast.error(detalle || 'Error al eliminar la zona');
+    } finally {
+      setBorrando(false);
     }
   };
 
-  // Deshabilitar una zona (soft delete - pone activo=false)
-  const handleDeshabilitar = async (zona: Zona) => {
+  /** Activar/desactivar desde la lista, optimista y con rollback. */
+  const alternarActivo = async (zona: ZonaConPeso, activo: boolean) => {
+    setZonas((prev) => prev.map((z) => (z.id === zona.id ? { ...z, activo } : z)));
     try {
-      await zonasApi.update(zona.id, { ...zona, activo: false });
-      toast.success(`"${zona.nombre}" deshabilitada`);
-      fetchZonas();
-    } catch (error) {
-      toast.error('Error al deshabilitar');
-      console.error('Error:', error);
+      await zonasApi.update(zona.id, { ...zona, activo });
+    } catch {
+      setZonas((prev) => prev.map((z) => (z.id === zona.id ? { ...z, activo: !activo } : z)));
+      toast.error('No se pudo cambiar el estado');
     }
   };
 
-  // Habilitar una zona deshabilitada
-  const handleHabilitar = async (zona: Zona) => {
-    try {
-      await zonasApi.update(zona.id, { ...zona, activo: true });
-      toast.success(`"${zona.nombre}" habilitada nuevamente`);
-      fetchZonas();
-    } catch (error) {
-      toast.error('Error al habilitar');
-      console.error('Error:', error);
-    }
-  };
+  /* --- Derivados: los números del hero salen de acá ------------------- */
 
-  const filteredZonas = zonas.filter(z =>
-    z.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    z.codigo?.toLowerCase().includes(search.toLowerCase()) ||
-    z.descripcion?.toLowerCase().includes(search.toLowerCase())
+  const conCuadrilla = useMemo(
+    () => zonas.filter((z) => (z.cuadrillas_count ?? 0) > 0).length,
+    [zonas],
   );
+  const sinCuadrilla = zonas.length - conCuadrilla;
+  const hayPeso = zonas.some((z) => typeof z.reclamos_count === 'number');
+  const totalReclamos = useMemo(
+    () => zonas.reduce((acc, z) => acc + (z.reclamos_count ?? 0), 0),
+    [zonas],
+  );
+  const sinReclamos = useMemo(
+    () => (hayPeso ? zonas.filter((z) => (z.reclamos_count ?? 0) === 0).length : 0),
+    [zonas, hayPeso],
+  );
+  const masCargada = useMemo(() => {
+    if (!hayPeso || zonas.length === 0) return null;
+    return zonas.slice().sort((a, b) => (b.reclamos_count ?? 0) - (a.reclamos_count ?? 0))[0];
+  }, [zonas, hayPeso]);
 
-  // Separar zonas activas y deshabilitadas
-  const zonasActivas = filteredZonas.filter(z => z.activo);
-  const zonasDeshabilitadas = filteredZonas.filter(z => !z.activo);
+  const heroKpis = useMemo<HeroKpi[]>(() => {
+    if (loading || zonas.length === 0) return [];
+    return [
+      {
+        etiqueta: 'Zonas',
+        valor: zonas.length,
+        sub: `${zonas.filter((z) => z.activo).length} activas`,
+      },
+      { etiqueta: 'Con cuadrilla', valor: conCuadrilla, sub: `de ${zonas.length} zonas` },
+      {
+        etiqueta: 'Sin cuadrilla',
+        valor: sinCuadrilla,
+        sub: sinCuadrilla ? 'los reclamos entran sin equipo' : 'todas cubiertas',
+        veredicto: sinCuadrilla > 0 ? 'advertencia' : undefined,
+      },
+      {
+        etiqueta: 'Reclamos',
+        valor: hayPeso ? totalReclamos : '—',
+        sub: hayPeso ? 'repartidos en el territorio' : 'sin dato de la API',
+      },
+      {
+        etiqueta: 'Más cargada',
+        valor: masCargada ? (masCargada.reclamos_count ?? 0) : '—',
+        sub: masCargada ? masCargada.nombre : 'sin dato de la API',
+      },
+    ];
+  }, [loading, zonas, conCuadrilla, sinCuadrilla, hayPeso, totalReclamos, masCargada]);
 
-  const paginatedActivas = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(zonasActivas.length / pageSize));
-    if (page > totalPages) return zonasActivas.slice(0, pageSize);
-    return zonasActivas.slice((page - 1) * pageSize, page * pageSize);
-  }, [zonasActivas, page, pageSize]);
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading) return [];
+    if (zonas.length === 0) {
+      return [
+        {
+          segmentos: [
+            seg('Todavía no hay zonas', 'malo'),
+            seg(': sin zonas, los reclamos entran sin territorio y nadie los reparte.'),
+          ],
+          acciones: [{ label: 'Crear la primera zona', onClick: () => openSheet(), primaria: true }],
+        },
+      ];
+    }
 
-  useEffect(() => {
-    setPage(1);
-  }, [filteredZonas.length]);
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${zonas.length} zona${zonas.length === 1 ? '' : 's'}`, 'bueno'),
+          seg(
+            sinCuadrilla === 0
+              ? ', todas con cuadrilla asignada.'
+              : ` y ${conCuadrilla} con cuadrilla.`,
+          ),
+          ...(sinCuadrilla > 0
+            ? [
+                seg(` Hay ${sinCuadrilla} sin equipo`, 'advertencia'),
+                seg(': los reclamos de ahí entran y no se despachan solos.'),
+              ]
+            : []),
+        ],
+      },
+    ];
 
-  // Efecto para animar cards de a una (staggered) - solo la primera vez
-  useEffect(() => {
-    if (loading || zonas.length === 0 || animationDone) return;
+    if (masCargada && (masCargada.reclamos_count ?? 0) > 0) {
+      frases.push({
+        segmentos: [
+          seg(`«${masCargada.nombre}» concentra ${masCargada.reclamos_count} reclamos`),
+          seg(
+            sinReclamos > 0
+              ? ` y ${sinReclamos} zonas no recibieron ninguno: el territorio no está parejo.`
+              : ' — es la que más trabajo genera.',
+          ),
+        ],
+      });
+    }
+    return frases;
+  }, [loading, zonas, conCuadrilla, sinCuadrilla, masCargada, sinReclamos]);
 
-    // Animar cada card con delay (una sola vez al cargar)
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
-    zonas.forEach((zona, index) => {
-      const timeout = setTimeout(() => {
-        setVisibleCards(prev => new Set([...prev, zona.id]));
-      }, 50 + index * 80);
-      timeouts.push(timeout);
+  const visibles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return zonas.filter((z) => {
+      if (estadoTab === 'con' && (z.cuadrillas_count ?? 0) === 0) return false;
+      if (estadoTab === 'sin' && (z.cuadrillas_count ?? 0) > 0) return false;
+      if (estadoTab === 'inactivas' && z.activo) return false;
+      if (!q) return true;
+      return (
+        z.nombre.toLowerCase().includes(q) ||
+        (z.codigo ?? '').toLowerCase().includes(q) ||
+        (z.descripcion ?? '').toLowerCase().includes(q)
+      );
     });
+  }, [zonas, search, estadoTab]);
 
-    // Marcar animación como completada
-    const finalTimeout = setTimeout(() => {
-      setAnimationDone(true);
-    }, 50 + zonas.length * 80 + 100);
-    timeouts.push(finalTimeout);
-
-    return () => timeouts.forEach(t => clearTimeout(t));
-  }, [loading, zonas.length, animationDone]);
-
-  const tableColumns = [
-    {
-      key: 'nombre',
-      header: 'Nombre',
-      sortValue: (z: Zona) => z.nombre,
-      render: (z: Zona) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-            <MapPin className="h-4 w-4 text-emerald-600" />
-          </div>
-          <span className="font-medium">{z.nombre}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'codigo',
-      header: 'Código',
-      sortValue: (z: Zona) => z.codigo || '',
-      render: (z: Zona) => (
-        <span className="font-mono" style={{ color: theme.textSecondary }}>{z.codigo || '-'}</span>
-      ),
-    },
-    {
-      key: 'descripcion',
-      header: 'Descripción',
-      sortValue: (z: Zona) => z.descripcion || '',
-      render: (z: Zona) => (
-        <span style={{ color: theme.textSecondary }}>{z.descripcion || '-'}</span>
-      ),
-    },
-    {
-      key: 'coords',
-      header: 'Coordenadas',
-      sortable: false,
-      render: (z: Zona) => (
-        <span className="text-xs" style={{ color: theme.textSecondary }}>
-          {z.latitud_centro && z.longitud_centro
-            ? `${z.latitud_centro.toFixed(4)}, ${z.longitud_centro.toFixed(4)}`
-            : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'activo',
-      header: 'Estado',
-      sortValue: (z: Zona) => z.activo,
-      render: (z: Zona) => <ABMBadge active={z.activo} />,
-    },
-  ];
+  const columnas = useMemo<ColumnSpec<ZonaConPeso>[]>(
+    () => [
+      {
+        id: 'nombre',
+        header: 'Zona',
+        width: 'minmax(200px, 1.6fr)',
+        kind: 'entity',
+        cell: (z) => (
+          <EntityCell
+            icon={MapPin}
+            title={z.nombre}
+            subtitle={z.descripcion || z.codigo || undefined}
+          />
+        ),
+      },
+      { id: 'codigo', header: 'Código', width: 'minmax(90px, 0.7fr)', kind: 'text' },
+      {
+        id: 'cuadrillas',
+        header: 'Cuadrillas',
+        width: 'minmax(100px, 0.7fr)',
+        align: 'right',
+        kind: 'metric',
+        cell: (z) => {
+          const n = z.cuadrillas_count ?? 0;
+          return (
+            <MetricCell
+              value={String(n)}
+              note={n === 0 ? 'sin equipo' : n === 1 ? 'asignada' : 'asignadas'}
+              veredicto={n === 0 ? 'advertencia' : undefined}
+            />
+          );
+        },
+      },
+      {
+        id: 'reclamos',
+        header: 'Reclamos',
+        width: 'minmax(100px, 0.7fr)',
+        align: 'right',
+        kind: 'metric',
+        cell: (z) => {
+          const n = z.reclamos_count;
+          if (typeof n !== 'number') return <MetricCell value="—" note="sin dato" muted />;
+          return <MetricCell value={String(n)} note="recibidos" muted={n === 0} />;
+        },
+      },
+      {
+        id: 'activo',
+        header: 'Estado',
+        width: 'minmax(76px, 0.5fr)',
+        align: 'right',
+        cell: (z) => (
+          <Switch
+            checked={z.activo}
+            ariaLabel={z.activo ? `Desactivar ${z.nombre}` : `Activar ${z.nombre}`}
+            onChange={(v) => alternarActivo(z, v)}
+          />
+        ),
+      },
+      { id: 'acciones', header: 'Acciones', width: 'minmax(76px, 0.5fr)', kind: 'actions', align: 'right' },
+    ],
+    // Las columnas no dependen de nada que cambie su forma.
+    [],
+  );
 
   return (
     <>
-      <ABMPage
-      title="Zonas / Barrios"
-      icon={<Map className="h-5 w-5" />}
-      backLink="/gestion/configuracion"
-      buttonLabel="Nueva Zona"
-      onAdd={() => openSheet()}
-      searchPlaceholder="Buscar zonas..."
-      searchValue={search}
-      onSearchChange={setSearch}
-      loading={loading}
-      isEmpty={filteredZonas.length === 0}
-      emptyMessage="No se encontraron zonas"
-      sheetOpen={sheetOpen}
-      sheetTitle={selectedZona ? 'Editar Zona' : 'Nueva Zona'}
-      sheetDescription={selectedZona ? 'Modifica los datos de la zona' : 'Completa los datos para crear una nueva zona'}
-      onSheetClose={closeSheet}
-      pagination={{
-        page,
-        pageSize,
-        totalItems: zonasActivas.length,
-        onPageChange: setPage,
-        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
-      }}
-      tableView={
-        <ABMTable
-          data={paginatedActivas}
-          columns={tableColumns}
-          keyExtractor={(z) => z.id}
-          onRowClick={(z) => openSheet(z)}
-          actions={(z) => (
-            <>
-              <ABMTableAction
-                icon={<Edit className="h-4 w-4" />}
-                onClick={() => openSheet(z)}
-                title="Editar"
-              />
-              <ABMTableAction
-                icon={<EyeOff className="h-4 w-4" />}
-                onClick={() => handleDeshabilitar(z)}
-                title="Deshabilitar"
-                variant="danger"
-              />
-            </>
-          )}
-        />
-      }
-      disabledSection={
-        zonasDeshabilitadas.length > 0 && (
-          <div className="mt-8">
-            {/* Header colapsable */}
+      <SemanticAbmPage<ZonaConPeso>
+        moduleKey="zonas"
+        eyebrow="Catálogos · Territorio"
+        title="Zonas"
+        description="Cómo se divide el municipio para repartir el trabajo."
+        hero={{
+          etiqueta: 'CATÁLOGOS · TERRITORIO',
+          frases: heroFrases,
+          kpis: heroKpis,
+        }}
+        pista={{
+          titulo: 'Las zonas se dibujan en el mapa',
+          texto:
+            'Acá se editan el nombre, el código y el estado. El área de cada zona se ajusta sobre el mapa, no en esta grilla.',
+          accion: embedded ? undefined : { label: 'Abrir el mapa', to: '/gestion/mapa' },
+        }}
+        searchPlaceholder="Buscar zona, código o descripción…"
+        views={['table']}
+        activeView={vista}
+        onViewChange={setVista}
+        search={search}
+        onSearchChange={setSearch}
+        primaryAction={{ label: 'Nueva zona', onClick: () => openSheet() }}
+        selects={[]}
+        statusTabs={[
+          { id: 'todos', label: 'Todas', count: zonas.length },
+          { id: 'con', label: 'Con cuadrilla', count: conCuadrilla },
+          { id: 'sin', label: 'Sin cuadrilla', count: sinCuadrilla },
+          { id: 'inactivas', label: 'Inactivas', count: zonas.filter((z) => !z.activo).length },
+        ]}
+        activeStatus={estadoTab}
+        onStatusChange={setEstadoTab}
+        kind="plain"
+        columns={columnas}
+        rows={visibles}
+        rowKey={(z) => z.id}
+        rowActions={[
+          { id: 'edit', label: 'Editar', icon: Pencil, onClick: (z) => openSheet(z) },
+          { id: 'del', label: 'Eliminar', icon: Trash2, danger: true, onClick: (z) => setABorrar(z) },
+        ]}
+        onRowClick={(z) => openSheet(z)}
+        loading={loading}
+        emptyMessage={
+          search.trim()
+            ? `Ninguna zona coincide con "${search.trim()}".`
+            : 'Todavía no hay zonas cargadas.'
+        }
+        footer={{
+          showing: `Mostrando ${visibles.length} de ${zonas.length}`,
+          note: 'Borrar una zona deja su territorio sin cobertura: los reclamos de ahí entran sin cuadrilla.',
+        }}
+      />
+
+      {/* --- Drawer de alta / edición --- */}
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={selectedZona ? 'Editar zona' : 'Nueva zona'}
+        description={
+          selectedZona ? 'Modificá los datos y guardá' : 'Completá los datos de la nueva zona'
+        }
+        stickyFooter={
+          <div className="flex justify-end gap-2">
             <button
-              onClick={() => setShowDeshabilitados(!showDeshabilitados)}
-              className="w-full flex items-center justify-between p-4 rounded-xl transition-all hover:opacity-90"
+              onClick={() => setSheetOpen(false)}
+              className="px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+              style={{ backgroundColor: theme.primary, color: '#fff' }}
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              Guardar
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="av2-campo-label">
+              Nombre <span style={{ color: 'var(--pl-red)' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.nombre}
+              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              onBlur={(e) => validarDuplicado(e.target.value)}
+              placeholder="Ej: Zona Centro"
+              className="w-full px-3 py-2 rounded-xl text-sm"
               style={{
                 backgroundColor: theme.backgroundSecondary,
                 border: `1px solid ${theme.border}`,
+                color: theme.text,
               }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
-                >
-                  <EyeOff className="h-5 w-5" style={{ color: '#ef4444' }} />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold" style={{ color: theme.text }}>
-                    Zonas Deshabilitadas
-                  </h3>
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>
-                    {zonasDeshabilitadas.length} zona{zonasDeshabilitadas.length !== 1 ? 's' : ''} deshabilitada{zonasDeshabilitadas.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
+            />
+            {/* Validación de duplicados con IA: la pantalla vieja ya la tenía y
+                es lo que evita partir los reclamos de un barrio en dos colas. */}
+            {validando && (
+              <p className="av2-campo-nota" style={{ marginTop: 6 }}>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Revisando si ya existe una zona parecida…
+              </p>
+            )}
+            {!validando && validacion && !selectedZona && (
               <div
-                className="p-2 rounded-lg transition-transform"
-                style={{
-                  backgroundColor: theme.card,
-                  transform: showDeshabilitados ? 'rotate(0deg)' : 'rotate(-90deg)',
-                }}
+                className={`av2-nota ${validacion.es_duplicado ? 'av2-nota--alerta' : 'av2-nota--ok'}`}
               >
-                <ChevronDown className="h-4 w-4" style={{ color: theme.textSecondary }} />
-              </div>
-            </button>
-
-            {/* Lista de zonas deshabilitadas */}
-            {showDeshabilitados && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {zonasDeshabilitadas.map((z, index) => {
-                  const zoneColor = ZONE_COLORS[index % ZONE_COLORS.length];
-
-                  return (
-                    <div
-                      key={z.id}
-                      className="rounded-xl overflow-hidden opacity-75 hover:opacity-100 transition-opacity"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                      }}
-                    >
-                      <div
-                        className="flex items-center justify-between p-4"
-                        style={{
-                          background: `linear-gradient(135deg, ${zoneColor}10 0%, ${zoneColor}05 100%)`,
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center grayscale"
-                            style={{ backgroundColor: zoneColor }}
-                          >
-                            <MapPin className="h-5 w-5 text-white" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold" style={{ color: theme.text }}>
-                                {z.nombre}
-                              </h3>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">
-                                Deshabilitada
-                              </span>
-                            </div>
-                            {z.codigo && (
-                              <p className="text-sm font-mono" style={{ color: theme.textSecondary }}>
-                                {z.codigo}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {/* Botón habilitar */}
-                          <button
-                            onClick={() => handleHabilitar(z)}
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
-                            style={{
-                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                              color: '#10b981',
-                            }}
-                            title="Habilitar zona"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                            <span className="text-sm font-medium">Habilitar</span>
-                          </button>
-
-                          {/* Botón editar */}
-                          <button
-                            onClick={() => openSheet(z)}
-                            className="p-2 rounded-lg transition-colors hover:scale-105"
-                            style={{
-                              backgroundColor: theme.backgroundSecondary,
-                              color: theme.textSecondary,
-                            }}
-                            title="Editar zona"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {validacion.es_duplicado ? (
+                  <AlertTriangle className="av2-nota-ico" aria-hidden />
+                ) : (
+                  <CheckCircle className="av2-nota-ico" aria-hidden />
+                )}
+                <span className="av2-nota-txt">
+                  {validacion.es_duplicado
+                    ? `Se parece a «${validacion.similar_a}» (confianza ${validacion.confianza}). ${validacion.sugerencia}`
+                    : 'No hay ninguna zona parecida cargada.'}
+                </span>
               </div>
             )}
           </div>
-        )
-      }
-      sheetFooter={
-        <ABMSheetFooter
-          onCancel={closeSheet}
-          onSave={handleSubmit}
-          saving={saving}
-        />
-      }
-      sheetContent={
-        <form className="space-y-4">
-          <ABMInput
-            label="Nombre"
-            required
-            value={formData.nombre}
-            onChange={(e) => {
-              setFormData({ ...formData, nombre: e.target.value });
-              setValidacion(null);
-            }}
-            placeholder="Nombre de la zona"
-          />
-
-          <ABMInput
-            label="Código"
-            value={formData.codigo}
-            onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-            placeholder="Ej: Z-CEN, Z-NOR"
-          />
 
           <div>
-            <ABMTextarea
-              label="Descripción"
+            <label className="av2-campo-label">Código</label>
+            <input
+              type="text"
+              value={formData.codigo}
+              onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+              placeholder="Ej: Z-CENTRO"
+              className="w-full px-3 py-2 rounded-xl text-sm"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="av2-campo-label">Descripción</label>
+            <textarea
+              rows={2}
               value={formData.descripcion}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              onBlur={() => {
-                // Validar al perder foco en descripción
-                if (!selectedZona && formData.nombre.trim().length >= 2) {
-                  validarDuplicado(formData.nombre);
-                }
+              placeholder="Qué barrios abarca"
+              className="w-full px-3 py-2 rounded-xl text-sm resize-none"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
               }}
-              placeholder="Descripción de la zona"
-              rows={3}
-            />
-            {/* Indicador de validación IA */}
-            {!selectedZona && (
-              <div className="mt-2">
-                {validando ? (
-                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Verificando con IA si ya existe...</span>
-                  </div>
-                ) : validacion ? (
-                  <div
-                    className={`flex items-start gap-2 text-sm p-2 rounded-lg ${
-                      validacion.es_duplicado
-                        ? 'bg-amber-500/10 border border-amber-500/30'
-                        : 'bg-green-500/10 border border-green-500/30'
-                    }`}
-                  >
-                    {validacion.es_duplicado ? (
-                      <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                    )}
-                    <div>
-                      <p className={validacion.es_duplicado ? 'text-amber-600' : 'text-green-600'}>
-                        {validacion.sugerencia}
-                      </p>
-                      {validacion.es_duplicado && validacion.similar_a && (
-                        <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                          Similar a: <strong>{validacion.similar_a}</strong>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <ABMInput
-              label="Latitud Centro"
-              type="number"
-              step="any"
-              value={formData.latitud_centro}
-              onChange={(e) => setFormData({ ...formData, latitud_centro: e.target.value })}
-              placeholder="Ej: -34.6037"
-            />
-            <ABMInput
-              label="Longitud Centro"
-              type="number"
-              step="any"
-              value={formData.longitud_centro}
-              onChange={(e) => setFormData({ ...formData, longitud_centro: e.target.value })}
-              placeholder="Ej: -58.3816"
             />
           </div>
-        </form>
-      }
-    >
-      {paginatedActivas.map((z, index) => {
-        const zoneColor = ZONE_COLORS[index % ZONE_COLORS.length];
-        const mapImage = getMapImageUrl(z.latitud_centro, z.longitud_centro);
-        // Si la animación terminó, siempre visible
-        const isVisible = animationDone || visibleCards.has(z.id);
 
-        return (
-          <div
-            key={z.id}
-            onClick={() => openSheet(z)}
-            className={`group relative rounded-2xl cursor-pointer overflow-hidden abm-card-hover transition-all duration-500 ${
-              isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
-            }`}
-            style={{
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            {/* Imagen de mapa de fondo */}
-            {mapImage && (
-              <div className="absolute inset-0">
-                <img
-                  src={mapImage}
-                  alt=""
-                  className="w-full h-full object-cover opacity-15 group-hover:opacity-25 group-hover:scale-110 transition-all duration-700"
-                />
-                {/* Overlay con gradiente */}
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `linear-gradient(135deg, ${theme.card}F5 0%, ${theme.card}E8 50%, ${zoneColor}25 100%)`,
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Fondo con gradiente sutil (fallback si no hay coordenadas) */}
-            {!mapImage && (
-              <div
-                className="absolute inset-0 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500"
-                style={{
-                  background: `
-                    radial-gradient(ellipse at top right, ${zoneColor}60 0%, transparent 50%),
-                    radial-gradient(ellipse at bottom left, ${zoneColor}40 0%, transparent 50%)
-                  `,
-                }}
+          <div>
+            <label className="av2-campo-label">Centro de la zona</label>
+            <div className="av2-campo-fila">
+              <input
+                type="number"
+                step="any"
+                value={formData.latitud_centro}
+                onChange={(e) => setFormData({ ...formData, latitud_centro: e.target.value })}
+                placeholder="Latitud"
+                className="av2-campo-num"
+                style={{ width: 140 }}
               />
-            )}
-
-            {/* Shine effect on hover */}
-            <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
-              <div
-                className="absolute -inset-full opacity-0 group-hover:opacity-100"
-                style={{
-                  background: `linear-gradient(90deg, transparent 0%, ${zoneColor}15 50%, transparent 100%)`,
-                }}
+              <input
+                type="number"
+                step="any"
+                value={formData.longitud_centro}
+                onChange={(e) => setFormData({ ...formData, longitud_centro: e.target.value })}
+                placeholder="Longitud"
+                className="av2-campo-num"
+                style={{ width: 140 }}
               />
             </div>
-
-            {/* Contenido */}
-            <div className="relative z-10 p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
-                    style={{
-                      backgroundColor: zoneColor,
-                      boxShadow: `0 4px 14px ${zoneColor}40`,
-                    }}
-                  >
-                    <MapPin className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="font-semibold text-lg" style={{ color: theme.text }}>{z.nombre}</p>
-                    {z.codigo && (
-                      <p className="text-sm font-mono" style={{ color: theme.textSecondary }}>
-                        {z.codigo}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <ABMBadge active={z.activo} />
-              </div>
-
-              {z.descripcion && (
-                <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
-                  {z.descripcion}
-                </p>
-              )}
-
-              {/* Footer con coordenadas */}
-              <div className="flex items-center justify-between mt-3">
-                {z.latitud_centro && z.longitud_centro ? (
-                  <span
-                    className="text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1"
-                    style={{
-                      backgroundColor: `${zoneColor}20`,
-                      color: zoneColor,
-                    }}
-                  >
-                    <Navigation className="h-3 w-3" />
-                    {z.latitud_centro.toFixed(4)}, {z.longitud_centro.toFixed(4)}
-                  </span>
-                ) : (
-                  <span
-                    className="text-xs px-2.5 py-1 rounded-full font-medium"
-                    style={{
-                      backgroundColor: `${theme.textSecondary}15`,
-                      color: theme.textSecondary,
-                    }}
-                  >
-                    Sin coordenadas
-                  </span>
-                )}
-                <ABMCardActions
-                  onEdit={() => openSheet(z)}
-                  onDelete={() => handleDeshabilitar(z)}
-                />
-              </div>
-            </div>
+            <p className="av2-campo-nota-larga">
+              <Map size={13} strokeWidth={2} aria-hidden /> Es el punto donde el mapa centra la
+              zona. El área se dibuja desde el mapa, no acá.
+            </p>
           </div>
-        );
-      })}
-    </ABMPage>
+        </div>
+      </Sheet>
+
+      <ConfirmModal
+        isOpen={!!aBorrar}
+        onClose={() => setABorrar(null)}
+        onConfirm={confirmarBorrado}
+        loading={borrando}
+        variant="danger"
+        title="Eliminar zona"
+        message={
+          aBorrar
+            ? `Se va a eliminar "${aBorrar.nombre}". Los reclamos de ese territorio van a entrar sin zona y sin cuadrilla hasta que crees otra.`
+            : ''
+        }
+        confirmText="Eliminar"
+      />
     </>
   );
 }
