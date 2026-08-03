@@ -3756,6 +3756,162 @@ button.av2-chip:hover { opacity: 0.85; }
   text-wrap: pretty;
 }
 
+/* ============================================================
+   [APARIENCIA] — el panel de "Apariencia" del canvas.
+
+   UNA tarjeta con tres bloques separados por hairlines: tema del
+   panel, color de acento y fondo de la barra lateral. Las medidas
+   son las del .dc (lienzo de 62px, muestras de 11 de radio,
+   círculos de 34, líneas de 4px).
+
+   Los colores de las muestras los pone el consumidor inline
+   porque son valores RUNTIME derivados del motor de tema: el
+   preview tiene que SER lo que se va a ver.
+   ============================================================ */
+.ap-panel {
+  padding: 18px 20px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+
+.ap-nota {
+  margin: 5px 0 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+}
+
+.ap-hairline {
+  display: block;
+  height: 1px;
+  background: var(--pl-border);
+  margin: 18px 0;
+}
+
+.ap-grilla {
+  display: grid;
+  gap: 9px;
+  margin-top: 11px;
+}
+/* Seis temas entran en una fila en desktop y se reacomodan solos. */
+.ap-grilla--temas { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.ap-grilla--barras {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  max-width: 460px;
+}
+
+.ap-muestra {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  min-width: 0;
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  background: var(--pl-surface);
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.ap-muestra:hover { border-color: var(--pl-green-200); }
+.ap-muestra--activa {
+  border-color: var(--pl-green);
+  box-shadow: 0 0 0 1px var(--pl-green);
+}
+
+.ap-lienzo {
+  display: flex;
+  height: 62px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ap-lienzo-barra { width: 30%; height: 100%; }
+.ap-lienzo-cuerpo {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* La muestra de la barra lateral no tiene columna: las líneas van directo
+   sobre el lienzo, que ES el color de la barra. */
+.ap-lienzo--barra {
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 10px;
+}
+
+.ap-linea {
+  display: block;
+  height: 3px;
+  width: 92%;
+  border-radius: var(--pl-radius-pill);
+}
+.ap-linea--acento { height: 4px; width: 76%; }
+.ap-linea--corta { width: 64%; }
+
+.ap-muestra-pie {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px 1px;
+  min-width: 0;
+}
+.ap-muestra-nombre {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ap-muestra--activa .ap-muestra-nombre { font-weight: 600; color: var(--pl-text); }
+.ap-muestra-check {
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  flex: 0 0 13px;
+  stroke-width: 2.8;
+}
+
+.ap-acentos {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.ap-acento {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  cursor: pointer;
+  /* El anillo se pinta con el color del propio acento (currentColor lo trae
+     del style inline), así funciona con cualquier color sin tokens extra. */
+  transition: box-shadow var(--pl-dur-ui) var(--pl-ease);
+}
+.ap-acento--activo { box-shadow: 0 0 0 2px var(--pl-surface), 0 0 0 4px currentColor; }
+.ap-acento-check { width: 15px; height: 15px; stroke-width: 3.2; }
+.ap-acento-nombre {
+  margin-left: 4px;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ap-pie {
+  margin: 18px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
 /* --- IconColorPicker ---------------------------------------- */
 .av2-picker { min-width: 0; }
 

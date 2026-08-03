@@ -33,20 +33,19 @@ const brandDefaultPreset = brandDefault?.bgId;
 const brandDefaultAccent = brandDefault?.accentId ?? null;
 const brandDefaultSidebar = BRAND.fixedTheme ? resolveSidebarMode(BRAND.themeVariant) : undefined;
 
-// Temas de fondo que ofrece el selector: si la marca declara los suyos
-// (fixedTheme), se muestran ESOS (p.ej. el par verde claro/oscuro, que ahora
-// es el mismo acento sobre dos fondos); si no, la colección de Munify.
-const selectorPresets: BgTheme[] = (() => {
-  if (!BRAND.fixedTheme || !BRAND.themePresetIds?.length) return bgThemes;
-  const ids = BRAND.themePresetIds.map((id) => resolveSavedPreset(id).bgId);
-  return bgThemes.filter((t) => ids.includes(t.id));
-})();
-
-// Una marca con identidad de color FIJA no ofrece la paleta de acentos: su
-// acento ES el de la marca (el usuario alterna el fondo, no el color).
-const selectorAccents: AccentOption[] = brandDefaultAccent
-  ? accentCatalog.filter((a) => a.id === brandDefaultAccent)
-  : accentCatalog;
+// El selector ofrece SIEMPRE el catálogo completo: los seis temas de fondo y
+// todos los acentos, para cualquier marca.
+//
+// Antes la marca recortaba las dos listas (`BRAND.themePresetIds` filtraba los
+// fondos y un acento de marca dejaba UNO solo). En Paraguay Limpio eso se veía
+// como un único color verde sin forma de cambiarlo, que es justo lo contrario
+// de lo que pide el canvas: "el acento se aplica sobre cualquier tema".
+//
+// La marca sigue mandando en lo que importa: `brandDefaultPreset` y
+// `brandDefaultAccent` son con lo que ARRANCA el municipio (Paraguay abre en
+// verde). Elegir otro es del usuario.
+const selectorPresets: BgTheme[] = bgThemes;
+const selectorAccents: AccentOption[] = accentCatalog;
 
 // Exportar tipos necesarios
 export type {

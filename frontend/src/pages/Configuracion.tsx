@@ -15,6 +15,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { buildThemeColors } from '../config/themePresets';
 import { useAuth } from '../contexts/AuthContext';
 import { SettingsShell } from '../components/abmv2/SettingsShell';
+import { AbmDeConfiguracion } from '../components/config/AbmDeConfiguracion';
+import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../config/canvasAbmSpec';
 import { EmbedProvider } from '../components/abmv2/EmbedContext';
 import { QRCarteleria } from '../components/ui/QRCarteleria';
 import { AppearanceSettings } from '../components/ui/AppearanceSettings';
@@ -102,6 +104,51 @@ const TAB_TESORERIA: Record<string, string> = {
   'tesoreria-parajes': 'parajes',
   'tesoreria-proyectos': 'proyectos',
 };
+
+/**
+ * Qué ajuste corresponde a cada ABM del canvas (`config/canvasAbmSpec.ts`).
+ *
+ * Mientras la pantalla real no esté migrada, el panel muestra el PROTOTIPO:
+ * el mismo hero, los mismos KPIs, las mismas columnas y la misma regla que
+ * dibujó el diseño, con sus datos de muestra. Así Configuración entera se ve
+ * como el mockup desde el primer día, y engancharle el endpoint a cada
+ * pantalla es un cambio local que no toca el layout.
+ */
+const SPEC_DE_AJUSTE: Record<string, string> = {
+  empleados: 'empleados',
+  cuadrillas: 'cuadrillas',
+  ausencias: 'ausencias',
+  vecinos: 'vecinos',
+  sla: 'sla',
+  dependencias: 'dependencias',
+  zonas: 'zonas',
+  inventario: 'inv',
+  'tesoreria-saldos': 'cajas',
+  'tesoreria-retenciones': 'retenciones',
+  'tesoreria-proyectos': 'proyectos',
+  'tesoreria-tarjetas': 'tarjetas',
+  'tesoreria-contactos': 'contactos',
+  'tesoreria-tasas': 'tasas',
+  'proveedores-pago': 'pagos',
+  'audit-logs': 'auditoria',
+  suscripciones: 'suscripciones',
+};
+
+/**
+ * Ajustes cuya pantalla YA está migrada al kit y trae datos reales: esas
+ * ganan sobre el prototipo. El resto muestra el spec del canvas hasta que le
+ * toque su turno.
+ */
+const CON_DATOS_REALES = new Set([
+  'categorias-reclamo',
+  'categorias-tramite',
+  'poi-tipos',
+  'categorias-inventario',
+  'zonas',
+  'tramites-config',
+  'asignacion-dependencias',
+  'empleados',
+]);
 
 const PANTALLA_DE_AJUSTE: Record<string, LazyExoticComponent<ComponentType>> = {
   // Personal
@@ -662,7 +709,7 @@ export default function Configuracion() {
     () =>
       presets.map(t => {
         const c = buildThemeColors(t.id, currentAccentId, currentSidebarMode);
-        return { key: t.id, label: t.name, swatch: c.background, chip: c.sidebar };
+        return { key: t.id, label: t.name, swatch: c.background, chip: c.sidebar, line: c.border };
       }),
     [presets, currentAccentId, currentSidebarMode],
   );
@@ -1523,6 +1570,19 @@ export default function Configuracion() {
               <ConfigTesoreria tabInicial={TAB_TESORERIA[ajusteActivo.id]} />
             </EmbedProvider>
           </Suspense>
+        ) : ajusteActivo
+            && SPEC_DE_AJUSTE[ajusteActivo.id]
+            && ABM_SPEC[SPEC_DE_AJUSTE[ajusteActivo.id]]
+            && !CON_DATOS_REALES.has(ajusteActivo.id) ? (
+          // Prototipo del canvas: la pantalla real todavía no se migró, así que
+          // se muestra el ABM tal cual lo diseñó Claude Design (con sus datos
+          // de muestra). Enganchar el endpoint después no cambia el layout.
+          <AbmDeConfiguracion
+            spec={ABM_SPEC[SPEC_DE_AJUSTE[ajusteActivo.id]]}
+            moduleKey={ajusteActivo.id}
+            title={ajusteActivo.label}
+            descripcion={DESCRIPCION_AJUSTE[SPEC_DE_AJUSTE[ajusteActivo.id]]}
+          />
         ) : ajusteActivo && PANTALLA_DE_AJUSTE[ajusteActivo.id] ? (
           <Suspense fallback={
             <div className="flex items-center justify-center py-16">
