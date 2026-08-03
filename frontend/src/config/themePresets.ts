@@ -75,6 +75,10 @@ export interface BgTheme {
   /** ID del acento que se aplica al elegir este tema, mientras el usuario no
    *  haya elegido uno propio (si eligió, esa elección manda). */
   acentoRecomendado: string;
+  /** Acentos que este fondo ofrece, en orden. No todos los acentos quedan
+   *  bien sobre todos los fondos: un ámbar sobre marfil se lava y un olivo
+   *  sobre midnight se apaga. Cada fondo declara su juego. */
+  acentos: string[];
 }
 
 /** Un acento del catálogo transversal. */
@@ -210,14 +214,16 @@ const accentWash = (card: string, primary: string): string =>
 
 export const bgThemes: BgTheme[] = [
   // ---- CLAROS (blancos suaves, NUNCA blanco puro) ----
-  { id: 'niebla', name: 'Niebla', modo: 'claro', base: '#f4f6fa', acentoRecomendado: 'indigo' },
-  { id: 'marfil', name: 'Marfil', modo: 'claro', base: '#faf8f3', acentoRecomendado: 'olivo' },
-  { id: 'perla', name: 'Perla', modo: 'claro', base: '#f1f5f9', acentoRecomendado: 'celeste' },
+  { id: 'niebla', name: 'Niebla', modo: 'claro', base: '#f4f6fa', acentoRecomendado: 'indigo',
+    acentos: ['indigo', 'celeste', 'verde', 'negro'] },
+  { id: 'marfil', name: 'Marfil', modo: 'claro', base: '#faf8f3', acentoRecomendado: 'olivo',
+    acentos: ['olivo', 'ambar', 'verde', 'negro'] },
 
   // ---- OSCUROS (gris carbón / navy, NUNCA negro puro) ----
-  { id: 'carbon', name: 'Carbon', modo: 'oscuro', base: '#1e1e1e', acentoRecomendado: 'celeste' },
-  { id: 'onix', name: 'Onix', modo: 'oscuro', base: '#1a1a1d', acentoRecomendado: 'turquesa' },
-  { id: 'midnight', name: 'Midnight', modo: 'oscuro', base: '#0a0f1a', acentoRecomendado: 'indigo' },
+  { id: 'carbon', name: 'Carbon', modo: 'oscuro', base: '#1e1e1e', acentoRecomendado: 'celeste',
+    acentos: ['celeste', 'turquesa', 'ambar', 'blanco'] },
+  { id: 'midnight', name: 'Midnight', modo: 'oscuro', base: '#0a0f1a', acentoRecomendado: 'indigo',
+    acentos: ['indigo', 'turquesa', 'celeste', 'blanco'] },
 ];
 
 // ============================================================
@@ -234,6 +240,10 @@ export const accents: AccentOption[] = [
   { id: 'verde', name: 'Verde', color: '#1b7a3d' },
   // Se resuelve por MODO: blanco sobre oscuro, negro sobre claro.
   { id: 'neutro', name: 'Neutro', color: { oscuro: '#fafafa', claro: '#171717' } },
+  // Blanco y negro explícitos: el acento monocromo que pidió el dueño. A
+  // diferencia de `neutro`, acá el usuario elige el color, no el modo.
+  { id: 'blanco', name: 'Blanco', color: '#fafafa' },
+  { id: 'negro', name: 'Negro', color: '#171717' },
 ];
 
 // ============================================================

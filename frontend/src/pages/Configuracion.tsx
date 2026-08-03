@@ -675,15 +675,26 @@ export default function Configuracion() {
       }),
     [presets, currentAccentId, currentSidebarMode],
   );
+  // Los acentos DEPENDEN del fondo: cada tema declara su juego (un ámbar
+  // sobre marfil se lava, un olivo sobre midnight se apaga). Si el tema no
+  // declara ninguno, se ofrecen todos — así un tema nuevo nunca queda mudo.
   const accentsMeta = useMemo(
-    () =>
-      acentosDisponibles.map(a => {
+    () => {
+      const temaActivo = presets.find(t => t.id === currentPresetId);
+      const permitidos = temaActivo?.acentos;
+      const lista = permitidos?.length
+        ? permitidos
+            .map(id => acentosDisponibles.find(a => a.id === id))
+            .filter((a): a is NonNullable<typeof a> => !!a)
+        : acentosDisponibles;
+      return lista.map(a => {
         // El acento "Neutro" no tiene color propio: se resuelve por el modo del
         // tema activo (blanco sobre oscuro, negro sobre claro).
         const c = buildThemeColors(currentPresetId, a.id, currentSidebarMode);
         return { key: a.id, label: a.name, color: c.primary, ink: c.primaryText };
-      }),
-    [acentosDisponibles, currentPresetId, currentSidebarMode],
+      });
+    },
+    [acentosDisponibles, presets, currentPresetId, currentSidebarMode],
   );
   const sidebarMeta = useMemo(
     () =>
@@ -1626,7 +1637,16 @@ export default function Configuracion() {
           accents={accentsMeta}
           activeBg={currentPresetId}
           activeAccent={currentAccentId}
-          onBgChange={setPreset}
+          onBgChange={(key) => {
+            // Si el acento actual no lo ofrece el fondo nuevo, se pasa al
+            // recomendado de ese fondo: si no, el selector queda sin ninguno
+            // marcado y el panel con un acento que ya no se puede elegir.
+            setPreset(key);
+            const nuevo = presets.find(t => t.id === key);
+            if (nuevo?.acentos?.length && !nuevo.acentos.includes(currentAccentId)) {
+              setAccent(nuevo.acentoRecomendado);
+            }
+          }}
           onAccentChange={setAccent}
           sidebarOptions={sidebarMeta}
           activeSidebar={currentSidebarMode}
