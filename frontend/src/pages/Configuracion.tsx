@@ -109,6 +109,18 @@ const PANTALLA_DE_AJUSTE: Record<string, LazyExoticComponent<ComponentType>> = {
   // Inventario
   inventario: lazy(() => import('./Inventario')),
   'categorias-inventario': lazy(() => import('./InventarioCategoriasConfig')),
+  // Tesorería (las que tienen pantalla propia; las de `?tab=` viven en
+  // ConfiguracionTesoreria y siguen abriéndose por su acceso)
+  'tesoreria-contactos': lazy(() => import('./TesoreriaContactos')),
+  'tesoreria-saldos': lazy(() => import('./TesoreriaCajas')),
+  'tesoreria-tarjetas': lazy(() => import('./TarjetasCredito')),
+  // Integraciones
+  'whatsapp-config': lazy(() => import('./WhatsAppConfig')),
+  'proveedores-pago': lazy(() => import('./ProveedoresPago')),
+  // Super Admin
+  municipios: lazy(() => import('./Municipios')),
+  'dashboard-config': lazy(() => import('./ConfigDashboard')),
+  exportar: lazy(() => import('./Exportar')),
 };
 
 export default function Configuracion() {
