@@ -210,8 +210,6 @@ export default function Configuracion() {
   const portadaInputRef = useRef<HTMLInputElement>(null);
   const [portadaSinFiltro, setPortadaSinFiltro] = useState(municipioActual?.tema_config?.portadaSinFiltro || false);
   const [portadaOpacity, setPortadaOpacity] = useState(municipioActual?.tema_config?.portadaOpacity ?? 1);
-  const [cabeceraOpacity, setCabeceraOpacity] = useState(municipioActual?.tema_config?.cabeceraOpacity ?? 0.4);
-  const [cabeceraBlur, setCabeceraBlur] = useState(municipioActual?.tema_config?.cabeceraBlur ?? 4);
 
   // Estados para autocompletado de municipio (nombre)
   const [municipioSuggestions, setMunicipioSuggestions] = useState<AddressSuggestion[]>([]);
@@ -245,8 +243,6 @@ export default function Configuracion() {
       setImagenPortadaUrl(municipioActual.imagen_portada || '');
       setPortadaSinFiltro(municipioActual.tema_config?.portadaSinFiltro || false);
       setPortadaOpacity(municipioActual.tema_config?.portadaOpacity ?? 1);
-      setCabeceraOpacity(municipioActual.tema_config?.cabeceraOpacity ?? 0.4);
-      setCabeceraBlur(municipioActual.tema_config?.cabeceraBlur ?? 4);
     }
   }, [municipioActual]);
 
@@ -375,32 +371,8 @@ export default function Configuracion() {
     portadaSinFiltro !== (municipioActual?.tema_config?.portadaSinFiltro || false) ||
     portadaOpacity !== (municipioActual?.tema_config?.portadaOpacity ?? 1);
 
-  // Verificar si hay cambios en la configuración de cabecera
-  const hasCabeceraConfigChanges =
-    cabeceraOpacity !== (municipioActual?.tema_config?.cabeceraOpacity ?? 0.4) ||
-    cabeceraBlur !== (municipioActual?.tema_config?.cabeceraBlur ?? 4);
-
-  // Guardar configuración de cabecera
-  const handleSaveCabeceraConfig = async () => {
-    if (!municipioActual) return;
-
-    setPortadaLoading(true);
-    try {
-      const currentConfig = municipioActual.tema_config || {};
-      await municipiosApi.updateTema(municipioActual.id, {
-        ...currentConfig,
-        cabeceraOpacity: cabeceraOpacity,
-        cabeceraBlur: cabeceraBlur,
-      });
-      await loadMunicipios();
-      toast.success('Configuración de cabecera guardada');
-    } catch (error) {
-      console.error('Error guardando configuración de cabecera:', error);
-      toast.error('Error al guardar');
-    } finally {
-      setPortadaLoading(false);
-    }
-  };
+  // El tinte y el blur de la cabecera ya no se configuran (los define el
+  // diseño); por eso no hay estado de "cambios sin guardar" para ellos.
 
   // Generar color secundario basado en el primario
   const generateSecondaryColor = (primary: string) => {
@@ -694,26 +666,21 @@ export default function Configuracion() {
       }),
     [presets, currentAccentId, currentSidebarMode],
   );
-  // Los acentos DEPENDEN del fondo: cada tema declara su juego (un ámbar
-  // sobre marfil se lava, un olivo sobre midnight se apaga). Si el tema no
-  // declara ninguno, se ofrecen todos — así un tema nuevo nunca queda mudo.
+  // Los acentos son TRANSVERSALES: se ofrecen todos sobre cualquier tema, como
+  // dice el canvas ("el acento se aplica sobre cualquier tema"). Cada tema
+  // sigue declarando su `acentoRecomendado` —el que se aplica solo al elegirlo,
+  // mientras el usuario no haya elegido uno— pero eso ya no recorta la lista:
+  // en Paraguay Limpio dejaba un único acento visible y el municipio no podía
+  // cambiarlo aunque quisiera.
   const accentsMeta = useMemo(
-    () => {
-      const temaActivo = presets.find(t => t.id === currentPresetId);
-      const permitidos = temaActivo?.acentos;
-      const lista = permitidos?.length
-        ? permitidos
-            .map(id => acentosDisponibles.find(a => a.id === id))
-            .filter((a): a is NonNullable<typeof a> => !!a)
-        : acentosDisponibles;
-      return lista.map(a => {
-        // El acento "Neutro" no tiene color propio: se resuelve por el modo del
-        // tema activo (blanco sobre oscuro, negro sobre claro).
+    () =>
+      acentosDisponibles.map(a => {
+        // "Neutro" no tiene color propio: se resuelve por el modo del tema
+        // activo (blanco sobre oscuro, negro sobre claro).
         const c = buildThemeColors(currentPresetId, a.id, currentSidebarMode);
         return { key: a.id, label: a.name, color: c.primary, ink: c.primaryText };
-      });
-    },
-    [acentosDisponibles, presets, currentPresetId, currentSidebarMode],
+      }),
+    [acentosDisponibles, currentPresetId, currentSidebarMode],
   );
   const sidebarMeta = useMemo(
     () =>
@@ -840,8 +807,7 @@ export default function Configuracion() {
   // esta página. Cada una es un ítem del riel, como en el canvas.
   const AJUSTES_GENERAL = [
     { id: 'identidad', label: 'Identidad', description: 'Nombre, ubicación y el contacto que ve el vecino.' },
-    { id: 'portada', label: 'Portada del tablero', description: 'La imagen de fondo del tablero y el filtro de su cabecera.' },
-    { id: 'apariencia', label: 'Apariencia', description: 'Tema del panel, color de acento y fondo de la barra lateral. Se guarda por dispositivo y usuario.' },
+    { id: 'apariencia', label: 'Apariencia', description: 'La portada del tablero, el logo, el tema del panel, el color de acento y el fondo de la barra lateral.' },
     { id: 'carteleria', label: 'Cartelería', description: 'El QR para imprimir y pegar en el municipio.' },
     ...(otherConfigs.length > 0 ? [{ id: 'avanzado', label: 'Avanzado', description: 'Otras claves de configuración del sistema.' }] : []),
     ...(isSuperAdmin ? [{ id: 'modulos', label: 'Módulos', description: 'Qué módulos tiene activos este municipio.' }] : []),
@@ -1134,157 +1100,14 @@ export default function Configuracion() {
       </div>
       )}
 
-      {/* Sección Filtro de Cabecera */}
-      {itemGeneral.id === 'portada' && (
-      <div
-        className="rounded-xl p-5"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <SlidersHorizontal className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: theme.text }}>
-              Filtro de Cabecera
-            </h2>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Controla la apariencia de la barra superior
-            </p>
-          </div>
-        </div>
+      {/* El filtro de la cabecera (tinte de marca + degradé que protege el
+          título) YA NO se configura: lo define el diseño y se aplica solo.
+          El usuario elige la foto y nada más. Antes había sliders de blur,
+          opacidad de portada y opacidad de cabecera, y cada municipio
+          terminaba con un banner distinto, casi siempre ilegible. */}
 
-        {/* Info del color del filtro (usa color de paleta) */}
-        <div
-          className="mb-4 p-3 rounded-lg"
-          style={{ backgroundColor: theme.backgroundSecondary }}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm font-medium" style={{ color: theme.text }}>
-                Color del filtro
-              </p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                El filtro usa el color de la paleta del municipio
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded-lg border-2"
-                style={{
-                  backgroundColor: theme.primary,
-                  borderColor: theme.border,
-                }}
-              />
-              <span className="text-xs font-mono" style={{ color: theme.textSecondary }}>
-                {theme.primary}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Slider de blur de imagen */}
-        <div
-          className="mb-4 p-3 rounded-lg"
-          style={{ backgroundColor: theme.backgroundSecondary }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-sm font-medium" style={{ color: theme.text }}>
-                Blur de la imagen
-              </p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Desenfoque aplicado a la imagen de fondo
-              </p>
-            </div>
-            <span className="text-sm font-mono" style={{ color: theme.primary }}>
-              {cabeceraBlur}px
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="20"
-            step="1"
-            value={cabeceraBlur}
-            onChange={(e) => setCabeceraBlur(parseInt(e.target.value))}
-            className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${(cabeceraBlur / 20) * 100}%, ${theme.border} ${(cabeceraBlur / 20) * 100}%, ${theme.border} 100%)`,
-            }}
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin blur</span>
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Máximo</span>
-          </div>
-        </div>
-
-        {/* Slider de opacidad del filtro */}
-        <div
-          className="mb-4 p-3 rounded-lg"
-          style={{ backgroundColor: theme.backgroundSecondary }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-sm font-medium" style={{ color: theme.text }}>
-                Opacidad del filtro
-              </p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Intensidad del filtro de color sobre la imagen
-              </p>
-            </div>
-            <span className="text-sm font-mono" style={{ color: theme.primary }}>
-              {Math.round(cabeceraOpacity * 100)}%
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={cabeceraOpacity}
-            onChange={(e) => setCabeceraOpacity(parseFloat(e.target.value))}
-            className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${cabeceraOpacity * 100}%, ${theme.border} ${cabeceraOpacity * 100}%, ${theme.border} 100%)`,
-            }}
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin filtro</span>
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Máximo</span>
-          </div>
-        </div>
-
-        {/* Botón guardar */}
-        {hasCabeceraConfigChanges && (
-          <button
-            onClick={handleSaveCabeceraConfig}
-            disabled={portadaLoading}
-            className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
-            style={{
-              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-              color: '#ffffff',
-            }}
-          >
-            {portadaLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Guardar configuración
-          </button>
-        )}
-      </div>
-      )}
-
-      {/* Sección Imagen de Portada */}
-      {itemGeneral.id === 'portada' && (
+      {/* Portada y logo — parte de Apariencia (el canvas los muestra juntos) */}
+      {itemGeneral.id === 'apariencia' && (
       <div
         className="rounded-xl p-5"
         style={{
@@ -1680,7 +1503,7 @@ export default function Configuracion() {
           sidebarOptions={sidebarMeta}
           activeSidebar={currentSidebarMode}
           onSidebarChange={key => setSidebarMode(key as typeof currentSidebarMode)}
-          footnote="La apariencia se guarda en este dispositivo y para tu usuario: nadie más del municipio ve estos cambios. Lo que sí ven todos —la imagen de portada y el filtro de cabecera— se configura más arriba, en esta misma pestaña."
+          footnote="El tema, el acento y la barra lateral se guardan en este dispositivo y para tu usuario: nadie más del municipio los ve. La portada y el logo de arriba, en cambio, los ve todo el equipo."
         />
       </div>
       )}

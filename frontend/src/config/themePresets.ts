@@ -75,9 +75,15 @@ export interface BgTheme {
   /** ID del acento que se aplica al elegir este tema, mientras el usuario no
    *  haya elegido uno propio (si eligió, esa elección manda). */
   acentoRecomendado: string;
-  /** Acentos que este fondo ofrece, en orden. No todos los acentos quedan
-   *  bien sobre todos los fondos: un ámbar sobre marfil se lava y un olivo
-   *  sobre midnight se apaga. Cada fondo declara su juego. */
+  /**
+   * Acentos que este fondo LUCE mejor, en orden. Es una recomendación, NO una
+   * restricción: el selector ofrece los del catálogo completo sobre cualquier
+   * tema, como dice el canvas ("el acento se aplica sobre cualquier tema").
+   *
+   * Hubo una vuelta previa en la que este campo filtraba la lista. Se revirtió
+   * a pedido del dueño: en Paraguay Limpio dejaba un solo acento visible y no
+   * había forma de cambiarlo aunque el municipio quisiera.
+   */
   acentos: string[];
 }
 
@@ -213,18 +219,36 @@ const accentWash = (card: string, primary: string): string =>
 // ============================================================
 
 export const bgThemes: BgTheme[] = [
-  // ---- CLAROS (blancos suaves, NUNCA blanco puro) ----
-  { id: 'niebla', name: 'Niebla', modo: 'claro', base: '#f4f6fa', acentoRecomendado: 'indigo',
+  // ---- CLAROS ----
+  { id: 'blanco', name: 'Blanco', modo: 'claro', base: '#f7f8fa', acentoRecomendado: 'indigo',
     acentos: ['indigo', 'celeste', 'verde', 'negro'] },
   { id: 'marfil', name: 'Marfil', modo: 'claro', base: '#faf8f3', acentoRecomendado: 'olivo',
     acentos: ['olivo', 'ambar', 'verde', 'negro'] },
+  // Ámbar apagado: cálido como el marfil pero un punto más gris, para que a
+  // pantalla completa no se lea amarillo.
+  { id: 'ambar', name: 'Ámbar', modo: 'claro', base: '#f5f2ea', acentoRecomendado: 'ambar',
+    acentos: ['ambar', 'olivo', 'verde', 'negro'] },
 
-  // ---- OSCUROS (gris carbón / navy, NUNCA negro puro) ----
-  { id: 'carbon', name: 'Carbon', modo: 'oscuro', base: '#1e1e1e', acentoRecomendado: 'celeste',
+  // ---- OSCUROS ----
+  { id: 'negro', name: 'Negro', modo: 'oscuro', base: '#0d0d0d', acentoRecomendado: 'blanco',
+    acentos: ['blanco', 'ambar', 'turquesa', 'celeste'] },
+  { id: 'gris', name: 'Gris', modo: 'oscuro', base: '#1e1e1e', acentoRecomendado: 'celeste',
     acentos: ['celeste', 'turquesa', 'ambar', 'blanco'] },
-  { id: 'midnight', name: 'Midnight', modo: 'oscuro', base: '#0a0f1a', acentoRecomendado: 'indigo',
+  { id: 'azul', name: 'Azul', modo: 'oscuro', base: '#0a0f1a', acentoRecomendado: 'indigo',
     acentos: ['indigo', 'turquesa', 'celeste', 'blanco'] },
 ];
+
+/**
+ * IDs viejos → nuevos. Los temas se renombraron a lo que el dueño nombra
+ * ("negro, gris, azul" / "blanco, marfil, ámbar"), y hay usuarios con el id
+ * anterior guardado en localStorage: sin esta tabla, esos usuarios abrirían la
+ * app con el tema por defecto y pensarían que se les borró la preferencia.
+ */
+export const ALIAS_TEMAS: Record<string, string> = {
+  niebla: 'blanco',
+  carbon: 'gris',
+  midnight: 'azul',
+};
 
 // ============================================================
 // EJE 2 — ACENTOS (transversales: cualquiera sobre cualquier fondo)
@@ -232,16 +256,22 @@ export const bgThemes: BgTheme[] = [
 // ============================================================
 
 export const accents: AccentOption[] = [
-  { id: 'indigo', name: 'Índigo', color: '#4f46e5' },
-  { id: 'olivo', name: 'Olivo', color: '#65a30d' },
-  { id: 'celeste', name: 'Celeste', color: '#0369a1' },
-  { id: 'ambar', name: 'Ámbar', color: '#f59e0b' },
-  { id: 'turquesa', name: 'Turquesa', color: '#14b8a6' },
   { id: 'verde', name: 'Verde', color: '#1b7a3d' },
+  { id: 'esmeralda', name: 'Esmeralda', color: '#059669' },
+  { id: 'turquesa', name: 'Turquesa', color: '#14b8a6' },
+  { id: 'celeste', name: 'Celeste', color: '#0369a1' },
+  { id: 'azul', name: 'Azul', color: '#2563eb' },
+  { id: 'indigo', name: 'Índigo', color: '#4f46e5' },
+  { id: 'violeta', name: 'Violeta', color: '#7c3aed' },
+  { id: 'rosa', name: 'Rosa', color: '#db2777' },
+  { id: 'rojo', name: 'Rojo', color: '#dc2626' },
+  { id: 'naranja', name: 'Naranja', color: '#ea580c' },
+  { id: 'ambar', name: 'Ámbar', color: '#f59e0b' },
+  { id: 'olivo', name: 'Olivo', color: '#65a30d' },
   // Se resuelve por MODO: blanco sobre oscuro, negro sobre claro.
   { id: 'neutro', name: 'Neutro', color: { oscuro: '#fafafa', claro: '#171717' } },
-  // Blanco y negro explícitos: el acento monocromo que pidió el dueño. A
-  // diferencia de `neutro`, acá el usuario elige el color, no el modo.
+  // Blanco y negro explícitos: el acento monocromo. A diferencia de `neutro`,
+  // acá el usuario elige el color, no el modo.
   { id: 'blanco', name: 'Blanco', color: '#fafafa' },
   { id: 'negro', name: 'Negro', color: '#171717' },
 ];
@@ -251,15 +281,17 @@ export const accents: AccentOption[] = [
 // ============================================================
 
 export const sidebarModes: SidebarModeOption[] = [
-  { id: 'organico', name: 'Orgánico', description: 'Sigue al tema de fondo' },
-  { id: 'tinte', name: 'Tinte', description: 'Lavado del color de acento' },
-  { id: 'claro', name: 'Claro', description: 'Barra clara siempre' },
+  // Los tres son el MISMO acento lavado sobre la base, en tres intensidades
+  // (ver sidebarColor). Ninguno es un color propio.
+  { id: 'tinte', name: 'Tinte', description: 'Se nota el acento en la barra' },
+  { id: 'organico', name: 'Orgánico', description: 'El acento se insinúa' },
+  { id: 'claro', name: 'Claro', description: 'Apenas separada del fondo' },
 ];
 
 // Configuración por defecto — tema oscuro estilo VS Code, sin acento elegido
 // (usa el `acentoRecomendado` del tema) y sidebar siguiendo al tema.
 export const defaultThemeConfig = {
-  presetId: 'carbon',
+  presetId: 'gris',
   sidebarMode: 'organico' as SidebarMode,
 };
 
@@ -284,23 +316,28 @@ export function resolveAccentColor(accentId: string | null | undefined, modo: Th
 
 /** Fondo del sidebar según el eje 3, derivado del tema y del acento activo. */
 function sidebarColor(tema: BgTheme, acento: string, modo: SidebarMode): string {
+  // Las tres opciones NO son colores propios: son la MISMA idea con distinta
+  // intensidad — el acento lavado sobre la base del tema. Por eso la barra
+  // siempre pertenece al tema (nunca una barra blanca sobre un tema oscuro,
+  // que era lo que hacía la opción "claro" y rompía el modo).
+  //
+  // La escala va de más a menos invasiva:
+  //   tinte    → se nota que la barra está teñida del acento
+  //   orgánico → el acento se insinúa, la barra sigue leyéndose como el tema
+  //   claro    → apenas un grado de separación con el fondo
+  //
+  // En los temas oscuros la mezcla necesita un punto más para percibirse: el
+  // ojo distingue peor entre tonos oscuros que entre claros.
   const claro = tema.modo === 'claro';
-  switch (modo) {
-    case 'tinte':
-      // Lavado del acento sobre la base, conservando la luminosidad del modo.
-      return mixColors(tema.base, acento, claro ? 0.22 : 0.3);
-    case 'claro':
-      // Barra clara SIEMPRE, incluso con tema oscuro. Mezcla contra blanco
-      // (no un gris fijo) para conservar la temperatura del tema.
-      return mixColors(tema.base, '#ffffff', claro ? 0.6 : 0.9);
-    case 'organico':
-    default:
-      // Sigue al tema: el segundo tono del base. En claro baja DOS escalones
-      // (el fondo ya bajó uno) para que quede la jerarquía sidebar < fondo <
-      // card; con un solo escalón la barra daba exactamente el color del fondo
-      // y la opción no se distinguía de las otras dos.
-      return claro ? darken(tema.base, 10) : lighten(tema.base, 5);
-  }
+  const intensidad =
+    modo === 'tinte' ? (claro ? 0.22 : 0.3)
+    : modo === 'organico' ? (claro ? 0.1 : 0.14)
+    : (claro ? 0.035 : 0.06);
+
+  const teñida = mixColors(tema.base, acento, intensidad);
+  // Además del tinte, un escalón de luminosidad contra el fondo para que la
+  // barra se separe aunque el acento sea casi del color de la base.
+  return claro ? darken(teñida, 4) : lighten(teñida, 4);
 }
 
 /**

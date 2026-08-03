@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp, Radio } from 'lucide-react';
+import { AlertCircle, BarChart3, Bell, BellRing, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FileCheck, Home, LogOut, Map, MapPin, Menu, Moon, Plus, Radio, ScanLine, Settings, Sparkles, Sun, Trophy, User, Wallet, Wrench, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme, type BgTheme } from '../contexts/ThemeContext';
-import { buildThemeColors } from '../config/themePresets';
+import { useTheme } from '../contexts/ThemeContext';
 // alpha()/lighten() entienden cualquier formato de color; pegar dígitos al
 // final de un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
 import { alpha, lighten } from '../lib/colorUtils';
 import { BentoMenu, type BentoItem } from './ui/BentoMenu';
 import { getNavigation, isMobileDevice } from '../config/navigation';
-import { fontPresets } from '../config/fontPresets';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
@@ -83,7 +80,6 @@ export default function Layout() {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved === 'true';
   });
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   // Recorrido guiado (autocontenido) accesible desde el menú "Más" del admin.
@@ -104,8 +100,6 @@ export default function Layout() {
     nuevoEmail: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingTheme, setSavingTheme] = useState(false);
-  const [uploadingSidebarBg, setUploadingSidebarBg] = useState(false);
   const [emailValidationOpen, setEmailValidationOpen] = useState(false);
   const [emailValidationCode, setEmailValidationCode] = useState('');
   // Items del sidebar ocultos por el superadmin para el muni actual
@@ -115,7 +109,6 @@ export default function Layout() {
   const [modulosDesactivados, setModulosDesactivados] = useState<string[]>([]);
   const [iaHabilitada, setIaHabilitada] = useState<boolean>(false);
   const [pendingEmail, setPendingEmail] = useState('');
-  const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
   const [pushSubscribed, setPushSubscribed] = useState(() => localStorage.getItem('pushActivated') === 'true');
   const [pushSubscribing, setPushSubscribing] = useState(false);
@@ -123,39 +116,18 @@ export default function Layout() {
   const { user, logout, municipioActual, refreshUser } = useAuth();
   const {
     theme,
-    currentPresetId,
-    setPreset,
-    currentAccentId,
-    setAccent,
-    currentSidebarMode,
-    setSidebarMode,
-    presets,
-    accents,
-    sidebarOptions,
+    currentMode,
+    alternarModo,
     sidebarBgImage,
-    setSidebarBgImage,
     sidebarBgOpacity,
-    setSidebarBgOpacity,
     contentBgImage,
-    setContentBgImage,
     contentBgOpacity,
-    setContentBgOpacity,
-    currentFontId,
-    setFont,
   } = useTheme();
   const location = useLocation();
 
   // Mini-muestras del selector: los colores REALES que produce cada opción,
   // derivados con los otros dos ejes en su valor actual (antes se pintaba una
   // paleta declarada a mano que no siempre era lo que se terminaba viendo).
-  const muestraDelTema = (t: BgTheme) => {
-    const c = buildThemeColors(t.id, currentAccentId, currentSidebarMode);
-    return [c.background, c.card, c.sidebar, c.primary];
-  };
-  const muestraDelAcento = (accentId: string) => {
-    const c = buildThemeColors(currentPresetId, accentId, currentSidebarMode);
-    return { color: c.primary, tinta: c.primaryText };
-  };
 
   // Badges de items pendientes (reclamos/tramites/tasas) — solo aplica a vecinos.
 
@@ -286,71 +258,8 @@ export default function Layout() {
   };
 
   // Handler para guardar el tema actual en el municipio
-  const handleSaveTheme = async () => {
-    if (!municipioActual || (user?.rol !== 'admin' && user?.rol !== 'supervisor')) return;
-
-    setSavingTheme(true);
-    try {
-      const temaConfig = {
-        presetId: currentPresetId,
-        accentId: currentAccentId,
-        sidebarMode: currentSidebarMode,
-        sidebarBgImage,
-        sidebarBgOpacity,
-        contentBgImage,
-        contentBgOpacity,
-      };
-
-      await municipiosApi.updateTema(municipioActual.id, temaConfig);
-      toast.success('Tema guardado exitosamente');
-      setThemeMenuOpen(false);
-
-      // Refrescar el usuario para que tenga el municipio actualizado
-      await refreshUser();
-    } catch (error) {
-      console.error('Error guardando tema:', error);
-      toast.error('Error al guardar el tema');
-    } finally {
-      setSavingTheme(false);
-    }
-  };
 
   // Handler para subir imagen de fondo del sidebar
-  const handleSidebarBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !municipioActual) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor selecciona una imagen válida');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('La imagen no debe superar los 2MB');
-      return;
-    }
-
-    setUploadingSidebarBg(true);
-    try {
-      const formData = new FormData();
-      formData.append('imagen', file);
-
-      const response = await municipiosApi.updateSidebarBg(municipioActual.id, formData);
-
-      if (response.data?.sidebar_bg_url) {
-        setSidebarBgImage(response.data.sidebar_bg_url);
-        toast.success('Imagen de fondo actualizada');
-      }
-    } catch (error) {
-      console.error('Error subiendo imagen:', error);
-      toast.error('Error al subir la imagen');
-    } finally {
-      setUploadingSidebarBg(false);
-      // Reset input
-      if (sidebarBgInputRef.current) {
-        sidebarBgInputRef.current.value = '';
-      }
-    }
-  };
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -433,10 +342,13 @@ export default function Layout() {
       <button
         type="button"
         className="tv2-iconbtn"
-        title="Tema"
-        onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+        title={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
+        aria-label={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
+        onClick={alternarModo}
       >
-        <Palette className="tv2-iconbtn-svg" />
+        {currentMode === 'claro'
+          ? <Moon className="tv2-iconbtn-svg" />
+          : <Sun className="tv2-iconbtn-svg" />}
       </button>
       <NotificacionesDropdown />
       <Link to="/gestion/configuracion" className="tv2-iconbtn" title="Configuración">
@@ -990,16 +902,19 @@ export default function Layout() {
             </h1>
           </div>
 
-          {/* Derecha: Selector de tema + Notificaciones */}
+          {/* Derecha: luna/sol + Notificaciones */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* Theme selector */}
             <button
-              onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+              onClick={alternarModo}
               className="p-2 rounded-lg transition-colors"
               style={{ color: theme.textSecondary }}
-              title="Tema"
+              title={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
+              aria-label={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
             >
-              <Palette className="h-5 w-5" strokeWidth={2.5} />
+              {currentMode === 'claro'
+                ? <Moon className="h-5 w-5" strokeWidth={2.5} />
+                : <Sun className="h-5 w-5" strokeWidth={2.5} />}
             </button>
             <NotificacionesDropdown />
           </div>
@@ -1049,319 +964,12 @@ export default function Layout() {
 
           {/* Dropdown del tema — portal SIEMPRE montado (los triggers viven
               en la topbar v2 en desktop y en el header sticky en mobile). */}
-          {themeMenuOpen && createPortal(
-                  <>
-                    <div
-                      className="fixed inset-0 z-[60]"
-                      onClick={() => setThemeMenuOpen(false)}
-                    />
-                    <div
-                      className="fixed right-3 top-14 lg:right-6 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl shadow-2xl z-[70] theme-dropdown-enter"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        maxHeight: 'calc(100vh - 100px)',
-                        overflowY: 'auto',
-                      }}
-                    >
-                      <div className="px-4 py-3 border-b" style={{ borderColor: theme.border }}>
-                        <h3 className="font-semibold" style={{ color: theme.text }}>Personalizar tema</h3>
-                      </div>
-                      <div className="p-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          {presets.map((preset) => {
-                            const isSelected = currentPresetId === preset.id;
-                            return (
-                              <button
-                                key={preset.id}
-                                onClick={() => setPreset(preset.id)}
-                                className="relative p-2 rounded-lg transition-all duration-200 hover:scale-[1.02]"
-                                style={{
-                                  backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
-                                  border: `2px solid ${isSelected ? theme.primary : 'transparent'}`,
-                                }}
-                              >
-                                <div className="flex h-6 rounded-md overflow-hidden mb-1.5">
-                                  {muestraDelTema(preset).map((color, i) => (
-                                    <div key={i} className="flex-1" style={{ backgroundColor: color }} />
-                                  ))}
-                                </div>
-                                <span className="text-xs font-medium" style={{ color: isSelected ? theme.primary : theme.text }}>
-                                  {preset.name}
-                                </span>
-                                {isSelected && (
-                                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primary }}>
-                                    <Check className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {accents.length > 1 && (
-                        <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Acento</span>
-                          <div className="flex gap-2 mt-2 flex-wrap">
-                            {accents.map((acento) => {
-                              const muestra = muestraDelAcento(acento.id);
-                              const isSelected = currentAccentId === acento.id;
-                              return (
-                                <button
-                                  key={acento.id}
-                                  onClick={() => setAccent(acento.id)}
-                                  title={acento.name}
-                                  aria-label={acento.name}
-                                  type="button"
-                                  className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
-                                  style={{
-                                    backgroundColor: muestra.color,
-                                    boxShadow: isSelected ? `0 0 0 2px ${theme.card}, 0 0 0 4px ${muestra.color}` : 'none',
-                                  }}
-                                >
-                                  {isSelected && <Check className="w-3.5 h-3.5" style={{ color: muestra.tinta }} />}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Barra lateral</span>
-                        <div className="flex gap-2 mt-2">
-                          {sidebarOptions.map((opcion) => {
-                            const isSelected = currentSidebarMode === opcion.id;
-                            return (
-                              <button
-                                key={opcion.id}
-                                onClick={() => setSidebarMode(opcion.id)}
-                                title={opcion.description}
-                                className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all"
-                                style={{
-                                  backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
-                                  color: isSelected ? theme.primaryText : theme.text,
-                                }}
-                              >
-                                {opcion.name}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Tipografia — solo visible para superadmin */}
-                      {user?.rol === 'admin' && !user?.municipio_id && (
-                        <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            Tipografia (superadmin)
-                          </span>
-                          <div className="grid grid-cols-2 gap-1.5 mt-2">
-                            {fontPresets.map((f) => {
-                              const isSelected = currentFontId === f.id;
-                              return (
-                                <button
-                                  key={f.id}
-                                  onClick={() => setFont(f.id)}
-                                  className="text-left px-2 py-1.5 rounded-md transition-all"
-                                  style={{
-                                    backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
-                                    border: `1.5px solid ${isSelected ? theme.primary : 'transparent'}`,
-                                    fontFamily: f.family,
-                                  }}
-                                  title={f.name}
-                                  type="button"
-                                >
-                                  <span className="block text-[11px] font-semibold leading-tight" style={{ color: isSelected ? theme.primary : theme.text }}>
-                                    {f.name}
-                                  </span>
-                                  <span className="block text-[10px] leading-tight" style={{ color: theme.textSecondary }}>
-                                    Aa Bb Cc 123
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Fondo del sidebar */}
-                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            <Image className="h-3 w-3 inline mr-1" />
-                            Fondo sidebar
-                          </span>
-                          {sidebarBgImage && (
-                            <button
-                              onClick={() => setSidebarBgImage(null)}
-                              className="text-[10px] px-2 py-0.5 rounded"
-                              style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
-                            >
-                              Quitar
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Preview de imagen actual */}
-                        {sidebarBgImage ? (
-                          <div
-                            className="w-full h-20 rounded-lg mb-2 bg-cover bg-center"
-                            style={{
-                              backgroundImage: `url(${sidebarBgImage})`,
-                              border: `1px solid ${theme.border}`,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-20 rounded-lg mb-2 flex items-center justify-center"
-                            style={{
-                              backgroundColor: theme.backgroundSecondary,
-                              border: `1px dashed ${theme.border}`,
-                            }}
-                          >
-                            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin imagen</span>
-                          </div>
-                        )}
-
-                        {/* Hidden file input */}
-                        <input
-                          type="file"
-                          ref={sidebarBgInputRef}
-                          onChange={handleSidebarBgUpload}
-                          className="hidden"
-                          accept="image/*"
-                        />
-
-                        {/* Upload button */}
-                        <button
-                          onClick={() => sidebarBgInputRef.current?.click()}
-                          disabled={uploadingSidebarBg}
-                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg mb-2 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-                          style={{
-                            backgroundColor: theme.backgroundSecondary,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        >
-                          {uploadingSidebarBg ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-xs">Subiendo...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="h-4 w-4" />
-                              <span className="text-xs">Subir imagen</span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* Slider de opacidad */}
-                        {sidebarBgImage && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>Opacidad</span>
-                            <input
-                              type="range"
-                              min="0.1"
-                              max="0.5"
-                              step="0.05"
-                              value={sidebarBgOpacity}
-                              onChange={(e) => setSidebarBgOpacity(parseFloat(e.target.value))}
-                              className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                              style={{ backgroundColor: theme.border }}
-                            />
-                            <span className="text-[10px] w-8" style={{ color: theme.textSecondary }}>
-                              {Math.round(sidebarBgOpacity * 100)}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {/* Fondo del contenido - usa imagen_portada del municipio */}
-                      {(() => {
-                        // Usar la misma lógica de fallback que Dashboard
-                        const defaultBgImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
-                        const availableBgImage = municipioActual?.imagen_portada || municipioActual?.logo_url || defaultBgImage;
-
-                        return (
-                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            <Image className="h-3 w-3 inline mr-1" />
-                            Fondo content
-                          </span>
-                          {contentBgImage && (
-                            <button
-                              onClick={() => setContentBgImage(null)}
-                              className="text-[10px] px-2 py-0.5 rounded"
-                              style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
-                            >
-                              Quitar
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Preview de imagen - siempre muestra preview */}
-                        <div
-                          className="w-full h-16 rounded-lg mb-2 bg-cover bg-center"
-                          style={{
-                            backgroundImage: `url(${contentBgImage || availableBgImage})`,
-                            border: `1px solid ${theme.border}`,
-                            opacity: contentBgImage ? 1 : 0.5,
-                          }}
-                        />
-
-                        {/* Toggle para activar/desactivar */}
-                        <button
-                          onClick={() => setContentBgImage(contentBgImage ? null : availableBgImage)}
-                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg mb-2 transition-all hover:opacity-90 active:scale-[0.98]"
-                          style={{
-                            backgroundColor: contentBgImage ? theme.primary : theme.backgroundSecondary,
-                            border: `1px solid ${contentBgImage ? theme.primary : theme.border}`,
-                            color: contentBgImage ? '#ffffff' : theme.text,
-                          }}
-                        >
-                          <Image className="h-4 w-4" />
-                          <span className="text-xs">{contentBgImage ? 'Fondo activo' : 'Usar imagen municipio'}</span>
-                        </button>
-
-                        {/* Slider de opacidad */}
-                        {contentBgImage && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>Opacidad</span>
-                            <input
-                              type="range"
-                              min="0.1"
-                              max="0.5"
-                              step="0.05"
-                              value={contentBgOpacity}
-                              onChange={(e) => setContentBgOpacity(parseFloat(e.target.value))}
-                              className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                              style={{ backgroundColor: theme.border }}
-                            />
-                            <span className="text-[10px] w-8" style={{ color: theme.textSecondary }}>
-                              {Math.round(contentBgOpacity * 100)}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                        );
-                      })()}
-                      {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-                        <div className="p-3 border-t" style={{ borderColor: theme.border }}>
-                          <button
-                            onClick={handleSaveTheme}
-                            disabled={savingTheme}
-                            className="w-full py-2 px-4 rounded-lg font-medium text-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                            style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-                          >
-                            {savingTheme ? 'Guardando...' : 'Guardar para el municipio'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>,
-                  document.body
-                )}
+          {/* El selector de temas salió de la topbar (pedido del dueño,
+              2026-08-03): ahí queda SOLO la luna/sol, que alterna entre el
+              tema claro y el oscuro que el usuario eligió en Configuración →
+              Apariencia. Elegir CUÁL claro y CUÁL oscuro se hace allá, que es
+              donde se ven las seis muestras; la topbar es para el gesto de
+              todos los días, no para configurar. */}
 
           {/* Banner de Dependencia — solo MOBILE: en desktop el contexto de
               la dependencia vive en la pill de la topbar v2 (el breadcrumb y

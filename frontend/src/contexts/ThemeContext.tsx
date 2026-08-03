@@ -79,6 +79,16 @@ interface ThemeContextType {
   /** Modo del tema de fondo activo. Es lo que hay que mirar para saber si la
    *  app está en claro u oscuro (no adivinar por el id ni por el color). */
   currentMode: ThemeMode;
+  /**
+   * Cambia de claro a oscuro y viceversa, volviendo al ÚLTIMO tema que el
+   * usuario eligió de ese modo. Es lo que hace la luna/sol de la topbar.
+   *
+   * Por eso se recuerdan dos temas y no uno: el usuario elige en Configuración
+   * su claro (blanco, marfil o ámbar) y su oscuro (negro, gris o azul), y la
+   * luna alterna entre ESOS dos. Con un solo tema guardado, la luna tendría
+   * que adivinar a cuál volver y siempre le erraría a alguien.
+   */
+  alternarModo: () => void;
 
   /** Eje 2 — acento activo: el que eligió el usuario, o el `acentoRecomendado`
    *  del tema de fondo mientras no haya elegido ninguno. */
@@ -184,6 +194,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const inicialApariencia = resolverApariencia(initial);
 
   const [currentPresetId, setCurrentPresetId] = useState<string>(inicialApariencia.bgId);
+  // Último tema elegido de cada modo, para que la luna sepa a cuál volver.
+  // Arrancan en el tema activo (si es de ese modo) o en el default del modo.
+  const [ultimoClaro, setUltimoClaro] = useState<string>(
+    () => localStorage.getItem(userScopedKey(user?.id, 'themePresetClaro'))
+      || (getBgTheme(inicialApariencia.bgId).modo === 'claro' ? inicialApariencia.bgId : 'blanco'),
+  );
+  const [ultimoOscuro, setUltimoOscuro] = useState<string>(
+    () => localStorage.getItem(userScopedKey(user?.id, 'themePresetOscuro'))
+      || (getBgTheme(inicialApariencia.bgId).modo === 'oscuro' ? inicialApariencia.bgId : 'gris'),
+  );
   // null = seguir el acento recomendado del tema; un id = elección del usuario.
   const [accentOverride, setAccentOverride] = useState<string | null>(inicialApariencia.accentId);
   const [currentSidebarMode, setCurrentSidebarMode] = useState<SidebarMode>(
@@ -445,6 +465,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // esa elección manda sobre el recomendado del tema nuevo.
   const setPreset = (presetId: string) => {
     setCurrentPresetId(presetId);
+    // Se recuerda como "el claro" o "el oscuro" del usuario según su modo.
+    const modo = getBgTheme(presetId).modo;
+    if (modo === 'claro') {
+      setUltimoClaro(presetId);
+      localStorage.setItem(userScopedKey(user?.id, 'themePresetClaro'), presetId);
+    } else {
+      setUltimoOscuro(presetId);
+      localStorage.setItem(userScopedKey(user?.id, 'themePresetOscuro'), presetId);
+    }
+  };
+
+  /** La luna/sol de la topbar: salta al último tema del otro modo. */
+  const alternarModo = () => {
+    setCurrentPresetId(bgTheme.modo === 'claro' ? ultimoOscuro : ultimoClaro);
   };
 
   // Eje 2: a partir de acá el acento es una elección explícita del usuario.
@@ -484,6 +518,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         currentPresetId,
         setPreset,
         currentMode: bgTheme.modo,
+        alternarModo,
         currentAccentId,
         setAccent,
         currentSidebarMode,
