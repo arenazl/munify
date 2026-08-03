@@ -332,9 +332,6 @@ export function DataTable<Row>({
     );
   }
 
-  const visibles = rowActions.slice(0, 2);
-  const desbordadas = rowActions.slice(2);
-
   // Template del grid y min-width = valores runtime → CSS vars inline.
   const estiloGrid = {
     '--av2-cols': columns.map((c) => c.width).join(' '),
@@ -360,6 +357,11 @@ export function DataTable<Row>({
 
   const renderAcciones = (row: Row) => {
     const key = rowKey(row);
+    // [v2.4] El recorte por fila va ACÁ y no afuera: qué acciones aplican
+    // depende del estado de CADA registro (ver RowAction.visible).
+    const aplicables = rowActions.filter((a) => !a.visible || a.visible(row));
+    const visibles = aplicables.slice(0, 2);
+    const desbordadas = aplicables.slice(2);
     return (
       <span className="av2-tabla-acciones" role="cell">
         {visibles.map((a) => (

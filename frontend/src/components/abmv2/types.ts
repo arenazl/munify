@@ -355,6 +355,14 @@ export interface RowAction<Row = unknown> {
   onClick: (row: Row) => void;
   /** true ⇒ gris que pasa a `--pl-red-700` en hover (Eliminar). */
   danger?: boolean;
+  /** [v2.4] ¿Esta acción aplica a ESTA fila? Sin la prop, la acción va en
+   *  todas (comportamiento histórico). Existe porque los circuitos con
+   *  estados —una orden de pago se autoriza sólo si está pendiente y se paga
+   *  sólo si está autorizada— necesitan que el juego de botones cambie por
+   *  fila; sin esto la única salida era mostrar acciones que fallan al
+   *  apretarlas. El recorte se aplica ANTES de partir en visibles/desbordadas,
+   *  así una fila con pocas acciones no arrastra un menú "…" vacío. */
+  visible?: (row: Row) => boolean;
 }
 
 /** Grupo precomputado por la página (DateGroupRow / franja horaria).
