@@ -39,11 +39,14 @@ import { CardGrid } from '../abmv2/CardGrid';
 import { EntityCell, ChipEstado } from '../abmv2/DataTable';
 import { MetricCell, ScalePicker, SegmentedControl, Switch } from '../abmv2/Controls';
 import { IconColorPicker } from '../abmv2/IconColorPicker';
-import type { ColumnSpec, ScaleStep, ViewKind } from '../abmv2/types';
+import type { ColumnSpec, MetricCellData, ScaleStep, ViewKind } from '../abmv2/types';
+import type { ReactNode } from 'react';
 
 export interface CategoriaItem {
   id: number;
-  municipio_id: number;
+  /** No todos los catálogos lo devuelven en el listado (el backend ya filtra
+   *  por municipio); por eso es opcional. */
+  municipio_id?: number;
   nombre: string;
   descripcion?: string;
   icono?: string;
@@ -84,6 +87,29 @@ interface Props {
   showInternaField?: boolean;
   /** Copy del singular para los botones y mensajes ("categoría", "tipo"). */
   entidad?: string;
+  /**
+   * Lo PROPIO de este catálogo. Los siete catálogos comparten el 90% (nombre,
+   * icono, color, activo, orden) y cada uno suma lo suyo: el radio de un punto
+   * de interés, la naturaleza de una categoría de inventario.
+   *
+   * Se resolvió con un contrato chico en vez de una prop por campo: el
+   * componente maneja el núcleo y no se entera de qué agrega cada pantalla —
+   * si mañana entra un catálogo con tres campos raros, no se toca este
+   * archivo.
+   */
+  extras?: {
+    /** Valores iniciales de los campos propios. `null` = alta. */
+    inicial: (item: CategoriaItem | null) => Record<string, unknown>;
+    /** Los campos, para el drawer. */
+    campos: (
+      valores: Record<string, unknown>,
+      set: (clave: string, valor: unknown) => void,
+    ) => ReactNode;
+    /** Columnas extra de la tabla, después del nombre. */
+    columnas?: ColumnSpec<CategoriaItem>[];
+    /** Cifra de la tarjeta en la vista de tarjetas. */
+    metrica?: (item: CategoriaItem) => MetricCellData | undefined;
+  };
 }
 
 interface CategoriaSugerida {
@@ -164,6 +190,7 @@ export function CategoriaConfigBase({
   enableSugerencias = false,
   showInternaField = false,
   entidad = 'categoría',
+  extras,
 }: Props) {
   const { theme } = useTheme();
   const [items, setItems] = useState<CategoriaItem[]>([]);
@@ -188,6 +215,11 @@ export function CategoriaConfigBase({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);
   const [unidadPlazo, setUnidadPlazo] = useState<'horas' | 'dias'>('horas');
+  // Campos propios del catálogo (ver Props.extras). Viven aparte del form
+  // del núcleo para que el componente no tenga que conocerlos.
+  const [propios, setPropios] = useState<Record<string, unknown>>({});
+  const setPropio = (clave: string, valor: unknown) =>
+    setPropios((p) => ({ ...p, [clave]: valor }));
 
   // Borrado: ConfirmModal, nunca `confirm()` (control nativo vetado).
   const [aBorrar, setABorrar] = useState<CategoriaItem | null>(null);
@@ -215,6 +247,7 @@ export function CategoriaConfigBase({
   const abrirNuevo = () => {
     setEditing(null);
     setForm({ ...FORM_VACIO, orden: items.length + 1 });
+    setPropios(extras?.inicial(null) ?? {});
     setUnidadPlazo('horas');
     setSugerencias([]);
     setMostrarSugerencias(false);
@@ -234,6 +267,7 @@ export function CategoriaConfigBase({
       prioridad_default: item.prioridad_default ?? 3,
       interna: item.interna ?? false,
     });
+    setPropios(extras?.inicial(item) ?? {});
     // Arranca en la unidad que hace legible el valor guardado.
     setUnidadPlazo(horas % 24 === 0 && horas >= 24 ? 'dias' : 'horas');
     setSheetOpen(true);
@@ -309,6 +343,7 @@ export function CategoriaConfigBase({
       if (showInternaField) {
         payload.interna = form.interna;
       }
+      Object.assign(payload, propios);
 
       if (editing) {
         await api.update(editing.id, payload);
@@ -452,6 +487,8 @@ export function CategoriaConfigBase({
       });
     }
 
+    if (extras?.columnas?.length) cols.push(...extras.columnas);
+
     if (showInternaField) {
       cols.push({
         id: 'alcance',
@@ -493,7 +530,7 @@ export function CategoriaConfigBase({
     // `alternarActivo` se recrea en cada render (usa `items`); las columnas se
     // reconstruyen igual cuando cambian las banderas, que es lo que importa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showReclamoFields, showInternaField]);
+  }, [showReclamoFields, showInternaField, extras?.columnas]);
 
   const acciones = useMemo(
     () => [
@@ -569,7 +606,9 @@ export function CategoriaConfigBase({
                 subtitle: r.descripcion,
                 icon: <DynamicIcon name={r.icono || 'Folder'} size={18} strokeWidth={1.9} />,
                 tileColor: r.color,
-                metric: showReclamoFields
+                metric: extras?.metrica
+                  ? extras.metrica(r)
+                  : showReclamoFields
                   ? {
                       value: formatearPlazo(r.tiempo_resolucion_estimado ?? 0),
                       note: `prioridad ${r.prioridad_default ?? 3}`,
@@ -831,6 +870,8 @@ export function CategoriaConfigBase({
               />
             </div>
           )}
+
+          {extras?.campos(propios, setPropio)}
 
           <div>
             <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>

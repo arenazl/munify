@@ -3703,6 +3703,48 @@ button.av2-chip:hover { opacity: 0.85; }
 
 .av2-card--skel { gap: 8px; }
 
+/* --- Campos propios de un catálogo (Props.extras del ABM genérico) ---
+   Viven acá y no en cada pantalla para que los siete catálogos escriban sus
+   campos extra con el mismo lenguaje que el resto del drawer. */
+.av2-campo-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-campo-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.av2-campo-num {
+  width: 96px;
+  padding: 8px 12px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+}
+.av2-campo-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.av2-campo-nota-larga {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
 /* --- IconColorPicker ---------------------------------------- */
 .av2-picker { min-width: 0; }
 
