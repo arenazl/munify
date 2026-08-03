@@ -54,7 +54,7 @@
  * sobre tokens --pl-*. Inline SOLO valores runtime: el acento del hero
  * (--av2-hero-accent) y el ancho del aside (--av2-aside-w).
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { SemanticHero } from '../ui/SemanticHero';
 import { PageHeader } from './PageHeader';
@@ -62,6 +62,7 @@ import { ListToolbar } from './ListToolbar';
 import { FilterBar } from './FilterBar';
 import { DataTable } from './DataTable';
 import { SideModal } from './SideModal';
+import { useEmbed } from './useEmbed';
 import type { SideModalComponentProps } from './SideModal';
 import type { Action, SemanticAbmPageProps } from './types';
 import '../../styles/abmv2.css';
@@ -170,6 +171,22 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     embedded = false,
   } = props;
 
+  // Embebida (panel del SettingsShell): sin PageHeader y publicando su total.
+  const embedCtx = useEmbed();
+  const embebida = embedded || embedCtx.embedded;
+  const { slotId, reportarTotal } = embedCtx;
+  // El total sale del tab "Todos" (que ya lo calcula la página) o, en su
+  // defecto, de las filas cargadas. Si no hay ninguno, no se reporta nada:
+  // el riel prefiere no mostrar número antes que mostrar uno inventado.
+  const totalReportable =
+    statusTabs?.find(t => t.id === 'todos')?.count
+    ?? (groups ? groups.reduce((acc, g) => acc + g.rows.length, 0) : rows?.length);
+  useEffect(() => {
+    if (slotId && reportarTotal && typeof totalReportable === 'number') {
+      reportarTotal(slotId, totalReportable);
+    }
+  }, [slotId, reportarTotal, totalReportable]);
+
   const [drawer, setDrawer] = useState<SideModalRequest<Row> | null>(null);
   const cerrarDrawer = useCallback(() => setDrawer(null), []);
 
@@ -264,10 +281,10 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
   const specDrawer = sideModal && drawer ? sideModal(drawer) : null;
 
   return (
-    <div className={`av2-page ${embedded ? 'av2-page--embebida' : ''}`} data-module={moduleKey}>
+    <div className={`av2-page ${embebida ? 'av2-page--embebida' : ''}`} data-module={moduleKey}>
       {/* 1. [v2.2] Cabecera de módulo: lo PRIMERO que se lee de la pantalla.
           [v2.4] En modo embebido no va: el título lo puso el contenedor. */}
-      {!embedded && <PageHeader eyebrow={eyebrow} title={title} description={description} />}
+      {!embebida && <PageHeader eyebrow={eyebrow} title={title} description={description} />}
 
       {/* 2. ModuleHero = SemanticHero existente. Los números viven acá
           (stat strip en `hero.kpis`) — nada de KPIs sueltos arriba. */}

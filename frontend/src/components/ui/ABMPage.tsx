@@ -1,4 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
+import { useEmbed } from '../abmv2/useEmbed';
 import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -348,6 +349,15 @@ export function ABMPage({
   defaultViewMode,
   stickyHeader = true,
 }: ABMPageProps) {
+  // Embebida en el panel de Configuración: sin cabecera propia (el contenedor
+  // ya puso el título) y publicando su total para el contador del riel.
+  const { embedded, slotId, reportarTotal } = useEmbed();
+  const totalReportable = pagination?.totalItems;
+  useEffect(() => {
+    if (slotId && reportarTotal && typeof totalReportable === 'number') {
+      reportarTotal(slotId, totalReportable);
+    }
+  }, [slotId, reportarTotal, totalReportable]);
   // Combinar filters con extraFilters para compatibilidad
   const allFilters = filters || extraFilters;
   const { theme } = useTheme();
@@ -603,9 +613,11 @@ export function ABMPage({
                 <span style={{ color: theme.primary }}>{icon}</span>
               </div>
             )}
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
-              {title}
-            </h1>
+            {!embedded && (
+              <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
+                {title}
+              </h1>
+            )}
           </div>
 
           {/* Separador vertical - se oculta en mobile cuando search enfocado */}

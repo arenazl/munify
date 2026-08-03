@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import type { ComponentType, LazyExoticComponent } from 'react';
 import {
   Save, Sparkles, Check, X, MapPin, Loader2, Building2, Upload,
@@ -15,6 +15,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { buildThemeColors } from '../config/themePresets';
 import { useAuth } from '../contexts/AuthContext';
 import { SettingsShell } from '../components/abmv2/SettingsShell';
+import { EmbedProvider } from '../components/abmv2/EmbedContext';
 import { QRCarteleria } from '../components/ui/QRCarteleria';
 import { AppearanceSettings } from '../components/ui/AppearanceSettings';
 import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
@@ -152,6 +153,12 @@ export default function Configuracion() {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   // Buscador de ajustes: filtra por label y descripción, cruzando todos los grupos.
   const [buscaAjuste, setBuscaAjuste] = useState('');
+  // Cada pantalla embebida publica cuántas filas tiene; el riel las muestra.
+  // Se van llenando a medida que se visitan — no se piden N endpoints al abrir.
+  const [conteos, setConteos] = useState<Record<string, number>>({});
+  const reportarTotal = useCallback((slotId: string, total: number) => {
+    setConteos(prev => (prev[slotId] === total ? prev : { ...prev, [slotId]: total }));
+  }, []);
   const navigate = useNavigate();
   const isAdmin = user?.rol === 'admin';
   const isSupervisor = user?.rol === 'supervisor';
@@ -858,7 +865,7 @@ export default function Configuracion() {
       railTitle={grupoActivo?.label}
       items={activeTab === 'general'
         ? AJUSTES_GENERAL.map(i => ({ id: i.id, label: i.label }))
-        : ajustesDelGrupo.map(i => ({ id: i.id, label: i.label }))}
+        : ajustesDelGrupo.map(i => ({ id: i.id, label: i.label, count: conteos[i.id] }))}
       activeItem={activeTab === 'general' ? itemGeneral.id : ajusteActivo?.id}
       onItemChange={setActiveItem}
       panelTitle={activeTab === 'general' ? itemGeneral.label : (ajusteActivo?.label ?? grupoActivo?.label ?? '')}
@@ -1642,7 +1649,11 @@ export default function Configuracion() {
           }>
             {(() => {
               const Pantalla = PANTALLA_DE_AJUSTE[ajusteActivo.id];
-              return <Pantalla />;
+              return (
+                <EmbedProvider slotId={ajusteActivo.id} reportarTotal={reportarTotal}>
+                  <Pantalla />
+                </EmbedProvider>
+              );
             })()}
           </Suspense>
         ) : ajusteActivo ? (
