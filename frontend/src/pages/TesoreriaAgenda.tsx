@@ -1,69 +1,120 @@
+/**
+ * Pagos programados — estándar `SemanticAbmPage` con `kind='money'`
+ * (components/abmv2/README.md, fila "Liquidaciones").
+ * Referencia visual: canvas "Pagos programados".
+ *
+ * Idea de fondo del diseño: UN DÍA = UNA TRANSFERENCIA. La tabla agrupa por
+ * día de vencimiento con subtotal, cada fila se puede MARCAR, y lo marcado
+ * alimenta el KPI SELECCIONADO, el total del pie y el CTA de pago masivo.
+ *
+ * La lógica de datos (fetch, filtros, ejecutar / omitir / mover un pago) es la
+ * de siempre. Hero con el strip de KPIs ADENTRO, ListToolbar + FilterBar +
+ * DataTable. Las 3 vistas (tabla / tarjetas / calendario) siguen vivas vía
+ * `viewSlots`, y Adelantados/Realizados reusan el MISMO DataTable con otras
+ * columnas en vez de la lista maquetada a mano que había antes.
+ * Cero hex inline: todo sale de los tokens --pl-*; donde hace falta un color
+ * CONCRETO (CalendarView concatena el alpha sobre el string) se lee el token
+ * del CSS computado, mismo patrón que pages/Mapa.tsx.
+ */
 import { useEffect, useMemo, useState } from 'react';
-import {
-  CalendarClock, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Loader2, Calendar,
-  Home, Briefcase, Wallet, Sparkles, Gift, SkipForward, Layers,
-} from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { Check, CheckCircle2, Edit2, Loader2, SkipForward, Trash2, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
-import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PagoMasivoModal } from '../components/tesoreria/PagoMasivoModal';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
-
-const TOUR_STEPS_LIQ = [
-  {
-    target: '[data-tour="liq-kpis"]',
-    content: 'Resumen rápido: cuántas liquidaciones tenés activas, próximos vencimientos y masa salarial total.',
-    title: 'Resumen de Liquidaciones',
-    placement: 'bottom' as const,
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="liq-nueva"]',
-    content: 'Creás una liquidación recurrente para un empleado: monto base, frecuencia (mensual/quincenal), día de pago y caja. En cada card después aparece el botón "Pagar" verde para ejecutar el pago con monto editable y premios aplicables (presentismo, trabajo extra).',
-    title: 'Nueva liquidación + ejecución',
-    placement: 'bottom' as const,
-  },
-];
-import type { KpiSpec } from '../components/ui/KpiCard';
-import { StatusPill } from '../components/ui/StatusPill';
-import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { Sheet } from '../components/ui/Sheet';
-import { conceptoIcon } from '../lib/conceptoIcons';
-import { contactoIconByTipo, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { CalendarView } from '../components/ui/CalendarView';
-import { agendaPagosApi, contactosApi, cajasApi, premiosApi, conceptosLiquidacionApi } from '../lib/api';
-import type { PagoProgramado, Contacto, Caja, FrecuenciaPago, Premio, PagoEjecutadoHistorial, ConceptoLiquidacion } from '../types';
+import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
+import { ChipEstado, DataTable, DotCell, EntityCell } from '../components/abmv2/DataTable';
+import type {
+  ChipTone, ColumnSpec, RowAction, SelectSpec, StatusTab, TableGroup, ViewKind,
+} from '../components/abmv2/types';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
+import { conceptoIcon } from '../lib/conceptoIcons';
+import {
+  contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS_SINGULAR,
+} from '../lib/contactoIcons';
+import { agendaPagosApi, contactosApi, cajasApi, conceptosLiquidacionApi } from '../lib/api';
+import type {
+  Caja, Contacto, ConceptoLiquidacion, FrecuenciaPago, PagoEjecutadoHistorial, PagoProgramado,
+} from '../types';
+import '../styles/liquidaciones.css';
+
+/* ---------- Constantes de dominio ---------- */
 
 const FRECUENCIA_LABELS: Record<FrecuenciaPago, string> = {
   semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual',
   bimestral: 'Bimestral', trimestral: 'Trimestral', anual: 'Anual',
 };
 
-const FRECUENCIA_COLORS: Record<FrecuenciaPago, string> = {
-  semanal: '#ef4444', quincenal: '#f59e0b', mensual: '#3b82f6',
-  bimestral: '#8b5cf6', trimestral: '#06b6d4', anual: '#10b981',
+/** Frecuencia → tono del chip del kit (paleta StatusPill del estándar).
+ *  Reemplaza al mapa de hex que tenía la pantalla. */
+const FRECUENCIA_TONO: Record<FrecuenciaPago, ChipTone> = {
+  semanal: 'red', quincenal: 'amber', mensual: 'blue',
+  bimestral: 'gray', trimestral: 'gray', anual: 'green',
 };
 
-// Frecuencias que el usuario puede elegir al cargar/filtrar un pago. "quincenal"
-// queda EXCLUIDA: su cálculo real es "cada 14 días corridos" (no el 15 y el 30),
-// se desalinea del calendario y confunde. Se mantiene en LABELS/COLORS de arriba
-// para poder mostrar datos históricos si existieran, pero no como opción cargable.
+/** Token de color por frecuencia, para las piezas que necesitan un color
+ *  concreto (tile de la celda de concepto, calendario, tarjetas). */
+const FRECUENCIA_TOKEN: Record<FrecuenciaPago, string> = {
+  semanal: '--pl-red', quincenal: '--pl-amber-strong', mensual: '--pl-blue',
+  bimestral: '--pl-data-2', trimestral: '--pl-data-3', anual: '--pl-green',
+};
+
+// "quincenal" queda EXCLUIDA de lo cargable: su cálculo real es "cada 14 días
+// corridos" (no el 15 y el 30), se desalinea del calendario y confunde. Sigue
+// en LABELS/TONO para poder mostrar datos históricos si existieran.
 const FRECUENCIAS_SELECCIONABLES: FrecuenciaPago[] =
   (Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).filter((f) => f !== 'quincenal');
 
-const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+  .map((label, i) => ({ value: String(i), label }));
 
-// Parsea un YYYY-MM-DD como fecha LOCAL (NO UTC). Evita el clasico bug:
-// new Date("2026-06-01") es UTC midnight -> en AR (-03) se ve como 31/05.
+/** Input de texto/número del sheet: tokens, nunca hex (patrón ConfiguracionAgenda). */
+const ESTILO_INPUT: CSSProperties = {
+  width: '100%', minWidth: 0, height: 32, padding: '0 10px',
+  background: 'var(--pl-surface)', border: '1px solid var(--pl-border-strong)',
+  borderRadius: 'var(--pl-radius-md)', color: 'var(--pl-text)',
+  fontFamily: 'inherit', fontSize: 'var(--pl-fs-body-sm)',
+};
+
+type EstadoFiltro = 'todos' | 'vencidos' | 'urgentes' | 'mas_adelante' | 'adelantados' | 'realizados';
+
+const VISTA_KEY = 'agenda_view';
+const TOUR_KEY = 'sueldos-liquidaciones';
+/** Los pagos ejecutados quedan como gastos: ahí están sus comprobantes. */
+const RUTA_COMPROBANTES = '/gestion/tesoreria';
+
+const TOUR_STEPS_LIQ = [
+  {
+    target: '.av2-hero',
+    content: 'Cuánto está vencido, cuánto vence esta semana, cuánto tenés comprometido y cuánto llevás marcado para pagar.',
+    title: 'Resumen de pagos programados',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '.av2-btn-primario',
+    content: 'Marcá los pagos de un mismo día y cerralos todos juntos: una transferencia por día. El botón te dice cuántos llevás marcados.',
+    title: 'Pago masivo',
+    placement: 'bottom' as const,
+  },
+];
+
+/* ---------- Helpers de fecha / moneda ---------- */
+
+/** Parsea un YYYY-MM-DD como fecha LOCAL (NO UTC). Evita el clásico bug:
+ *  new Date("2026-06-01") es UTC midnight -> en AR (-03) se ve como 31/05. */
 function parseLocalDate(fecha: string | null | undefined): Date {
   const m = (fecha || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m
@@ -72,60 +123,124 @@ function parseLocalDate(fecha: string | null | undefined): Date {
 }
 
 function fmtFecha(fecha: string | null | undefined): string {
-  if (!fecha) return '';
-  return parseLocalDate(fecha).toLocaleDateString('es-AR');
+  return fecha ? parseLocalDate(fecha).toLocaleDateString('es-AR') : '';
 }
 
 function diasDesdeHoy(fecha: string): number {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const d = parseLocalDate(fecha);
-  d.setHours(0, 0, 0, 0);
+  const d = parseLocalDate(fecha); d.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - hoy.getTime()) / 86400000);
 }
 
 function fmtMoney(v: string | number): string {
   const n = typeof v === 'string' ? parseFloat(v) : v;
-  return `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+  return `$ ${(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
 }
+
+const plural = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
+
+/** Título del grupo: "1 de agosto". */
+const tituloDia = (iso: string) => {
+  const d = parseLocalDate(iso);
+  return `${d.getDate()} de ${d.toLocaleDateString('es-AR', { month: 'long' })}`;
+};
+
+/** "venció hace 2 días" / "vence hoy" / "en 3 días". */
+const estadoDia = (dias: number) =>
+  dias < 0 ? `venció hace ${plural(Math.abs(dias), 'día', 'días')}`
+    : dias === 0 ? 'vence hoy' : `en ${plural(dias, 'día', 'días')}`;
+
+/** Versión corta para la celda VENCE. */
+const estadoCorto = (dias: number) =>
+  dias < 0 ? `venció hace ${Math.abs(dias)} d` : dias === 0 ? 'vence hoy' : `en ${dias} d`;
+
+/** Mensaje de error del backend (axios) con fallback. Evita el `catch (e: any)`
+ *  que tenía cada handler — `any` está vetado por el ESLint del repo. */
+function msgError(e: unknown, fallback: string): string {
+  const detalle = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  return typeof detalle === 'string' && detalle ? detalle : fallback;
+}
+
+/** Agrupa por día y arma el TableGroup del kit (insignia día/mes + etiqueta +
+ *  subtotal ya formateado). La página agrupa, el DataTable sólo pinta. */
+function agruparPorDia<T>(
+  items: T[],
+  getFecha: (item: T) => string,
+  getMonto: (item: T) => number,
+  etiqueta: (rows: T[], dias: number, iso: string) => string,
+  desc: boolean,
+): TableGroup<T>[] {
+  const porDia = new Map<string, T[]>();
+  for (const it of items) {
+    const k = (getFecha(it) || '').slice(0, 10);
+    const arr = porDia.get(k);
+    if (arr) arr.push(it); else porDia.set(k, [it]);
+  }
+  return Array.from(porDia.entries())
+    .sort((a, b) => (desc ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0])))
+    .map(([k, rows]) => {
+      const d = parseLocalDate(k);
+      return {
+        key: k,
+        badge: {
+          top: String(d.getDate()),
+          bottom: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').toUpperCase(),
+        },
+        label: etiqueta(rows, diasDesdeHoy(k), k),
+        subtotal: fmtMoney(rows.reduce((s, r) => s + getMonto(r), 0)),
+        rows,
+      };
+    });
+}
+
+/* ---------- Pantalla ---------- */
 
 export default function TesoreriaAgenda() {
   const { theme } = useTheme();
   const { user } = useAuth();
+
   const [pagos, setPagos] = useState<PagoProgramado[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [conceptosLiq, setConceptosLiq] = useState<ConceptoLiquidacion[]>([]);
+  const [historial, setHistorial] = useState<PagoEjecutadoHistorial[]>([]);
   const [loading, setLoading] = useState(true);
   const [executingId, setExecutingId] = useState<number | null>(null);
 
   // Filtros
   const [search, setSearch] = useState('');
-  const [contactoFiltro, setContactoFiltro] = useState<string>('');
-  const [cajaFiltro, setCajaFiltro] = useState<string>('');
+  const [contactoFiltro, setContactoFiltro] = useState('');
+  const [cajaFiltro, setCajaFiltro] = useState('');
   const [frecuenciaFiltro, setFrecuenciaFiltro] = useState<FrecuenciaPago | ''>('');
-  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
-  const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos' | 'adelantados' | 'realizados'>('todos');
-  const [masivoOpen, setMasivoOpen] = useState(false);
-  const [historial, setHistorial] = useState<PagoEjecutadoHistorial[]>([]);
-  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [conceptoFiltro, setConceptoFiltro] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('todos');
+  const [vista, setVista] = useState<ViewKind>(() => {
+    const g = typeof window !== 'undefined' ? localStorage.getItem(VISTA_KEY) : null;
+    return g === 'cards' || g === 'guided' ? g : 'table';
+  });
 
+  /** Pagos marcados para cerrar juntos (un día = una transferencia). */
+  const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
+  /** Resumen del último cierre, para el banner verde. */
+  const [cierre, setCierre] = useState<{ cantidad: number; monto: number; caja: string } | null>(null);
+
+  const [masivoOpen, setMasivoOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PagoProgramado | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Sheet "Ejecutar pago" — reemplaza al confirm() nativo.
-  // Permite al user ajustar el monto del mes (varia por persona/mes) y
-  // marcar premios del catalogo que se aplican (presentismo, etc.).
-  const [premios, setPremios] = useState<Premio[]>([]);
-  const [conceptosLiq, setConceptosLiq] = useState<ConceptoLiquidacion[]>([]);
+  // Sheet "Ejecutar pago": el user puede ajustar el monto del mes (varía por
+  // persona/mes) antes de confirmar. Reemplaza al confirm() nativo.
   const [ejecutarPago, setEjecutarPago] = useState<PagoProgramado | null>(null);
-  const [ejecutarMonto, setEjecutarMonto] = useState<string>('');
-  const [ejecutarFecha, setEjecutarFecha] = useState<string>(new Date().toISOString().slice(0, 10));
-  // Map<premio_id, monto override> — null o '' = usa el monto del catalogo.
-  // Si el premio no esta en el map, no esta seleccionado.
-  const [ejecutarPremiosSel, setEjecutarPremiosSel] = useState<Map<number, string>>(new Map());
-  const [ejecutarNotas, setEjecutarNotas] = useState<string>('');
-  // Paginación client-side (50 items por página)
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [ejecutarMonto, setEjecutarMonto] = useState('');
+  const [ejecutarFecha, setEjecutarFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [ejecutarNotas, setEjecutarNotas] = useState('');
+
+  const [omitingId, setOmitingId] = useState<number | null>(null);
+  const [omitirPago, setOmitirPago] = useState<PagoProgramado | null>(null);
+  const [borrarPago, setBorrarPago] = useState<PagoProgramado | null>(null);
+  const [borrando, setBorrando] = useState(false);
+
   const [form, setForm] = useState({
     contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
     monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual' as FrecuenciaPago,
@@ -133,32 +248,67 @@ export default function TesoreriaAgenda() {
     fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
     premios_default: [] as number[],
   });
-  const [saving, setSaving] = useState(false);
 
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
-  }
+  // Gate de rol: el guard de render vive DESPUÉS de todos los hooks (regla de
+  // hooks); acá sólo gateamos los fetches. Antes el early-return estaba ARRIBA
+  // de los hooks, que es justo lo que rules-of-hooks prohíbe.
+  const esGestor = !user || user.rol === 'admin' || user.rol === 'supervisor';
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [p, c, cj, pr, cl] = await Promise.all([
+      const [p, c, cj, cl, h] = await Promise.all([
         agendaPagosApi.list({ activo: true }),
         contactosApi.list({ activo: true, limit: 5000 }),
         cajasApi.list({ activo: true, include_saldos: true }),
-        premiosApi.list({ activo: true }).catch(() => ({ data: [] as Premio[] })),
         conceptosLiquidacionApi.list({ activo: true }).catch(() => ({ data: [] as ConceptoLiquidacion[] })),
+        // El historial alimenta las pestañas Adelantados/Realizados. Se trae en
+        // la carga inicial (antes era lazy) porque el segmented del estándar
+        // APAGA las pestañas con count 0: en lazy quedaban muertas y no había
+        // forma de entrar a verlas.
+        agendaPagosApi.historial({ limit: 500 }).catch(() => ({ data: [] as PagoEjecutadoHistorial[] })),
       ]);
       setPagos(p.data || []);
       setContactos(c.data || []);
       setCajas(cj.data || []);
-      setPremios(pr.data || []);
       setConceptosLiq(cl.data || []);
+      setHistorial(h.data || []);
     } catch { toast.error('Error cargando agenda'); } finally { setLoading(false); }
   };
-  useEffect(() => { fetchAll(); }, []);
 
-  // Filtros aplicados
+  useEffect(() => {
+    if (!esGestor) return;
+    fetchAll();
+  }, [esGestor]);
+
+  useEffect(() => { localStorage.setItem(VISTA_KEY, vista); }, [vista]);
+
+  /* ---------- Colores concretos desde los tokens ----------
+     CalendarView concatena el alpha sobre el string del color ("#RRGGBB"+"25"),
+     así que ahí `var(--pl-*)` no sirve. Se leen del CSS computado, igual que
+     en Mapa.tsx: siguen al theme y a la marca, cero hex fijos. */
+  const colorFrecuencia = useMemo(() => {
+    const cs = getComputedStyle(document.documentElement);
+    return Object.fromEntries(
+      (Object.keys(FRECUENCIA_TOKEN) as FrecuenciaPago[])
+        .map((f) => [f, cs.getPropertyValue(FRECUENCIA_TOKEN[f]).trim() || theme.primary]),
+    ) as Record<FrecuenciaPago, string>;
+  }, [theme.primary]);
+
+  /* ---------- Mapas auxiliares ---------- */
+  const contactosMap = useMemo(() => {
+    const m = new Map<number, Contacto>();
+    contactos.forEach(c => m.set(c.id, c));
+    return m;
+  }, [contactos]);
+
+  const cajasMap = useMemo(() => {
+    const m = new Map<number, Caja>();
+    cajas.forEach(c => m.set(c.id, c));
+    return m;
+  }, [cajas]);
+
+  /* ---------- Filtros ---------- */
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     return pagos.filter(p => {
@@ -174,82 +324,109 @@ export default function TesoreriaAgenda() {
       const dias = diasDesdeHoy(p.proximo_pago);
       if (estadoFiltro === 'vencidos' && dias >= 0) return false;
       if (estadoFiltro === 'urgentes' && (dias < 0 || dias > 7)) return false;
-      if (estadoFiltro === 'mes' && (dias < 0 || dias > 30)) return false;
+      if (estadoFiltro === 'mas_adelante' && dias <= 7) return false;
       return true;
     }).sort((a, b) => a.proximo_pago.localeCompare(b.proximo_pago));
   }, [pagos, search, contactoFiltro, cajaFiltro, frecuenciaFiltro, conceptoFiltro, estadoFiltro]);
 
-  const paginatedFiltered = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    if (page > totalPages) return filtered.slice(0, pageSize);
-    return filtered.slice((page - 1) * pageSize, page * pageSize);
-  }, [filtered, page, pageSize]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filtered.length]);
-
   const stats = useMemo(() => {
-    let pendientes7 = 0, total7 = 0, total30 = 0, vencidos = 0;
+    let pendientes7 = 0, monto7 = 0, masAdelante = 0;
+    let vencidos = 0, montoVencido = 0, comprometido = 0;
     for (const p of pagos) {
       const d = diasDesdeHoy(p.proximo_pago);
-      if (d < 0) vencidos++;
-      if (d >= 0 && d <= 7) { pendientes7++; total7 += parseFloat(p.monto_pesos); }
-      if (d >= 0 && d <= 30) total30 += parseFloat(p.monto_pesos);
+      const m = parseFloat(p.monto_pesos || '0');
+      comprometido += m;
+      if (d < 0) { vencidos++; montoVencido += m; }
+      else if (d <= 7) { pendientes7++; monto7 += m; }
+      else masAdelante++;
     }
-    return { pendientes7, total7, total30, vencidos };
+    return { pendientes7, monto7, masAdelante, vencidos, montoVencido, comprometido };
   }, [pagos]);
 
-  // El historial trae TODOS los gastos de liquidaciones (incluye fecha futura).
-  // Se parte en dos por la fecha de impacto vs hoy:
-  //  - adelantados = ya tildados pero la fecha de impacto todavia no llego (futuro).
+  /** Los vencidos: alimentan el veredicto y la acción "marcarlos". */
+  const vencidos = useMemo(
+    () => pagos.filter(p => diasDesdeHoy(p.proximo_pago) < 0), [pagos]);
+
+  /** Concepto dominante entre los vencidos + el día que más concentra. Sólo se
+   *  afirma si de verdad domina (>= 50%); si no, el veredicto no lo menciona
+   *  (nada de "casi todos X" inventado). */
+  const focoVencidos = useMemo(() => {
+    if (vencidos.length === 0) return null;
+    const porConcepto = new Map<string, number>();
+    const porDia = new Map<string, number>();
+    for (const p of vencidos) {
+      porConcepto.set(p.concepto, (porConcepto.get(p.concepto) || 0) + 1);
+      const k = (p.proximo_pago || '').slice(0, 10);
+      porDia.set(k, (porDia.get(k) || 0) + 1);
+    }
+    const [concepto, n] = Array.from(porConcepto.entries()).sort((a, b) => b[1] - a[1])[0];
+    if (n / vencidos.length < 0.5) return null;
+    const [diaTop] = Array.from(porDia.entries()).sort((a, b) => b[1] - a[1])[0];
+    return { concepto, dia: tituloDia(diaTop) };
+  }, [vencidos]);
+
+  /* ---------- Selección múltiple ---------- */
+  const seleccionados = useMemo(
+    () => filtered.filter(p => seleccion.has(p.id)), [filtered, seleccion]);
+  const totalSeleccionado = useMemo(
+    () => seleccionados.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0), [seleccionados]);
+
+  const toggleSeleccion = (id: number) => setSeleccion(prev => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+
+  const marcarVencidos = () => setSeleccion(new Set(vencidos.map(p => p.id)));
+
+  /** Caja del módulo: sólo se muestra si TODOS los pagos salen de la misma. El
+   *  modelo real admite una caja por pago, así que afirmar un único fondo
+   *  cuando hay varios sería falso (ver reporte). */
+  const cajaUnica = useMemo(() => {
+    const ids = new Set(pagos.map(p => p.caja_id ?? 0));
+    if (ids.size !== 1) return null;
+    const id = Array.from(ids)[0];
+    return id ? cajasMap.get(id)?.nombre || null : null;
+  }, [pagos, cajasMap]);
+
+  // El historial trae TODOS los gastos de liquidaciones (incluye fecha futura),
+  // partido por la fecha de impacto vs hoy:
+  //  - adelantados = ya tildados pero la fecha todavía no llegó.
   //  - realizados  = ya impactaron (fecha <= hoy).
-  // Un mismo pago pasa solo de adelantado a realizado cuando llega su fecha.
   const adelantados = useMemo(() => historial.filter(h => diasDesdeHoy(h.fecha) > 0), [historial]);
   const realizados = useMemo(() => historial.filter(h => diasDesdeHoy(h.fecha) <= 0), [historial]);
 
-  // Mover un pago a otra fecha via drag&drop -> actualiza proximo_pago en el backend
-  const handleMoverPago = async (pago: PagoProgramado, nuevaFechaISO: string) => {
-    const dia = parseInt(nuevaFechaISO.slice(8, 10), 10);
-    try {
-      await agendaPagosApi.update(pago.id, { proximo_pago: nuevaFechaISO, dia_del_mes: dia });
-      toast.success('Pago movido');
-      fetchAll();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Error moviendo');
-    }
-  };
+  const esVistaHistorial = estadoFiltro === 'adelantados' || estadoFiltro === 'realizados';
+  const itemsHistorial = estadoFiltro === 'adelantados' ? adelantados : realizados;
+  const totalHistorial = useMemo(
+    () => itemsHistorial.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0), [itemsHistorial]);
 
+  /* ---------- Acciones ---------- */
   const openSheet = (p: PagoProgramado | null = null) => {
-    if (p) {
-      setEditing(p);
-      setForm({
-        contacto_id: p.contacto_id,
-        caja_id: p.caja_id || 0,
-        concepto: p.concepto, descripcion: p.descripcion || '',
-        monto_pesos: String(p.monto_pesos), forma_pago: p.forma_pago,
-        frecuencia: p.frecuencia, dia_del_mes: p.dia_del_mes,
-        dia_semana: p.dia_semana ?? null,
-        fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin || '',
-        premios_default: (p.premios_default as number[] | null) || [],
-      });
-    } else {
-      setEditing(null);
-      setForm({
-        contacto_id: 0, caja_id: 0, concepto: '', descripcion: '',
-        monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual',
-        dia_del_mes: 1, dia_semana: null,
-        fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
-        premios_default: [],
-      });
-    }
+    setEditing(p);
+    setForm(p
+      ? {
+          contacto_id: p.contacto_id, caja_id: p.caja_id || 0,
+          concepto: p.concepto, descripcion: p.descripcion || '',
+          monto_pesos: String(p.monto_pesos), forma_pago: p.forma_pago,
+          frecuencia: p.frecuencia, dia_del_mes: p.dia_del_mes, dia_semana: p.dia_semana ?? null,
+          fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin || '',
+          premios_default: (p.premios_default as number[] | null) || [],
+        }
+      : {
+          contacto_id: 0, caja_id: 0, concepto: '', descripcion: '',
+          monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual',
+          dia_del_mes: 1, dia_semana: null,
+          fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
+          premios_default: [],
+        });
     setSheetOpen(true);
   };
 
   const save = async () => {
     if (!form.contacto_id) return toast.error('Elegí un contacto');
     if (!form.concepto.trim()) return toast.error('Falta concepto');
-    if (!form.monto_pesos || parseFloat(form.monto_pesos) <= 0) return toast.error('Monto invalido');
+    if (!form.monto_pesos || parseFloat(form.monto_pesos) <= 0) return toast.error('Monto inválido');
     setSaving(true);
     try {
       const payload = {
@@ -260,358 +437,442 @@ export default function TesoreriaAgenda() {
         frecuencia: form.frecuencia, dia_del_mes: form.dia_del_mes,
         dia_semana: form.frecuencia === 'semanal' ? (form.dia_semana ?? 4) : null,
         fecha_inicio: form.fecha_inicio, fecha_fin: form.fecha_fin || null,
-        // Premios se manejan como liquidaciones aparte; no van junto al sueldo.
+        // Los premios se manejan como liquidaciones aparte; no van con el sueldo.
         premios_default: [],
       };
       if (editing) await agendaPagosApi.update(editing.id, payload);
       else await agendaPagosApi.create(payload);
       toast.success(editing ? 'Pago actualizado' : 'Pago programado creado');
       setSheetOpen(false); fetchAll();
-    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error guardando'); } finally { setSaving(false); }
+    } catch (e) { toast.error(msgError(e, 'Error guardando')); } finally { setSaving(false); }
   };
 
-  // Abre el Sheet para ejecutar. NO ejecuta directo — el user puede
-  // ajustar monto del mes y aplicar premios antes de confirmar.
-  const [omitingId, setOmitingId] = useState<number | null>(null);
-  const [omitirPago, setOmitirPago] = useState<PagoProgramado | null>(null);
-  // El boton Omitir solo abre el modal de confirmacion con estilo de la app
-  // (ConfirmModal), no el confirm() nativo — evita omitir por un toque accidental.
-  const handleOmitir = (p: PagoProgramado) => setOmitirPago(p);
+  /** Drag&drop del calendario: mueve el pago a otra fecha. */
+  const handleMoverPago = async (pago: PagoProgramado, nuevaFechaISO: string) => {
+    try {
+      await agendaPagosApi.update(pago.id, {
+        proximo_pago: nuevaFechaISO,
+        dia_del_mes: parseInt(nuevaFechaISO.slice(8, 10), 10),
+      });
+      toast.success('Pago movido');
+      fetchAll();
+    } catch (e) { toast.error(msgError(e, 'Error moviendo')); }
+  };
+
   const confirmarOmitir = async () => {
     const p = omitirPago;
     if (!p) return;
     setOmitingId(p.id);
     try {
       const res = await agendaPagosApi.omitir(p.id);
-      const next = res.data.proximo_pago
-        ? fmtFecha(res.data.proximo_pago)
-        : 'fin de la liquidación';
+      const next = res.data.proximo_pago ? fmtFecha(res.data.proximo_pago) : 'fin de la liquidación';
       toast.success(`Pago omitido. Próximo: ${next}`);
       setOmitirPago(null);
       fetchAll();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Error omitiendo');
-    } finally { setOmitingId(null); }
+    } catch (e) { toast.error(msgError(e, 'Error omitiendo')); }
+    finally { setOmitingId(null); }
   };
 
   const handleEjecutar = (p: PagoProgramado) => {
     setEjecutarPago(p);
     setEjecutarMonto(p.monto_pesos);
-    // Fecha de impacto = fecha programada (proximo_pago), no la del clic.
-    // Si el pago estaba programado para el 4 y se confirma el 1, en
-    // historial figura como del dia 4.
+    // Fecha de impacto = la programada (proximo_pago), no la del clic: un pago
+    // del día 4 confirmado el 1 figura en historial como del día 4.
     setEjecutarFecha((p.proximo_pago || '').slice(0, 10) || new Date().toISOString().slice(0, 10));
-    setEjecutarPremiosSel(new Map());
     setEjecutarNotas('');
   };
 
   const cerrarEjecutar = () => {
-    setEjecutarPago(null);
-    setEjecutarMonto('');
-    setEjecutarPremiosSel(new Map());
-    setEjecutarNotas('');
+    setEjecutarPago(null); setEjecutarMonto(''); setEjecutarNotas('');
   };
 
-  // Total dinamico del Sheet de ejecutar = monto base + premios marcados
-  // (con override si se edito el monto del premio).
-  const ejecutarTotal = useMemo(() => {
-    const base = parseFloat(ejecutarMonto || '0') || 0;
-    let extras = 0;
-    premios.forEach(p => {
-      if (ejecutarPremiosSel.has(p.id)) {
-        const override = ejecutarPremiosSel.get(p.id) || '';
-        const monto = override !== '' ? parseFloat(override) : parseFloat(p.monto || '0');
-        extras += monto || 0;
-      }
-    });
-    return base + extras;
-  }, [ejecutarMonto, ejecutarPremiosSel, premios]);
+  const ejecutarTotal = parseFloat(ejecutarMonto || '0') || 0;
 
   const confirmarEjecutar = async () => {
     if (!ejecutarPago) return;
-    const baseNum = parseFloat(ejecutarMonto || '0');
-    if (!baseNum || baseNum <= 0) {
-      toast.error('Monto inválido');
-      return;
-    }
-    setExecutingId(ejecutarPago.id);
+    if (!ejecutarTotal || ejecutarTotal <= 0) { toast.error('Monto inválido'); return; }
+    const pagado = ejecutarPago;
+    setExecutingId(pagado.id);
     try {
-      // Armar premios_aplicados con override de monto cuando corresponda.
-      const premiosAplicados = Array.from(ejecutarPremiosSel.entries()).map(([premio_id, override]) => {
-        const item: { premio_id: number; monto?: string } = { premio_id };
-        if (override && override !== '') item.monto = override;
-        return item;
-      });
-      const res = await agendaPagosApi.ejecutar(ejecutarPago.id, {
+      const res = await agendaPagosApi.ejecutar(pagado.id, {
         fecha_pago: ejecutarFecha,
         monto_base: ejecutarMonto,
-        premios_aplicados: premiosAplicados,
+        // Los premios se cargan como liquidaciones independientes (presentismo
+        // semanal, incentivo de mitad de mes), no como extras del sueldo.
+        premios_aplicados: [],
         notas: ejecutarNotas.trim() || undefined,
       });
       toast.success(`Pago de ${fmtMoney(res.data.monto_total)} ejecutado`);
+      setCierre({
+        cantidad: 1,
+        monto: parseFloat(res.data.monto_total) || 0,
+        caja: pagado.caja_nombre || 'la caja asignada',
+      });
+      setSeleccion(prev => { const n = new Set(prev); n.delete(pagado.id); return n; });
       cerrarEjecutar();
       fetchAll();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Error ejecutando');
-    } finally {
-      setExecutingId(null);
+    } catch (e) { toast.error(msgError(e, 'Error ejecutando')); }
+    finally { setExecutingId(null); }
+  };
+
+  const confirmarBorrar = async () => {
+    if (!borrarPago) return;
+    setBorrando(true);
+    try {
+      await agendaPagosApi.delete(borrarPago.id);
+      toast.success('Eliminado');
+      setBorrarPago(null);
+      fetchAll();
+    } catch { toast.error('Error'); } finally { setBorrando(false); }
+  };
+
+  /** Cierre del pago masivo: refresca y arma el banner con el resumen REAL que
+   *  devuelve el backend (nada estimado). */
+  const onMasivoDone = (resumen?: { cantidad: number; monto: number }) => {
+    if (resumen && resumen.cantidad > 0) {
+      setCierre({
+        cantidad: resumen.cantidad,
+        monto: resumen.monto,
+        caja: cajaUnica || 'las cajas asignadas',
+      });
     }
+    setSeleccion(new Set());
+    fetchAll();
   };
 
-  const handleDelete = async (p: PagoProgramado) => {
-    if (!confirm(`¿Eliminar el pago programado de ${p.contacto_nombre}?`)) return;
-    try { await agendaPagosApi.delete(p.id); toast.success('Eliminado'); fetchAll(); }
-    catch { toast.error('Error'); }
-  };
+  /* ---------- Opciones de combos ---------- */
+  const contactoOptions = useMemo(
+    () => contactos.map(c => ({ value: String(c.id), label: `${c.nombre} ${c.apellido || ''}`.trim() })),
+    [contactos]);
 
-  // ==================== Opciones combos ====================
-  const contactoOptions = useMemo(() => ([
-    { value: '', label: 'Contactos' },
-    ...contactos.map(c => ({ value: String(c.id), label: `${c.nombre} ${c.apellido || ''}`.trim() })),
-  ]), [contactos]);
+  const cajaOptions = useMemo(
+    () => cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
+    [cajas]);
 
-  const cajaOptions = useMemo(() => ([
-    { value: '', label: 'Cajas' },
-    ...cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
-  ]), [cajas]);
-
-  const cajaFormOptions = useMemo(() => ([
-    { value: '0', label: 'Sin caja específica' },
-    ...cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
-  ]), [cajas]);
-
-  const frecuenciaOptions = useMemo(() => ([
-    { value: '', label: 'Frecuencias' },
-    ...FRECUENCIAS_SELECCIONABLES.map(f => ({
-      value: f, label: FRECUENCIA_LABELS[f], color: FRECUENCIA_COLORS[f],
-    })),
-  ]), []);
+  const frecuenciaOptions = useMemo(
+    () => FRECUENCIAS_SELECCIONABLES.map(f => ({ value: f, label: FRECUENCIA_LABELS[f] })), []);
 
   // Conceptos derivados de los pagos cargados (matchea siempre lo filtrable).
-  const conceptoOptions = useMemo(() => ([
-    { value: '', label: 'Conceptos' },
-    ...Array.from(new Set(pagos.map(p => p.concepto).filter(Boolean)))
+  const conceptoOptions = useMemo(
+    () => Array.from(new Set(pagos.map(p => p.concepto).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b))
       .map(c => ({ value: c, label: c })),
-  ]), [pagos]);
+    [pagos]);
 
-  const FRECUENCIA_OPTS_FORM = FRECUENCIAS_SELECCIONABLES.map(f => ({
-    value: f, label: FRECUENCIA_LABELS[f],
-  }));
-
-  // ==================== Filtros header ====================
-  const ESTADO_CHIPS: { value: typeof estadoFiltro; label: string; color: string }[] = [
-    { value: 'todos', label: `Todos (${pagos.length})`, color: theme.primary },
-    { value: 'urgentes', label: `Esta semana (${stats.pendientes7})`, color: '#f59e0b' },
-    { value: 'mes', label: 'Este mes', color: '#3b82f6' },
-    { value: 'vencidos', label: `Vencidos (${stats.vencidos})`, color: '#ef4444' },
-    { value: 'adelantados', label: `Adelantados${adelantados.length > 0 ? ` (${adelantados.length})` : ''}`, color: '#10b981' },
-    { value: 'realizados', label: `Realizados${realizados.length > 0 ? ` (${realizados.length})` : ''}`, color: '#64748b' },
+  /* ---------- FilterBar: Concepto · Contacto · Frecuencia · Caja ---------- */
+  const selects: SelectSpec[] = [
+    { id: 'concepto', label: 'Concepto', value: conceptoFiltro, onChange: setConceptoFiltro,
+      options: [{ value: '', label: 'Todos' }, ...conceptoOptions] },
+    { id: 'contacto', label: 'Contacto', value: contactoFiltro, onChange: setContactoFiltro,
+      options: [{ value: '', label: 'Todos' }, ...contactoOptions] },
+    { id: 'frecuencia', label: 'Frecuencia', value: frecuenciaFiltro,
+      onChange: (v) => setFrecuenciaFiltro(v as FrecuenciaPago | ''),
+      options: [{ value: '', label: 'Todas' }, ...frecuenciaOptions] },
+    { id: 'caja', label: 'Caja', value: cajaFiltro, onChange: setCajaFiltro,
+      options: [{ value: '', label: 'Todas' }, ...cajaOptions] },
   ];
 
-  // Fetch historial cuando se elige "Realizados" o "Adelantados" (lazy). El
-  // mismo dataset (gastos de liquidaciones, incluye fecha futura) alimenta a
-  // ambas vistas; se parte por fecha vs hoy en adelantados/realizados.
-  useEffect(() => {
-    if (estadoFiltro !== 'realizados' && estadoFiltro !== 'adelantados') return;
-    setLoadingHistorial(true);
-    agendaPagosApi.historial({ limit: 500 })
-      .then(r => setHistorial(r.data || []))
-      .catch(() => toast.error('Error cargando historial'))
-      .finally(() => setLoadingHistorial(false));
-  }, [estadoFiltro]);
+  const statusTabs: StatusTab[] = [
+    { id: 'todos', label: 'Todos', count: pagos.length },
+    { id: 'vencidos', label: 'Vencidos', count: stats.vencidos },
+    { id: 'urgentes', label: 'Esta semana', count: stats.pendientes7 },
+    { id: 'mas_adelante', label: 'Más adelante', count: stats.masAdelante },
+    // Las dos de abajo NO están en el canvas, pero son la única vía a los pagos
+    // ya tildados (adelantados) y ya impactados (realizados): se conservan.
+    { id: 'adelantados', label: 'Adelantados', count: adelantados.length },
+    { id: 'realizados', label: 'Realizados', count: realizados.length },
+  ];
 
-  const secondaryFilters = (
-    <div className="flex flex-wrap items-center gap-2 agenda-filters-row">
-      <style>{`
-        .agenda-filters-row .ts-fitem button,
-        .agenda-filters-row .ts-fitem > div > button {
-          height: 40px !important;
-          padding-top: 0 !important;
-          padding-bottom: 0 !important;
-          font-size: 0.875rem !important;
-          border-radius: 0.75rem !important;
-        }
-      `}</style>
-      <div className="min-w-[200px] flex-shrink-0 ts-fitem">
-        <ModernSelect value={contactoFiltro} onChange={setContactoFiltro}
-          options={contactoOptions} placeholder="Todos los contactos" searchable />
-      </div>
-      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
-        <ModernSelect value={cajaFiltro} onChange={setCajaFiltro}
-          options={cajaOptions} placeholder="Todas las cajas" searchable />
-      </div>
-      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
-        <ModernSelect value={frecuenciaFiltro} onChange={(v) => setFrecuenciaFiltro(v as FrecuenciaPago | '')}
-          options={frecuenciaOptions} placeholder="Todas las frecuencias" searchable />
-      </div>
-      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
-        <ModernSelect value={conceptoFiltro} onChange={setConceptoFiltro}
-          options={conceptoOptions} placeholder="Todos los conceptos" searchable />
-      </div>
-      <div className="inline-flex items-center gap-1.5 ml-auto flex-shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-        {ESTADO_CHIPS.map(c => (
-          <button key={c.value} onClick={() => setEstadoFiltro(c.value)}
-            className="px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap"
-            style={{
-              backgroundColor: estadoFiltro === c.value ? c.color : `${c.color}15`,
-              color: estadoFiltro === c.value ? '#fff' : c.color,
-              border: `1px solid ${c.color}40`,
-            }}>
-            {c.label}
-          </button>
-        ))}
-      </div>
-    </div>
+  /* ---------- Hero semántico ---------- */
+  const frases: HeroFrase[] = [(() => {
+    if (pagos.length === 0) {
+      return { segmentos: [
+        seg('Todavía no hay pagos programados. Cargá el primero y el sistema te avisa cuándo toca pagar.'),
+      ] };
+    }
+    const segmentos = stats.vencidos > 0
+      ? [
+          seg(`${plural(stats.vencidos, 'pago vencido', 'pagos vencidos')} por ${fmtMoney(stats.montoVencido)}`, 'malo'),
+          seg(focoVencidos
+            ? `, casi todos ${focoVencidos.concepto.toLowerCase()} del ${focoVencidos.dia}. Marcalos y pagás todo junto en una transferencia.`
+            : '. Marcalos y pagás todo junto en una transferencia.'),
+        ]
+      : [
+          seg('No hay pagos vencidos', 'bueno'),
+          seg(stats.pendientes7 > 0
+            ? `, pero ${plural(stats.pendientes7, 'vence', 'vencen')} esta semana por ${fmtMoney(stats.monto7)}. Marcalos y cerralos juntos.`
+            : ' ni vencimientos en los próximos 7 días.'),
+        ];
+    return {
+      segmentos,
+      acciones: [
+        ...(stats.vencidos > 0
+          ? [{ label: `Marcar los ${stats.vencidos} vencidos`, onClick: marcarVencidos, primaria: true }]
+          : []),
+        { label: 'Ver proyección de caja', to: '/gestion/tesoreria/proyecciones' },
+      ],
+    };
+  })()];
+
+  const heroKpis: HeroKpi[] = [
+    {
+      etiqueta: 'VENCIDOS',
+      valor: fmtMoney(stats.montoVencido),
+      sub: plural(stats.vencidos, 'pago atrasado', 'pagos atrasados'),
+      veredicto: stats.vencidos > 0 ? 'malo' : undefined,
+    },
+    {
+      etiqueta: 'ESTA SEMANA',
+      valor: fmtMoney(stats.monto7),
+      sub: `${stats.pendientes7} por vencer`,
+      veredicto: stats.pendientes7 > 0 ? 'advertencia' : undefined,
+    },
+    {
+      etiqueta: 'COMPROMETIDO',
+      valor: fmtMoney(stats.comprometido),
+      sub: plural(pagos.length, 'pago activo', 'pagos activos'),
+    },
+    {
+      etiqueta: 'SELECCIONADO',
+      valor: fmtMoney(totalSeleccionado),
+      sub: seleccion.size > 0 ? `${seleccion.size} marcados` : 'nada marcado',
+      veredicto: seleccion.size > 0 ? 'bueno' : undefined,
+    },
+  ];
+
+  /* ---------- Celdas compartidas por las dos tablas ---------- */
+  const celdaFecha = (iso: string, sub: ReactNode) => (
+    <span className="flex flex-col">
+      <span className="av2-tabla-fecha av2-tnum">{fmtFecha(iso)}</span>
+      {sub}
+    </span>
   );
 
-  // Map contacto_id -> tipo (para ícono uniforme por tipo de contacto)
-  const contactosMap = useMemo(() => {
-    const m = new Map<number, Contacto>();
-    contactos.forEach(c => m.set(c.id, c));
-    return m;
-  }, [contactos]);
+  const celdaContacto = (nombre: string | null | undefined, contactoId: number | null | undefined) => {
+    const tipo = (contactoId ? contactosMap.get(contactoId)?.tipo : null) || 'otro';
+    return (
+      <EntityCell
+        icon={contactoIconByTipo(tipo)}
+        tileColor={TIPO_CONTACTO_COLORS[tipo]}
+        title={nombre || '—'}
+        subtitle={TIPO_CONTACTO_LABELS_SINGULAR[tipo]}
+        dotColor={TIPO_CONTACTO_COLORS[tipo]}
+      />
+    );
+  };
 
-  // ==================== Vista TABLA (ABMTable canónica) ====================
-  const tableView = (
-    <ABMTable<PagoProgramado>
-      data={paginatedFiltered}
-      keyExtractor={(p) => p.id}
-      onRowClick={(p) => openSheet(p)}
-      groupBy={{
-        sortKey: 'proximo_pago',
-        getKey: (p) => p.proximo_pago.slice(0, 10),
-        renderLabel: (key, items) => renderGroupDayLabel({
-          isoDate: key,
-          count: items.length,
-          itemLabel: { singular: 'pago', plural: 'pagos' },
-          themeCard: theme.card,
-          themeBorder: theme.border,
-          themeText: theme.text,
-          themeTextSecondary: theme.textSecondary,
-          themePrimary: theme.primary,
-        }),
-        renderSubtotal: (_key, items) => renderGroupSubtotal({
-          amount: items.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0),
-          themeText: theme.text,
-          themeTextSecondary: theme.textSecondary,
-        }),
-      }}
-      columns={[
-        {
-          key: 'proximo_pago',
-          header: 'Próximo pago',
-          sortValue: (p) => p.proximo_pago,
-          render: (p) => {
-            const dias = diasDesdeHoy(p.proximo_pago);
-            return (
-              <div className="flex flex-col">
-                <span className="font-medium whitespace-nowrap" style={{ color: theme.text }}>
-                  {fmtFecha(p.proximo_pago)}
-                </span>
-                <span className="text-[10px] font-semibold"
-                  style={{ color: dias < 0 ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
-                  {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
-                </span>
-              </div>
-            );
-          },
-        },
-        {
-          key: 'contacto_nombre',
-          header: 'Contacto',
-          sortValue: (p) => p.contacto_nombre || '',
-          render: (p) => {
-            const c = contactosMap.get(p.contacto_id);
-            const tipo = c?.tipo || 'otro';
-            const Icon = contactoIconByTipo(tipo);
-            const color = TIPO_CONTACTO_COLORS[tipo] || theme.primary;
-            return (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
-                  <Icon className="h-3 w-3" style={{ color }} />
-                </span>
-                <span className="font-medium truncate max-w-[200px]" style={{ color: theme.text }}>{p.contacto_nombre || 'Contacto'}</span>
-              </span>
-            );
-          },
-        },
-        {
-          key: 'concepto',
-          header: 'Concepto',
-          sortValue: (p) => p.concepto,
-          render: (p) => {
-            const Icon = conceptoIcon(p.concepto);
-            const color = FRECUENCIA_COLORS[p.frecuencia];
-            return (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
-                  <Icon className="h-3 w-3" style={{ color }} />
-                </span>
-                <span className="font-medium" style={{ color: theme.text }}>{p.concepto}</span>
-              </span>
-            );
-          },
-        },
-        {
-          key: 'monto_pesos',
-          header: 'Monto',
-          sortValue: (p) => parseFloat(p.monto_pesos),
-          render: (p) => <span className="font-bold tabular-nums">{fmtMoney(p.monto_pesos)}</span>,
-        },
-        {
-          key: 'frecuencia',
-          header: 'Frec.',
-          sortValue: (p) => p.frecuencia,
-          render: (p) => <StatusPill label={FRECUENCIA_LABELS[p.frecuencia]} color={FRECUENCIA_COLORS[p.frecuencia]} size="xs" />,
-        },
-        {
-          key: 'caja_nombre',
-          header: 'Caja',
-          sortValue: (p) => p.caja_nombre || '',
-          render: (p) => p.caja_nombre
-            ? <StatusPill label={p.caja_nombre} color={theme.primary} size="xs" showDot={false} />
-            : <span className="opacity-50 text-xs">—</span>,
-        },
-      ]}
-      actions={(p) => (
-        <>
-          <PrimaryButton
-            variant="success"
-            size="sm"
-            disabled={executingId === p.id}
-            onClick={(e) => { e.stopPropagation(); handleEjecutar(p); }}
-            title="Pagar ahora"
-            icon={executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-          >
-            Pagar
-          </PrimaryButton>
-          <button
-            onClick={() => handleOmitir(p)} disabled={omitingId === p.id}
-            title="Avanza al siguiente período sin descontar caja"
-            className="px-2 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
-            {omitingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SkipForward className="h-3 w-3" />}
-            Omitir
-          </button>
-          <button
-            onClick={() => openSheet(p)}
-            className="px-2 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
-            <Edit2 className="h-3 w-3" /> Editar
-          </button>
-          <button
-            onClick={() => handleDelete(p)}
-            className="px-2 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
-            <Trash2 className="h-3 w-3" /> Borrar
-          </button>
-        </>
+  const celdaMonto = (v: string) => <span className="av2-money av2-tabla-monto">{fmtMoney(v)}</span>;
+
+  const COL_CONTACTO = { header: 'CONTACTO', width: 'minmax(180px, 1.7fr)', kind: 'entity' } as const;
+  const COL_CONCEPTO = { header: 'CONCEPTO', width: 'minmax(160px, 1.4fr)', kind: 'entity' } as const;
+  const COL_MONTO = { header: 'MONTO', width: 'minmax(100px, 126px)', kind: 'money', align: 'right' } as const;
+  const COL_FECHA = { width: 'minmax(100px, 0.9fr)', kind: 'date' } as const;
+
+  /** Checkbox de fila: para en seco el click para no abrir el sheet de edición. */
+  const celdaCheck = (p: PagoProgramado) => {
+    const on = seleccion.has(p.id);
+    return (
+      <button
+        type="button" role="checkbox" aria-checked={on}
+        aria-label={`Marcar el pago de ${p.contacto_nombre || 'contacto'} para pagar en grupo`}
+        className={on ? 'liq-check liq-check--on' : 'liq-check'}
+        onClick={(e) => { e.stopPropagation(); toggleSeleccion(p.id); }}
+      >
+        <Check size={12} strokeWidth={3} aria-hidden />
+      </button>
+    );
+  };
+
+  /** Las 4 acciones SIEMPRE visibles. El DataTable del kit sólo muestra 2 vía
+   *  `rowActions` y manda el resto a un menú "…", así que van en celda propia
+   *  y `rowActions` queda vacío. */
+  const celdaAcciones = (p: PagoProgramado) => (
+    <span className="liq-acciones" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="liq-pagar" disabled={executingId === p.id}
+        title="Pagar ahora" onClick={() => handleEjecutar(p)}>
+        {executingId === p.id
+          ? <Loader2 size={12} className="animate-spin" aria-hidden />
+          : <CheckCircle2 size={12} strokeWidth={2.4} aria-hidden />}
+        Pagar
+      </button>
+      <button type="button" className="av2-tabla-accion" disabled={omitingId === p.id}
+        title="Omitir el período (no descuenta caja)" aria-label="Omitir el período"
+        onClick={() => setOmitirPago(p)}>
+        <SkipForward size={15} strokeWidth={1.8} />
+      </button>
+      <button type="button" className="av2-tabla-accion" title="Editar" aria-label="Editar"
+        onClick={() => openSheet(p)}>
+        <Edit2 size={15} strokeWidth={1.8} />
+      </button>
+      <button type="button" className="av2-tabla-accion av2-tabla-accion--peligro"
+        title="Eliminar" aria-label="Eliminar" onClick={() => setBorrarPago(p)}>
+        <Trash2 size={15} strokeWidth={1.8} />
+      </button>
+    </span>
+  );
+
+  const columns: ColumnSpec<PagoProgramado>[] = [
+    { id: 'sel', header: '', width: '34px', kind: 'text', cell: celdaCheck },
+    {
+      ...COL_FECHA, id: 'proximo_pago', header: 'VENCE',
+      cell: (p) => {
+        const dias = diasDesdeHoy(p.proximo_pago);
+        return celdaFecha(p.proximo_pago, (
+          <span className={dias < 0 ? 'av2-money--bad' : dias <= 7 ? 'liq-warn' : 'av2-tabla-texto'}>
+            {estadoCorto(dias)}
+          </span>
+        ));
+      },
+    },
+    { ...COL_CONTACTO, id: 'contacto_nombre', cell: (p) => celdaContacto(p.contacto_nombre, p.contacto_id) },
+    {
+      ...COL_CONCEPTO, id: 'concepto',
+      cell: (p) => (
+        <EntityCell
+          icon={conceptoIcon(p.concepto)}
+          tileColor={colorFrecuencia[p.frecuencia]}
+          title={p.concepto}
+          subtitle={FRECUENCIA_LABELS[p.frecuencia]}
+          dotColor={colorFrecuencia[p.frecuencia]}
+        />
+      ),
+    },
+    { ...COL_MONTO, id: 'monto_pesos', cell: (p) => celdaMonto(p.monto_pesos) },
+    {
+      id: 'acciones', header: 'ACCIONES', width: 'minmax(150px, 162px)',
+      kind: 'text', align: 'right', cell: celdaAcciones,
+    },
+  ];
+
+  const grupos = useMemo(
+    () => agruparPorDia<PagoProgramado>(
+      filtered, (p) => p.proximo_pago, (p) => parseFloat(p.monto_pesos || '0'),
+      // "1 de agosto · 4 pagos · venció hace 2 días" — un día = una transferencia.
+      (rows, dias, iso) => `${tituloDia(iso)} · ${plural(rows.length, 'pago', 'pagos')} · ${estadoDia(dias)}`,
+      false,
+    ),
+    [filtered]);
+
+  /* ---------- Tabla de historial (Adelantados / Realizados) ----------
+     Mismo DataTable del kit con otras columnas: antes era una lista maquetada
+     a mano con su propio encabezado, agrupado y subtotales. */
+  const columnasHistorial: ColumnSpec<PagoEjecutadoHistorial>[] = [
+    {
+      ...COL_FECHA, id: 'fecha', header: 'FECHA',
+      cell: (h) => {
+        const dias = diasDesdeHoy(h.fecha);
+        return celdaFecha(h.fecha, dias > 0
+          ? <span className="av2-tabla-texto">impacta en {dias} d</span>
+          : null);
+      },
+    },
+    { ...COL_CONTACTO, id: 'contacto_nombre', cell: (h) => celdaContacto(h.contacto_nombre, h.contacto_id) },
+    { ...COL_CONCEPTO, id: 'concepto', cell: (h) => <EntityCell icon={conceptoIcon(h.concepto)} title={h.concepto} /> },
+    {
+      id: 'caja_nombre', header: 'CAJA', width: 'minmax(96px, 1fr)', kind: 'dot',
+      cell: (h) => (h.caja_nombre
+        ? <DotCell label={h.caja_nombre} dotColor={h.caja_color || undefined} />
+        : <span className="av2-tabla-texto">—</span>),
+    },
+    { ...COL_MONTO, id: 'monto_pesos', cell: (h) => celdaMonto(h.monto_pesos) },
+  ];
+
+  const tablaHistorial = (
+    <DataTable<PagoEjecutadoHistorial>
+      kind="money"
+      columns={columnasHistorial}
+      groupBy="date"
+      showGroupSubtotal
+      rows={[]}
+      groups={agruparPorDia<PagoEjecutadoHistorial>(
+        itemsHistorial, (h) => h.fecha, (h) => parseFloat(h.monto_pesos || '0'),
+        (rows, _dias, iso) => `${tituloDia(iso)} · ${plural(rows.length, 'pago', 'pagos')}`,
+        // realizados: más reciente arriba; adelantados: más próximo arriba.
+        estadoFiltro === 'realizados',
       )}
+      rowKey={(h) => h.id}
+      rowActions={[]}
+      loading={loading}
+      emptyMessage={estadoFiltro === 'adelantados'
+        ? 'No hay pagos adelantados (tildados antes de su fecha de impacto).'
+        : 'Todavía no hay pagos ejecutados desde un pago programado.'}
+      footer={{
+        showing: `Mostrando ${itemsHistorial.length} de ${itemsHistorial.length}`,
+        total: {
+          label: estadoFiltro === 'adelantados' ? 'TOTAL ADELANTADO' : 'TOTAL REALIZADO',
+          value: fmtMoney(totalHistorial),
+        },
+      }}
     />
   );
 
-  // ==================== Vista CALENDARIO (guiada) — usa CalendarView reutilizable ====================
+  /** Botonera de un pago en las vistas que no son la tabla. `completo` suma
+   *  Omitir y Eliminar (tarjetas); sin él quedan sólo Pagar y Editar. */
+  const botonesFila = (p: PagoProgramado, completo: boolean) => (
+    <>
+      <button type="button" className="av2-btn-primario" disabled={executingId === p.id}
+        onClick={() => handleEjecutar(p)}>
+        {executingId === p.id
+          ? <Loader2 size={15} className="animate-spin" aria-hidden />
+          : <CheckCircle2 size={15} strokeWidth={2.4} aria-hidden />}
+        Pagar
+      </button>
+      {completo && (
+        <button type="button" className="av2-btn-secundario" disabled={omitingId === p.id}
+          title="Avanza al siguiente período sin descontar caja" onClick={() => setOmitirPago(p)}>
+          <SkipForward size={14} aria-hidden /> Omitir
+        </button>
+      )}
+      <button type="button" className={completo ? 'av2-tabla-accion ml-auto' : 'av2-tabla-accion'}
+        title="Editar" aria-label={`Editar el pago de ${p.contacto_nombre || 'contacto'}`}
+        onClick={() => openSheet(p)}>
+        <Edit2 size={16} strokeWidth={1.8} />
+      </button>
+      {completo && (
+        <button type="button" className="av2-tabla-accion av2-tabla-accion--peligro"
+          title="Eliminar" aria-label={`Eliminar el pago de ${p.contacto_nombre || 'contacto'}`}
+          onClick={() => setBorrarPago(p)}>
+          <Trash2 size={16} strokeWidth={1.8} />
+        </button>
+      )}
+    </>
+  );
+
+  /* ---------- Vista tarjetas ---------- */
+  const cardsView = (
+    <div className="liq-cards">
+      {filtered.map(p => {
+        const dias = diasDesdeHoy(p.proximo_pago);
+        return (
+          <div key={p.id} className="av2-panel">
+            <div className="av2-panel-head">
+              {celdaCheck(p)}
+              <EntityCell
+                icon={conceptoIcon(p.concepto)}
+                tileColor={colorFrecuencia[p.frecuencia]}
+                title={p.contacto_nombre || 'Contacto'}
+                subtitle={p.concepto}
+              />
+              <span className="ml-auto">
+                <ChipEstado label={FRECUENCIA_LABELS[p.frecuencia]} tone={FRECUENCIA_TONO[p.frecuencia]} />
+              </span>
+            </div>
+            <span className="av2-money av2-tabla-monto">{fmtMoney(p.monto_pesos)}</span>
+            <span className="av2-panel-caption">
+              {fmtFecha(p.proximo_pago)} ·{' '}
+              <span className={dias < 0 ? 'av2-money--bad' : dias <= 7 ? 'liq-warn' : undefined}>
+                {estadoCorto(dias)}
+              </span>
+              {p.caja_nombre ? ` · ${p.caja_nombre}` : ''}
+            </span>
+            <div className="flex items-center gap-2 mt-3">{botonesFila(p, true)}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  /* ---------- Vista calendario ---------- */
   const guidedView = (
     <CalendarView<PagoProgramado>
       items={filtered}
@@ -619,458 +880,322 @@ export default function TesoreriaAgenda() {
       getDate={(p) => p.proximo_pago}
       getLabel={(p) => (p.contacto_nombre || '').split(' ')[0]}
       getAmount={(p) => parseFloat(p.monto_pesos)}
-      getColor={(p) => FRECUENCIA_COLORS[p.frecuencia]}
+      getColor={(p) => colorFrecuencia[p.frecuencia]}
       getTooltip={(p) => `${p.contacto_nombre} · ${p.concepto} · ${fmtMoney(p.monto_pesos)}`}
       onItemClick={(p) => openSheet(p)}
       onItemDrop={(p, newIso) => handleMoverPago(p, newIso)}
       mesesStorageKey="agenda_meses_visibles"
-      helperText="💡 Arrastrá un pago a otro día para cambiarle la fecha. Click sobre un pago para editar."
+      helperText="Arrastrá un pago a otro día para cambiarle la fecha. Click sobre un pago para editarlo."
       formatMoney={(n) => fmtMoney(n)}
       renderDetailRow={(p) => (
-        <div className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}20` }}>
-            <span className="text-xs font-bold" style={{ color: FRECUENCIA_COLORS[p.frecuencia] }}>{parseLocalDate(p.proximo_pago).getDate()}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{p.contacto_nombre}</p>
-            <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-              {p.concepto} · {fmtFecha(p.proximo_pago)}
-            </p>
-          </div>
-          <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</span>
-          <button onClick={() => handleEjecutar(p)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-white" style={{ backgroundColor: '#10b981' }}>
-            Pagar
-          </button>
-          <button onClick={() => openSheet(p)}
-            className="px-2 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
-            <Edit2 className="h-3 w-3" /> Editar
-          </button>
+        <div className="flex items-center gap-3 py-2">
+          <EntityCell
+            icon={conceptoIcon(p.concepto)}
+            tileColor={colorFrecuencia[p.frecuencia]}
+            title={p.contacto_nombre || 'Contacto'}
+            subtitle={`${p.concepto} · ${fmtFecha(p.proximo_pago)}`}
+          />
+          <span className="av2-money av2-tabla-monto ml-auto">{fmtMoney(p.monto_pesos)}</span>
+          {botonesFila(p, false)}
         </div>
       )}
     />
   );
 
+  /* ---------- Piezas de los sheets ---------- */
+  const headSheet = (eyebrow: string, titulo: string, bajada: ReactNode, onClose: () => void) => (
+    <div className="rs-head">
+      <div className="rs-head-fila">
+        <span className="rs-eyebrow">{eyebrow}</span>
+        <span className="rs-head-icos">
+          <button type="button" className="rs-ico-btn" title="Cerrar" aria-label="Cerrar" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </button>
+        </span>
+      </div>
+      <h2 className="rs-titulo">{titulo}</h2>
+      <p className="rs-parrafo">{bajada}</p>
+    </div>
+  );
 
-  // ==================== Vista CARDS (children) ====================
-  // ==================== Vista LISTA de gastos (Realizados / Adelantados) ====================
-  // Misma lista para los dos estados, parametrizada por `esAdelantado`:
-  //  - Realizados (esAdelantado=false): gastos ya impactados (fecha <= hoy), acento gris.
-  //  - Adelantados (esAdelantado=true): gastos tildados con fecha futura, acento verde,
-  //    muestra a cuántos días impacta. Sin botón Pagar (ya están pagados).
-  const listaHistorial = (items: PagoEjecutadoHistorial[], esAdelantado: boolean) => {
-    const acento = esAdelantado ? '#10b981' : '#64748b';
+  const pieSheet = (onCancel: () => void, onConfirm: () => void, busy: boolean, label: ReactNode) => (
+    <div className="flex items-center gap-2">
+      <button type="button" className="rs-btn" onClick={onCancel}>Cancelar</button>
+      <button type="button" className="rs-cta flex-1 justify-center" onClick={onConfirm} disabled={busy}>
+        {label}
+      </button>
+    </div>
+  );
+
+  /* ---------- Guard de rol (después de TODOS los hooks) ---------- */
+  if (!esGestor) {
     return (
-      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        <div
-          className="px-4 py-3 flex items-center justify-between"
-          style={{ backgroundColor: theme.backgroundSecondary, borderBottom: `1px solid ${theme.border}` }}
-        >
-          <span className="text-sm font-bold inline-flex items-center gap-2" style={{ color: theme.text }}>
-            {esAdelantado
-              ? <CalendarClock className="h-4 w-4" style={{ color: acento }} />
-              : <CheckCircle2 className="h-4 w-4" style={{ color: acento }} />}
-            {esAdelantado ? 'Pagos adelantados (impactan en su fecha programada)' : 'Pagos realizados (últimos 90 días)'}
-          </span>
-          <span className="text-xs" style={{ color: theme.textSecondary }}>
-            {items.length} {items.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(items.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0))}
-          </span>
-        </div>
-        {loadingHistorial ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-10 text-sm" style={{ color: theme.textSecondary }}>
-            {esAdelantado
-              ? 'No hay pagos adelantados (tildados antes de su fecha).'
-              : 'Todavía no hay pagos ejecutados desde una liquidación.'}
-          </div>
-        ) : (
-          <div className="max-h-[600px] overflow-y-auto">
-            {(() => {
-              // Agrupar por fecha (como la agenda): un encabezado por día con
-              // subtotal + filas, en vez de repetir el badge de fecha en cada fila.
-              const porFecha = new Map<string, PagoEjecutadoHistorial[]>();
-              for (const h of items) {
-                const f = (h.fecha || '').slice(0, 10);
-                if (!porFecha.has(f)) porFecha.set(f, []);
-                porFecha.get(f)!.push(h);
-              }
-              const fechas = Array.from(porFecha.keys())
-                // realizados: más reciente arriba; adelantados: más próximo arriba.
-                .sort((a, b) => (esAdelantado ? a.localeCompare(b) : b.localeCompare(a)));
-              return fechas.map((f, gi) => {
-                const grupo = porFecha.get(f)!;
-                const subtotal = grupo.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0);
-                const fechaLabel = parseLocalDate(f).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-                return (
-                  <div key={f}>
-                    <div className="px-4 py-2 flex items-center justify-between sticky top-0 z-10"
-                      style={{ backgroundColor: theme.backgroundSecondary, borderTop: gi > 0 ? `1px solid ${theme.border}` : undefined }}>
-                      <span className="text-xs font-bold capitalize inline-flex items-center gap-1.5" style={{ color: acento }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acento }} />
-                        {fechaLabel}
-                      </span>
-                      <span className="text-[11px]" style={{ color: theme.textSecondary }}>
-                        {grupo.length} {grupo.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(subtotal)}
-                      </span>
-                    </div>
-                    {grupo.map(h => {
-                      const dias = diasDesdeHoy(h.fecha);
-                      return (
-                        <div key={h.id} className="px-4 py-2.5 flex items-center gap-3" style={{ borderTop: `1px solid ${theme.border}` }}>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                              {h.contacto_nombre || '—'}
-                            </p>
-                            <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                              {h.concepto}
-                              {h.caja_nombre && ` · ${h.caja_nombre}`}
-                              {esAdelantado && dias > 0 && ` · impacta en ${dias}d`}
-                            </p>
-                          </div>
-                          <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>
-                            {fmtMoney(h.monto_pesos)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        )}
+      <div className="p-6">
+        <p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p>
       </div>
     );
-  };
+  }
 
-  const realizadosView = listaHistorial(realizados, false);
-  const adelantadosView = listaHistorial(adelantados, true);
-  const esVistaHistorial = estadoFiltro === 'adelantados' || estadoFiltro === 'realizados';
-  const vistaHistorialActiva = estadoFiltro === 'adelantados' ? adelantadosView : realizadosView;
-
-  const cardsView = paginatedFiltered.map(p => {
-    const dias = diasDesdeHoy(p.proximo_pago);
-    return (
-      <div key={p.id} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold truncate" style={{ color: theme.text }}>{p.contacto_nombre}</p>
-            <p className="text-xs truncate" style={{ color: theme.textSecondary }}>{p.concepto}</p>
-          </div>
-          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}20`, color: FRECUENCIA_COLORS[p.frecuencia] }}>
-            {FRECUENCIA_LABELS[p.frecuencia]}
-          </span>
-        </div>
-        <p className="text-xl font-bold tabular-nums mb-2" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</p>
-        <div className="flex items-center justify-between text-xs mb-3" style={{ color: theme.textSecondary }}>
-          <span>{fmtFecha(p.proximo_pago)}</span>
-          <span className="font-semibold" style={{ color: dias < 0 ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
-            {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => handleEjecutar(p)} disabled={executingId === p.id}
-            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white inline-flex items-center justify-center gap-1 transition-all hover:opacity-90 active:scale-95"
-            style={{ backgroundColor: '#10b981', opacity: executingId === p.id ? 0.5 : 1 }}>
-            {executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-            Pagar
-          </button>
-          <button onClick={() => handleOmitir(p)} disabled={omitingId === p.id}
-            title="Avanza al siguiente período sin descontar caja"
-            className="px-2.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
-            {omitingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SkipForward className="h-3 w-3" />}
-            Omitir
-          </button>
-          <button onClick={() => openSheet(p)}
-            className="px-2.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
-            <Edit2 className="h-3 w-3" /> Editar
-          </button>
-          <button onClick={() => handleDelete(p)}
-            className="px-2.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
-            style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
-            <Trash2 className="h-3 w-3" /> Borrar
-          </button>
-        </div>
-      </div>
-    );
-  });
+  const mesActual = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
   return (
     <>
-      <PageHint pageId="sueldos-liquidaciones" />
-      <TesoreriaHint titulo="Liquidaciones de sueldo" storageKey="agenda">
+      <PageHint pageId={TOUR_KEY} />
+      <TesoreriaHint titulo="Pagos programados" storageKey="agenda">
         Programá pagos <b>recurrentes</b> (sueldos, honorarios, alquileres). El sistema te
         recuerda cuándo toca pagar y con un click crea el gasto + descuenta la caja correspondiente.
       </TesoreriaHint>
 
-      <ABMPage
-        title="Liquidaciones"
-        icon={<CalendarClock className="h-5 w-5" />}
-        backLink="/gestion/tesoreria"
-        buttonLabel="Nuevo Pago Programado"
-        onAdd={() => openSheet()}
-        tourAnchors={{ kpis: 'liq-kpis', addButton: 'liq-nueva' }}
-        headerActions={
-          <div className="flex items-center gap-2">
-            {!esVistaHistorial && pagos.length > 0 && (
-              <button onClick={() => setMasivoOpen(true)}
-                className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-1.5 transition-all hover:opacity-90 active:scale-95"
-                style={{ backgroundColor: '#10b981' }}>
-                <Layers className="h-4 w-4" /> Pago masivo
-              </button>
-            )}
-            <TourButton tourKey="sueldos-liquidaciones" title="Ver tutorial de Liquidaciones" />
-          </div>
-        }
-        searchPlaceholder="Buscar por concepto o contacto..."
-        searchValue={search}
-        onSearchChange={setSearch}
-        kpis={[
-          { label: 'Vencidos', value: String(stats.vencidos), footnote: 'atrasados', color: '#dc2626', icon: AlertCircle },
-          { label: 'Próx. 7 días', value: String(stats.pendientes7), footnote: fmtMoney(stats.total7), color: '#ef4444', icon: AlertCircle },
-          { label: 'Próx. 30 días', value: fmtMoney(stats.total30), footnote: `${pagos.length} pagos activos`, color: '#3b82f6', icon: Calendar },
-          { label: 'Total activos', value: String(pagos.length), footnote: 'programados', color: '#10b981', icon: CalendarClock },
-        ] as KpiSpec[]}
-        secondaryFilters={secondaryFilters}
-        pagination={{
-          page,
-          pageSize,
-          totalItems: filtered.length,
-          onPageChange: setPage,
-          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      {/* El estándar v2 no tiene slot de acciones en la cabecera de módulo, así
+          que el disparador del tutorial va acá arriba, dockeado a la derecha. */}
+      <div className="flex justify-end mb-1">
+        <TourButton tourKey={TOUR_KEY} title="Ver tutorial de Pagos programados" />
+      </div>
+
+      {/* Banner de cierre: aparece sólo después de pagar. */}
+      {cierre && (
+        <div className="liq-cerrados" role="status">
+          <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden />
+          <span>
+            Pagaste {plural(cierre.cantidad, 'pago', 'pagos')} por {fmtMoney(cierre.monto)} recién.
+            Ya {cierre.cantidad === 1 ? 'salió' : 'salieron'} de {cierre.caja}.
+          </span>
+          <Link className="liq-cerrados-link" to={RUTA_COMPROBANTES}>Ver comprobantes</Link>
+          <button type="button" className="liq-cerrados-x" title="Cerrar aviso"
+            aria-label="Cerrar aviso" onClick={() => setCierre(null)}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <SemanticAbmPage<PagoProgramado>
+        moduleKey="pagos-programados"
+        eyebrow="Tesorería"
+        title="Pagos programados"
+        description="Los pagos que se repiten (sueldos, honorarios, alquileres) con su próximo vencimiento. La tabla los agrupa por día: marcá los de un mismo día y cerralos en una sola transferencia."
+        hero={{
+          etiqueta: `PAGOS PROGRAMADOS · ${mesActual.toUpperCase()}${cajaUnica ? ` · ${cajaUnica.toUpperCase()}` : ''}`,
+          frases,
+          kpis: heroKpis,
         }}
-        loading={loading || (esVistaHistorial && loadingHistorial)}
-        isEmpty={esVistaHistorial
-          ? (estadoFiltro === 'adelantados' ? adelantados.length === 0 : realizados.length === 0)
-          : filtered.length === 0}
-        emptyMessage={esVistaHistorial
-          ? (estadoFiltro === 'adelantados'
-              ? 'No hay pagos adelantados (tildados antes de su fecha).'
-              : 'Todavía no hay pagos realizados.')
-          : 'No hay pagos con esos filtros.'}
-        defaultViewMode="table"
-        viewStorageKey="agenda_view"
-        tableView={esVistaHistorial ? vistaHistorialActiva : tableView}
-        guidedView={esVistaHistorial ? vistaHistorialActiva : guidedView}
-        sheetOpen={sheetOpen}
-        sheetTitle={editing ? `Editar pago · ${editing.contacto_nombre}` : 'Nuevo pago programado'}
-        sheetContent={
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Contacto *</label>
-              <ModernSelect value={form.contacto_id ? String(form.contacto_id) : ''}
-                onChange={(v) => setForm(f => ({ ...f, contacto_id: parseInt(v, 10) }))}
-                options={contactoOptions.filter(o => o.value !== '')} placeholder="Elegir contacto..." searchable />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Concepto *</label>
-              {conceptosLiq.length > 0 ? (
-                <ModernSelect
-                  value={form.concepto}
-                  onChange={(v) => {
-                    const def = conceptosLiq.find(c => c.nombre === v);
-                    setForm(f => ({
-                      ...f,
-                      concepto: v,
-                      // Al CAMBIAR el combo de concepto (accion del user) recargamos la
-                      // recomendacion frec/dia del nuevo concepto, tanto en alta como en
-                      // edicion. La carga inicial del pago existente la hace openSheet con
-                      // los valores GUARDADOS (no dispara este onChange), asi que abrir a
-                      // editar conserva lo elegido; recien al tocar el combo se recarga.
-                      ...(def?.frecuencia_default ? {
-                        frecuencia: def.frecuencia_default as FrecuenciaPago,
-                        dia_del_mes: def.dia_del_mes_default ?? f.dia_del_mes,
-                        dia_semana: def.dia_semana_default ?? f.dia_semana,
-                      } : {}),
-                    }));
-                  }}
-                  options={conceptosLiq.map(c => ({
-                    value: c.nombre,
-                    label: c.nombre,
-                    color: c.color || undefined,
-                  }))}
-                  placeholder="Elegí un concepto..."
-                  searchable
-                />
-              ) : (
-                <input value={form.concepto} onChange={(e) => setForm(f => ({ ...f, concepto: e.target.value }))}
-                  placeholder="Cargá conceptos en Configuración → Tesorería → Conceptos liq."
-                  className="w-full px-3 py-2 rounded-lg text-sm"
-                  style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Monto *</label>
-                <MoneyInput value={form.monto_pesos} onChange={(v) => setForm(f => ({ ...f, monto_pesos: v }))}
-                  className="w-full px-3 py-2 rounded-lg text-sm tabular-nums"
-                  style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Caja</label>
-                <ModernSelect value={String(form.caja_id)}
-                  onChange={(v) => setForm(f => ({ ...f, caja_id: parseInt(v, 10) }))}
-                  options={cajaFormOptions} placeholder="Sin caja" searchable />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Frecuencia</label>
-                <ModernSelect value={form.frecuencia}
-                  onChange={(v) => setForm(f => ({ ...f, frecuencia: v as FrecuenciaPago }))}
-                  options={FRECUENCIA_OPTS_FORM} />
-              </div>
-              <div>
-                {form.frecuencia === 'semanal' ? (
-                  <>
-                    <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día de la semana</label>
-                    <ModernSelect
-                      value={String(form.dia_semana ?? 4)}
-                      onChange={(v) => setForm(f => ({ ...f, dia_semana: parseInt(v) }))}
-                      options={[
-                        { value: '0', label: 'Lunes' },
-                        { value: '1', label: 'Martes' },
-                        { value: '2', label: 'Miércoles' },
-                        { value: '3', label: 'Jueves' },
-                        { value: '4', label: 'Viernes' },
-                        { value: '5', label: 'Sábado' },
-                        { value: '6', label: 'Domingo' },
-                      ]}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día del mes</label>
-                    <input type="number" min={1} max={28} value={form.dia_del_mes}
-                      onChange={(e) => setForm(f => ({ ...f, dia_del_mes: parseInt(e.target.value) || 1 }))}
-                      className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
-                  </>
-                )}
-              </div>
-            </div>
-            {/* Fecha inicio / Fecha fin ocultas a propósito: la programación arranca
-                en el momento del alta (fecha_inicio = hoy, se setea solo) y vive hasta
-                que se la borra/desactiva (fecha_fin = null). El próximo cobro se calcula
-                solo con frecuencia + día. Los campos siguen en el form state y en la BD,
-                pero no se piden al usuario. */}
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
-              <textarea value={form.descripcion} onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
-                className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
-            </div>
+        accentColor={stats.vencidos > 0 ? 'var(--pl-red)' : undefined}
+        searchPlaceholder="Contacto o concepto"
+        views={['table', 'cards', 'guided']}
+        // El canvas invierte la jerarquía de un ABM común: el primario verde es
+        // el pago masivo (el trabajo real de la pantalla) y el alta baja a
+        // secundario.
+        secondaryAction={{ label: 'Nuevo pago', onClick: () => openSheet() }}
+        primaryAction={pagos.length > 0 && !esVistaHistorial
+          ? {
+              label: seleccion.size > 0 ? `Pagar ${seleccion.size} juntos` : 'Pago masivo',
+              icon: Wallet,
+              onClick: () => setMasivoOpen(true),
+            }
+          : undefined}
+        selects={selects}
+        statusTabs={statusTabs}
+        activeStatus={estadoFiltro}
+        onStatusChange={(id) => setEstadoFiltro(id as EstadoFiltro)}
+        filterSummary={esVistaHistorial
+          ? `${plural(itemsHistorial.length, 'pago', 'pagos')} · ${fmtMoney(totalHistorial)}`
+          : `${filtered.length} de ${plural(pagos.length, 'pago', 'pagos')}`}
+        kind="money"
+        columns={columns}
+        groupBy="date"
+        showGroupSubtotal
+        rows={[]}
+        groups={grupos}
+        rowActions={[] as RowAction<PagoProgramado>[]}
+        loading={loading}
+        emptyMessage="No hay pagos con esos filtros. Probá limpiar la búsqueda o cambiar de pestaña."
+        footer={{
+          showing: loading
+            ? 'Cargando…'
+            : seleccion.size > 0
+              ? `${seleccion.size} seleccionados de ${filtered.length}`
+              : 'Marcá los pagos que querés cerrar juntos',
+          total: { label: 'TOTAL A PAGAR', value: fmtMoney(totalSeleccionado) },
+        }}
+        // Adelantados/Realizados son otro dataset: se sirve la MISMA tabla del
+        // kit con sus columnas, sea cual sea la vista elegida.
+        viewSlots={esVistaHistorial
+          ? { table: tablaHistorial, cards: tablaHistorial, guided: tablaHistorial }
+          : { cards: cardsView, guided: guidedView }}
+        search={search}
+        onSearchChange={setSearch}
+        activeView={vista}
+        onViewChange={setVista}
+        rowKey={(p) => p.id}
+        onRowClick={openSheet}
+      />
 
-            {/* Premios se manejan como pagos programados independientes
-                (presentismo semanal, incentivo mitad de mes). Ya no se suman
-                acá a la liquidacion mensual del sueldo. */}
-          </div>
-        }
-        sheetFooter={<ABMSheetFooter onCancel={() => setSheetOpen(false)} onSave={save} saving={saving} />}
-        onSheetClose={() => setSheetOpen(false)}
+      {/* Alta / edición del pago programado */}
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editing ? `Editar pago · ${editing.contacto_nombre}` : 'Nuevo pago'}
+        description="Pago recurrente"
+        customHeader={headSheet(
+          `Pagos programados · ${editing ? 'Edición' : 'Alta'}`,
+          editing ? editing.contacto_nombre || 'Editar pago' : 'Nuevo pago',
+          'Un pago programado se repite solo. Definís a quién, cuánto y cada cuánto; el sistema calcula el próximo vencimiento y te avisa cuándo toca.',
+          () => setSheetOpen(false),
+        )}
+        stickyFooter={pieSheet(
+          () => setSheetOpen(false), save, saving,
+          saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear pago programado',
+        )}
       >
-        {esVistaHistorial ? <div className="col-span-full">{vistaHistorialActiva}</div> : cardsView}
-      </ABMPage>
+        <div className="av2-form-grid">
+          <div className="av2-field av2-field--full">
+            <span className="av2-field-label">Contacto<span className="av2-field-req" aria-hidden>*</span></span>
+            <ModernSelect variant="v2" value={form.contacto_id ? String(form.contacto_id) : ''}
+              onChange={(v) => setForm(f => ({ ...f, contacto_id: parseInt(v, 10) }))}
+              options={contactoOptions} placeholder="Elegir contacto…" searchable />
+          </div>
 
-      {/* Sheet "Ejecutar pago" — reemplaza al confirm() nativo. */}
+          <div className="av2-field av2-field--full">
+            <span className="av2-field-label">Concepto<span className="av2-field-req" aria-hidden>*</span></span>
+            {conceptosLiq.length > 0 ? (
+              <ModernSelect
+                variant="v2"
+                value={form.concepto}
+                onChange={(v) => {
+                  const def = conceptosLiq.find(c => c.nombre === v);
+                  setForm(f => ({
+                    ...f,
+                    concepto: v,
+                    // Al CAMBIAR el combo (acción del user) se recarga la
+                    // recomendación frec/día del concepto nuevo. La carga
+                    // inicial la hace openSheet con los valores GUARDADOS (no
+                    // dispara este onChange), así que abrir a editar conserva
+                    // lo elegido; recién al tocar el combo se recalcula.
+                    ...(def?.frecuencia_default ? {
+                      frecuencia: def.frecuencia_default as FrecuenciaPago,
+                      dia_del_mes: def.dia_del_mes_default ?? f.dia_del_mes,
+                      dia_semana: def.dia_semana_default ?? f.dia_semana,
+                    } : {}),
+                  }));
+                }}
+                options={conceptosLiq.map(c => ({ value: c.nombre, label: c.nombre, color: c.color || undefined }))}
+                placeholder="Elegí un concepto…"
+                searchable
+              />
+            ) : (
+              <>
+                <input value={form.concepto} aria-label="Concepto del pago" style={ESTILO_INPUT}
+                  onChange={(e) => setForm(f => ({ ...f, concepto: e.target.value }))} />
+                <p className="av2-field-ayuda">
+                  Cargá conceptos en Configuración → Tesorería → Conceptos de liquidación.
+                </p>
+              </>
+            )}
+          </div>
+
+          <div className="av2-field">
+            <span className="av2-field-label">Monto<span className="av2-field-req" aria-hidden>*</span></span>
+            <MoneyInput value={form.monto_pesos} onChange={(v) => setForm(f => ({ ...f, monto_pesos: v }))}
+              style={{ ...ESTILO_INPUT, fontVariantNumeric: 'tabular-nums' }} />
+          </div>
+
+          <div className="av2-field">
+            <span className="av2-field-label">Caja</span>
+            <ModernSelect variant="v2" value={String(form.caja_id)}
+              onChange={(v) => setForm(f => ({ ...f, caja_id: parseInt(v, 10) }))}
+              options={[{ value: '0', label: 'Sin caja específica' }, ...cajaOptions]}
+              placeholder="Sin caja" searchable />
+          </div>
+
+          <div className="av2-field">
+            <span className="av2-field-label">Frecuencia</span>
+            <ModernSelect variant="v2" value={form.frecuencia}
+              onChange={(v) => setForm(f => ({ ...f, frecuencia: v as FrecuenciaPago }))}
+              options={frecuenciaOptions} />
+          </div>
+
+          <div className="av2-field">
+            {form.frecuencia === 'semanal' ? (
+              <>
+                <span className="av2-field-label">Día de la semana</span>
+                <ModernSelect variant="v2" value={String(form.dia_semana ?? 4)}
+                  onChange={(v) => setForm(f => ({ ...f, dia_semana: parseInt(v, 10) }))}
+                  options={DIAS_SEMANA} />
+              </>
+            ) : (
+              <>
+                <span className="av2-field-label">Día del mes</span>
+                <input type="number" min={1} max={28} value={form.dia_del_mes}
+                  aria-label="Día del mes en que vence" style={ESTILO_INPUT}
+                  onChange={(e) => setForm(f => ({ ...f, dia_del_mes: parseInt(e.target.value, 10) || 1 }))} />
+              </>
+            )}
+          </div>
+
+          {/* Fecha inicio / fin ocultas a propósito: la programación arranca en
+              el alta (fecha_inicio = hoy) y vive hasta que se la borra
+              (fecha_fin = null). El próximo cobro sale de frecuencia + día.
+              Siguen en el form state y en la BD, pero no se piden. */}
+          <div className="av2-field av2-field--full">
+            <span className="av2-field-label">Descripción</span>
+            <textarea className="av2-sheet-nota" rows={2} value={form.descripcion}
+              aria-label="Descripción del pago"
+              onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} />
+          </div>
+        </div>
+      </Sheet>
+
+      {/* Ejecutar el pago programado — reemplaza al confirm() nativo */}
       <Sheet
         open={!!ejecutarPago}
         onClose={cerrarEjecutar}
         title="Ejecutar pago programado"
         description={ejecutarPago?.contacto_nombre || ''}
-        stickyFooter={
-          <ABMSheetFooter
-            onCancel={cerrarEjecutar}
-            onSave={confirmarEjecutar}
-            saving={executingId === ejecutarPago?.id}
-            saveLabel={`Confirmar pago · ${fmtMoney(ejecutarTotal)}`}
-          />
-        }
+        customHeader={ejecutarPago
+          ? headSheet(
+              `Pago programado · ${FRECUENCIA_LABELS[ejecutarPago.frecuencia]}`,
+              ejecutarPago.contacto_nombre || 'Ejecutar pago',
+              `${ejecutarPago.concepto} · vence el ${fmtFecha(ejecutarPago.proximo_pago)} · caja ${ejecutarPago.caja_nombre || 'sin asignar'} · base ${fmtMoney(ejecutarPago.monto_pesos)}`,
+              cerrarEjecutar,
+            )
+          : undefined}
+        stickyFooter={pieSheet(
+          cerrarEjecutar, confirmarEjecutar, executingId === ejecutarPago?.id,
+          <>
+            {executingId === ejecutarPago?.id
+              ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              : <CheckCircle2 className="h-4 w-4" aria-hidden />}
+            Confirmar pago · {fmtMoney(ejecutarTotal)}
+          </>,
+        )}
       >
         {ejecutarPago && (
-          <div className="space-y-4">
-            {/* Resumen del programado */}
-            <div
-              className="rounded-xl p-3"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-            >
-              <p className="text-xs uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
-                Recordatorio del programado
-              </p>
-              <p className="text-sm font-semibold" style={{ color: theme.text }}>
-                {ejecutarPago.concepto} · {ejecutarPago.contacto_nombre}
-              </p>
-              <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-                Vencimiento: {ejecutarPago.proximo_pago} ·
-                Caja: {ejecutarPago.caja_nombre || '—'} ·
-                Base: {fmtMoney(ejecutarPago.monto_pesos)}
-              </p>
+          <div className="av2-form-grid">
+            <div className="av2-field av2-field--full">
+              <span className="av2-field-label">Monto base del mes</span>
+              <MoneyInput value={ejecutarMonto} onChange={setEjecutarMonto}
+                style={{ ...ESTILO_INPUT, height: 40, fontSize: 'var(--pl-fs-hero-line)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }} />
+              <p className="av2-field-ayuda">Si el monto de este mes es distinto al programado, ajustalo acá.</p>
             </div>
 
-            {/* Monto base editable */}
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
-                Monto base del mes
-              </label>
-              <MoneyInput
-                value={ejecutarMonto}
-                onChange={setEjecutarMonto}
-                className="w-full px-3 py-2 rounded-xl text-lg font-bold tabular-nums"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-              />
-              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
-                Si el monto de este mes es distinto al programado, ajustalo acá.
-              </p>
-            </div>
-
-            {/* Fecha */}
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
-                Fecha del pago
-              </label>
+            <div className="av2-field av2-field--full">
+              <span className="av2-field-label">Fecha del pago</span>
               <DatePicker value={ejecutarFecha} onChange={setEjecutarFecha} />
+              <p className="av2-field-ayuda">Es la fecha con la que impacta en la caja, no la del clic.</p>
             </div>
 
-            {/* Premios se manejan como liquidaciones aparte (presentismo
-                semanal, incentivo mitad de mes). Ya no se eligen acá al
-                pagar el sueldo. */}
-
-            {/* Notas */}
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
-                Notas (opcional)
-              </label>
-              <textarea
-                value={ejecutarNotas}
-                onChange={(e) => setEjecutarNotas(e.target.value)}
-                rows={2}
-                placeholder="Detalle adicional del pago..."
-                className="w-full px-3 py-2 rounded-lg text-sm resize-none"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-              />
+            <div className="av2-field av2-field--full">
+              <span className="av2-field-label">Notas (opcional)</span>
+              <textarea className="av2-sheet-nota" rows={2} value={ejecutarNotas}
+                placeholder="Detalle adicional del pago…" aria-label="Notas del pago"
+                onChange={(e) => setEjecutarNotas(e.target.value)} />
             </div>
 
-            {/* Total final */}
-            <div
-              className="rounded-xl p-3 flex items-center justify-between"
-              style={{ background: `linear-gradient(135deg, ${theme.primary}15, ${theme.primary}05)`, border: `1px solid ${theme.primary}40` }}
-            >
-              <div>
-                <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
-                  Total a pagar
-                </p>
-                <p className="text-2xl font-bold tabular-nums" style={{ color: theme.primary }}>
-                  {fmtMoney(ejecutarTotal)}
-                </p>
+            <div className="av2-field av2-field--full">
+              <div className="av2-panel-head">
+                <Wallet size={18} aria-hidden />
+                <span className="av2-panel-titulo">Total a pagar</span>
+                <span className="av2-money av2-tabla-monto ml-auto">{fmtMoney(ejecutarTotal)}</span>
               </div>
-              <Wallet className="h-8 w-8" style={{ color: theme.primary }} />
             </div>
           </div>
         )}
@@ -1091,15 +1216,30 @@ export default function TesoreriaAgenda() {
         icon={<SkipForward className="h-5 w-5" />}
       />
 
+      {/* Antes era un confirm() nativo (control vetado por CLAUDE.md §4). */}
+      <ConfirmModal
+        isOpen={!!borrarPago}
+        onClose={() => setBorrarPago(null)}
+        onConfirm={confirmarBorrar}
+        variant="danger"
+        title="Eliminar el pago programado"
+        message={borrarPago
+          ? `Se elimina el pago programado de "${borrarPago.contacto_nombre}" (${borrarPago.concepto} · ${fmtMoney(borrarPago.monto_pesos)}). Los pagos ya ejecutados quedan como están.`
+          : ''}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        loading={borrando}
+      />
+
       <PagoMasivoModal
         open={masivoOpen}
         onClose={() => setMasivoOpen(false)}
         pagos={filtered}
-        onDone={fetchAll}
+        preseleccion={seleccionados.map(p => p.id)}
+        onDone={onMasivoDone}
       />
 
-      <MunifyTour tourKey="sueldos-liquidaciones" steps={TOUR_STEPS_LIQ} />
+      <MunifyTour tourKey={TOUR_KEY} steps={TOUR_STEPS_LIQ} />
     </>
   );
 }
-

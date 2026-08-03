@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { CalendarClock, Check, Layers, Wallet } from 'lucide-react';
+import { CalendarClock, Check, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { WizardModal, WizardStep } from '../ui/WizardModal';
+import { Sheet } from '../ui/Sheet';
 import { agendaPagosApi } from '../../lib/api';
 import type { PagoProgramado } from '../../types';
+import '../../styles/liquidaciones.css';
 
 // Helpers locales (no dependemos de los de TesoreriaAgenda, que no se exportan).
 function parseLocalDate(f: string): Date {
@@ -25,14 +26,30 @@ function fmtMoney(v: string | number): string {
 function totalDe(ps: PagoProgramado[]): number {
   return ps.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0);
 }
+/** Días hasta la fecha (negativo = vencido). */
+function diasHasta(f: string): number {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const d = parseLocalDate(f); d.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - hoy.getTime()) / 86400000);
+}
+/** Mensaje de error del backend con fallback (sin `any`). */
+function msgError(e: unknown, fallback: string): string {
+  const detalle = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  return typeof detalle === 'string' && detalle ? detalle : fallback;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** Candidatos a pagar: los pagos pendientes ya filtrados de la agenda. */
   pagos: PagoProgramado[];
-  /** Refrescar la agenda tras un pago masivo exitoso. */
-  onDone: () => void;
+  /** Pagos ya marcados en la grilla. Si vienen, el panel saltea la elección de
+   *  días y abre directo el repaso con ésos tildados. */
+  preseleccion?: number[];
+  /** Refrescar la agenda tras un pago masivo exitoso. `resumen` trae lo que
+   *  devolvió el backend, para que la pantalla arme su banner de cierre con
+   *  datos reales (nunca estimados). */
+  onDone: (resumen?: { cantidad: number; monto: number }) => void;
 }
 
 /**
@@ -43,7 +60,7 @@ interface Props {
  *     Cada pago se ejecuta con sus valores por defecto (monto, caja, fecha
  *     programada) vía POST /agenda/ejecutar-masivo. No se puede editar nada.
  */
-export function PagoMasivoModal({ open, onClose, pagos, onDone }: Props) {
+export function PagoMasivoModal({ open, onClose, pagos, preseleccion, onDone }: Props) {
   const { theme } = useTheme();
   const [fase, setFase] = useState<'fechas' | 'wizard'>('fechas');
   const [fechasSel, setFechasSel] = useState<Set<string>>(new Set());
@@ -51,9 +68,23 @@ export function PagoMasivoModal({ open, onClose, pagos, onDone }: Props) {
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  // Arranque limpio cada vez que se abre.
+  // Arranque cada vez que se abre. Con pagos ya marcados en la grilla, el
+  // panel saltea la elección de días: el usuario ya la hizo ahí.
   useEffect(() => {
-    if (open) { setFase('fechas'); setFechasSel(new Set()); setChecked(new Set()); setStep(0); }
+    if (!open) return;
+    setStep(0);
+    const pre = preseleccion || [];
+    if (pre.length > 0) {
+      const ids = new Set(pre);
+      setChecked(ids);
+      setFechasSel(new Set(
+        pagos.filter(p => ids.has(p.id)).map(p => (p.proximo_pago || '').slice(0, 10)),
+      ));
+      setFase('wizard');
+    } else {
+      setFase('fechas'); setFechasSel(new Set()); setChecked(new Set());
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [open]);
 
   // Agrupar candidatos por fecha de próximo pago, ordenados.
@@ -71,7 +102,11 @@ export function PagoMasivoModal({ open, onClose, pagos, onDone }: Props) {
   const cerrar = () => { onClose(); };
 
   const toggleFecha = (f: string) =>
-    setFechasSel(prev => { const n = new Set(prev); n.has(f) ? n.delete(f) : n.add(f); return n; });
+    setFechasSel(prev => {
+      const n = new Set(prev);
+      if (n.has(f)) n.delete(f); else n.add(f);
+      return n;
+    });
 
   const todasSeleccionadas = grupos.length > 0 && fechasSel.size === grupos.length;
   const toggleTodas = () =>
@@ -93,7 +128,11 @@ export function PagoMasivoModal({ open, onClose, pagos, onDone }: Props) {
   const multi = fechasWizard.length > 1;
 
   const togglePago = (id: number) =>
-    setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setChecked(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
 
   const seleccionados = useMemo(() => pagos.filter(p => checked.has(p.id)), [pagos, checked]);
   const totalSel = totalDe(seleccionados);
@@ -107,91 +146,105 @@ export function PagoMasivoModal({ open, onClose, pagos, onDone }: Props) {
       if (data.fallidos > 0) toast.warning(`${data.exitosos} pagados, ${data.fallidos} fallaron`);
       else toast.success(`${data.exitosos} ${data.exitosos === 1 ? 'pago realizado' : 'pagos realizados'} · ${fmtMoney(data.monto_total)}`);
       cerrar();
-      onDone();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Error en el pago masivo');
+      onDone({ cantidad: data.exitosos, monto: parseFloat(data.monto_total) || 0 });
+    } catch (e) {
+      toast.error(msgError(e, 'Error en el pago masivo'));
     } finally { setSaving(false); }
   };
 
   if (!open) return null;
 
-  // Checkbox visual reutilizable.
+  // Checkbox visual reutilizable (clases sobre tokens, cero hex).
   const checkBox = (on: boolean) => (
-    <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-      style={{ backgroundColor: on ? theme.primary : 'transparent', border: `2px solid ${on ? theme.primary : theme.border}` }}>
-      {on && <Check className="h-3 w-3" style={{ color: '#fff' }} />}
+    <span className={on ? 'liq-check liq-check--on' : 'liq-check'} aria-hidden>
+      <Check size={12} strokeWidth={3} />
     </span>
   );
 
-  // ===================== Fase 1: selector de fechas =====================
+  // ===================== Fase 1: elegir qué días =====================
+  // Drawer del kit (antes era un modal centrado a mano con portal + hex).
   if (fase === 'fechas') {
-    return createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in"
-        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={cerrar}>
-        <div className="w-full max-w-md rounded-2xl overflow-hidden animate-in slide-in-from-bottom-2"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
-          <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
-            <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: `${theme.primary}20` }}>
-              <Layers className="h-5 w-5" style={{ color: theme.primary }} />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-base font-bold" style={{ color: theme.text }}>Pago masivo</h3>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Elegí qué fechas pagar</p>
-            </div>
-          </div>
+    const totalElegido = grupos
+      .filter(g => fechasSel.has(g[0]))
+      .reduce((sum, g) => sum + totalDe(g[1]), 0);
 
-          <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
-            {grupos.length === 0 ? (
-              <p className="text-sm text-center py-8" style={{ color: theme.textSecondary }}>
-                No hay pagos pendientes para pagar.
-              </p>
-            ) : (
-              <>
-                <button onClick={toggleTodas}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all active:scale-[0.99]"
-                  style={{ backgroundColor: todasSeleccionadas ? `${theme.primary}15` : theme.background, border: `1px solid ${todasSeleccionadas ? theme.primary : theme.border}` }}>
-                  {checkBox(todasSeleccionadas)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold" style={{ color: theme.text }}>Pagar todo</p>
-                    <p className="text-[11px]" style={{ color: theme.textSecondary }}>{pagos.length} pagos · {fmtMoney(totalDe(pagos))}</p>
-                  </div>
+    return (
+      <Sheet
+        open={open}
+        onClose={cerrar}
+        title="Pago masivo"
+        description="Una transferencia por cada día que elijas"
+        customHeader={
+          <div className="rs-head">
+            <div className="rs-head-fila">
+              <span className="rs-eyebrow">Pagos programados</span>
+              <span className="rs-head-icos">
+                <button type="button" className="rs-ico-btn" title="Cerrar" aria-label="Cerrar" onClick={cerrar}>
+                  <X className="h-4 w-4" />
                 </button>
-
-                <div className="h-px my-1" style={{ backgroundColor: theme.border }} />
-
-                {grupos.map(([f, ps]) => {
-                  const on = fechasSel.has(f);
-                  return (
-                    <button key={f} onClick={() => toggleFecha(f)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all active:scale-[0.99]"
-                      style={{ backgroundColor: on ? `${theme.primary}12` : theme.background, border: `1px solid ${on ? theme.primary : theme.border}` }}>
-                      {checkBox(on)}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold capitalize truncate" style={{ color: theme.text }}>{fmtFechaLarga(f)}</p>
-                        <p className="text-[11px]" style={{ color: theme.textSecondary }}>{ps.length} {ps.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(totalDe(ps))}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </>
-            )}
+              </span>
+            </div>
+            <h2 className="rs-titulo">Pago masivo</h2>
+            <p className="rs-parrafo">Una transferencia por cada día que elijas.</p>
           </div>
-
-          <div className="px-5 py-3 flex justify-end gap-2" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <button onClick={cerrar}
-              className="px-4 py-2 rounded-lg text-sm transition-all hover:opacity-80"
-              style={{ border: `1px solid ${theme.border}`, color: theme.text }}>Cancelar</button>
-            <button onClick={continuarAlWizard} disabled={fechasSel.size === 0}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-1.5 transition-all hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ backgroundColor: theme.primary }}>
+        }
+        stickyFooter={
+          <div className="flex flex-col gap-2">
+            <span className="liq-masivo-total">
+              <span className="liq-masivo-total-label">Total a transferir</span>
+              <span className="liq-masivo-total-valor">{fmtMoney(totalElegido)}</span>
+            </span>
+            <span className="liq-masivo-detalle">
+              {fechasSel.size === 0
+                ? 'Elegí al menos un día'
+                : `${fechasSel.size} ${fechasSel.size === 1 ? 'día' : 'días'} · ${fechasElegidasCount} ${fechasElegidasCount === 1 ? 'pago' : 'pagos'}`}
+            </span>
+            <button type="button" className="rs-cta w-full justify-center"
+              onClick={continuarAlWizard} disabled={fechasSel.size === 0}>
               <Wallet className="h-4 w-4" />
-              Continuar ({fechasElegidasCount})
+              Pagar {fechasElegidasCount} {fechasElegidasCount === 1 ? 'pago' : 'pagos'}
             </button>
           </div>
-        </div>
-      </div>,
-      document.body,
+        }
+      >
+        {grupos.length === 0 ? (
+          <p className="liq-masivo-vacio">No hay pagos pendientes para pagar.</p>
+        ) : (
+          <>
+            <button type="button" onClick={toggleTodas}
+              className={todasSeleccionadas ? 'liq-masivo-op liq-masivo-op--on' : 'liq-masivo-op'}>
+              {checkBox(todasSeleccionadas)}
+              <span className="liq-masivo-cuerpo">
+                <span className="liq-masivo-titulo">Pagar todo lo pendiente</span>
+                <span className="liq-masivo-detalle">
+                  {pagos.length} {pagos.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(totalDe(pagos))}
+                </span>
+              </span>
+            </button>
+
+            <span className="liq-masivo-rotulo">O elegí qué días</span>
+
+            {grupos.map(([f, ps]) => {
+              const on = fechasSel.has(f);
+              const d = diasHasta(f);
+              return (
+                <button key={f} type="button" onClick={() => toggleFecha(f)}
+                  className={on ? 'liq-masivo-op liq-masivo-op--on' : 'liq-masivo-op'}>
+                  {checkBox(on)}
+                  <span className="liq-masivo-cuerpo">
+                    <span className="liq-masivo-titulo">{fmtFechaLarga(f)}</span>
+                    <span className="liq-masivo-detalle">
+                      {ps.length} {ps.length === 1 ? 'pago' : 'pagos'}
+                      {d < 0 ? ' · vencido' : d === 0 ? ' · vence hoy' : ''}
+                    </span>
+                  </span>
+                  <span className="av2-money av2-tabla-monto">{fmtMoney(totalDe(ps))}</span>
+                </button>
+              );
+            })}
+          </>
+        )}
+      </Sheet>
     );
   }
 
