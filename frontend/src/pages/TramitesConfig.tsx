@@ -25,6 +25,7 @@ import {
 } from '../components/config/TramiteAutocompleteInput';
 import { ChipsDocumentosSugeridos } from '../components/config/ChipsDocumentosSugeridos';
 import type { Tramite, CategoriaTramite } from '../types';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 interface TramiteForm {
   categoria_tramite_id: number | null;
@@ -86,6 +87,8 @@ const EMPTY_FORM: TramiteForm = {
 export default function TramitesConfig() {
   const { theme } = useTheme();
   const [tramites, setTramites] = useState<Tramite[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(tramites.length);
   const [categorias, setCategorias] = useState<CategoriaTramite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

@@ -9,6 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 interface Municipio {
   id: number;
@@ -35,6 +36,10 @@ export default function Municipios() {
   const { user } = useAuth();
 
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
+
+  // Publica el total para el contador del riel de Configuración.
+
+  useReportarTotal(municipios.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 

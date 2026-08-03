@@ -6,6 +6,7 @@ import { Sheet } from '../ui/Sheet';
 import { DynamicIcon } from '../ui/DynamicIcon';
 import { StickyPageHeader } from '../ui/StickyPageHeader';
 import { categoriasReclamoSugeridasApi } from '../../lib/api';
+import { useReportarTotal } from '../abmv2/useEmbed';
 
 export interface CategoriaItem {
   id: number;
@@ -75,6 +76,8 @@ const COLORES_DISPONIBLES = [
 export function CategoriaConfigBase({ title, api, showReclamoFields = false, enableSugerencias = false, showInternaField = false }: Props) {
   const { theme } = useTheme();
   const [items, setItems] = useState<CategoriaItem[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(items.length);
 
   // Autocomplete de sugerencias cross-municipio (solo en modo alta).
   const [sugerencias, setSugerencias] = useState<CategoriaSugerida[]>([]);

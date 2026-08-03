@@ -23,6 +23,7 @@ import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoTasa, veredictoMasEsPeor } from '../lib/veredictos';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 interface SLAConfig {
   id: number;
@@ -60,6 +61,8 @@ interface SLAAlerta {
 export default function SLA() {
   const { theme } = useTheme();
   const [configs, setConfigs] = useState<SLAConfig[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(configs.length);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [resumen, setResumen] = useState<SLAResumen | null>(null);
   const [alertas, setAlertas] = useState<SLAAlerta[]>([]);

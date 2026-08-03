@@ -68,10 +68,6 @@ export default function TesoreriaContactos() {
   const [unificarOpen, setUnificarOpen] = useState(false);
   const [unificarManualOpen, setUnificarManualOpen] = useState(false);
 
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <p className="p-6 text-sm">Sin permisos.</p>;
-  }
-
   // Paginacion server-side: cada cambio de filtro/pagina dispara fetch.
   // ABMPage NO se desmonta porque loading se mantiene true brevemente y
   // los contactos viejos se mantienen visibles hasta que llegan los nuevos
@@ -429,6 +425,12 @@ export default function TesoreriaContactos() {
       )}
     </div>
   );
+
+  // El guard va DESPUÉS de todos los hooks: antes cortaba el render entre
+  // medio y dejaba los hooks siguientes fuera del orden fijo (React #310).
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <p className="p-6 text-sm">Sin permisos.</p>;
+  }
 
   return (
     <>

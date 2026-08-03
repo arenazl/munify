@@ -18,6 +18,7 @@ import {
   ESTADO_ACTIVO_OPTIONS,
 } from '../lib/enums/inventario';
 import type { InventarioItem, InventarioCategoria, NaturalezaInventario, EstadoActivo } from '../types';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 type FormState = {
   categoria_id: string;
@@ -41,6 +42,10 @@ export default function Inventario() {
   const { user } = useAuth();
 
   const [items, setItems] = useState<InventarioItem[]>([]);
+
+  // Publica el total para el contador del riel de Configuración.
+
+  useReportarTotal(items.length);
   const [todos, setTodos] = useState<InventarioItem[]>([]); // sin filtro, para contar píldoras
   const [categorias, setCategorias] = useState<InventarioCategoria[]>([]);
   const [loading, setLoading] = useState(true);

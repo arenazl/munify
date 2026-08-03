@@ -12,6 +12,7 @@ import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
 import { MapPicker } from '../components/ui/MapPicker';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 type TipoJerarquico = 'SECRETARIA' | 'DIRECCION';
 
@@ -142,6 +143,8 @@ export default function DependenciasConfig() {
 
   // Datos
   const [dependenciasMunicipio, setDependenciasMunicipio] = useState<MunicipioDependencia[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(dependenciasMunicipio.length);
   const [catalogoGlobal, setCatalogoGlobal] = useState<Dependencia[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [tiposTramite, setTiposTramite] = useState<TipoTramite[]>([]);

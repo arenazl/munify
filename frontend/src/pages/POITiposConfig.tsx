@@ -9,6 +9,7 @@ import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { poiApi } from '../lib/api';
 import { estadoActivoColors } from '../lib/enums/inventario';
 import type { PoiTipo } from '../types';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 // Iconos pensados para puntos de interés (hospitales, escuelas, comercios, etc.).
 const ICONOS_DISPONIBLES = [
@@ -35,6 +36,8 @@ const FORM_VACIO: FormState = { nombre: '', icono: 'MapPin', color: '#3b82f6', r
 export default function POITiposConfig() {
   const { theme } = useTheme();
   const [items, setItems] = useState<PoiTipo[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(items.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);

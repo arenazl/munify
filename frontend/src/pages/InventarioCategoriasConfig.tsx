@@ -9,6 +9,7 @@ import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { inventarioApi } from '../lib/api';
 import { naturalezaLabels, naturalezaDescripcion, naturalezaColors, naturalezaIcons, estadoActivoColors } from '../lib/enums/inventario';
 import type { InventarioCategoria, NaturalezaInventario } from '../types';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 const ICONOS_DISPONIBLES = [
   'Truck', 'Car', 'Forklift', 'Tractor', 'HardHat', 'Wrench',
@@ -40,6 +41,8 @@ const FORM_VACIO: FormState = {
 export default function InventarioCategoriasConfig() {
   const { theme } = useTheme();
   const [items, setItems] = useState<InventarioCategoria[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(items.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 

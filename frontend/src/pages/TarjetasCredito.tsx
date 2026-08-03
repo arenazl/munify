@@ -8,6 +8,7 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { tarjetasApi } from '../lib/api';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 interface Tarjeta {
   id: number;
@@ -49,6 +50,8 @@ export default function TarjetasCredito() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(tarjetas.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -56,10 +59,6 @@ export default function TarjetasCredito() {
   const [form, setForm] = useState<FormState>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
   const [confirmDel, setConfirmDel] = useState<Tarjeta | null>(null);
-
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
-  }
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,6 +82,12 @@ export default function TarjetasCredito() {
       (t.ultimos_4 || '').includes(s)
     );
   }, [tarjetas, search]);
+
+  // El guard va DESPUÉS de todos los hooks: antes cortaba el render entre
+  // medio y dejaba useEffect/useMemo fuera del orden fijo (React #310).
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
+  }
 
   const abrirNueva = () => { setEditId(null); setForm(FORM_VACIO); setSheetOpen(true); };
   const abrirEditar = (t: Tarjeta) => {

@@ -4,7 +4,7 @@
  * Vive separado del Provider porque un archivo que exporta componentes Y
  * funciones rompe el fast-refresh de Vite (react-refresh/only-export-components).
  */
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 
 export interface EmbedContextValue {
   /** true ⇒ la pantalla vive dentro de otra: sin cabecera propia. */
@@ -20,4 +20,20 @@ export const EmbedContext = createContext<EmbedContextValue | null>(null);
 /** Devuelve el contexto o el default "soy una página normal". */
 export function useEmbed(): EmbedContextValue {
   return useContext(EmbedContext) ?? { embedded: false };
+}
+
+/**
+ * Publica cuántas filas tiene la pantalla para el contador del riel.
+ *
+ * Lo llaman las pantallas que no pasan por `ABMPage`/`SemanticAbmPage` (arman
+ * su propia tabla) o que no exponen paginación ni tab "Todos". Fuera de un
+ * contenedor no hace nada.
+ */
+export function useReportarTotal(total: number | undefined): void {
+  const { slotId, reportarTotal } = useEmbed();
+  useEffect(() => {
+    if (slotId && reportarTotal && typeof total === 'number') {
+      reportarTotal(slotId, total);
+    }
+  }, [slotId, reportarTotal, total]);
 }
