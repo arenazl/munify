@@ -553,7 +553,18 @@ export interface SemanticAbmPageProps<Row = unknown> {
   /** [v2.2] Bajada de la cabecera (1-2 líneas: de dónde salen las filas y cómo
    *  se agrupan). Omitida ⇒ no se renderiza. */
   description?: string;
-  hero: ModuleHeroProps;
+  /**
+   * [v2.5] AHORA OPCIONAL. Un catálogo simple —nombre, icono, color, activo,
+   * orden— no tiene veredicto que contar: forzarle un hero obligaba a
+   * inventar una frase ("hay 9 categorías") que no interpreta nada, y encima
+   * dentro del panel de Configuración competía con el título que ya puso el
+   * shell. Sin `hero` la página arranca directo en la toolbar.
+   *
+   * Sigue siendo obligatorio en el espíritu del estándar para los módulos que
+   * SÍ tienen estado que leer (Reclamos, Gastos, Liquidaciones): omitirlo ahí
+   * es perder la única pieza que dice cómo viene el mes.
+   */
+  hero?: ModuleHeroProps;
   /** Borde izquierdo del hero: token CSS (`var(--pl-green)` por defecto,
    *  `var(--pl-red)` cuando el módulo está en alerta). NUNCA un hex literal. */
   accentColor?: string;
@@ -607,6 +618,11 @@ export interface SemanticAbmPageProps<Row = unknown> {
   loading?: boolean;
   /** [v2.1] Copy del estado vacío — ver DataTableProps.emptyMessage. */
   emptyMessage?: string;
+  /** [v2.5] Modo "Reordenar" de la tabla — pass-through a DataTable.reorder.
+   *  El botón que lo prende y apaga lo pone la página (normalmente en
+   *  `secondaryAction`), porque es ella la que sabe si el orden se puede
+   *  guardar. */
+  reorder?: ReorderSpec<Row>;
 
   /* --- Estado controlado (extensión de implementación) --- */
   search: string;
@@ -979,6 +995,51 @@ export interface TreeListProps {
   onNodeClick?: (node: TreeNode) => void;
   /** Pie del árbol ("11 dependencias · 42 trámites"). */
   footer?: string;
+  loading?: boolean;
+  emptyMessage?: string;
+}
+
+/* --- Grilla de tarjetas ------------------------------------------------- */
+
+/** Cómo se ve UNA tarjeta. Lo arma la página a partir de su fila. */
+export interface CardItem {
+  title: string;
+  subtitle?: string;
+  icon?: LucideIcon | ReactNode;
+  /** Color del tile — runtime (viene de datos). */
+  tileColor?: string;
+  /** Cifra grande de la tarjeta (lo que pesa este registro). */
+  metric?: MetricCellData;
+  /** Píldora de estado arriba a la derecha. */
+  chip?: { label: string; tone?: ChipTone };
+}
+
+/**
+ * Grilla de tarjetas: la MISMA lista que la tabla, en la otra vista del
+ * segmented. No es un componente distinto por pantalla — es la vista 'cards'
+ * del kit, y por eso toma las mismas piezas (entidad, métrica, acciones,
+ * interruptor) que la fila de la tabla.
+ *
+ * Por qué existe: cada pantalla que quería tarjetas se maquetaba su grilla, y
+ * terminábamos con seis tarjetas distintas para el mismo dato. El toggle
+ * tabla/tarjetas del canvas sólo tiene sentido si las dos vistas son la misma
+ * información con otra densidad.
+ */
+export interface CardGridProps<Row = unknown> {
+  rows: Row[];
+  rowKey: (row: Row) => string | number;
+  /** Traduce una fila a lo que se ve en la tarjeta. */
+  card: (row: Row) => CardItem;
+  /** Mismas acciones que la tabla (máximo 2 visibles, sin menú). */
+  actions?: RowAction<Row>[];
+  /** Interruptor en el pie de la tarjeta (activo/inactivo). */
+  toggle?: {
+    checked: (row: Row) => boolean;
+    onChange: (row: Row, value: boolean) => void;
+    labelOn?: string;
+    labelOff?: string;
+  };
+  onCardClick?: (row: Row) => void;
   loading?: boolean;
   emptyMessage?: string;
 }

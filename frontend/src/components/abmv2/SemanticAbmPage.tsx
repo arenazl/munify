@@ -155,6 +155,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     footer,
     loading,
     emptyMessage,
+    reorder,
     /* estado controlado */
     search,
     onSearchChange,
@@ -269,6 +270,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
       footer={footer}
       loading={loading}
       emptyMessage={emptyMessage}
+      reorder={reorder}
     />
   ) : null;
 
@@ -287,15 +289,20 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
       {!embebida && <PageHeader eyebrow={eyebrow} title={title} description={description} />}
 
       {/* 2. ModuleHero = SemanticHero existente. Los números viven acá
-          (stat strip en `hero.kpis`) — nada de KPIs sueltos arriba. */}
-      <div className="av2-hero-wrap" style={estiloHero}>
-        <SemanticHero
-          etiqueta={hero.etiqueta}
-          frases={hero.frases}
-          kpis={hero.kpis}
-          className={hero.className ? `av2-hero ${hero.className}` : 'av2-hero'}
-        />
-      </div>
+          (stat strip en `hero.kpis`) — nada de KPIs sueltos arriba.
+          [v2.5] Opcional: un catálogo simple no tiene veredicto que contar
+          (ver SemanticAbmPageProps.hero). Sin él la página arranca en la
+          toolbar. */}
+      {hero && (
+        <div className="av2-hero-wrap" style={estiloHero}>
+          <SemanticHero
+            etiqueta={hero.etiqueta}
+            frases={hero.frases}
+            kpis={hero.kpis}
+            className={hero.className ? `av2-hero ${hero.className}` : 'av2-hero'}
+          />
+        </div>
+      )}
 
       {/* 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. */}
       <div className="av2-controles">

@@ -1,20 +1,18 @@
 import { CategoriaConfigBase } from '../components/config/CategoriaConfigBase';
 import { categoriasReclamoApi } from '../lib/api';
 
+/**
+ * Categorías de reclamo = una instancia del ABM de catálogo del kit. La
+ * pantalla no maqueta nada: elige la API y qué campos extra aplican.
+ */
 export default function CategoriasReclamoConfig() {
   return (
-    <div className="h-full flex flex-col">
-      <div className="px-3 sm:px-6 pt-3">
-      </div>
-      <div className="flex-1 min-h-0">
-        <CategoriaConfigBase
-          title="Categorías de Reclamo"
-          api={categoriasReclamoApi as any}
-          showReclamoFields
-          enableSugerencias
-          showInternaField
-        />
-      </div>
-    </div>
+    <CategoriaConfigBase
+      title="Categorías de reclamo"
+      api={categoriasReclamoApi}
+      showReclamoFields
+      enableSugerencias
+      showInternaField
+    />
   );
 }

@@ -1,12 +1,45 @@
-import { useEffect, useRef, useState } from 'react';
-import { Pencil, Trash2, Loader2, Sparkles } from 'lucide-react';
+/**
+ * CategoriaConfigBase — el ABM de catálogo del canvas de Configuración.
+ *
+ * Es el cuerpo `tipo: 'catalogo'` de "Configuracion.dc.html": nombre, icono,
+ * color, activo y orden. El brief lo dice explícito — **7 tabs hijos son
+ * exactamente este mismo ABM**, por eso el canvas dibujó uno solo y acá hay un
+ * componente, no siete pantallas.
+ *
+ * Hoy lo instancian Categorías de reclamo y Categorías de trámite. Los otros
+ * cinco (tipos de POI, categorías de inventario, tipos de empleado, parajes,
+ * tipos de trabajo) tienen su propia pantalla vieja y migran a este mismo
+ * componente — cada uno con su `api`, sin escribir una pantalla nueva.
+ *
+ * [2026-08-03] Migrado del layout viejo (StickyPageHeader + grilla de
+ * tarjetas a mano + `confirm()` nativo) al kit v2:
+ *   - `SemanticAbmPage` embebida sin hero — un catálogo no tiene veredicto
+ *     que contar y el panel de Configuración ya puso el título.
+ *   - Tabla y tarjetas son la MISMA lista (`DataTable` / `CardGrid`), no dos
+ *     maquetas distintas.
+ *   - El orden se arrastra (modo "Reordenar" del kit) en vez de escribirse en
+ *     un campo numérico. El campo sigue en el drawer para el caso exacto.
+ *   - `Switch` para activar/desactivar sin abrir el drawer: antes la lista
+ *     mostraba "Inactiva" pero no había forma de cambiarlo desde ahí.
+ *   - `IconColorPicker` y `ScalePicker` en lugar de los dos grids y el input
+ *     numérico de prioridad.
+ *   - `ConfirmModal` en lugar de `confirm()` (control nativo vetado).
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDownUp, Loader2, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from '../ui/Sheet';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import { DynamicIcon } from '../ui/DynamicIcon';
-import { StickyPageHeader } from '../ui/StickyPageHeader';
 import { categoriasReclamoSugeridasApi } from '../../lib/api';
 import { useReportarTotal } from '../abmv2/useEmbed';
+import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
+import { CardGrid } from '../abmv2/CardGrid';
+import { EntityCell, ChipEstado } from '../abmv2/DataTable';
+import { MetricCell, ScalePicker, SegmentedControl, Switch } from '../abmv2/Controls';
+import { IconColorPicker } from '../abmv2/IconColorPicker';
+import type { ColumnSpec, ScaleStep, ViewKind } from '../abmv2/types';
 
 export interface CategoriaItem {
   id: number;
@@ -17,6 +50,9 @@ export interface CategoriaItem {
   color?: string;
   orden: number;
   activo: boolean;
+  // Solo aplica a Categoría de Reclamo (showReclamoFields).
+  tiempo_resolucion_estimado?: number;
+  prioridad_default?: number;
   // Solo aplica a Categoría de Reclamo (showInternaField). Clasifica trabajo
   // interno (OT) que NO se le ofrece al vecino al crear un reclamo.
   interna?: boolean;
@@ -46,6 +82,8 @@ interface Props {
    * aplica a Categoría de Reclamo.
    */
   showInternaField?: boolean;
+  /** Copy del singular para los botones y mensajes ("categoría", "tipo"). */
+  entidad?: string;
 }
 
 interface CategoriaSugerida {
@@ -67,73 +105,137 @@ const ICONOS_DISPONIBLES = [
   'Building2', 'Folder', 'Tag', 'Star',
 ];
 
+/** Los colores del catálogo son DATOS (se guardan en la fila), no tokens del
+ *  theme: son la paleta que el municipio usa para distinguir sus categorías
+ *  en el mapa y en las listas. Por eso van con nombre, para el tooltip. */
 const COLORES_DISPONIBLES = [
-  '#f59e0b', '#78716c', '#10b981', '#06b6d4', '#22c55e',
-  '#ef4444', '#3b82f6', '#84cc16', '#a855f7', '#ec4899',
-  '#8b5cf6', '#0ea5e9', '#6366f1', '#64748b',
+  { name: 'Ámbar', value: '#f59e0b' },
+  { name: 'Piedra', value: '#78716c' },
+  { name: 'Esmeralda', value: '#10b981' },
+  { name: 'Cian', value: '#06b6d4' },
+  { name: 'Verde', value: '#22c55e' },
+  { name: 'Rojo', value: '#ef4444' },
+  { name: 'Azul', value: '#3b82f6' },
+  { name: 'Lima', value: '#84cc16' },
+  { name: 'Púrpura', value: '#a855f7' },
+  { name: 'Rosa', value: '#ec4899' },
+  { name: 'Violeta', value: '#8b5cf6' },
+  { name: 'Celeste', value: '#0ea5e9' },
+  { name: 'Índigo', value: '#6366f1' },
+  { name: 'Pizarra', value: '#64748b' },
 ];
 
-export function CategoriaConfigBase({ title, api, showReclamoFields = false, enableSugerencias = false, showInternaField = false }: Props) {
+/** Escala de prioridad. El veredicto es el del canvas: 4-5 se lee en alerta,
+ *  3 avisa, 1-2 tranquilo. La urgencia la define esto, no el color elegido. */
+const PRIORIDADES: ScaleStep[] = [
+  { value: 1, label: 'Muy baja', veredicto: 'bueno' },
+  { value: 2, label: 'Baja', veredicto: 'bueno' },
+  { value: 3, label: 'Media', veredicto: 'advertencia' },
+  { value: 4, label: 'Alta', veredicto: 'malo' },
+  { value: 5, label: 'Urgente', veredicto: 'malo' },
+];
+
+/** Plazo legible: en días cuando es múltiplo exacto, en horas cuando no.
+ *  "72 h" no se lee; "3 días" sí. */
+function formatearPlazo(horas: number): string {
+  if (!horas) return '—';
+  if (horas % 24 === 0) {
+    const dias = horas / 24;
+    return dias === 1 ? '1 día' : `${dias} días`;
+  }
+  return `${horas} h`;
+}
+
+const FORM_VACIO = {
+  nombre: '',
+  descripcion: '',
+  icono: 'Folder',
+  color: '#6366f1',
+  orden: 0,
+  tiempo_resolucion_estimado: 48,
+  prioridad_default: 3,
+  interna: false,
+};
+
+export function CategoriaConfigBase({
+  title,
+  api,
+  showReclamoFields = false,
+  enableSugerencias = false,
+  showInternaField = false,
+  entidad = 'categoría',
+}: Props) {
   const { theme } = useTheme();
   const [items, setItems] = useState<CategoriaItem[]>([]);
   // Publica el total para el contador del riel de Configuración.
   useReportarTotal(items.length);
+
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [vista, setVista] = useState<ViewKind>('table');
+  const [estadoTab, setEstadoTab] = useState('todos');
+  const [ordenando, setOrdenando] = useState(false);
 
   // Autocomplete de sugerencias cross-municipio (solo en modo alta).
   const [sugerencias, setSugerencias] = useState<CategoriaSugerida[]>([]);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
 
-  // Sheet state
+  // Drawer de alta/edición.
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<CategoriaItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    nombre: '',
-    descripcion: '',
-    icono: 'Folder',
-    color: '#6366f1',
-    orden: 0,
-    tiempo_resolucion_estimado: 48,
-    prioridad_default: 3,
-    interna: false,
-  });
+  const [form, setForm] = useState(FORM_VACIO);
+  const [unidadPlazo, setUnidadPlazo] = useState<'horas' | 'dias'>('horas');
 
-  const cargar = async () => {
+  // Borrado: ConfirmModal, nunca `confirm()` (control nativo vetado).
+  const [aBorrar, setABorrar] = useState<CategoriaItem | null>(null);
+  const [borrando, setBorrando] = useState(false);
+
+  const cargar = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.getAll();
       setItems(res.data);
     } catch (err) {
-      toast.error('Error cargando categorías');
+      toast.error(`Error cargando ${entidad}s`);
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [api, entidad]);
 
   useEffect(() => {
     cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cargar]);
+
+  /* --- Alta / edición ------------------------------------------------- */
 
   const abrirNuevo = () => {
     setEditing(null);
-    setForm({
-      nombre: '',
-      descripcion: '',
-      icono: 'Folder',
-      color: '#6366f1',
-      orden: items.length + 1,
-      tiempo_resolucion_estimado: 48,
-      prioridad_default: 3,
-      interna: false,
-    });
+    setForm({ ...FORM_VACIO, orden: items.length + 1 });
+    setUnidadPlazo('horas');
     setSugerencias([]);
     setMostrarSugerencias(false);
+    setSheetOpen(true);
+  };
+
+  const abrirEdit = (item: CategoriaItem) => {
+    setEditing(item);
+    const horas = item.tiempo_resolucion_estimado ?? 48;
+    setForm({
+      nombre: item.nombre,
+      descripcion: item.descripcion || '',
+      icono: item.icono || 'Folder',
+      color: item.color || '#6366f1',
+      orden: item.orden,
+      tiempo_resolucion_estimado: horas,
+      prioridad_default: item.prioridad_default ?? 3,
+      interna: item.interna ?? false,
+    });
+    // Arranca en la unidad que hace legible el valor guardado.
+    setUnidadPlazo(horas % 24 === 0 && horas >= 24 ? 'dias' : 'horas');
     setSheetOpen(true);
   };
 
@@ -143,10 +245,9 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
    * con debounce de 300ms. No se llama al backend en modo edición.
    */
   const handleNombreChange = (nombre: string) => {
-    setForm({ ...form, nombre });
+    setForm((f) => ({ ...f, nombre }));
 
     if (!enableSugerencias || editing) return;
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (nombre.trim().length < 2) {
@@ -170,9 +271,8 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
   };
 
   /**
-   * Al elegir una sugerencia del catálogo cross-municipio, precargamos
-   * todos los campos del form (nombre, descripción, ícono, color, tiempo,
-   * prioridad). El admin puede editarlos antes de guardar.
+   * Al elegir una sugerencia del catálogo cross-municipio, precargamos todos
+   * los campos del form. El admin puede editarlos antes de guardar.
    */
   const aplicarSugerencia = (s: CategoriaSugerida) => {
     setForm({
@@ -186,21 +286,6 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
       interna: false,
     });
     setMostrarSugerencias(false);
-  };
-
-  const abrirEdit = (item: CategoriaItem) => {
-    setEditing(item);
-    setForm({
-      nombre: item.nombre,
-      descripcion: item.descripcion || '',
-      icono: item.icono || 'Folder',
-      color: item.color || '#6366f1',
-      orden: item.orden,
-      tiempo_resolucion_estimado: (item as any).tiempo_resolucion_estimado ?? 48,
-      prioridad_default: (item as any).prioridad_default ?? 3,
-      interna: item.interna ?? false,
-    });
-    setSheetOpen(true);
   };
 
   const guardar = async () => {
@@ -227,116 +312,296 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
 
       if (editing) {
         await api.update(editing.id, payload);
-        toast.success('Categoría actualizada');
+        toast.success(`${entidad[0].toUpperCase()}${entidad.slice(1)} actualizada`);
       } else {
         await api.create(payload);
-        toast.success('Categoría creada');
+        toast.success(`${entidad[0].toUpperCase()}${entidad.slice(1)} creada`);
       }
       setSheetOpen(false);
       await cargar();
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail || 'Error guardando';
+    } catch (err) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Error guardando';
       toast.error(detail);
     } finally {
       setSaving(false);
     }
   };
 
-  const eliminar = async (item: CategoriaItem) => {
-    if (!confirm(`¿Eliminar categoría "${item.nombre}"?`)) return;
+  const confirmarBorrado = async () => {
+    if (!aBorrar) return;
+    setBorrando(true);
     try {
-      await api.delete(item.id);
-      toast.success('Categoría eliminada');
+      await api.delete(aBorrar.id);
+      toast.success(`${entidad[0].toUpperCase()}${entidad.slice(1)} eliminada`);
+      setABorrar(null);
       await cargar();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Error eliminando');
+    } catch (err) {
+      // El backend bloquea el borrado de una categoría en uso y explica por
+      // qué ("la usan 38 reclamos"): ese detalle es la respuesta útil.
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Error eliminando';
+      toast.error(detail);
+    } finally {
+      setBorrando(false);
     }
   };
 
-  const filtrados = items.filter(it =>
-    it.nombre.toLowerCase().includes(search.toLowerCase())
+  /* --- Activar / desactivar sin abrir el drawer ------------------------ */
+
+  const alternarActivo = async (item: CategoriaItem, activo: boolean) => {
+    // Optimista: el interruptor tiene que responder en el acto. Si el PUT
+    // falla se revierte y se avisa — mostrar el estado real es lo que importa.
+    setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, activo } : x)));
+    try {
+      await api.update(item.id, { activo });
+    } catch {
+      setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, activo: !activo } : x)));
+      toast.error('No se pudo cambiar el estado');
+    }
+  };
+
+  /* --- Reordenar ------------------------------------------------------ */
+
+  /**
+   * Persiste el orden nuevo. Sólo se mandan las filas cuyo `orden` cambió: en
+   * un catálogo de 20, mover una fila toca 3, no 20.
+   */
+  const reordenar = async (filas: CategoriaItem[]) => {
+    const conOrden = filas.map((f, i) => ({ ...f, orden: i + 1 }));
+    const previos = items;
+    setItems(conOrden);
+
+    const cambiadas = conOrden.filter((f) => {
+      const antes = previos.find((p) => p.id === f.id);
+      return antes && antes.orden !== f.orden;
+    });
+    if (!cambiadas.length) return;
+
+    try {
+      await Promise.all(cambiadas.map((f) => api.update(f.id, { orden: f.orden })));
+    } catch {
+      toast.error('No se pudo guardar el orden');
+      await cargar();
+    }
+  };
+
+  /* --- Derivados ------------------------------------------------------ */
+
+  const activas = useMemo(() => items.filter((i) => i.activo).length, [items]);
+
+  const visibles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((it) => {
+      if (estadoTab === 'activos' && !it.activo) return false;
+      if (estadoTab === 'inactivos' && it.activo) return false;
+      if (!q) return true;
+      return (
+        it.nombre.toLowerCase().includes(q) ||
+        (it.descripcion ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [items, search, estadoTab]);
+
+  // Reordenar sobre una lista filtrada daría un orden equivocado (las filas
+  // ocultas conservan su número y el resultado sale mezclado). Se apaga el
+  // modo y se dice por qué, en vez de dejar un botón que rompe.
+  const listaCompleta = !search.trim() && estadoTab === 'todos';
+  const puedeReordenar = vista === 'table' && listaCompleta;
+  useEffect(() => {
+    if (ordenando && !puedeReordenar) setOrdenando(false);
+  }, [ordenando, puedeReordenar]);
+
+  const columnas = useMemo<ColumnSpec<CategoriaItem>[]>(() => {
+    const cols: ColumnSpec<CategoriaItem>[] = [
+      {
+        id: 'nombre',
+        header: 'Nombre y descripción',
+        width: 'minmax(220px, 2.2fr)',
+        kind: 'entity',
+        cell: (r) => (
+          <EntityCell
+            icon={<DynamicIcon name={r.icono || 'Folder'} size={16} strokeWidth={1.9} />}
+            tileColor={r.color}
+            title={r.nombre}
+            subtitle={r.descripcion}
+          />
+        ),
+      },
+    ];
+
+    if (showReclamoFields) {
+      cols.push({
+        id: 'respuesta',
+        header: 'Respuesta comprometida',
+        width: 'minmax(130px, 1fr)',
+        kind: 'metric',
+        cell: (r) => {
+          const prio = r.prioridad_default ?? 3;
+          const step = PRIORIDADES.find((p) => p.value === prio);
+          return (
+            <MetricCell
+              value={formatearPlazo(r.tiempo_resolucion_estimado ?? 0)}
+              note={`prioridad ${prio} · ${step?.label.toLowerCase() ?? ''}`}
+              veredicto={step?.veredicto}
+            />
+          );
+        },
+      });
+    }
+
+    if (showInternaField) {
+      cols.push({
+        id: 'alcance',
+        header: 'Alcance',
+        width: 'minmax(100px, 0.8fr)',
+        kind: 'chip',
+        cell: (r) =>
+          r.interna ? (
+            <ChipEstado label="Interna" tone="gray" />
+          ) : (
+            <ChipEstado label="La ve el vecino" tone="blue" />
+          ),
+      });
+    }
+
+    cols.push(
+      {
+        id: 'activo',
+        header: 'Estado',
+        width: 'minmax(76px, 0.5fr)',
+        align: 'right',
+        cell: (r) => (
+          <Switch
+            checked={r.activo}
+            ariaLabel={r.activo ? `Desactivar ${r.nombre}` : `Activar ${r.nombre}`}
+            onChange={(v) => alternarActivo(r, v)}
+          />
+        ),
+      },
+      {
+        id: 'acciones',
+        header: 'Acciones',
+        width: 'minmax(76px, 0.5fr)',
+        kind: 'actions',
+        align: 'right',
+      },
+    );
+    return cols;
+    // `alternarActivo` se recrea en cada render (usa `items`); las columnas se
+    // reconstruyen igual cuando cambian las banderas, que es lo que importa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReclamoFields, showInternaField]);
+
+  const acciones = useMemo(
+    () => [
+      { id: 'edit', label: 'Editar', icon: Pencil, onClick: (r: CategoriaItem) => abrirEdit(r) },
+      {
+        id: 'del',
+        label: 'Eliminar',
+        icon: Trash2,
+        danger: true,
+        onClick: (r: CategoriaItem) => setABorrar(r),
+      },
+    ],
+    [],
   );
 
+  const plazoEnUnidad =
+    unidadPlazo === 'dias'
+      ? Math.max(1, Math.round(form.tiempo_resolucion_estimado / 24))
+      : form.tiempo_resolucion_estimado;
+
   return (
-    <div className="h-full flex flex-col">
-      <StickyPageHeader
-        backLink="/gestion/configuracion"
+    <>
+      <SemanticAbmPage<CategoriaItem>
+        moduleKey="catalogo"
         title={title}
-        searchValue={search}
+        description={`Las ${entidad}s que usa toda la app. El orden es el que ve el vecino.`}
+        searchPlaceholder={`Buscar ${entidad}…`}
+        views={['table', 'cards']}
+        activeView={vista}
+        onViewChange={setVista}
+        search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Buscar categoría..."
-        buttonLabel="Nueva categoría"
-        onButtonClick={abrirNuevo}
+        secondaryAction={{
+          label: ordenando ? 'Listo' : 'Reordenar',
+          icon: ArrowDownUp,
+          onClick: () => setOrdenando((v) => !v),
+          disabled: !puedeReordenar,
+          disabledReason: !listaCompleta
+            ? 'Para reordenar, limpiá la búsqueda y volvé a "Todas"'
+            : 'El orden se arrastra en la vista de tabla',
+        }}
+        primaryAction={{ label: `Nueva ${entidad}`, onClick: abrirNuevo }}
+        selects={[]}
+        statusTabs={[
+          { id: 'todos', label: 'Todas', count: items.length },
+          { id: 'activos', label: 'Activas', count: activas },
+          { id: 'inactivos', label: 'Inactivas', count: items.length - activas },
+        ]}
+        activeStatus={estadoTab}
+        onStatusChange={setEstadoTab}
+        kind="plain"
+        columns={columnas}
+        rows={visibles}
+        rowKey={(r) => r.id}
+        rowActions={acciones}
+        onRowClick={ordenando ? undefined : abrirEdit}
+        loading={loading}
+        emptyMessage={
+          search.trim()
+            ? `Ninguna ${entidad} coincide con "${search.trim()}".`
+            : `Todavía no hay ${entidad}s. Creá la primera con el botón de arriba.`
+        }
+        footer={{ showing: `Mostrando ${visibles.length} de ${items.length}` }}
+        reorder={{ active: ordenando, onReorder: (filas) => reordenar(filas) }}
+        viewSlots={{
+          cards: (
+            <CardGrid<CategoriaItem>
+              rows={visibles}
+              rowKey={(r) => r.id}
+              loading={loading}
+              card={(r) => ({
+                title: r.nombre,
+                subtitle: r.descripcion,
+                icon: <DynamicIcon name={r.icono || 'Folder'} size={18} strokeWidth={1.9} />,
+                tileColor: r.color,
+                metric: showReclamoFields
+                  ? {
+                      value: formatearPlazo(r.tiempo_resolucion_estimado ?? 0),
+                      note: `prioridad ${r.prioridad_default ?? 3}`,
+                      veredicto: PRIORIDADES.find((p) => p.value === (r.prioridad_default ?? 3))
+                        ?.veredicto,
+                    }
+                  : undefined,
+                chip:
+                  showInternaField && r.interna ? { label: 'Interna', tone: 'gray' } : undefined,
+              })}
+              actions={acciones}
+              toggle={{
+                checked: (r) => r.activo,
+                onChange: (r, v) => alternarActivo(r, v),
+                labelOn: 'Activa',
+                labelOff: 'Inactiva',
+              }}
+              onCardClick={abrirEdit}
+              emptyMessage={`Todavía no hay ${entidad}s.`}
+            />
+          ),
+        }}
       />
 
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="text-center py-20" style={{ color: theme.textSecondary }}>
-            No hay categorías. Hacé click en "Nueva categoría" para crear una.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtrados.map(item => (
-              <div
-                key={item.id}
-                className="p-4 rounded-xl flex items-start gap-3 transition-all duration-200 hover:scale-[1.02]"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-              >
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${item.color || '#6366f1'}20` }}
-                >
-                  <DynamicIcon name={item.icono || 'Folder'} className="h-6 w-6" style={{ color: item.color || '#6366f1' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold truncate" style={{ color: theme.text }}>{item.nombre}</h3>
-                  {item.descripcion && (
-                    <p className="text-xs mt-1 line-clamp-2" style={{ color: theme.textSecondary }}>{item.descripcion}</p>
-                  )}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {showInternaField && item.interna && (
-                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: `${theme.textSecondary}20`, color: theme.textSecondary }}>
-                        Interna
-                      </span>
-                    )}
-                    {!item.activo && (
-                      <span className="inline-block px-2 py-0.5 rounded text-xs" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
-                        Inactiva
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => abrirEdit(item)}
-                    className="p-1.5 rounded-lg transition-colors hover:bg-black/5"
-                    style={{ color: theme.textSecondary }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => eliminar(item)}
-                    className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10"
-                    style={{ color: '#ef4444' }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+      {/* --- Drawer de alta / edición --- */}
       <Sheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        title={editing ? 'Editar categoría' : 'Nueva categoría'}
-        description={editing ? 'Modificá los datos y guardá' : 'Completá los datos de la nueva categoría'}
+        title={editing ? `Editar ${entidad}` : `Nueva ${entidad}`}
+        description={
+          editing ? 'Modificá los datos y guardá' : `Completá los datos de la nueva ${entidad}`
+        }
         stickyFooter={
           <div className="flex justify-end gap-2">
             <button
@@ -366,18 +631,25 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
             <input
               type="text"
               value={form.nombre}
-              onChange={e => handleNombreChange(e.target.value)}
+              onChange={(e) => handleNombreChange(e.target.value)}
               onFocus={() => {
                 if (enableSugerencias && !editing && sugerencias.length > 0) {
                   setMostrarSugerencias(true);
                 }
               }}
-              placeholder={enableSugerencias && !editing ? 'Ej: "iluminación", "bache", "basura"...' : ''}
+              placeholder={enableSugerencias && !editing ? 'Ej: "iluminación", "bache", "basura"…' : ''}
               className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
+              }}
             />
             {enableSugerencias && !editing && (
-              <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: theme.textSecondary }}>
+              <p
+                className="text-[10px] mt-1 flex items-center gap-1"
+                style={{ color: theme.textSecondary }}
+              >
                 <Sparkles className="h-3 w-3" />
                 Te sugerimos categorías típicas mientras tipeás. Click para precargar.
               </p>
@@ -387,10 +659,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
             {enableSugerencias && !editing && mostrarSugerencias && (sugerencias.length > 0 || loadingSugerencias) && (
               <div
                 className="absolute left-0 right-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden max-h-72 overflow-y-auto z-50"
-                style={{
-                  backgroundColor: theme.card,
-                  border: `1px solid ${theme.border}`,
-                }}
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 <div
@@ -402,7 +671,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
                   }}
                 >
                   <Sparkles className="h-3 w-3" />
-                  {loadingSugerencias ? 'Buscando...' : `${sugerencias.length} sugerencias del catálogo`}
+                  {loadingSugerencias ? 'Buscando…' : `${sugerencias.length} sugerencias del catálogo`}
                 </div>
                 {sugerencias.map((s) => (
                   <button
@@ -413,10 +682,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
                       aplicarSugerencia(s);
                     }}
                     className="w-full text-left px-3 py-2.5 transition-colors border-b last:border-b-0 hover:brightness-110"
-                    style={{
-                      borderBottomColor: theme.border,
-                      backgroundColor: theme.card,
-                    }}
+                    style={{ borderBottomColor: theme.border, backgroundColor: theme.card }}
                   >
                     <div className="flex items-start gap-2">
                       <div
@@ -434,7 +700,10 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
                           {s.nombre}
                         </p>
                         {s.descripcion && (
-                          <p className="text-[11px] mt-0.5 line-clamp-2" style={{ color: theme.textSecondary }}>
+                          <p
+                            className="text-[11px] mt-0.5 line-clamp-2"
+                            style={{ color: theme.textSecondary }}
+                          >
                             {s.descripcion}
                           </p>
                         )}
@@ -460,119 +729,147 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
             </label>
             <textarea
               value={form.descripcion}
-              onChange={e => setForm({ ...form, descripcion: e.target.value })}
+              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               rows={2}
               className="w-full px-3 py-2 rounded-xl text-sm resize-none"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
+              }}
+            />
+            <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+              Es el texto que el vecino lee al elegir.
+            </p>
+          </div>
+
+          {/* Icono y color juntos: lo que se elige no es "un icono", es cómo se
+              va a ver la fila en la app del vecino. */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+              Cómo se ve en la app
+            </label>
+            <IconColorPicker
+              icons={ICONOS_DISPONIBLES}
+              icon={form.icono}
+              onIconChange={(n) => setForm((f) => ({ ...f, icono: n }))}
+              colors={COLORES_DISPONIBLES}
+              color={form.color}
+              onColorChange={(c) => setForm((f) => ({ ...f, color: c }))}
+              preview={{ title: form.nombre || `Sin nombre`, subtitle: 'Icono y color' }}
+              note="El color agrupa visualmente en el mapa y las listas. La urgencia la define la prioridad, no el color."
+              collapsible
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-              Icono
-            </label>
-            <div className="grid grid-cols-8 gap-2">
-              {ICONOS_DISPONIBLES.map(ic => (
-                <button
-                  key={ic}
-                  type="button"
-                  onClick={() => setForm({ ...form, icono: ic })}
-                  className="aspect-square rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                  style={{
-                    backgroundColor: form.icono === ic ? `${form.color}30` : theme.backgroundSecondary,
-                    border: `2px solid ${form.icono === ic ? form.color : 'transparent'}`,
-                  }}
-                >
-                  <DynamicIcon name={ic} className="h-5 w-5" style={{ color: form.color }} />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-              Color
-            </label>
-            <div className="grid grid-cols-7 gap-2">
-              {COLORES_DISPONIBLES.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setForm({ ...form, color: c })}
-                  className="aspect-square rounded-lg transition-all duration-200 hover:scale-110"
-                  style={{
-                    backgroundColor: c,
-                    border: `3px solid ${form.color === c ? theme.text : 'transparent'}`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
           {showReclamoFields && (
-            <div className="grid grid-cols-2 gap-3">
+            <>
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
-                  Tiempo resolución (hs)
+                <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+                  Plazo de resolución
                 </label>
-                <input
-                  type="number"
-                  value={form.tiempo_resolucion_estimado}
-                  onChange={e => setForm({ ...form, tiempo_resolucion_estimado: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="number"
+                    min={1}
+                    value={plazoEnUnidad}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value) || 0;
+                      setForm((f) => ({
+                        ...f,
+                        tiempo_resolucion_estimado: unidadPlazo === 'dias' ? n * 24 : n,
+                      }));
+                    }}
+                    className="w-24 px-3 py-2 rounded-xl text-sm"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      border: `1px solid ${theme.border}`,
+                      color: theme.text,
+                    }}
+                  />
+                  <SegmentedControl
+                    size="sm"
+                    ariaLabel="Unidad del plazo"
+                    value={unidadPlazo}
+                    onChange={(id) => setUnidadPlazo(id as 'horas' | 'dias')}
+                    options={[
+                      { id: 'horas', label: 'horas' },
+                      { id: 'dias', label: 'días' },
+                    ]}
+                  />
+                  <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    Se guarda en horas: {form.tiempo_resolucion_estimado} h
+                  </span>
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
-                  Prioridad default (1-5)
+                <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+                  Prioridad por defecto
                 </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
+                <ScalePicker
+                  steps={PRIORIDADES}
                   value={form.prioridad_default}
-                  onChange={e => setForm({ ...form, prioridad_default: parseInt(e.target.value) || 3 })}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+                  onChange={(v) => setForm((f) => ({ ...f, prioridad_default: v }))}
+                  ariaLabel="Prioridad por defecto"
+                  note="Con la que entra un reclamo de esta categoría si nadie la cambia."
                 />
               </div>
-            </div>
+            </>
           )}
 
           {showInternaField && (
-            <div className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-              <input
-                type="checkbox"
-                id="categoria-interna"
+            <div
+              className="p-3 rounded-xl"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+            >
+              <Switch
                 checked={form.interna}
-                onChange={e => setForm({ ...form, interna: e.target.checked })}
-                className="h-4 w-4 rounded mt-0.5 flex-shrink-0"
-                style={{ accentColor: theme.primary }}
+                onChange={(v) => setForm((f) => ({ ...f, interna: v }))}
+                label="Interna"
+                description="No se le ofrece al vecino al crear un reclamo; sirve para clasificar trabajo interno (preventivo, mantenimiento, obra)."
               />
-              <label htmlFor="categoria-interna" className="cursor-pointer select-none">
-                <span className="block text-sm font-medium" style={{ color: theme.text }}>Interna</span>
-                <span className="block text-xs mt-0.5" style={{ color: theme.textSecondary }}>
-                  No se le ofrece al vecino al crear un reclamo; sirve para clasificar trabajo interno (preventivo, mantenimiento, obra).
-                </span>
-              </label>
             </div>
           )}
 
           <div>
             <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
-              Orden
+              Orden en la app del vecino
             </label>
-            <input
-              type="number"
-              value={form.orden}
-              onChange={e => setForm({ ...form, orden: parseInt(e.target.value) || 0 })}
-              className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                type="number"
+                value={form.orden}
+                onChange={(e) => setForm({ ...form, orden: parseInt(e.target.value) || 0 })}
+                className="w-24 px-3 py-2 rounded-xl text-sm"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.text,
+                }}
+              />
+              <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+                También se puede arrastrar la lista con el botón "Reordenar".
+              </span>
+            </div>
           </div>
         </div>
       </Sheet>
-    </div>
+
+      <ConfirmModal
+        isOpen={!!aBorrar}
+        onClose={() => setABorrar(null)}
+        onConfirm={confirmarBorrado}
+        loading={borrando}
+        variant="danger"
+        title={`Eliminar ${entidad}`}
+        message={
+          aBorrar
+            ? `Se va a eliminar "${aBorrar.nombre}". Si ya se usó en registros existentes, el sistema no va a dejar borrarla y te lo va a decir.`
+            : ''
+        }
+        confirmText="Eliminar"
+      />
+    </>
   );
 }
