@@ -1,7 +1,7 @@
 # Handoff — Dashboard v2: paridad con la referencia del diseñador
 
 **Fecha:** 2026-07-31 · **Rama:** qa (working tree SIN pushear — push conjunto cuando el dueño apruebe lo visual)
-**Referencias:** `design/handoff-v2/references/dashboard-claro.dc.html` y `dashboard-oscuro.dc.html`
+**Referencias:** `docs/design/paquetes/04_2026-07-31_handoff-v2/references/dashboard-claro.dc.html` y `dashboard-oscuro.dc.html`
 
 ## Qué se hizo (verificado con Playwright headless en localhost:5173/asuncion, 0 errores JS/HTTP)
 
@@ -50,4 +50,4 @@ EN PAUSA: el dueño quería hacer una corrección antes de seguir.
 ## Cómo retomar
 pm2 `munify-front-dev` (Vite 5173, proxy /api→QA). Captura/medición: `frontend/_dash_compare.mjs`
 (login /asuncion como Administrador, screenshots + computed styles del banner). Orden de secciones
-de la referencia: `design/handoff-v2/_orden_secciones.txt`.
+de la referencia: `docs/design/paquetes/04_2026-07-31_handoff-v2/_orden_secciones.txt`.

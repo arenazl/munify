@@ -23,7 +23,7 @@ asume.
 | `Rediseño Sidebar y Banner.dc.html` (+ variante oscura) | `components/shell/SidebarV2.tsx`, `TopbarV2` | Implementado |
 | `Sidebar Colapsada.dc.html` | `components/shell/SidebarV2.tsx` | Implementado (commit `999b6e1`) |
 | `Liquidaciones.dc.html` | `pages/TesoreriaAgenda.tsx` | **Pendiente** — verificado sin piezas v2 |
-| `Horarios.dc.html` | `pages/GestionHorarios.tsx` | **Pendiente** — verificado sin piezas v2 |
+| `Horarios.dc.html` | `pages/ConfiguracionAgenda.tsx` (el item "Horarios" del sidebar apunta a `/gestion/configuracion-agenda`) | Implementado — el archivo declara el `.dc` como origen en su cabecera |
 | `Ordenes de Pago.dc.html` | `pages/OrdenesPago.tsx` | **Pendiente** — verificado sin piezas v2 |
 | `Personal.dc.html` | `pages/Empleados.tsx` o `SueldosEmpleados.tsx` | Mapeo **por confirmar** |
 | `Gastos.dc.html` | `pages/Tesoreria.tsx` (?) | Mapeo **por confirmar** |
@@ -31,6 +31,24 @@ asume.
 | `Dashboard Animado.dc.html`, `dashboard-municipal-v3.dc.html` | `pages/Dashboard.tsx` | Usa kit v2; alineación al `.dc` **por confirmar** |
 | `Migracion Multitenant.dc.html` | — | Sin relevar (apareció el 2026-08-02) |
 | `Canvas.dc.html` | — | Pieza del canvas, no es pantalla de la app |
+
+## Cómo NO mapear (error real, 2026-08-02)
+
+La primera versión de esta tabla dio `Horarios.dc.html` → `pages/GestionHorarios.tsx`
+**por el parecido del nombre**. Estaba mal en los dos sentidos:
+
+- El item "Horarios" del sidebar apunta a `/gestion/configuracion-agenda`, o sea
+  a `ConfiguracionAgenda.tsx` — que **ya tenía el diseño implementado**.
+- `GestionHorarios.tsx` es **código huérfano**: ningún archivo lo importa, no
+  tiene ruta ni entrada de sidebar. Su función (horario semanal del empleado) ya
+  fue absorbida por el Sheet de `Empleados.tsx`.
+
+Se estuvo a punto de migrar una pantalla inalcanzable contra un diseño que era
+de otra, y de pisar función ya resuelta.
+
+**Regla:** mapear por la **ruta del sidebar** (`config/navigation.ts` → `href` →
+componente en el router), nunca por el nombre del archivo. Y antes de tocar una
+pantalla, confirmar que esté referenciada en algún lado.
 
 ## Pantallas del sistema SIN diseño en el canvas
 

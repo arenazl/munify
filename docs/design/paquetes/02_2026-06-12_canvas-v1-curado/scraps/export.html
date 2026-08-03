@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Munify · export</title>
+<meta name="viewport" content="width=1200,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..700,0..100&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../brand.css" />
+<style>
+  /* Body shrinks to exactly the card so any capture of body/#stage is tight. */
+  html, body { margin: 0; padding: 0; background: transparent; width: max-content; }
+  body { font-family: var(--sans); }
+  #stage { display: block; overflow: hidden; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="stage"></div>
+<script type="text/babel" src="../brand.jsx?v=5"></script>
+<script type="text/babel" src="../profile.jsx?v=5"></script>
+<script type="text/babel" src="../catalog.jsx?v=5"></script>
+<script type="text/babel" src="../banners.jsx?v=5"></script>
+<script type="text/babel">
+const REGISTRY = {
+  'profile':       { Comp: ProfilePic,         w: 640,  h: 640 },
+  'profile-alt':   { Comp: ProfilePicMarkOnly, w: 640,  h: 640 },
+  'cover':         { Comp: CoverCard,          w: 1080, h: 1080 },
+  'combo':         { Comp: ComboCard,          w: 1080, h: 1080 },
+  'reclamos':      { Comp: ReclamosCard,       w: 1080, h: 1080 },
+  'tramites':      { Comp: TramitesCard,       w: 1080, h: 1080 },
+  'tesoreria':     { Comp: TesoreriaCard,      w: 1080, h: 1080 },
+  'renaper':       { Comp: RenaperCard,        w: 1080, h: 1080 },
+  'soporte':       { Comp: SoporteCard,        w: 1080, h: 1080 },
+  'plan-estandar': { Comp: PlanEstandarCard,   w: 1080, h: 1080 },
+  'plan-express':  { Comp: PlanExpressCard,    w: 1080, h: 1080 },
+  'plan-premium':  { Comp: PlanPremiumCard,    w: 1080, h: 1080 },
+  'demo':          { Comp: DemoCard,           w: 1080, h: 1080 },
+  'fb-editorial':  { Comp: BannerEditorial,    w: 851,  h: 315 },
+  'fb-promo':      { Comp: BannerPromo,        w: 851,  h: 315 },
+  'fb-split':      { Comp: BannerSplit,        w: 851,  h: 315 },
+  'fb-modulos':    { Comp: BannerModulos,      w: 851,  h: 315 },
+  'fb-flujo':      { Comp: BannerFlujo,        w: 851,  h: 315 },
+  'fb-tiemporeal': { Comp: BannerTiempoReal,   w: 851,  h: 315 },
+  'fb-web-hero':   { Comp: BannerWebHero,      w: 851,  h: 315 },
+  'fb-web-serv':   { Comp: BannerWebServicios, w: 851,  h: 315 },
+  'fb-web-ia':     { Comp: BannerWebIA,        w: 851,  h: 315 },
+};
+
+const stage = document.getElementById('stage');
+const root = ReactDOM.createRoot(stage);
+
+function render() {
+  const id = location.hash.replace('#', '') || 'cover';
+  const entry = REGISTRY[id];
+  if (!entry) { stage.innerHTML = 'unknown: ' + id; return; }
+  // Make stage AND the document exactly the card size — no gray bleed,
+  // no body width inherited from the viewport.
+  stage.style.width  = entry.w + 'px';
+  stage.style.height = entry.h + 'px';
+  document.documentElement.style.width = entry.w + 'px';
+  document.documentElement.style.height = entry.h + 'px';
+  document.body.style.width = entry.w + 'px';
+  document.body.style.height = entry.h + 'px';
+  root.render(<entry.Comp/>);
+}
+
+window.addEventListener('hashchange', render);
+setTimeout(render, 50);
+
+// Direct render hook for the exporter (re-selecting the same card still re-renders).
+window.__show = function (id) { location.hash = '#' + id; render(); };
+</script>
+</body>
+</html>

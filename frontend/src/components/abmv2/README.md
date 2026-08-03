@@ -2,8 +2,8 @@
 
 Implementación del estándar de páginas ABM del rediseño v2. Fuentes de verdad:
 
-- `design/handoff-v2/STANDARD-SemanticAbmPage.md` — anatomía, medidas, reglas transversales.
-- `design/handoff-v2/STANDARD-Variaciones-por-props.md` — contratos TS y variaciones por `kind`/`mode`.
+- `docs/design/paquetes/04_2026-07-31_handoff-v2/STANDARD-SemanticAbmPage.md` — anatomía, medidas, reglas transversales.
+- `docs/design/paquetes/04_2026-07-31_handoff-v2/STANDARD-Variaciones-por-props.md` — contratos TS y variaciones por `kind`/`mode`.
 
 **Todas las pantallas de listado son LA MISMA página configurada por props.** No se maqueta una
 pantalla por módulo: se instancia `SemanticAbmPage<Row>` con otra data y otras banderas.

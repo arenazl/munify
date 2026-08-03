@@ -5,7 +5,7 @@ SemanticHero con KPIs ADENTRO + ListToolbar + FilterBar + DataTable con tabs v2.
 sheets = Sheet `customHeader` plano + clases `rs-*`). **Cero KPIs sueltos, cero
 pills viejas, cero Tip banners.** Fuente de verdad: canvas Claude Design
 `46976e44-b6dc-4395-b1fe-15aa2a8f9584`; canónicos bajados a
-`design/handoff-v2/references/*-canvas.dc.html`.
+`docs/design/paquetes/04_2026-07-31_handoff-v2/references/*-canvas.dc.html`.
 
 ## Pusheado a qa (todo con eslint sin errores nuevos + tsc + build verdes)
 

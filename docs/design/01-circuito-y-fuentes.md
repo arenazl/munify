@@ -37,9 +37,26 @@ legible**, así que se puede listar para ver qué otras pantallas existen.
 | Lugar | Qué es | Rol |
 |---|---|---|
 | El canvas | Los `.dc.html` originales | **Fuente de verdad.** Siempre la última versión |
-| `design/handoff-v2/references/*.dc.html` | Copias bajadas a disco | **Caché descartable** |
+| `docs/design/paquetes/NN_<fecha>_<nombre>/` | Cada bajada del canvas, fechada | **Caché descartable.** El NN más alto es la vigente |
+| `docs/design/_media/` | Binarios pesados de esos paquetes (mp4, zip, exports) | Fuera de git. No se versiona ni se borra |
 | `docs/design/` | Esta documentación | Índice, histórico y auditoría |
 | Memoria del agente | El id del canvas y las reglas | Puntero, no contenido |
+
+**Nada de esto va en la raíz del repo.** Hasta el 2026-08-02 había una carpeta
+`design/` colgando de la raíz con 71 MB mezclados (paquetes, mp4 de reels, un zip
+de 12 MB). Se consolidó toda acá, por fecha, sin perder nada.
+
+## 3.bis. El canal es de doble vía
+
+`DesignSync` no sólo baja. Los métodos de escritura (`finalize_plan` +
+`write_files`) permiten **dejarle archivos al canvas**: un brief con el mapa de
+una pantalla, el grafo de datos, el kit actual en HTML. Es la alternativa a
+pegarle capturas a mano — el proyecto tenía 87 `pasted-*.png` en `uploads/`
+justamente porque esta mitad del canal nunca se usó.
+
+Asimetría a tener presente: **Claude Design no tiene herramienta para iniciar el
+contacto.** Ve los archivos aparecer en su proyecto, sin saber quién los puso, y
+no puede avisar cuando produce algo. El turno lo da siempre el dueño.
 
 **Por qué existe la caché:** cuando se lanza una flota de subagentes para
 migrar varias pantallas en paralelo, **`DesignSync` no llega a los subagentes**.
@@ -68,7 +85,7 @@ Los valores concretos del canvas **sí** se respetan (256px, 68px, 240ms,
 
 ## 5. Higiene de la caché (deuda conocida)
 
-Estado relevado el 2026-08-02 en `design/handoff-v2/references/` — 18 archivos,
+Estado relevado el 2026-08-02 en `docs/design/paquetes/04_2026-07-31_handoff-v2/references/` — 18 archivos,
 ~1,8 MB:
 
 - **2 pares duplicados**, idénticos byte a byte con nombres distintos:

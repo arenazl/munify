@@ -22,7 +22,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`marketing/`](marketing/) | Brochure comercial |
 | [`reels/`](reels/) | Contexto de reels de promoción (doc vivo entre agentes) |
 | [`clientes/`](clientes/) | Docs por cliente (`spn/` = San Pedro Norte: notas, reportes, planillas) |
-| [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas y su estado |
+| [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas, y `paquetes/` con cada bajada del canvas fechada (la de número más alto es la vigente) |
 | [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`) — se crea al primer uso |
 | [`historico/`](historico/) | Docs superados, archivados por fecha (`YYYY-MM-DD-titulo.md`) |
 | [`legacy/`](legacy/) | Archivo histórico pre-criterio (congelado; no mover, no borrar) |

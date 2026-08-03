@@ -98,13 +98,9 @@ reels/
 sofi/
 *.zip
 
-# Scratch de diseño: assets pesados y canvas de trabajo.
-# El handoff versionado vive en design/handoff-v2/
-design/uploads/
-design/exports/
-design/new/
-design/scraps/
-design/.design-canvas.state.json
+# Diseño: los paquetes versionados viven en docs/design/paquetes/.
+# _media/ son los binarios pesados (mp4, zip, capturas exportadas) — fuera de git.
+docs/design/_media/
 
 # Scripts descartables: verificación con Playwright, respaldos y análisis ad-hoc
 frontend/_*.mjs

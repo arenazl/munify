@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1830; --ink-2:#1A2647;
+    --logo-navy:#103070; --logo-azure:#4070C0;
+    --accent:#C8A24E;
+    --display:'Fraunces',Georgia,serif;
+    --sans:'Inter',system-ui,sans-serif;
+  }
+  html,body{margin:0;padding:0;background:#000;}
+  .disp{font-family:var(--display);font-style:italic;font-weight:500;letter-spacing:-0.015em;font-variation-settings:"opsz" 144;}
+  .disp-roman{font-family:var(--display);font-style:normal;font-weight:500;letter-spacing:-0.015em;font-variation-settings:"opsz" 144;}
+  .sans{font-family:var(--sans);}
+
+  #banner{
+    width:851px;height:315px;position:relative;overflow:hidden;
+    background:#0E1830;font-family:var(--sans);color:#fff;
+  }
+  #banner .glow{
+    position:absolute;inset:0;
+    background:
+      radial-gradient(circle at 86% 16%, rgba(200,162,78,0.20), transparent 46%),
+      radial-gradient(circle at 6% 96%, rgba(26,38,71,0.70), transparent 55%),
+      radial-gradient(circle at 70% 90%, rgba(64,112,192,0.10), transparent 50%);
+  }
+  .logo{position:absolute;top:30px;left:48px;display:inline-flex;align-items:center;gap:12px;}
+  .logo .word{font-size:30px;color:#fff;line-height:1;}
+
+  .head{position:absolute;left:48px;top:0;bottom:0;width:470px;display:flex;flex-direction:column;justify-content:center;}
+  .head .h{font-size:60px;line-height:1.0;color:#fff;}
+  .head .h .accent{color:var(--accent);}
+
+  .mods{position:absolute;right:44px;top:0;bottom:0;width:288px;display:flex;flex-direction:column;justify-content:center;gap:18px;}
+  .mods .row{display:flex;align-items:center;gap:13px;}
+  .mods .ic{width:23px;height:23px;flex:0 0 auto;display:block;}
+  .mods .t{font-size:20px;color:rgba(255,255,255,0.95);font-weight:500;font-family:var(--display);font-style:italic;font-variation-settings:"opsz" 144;letter-spacing:-0.005em;}
+</style>
+</head>
+<body>
+<div id="banner">
+  <div class="glow"></div>
+
+  <div class="logo">
+    <svg width="35.2" height="39.5" viewBox="0 0 1271.65 1426" style="display:block;overflow:visible">
+      <polygon fill="#FFFFFF" points="1271.65 371.24 1271.65 1069.5 635.82 1426 0 1069.5 0 356.5 635.82 0 1128.59 276.29 1000.48 381.26 636.9 177.4 160.18 444.69 160.18 979.27 636.9 1246.56 1113.62 979.27 1113.62 544.87 1271.65 371.24"/>
+      <polygon fill="#4070C0" points="1446.79 79.97 1225.77 330.78 1113.62 458.05 644.86 989.99 448.06 781.76 448.06 568.98 637.63 759.38 1052.94 410.67 1179.19 304.66 1446.79 79.97"/>
+      <polygon fill="#FFFFFF" points="404.64 517.83 404.64 1037.89 253.8 953.49 253.8 500.38 332.09 454.86 404.64 517.83"/>
+      <polygon fill="#FFFFFF" points="1020.14 650.78 1020.14 954.08 867.22 1039.31 868.09 818.95 1020.14 650.78"/>
+    </svg>
+    <span class="disp-roman word">Munify</span>
+  </div>
+
+  <div class="head">
+    <div style="height:24px"></div>
+    <span class="disp h">Tu municipio,<br/><span class="accent">al d&iacute;a.</span></span>
+  </div>
+
+  <div class="mods">
+    <div class="row">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#1FC591" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+      <span class="t">Reclamos vecinales</span>
+    </div>
+    <div class="row">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#5B9BFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+      <span class="t">Tr&aacute;mites online &middot; RENAPER</span>
+    </div>
+    <div class="row">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#D8B25E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+      <span class="t">Tesorer&iacute;a municipal</span>
+    </div>
+    <div class="row">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#E2D5B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a9 9 0 0 1 18 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>
+      <span class="t">Soporte humano 24/7</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

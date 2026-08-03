@@ -10,7 +10,7 @@
 ## Fuentes
 - Proyecto Claude Design: `46976e44-b6dc-4395-b1fe-15aa2a8f9584`
   ("Rediseño de sidebar, banner y botones") — accesible via DesignSync.
-- Referencia extraída: `design/brand-paraguay-limpio/redesign-sidebar-banner-oscuro.html`
+- Referencia extraída: `docs/design/paquetes/03_2026-07-31_paraguay-limpio/redesign-sidebar-banner-oscuro.html`
   (dump del .dc.html oscuro; existe también la variante clara en el proyecto).
 - Tokens de Design: `design_handoff_dashboard_municipal/tokens.css` (en el
   proyecto Design) — sistema `--pl-*`: marca, rampa de datos (5 tonos), superficies,

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..700,0..100&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="brand.css" />
+<style>
+  html, body { margin: 0; padding: 0; background: #777; }
+  .art { width: 1080px; line-height: 0; margin: 0; }
+  #root { width: 1080px; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="brand.jsx"></script>
+<script type="text/babel" src="catalog.jsx"></script>
+<script type="text/babel">
+  const PIECES = [
+    ['cover', CoverCard],
+    ['combo', ComboCard],
+    ['reclamos', ReclamosCard],
+    ['tramites', TramitesCard],
+    ['tesoreria', TesoreriaCard],
+    ['renaper', RenaperCard],
+    ['soporte', SoporteCard],
+    ['plan-estandar', PlanEstandarCard],
+    ['plan-express', PlanExpressCard],
+    ['plan-premium', PlanPremiumCard],
+    ['demo', DemoCard],
+  ];
+  const Sheet = () => (
+    <div>
+      {PIECES.map(([id, C]) => (
+        <div className="art" id={'art-' + id} key={id}><C/></div>
+      ))}
+    </div>
+  );
+  ReactDOM.createRoot(document.getElementById('root')).render(<Sheet/>);
+  // signal ready on next frame so layout/paint settles
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.setAttribute('data-ready', '1');
+  }));
+</script>
+</body>
+</html>
