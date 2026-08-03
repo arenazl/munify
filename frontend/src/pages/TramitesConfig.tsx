@@ -26,6 +26,14 @@ import {
 import { ChipsDocumentosSugeridos } from '../components/config/ChipsDocumentosSugeridos';
 import type { Tramite, CategoriaTramite } from '../types';
 import { useReportarTotal } from '../components/abmv2/useEmbed';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { TreeList } from '../components/abmv2/TreeList';
+import type { ChipTone, TreeNode } from '../components/abmv2/types';
+
+/** Campos de cobro que el trámite trae del backend pero que el tipo
+ *  `Tramite` del front todavía no declara. Se tipan acá en vez de usar
+ *  `any`: si mañana se agregan al tipo, esto se borra y nada se rompe. */
+type TramiteCobro = { tipo_pago?: string | null; momento_pago?: string | null };
 
 interface TramiteForm {
   categoria_tramite_id: number | null;
@@ -106,6 +114,14 @@ export default function TramitesConfig() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<TramiteForm>(EMPTY_FORM);
 
+  // Borrado con confirmación (antes era `confirm()` nativo).
+  const [aBorrar, setABorrar] = useState<Tramite | null>(null);
+  const [borrando, setBorrando] = useState(false);
+
+  // Ramas abiertas del árbol. Se reabren todas al recargar: después de crear
+  // o editar, el usuario quiere ver dónde quedó lo que tocó.
+  const [ramasAbiertas, setRamasAbiertas] = useState<string[]>([]);
+
   // Oficinas del muni para el mapeo trámite→dependencia (turnero)
   const [dependencias, setDependencias] = useState<{ id: number; nombre?: string; dependencia?: { nombre?: string } }[]>([]);
   useEffect(() => {
@@ -172,8 +188,8 @@ export default function TramitesConfig() {
         url_externa: t.url_externa || '',
         requiere_validacion_dni: !!t.requiere_validacion_dni,
         requiere_validacion_facial: !!t.requiere_validacion_facial,
-        tipo_pago: (t as any).tipo_pago || '',
-        momento_pago: (t as any).momento_pago || '',
+        tipo_pago: (t as TramiteCobro).tipo_pago || '',
+        momento_pago: (t as TramiteCobro).momento_pago || '',
         requiere_cenat: !!t.requiere_cenat,
         monto_cenat_referencia: t.monto_cenat_referencia != null ? String(t.monto_cenat_referencia) : '',
         requiere_kyc: !!(t as { requiere_kyc?: boolean }).requiere_kyc,
@@ -192,7 +208,7 @@ export default function TramitesConfig() {
         })),
       });
       setEditSheetOpen(true);
-    } catch (err) {
+    } catch {
       toast.error('Error cargando trámite');
     }
   };
@@ -301,21 +317,31 @@ export default function TramitesConfig() {
         setWizardOpen(false);
       }
       await cargar();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Error guardando');
+    } catch (err) {
+      const detalle = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detalle || 'Error guardando');
     } finally {
       setSaving(false);
     }
   };
 
-  const eliminar = async (t: Tramite) => {
-    if (!confirm(`¿Eliminar trámite "${t.nombre}"?`)) return;
+  /** Borrado con ConfirmModal — `confirm()` nativo está vetado (rompe el
+   *  theme y no se puede explicar por qué el trámite no se puede borrar). */
+  const eliminar = async () => {
+    if (!aBorrar) return;
+    setBorrando(true);
     try {
-      await tramitesApi.delete(t.id);
+      await tramitesApi.delete(aBorrar.id);
       toast.success('Trámite eliminado');
+      setABorrar(null);
       await cargar();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Error eliminando');
+    } catch (err) {
+      // El backend explica por qué no se puede borrar ("lo iniciaron 12
+      // vecinos"): ese detalle es la respuesta útil, no un error genérico.
+      const detalle = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detalle || 'Error eliminando');
+    } finally {
+      setBorrando(false);
     }
   };
 
@@ -329,6 +355,115 @@ export default function TramitesConfig() {
     (acc[t.categoria_tramite_id] ||= []).push(t);
     return acc;
   }, {});
+
+  /* ============================================================
+   * Árbol del catálogo (cuerpo `tipo: 'arbol'` del canvas)
+   *
+   * Antes eran tarjetas agrupadas por categoría: cada trámite ocupaba una
+   * caja con cuatro badges y había que scrollear para ver la estructura.
+   * Lo que el usuario viene a entender acá es de qué categoría cuelga cada
+   * trámite y qué le pide al vecino — eso es un árbol, no una grilla.
+   * ============================================================ */
+
+  const formatearCosto = (costo?: number | null) =>
+    !costo ? 'Gratis' : `$ ${costo.toLocaleString('es-AR')}`;
+
+  // Las categorías arrancan abiertas: un árbol todo colapsado esconde
+  // justamente lo que la pantalla viene a mostrar. Se recalcula en cada
+  // recarga para que después de crear o editar se vea dónde quedó.
+  useEffect(() => {
+    setRamasAbiertas(categorias.map((c) => `cat-${c.id}`));
+  }, [categorias]);
+
+  const nodosArbol = useMemo<TreeNode[]>(() => {
+    const tonoModo: Record<string, ChipTone> = {
+      online: 'green',
+      presencial_con_turno: 'blue',
+      presencial_sin_turno: 'amber',
+    };
+
+    return Object.entries(tramitesPorCat).map(([catId, lista]) => {
+      const cat = categorias.find((c) => c.id === Number(catId));
+      return {
+        id: `cat-${catId}`,
+        label: cat?.nombre || 'Sin categoría',
+        icon: <DynamicIcon name={cat?.icono || 'Folder'} size={16} strokeWidth={1.9} />,
+        tileColor: cat?.color,
+        sub: lista.length === 1 ? '1 trámite' : `${lista.length} trámites`,
+        children: lista.map((t): TreeNode => {
+          const meta = MODO_ATENCION_META[t.modo_atencion || 'online'];
+          const docs = t.documentos_requeridos || [];
+          return {
+            id: `tra-${t.id}`,
+            label: t.nombre,
+            sub: t.descripcion || undefined,
+            chip: meta
+              ? { label: meta.label, tone: tonoModo[t.modo_atencion || 'online'] ?? 'gray' }
+              : undefined,
+            amount: {
+              value: formatearCosto(t.costo),
+              note:
+                t.tiempo_estimado_dias === 1 ? 'en 1 día' : `en ${t.tiempo_estimado_dias} días`,
+              // Gratis se lee bien: no es una alerta ni un dato menor.
+              veredicto: !t.costo ? 'bueno' : undefined,
+            },
+            actions: [
+              {
+                id: 'edit',
+                label: 'Editar',
+                icon: Pencil,
+                onClick: () => abrirEdit(t),
+              },
+              {
+                id: 'del',
+                label: 'Eliminar',
+                icon: Trash2,
+                danger: true,
+                onClick: () => setABorrar(t),
+              },
+            ],
+            // El detalle explica QUÉ le pide al vecino: es la información que
+            // antes obligaba a abrir el drawer de edición para verla.
+            detail: (
+              <div className="av2-arbol-req">
+                <span className="av2-eyebrow">Documentos que pide</span>
+                {docs.length === 0 ? (
+                  <p className="av2-arbol-req-vacio">
+                    No pide ningún documento: el vecino lo inicia sin adjuntar nada.
+                  </p>
+                ) : (
+                  <ul className="av2-arbol-req-lista">
+                    {docs.map((d, i) => (
+                      <li key={i}>
+                        <FileText size={13} strokeWidth={2} aria-hidden />
+                        <span>{d.nombre}</span>
+                        <span className="av2-arbol-req-nota">
+                          {d.obligatorio === false ? 'opcional' : 'obligatorio'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="av2-arbol-req-pie">
+                  <span>
+                    {docs.length === 0
+                      ? 'Sin requisitos cargados.'
+                      : `El vecino tiene que juntar ${docs.length} ${
+                          docs.length === 1 ? 'documento' : 'documentos'
+                        }.`}
+                  </span>
+                  <button type="button" className="av2-arbol-req-accion" onClick={() => abrirEdit(t)}>
+                    Editar requisitos
+                  </button>
+                </div>
+              </div>
+            ),
+          };
+        }),
+      };
+    });
+    // Las dependencias reales del árbol son los trámites y las categorías.
+  }, [tramitesPorCat, categorias]);
 
   // Hero semántico: frases con datos REALES del catálogo ya cargado.
   // Nota: el listado no trae la oficina asignada por trámite (se consulta
@@ -801,132 +936,40 @@ export default function TramitesConfig() {
       />
 
       <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="text-center py-20" style={{ color: theme.textSecondary }}>
-            {tramites.length === 0
-              ? 'No hay trámites cargados. Hacé click en "Nuevo trámite" para crear el primero.'
-              : 'Sin resultados para los filtros aplicados.'}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.entries(tramitesPorCat).map(([catId, lista]) => {
-              const cat = categorias.find(c => c.id === Number(catId));
-              return (
-                <div key={catId}>
-                  <div className="flex items-center gap-2 mb-3">
-                    {cat?.icono && (
-                      <DynamicIcon name={cat.icono} className="h-5 w-5" style={{ color: cat.color || theme.primary }} />
-                    )}
-                    <h2 className="text-base font-semibold" style={{ color: theme.text }}>
-                      {cat?.nombre || 'Sin categoría'}
-                    </h2>
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
-                      {lista.length}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {lista.map(t => (
-                      <div
-                        key={t.id}
-                        className="p-4 rounded-xl flex items-start gap-3 transition-all duration-200 hover:scale-[1.02]"
-                        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                            {t.nombre}
-                          </h3>
-                          {t.descripcion && (
-                            <p className="text-xs mt-1 line-clamp-2" style={{ color: theme.textSecondary }}>
-                              {t.descripcion}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: theme.textSecondary }}>
-                            <span>{t.tiempo_estimado_dias} días</span>
-                            {t.costo ? <span>${t.costo}</span> : <span>Gratis</span>}
-                            {t.documentos_requeridos?.length > 0 && (
-                              <span>{t.documentos_requeridos.length} docs</span>
-                            )}
-                          </div>
-                          {/* Badge de modo de atención — turnero consolidado */}
-                          {(() => {
-                            const meta = MODO_ATENCION_META[t.modo_atencion || 'online'];
-                            const ModoIcon = meta.icon;
-                            return (
-                              <div
-                                className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium mr-2"
-                                style={{ backgroundColor: `${meta.color}15`, color: meta.color, border: `1px solid ${meta.color}40` }}
-                              >
-                                <ModoIcon className="h-3 w-3" /> {meta.label}
-                              </div>
-                            );
-                          })()}
-                          {/* Badge de método de cobro — solo si tiene costo */}
-                          {!!t.costo && t.costo > 0 && (() => {
-                            const tp = (t as any).tipo_pago as string | null;
-                            const mp = (t as any).momento_pago as string | null;
-                            const tipoPagoMeta: Record<string, { label: string; color: string; emoji: string }> = {
-                              boton_pago: { label: 'Botón de Pago', color: '#3b82f6', emoji: '💳' },
-                              rapipago: { label: 'Rapipago', color: '#ef4444', emoji: '🧾' },
-                              adhesion_debito: { label: 'Adhesión Débito', color: '#10b981', emoji: '🔁' },
-                              qr: { label: 'QR', color: '#8b5cf6', emoji: '📱' },
-                            };
-                            const meta = tp ? tipoPagoMeta[tp] : null;
-                            if (!meta) {
-                              return (
-                                <div
-                                  className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium"
-                                  style={{ backgroundColor: '#f59e0b15', color: '#f59e0b', border: '1px solid #f59e0b40' }}
-                                  title="Tiene costo pero no tiene método de cobro asignado"
-                                >
-                                  ⚠️ Sin método de cobro
-                                </div>
-                              );
-                            }
-                            return (
-                              <div
-                                className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium"
-                                style={{
-                                  backgroundColor: `${meta.color}15`,
-                                  color: meta.color,
-                                  border: `1px solid ${meta.color}40`,
-                                }}
-                                title={`Cobra ${mp === 'fin' ? 'al retirar' : 'al iniciar el trámite'}`}
-                              >
-                                {meta.emoji} {meta.label}
-                                {mp && <span className="opacity-70">· {mp === 'fin' ? 'al retirar' : 'al inicio'}</span>}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                        <div className="flex flex-col gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => abrirEdit(t)}
-                            className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
-                            style={{ color: theme.textSecondary }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => eliminar(t)}
-                            className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-                            style={{ color: '#ef4444' }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <TreeList
+          nodes={nodosArbol}
+          expandedIds={ramasAbiertas}
+          onExpandedChange={setRamasAbiertas}
+          loading={loading}
+          emptyMessage={
+            tramites.length === 0
+              ? 'No hay trámites cargados. Creá el primero con el botón de arriba.'
+              : 'Sin resultados para los filtros aplicados.'
+          }
+          footer={
+            filtrados.length > 0
+              ? `${Object.keys(tramitesPorCat).length} ${
+                  Object.keys(tramitesPorCat).length === 1 ? 'categoría' : 'categorías'
+                } · ${filtrados.length} ${filtrados.length === 1 ? 'trámite' : 'trámites'}`
+              : undefined
+          }
+        />
       </div>
+
+      <ConfirmModal
+        isOpen={!!aBorrar}
+        onClose={() => setABorrar(null)}
+        onConfirm={eliminar}
+        loading={borrando}
+        variant="danger"
+        title="Eliminar trámite"
+        message={
+          aBorrar
+            ? `Se va a eliminar "${aBorrar.nombre}". Si algún vecino ya lo inició, el sistema no va a dejar borrarlo y te lo va a decir.`
+            : ''
+        }
+        confirmText="Eliminar"
+      />
 
       {/* Wizard: alta de trámite nuevo */}
       <WizardModal

@@ -3588,6 +3588,62 @@ button.av2-chip:hover { opacity: 0.85; }
   color: var(--pl-text-3);
 }
 
+/* Detalle de una hoja del árbol: qué le pide al vecino. Es contenido de la
+   página (el kit no sabe de documentos), pero las clases viven acá para que
+   cualquier árbol con requisitos se vea igual. */
+.av2-arbol-req { min-width: 0; }
+.av2-arbol-req-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.av2-arbol-req-lista li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+.av2-arbol-req-lista li svg { flex: 0 0 13px; color: var(--pl-text-muted); }
+.av2-arbol-req-nota {
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-amber-700);
+  white-space: nowrap;
+}
+.av2-arbol-req-vacio {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+}
+.av2-arbol-req-pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pl-border);
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+  flex-wrap: wrap;
+}
+.av2-arbol-req-accion {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.av2-arbol-req-accion:hover { text-decoration: underline; }
+
 /* --- CardGrid: la vista 'cards' del kit --------------------- */
 .av2-cards {
   display: grid;
