@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
-  Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload,
+  Save, Sparkles, Check, X, MapPin, Loader2, Building2, Upload,
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
   Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
   UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
   Briefcase, PiggyBank, Trees, Boxes, MapPinned, Package,
   Banknote, Clock,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi, modulosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { buildThemeColors } from '../config/themePresets';
 import { useAuth } from '../contexts/AuthContext';
-import SettingsHeader from '../components/ui/SettingsHeader';
+import { SettingsShell } from '../components/abmv2/SettingsShell';
 import { QRCarteleria } from '../components/ui/QRCarteleria';
 import { AppearanceSettings } from '../components/ui/AppearanceSettings';
 import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
@@ -103,6 +103,11 @@ export default function Configuracion() {
     setActiveTab(t);
     try { localStorage.setItem('configuracion_active_tab', t); } catch {}
   };
+  // Ajuste elegido dentro del grupo (riel del SettingsShell). null = el primero.
+  const [activeItem, setActiveItem] = useState<string | null>(null);
+  // Buscador de ajustes: filtra por label y descripción, cruzando todos los grupos.
+  const [buscaAjuste, setBuscaAjuste] = useState('');
+  const navigate = useNavigate();
   const isAdmin = user?.rol === 'admin';
   const isSupervisor = user?.rol === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
@@ -656,17 +661,6 @@ export default function Configuracion() {
   }
 
   // Tabs visibles segun rol — fusion de Ajustes.tsx + Configuracion.tsx
-  const mainTabs = [
-    { id: 'general', title: 'General' },
-    ...(isAdminOrSupervisor ? [
-      { id: 'usuarios', title: 'Usuarios' },
-      { id: 'catalogos', title: 'Catálogos' },
-      { id: 'cobranzas', title: 'Cobranzas' },
-      { id: 'tesoreria', title: 'Tesorería' },
-      { id: 'whatsapp', title: 'WhatsApp' },
-    ] : []),
-    ...(isSuperAdmin ? [{ id: 'super-admin', title: 'Super Admin' }] : []),
-  ];
 
   // Tarjetas por tab (replica el patron del dashboard de Ajustes)
   const cardSections: SettingSection[] = [
@@ -741,41 +735,82 @@ export default function Configuracion() {
     },
   ];
 
-  const currentSection = cardSections.find(s => s.id === activeTab);
-  const visibleItems = currentSection ? currentSection.items.filter(i => i.show) : [];
+
+  // ── Reagrupación por FK real (handoff 2026-08-02) ────────────────────────
+  // El tab "Catálogos" era un cajón de 15 tarjetas donde convivían un
+  // exportador de CSV, un ABM de super admin y un configurador de UI. Los
+  // grupos salen del grafo de foreign keys, no del parecido semántico:
+  // `categorias_reclamo` es un hub (SLA, escalado, cuadrillas, empleados) y
+  // `zonas` es criterio de asignación, no geografía.
+  const GRUPO_DE_ITEM: Record<string, string> = {
+    empleados: 'personal', cuadrillas: 'personal', ausencias: 'personal',
+    'tesoreria-tipos-empleado': 'personal',
+    vecinos: 'vecino', 'categorias-reclamo': 'vecino', 'tramites-config': 'vecino',
+    sla: 'vecino', 'poi-tipos': 'vecino',
+    dependencias: 'catalogos', 'asignacion-dependencias': 'catalogos', zonas: 'catalogos',
+    'categorias-tramite': 'catalogos', 'importar-padron': 'catalogos',
+    inventario: 'inventario', 'categorias-inventario': 'inventario',
+    'whatsapp-config': 'integraciones', 'proveedores-pago': 'integraciones',
+    'tramites-pago': 'integraciones',
+    municipios: 'super-admin', 'dashboard-config': 'super-admin', exportar: 'super-admin',
+  };
+  const GRUPOS: { id: string; label: string }[] = [
+    { id: 'general', label: 'General' },
+    { id: 'personal', label: 'Personal' },
+    { id: 'vecino', label: 'Atención al vecino' },
+    { id: 'catalogos', label: 'Catálogos' },
+    { id: 'inventario', label: 'Inventario' },
+    { id: 'tesoreria', label: 'Tesorería' },
+    { id: 'integraciones', label: 'Integraciones' },
+    { id: 'super-admin', label: 'Super Admin' },
+  ];
+
+  // Aplana las tarjetas y les asigna grupo. Sin entrada en el mapa, cae al id
+  // de su sección de origen (así una tarjeta nueva nunca desaparece).
+  const todosLosAjustes = cardSections
+    .flatMap(s => s.items.map(i => ({ ...i, grupo: GRUPO_DE_ITEM[i.id] ?? s.id })))
+    .filter(i => i.show);
+
+  const q = buscaAjuste.trim().toLowerCase();
+  const ajustesFiltrados = q
+    ? todosLosAjustes.filter(i =>
+        i.label.toLowerCase().includes(q) || i.description.toLowerCase().includes(q))
+    : todosLosAjustes;
+
+  const gruposVisibles = GRUPOS
+    .map(g => ({
+      ...g,
+      count: g.id === 'general' ? undefined : ajustesFiltrados.filter(i => i.grupo === g.id).length,
+    }))
+    .filter(g => g.id === 'general' || (g.count ?? 0) > 0);
+
+  const ajustesDelGrupo = ajustesFiltrados.filter(i => i.grupo === activeTab);
+  const ajusteActivo = ajustesDelGrupo.find(i => i.id === activeItem) ?? ajustesDelGrupo[0];
+  const grupoActivo = gruposVisibles.find(g => g.id === activeTab);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <SettingsHeader
-        title="Configuración"
-        subtitle="Parámetros del sistema, catálogos y branding"
-        icon={Settings}
-      />
-
-      {/* Tabs */}
-      <div
-        className="flex gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-xl overflow-x-auto scrollbar-hide"
-        style={{ backgroundColor: theme.backgroundSecondary }}
-      >
-        {mainTabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all flex-shrink-0"
-            style={{
-              backgroundColor: activeTab === t.id ? theme.card : 'transparent',
-              color: activeTab === t.id ? theme.primary : theme.textSecondary,
-              boxShadow: activeTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            }}
-            type="button"
-          >
-            {t.title}
-          </button>
-        ))}
-      </div>
-
-      {/* TAB: GENERAL — contiene Datos del Municipio + Filtros + Branding (contenido legacy) */}
+    <SettingsShell
+      eyebrow={`CONFIGURACIÓN · ${(BRAND.name || 'MUNICIPIO').toUpperCase()}`}
+      title="Cómo está armado el municipio"
+      description="Las listas y las reglas que usa toda la app: quién atiende cada cosa, en cuántos días y qué le pide al vecino."
+      search={buscaAjuste}
+      onSearchChange={setBuscaAjuste}
+      groups={gruposVisibles}
+      activeGroup={activeTab}
+      onGroupChange={(id) => { setTab(id); setActiveItem(null); }}
+      railTitle={grupoActivo?.label}
+      items={activeTab === 'general' ? [] : ajustesDelGrupo.map(i => ({ id: i.id, label: i.label }))}
+      activeItem={ajusteActivo?.id}
+      onItemChange={setActiveItem}
+      panelTitle={activeTab === 'general' ? 'Datos del municipio' : (ajusteActivo?.label ?? grupoActivo?.label ?? '')}
+      panelNota={activeTab === 'general'
+        ? 'Identidad, contacto que ve el vecino, portada del tablero y apariencia del panel.'
+        : ajusteActivo?.description}
+      primaryAction={activeTab !== 'general' && ajusteActivo
+        ? { label: 'Abrir', onClick: () => navigate(ajusteActivo.link) }
+        : undefined}
+    >
+      {/* GENERAL — Datos del Municipio + Filtros + Branding + Apariencia */}
       {activeTab === 'general' && (
         <div className="space-y-6">
       {/* Modulos activables — solo super admin */}
@@ -1531,41 +1566,35 @@ export default function Configuracion() {
         </div>
       )}
 
-      {/* OTROS TABS — grid de tarjetas */}
+      {/* Panel del ajuste elegido. Etapa A: ficha + acceso; el contenido se
+          embebe acá en la etapa siguiente (un SemanticAbmPage por catálogo). */}
       {activeTab !== 'general' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Tab notificaciones inline (no se ve normal, pero por si lo agregamos) */}
-          {visibleItems.length === 0 && (
-            <p className="text-sm col-span-full text-center py-8" style={{ color: theme.textSecondary }}>
-              No hay items disponibles en esta sección.
-            </p>
-          )}
-          {visibleItems.map(item => (
-            <Link
-              key={item.id}
-              to={item.link}
-              className="group rounded-xl p-5 transition-all hover:shadow-lg"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        ajusteActivo ? (
+          <Link
+            to={ajusteActivo.link}
+            className="group flex items-start gap-4 rounded-xl p-5 transition-all hover:shadow-lg"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+              style={{ backgroundColor: `${ajusteActivo.color}20` }}
             >
-              <div className="flex items-start gap-4">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
-                  style={{ backgroundColor: `${item.color}20` }}
-                >
-                  <item.icon className="h-6 w-6" style={{ color: item.color }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold" style={{ color: theme.text }}>{item.label}</h3>
-                    <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" style={{ color: theme.textSecondary }} />
-                  </div>
-                  <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>{item.description}</p>
-                </div>
+              <ajusteActivo.icon className="h-6 w-6" style={{ color: ajusteActivo.color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold" style={{ color: theme.text }}>{ajusteActivo.label}</h3>
+                <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" style={{ color: theme.textSecondary }} />
               </div>
-            </Link>
-          ))}
-        </div>
+              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>{ajusteActivo.description}</p>
+            </div>
+          </Link>
+        ) : (
+          <p className="text-sm text-center py-8" style={{ color: theme.textSecondary }}>
+            {buscaAjuste ? 'Ningún ajuste coincide con la búsqueda.' : 'No hay ajustes disponibles en esta sección.'}
+          </p>
+        )
       )}
-    </div>
+    </SettingsShell>
   );
 }
