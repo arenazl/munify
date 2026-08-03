@@ -2912,3 +2912,16 @@ button.av2-chip:hover { opacity: 0.85; }
   font-weight: 600;
   color: var(--pl-text-faint);
 }
+
+/* [v2.4] Página embebida (panel del SettingsShell): sin cabecera propia y sin
+   el padding de página — el contenedor ya lo puso. */
+.av2-page--embebida { padding: 0; }
+.av2-page--embebida > .av2-hero-wrap:first-child { margin-top: 0; }
+
+/* Pantalla embebida en el panel de Configuración: su cabecera de módulo
+   sobra —el título ya lo puso el panel— y el padding de página también.
+   Cubre las pantallas migradas al kit v2 (`av2-pagehead`); las que todavía
+   usan el ABMPage viejo muestran su propio título adentro del panel hasta
+   que se migren. */
+.av2-set-panel-cuerpo .av2-pagehead { display: none; }
+.av2-set-panel-cuerpo .av2-page { padding: 0; }

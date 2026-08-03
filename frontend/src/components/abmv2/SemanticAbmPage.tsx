@@ -101,6 +101,18 @@ export interface SemanticAbmPageComponentProps<Row> extends SemanticAbmPageProps
    * dispara igual antes de abrir. Default false: la página decide.
    */
   primaryOpensCreate?: boolean;
+  /**
+   * [v2.4] Modo EMBEBIDO: la pieza entra dentro de otra pantalla (hoy el
+   * panel del `SettingsShell`) y por eso NO dibuja su `PageHeader` — el
+   * título ya lo puso el contenedor y dos H1 seguidos es ruido.
+   *
+   * Es exactamente lo que pide la nota del canvas: "entra la misma pieza que
+   * Gastos o Liquidaciones, pero pelada: el título lo pone esta pantalla, no
+   * el componente".
+   *
+   * Aditivo: sin la prop, todas las pantallas existentes renderizan igual.
+   */
+  embedded?: boolean;
 }
 
 /* ============================================================
@@ -155,6 +167,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     /* drawer */
     sideModal,
     primaryOpensCreate = false,
+    embedded = false,
   } = props;
 
   const [drawer, setDrawer] = useState<SideModalRequest<Row> | null>(null);
@@ -251,9 +264,10 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
   const specDrawer = sideModal && drawer ? sideModal(drawer) : null;
 
   return (
-    <div className="av2-page" data-module={moduleKey}>
-      {/* 1. [v2.2] Cabecera de módulo: lo PRIMERO que se lee de la pantalla. */}
-      <PageHeader eyebrow={eyebrow} title={title} description={description} />
+    <div className={`av2-page ${embedded ? 'av2-page--embebida' : ''}`} data-module={moduleKey}>
+      {/* 1. [v2.2] Cabecera de módulo: lo PRIMERO que se lee de la pantalla.
+          [v2.4] En modo embebido no va: el título lo puso el contenedor. */}
+      {!embedded && <PageHeader eyebrow={eyebrow} title={title} description={description} />}
 
       {/* 2. ModuleHero = SemanticHero existente. Los números viven acá
           (stat strip en `hero.kpis`) — nada de KPIs sueltos arriba. */}

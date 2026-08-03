@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
+import type { ComponentType, LazyExoticComponent } from 'react';
 import {
   Save, Sparkles, Check, X, MapPin, Loader2, Building2, Upload,
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
@@ -77,6 +78,38 @@ const BRAND_COLORS = [
   { name: 'Violeta', value: '#8b5cf6' },
   { name: 'Gris', value: '#6b7280' },
 ];
+
+
+/* ============================================================
+ * Pantallas embebidas en el panel de Configuración.
+ *
+ * NO se reimplementa ningún ABM: se monta la MISMA página que ya existe en su
+ * ruta, con sus datos y sus endpoints reales. Lazy para no engordar el bundle
+ * de Configuración con pantallas que quizá no se abran.
+ *
+ * Un ajuste sin entrada acá cae a la ficha con acceso — así se puede ir
+ * enchufando de a una sin romper las demás.
+ * ============================================================ */
+const PANTALLA_DE_AJUSTE: Record<string, LazyExoticComponent<ComponentType>> = {
+  // Personal
+  empleados: lazy(() => import('./Empleados')),
+  cuadrillas: lazy(() => import('./GestionCuadrillas')),
+  ausencias: lazy(() => import('./GestionAusencias')),
+  // Atención al vecino
+  vecinos: lazy(() => import('./Usuarios')),
+  'categorias-reclamo': lazy(() => import('./CategoriasReclamoConfig')),
+  'tramites-config': lazy(() => import('./TramitesConfig')),
+  sla: lazy(() => import('./SLA')),
+  'poi-tipos': lazy(() => import('./POITiposConfig')),
+  // Catálogos
+  dependencias: lazy(() => import('./DependenciasConfig')),
+  'asignacion-dependencias': lazy(() => import('./AsignacionDependencias')),
+  zonas: lazy(() => import('./Zonas')),
+  'categorias-tramite': lazy(() => import('./CategoriasTramiteConfig')),
+  // Inventario
+  inventario: lazy(() => import('./Inventario')),
+  'categorias-inventario': lazy(() => import('./InventarioCategoriasConfig')),
+};
 
 export default function Configuracion() {
   const {
@@ -1586,10 +1619,21 @@ export default function Configuracion() {
         </div>
       )}
 
-      {/* Panel del ajuste elegido. Etapa A: ficha + acceso; el contenido se
-          embebe acá en la etapa siguiente (un SemanticAbmPage por catálogo). */}
+      {/* Panel del ajuste elegido: la pantalla real embebida si está
+          registrada; si no, su ficha con el acceso a la ruta. */}
       {activeTab !== 'general' && (
-        ajusteActivo ? (
+        ajusteActivo && PANTALLA_DE_AJUSTE[ajusteActivo.id] ? (
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} />
+            </div>
+          }>
+            {(() => {
+              const Pantalla = PANTALLA_DE_AJUSTE[ajusteActivo.id];
+              return <Pantalla />;
+            })()}
+          </Suspense>
+        ) : ajusteActivo ? (
           <Link
             to={ajusteActivo.link}
             className="group flex items-start gap-4 rounded-xl p-5 transition-all hover:shadow-lg"
