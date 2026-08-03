@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+<script src="./image-slot.js"></script>
+<style>
+  body { margin: 0; background: #F1F4F2; font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #00794F; text-decoration: none; font-weight: 600; }
+  a:hover { text-decoration: underline; }
+  @keyframes latido { 0% { opacity: .5; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.35); } }
+  @keyframes entrarPanel { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; color: #0D1412;">
+
+  <div style="background: #F1F4F2; padding: 24px 20px 0;">
+    <div style="display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; row-gap: 14px;">
+      <div style="flex: 1 1 420px; min-width: 0;">
+        <span style="display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.11em; color: #7A8783;">CONFIGURACIÓN · PARAGUAY LIMPIO</span>
+        <h1 style="margin: 8px 0 0; font-family: Sora, sans-serif; font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; color: #0D1412; text-wrap: pretty;">Cómo está armado el municipio</h1>
+        <p style="margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: #5B6764; text-wrap: pretty; max-width: 76ch;">Las listas y las reglas que usa toda la app: quién atiende cada cosa, en cuántos días y qué le pide al vecino.</p>
+      </div>
+      <span style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 11px; min-width: 240px; flex: 0 0 auto; margin-top: 22px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 15px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar un ajuste</span>
+        <span style="margin-left: auto; font-size: 10px; color: #9AA5A1; border: 1px solid rgba(13,20,18,0.1); border-radius: 5px; padding: 1px 4px; flex: 0 0 auto;">⌘K</span>
+      </span>
+    </div>
+  </div>
+
+  <div style="position: sticky; top: 0; z-index: 8; padding: 20px 20px 0; background: #F1F4F2; border-bottom: 1px solid rgba(13,20,18,0.08);">
+    <div style="position: relative;">
+    <div style="display: flex; align-items: flex-end; gap: 2px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: rgba(13,20,18,0.16) transparent;">
+      <sc-for list="{{ padres }}" as="m" hint-placeholder-count="6">
+        <span onClick="{{ m.ir }}" style="display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 13px; border-bottom: 2px solid {{ m.linea }}; cursor: pointer; white-space: nowrap;" style-hover="background: rgba(13,20,18,0.03);">
+          <span style="font-size: 13px; font-weight: {{ m.peso }}; color: {{ m.color }};">{{ m.label }}</span>
+          <span style="font-size: 11px; font-weight: 600; color: {{ m.subColor }}; font-feature-settings: 'tnum';">{{ m.n }}</span>
+        </span>
+      </sc-for>
+    </div>
+    <span style="position: absolute; right: 0; top: 0; bottom: 6px; width: 36px; pointer-events: none; background: linear-gradient(90deg, rgba(241,244,242,0) 0%, #F1F4F2 70%);"></span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; padding: 18px 20px 40px; align-items: start;">
+
+    <aside style="position: sticky; top: 74px; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+      <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 0 10px 8px;">{{ tituloRiel }}</span>
+      <sc-for list="{{ hijos }}" as="h" hint-placeholder-count="6">
+        <span onClick="{{ h.ir }}" style="display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 7px 10px; border-radius: 9px; background: {{ h.bg }}; cursor: pointer;" style-hover="background: {{ h.bgHover }};">
+          <span style="font-size: 13px; font-weight: {{ h.peso }}; line-height: 1.35; color: {{ h.color }}; min-width: 0; text-wrap: pretty;">{{ h.label }}</span>
+          <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: {{ h.subColor }}; white-space: nowrap; font-feature-settings: 'tnum';">{{ h.n }}</span>
+        </span>
+      </sc-for>
+    </aside>
+
+    <div style="min-width: 0;">
+
+      <div style="display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; row-gap: 10px;">
+        <div style="flex: 1 1 380px; min-width: 0;">
+          <h2 style="margin: 0; font-family: Sora, sans-serif; font-size: 19px; font-weight: 700; letter-spacing: -0.022em;">{{ tituloHijo }}</h2>
+          <p style="margin: 7px 0 0; font-size: 13.5px; line-height: 1.5; color: #3D4945; text-wrap: pretty; max-width: 88ch;">{{ veredicto }}</p>
+        </div>
+        <sc-if value="{{ hayCta }}" hint-placeholder-val="{{ true }}">
+          <button style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 15px; border: 0; border-radius: 11px; background: #00B37E; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;" style-hover="background: #008F63;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            {{ ctaNuevo }}
+          </button>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ esCatalogo }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top: 16px;">
+
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px;">
+            <span style="display: flex; align-items: center; gap: 8px; flex: 1 1 240px; min-width: 0; height: 34px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 15px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar por nombre</span>
+            </span>
+            <span style="display: flex; gap: 2px; padding: 3px; background: #E8ECEA; border-radius: 10px; flex: 0 0 auto;">
+              <span onClick="{{ verTabla }}" title="Tabla" style="display: grid; place-items: center; width: 32px; height: 28px; border-radius: 7px; background: {{ bgTabla }}; box-shadow: {{ shTabla }}; cursor: pointer;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colTabla }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M9 10v9" /></svg>
+              </span>
+              <span onClick="{{ verTarjetas }}" title="Tarjetas" style="display: grid; place-items: center; width: 32px; height: 28px; border-radius: 7px; background: {{ bgTarjetas }}; box-shadow: {{ shTarjetas }}; cursor: pointer;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colTarjetas }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>
+              </span>
+            </span>
+            <span onClick="{{ reordenar }}" style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border: 1px solid {{ bdOrden }}; border-radius: 10px; background: {{ bgOrden }}; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ colOrden }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 15px;"><path d="M8 6h13M8 12h13M8 18h13M4 6h.01M4 12h.01M4 18h.01" /></svg>
+              <span style="font-size: 12.5px; font-weight: 600; color: {{ colOrden }};">{{ labelOrden }}</span>
+            </span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; row-gap: 8px;">
+            <sc-for list="{{ estados }}" as="e" hint-placeholder-count="3">
+              <span onClick="{{ e.ir }}" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid {{ e.bd }}; background: {{ e.bg }}; cursor: pointer; white-space: nowrap;">
+                <span style="font-size: 12.5px; font-weight: 600; color: {{ e.col }};">{{ e.label }}</span>
+                <span style="font-size: 11.5px; font-weight: 600; color: {{ e.sub }}; font-feature-settings: 'tnum';">{{ e.n }}</span>
+              </span>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ modoTabla }}" hint-placeholder-val="{{ true }}">
+            <div style="margin-top: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow-x: auto; overflow-y: hidden;">
+              <div style="box-sizing: border-box; display: grid; min-width: 560px; grid-template-columns: {{ cols }}; align-items: center; gap: 12px; padding: 10px 16px; background: #FAFBFA; border-bottom: 1px solid rgba(13,20,18,0.06);">
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">NOMBRE Y DESCRIPCIÓN</span>
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">{{ colRespuesta }}</span>
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: right;">EN USO</span>
+                <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: right;">ESTADO Y ACCIONES</span>
+              </div>
+
+              <sc-for list="{{ filas }}" as="r" hint-placeholder-count="6">
+                <div style="box-sizing: border-box; display: grid; min-width: 560px; grid-template-columns: {{ cols }}; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(13,20,18,0.05); background: {{ r.fondo }};" style-hover="background: #FAFBFA;">
+                  <span style="display: flex; align-items: center; gap: 9px; min-width: 0;">
+                    <span title="Arrastrá para reordenar" style="display: grid; place-items: center; width: {{ anchoHandle }}; overflow: hidden; cursor: {{ cursorOrden }}; opacity: {{ opOrden }}; flex: 0 0 {{ anchoHandle }};">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C6CFCB" stroke-width="2" stroke-linecap="round"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01" /></svg>
+                    </span>
+                    <span style="display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: {{ r.tinte }}; flex: 0 0 30px;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ r.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.glifo }}" /></svg>
+                    </span>
+                    <span style="min-width: 0;">
+                      <span style="display: flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap; row-gap: 3px;">
+                        <span style="font-size: 13px; font-weight: 600; color: {{ r.colorNombre }};">{{ r.nombre }}</span>
+                        <sc-if value="{{ r.sePisa }}" hint-placeholder-val="{{ false }}">
+                          <span title="{{ r.tituloPisa }}" style="display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; background: #FDF1DF; border-radius: 999px; flex: 0 0 auto; cursor: help;">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#B4560F" stroke-width="2.4" stroke-linecap="round"><circle cx="9" cy="12" r="6" /><circle cx="15" cy="12" r="6" /></svg>
+                            <span style="font-size: 10px; font-weight: 700; color: #B4560F;">se pisa</span>
+                          </span>
+                        </sc-if>
+                      </span>
+                      <span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; line-height: 1.4; color: #98A3A0; margin-top: 3px;">{{ r.desc }}</span>
+                    </span>
+                  </span>
+                  <span style="min-width: 0;">
+                    <span style="display: block; font-size: 12.5px; font-weight: 600; color: #0D1412; white-space: nowrap;">{{ r.sla }}</span>
+                    <span style="display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                      <sc-for list="{{ r.puntos }}" as="p" hint-placeholder-count="5">
+                        <span style="width: 6px; height: 6px; border-radius: 999px; background: {{ p.bg }};"></span>
+                      </sc-for>
+                      <span style="font-size: 10.5px; color: #98A3A0; margin-left: 3px; white-space: nowrap;">{{ r.prioLabel }}</span>
+                    </span>
+                  </span>
+                  <span style="text-align: right; min-width: 0;">
+                    <span style="display: block; font-family: Sora, sans-serif; font-size: 13px; font-weight: 700; color: {{ r.usoCol }}; white-space: nowrap; font-feature-settings: 'tnum';">{{ r.uso }}</span>
+                    <span style="display: block; font-size: 10.5px; color: #98A3A0; margin-top: 2px; white-space: nowrap;">{{ r.usoNota }}</span>
+                  </span>
+                  <span style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                    <span onClick="{{ r.alternar }}" title="{{ r.estado }}" style="position: relative; width: 32px; height: 18px; border-radius: 999px; background: {{ r.pistaBg }}; flex: 0 0 32px; cursor: pointer; transition: background 160ms cubic-bezier(0.2,0.8,0.2,1);">
+                      <span style="position: absolute; top: 2px; left: {{ r.perilla }}; width: 14px; height: 14px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.2); transition: left 160ms cubic-bezier(0.2,0.8,0.2,1);"></span>
+                    </span>
+                    <span onClick="{{ r.editar }}" title="Editar" style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;" style-hover="background: #EDF1EF;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+                    </span>
+                    <span title="{{ r.tituloBorrar }}" style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: {{ r.cursorBorrar }}; opacity: {{ r.opBorrar }};" style-hover="background: #FDF4F4;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ r.colBorrar }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12" /></svg>
+                    </span>
+                  </span>
+                </div>
+              </sc-for>
+
+              <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #FAFBFA; flex-wrap: wrap;">
+                <span style="font-size: 11.5px; color: #7A8783;">{{ pie }}</span>
+                <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0; white-space: nowrap;">{{ resumenFiltro }}</span>
+                <a href="#" onClick="{{ sinSalto }}" style="font-size: 12px; white-space: nowrap;">Exportar</a>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ modoTarjetas }}" hint-placeholder-val="{{ false }}">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px;">
+              <sc-for list="{{ filas }}" as="r" hint-placeholder-count="6">
+                <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 14px; min-width: 0; display: flex; flex-direction: column; opacity: {{ r.opTarjeta }};">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                    <span style="display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: {{ r.tinte }}; flex: 0 0 34px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ r.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.glifo }}" /></svg>
+                    </span>
+                    <span style="min-width: 0; flex: 1;">
+                      <span style="display: block; font-size: 13.5px; font-weight: 600; color: {{ r.colorNombre }}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.nombre }}</span>
+                      <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 2px;">Orden {{ r.orden }}</span>
+                    </span>
+                  </div>
+                  <div style="display: flex; align-items: baseline; gap: 7px; margin-top: 14px;">
+                    <span style="font-family: Sora, sans-serif; font-size: 22px; font-weight: 700; line-height: 1; color: {{ r.usoCol }}; font-feature-settings: 'tnum';">{{ r.uso }}</span>
+                    <span style="font-size: 11.5px; color: #98A3A0;">{{ r.usoNota }}</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(13,20,18,0.06);">
+                    <span onClick="{{ r.alternar }}" style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <span style="position: relative; width: 32px; height: 18px; border-radius: 999px; background: {{ r.pistaBg }}; flex: 0 0 32px; transition: background 160ms cubic-bezier(0.2,0.8,0.2,1);">
+                        <span style="position: absolute; top: 2px; left: {{ r.perilla }}; width: 14px; height: 14px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.2); transition: left 160ms cubic-bezier(0.2,0.8,0.2,1);"></span>
+                      </span>
+                      <span style="font-size: 11.5px; font-weight: 600; color: {{ r.estadoCol }};">{{ r.estado }}</span>
+                    </span>
+                    <span title="Editar" style="margin-left: auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;" style-hover="background: #EDF1EF;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+                    </span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ esForm }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 16px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px;">
+          <div style="padding: 18px 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+            <span style="grid-column: 1 / -1; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">IDENTIDAD</span>
+            <label style="display: block; min-width: 0;">
+              <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Nombre del municipio</span>
+              <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                <span style="font-size: 13px; color: #0D1412;">Municipalidad de Asunción</span>
+              </span>
+            </label>
+            <label style="display: block; min-width: 0;">
+              <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Nombre público en la app del vecino</span>
+              <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                <span style="font-size: 13px; color: #0D1412;">Paraguay Limpio</span>
+              </span>
+            </label>
+            <label style="display: block; min-width: 0;">
+              <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">RUC</span>
+              <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                <span style="font-size: 13px; color: #0D1412; font-feature-settings: 'tnum';">80016909-1</span>
+              </span>
+            </label>
+            <label style="display: block; min-width: 0;">
+              <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Departamento</span>
+              <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                <span style="font-size: 13px; color: #0D1412;">Central</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="margin-left: auto; flex: 0 0 14px;"><path d="m7 9 5 5 5-5" /></svg>
+              </span>
+            </label>
+
+            <span style="grid-column: 1 / -1; height: 1px; background: rgba(13,20,18,0.06); margin: 4px 0;"></span>
+            <span style="grid-column: 1 / -1; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">CONTACTO QUE VE EL VECINO</span>
+            <label style="display: block; min-width: 0;">
+              <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Teléfono de la mesa de entrada</span>
+              <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                <span style="font-size: 13px; color: #0D1412; font-feature-settings: 'tnum';">+595 21 664 100</span>
+              </span>
+            </label>
+            <label style="display: block; min-width: 0;">
+              <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Correo de contacto</span>
+              <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FDF8EE; border: 1px solid #F2DFC0; border-radius: 10px;">
+                <span style="font-size: 13px; color: #0D1412;">reclamos@asuncion.gov.py</span>
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: #B4560F; margin-top: 6px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 12px;"><path d="M12 8v5M12 17h.01" /><circle cx="12" cy="12" r="9" /></svg>
+                Sin verificar: los avisos al vecino todavía no salen desde esta casilla
+              </span>
+            </label>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #FAFBFA; border-top: 1px solid rgba(13,20,18,0.06); border-radius: 0 0 12px 12px; flex-wrap: wrap;">
+            <span style="font-size: 11.5px; color: #98A3A0;">Último cambio: Rocío Giménez, hace 3 días</span>
+            <span style="margin-left: auto; display: flex; gap: 8px;">
+              <span style="display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; font-size: 12.5px; font-weight: 600; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Descartar</span>
+              <span style="display: inline-flex; align-items: center; height: 34px; padding: 0 15px; border-radius: 10px; background: #00B37E; font-size: 12.5px; font-weight: 600; color: #FFFFFF; cursor: pointer;" style-hover="background: #008F63;">Guardar cambios</span>
+            </span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ esApariencia }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 16px;">
+
+          <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px 20px; min-width: 0;">
+            <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">BANNER DEL TABLERO</span>
+            <p style="margin: 9px 0 0; font-size: 13px; line-height: 1.5; color: #5B6764; text-wrap: pretty; max-width: 68ch;">Es la foto que ve el equipo al entrar. Conviene una imagen del municipio, horizontal, con el lado izquierdo despejado: ahí va el título.</p>
+
+            <div style="position: relative; margin-top: 14px; height: 300px; border-radius: 12px; overflow: hidden; background: #EDF1EF;">
+              <div style="position: absolute; inset: 0;">
+                <image-slot id="apariencia-banner" shape="rect" placeholder="Arrastrá la foto del banner — 2000 × 700 px o más"></image-slot>
+              </div>
+              <div style="position: absolute; inset: 0; background: {{ veloMarca }}; opacity: 0.35; mix-blend-mode: multiply; pointer-events: none; transition: opacity 200ms cubic-bezier(0.2,0.8,0.2,1);"></div>
+              <div style="position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,32,24,0.78) 0%, rgba(6,32,24,0.44) 48%, rgba(6,32,24,0.06) 100%); pointer-events: none;"></div>
+              <div style="position: absolute; left: 20px; right: 20px; top: 20px; pointer-events: none;">
+                <span style="display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 700; letter-spacing: 0.11em; color: rgba(255,255,255,0.72);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 12px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+                  MUNICIPALIDAD · VISTA CONSOLIDADA
+                </span>
+                <span style="display: block; margin-top: 8px; font-family: Sora, sans-serif; font-size: 24px; font-weight: 700; line-height: 1.1; letter-spacing: -0.025em; color: #FFFFFF;">Asunción, Dpto. Central</span>
+                <span style="display: block; margin-top: 6px; font-size: 12.5px; color: rgba(255,255,255,0.82);">Así se va a ver el título sobre tu foto</span>
+              </div>
+              <span style="position: absolute; right: 14px; bottom: 14px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; background: rgba(255,255,255,0.94); border-radius: 999px; box-shadow: 0 2px 8px rgba(13,20,18,0.16); cursor: pointer;" style-hover="background: #FFFFFF;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3D4945" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 20h14" /></svg>
+                <span style="font-size: 11.5px; font-weight: 600; color: #3D4945;">Cambiar foto</span>
+              </span>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: #FAFBFA; border-radius: 10px; flex-wrap: wrap;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="M12 8v5M12 17h.01" /><circle cx="12" cy="12" r="9" /></svg>
+              <span style="font-size: 11.5px; color: #7A8783; min-width: 0;">El tinte del color de marca y el degradé que protege el título se aplican solos: subí la foto sin retocar.</span>
+            </div>
+
+            <span style="display: block; height: 1px; background: rgba(13,20,18,0.06); margin: 18px 0;"></span>
+
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; row-gap: 12px;">
+              <span style="width: 60px; height: 60px; border-radius: 14px; overflow: hidden; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.07); flex: 0 0 60px;">
+                <image-slot id="apariencia-logo" shape="rounded" placeholder="Logo"></image-slot>
+              </span>
+              <span style="min-width: 0;">
+                <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">LOGO</span>
+                <span style="display: block; font-size: 13px; font-weight: 600; color: #0D1412; margin-top: 5px;">PNG con fondo transparente</span>
+                <span style="display: block; font-size: 11.5px; color: #7A8783; margin-top: 3px;">512 × 512 px · se usa en el menú y en los comprobantes</span>
+              </span>
+              <span style="margin-left: auto; font-size: 11.5px; line-height: 1.45; color: #98A3A0; max-width: 34ch;">La app corre white-label: el mismo esqueleto con la marca de cada municipio.</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px 20px; margin-top: 12px; min-width: 0;">
+          <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">TEMA DEL PANEL</span>
+          <span style="display: block; font-size: 11.5px; color: #7A8783; margin-top: 5px;">El acento se aplica sobre cualquier tema.</span>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 11px;">
+            <sc-for list="{{ temas }}" as="t" hint-placeholder-count="5">
+              <span onClick="{{ t.elegir }}" title="{{ t.nombre }}" style="display: flex; flex-direction: column; gap: 7px; padding: 7px; border: 1px solid {{ t.borde }}; border-radius: 11px; background: {{ t.fondoCard }}; cursor: pointer; min-width: 0;" style-hover="border-color: #9BDCC4;">
+                <span style="display: flex; height: 62px; border-radius: 7px; overflow: hidden; background: {{ t.lienzo }};">
+                  <span style="width: 30%; height: 100%; background: {{ t.barra }};"></span>
+                  <span style="flex: 1; min-width: 0; padding: 7px 6px 0; display: flex; flex-direction: column; gap: 4px;">
+                    <span style="display: block; height: 4px; width: 76%; border-radius: 999px; background: {{ acento }};"></span>
+                    <span style="display: block; height: 3px; width: 92%; border-radius: 999px; background: {{ t.linea }};"></span>
+                    <span style="display: block; height: 3px; width: 64%; border-radius: 999px; background: {{ t.linea }};"></span>
+                  </span>
+                </span>
+                <span style="display: flex; align-items: center; gap: 5px; padding: 0 2px 1px;">
+                  <span style="font-size: 12px; font-weight: {{ t.peso }}; color: {{ t.color }}; min-width: 0;">{{ t.nombre }}</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ acento }}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; flex: 0 0 13px; opacity: {{ t.tick }};"><path d="m4 12 5 5L20 6" /></svg>
+                </span>
+              </span>
+            </sc-for>
+          </div>
+
+          <span style="display: block; height: 1px; background: rgba(13,20,18,0.06); margin: 18px 0;"></span>
+
+          <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">COLOR DE ACENTO</span>
+          <span style="display: block; font-size: 11.5px; color: #7A8783; margin-top: 5px;">Pinta botones, estados activos y detalles en toda la app.</span>
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
+            <sc-for list="{{ acentos }}" as="a" hint-placeholder-count="6">
+              <span onClick="{{ a.elegir }}" title="{{ a.nombre }}" style="display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; background: {{ a.hex }}; cursor: pointer; box-shadow: 0 0 0 {{ a.anillo }} #FFFFFF, 0 0 0 {{ a.borde }} {{ a.hex }};">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="opacity: {{ a.tick }};"><path d="m4 12 5 5L20 6" /></svg>
+              </span>
+            </sc-for>
+            <span style="font-size: 11.5px; font-weight: 600; color: {{ acento }}; margin-left: 4px; white-space: nowrap;">{{ nombreAcento }}</span>
+          </div>
+
+          <span style="display: block; height: 1px; background: rgba(13,20,18,0.06); margin: 18px 0;"></span>
+
+          <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">FONDO DE LA BARRA LATERAL</span>
+          <span style="display: block; font-size: 11.5px; color: #7A8783; margin-top: 5px;">Se arma en armonía con el acento activo.</span>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 11px; max-width: 420px;">
+            <sc-for list="{{ barras }}" as="b" hint-placeholder-count="3">
+              <span onClick="{{ b.elegir }}" title="{{ b.nombre }}" style="display: flex; flex-direction: column; gap: 7px; padding: 7px; border: 1px solid {{ b.borde }}; border-radius: 11px; background: {{ b.fondoCard }}; cursor: pointer; min-width: 0;" style-hover="border-color: #9BDCC4;">
+                <span style="display: flex; flex-direction: column; gap: 6px; height: 62px; padding: 11px 10px; border-radius: 7px; background: {{ b.lienzo }};">
+                  <span style="display: block; height: 4px; width: 68%; border-radius: 999px; background: {{ b.textoAlto }};"></span>
+                  <span style="display: block; height: 4px; width: 84%; border-radius: 999px; background: {{ acento }};"></span>
+                  <span style="display: block; height: 4px; width: 52%; border-radius: 999px; background: {{ b.textoBajo }};"></span>
+                </span>
+                <span style="display: flex; align-items: center; gap: 5px; padding: 0 2px 1px;">
+                  <span style="font-size: 12px; font-weight: {{ b.peso }}; color: {{ b.color }}; min-width: 0;">{{ b.nombre }}</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ acento }}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto; flex: 0 0 13px; opacity: {{ b.tick }};"><path d="m4 12 5 5L20 6" /></svg>
+                </span>
+              </span>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ esQr }}" hint-placeholder-val="{{ false }}">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; margin-top: 16px; align-items: start;">
+          <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px 20px;">
+            <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">QUÉ IMPRIME EL CARTEL</span>
+            <p style="margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: #3D4945; text-wrap: pretty; max-width: 64ch;">El vecino escanea y entra directo a cargar un reclamo con la ubicación del cartel ya puesta. Sirve para plazas, paradas y edificios municipales.</p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;">
+              <label style="display: block; max-width: 420px;">
+                <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Texto del cartel</span>
+                <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                  <span style="font-size: 13px; color: #0D1412;">¿Ves algo roto? Avisanos acá</span>
+                </span>
+              </label>
+              <label style="display: block; max-width: 420px;">
+                <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Punto de interés asociado</span>
+                <span style="display: flex; align-items: center; height: 38px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+                  <span style="font-size: 13px; color: #0D1412;">Plaza Uruguaya</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="margin-left: auto; flex: 0 0 14px;"><path d="m7 9 5 5 5-5" /></svg>
+                </span>
+              </label>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+              <span style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 15px; border-radius: 11px; background: #00B37E; font-size: 13px; font-weight: 600; color: #FFFFFF; cursor: pointer; white-space: nowrap;" style-hover="background: #008F63;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14" /></svg>
+                Descargar para imprimir
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 15px; border: 1px solid rgba(13,20,18,0.12); border-radius: 11px; background: #FFFFFF; font-size: 13px; font-weight: 600; color: #3D4945; cursor: pointer; white-space: nowrap;" style-hover="background: #F4F7F6;">Generar de nuevo</span>
+            </div>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+            <span style="align-self: flex-start; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">VISTA PREVIA</span>
+            <span style="width: 168px; height: 168px; border-radius: 12px; overflow: hidden; background: #F3F7F5;">
+              <image-slot id="qr-carteleria" shape="rect" placeholder="QR generado"></image-slot>
+            </span>
+            <span style="font-size: 11.5px; color: #98A3A0; text-align: center; line-height: 1.45;">Generado el 28 de julio · 14 carteles activos</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ esAsignacion }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 16px;">
+
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 10px;">
+            <div style="display: flex; gap: 2px; padding: 3px; background: #E8ECEA; border-radius: 10px; width: fit-content; max-width: 100%; flex: 0 0 auto;">
+              <sc-for list="{{ tabsAsig }}" as="t" hint-placeholder-count="2">
+                <span onClick="{{ t.ir }}" style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 14px; border-radius: 8px; background: {{ t.bg }}; box-shadow: {{ t.sombra }}; cursor: pointer; white-space: nowrap;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{ t.col }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="{{ t.glifo }}" /></svg>
+                  <span style="font-size: 12.5px; font-weight: 600; color: {{ t.col }};">{{ t.label }}</span>
+                  <span style="font-size: 11.5px; font-weight: 600; color: {{ t.sub }}; font-feature-settings: 'tnum';">{{ t.n }}</span>
+                </span>
+              </sc-for>
+            </div>
+            <span style="display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; height: 34px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 15px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar categoría o dependencia</span>
+            </span>
+            <sc-if value="{{ haySugerencias }}" hint-placeholder-val="{{ true }}">
+              <span onClick="{{ aplicarTodas }}" style="display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border-radius: 10px; background: #00B37E; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="background: #008F63;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 15px;"><path d="m12 3 1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /><path d="m18.5 16.5.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></svg>
+                <span style="font-size: 12.5px; font-weight: 600; color: #FFFFFF;">{{ labelSugerencias }}</span>
+              </span>
+            </sc-if>
+          </div>
+
+
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(13,20,18,0.08); flex-wrap: wrap; row-gap: 8px;">
+            <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; margin-right: 2px;">FILTRAR</span>
+            <sc-for list="{{ chipsAsig }}" as="c" hint-placeholder-count="3">
+              <span onClick="{{ c.ir }}" style="display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid {{ c.bd }}; background: {{ c.bg }}; cursor: pointer; white-space: nowrap;">
+                <span style="width: 6px; height: 6px; border-radius: 999px; background: {{ c.punto }};"></span>
+                <span style="font-size: 12.5px; font-weight: 600; color: {{ c.col }};">{{ c.label }}</span>
+                <span style="font-size: 11.5px; font-weight: 600; color: {{ c.sub }}; font-feature-settings: 'tnum';">{{ c.n }}</span>
+              </span>
+            </sc-for>
+          </div>
+
+          <div style="margin-top: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow-x: auto; overflow-y: hidden;">
+            <div style="box-sizing: border-box; display: grid; min-width: 560px; grid-template-columns: minmax(200px, 1.5fr) 96px minmax(190px, 1.35fr); align-items: center; gap: 14px; padding: 10px 16px; background: #FAFBFA; border-bottom: 1px solid rgba(13,20,18,0.06);">
+              <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">CATEGORÍA</span>
+              <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; text-align: right;">{{ colUsoAsig }}</span>
+              <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">QUIÉN LOS ATIENDE</span>
+            </div>
+
+            <sc-for list="{{ gruposAsig }}" as="g" hint-placeholder-count="2">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: {{ g.bg }}; border-top: 1px solid rgba(13,20,18,0.06); border-bottom: 1px solid rgba(13,20,18,0.06);">
+                  <span style="width: 7px; height: 7px; border-radius: 999px; background: {{ g.punto }}; flex: 0 0 7px;"></span>
+                  <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; color: {{ g.col }};">{{ g.titulo }}</span>
+                  <span style="font-size: 11.5px; color: #98A3A0; min-width: 0;">{{ g.detalle }}</span>
+                </div>
+
+                <sc-for list="{{ g.filas }}" as="r" hint-placeholder-count="4">
+                  <div style="box-sizing: border-box; display: grid; min-width: 560px; grid-template-columns: minmax(200px, 1.5fr) 96px minmax(190px, 1.35fr); align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid rgba(13,20,18,0.05);" style-hover="background: #FAFBFA;">
+                    <span style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                      <span style="display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: {{ r.tinte }}; flex: 0 0 30px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ r.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.glifo }}" /></svg>
+                      </span>
+                      <span style="font-size: 13px; font-weight: 600; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.nombre }}</span>
+                    </span>
+                    <span style="text-align: right; min-width: 0;">
+                      <span style="display: block; font-family: Sora, sans-serif; font-size: 13px; font-weight: 700; color: {{ r.usoCol }}; white-space: nowrap; font-feature-settings: 'tnum';">{{ r.uso }}</span>
+                      <span style="display: block; font-size: 10.5px; color: #98A3A0; margin-top: 2px; white-space: nowrap;">{{ r.usoNota }}</span>
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                      <sc-if value="{{ r.asignada }}" hint-placeholder-val="{{ false }}">
+                        <span onClick="{{ r.quitar }}" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 34px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer;" style-hover="border-color: #9BDCC4; background: #F7FCFA;">
+                          <span style="width: 6px; height: 6px; border-radius: 999px; background: {{ r.depColor }}; flex: 0 0 6px;"></span>
+                          <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.dep }}</span>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="margin-left: auto; flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+                        </span>
+                      </sc-if>
+                      <sc-if value="{{ r.sinAsignar }}" hint-placeholder-val="{{ true }}">
+                        <span onClick="{{ r.aplicar }}" title="{{ r.tituloAplicar }}" style="display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; height: 34px; padding: 0 11px; background: #FFFFFF; border: 1px dashed #9BDCC4; border-radius: 10px; cursor: pointer;" style-hover="background: #F2FBF7; border-color: #00B37E;">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="m12 3 1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /></svg>
+                          <span style="font-size: 12.5px; font-weight: 600; color: #00794F; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.sugerida }}</span>
+                        </span>
+                      </sc-if>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #FAFBFA; flex-wrap: wrap;">
+              <span style="font-size: 11.5px; color: #7A8783; min-width: 0;">{{ pieAsig }}</span>
+              <span style="margin-left: auto; font-size: 11.5px; color: #98A3A0; white-space: nowrap;">{{ resumenAsig }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ esArbol }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 16px;">
+
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px;">
+            <span style="display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 0; height: 34px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 15px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <span style="font-size: 12.5px; color: #9AA5A1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar dependencia, categoría o trámite</span>
+            </span>
+            <span onClick="{{ expandirTodo }}" style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; background: #FFFFFF; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3D4945" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="{{ glifoExpandir }}" /></svg>
+              <span style="font-size: 12.5px; font-weight: 600; color: #3D4945;">{{ labelExpandir }}</span>
+            </span>
+            <span title="Propone la estructura típica de un municipio de este tamaño y la deja para que la revises" style="display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px; border: 1px solid #C9EBDD; border-radius: 10px; background: #E7F6F0; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="background: #DCF2E9;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="m12 3 1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /><path d="m18.5 16.5.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></svg>
+              <span style="font-size: 12.5px; font-weight: 600; color: #00794F;">Sugerir estructura</span>
+            </span>
+          </div>
+
+          <div style="display: flex; align-items: flex-start; gap: 9px; margin-top: 10px; padding: 10px 12px; background: linear-gradient(180deg, #F5FCF9 0%, #FFFFFF 62%); border: 1px solid #C9EBDD; border-left: 3px solid #00B37E; border-radius: 11px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 15px; margin-top: 1px;"><path d="m12 3 1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /></svg>
+            <span style="min-width: 0; font-size: 12px; line-height: 1.45; color: #3D4945;">Arrancá con la estructura sugerida y complejizala cuando la necesites. <strong style="font-weight: 600; color: #0D1412;">Nada se aplica sin que lo confirmes</strong>: la sugerencia queda marcada en el árbol para que la revises rama por rama.</span>
+          </div>
+
+          <div style="margin-top: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; overflow: hidden;">
+            <sc-for list="{{ arbol }}" as="n" hint-placeholder-count="8">
+              <sc-if value="{{ n.esNodo }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ n.toggle }}" style="display: flex; align-items: center; gap: 10px; padding: {{ n.padding }}; padding-left: {{ n.sangria }}; background: {{ n.bg }}; border-bottom: 1px solid rgba(13,20,18,0.05); cursor: {{ n.cursor }}; min-width: 0;" style-hover="background: {{ n.bgHover }};">
+                <span style="display: grid; place-items: center; width: 16px; flex: 0 0 16px; opacity: {{ n.opChev }};">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2.4" stroke-linecap="round" style="transition: transform 200ms cubic-bezier(0.2,0.8,0.2,1); transform: {{ n.chev }};"><path d="m9 6 6 6-6 6" /></svg>
+                </span>
+                <span style="display: grid; place-items: center; width: {{ n.iconoCaja }}; height: {{ n.iconoCaja }}; border-radius: 9px; background: {{ n.tinte }}; flex: 0 0 {{ n.iconoCaja }};">
+                  <svg width="{{ n.iconoSvg }}" height="{{ n.iconoSvg }}" viewBox="0 0 24 24" fill="none" stroke="{{ n.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.glifo }}" /></svg>
+                </span>
+                <span style="min-width: 0; flex: 1;">
+                  <span style="display: flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap; row-gap: 3px;">
+                    <span style="font-family: {{ n.fuente }}; font-size: {{ n.tamano }}; font-weight: {{ n.peso }}; letter-spacing: {{ n.tracking }}; color: {{ n.colorTexto }};">{{ n.label }}</span>
+                    <sc-if value="{{ n.tieneChip }}" hint-placeholder-val="{{ false }}">
+                      <span style="display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; background: {{ n.chipBg }}; border-radius: 999px; white-space: nowrap; flex: 0 0 auto;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="{{ n.chipCol }}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 10px;"><path d="{{ n.chipGlifo }}" /></svg>
+                        <span style="font-size: 10.5px; font-weight: 600; color: {{ n.chipCol }};">{{ n.chip }}</span>
+                      </span>
+                    </sc-if>
+                  </span>
+                  <sc-if value="{{ n.tieneSub }}" hint-placeholder-val="{{ false }}">
+                    <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 3px; min-width: 0;">{{ n.sub }}</span>
+                  </sc-if>
+                </span>
+                <sc-if value="{{ n.tieneMonto }}" hint-placeholder-val="{{ false }}">
+                  <span style="text-align: right; flex: 0 0 auto;">
+                    <span style="display: block; font-family: Sora, sans-serif; font-size: 13px; font-weight: 700; color: {{ n.montoCol }}; white-space: nowrap; font-feature-settings: 'tnum';">{{ n.monto }}</span>
+                    <span style="display: block; font-size: 10.5px; color: #98A3A0; margin-top: 3px; white-space: nowrap;">{{ n.montoNota }}</span>
+                  </span>
+                </sc-if>
+                <sc-if value="{{ n.tieneAcciones }}" hint-placeholder-val="{{ false }}">
+                  <span style="display: flex; align-items: center; gap: 2px; flex: 0 0 auto;">
+                    <span title="Editar" style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;" style-hover="background: #EDF1EF;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z" /></svg>
+                    </span>
+                    <span title="{{ n.tituloBorrar }}" style="display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: {{ n.cursorBorrar }}; opacity: {{ n.opBorrar }};" style-hover="background: #FDF4F4;">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ n.colBorrar }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12" /></svg>
+                    </span>
+                  </span>
+                </sc-if>
+              </div>
+              </sc-if>
+
+              <sc-if value="{{ n.esAgregar }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; align-items: center; gap: 9px; padding: 9px 18px; padding-left: {{ n.sangria }}; border-bottom: 1px solid rgba(13,20,18,0.05); cursor: pointer;" style-hover="background: #F7FCFA;">
+                  <span style="width: 16px; flex: 0 0 16px;"></span>
+                  <span style="display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; border: 1px dashed #9BDCC4; flex: 0 0 26px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                  </span>
+                  <span style="font-size: 12.5px; font-weight: 600; color: #00794F; min-width: 0;">{{ n.label }}</span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ n.esReq }}" hint-placeholder-val="{{ false }}">
+                <div style="padding: 14px 18px 16px; padding-left: {{ n.sangriaReq }}; background: #FAFBFA; border-bottom: 1px solid rgba(13,20,18,0.05);">
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px;">
+                    <div style="min-width: 0;">
+                      <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; margin-bottom: 8px;">DOCUMENTOS QUE PIDE</span>
+                      <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <sc-for list="{{ n.docs }}" as="doc" hint-placeholder-count="3">
+                          <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ doc.col }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5" /></svg>
+                            <span style="font-size: 12.5px; color: #3D4945; min-width: 0;">{{ doc.label }}</span>
+                            <span style="font-size: 10.5px; font-weight: 600; color: {{ doc.col }}; white-space: nowrap; flex: 0 0 auto;">{{ doc.nota }}</span>
+                          </span>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div style="min-width: 0;">
+                      <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; margin-bottom: 8px;">VALIDACIONES DE IDENTIDAD</span>
+                      <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <sc-for list="{{ n.checks }}" as="ch" hint-placeholder-count="2">
+                          <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                            <span style="display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; background: {{ ch.bg }}; flex: 0 0 16px;">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="{{ ch.tickCol }}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6" /></svg>
+                            </span>
+                            <span style="font-size: 12.5px; color: {{ ch.col }}; min-width: 0;">{{ ch.label }}</span>
+                          </span>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(13,20,18,0.06); flex-wrap: wrap;">
+                    <span style="font-size: 11.5px; color: #7A8783; min-width: 0;">{{ n.resumenReq }}</span>
+                    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #00794F; cursor: pointer; white-space: nowrap;" style-hover="gap: 9px;">
+                      Editar prerrequisitos
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+                    </span>
+                  </div>
+                </div>
+              </sc-if>
+            </sc-for>
+
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: #FAFBFA; flex-wrap: wrap;">
+              <span style="font-size: 11.5px; color: #7A8783; min-width: 0;">{{ pieArbol }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ esAbmCompleto }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 16px; padding: 22px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-left: 3px solid #3B82F6; border-radius: 12px; background: linear-gradient(180deg, #F7FAFE 0%, #FFFFFF 58%);">
+          <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #1D6FD1;">USA EL ABM COMPLETO, NO EL CATÁLOGO SIMPLE</span>
+          <p style="margin: 10px 0 0; font-family: Sora, sans-serif; font-size: 16px; font-weight: 600; line-height: 1.45; letter-spacing: -0.02em; text-wrap: pretty; max-width: 76ch;">{{ notaAbm }}</p>
+          <p style="margin: 10px 0 0; font-size: 13px; line-height: 1.55; color: #5B6764; text-wrap: pretty; max-width: 76ch;">Entra la misma pieza que Gastos o Liquidaciones —hero semántico con KPIs, barra de filtros y tabla con agrupadores— pero pelada: el título lo pone esta pantalla, no el componente.</p>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ editando }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ cerrarEdicion }}" style="position: fixed; inset: 0; z-index: 40; background: rgba(13,20,18,0.38);"></div>
+    <aside style="position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: 480px; max-width: 100%; background: #FFFFFF; display: flex; flex-direction: column; box-shadow: -12px 0 40px rgba(13,20,18,0.16); animation: entrarPanel 260ms cubic-bezier(0.2,0.8,0.2,1) both;">
+
+      <div style="flex: 0 0 auto; display: flex; align-items: center; gap: 11px; padding: 18px 20px 16px; border-bottom: 1px solid rgba(13,20,18,0.07);">
+        <span style="display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: {{ edTinte }}; flex: 0 0 34px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ edColor }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ edGlifo }}" /></svg>
+        </span>
+        <span style="flex: 1; min-width: 0;">
+          <span style="display: block; font-family: Sora, sans-serif; font-size: 16px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ edNombre }}</span>
+          <span style="display: block; font-size: 11.5px; color: #98A3A0;">{{ edSubtitulo }}</span>
+        </span>
+        <span onClick="{{ cerrarEdicion }}" title="Cerrar" style="width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; flex: 0 0 28px;" style-hover="background: #F4F7F6;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </span>
+      </div>
+
+      <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px;">
+
+        <sc-if value="{{ edSePisa }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: linear-gradient(180deg, #FEFAF2 0%, #FFFFFF 62%); border: 1px solid #F2DFC0; border-left: 3px solid #F59E0B; border-radius: 11px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B4560F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 16px; margin-top: 1px;"><circle cx="9" cy="12" r="6" /><circle cx="15" cy="12" r="6" /></svg>
+            <span style="min-width: 0;">
+              <span style="display: block; font-size: 12.5px; font-weight: 600; color: #8A6410;">Se solapa con «{{ edPisa }}»</span>
+              <span style="display: block; font-size: 11.5px; line-height: 1.45; color: #5B6764; margin-top: 3px;">El vecino no sabe cuál elegir y el mismo problema entra por las dos. Conviene fusionarlas o afinar las descripciones.</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 600; color: #B4560F; cursor: pointer;" style-hover="gap: 8px;">
+                Fusionar con «{{ edPisa }}»
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+              </span>
+            </span>
+          </div>
+        </sc-if>
+
+        <label style="display: block; min-width: 0;">
+          <span style="display: flex; align-items: baseline; gap: 5px; margin-bottom: 6px;">
+            <span style="font-size: 12px; font-weight: 600; color: #3D4945;">Nombre</span>
+            <span style="font-size: 12px; color: #C93A3E;">*</span>
+          </span>
+          <span style="display: flex; align-items: center; height: 40px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+            <span style="font-size: 13.5px; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ edNombre }}</span>
+          </span>
+        </label>
+
+        <label style="display: block; min-width: 0;">
+          <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Descripción</span>
+          <span style="display: block; min-height: 66px; padding: 10px 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px;">
+            <span style="font-size: 13px; line-height: 1.5; color: #0D1412; text-wrap: pretty;">{{ edDesc }}</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 12px;"><path d="M12 3a9 9 0 1 0 4.5 16.8L21 21l-1.2-4.5A9 9 0 0 0 12 3z" /></svg>
+            <span style="font-size: 11.5px; color: #98A3A0;">Es el texto que el vecino lee al elegir la categoría</span>
+          </span>
+        </label>
+
+        <div style="min-width: 0;">
+          <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Cómo se ve en la app</span>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #FAFBFA; border: 1px solid rgba(13,20,18,0.10); border-radius: 10px;">
+            <span style="display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: {{ edTinte }}; flex: 0 0 34px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ edColor }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ edGlifo }}" /></svg>
+            </span>
+            <span style="min-width: 0; flex: 1;">
+              <span style="display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ edNombre }}</span>
+              <span style="display: block; font-size: 11px; color: #98A3A0; margin-top: 2px;">Icono y color</span>
+            </span>
+            <span onClick="{{ togglePicker }}" style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid rgba(13,20,18,0.12); border-radius: 9px; background: #FFFFFF; font-size: 12px; font-weight: 600; color: #3D4945; cursor: pointer; white-space: nowrap; flex: 0 0 auto;" style-hover="border-color: #9BDCC4; color: #00794F;">{{ labelPicker }}</span>
+          </div>
+
+          <div style="display: grid; grid-template-rows: {{ grPicker }}; opacity: {{ opPicker }}; transition: grid-template-rows 240ms cubic-bezier(0.2,0.8,0.2,1), opacity 180ms cubic-bezier(0.2,0.8,0.2,1);">
+            <div style="overflow: hidden; min-height: 0;">
+              <div style="padding: 12px 0 0;">
+                <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; margin-bottom: 8px;">ICONO</span>
+                <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px;">
+                  <sc-for list="{{ iconos }}" as="i" hint-placeholder-count="16">
+                    <span onClick="{{ i.elegir }}" style="display: grid; place-items: center; height: 36px; border-radius: 9px; border: 1.5px solid {{ i.bd }}; background: {{ i.bg }}; cursor: pointer;" style-hover="border-color: #9BDCC4;">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{ i.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ i.glifo }}" /></svg>
+                    </span>
+                  </sc-for>
+                </div>
+                <span style="display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; margin: 14px 0 8px;">COLOR</span>
+                <div style="display: flex; gap: 7px; flex-wrap: wrap;">
+                  <sc-for list="{{ colores }}" as="c" hint-placeholder-count="6">
+                    <span onClick="{{ c.elegir }}" title="{{ c.nombre }}" style="display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; background: {{ c.hex }}; cursor: pointer; box-shadow: 0 0 0 {{ c.anillo }} #FFFFFF, 0 0 0 {{ c.borde }} {{ c.hex }};">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="opacity: {{ c.tick }};"><path d="m4 12 5 5L20 6" /></svg>
+                    </span>
+                  </sc-for>
+                </div>
+                <span style="display: block; font-size: 11.5px; color: #98A3A0; margin-top: 10px; line-height: 1.45;">El color solo agrupa visualmente en el mapa y las listas. La urgencia la define la prioridad, no el color.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <span style="height: 1px; background: rgba(13,20,18,0.06);"></span>
+
+        <div style="min-width: 0;">
+          <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Plazo de resolución</span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="display: flex; align-items: center; height: 40px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px; min-width: 92px;">
+              <span style="font-size: 13.5px; font-weight: 600; color: #0D1412; font-feature-settings: 'tnum';">{{ edPlazoValor }}</span>
+            </span>
+            <span style="display: flex; gap: 2px; padding: 3px; background: #E8ECEA; border-radius: 10px;">
+              <span onClick="{{ enHoras }}" style="display: inline-flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 8px; background: {{ bgHoras }}; box-shadow: {{ shHoras }}; font-size: 12.5px; font-weight: 600; color: {{ colHoras }}; cursor: pointer;">horas</span>
+              <span onClick="{{ enDias }}" style="display: inline-flex; align-items: center; height: 30px; padding: 0 13px; border-radius: 8px; background: {{ bgDias }}; box-shadow: {{ shDias }}; font-size: 12.5px; font-weight: 600; color: {{ colDias }}; cursor: pointer;">días</span>
+            </span>
+            <span style="font-size: 11.5px; color: #98A3A0; white-space: nowrap;">{{ edPlazoNota }}</span>
+          </div>
+        </div>
+
+        <div style="min-width: 0;">
+          <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Prioridad por defecto</span>
+          <div style="display: flex; gap: 6px;">
+            <sc-for list="{{ prioridades }}" as="p" hint-placeholder-count="5">
+              <span onClick="{{ p.elegir }}" style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px; border: 1.5px solid {{ p.bd }}; border-radius: 10px; background: {{ p.bg }}; cursor: pointer;" style-hover="border-color: #9BDCC4;">
+                <span style="font-family: Sora, sans-serif; font-size: 14px; font-weight: 700; color: {{ p.col }}; font-feature-settings: 'tnum';">{{ p.n }}</span>
+                <span style="font-size: 10px; font-weight: 600; color: {{ p.colSub }}; white-space: nowrap;">{{ p.label }}</span>
+              </span>
+            </sc-for>
+          </div>
+          <span style="display: block; font-size: 11.5px; color: #98A3A0; margin-top: 8px; line-height: 1.45;">{{ edPrioNota }}</span>
+        </div>
+
+        <div style="min-width: 0;">
+          <span style="display: block; font-size: 12px; font-weight: 600; color: #3D4945; margin-bottom: 6px;">Orden en la app del vecino</span>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="display: flex; align-items: center; height: 40px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.14); border-radius: 10px; min-width: 78px;">
+              <span style="font-size: 13.5px; font-weight: 600; color: #0D1412; font-feature-settings: 'tnum';">{{ edOrden }}</span>
+            </span>
+            <span style="font-size: 11.5px; color: #98A3A0; min-width: 0;">{{ edOrdenNota }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex: 0 0 auto; padding: 14px 20px 18px; border-top: 1px solid rgba(13,20,18,0.07);">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: {{ edUsoBg }}; border-radius: 10px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ edUsoCol }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 15px;"><path d="{{ edUsoGlifo }}" /></svg>
+          <span style="font-size: 11.5px; color: {{ edUsoCol }}; min-width: 0; line-height: 1.4;">{{ edUsoTexto }}</span>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <span onClick="{{ cerrarEdicion }}" style="display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border: 1px solid rgba(13,20,18,0.12); border-radius: 11px; font-size: 13px; font-weight: 600; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Cancelar</span>
+          <button onClick="{{ cerrarEdicion }}" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; border: 0; border-radius: 11px; background: #00B37E; color: #FFFFFF; font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="background: #008F63;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6" /></svg>
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+    </aside>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;contratados&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;general,personal,vecino,catalogos,inventario,tesoreria,integraciones,super&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Módulos contratados&quot;},&quot;densidad&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;comoda&quot;,&quot;compacta&quot;],&quot;default&quot;:&quot;comoda&quot;,&quot;tsType&quot;:&quot;'comoda' | 'compacta'&quot;,&quot;section&quot;:&quot;Tabla&quot;}}">
+class Component extends DCLogic {
+  state = { padre: 'vecino', hijo: 'cat-reclamo', filtro: 'todos', vista: 'tabla', orden: false, apagados: [],
+    edita: null, picker: false, unidad: 'auto', prio: null, icono: null, color: null };
+
+  // Estructura del brief. `tipo` decide qué cuerpo entra en el tab hijo:
+  // catalogo = el ABM genérico (nombre, icono, color, activo, orden),
+  // form / qr = cuerpos propios, abm = el SemanticAbmPage completo.
+  arbol() {
+    return [
+      { id: 'general', label: 'General', hijos: [
+        { id: 'muni', label: 'Datos del municipio', tipo: 'form' },
+        { id: 'qr', label: 'QR de cartelería', tipo: 'qr', n: '14' },
+        { id: 'apariencia', label: 'Apariencia', tipo: 'apariencia' },
+      ] },
+      { id: 'personal', label: 'Personal', hijos: [
+        { id: 'empleados', label: 'Empleados', tipo: 'abm', n: '86' },
+        { id: 'cuadrillas', label: 'Cuadrillas', tipo: 'abm', n: '7' },
+        { id: 'ausencias', label: 'Ausencias', tipo: 'abm', n: '12' },
+      ] },
+      { id: 'vecino', label: 'Atención al vecino', hijos: [
+        { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
+        { id: 'cat-reclamo', label: 'Categorías de reclamo', tipo: 'catalogo', n: '9' },
+        { id: 'arbol-tramite', label: 'Trámites', tipo: 'arbol' },
+        { id: 'sla', label: 'SLA', tipo: 'abm', n: '9' },
+        { id: 'tipos-poi', label: 'Tipos de punto de interés', tipo: 'catalogo', n: '5' },
+      ] },
+      { id: 'catalogos', label: 'Catálogos', hijos: [
+        { id: 'dependencias', label: 'Dependencias', tipo: 'abm', n: '11' },
+        { id: 'asignacion', label: 'Asignación', tipo: 'asignacion', n: '11' },
+        { id: 'zonas', label: 'Zonas', tipo: 'abm', n: '18' },
+      ] },
+      { id: 'inventario', label: 'Inventario', hijos: [
+        { id: 'inv', label: 'Inventario', tipo: 'abm', n: '240' },
+        { id: 'cat-inv', label: 'Categorías de inventario', tipo: 'catalogo', n: '8' },
+      ] },
+      { id: 'tesoreria', label: 'Tesorería', hijos: [
+        { id: 'conceptos', label: 'Conceptos', tipo: 'catalogo', n: '22' },
+        { id: 'conceptos-liq', label: 'Conceptos de liquidación', tipo: 'catalogo', n: '9' },
+        { id: 'tipos-empleado', label: 'Tipos de empleado', tipo: 'catalogo', n: '5' },
+        { id: 'cajas', label: 'Cajas y fondos', tipo: 'abm', n: '4' },
+        { id: 'retenciones', label: 'Retenciones', tipo: 'abm', n: '6' },
+        { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
+        { id: 'proyectos', label: 'Proyectos', tipo: 'abm', n: '8' },
+        { id: 'tarjetas', label: 'Tarjetas', tipo: 'abm', n: '3' },
+        { id: 'contactos', label: 'Contactos', tipo: 'abm', n: '148' },
+        { id: 'tasas', label: 'Catálogo de tasas', tipo: 'abm', n: '31' },
+      ] },
+      { id: 'integraciones', label: 'Integraciones', hijos: [
+        { id: 'pagos', label: 'Proveedores de pago', tipo: 'abm', n: '2' },
+        { id: 'wa', label: 'WhatsApp', tipo: 'form' },
+        { id: 'ia', label: 'IA', tipo: 'form' },
+      ] },
+      { id: 'super', label: 'Super Admin', hijos: [
+        { id: 'auditoria', label: 'Auditoría', tipo: 'abm' },
+        { id: 'suscripciones', label: 'Suscripciones', tipo: 'abm' },
+        { id: 'sidebar', label: 'Config del sidebar', tipo: 'form' },
+      ] },
+    ];
+  }
+
+  // Los 7 catálogos que el brief marca como idénticos comparten forma:
+  // nombre, icono, color, activo, orden — y "en uso", que es lo que decide
+  // si se puede borrar una fila o no.
+  datos() {
+    const g = {
+      bache: 'M4 8h16v12H4zM4 8l3-4h10l3 4M9 12h6',
+      luz: 'M9 18h6M10 21h4M12 3a6 6 0 0 1 3.5 10.9V17h-7v-3.1A6 6 0 0 1 12 3z',
+      basura: 'M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12',
+      agua: 'M12 3s6 6.4 6 10.4A6 6 0 0 1 6 13.4C6 9.4 12 3 12 3z',
+      arbol: 'M12 21v-5M8.5 16a4.5 4.5 0 0 1-1.4-8.4A5 5 0 0 1 17 6.6 4.5 4.5 0 0 1 15.5 16z',
+      perro: 'M6.5 8 4 5.5v4M17.5 8 20 5.5v4M6.5 8v5a5.5 5.5 0 0 0 11 0V8M10 12h.01M14 12h.01',
+      semaforo: 'M9 3h6v18H9zM12 7h.01M12 12h.01M12 17h.01',
+      ruido: 'M11 5 6.5 9H3v6h3.5L11 19zM15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10',
+      plaza: 'M4 20h16M6 20v-6h4v6M14 20v-9h4v9M8 8V4h8v4',
+      vereda: 'M5 4h6v16H5zM13 4h6v16h-6M5 9h6M5 14h6M13 9h6M13 14h6',
+      plaga: 'M12 8v9M8.5 10.5 12 8l3.5 2.5M6 13h12M7 17l2-2M17 17l-2-2M9 8 7 5M15 8l2-3',
+      cono: 'M12 4 5 20h14zM8.5 14h7M4 20h16',
+      cable: 'M7 4v6a3 3 0 0 0 3 3h4a3 3 0 0 1 3 3v4M5 4h4M15 4h4',
+      auto: 'M4 16h16v-4l-2-4H6L4 12zM7 16v2M17 16v2M8 12h8',
+      local: 'M4 9h16v11H4zM4 9l2-4h12l2 4M9 20v-6h6v6',
+      obra: 'M12 4 5 20h14zM8.5 14h7',
+      mapa: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14',
+      tasa: 'M2.5 6h19v12h-19zM2.5 11h19M6 15h4',
+      salud: 'M12 20s7-4.4 7-9.4A3.6 3.6 0 0 0 12 8a3.6 3.6 0 0 0-7 2.6C5 15.6 12 20 12 20z',
+      doc: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4',
+    };
+    const c = { verde: '#00B37E', ambar: '#F59E0B', azul: '#3B82F6', rojo: '#E5484D', gris: '#7A8783', violeta: '#8B5CF6' };
+    const t = { '#00B37E': '#E7F6F0', '#F59E0B': '#FDF1DF', '#3B82F6': '#E8F1FE', '#E5484D': '#FDECEC', '#7A8783': '#F3F7F5', '#8B5CF6': '#F1EBFE' };
+    const base = {
+      'cat-reclamo': { nuevo: 'Nueva categoría', unidad: 'reclamos', filas: [
+        { nombre: 'Bacheo y calles', glifo: g.bache, color: c.ambar, uso: 97, hs: 168, prio: 3, pisa: '',
+          desc: 'Deterioro de pavimento y asfalto: baches, hundimientos, pozos y roturas de calzada.' },
+        { nombre: 'Alumbrado público', glifo: g.luz, color: c.ambar, uso: 62, hs: 120, prio: 3, pisa: '',
+          desc: 'Luminarias apagadas o intermitentes, postes caídos, cables sueltos y zonas sin cobertura de iluminación.' },
+        { nombre: 'Higiene urbana', glifo: g.basura, color: c.verde, uso: 48, hs: 72, prio: 2, pisa: 'Recolección de residuos',
+          desc: 'Barrido de calles, limpieza de desagües pluviales, retiro de graffitis y cartelería.' },
+        { nombre: 'Agua y cloacas', glifo: g.agua, color: c.azul, uso: 34, hs: 48, prio: 4, pisa: 'Desagües y pluviales',
+          desc: 'Pérdidas de agua en vía pública, cortes de suministro y cloacas desbordadas.' },
+        { nombre: 'Arbolado y espacios verdes', glifo: g.arbol, color: c.verde, uso: 26, hs: 240, prio: 2, pisa: 'Plazas y juegos',
+          desc: 'Mantenimiento de plazas, parques y juegos; árboles caídos, ramas y poda.' },
+        { nombre: 'Animales sueltos', glifo: g.perro, color: c.rojo, uso: 19, hs: 48, prio: 4, pisa: '',
+          desc: 'Perros sueltos, animales heridos o muertos en vía pública, maltrato animal.' },
+        { nombre: 'Semáforos', glifo: g.semaforo, color: c.azul, uso: 12, hs: 24, prio: 5, pisa: 'Tránsito y señalización',
+          desc: 'Semáforos apagados, intermitentes o descoordinados.' },
+        { nombre: 'Veredas en mal estado', glifo: g.vereda, color: c.ambar, uso: 11, hs: 168, prio: 3, pisa: '',
+          desc: 'Baldosas flojas, rotas o veredas intransitables.' },
+        { nombre: 'Recolección de residuos', glifo: g.basura, color: c.verde, uso: 9, hs: 48, prio: 3, pisa: 'Higiene urbana',
+          desc: 'Fallas en el servicio: basura no retirada, contenedores desbordados o rotos.' },
+        { nombre: 'Desagües y pluviales', glifo: g.agua, color: c.azul, uso: 7, hs: 72, prio: 4, pisa: 'Agua y cloacas',
+          desc: 'Bocas de tormenta tapadas, anegamientos y agua servida en la calle.' },
+        { nombre: 'Plagas y control', glifo: g.plaga, color: c.rojo, uso: 5, hs: 96, prio: 3, pisa: '',
+          desc: 'Roedores, insectos, palomas y situaciones que requieran fumigación.' },
+        { nombre: 'Tránsito y señalización', glifo: g.cono, color: c.rojo, uso: 4, hs: 72, prio: 3, pisa: 'Semáforos',
+          desc: 'Carteles caídos, señalización borrosa y demarcación faltante.' },
+        { nombre: 'Cableado suelto', glifo: g.cable, color: c.violeta, uso: 3, hs: 24, prio: 5, pisa: '',
+          desc: 'Cables colgando, postes inclinados o instalaciones a la vista.' },
+        { nombre: 'Estacionamiento indebido', glifo: g.auto, color: c.violeta, uso: 2, hs: 24, prio: 2, pisa: '',
+          desc: 'Vehículos sobre la vereda, en rampas o en doble fila.' },
+        { nombre: 'Vehículos abandonados', glifo: g.auto, color: c.violeta, uso: 1, hs: 336, prio: 1, pisa: '',
+          desc: 'Autos o motos abandonados en la vía pública.' },
+        { nombre: 'Plazas y juegos', glifo: g.plaza, color: c.gris, uso: 0, hs: 240, prio: 2, pisa: 'Arbolado y espacios verdes', off: true,
+          desc: 'Juegos rotos, bancos dañados o plazas sin mantenimiento.' },
+        { nombre: 'Ruidos y convivencia', glifo: g.ruido, color: c.gris, uso: 0, hs: 72, prio: 1, pisa: '', off: true,
+          desc: 'Ruidos excesivos de viviendas, comercios, obras o vehículos.' },
+      ] },
+      'cat-tramite': { nuevo: 'Nueva categoría', unidad: 'tipos de trámite', filas: [
+        { nombre: 'Habilitaciones Comerciales', glifo: g.local, color: c.ambar, hs: null, prio: null, pisa: '',
+          desc: 'Habilitación y renovación de locales, industrias y actividades económicas.' },
+        { nombre: 'Espacios Públicos', glifo: g.arbol, color: c.verde, hs: null, prio: null, pisa: '',
+          desc: 'Uso de la vía pública: poda, publicidad, ferias y eventos en plazas.' },
+        { nombre: 'Tasas y Tributos', glifo: g.tasa, color: c.verde, hs: null, prio: null, pisa: '',
+          desc: 'Liquidación y pago de tasas municipales.' },
+        { nombre: 'Certificados y Documentación', glifo: g.doc, color: c.azul, hs: null, prio: null, pisa: '',
+          desc: 'Certificados que emite la municipalidad a pedido del vecino.' },
+        { nombre: 'Obras Particulares', glifo: g.obra, color: c.ambar, hs: null, prio: null, pisa: '',
+          desc: 'Permisos de construcción, refacción y demolición en propiedad privada.' },
+        { nombre: 'Tránsito y Transporte', glifo: g.auto, color: c.violeta, hs: null, prio: null, pisa: '',
+          desc: 'Licencias de conducir, remises y transporte de pasajeros.' },
+        { nombre: 'Salud y Bromatología', glifo: g.salud, color: c.rojo, hs: null, prio: null, pisa: '',
+          desc: 'Habilitaciones sanitarias y control de manipulación de alimentos.' },
+        { nombre: 'Catastro', glifo: g.mapa, color: c.azul, hs: null, prio: null, pisa: '',
+          desc: 'Datos parcelarios, certificados catastrales y cambios de titularidad.' },
+      ] },
+      'tipos-poi': { nuevo: 'Nuevo tipo', unidad: 'puntos', filas: [
+        { nombre: 'Plaza', glifo: g.plaza, color: c.verde, uso: 34, nota: 'Con QR de cartelería' },
+        { nombre: 'Escuela', glifo: g.semaforo, color: c.azul, uso: 22, nota: 'Con QR de cartelería' },
+        { nombre: 'Parada de colectivo', glifo: g.luz, color: c.ambar, uso: 18, nota: 'Con QR de cartelería' },
+        { nombre: 'Edificio municipal', glifo: g.bache, color: c.azul, uso: 11, nota: 'Sin QR' },
+        { nombre: 'Contenedor', glifo: g.basura, color: c.gris, uso: 0, nota: 'Se define por zona, no por punto', off: true },
+      ] },
+      'tipos-empleado': { nuevo: 'Nuevo tipo', unidad: 'empleados', filas: [
+        { nombre: 'Planta permanente', glifo: g.plaza, color: c.verde, uso: 52, nota: 'Liquidación mensual' },
+        { nombre: 'Contratado', glifo: g.bache, color: c.azul, uso: 21, nota: 'Liquidación mensual' },
+        { nombre: 'Jornalero', glifo: g.arbol, color: c.ambar, uso: 11, nota: 'Liquidación semanal' },
+        { nombre: 'Pasante', glifo: g.luz, color: c.gris, uso: 2, nota: 'Liquidación mensual' },
+        { nombre: 'Ad honorem', glifo: g.perro, color: c.gris, uso: 0, nota: 'Nunca se usó', off: true },
+      ] },
+      'parajes': { nuevo: 'Nuevo paraje', unidad: 'gastos', filas: [
+        { nombre: 'Centro histórico', glifo: g.plaza, color: c.verde, uso: 18, nota: 'Zona 1' },
+        { nombre: 'Villa Morra', glifo: g.arbol, color: c.verde, uso: 14, nota: 'Zona 2' },
+        { nombre: 'Sajonia', glifo: g.agua, color: c.azul, uso: 11, nota: 'Zona 3' },
+        { nombre: 'Trinidad', glifo: g.bache, color: c.ambar, uso: 7, nota: 'Zona 4' },
+        { nombre: 'Tacumbú', glifo: g.basura, color: c.ambar, uso: 5, nota: 'Zona 3' },
+        { nombre: 'Zeballos Cué', glifo: g.luz, color: c.gris, uso: 0, nota: 'Sin gastos imputados', off: true },
+      ] },
+      'cat-inv': { nuevo: 'Nueva categoría', unidad: 'artículos', filas: [
+        { nombre: 'Áridos y cemento', glifo: g.bache, color: c.ambar, uso: 62, nota: 'Depósito central' },
+        { nombre: 'Luminarias', glifo: g.luz, color: c.ambar, uso: 48, nota: 'Depósito central' },
+        { nombre: 'Herramientas', glifo: g.plaza, color: c.verde, uso: 41, nota: 'Corralón' },
+        { nombre: 'Limpieza', glifo: g.basura, color: c.verde, uso: 34, nota: 'Depósito central' },
+        { nombre: 'Señalización', glifo: g.semaforo, color: c.azul, uso: 26, nota: 'Corralón' },
+        { nombre: 'Riego y plantines', glifo: g.arbol, color: c.verde, uso: 19, nota: 'Vivero' },
+        { nombre: 'Insumos veterinarios', glifo: g.perro, color: c.rojo, uso: 8, nota: 'Zoonosis' },
+        { nombre: 'Papelería', glifo: g.plaza, color: c.gris, uso: 0, nota: 'Se compra por caja chica', off: true },
+      ] },
+      'conceptos': { nuevo: 'Nuevo concepto', unidad: 'movimientos', filas: [
+        { nombre: 'Servicios profesionales', glifo: g.plaza, color: c.azul, uso: 34, nota: 'Egreso · imputa a Gastos' },
+        { nombre: 'Insumos y materiales', glifo: g.bache, color: c.ambar, uso: 28, nota: 'Egreso · imputa a Gastos' },
+        { nombre: 'Combustible', glifo: g.luz, color: c.ambar, uso: 22, nota: 'Egreso · imputa a Gastos' },
+        { nombre: 'Alquileres', glifo: g.plaza, color: c.azul, uso: 14, nota: 'Egreso · pago programado' },
+        { nombre: 'Tasas cobradas', glifo: g.agua, color: c.verde, uso: 11, nota: 'Ingreso · imputa a Cobros' },
+        { nombre: 'Multas', glifo: g.semaforo, color: c.verde, uso: 6, nota: 'Ingreso · imputa a Cobros' },
+        { nombre: 'Pagos varios', glifo: g.basura, color: c.gris, uso: 3, nota: 'Egreso · sin partida definida' },
+      ] },
+      'conceptos-liq': { nuevo: 'Nuevo concepto', unidad: 'liquidaciones', filas: [
+        { nombre: 'Sueldo mensual', glifo: g.plaza, color: c.verde, uso: 52, nota: 'Remunerativo' },
+        { nombre: 'Presentismo', glifo: g.arbol, color: c.verde, uso: 38, nota: 'Remunerativo' },
+        { nombre: 'Horas extra', glifo: g.luz, color: c.ambar, uso: 24, nota: 'Remunerativo' },
+        { nombre: 'Antigüedad', glifo: g.bache, color: c.azul, uso: 19, nota: 'Remunerativo' },
+        { nombre: 'Adelanto', glifo: g.agua, color: c.ambar, uso: 8, nota: 'Descuento' },
+        { nombre: 'Aporte jubilatorio', glifo: g.semaforo, color: c.rojo, uso: 52, nota: 'Descuento' },
+      ] },
+      'tipos-tramite': { nuevo: 'Nuevo tipo', unidad: 'trámites', filas: [
+        { nombre: 'Habilitación de local', glifo: g.plaza, color: c.azul, uso: 22, nota: '6 pasos · requiere inspección' },
+        { nombre: 'Renovación de habilitación', glifo: g.plaza, color: c.verde, uso: 18, nota: '3 pasos' },
+        { nombre: 'Permiso de obra menor', glifo: g.bache, color: c.ambar, uso: 14, nota: '4 pasos · requiere plano' },
+        { nombre: 'Cartel publicitario', glifo: g.semaforo, color: c.verde, uso: 9, nota: '3 pasos' },
+        { nombre: 'Permiso de evento', glifo: g.ruido, color: c.verde, uso: 7, nota: '5 pasos · requiere seguro' },
+        { nombre: 'Poda autorizada', glifo: g.arbol, color: c.verde, uso: 4, nota: '2 pasos' },
+        { nombre: 'Baja de comercio', glifo: g.basura, color: c.gris, uso: 0, nota: 'Se hace por mostrador', off: true },
+      ] },
+    };
+    return this.armar(base, t, this.state.hijo);
+  }
+
+  // Permite leer un catálogo puntual sin depender del tab activo.
+  datosDe(id) {
+    const guardado = this.state.hijo;
+    this.state.hijo = id;
+    const d = this.datos();
+    this.state.hijo = guardado;
+    return d;
+  }
+
+  armar(base, t, cual) {
+    const conf = base[cual] || base['cat-reclamo'];
+    // Las categorías de trámite cuentan sus tipos: el uso sale de tramites(),
+    // no de un literal, así el catálogo padre nunca contradice al hijo.
+    if (cual === 'cat-tramite') {
+      const tipos = this.tramites();
+      conf.filas.forEach((f) => { f.uso = tipos.filter((x) => x.cat === f.nombre).length; });
+    }
+    return { nuevo: conf.nuevo, unidad: conf.unidad, tinte: t, filas: conf.filas };
+  }
+
+  // Los 10 trámites. `modo` es cómo se atiende, `pago` cuándo cobra,
+  // `docs` y `checks` son la colección de prerrequisitos que enfrenta el vecino.
+  tramites() {
+    const g = {
+      auto: 'M4 16h16v-4l-2-4H6L4 12zM7 16v2M17 16v2',
+      local: 'M4 9h16v11H4zM4 9l2-4h12l2 4M9 20v-6h6v6',
+      obra: 'M12 4 5 20h14zM8.5 14h7',
+      mapa: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14',
+      tasa: 'M2.5 6h19v12h-19zM2.5 11h19M6 15h4',
+      salud: 'M12 20s7-4.4 7-9.4A3.6 3.6 0 0 0 12 8a3.6 3.6 0 0 0-7 2.6C5 15.6 12 20 12 20z',
+      arbol: 'M12 21v-5M8.5 16a4.5 4.5 0 0 1-1.4-8.4A5 5 0 0 1 17 6.6 4.5 4.5 0 0 1 15.5 16z',
+      doc: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4',
+    };
+    const c = { verde: '#00B37E', ambar: '#F59E0B', azul: '#3B82F6', rojo: '#E5484D', violeta: '#8B5CF6' };
+    return [
+      { nombre: 'Habilitación comercial', cat: 'Habilitaciones Comerciales', glifo: g.local, color: c.ambar,
+        dias: 30, costo: 450000, modo: 'turno', pago: 'inicio', docs: 3, checks: 2, uso: 41 },
+      { nombre: 'Renovación de habilitación', cat: 'Habilitaciones Comerciales', glifo: g.local, color: c.ambar,
+        dias: 10, costo: 200000, modo: 'sinturno', pago: 'inicio', docs: 1, checks: 1, uso: 22 },
+      { nombre: 'Permiso de obra menor', cat: 'Obras Particulares', glifo: g.obra, color: c.ambar,
+        dias: 20, costo: 150000, modo: 'sinturno', pago: 'inicio', docs: 2, checks: 1, uso: 18 },
+      { nombre: 'Certificado de libre deuda municipal', cat: 'Certificados y Documentación', glifo: g.doc, color: c.azul,
+        dias: 5, costo: 60000, modo: 'turno', pago: 'inicio', docs: 2, checks: 1, uso: 34 },
+      { nombre: 'Pago de tasa de recolección de residuos', cat: 'Tasas y Tributos', glifo: g.tasa, color: c.verde,
+        dias: 1, costo: 0, modo: 'online', pago: 'inicio', docs: 1, checks: 0, uso: 96 },
+      { nombre: 'Habilitación de transporte de alimentos', cat: 'Salud y Bromatología', glifo: g.salud, color: c.rojo,
+        dias: 15, costo: 300000, modo: 'turno', pago: 'inicio', docs: 3, checks: 3, uso: 9 },
+      { nombre: 'Permiso de poda de árbol', cat: 'Espacios Públicos', glifo: g.arbol, color: c.verde,
+        dias: 12, costo: 0, modo: 'sinturno', pago: 'sin', docs: 2, checks: 0, uso: 14 },
+      { nombre: 'Licencia de conducir', cat: 'Tránsito y Transporte', glifo: g.auto, color: c.violeta,
+        dias: 7, costo: 180000, modo: 'turno', pago: 'inicio', docs: 3, checks: 4, uso: 62 },
+      { nombre: 'Certificado catastral', cat: 'Catastro', glifo: g.mapa, color: c.azul,
+        dias: 8, costo: 90000, modo: 'sinturno', pago: 'inicio', docs: 2, checks: 1, uso: 11 },
+      { nombre: 'Permiso de publicidad en vía pública', cat: 'Espacios Públicos', glifo: g.arbol, color: c.verde,
+        dias: 14, costo: 220000, modo: 'turno', pago: 'inicio', docs: 2, checks: 1, uso: 6 },
+    ];
+  }
+
+  // La insignia del riel sale de la misma fuente que las filas, no de un literal:
+  // así no se desfasa cuando cambian los datos.
+  conteoDe(h) {
+    if (h.tipo === 'catalogo') {
+      const guardado = this.state.hijo;
+      this.state.hijo = h.id;
+      const n = this.datos().filas.length;
+      this.state.hijo = guardado;
+      return String(n);
+    }
+    if (h.tipo === 'tramites' || h.tipo === 'arbol') return String(this.tramites().length);
+    if (h.tipo === 'asignacion') {
+      const rep = this.reparto();
+      const extra = this.state.asignadas || {};
+      return String(this.catalogoReclamos().filter((x) => !(extra[x.nombre] || (rep[x.nombre] && rep[x.nombre].dep))).length);
+    }
+    return h.n || '';
+  }
+
+  // La cadena completa: dependencia → categoría → tipo → prerrequisitos.
+  // Hoy eso vive en tres tabs separados y hay que cruzarlos de memoria.
+  cadena() {
+    return [
+      { dep: 'Dirección de Habilitaciones', color: '#F59E0B', cats: ['Habilitaciones Comerciales'] },
+      { dep: 'Secretaría de Obras Públicas', color: '#F59E0B', cats: ['Obras Particulares', 'Catastro'] },
+      { dep: 'Secretaría de Hacienda', color: '#00B37E', cats: ['Tasas y Tributos', 'Certificados y Documentación'] },
+      { dep: 'Dirección de Tránsito y Seguridad Vial', color: '#E5484D', cats: ['Tránsito y Transporte'] },
+      { dep: 'Dirección de Salud y Bromatología', color: '#E5484D', cats: ['Salud y Bromatología'] },
+      { dep: 'Secretaría de Servicios Públicos y Ambiente', color: '#00B37E', cats: ['Espacios Públicos'] },
+    ];
+  }
+
+  prerequisitos() {
+    return {
+      'Habilitación comercial': { docs: ['Cédula del titular', 'Título de propiedad o contrato de alquiler', 'Plano del local'], checks: ['Validación de cédula', 'Verificación biométrica'] },
+      'Renovación de habilitación': { docs: ['Habilitación anterior'], checks: ['Validación de cédula'] },
+      'Permiso de obra menor': { docs: ['Cédula del titular', 'Croquis de la obra'], checks: ['Validación de cédula'] },
+      'Certificado de libre deuda municipal': { docs: ['Cédula del titular', 'Número de cuenta municipal'], checks: ['Validación de cédula'] },
+      'Pago de tasa de recolección de residuos': { docs: ['Número de cuenta municipal'], checks: [] },
+      'Habilitación de transporte de alimentos': { docs: ['Cédula del titular', 'Registro del vehículo', 'Carnet de manipulación de alimentos'], checks: ['Validación de cédula', 'Verificación biométrica', 'Comprobante CENAT'] },
+      'Permiso de poda de árbol': { docs: ['Cédula del titular', 'Foto del árbol'], checks: [] },
+      'Licencia de conducir': { docs: ['Cédula de identidad', 'Certificado de aptitud psicofísica', 'Comprobante de curso vial'], checks: ['Validación de cédula', 'Validación facial', 'Comprobante CENAT', 'Verificación biométrica'] },
+      'Certificado catastral': { docs: ['Cédula del titular', 'Número de finca'], checks: ['Validación de cédula'] },
+      'Permiso de publicidad en vía pública': { docs: ['Cédula del titular', 'Diseño del cartel'], checks: ['Validación de cédula'] },
+    };
+  }
+
+  guaranies(n) { return n === 0 ? 'Gratis' : '$ ' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+  // Las categorías de reclamo, sin importar en qué tab estés parado:
+  // la pantalla de asignación siempre habla de ellas.
+  catalogoReclamos() { return this.datosDe('cat-reclamo').filas; }
+
+  // Las 5 dependencias del municipio y la categoría que le corresponde a cada una.
+  // `dep` es lo asignado hoy; `sug` es lo que el sistema propone para las 11 huérfanas.
+  dependencias() {
+    return {
+      'servicios': { label: 'Servicios Públicos y Ambiente', color: '#00B37E' },
+      'obras': { label: 'Obras Públicas', color: '#F59E0B' },
+      'transito': { label: 'Tránsito y Seguridad Vial', color: '#E5484D' },
+      'zoonosis': { label: 'Zoonosis y Salud Animal', color: '#8B5CF6' },
+      'seguridad': { label: 'Seguridad', color: '#3B82F6' },
+    };
+  }
+
+  reparto() {
+    return {
+      'Plazas y juegos': { dep: 'servicios' },
+      'Desagües y pluviales': { dep: 'obras' },
+      'Estacionamiento indebido': { dep: 'transito' },
+      'Plagas y control': { dep: 'zoonosis' },
+      'Animales sueltos': { dep: 'zoonosis' },
+      'Cableado suelto': { dep: 'seguridad' },
+      'Semáforos': { sug: 'transito' },
+      'Vehículos abandonados': { sug: 'transito' },
+      'Veredas en mal estado': { sug: 'obras' },
+      'Alumbrado público': { sug: 'servicios' },
+      'Bacheo y calles': { sug: 'obras' },
+      'Recolección de residuos': { sug: 'servicios' },
+      'Higiene urbana': { sug: 'servicios' },
+      'Arbolado y espacios verdes': { sug: 'servicios' },
+      'Tránsito y señalización': { sug: 'transito' },
+      'Agua y cloacas': { sug: 'obras' },
+      'Ruidos y convivencia': { sug: 'seguridad' },
+    };
+  }
+
+  renderVals() {
+    const acento = this.state.marca || '#00B37E';
+    const contratados = String(this.props.contratados ?? 'general,personal,vecino,catalogos,inventario,tesoreria,integraciones,super')
+      .split(',').map((x) => x.trim());
+    const arbol = this.arbol().filter((m) => contratados.indexOf(m.id) > -1);
+    const padre = arbol.filter((m) => m.id === this.state.padre)[0] || arbol[0];
+    const hijos = padre ? padre.hijos : [];
+    const hijo = hijos.filter((h) => h.id === this.state.hijo)[0] || hijos[0];
+    const compacta = (this.props.densidad ?? 'comoda') === 'compacta';
+
+    const d = this.datos();
+    const apagados = this.state.apagados;
+    const activas = d.filas.filter((f) => !(f.off || apagados.indexOf(f.nombre) > -1));
+    const sinUso = d.filas.filter((f) => f.uso === 0);
+    const top = d.filas.slice().sort((a, b) => b.uso - a.uso)[0];
+    const f = this.state.filtro;
+    const visibles = f === 'activos' ? activas
+      : f === 'inactivos' ? d.filas.filter((x) => x.off || apagados.indexOf(x.nombre) > -1)
+      : f === 'sinuso' ? sinUso : d.filas;
+
+    const chip = (id, label, n) => {
+      const on = f === id;
+      return { label, n, ir: () => this.setState({ filtro: id }),
+        bg: on ? '#FFFFFF' : '#F6F8F7', bd: on ? 'rgba(13,20,18,0.18)' : 'rgba(13,20,18,0.07)',
+        col: on ? '#0D1412' : '#3D4945', sub: on ? '#5B6764' : '#98A3A0' };
+    };
+
+    const totalUso = d.filas.reduce((t, x) => t + x.uso, 0);
+    const pisadas = d.filas.filter((x) => x.pisa).length;
+    const veredictoCatalogo = top
+      ? React.createElement('span', { dangerouslySetInnerHTML: { __html:
+          '<strong style="font-weight: 600; color: #0D1412;">' + d.filas.length + ' en el catálogo, ' + activas.length + ' activas.</strong> '
+          + '«' + top.nombre + '» concentra ' + top.uso + ' de ' + totalUso + ' ' + d.unidad
+          + (sinUso.length ? ', ' + sinUso.length + ' no se usaron nunca' : '')
+          + (pisadas ? ' y <strong style="font-weight: 600; color: #B4560F;">' + pisadas + ' se solapan con otra</strong>: ahí el vecino elige mal y el mismo problema entra por dos lados.' : '.') } })
+      : '';
+
+    const veredictos = {
+      muni: 'Lo que el vecino ve en la app y lo que sale impreso en los comprobantes. El correo de contacto todavía no está verificado.',
+      qr: '14 carteles activos apuntan a este QR. Si lo regenerás, los impresos viejos dejan de funcionar.',
+      apariencia: 'La foto del banner, el logo y el color con el que corre la app en este municipio. Todo se previsualiza acá antes de guardarlo.',
+      wa: 'La línea de WhatsApp por la que entran reclamos y salen los avisos de estado.',
+      ia: 'Clasificación automática de reclamos y redacción de respuestas al vecino.',
+      sidebar: 'Qué módulos ve cada municipio y en qué orden aparecen en el menú.',
+    };
+
+    const notasAbm = {
+      empleados: 'Empleados no es un catálogo: tiene legajo, foto, cuadrilla, ausencias y liquidación.',
+      cuadrillas: 'Cuadrillas cruza personal con zonas y órdenes de trabajo abiertas.',
+      ausencias: 'Ausencias es un calendario con solapamientos, no una lista de nombres.',
+      vecinos: '3.412 vecinos con historial de reclamos y calificaciones: necesita hero, filtros y buscador.',
+      sla: 'SLA define plazos por categoría y dependencia, y muestra el cumplimiento real.',
+      dependencias: 'Dependencias tiene responsables, jerarquía y qué categorías atiende cada una.',
+      asignacion: 'Asignación son reglas: qué cuadrilla toma qué categoría en qué zona.',
+      zonas: 'Zonas se edita sobre el mapa, no en una grilla.',
+      inv: '240 artículos con stock, mínimos y movimientos: es el ABM más pesado de la app.',
+      cajas: 'Cajas y fondos maneja saldos y arqueos, con montos que hay que conciliar.',
+      retenciones: 'Retenciones son porcentajes con vigencia y base de cálculo.',
+      proyectos: 'Proyectos agrupa gastos con presupuesto y avance.',
+      tarjetas: 'Tarjetas tiene cierres, vencimientos y consumos asociados.',
+      contactos: '148 contactos entre proveedores y empleados, con CUIT y datos bancarios.',
+      tasas: 'El catálogo de tasas tiene importes, vigencias y fórmulas de cálculo.',
+      auditoria: 'Auditoría es un log con filtros por usuario, fecha y entidad.',
+      suscripciones: 'Suscripciones maneja el plan de cada municipio y su facturación.',
+      pagos: 'Cada proveedor de pago tiene credenciales, comisiones y estado de conexión.',
+    };
+
+    const cols = compacta
+      ? 'minmax(210px, 2fr) 96px 72px 100px'
+      : 'minmax(220px, 2fr) 100px 76px 104px';
+
+    const ed = d.filas.filter((x) => x.nombre === this.state.edita)[0];
+    const edPrio = ed ? (this.state.prio || ed.prio) : 3;
+    const edGlifo = ed ? (this.state.icono || ed.glifo) : '';
+    const edColor = ed ? (this.state.color || ed.color) : '#00B37E';
+    const enDias = ed ? (this.state.unidad === 'auto' ? ed.hs % 24 === 0 : this.state.unidad === 'dias') : true;
+    const etiquetas = ['muy baja', 'baja', 'media', 'alta', 'urgente'];
+    const tonoPrio = (n) => (n >= 4 ? '#E5484D' : n === 3 ? '#F59E0B' : '#00B37E');
+    const paleta = [
+      { nombre: 'Verde', hex: '#00B37E' }, { nombre: 'Ámbar', hex: '#F59E0B' }, { nombre: 'Azul', hex: '#3B82F6' },
+      { nombre: 'Rojo', hex: '#E5484D' }, { nombre: 'Violeta', hex: '#8B5CF6' }, { nombre: 'Gris', hex: '#7A8783' },
+    ];
+    const glifos = d.filas.map((x) => x.glifo).filter((x, i, a) => a.indexOf(x) === i);
+
+    // --- Asignación de categorías a dependencias ---
+    const deps = this.dependencias();
+    const rep = this.reparto();
+    // La asignación tiene dos lados: categorías de reclamo y categorías de trámite.
+    const ladoAsig = this.state.ladoAsig || 'reclamos';
+    const tiposTram = this.tramites();
+    const catsTram = this.cadena().reduce((acc, rama) => acc.concat(rama.cats.map((c) => ({
+      nombre: c, glifo: 'M4 7h6l2 2h8v9H4z', color: rama.color, uso: tiposTram.filter((t) => t.cat === c).length, dep: rama.dep,
+    }))), []);
+    const catsRec = ladoAsig === 'tramites' ? catsTram : this.catalogoReclamos();
+    const asignadasExtra = this.state.asignadas || {};
+    const depsTram = {};
+    catsTram.forEach((c) => { depsTram[c.nombre] = c.dep; });
+    const depDe = (nombre) => {
+      if (asignadasExtra[nombre]) return asignadasExtra[nombre];
+      if (ladoAsig === 'tramites') return depsTram[nombre] ? 'tram:' + depsTram[nombre] : null;
+      return (rep[nombre] && rep[nombre].dep) || null;
+    };
+    const sugDe = (nombre) => (rep[nombre] && rep[nombre].sug) || null;
+    const huerfanas = catsRec.filter((x) => !depDe(x.nombre));
+    const cubiertas = catsRec.filter((x) => depDe(x.nombre));
+    const enRiesgo = huerfanas.reduce((t, x) => t + x.uso, 0);
+    const totalRec = catsRec.reduce((t, x) => t + x.uso, 0);
+    const fa = this.state.filtroAsig || 'sin';
+    const visiblesAsig = fa === 'sin' ? huerfanas : fa === 'con' ? cubiertas : catsRec;
+
+    const filaAsig = (x) => {
+      const id = depDe(x.nombre);
+      const sug = sugDe(x.nombre);
+      return {
+        nombre: x.nombre, glifo: x.glifo, color: x.color, tinte: d.tinte[x.color] || '#F3F7F5',
+        uso: x.uso === 0 ? '—' : String(x.uso),
+        usoNota: ladoAsig === 'tramites'
+          ? (x.uso === 1 ? 'tipo' : 'tipos')
+          : (x.uso === 0 ? 'sin usar' : x.uso === 1 ? 'histórico' : 'históricos'),
+        tituloAplicar: sug ? 'Asignar a ' + deps[sug].label : 'Elegir dependencia',
+        sugerida: sug ? 'Asignar a ' + deps[sug].label : 'Elegir dependencia',
+        usoCol: x.uso === 0 ? '#98A3A0' : (!id && x.uso > 20 ? '#C93A3E' : '#0D1412'),
+        asignada: !!id, sinAsignar: !id,
+        dep: id ? (deps[id] ? deps[id].label : id.replace(/^tram:/, '')) : '',
+        depColor: id ? (deps[id] ? deps[id].color : '#00B37E') : '#C6CFCB',
+
+        aplicar: () => { if (!sug) return; this.setState((st) => ({ asignadas: Object.assign({}, st.asignadas, { [x.nombre]: sug }) })); },
+        quitar: () => this.setState((st) => {
+          const n = Object.assign({}, st.asignadas);
+          n[x.nombre] = null;
+          return { asignadas: n };
+        }),
+      };
+    };
+
+    const chipAsig = (id, label, n, punto) => {
+      const on = fa === id;
+      return { label, n, punto, ir: () => this.setState({ filtroAsig: id }),
+        bg: on ? '#FFFFFF' : '#F6F8F7', bd: on ? 'rgba(13,20,18,0.18)' : 'rgba(13,20,18,0.07)',
+        col: on ? '#0D1412' : '#3D4945', sub: on ? '#5B6764' : '#98A3A0' };
+    };
+
+    // --- Trámites ---
+    const tram = this.tramites();
+    const modos = {
+      online: { label: '100% online', bg: '#E7F6F0', col: '#00794F', glifo: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M3.5 9h17M3.5 15h17M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18' },
+      turno: { label: 'Con turno', bg: '#E8F1FE', col: '#1D6FD1', glifo: 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4' },
+      sinturno: { label: 'Sin turno, hay que ir', bg: '#FDECEC', col: '#C93A3E', glifo: 'M9 8.5a3 3 0 1 0 6 0 3 3 0 0 0-6 0M4 20c0-3.9 3.6-7 8-7s8 3.1 8 7' },
+    };
+    const ft = this.state.filtroTram || 'todos';
+    const online = tram.filter((t) => t.modo === 'online');
+    const presencial = tram.filter((t) => t.modo !== 'online');
+    const pesados = tram.filter((t) => t.docs >= 3);
+    const visiblesTram = ft === 'online' ? online : ft === 'presencial' ? presencial : ft === 'pesados' ? pesados : tram;
+    const chipTram = (id, label, n, punto) => {
+      const on = ft === id;
+      return { label, n, punto, ir: () => this.setState({ filtroTram: id }),
+        bg: on ? '#FFFFFF' : '#F6F8F7', bd: on ? 'rgba(13,20,18,0.18)' : 'rgba(13,20,18,0.07)',
+        col: on ? '#0D1412' : '#3D4945', sub: on ? '#5B6764' : '#98A3A0' };
+    };
+    const cobraAntes = tram.filter((t) => t.pago === 'inicio' && t.costo > 0).length;
+
+    // --- Árbol dependencia → categoría → tipo → prerrequisitos ---
+    const abiertos = this.state.abiertosArbol || { 'Tránsito y Transporte': true, 'Licencia de conducir': true };
+    const todo = this.state.abiertoArbol === 'todo';
+    const abierto = (k) => todo || !!abiertos[k];
+    const alternar = (k) => () => this.setState((st) => {
+      const n = Object.assign({}, st.abiertosArbol || abiertos);
+      n[k] = !n[k];
+      return { abiertosArbol: n, abiertoArbol: null };
+    });
+    const pre = this.prerequisitos();
+    const gDep = 'M4 21V7l8-4 8 4v14M9 21v-6h6v6M9 11h.01M15 11h.01';
+    const gCat = 'M4 7h6l2 2h8v9H4z';
+    const nodos = [];
+    this.cadena().forEach((rama) => {
+      const tiposDep = tram.filter((t) => rama.cats.indexOf(t.cat) > -1);
+      nodos.push({
+        label: rama.dep, glifo: gDep, color: rama.color, tinte: d.tinte[rama.color] || '#F3F7F5',
+        sangria: '14px', padding: '12px 18px 12px 14px', bg: '#F3F6F5', bgHover: '#EDF1EF', cursor: 'pointer',
+        esNodo: true, esAgregar: false,
+        fuente: 'Sora, sans-serif', tamano: '13.5px', peso: 700, tracking: '-0.015em', colorTexto: '#0D1412',
+        iconoCaja: '30px', iconoSvg: '16px',
+        chev: abierto(rama.dep) ? 'rotate(90deg)' : 'rotate(0deg)', opChev: 1,
+        tieneSub: true, sub: rama.cats.length + (rama.cats.length === 1 ? ' categoría · ' : ' categorías · ') + tiposDep.length + (tiposDep.length === 1 ? ' trámite' : ' trámites'),
+        tieneChip: false, tieneMonto: false, tieneAcciones: true, esReq: false,
+        toggle: alternar(rama.dep),
+      });
+      if (!abierto(rama.dep)) return;
+      rama.cats.forEach((cat) => {
+        const tiposCat = tram.filter((t) => t.cat === cat);
+        nodos.push({
+          label: cat, glifo: gCat, color: '#7A8783', tinte: '#F3F7F5',
+          sangria: '40px', padding: '10px 18px', bg: '#FFFFFF', bgHover: '#FAFBFA', cursor: 'pointer',
+          esNodo: true, esAgregar: false,
+          fuente: 'Inter, sans-serif', tamano: '13px', peso: 600, tracking: '0', colorTexto: '#3D4945',
+          iconoCaja: '26px', iconoSvg: '14px',
+          chev: abierto(cat) ? 'rotate(90deg)' : 'rotate(0deg)', opChev: 1,
+          tieneSub: false, tieneChip: true, chip: tiposCat.length + (tiposCat.length === 1 ? ' trámite' : ' trámites'),
+          chipBg: '#EDF1EF', chipCol: '#5B6764', chipGlifo: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5',
+          tieneMonto: false, tieneAcciones: true, esReq: false,
+          toggle: alternar(cat),
+        });
+        if (!abierto(cat)) return;
+        tiposCat.forEach((t) => {
+          const m = modos[t.modo];
+          const p = pre[t.nombre] || { docs: [], checks: [] };
+          nodos.push({
+            label: t.nombre, glifo: t.glifo, color: t.color, tinte: d.tinte[t.color] || '#F3F7F5',
+            sangria: '46px', padding: '11px 18px', bg: '#FFFFFF', bgHover: '#FAFBFA', cursor: 'pointer',
+            esNodo: true, esAgregar: false,
+            fuente: 'Inter, sans-serif', tamano: '13px', peso: 600, tracking: '0', colorTexto: '#0D1412',
+            iconoCaja: '28px', iconoSvg: '15px',
+            chev: abierto(t.nombre) ? 'rotate(90deg)' : 'rotate(0deg)', opChev: 1,
+            tieneSub: true, sub: p.docs.length + (p.docs.length === 1 ? ' documento' : ' documentos') + (p.checks.length ? ' · ' + p.checks.length + (p.checks.length === 1 ? ' validación' : ' validaciones') : ' · sin validaciones'),
+            tieneChip: true, chip: m.label, chipBg: m.bg, chipCol: m.col, chipGlifo: m.glifo,
+            tieneMonto: true, monto: this.guaranies(t.costo), montoCol: t.costo === 0 ? '#00794F' : '#0D1412',
+            montoNota: t.dias === 1 ? 'en 1 día' : 'en ' + t.dias + ' días',
+            tieneAcciones: true,
+            colBorrar: t.uso === 0 ? '#C93A3E' : '#D5DDDA',
+            opBorrar: t.uso === 0 ? 1 : 0.5,
+            cursorBorrar: t.uso === 0 ? 'pointer' : 'not-allowed',
+            tituloBorrar: t.uso === 0 ? 'Borrar' : 'No se puede borrar: lo iniciaron ' + t.uso + ' vecinos',
+            esReq: abierto(t.nombre), sangriaReq: '46px',
+            docs: p.docs.map((x, i) => ({ label: x, nota: i === 0 ? 'obligatorio' : 'obligatorio', col: '#B4560F' })),
+            checks: p.checks.length ? p.checks.map((x) => ({ label: x, bg: '#00B37E', tickCol: '#FFFFFF', col: '#3D4945' }))
+              : [{ label: 'No pide validación de identidad', bg: '#EDF1EF', tickCol: '#C6CFCB', col: '#98A3A0' }],
+            resumenReq: 'El vecino tiene que juntar ' + p.docs.length + (p.docs.length === 1 ? ' documento' : ' documentos')
+              + (p.checks.length ? ' y pasar ' + p.checks.length + (p.checks.length === 1 ? ' validación' : ' validaciones') : '')
+              + ' antes de poder iniciarlo.',
+            toggle: alternar(t.nombre),
+          });
+        });
+        nodos.push({ esNodo: false, esAgregar: true, label: 'Nuevo trámite en ' + cat, sangria: '66px' });
+      });
+      nodos.push({ esNodo: false, esAgregar: true, label: 'Nueva categoría en ' + rama.dep.replace(/^(Secretaría|Dirección) de /, ''), sangria: '40px' });
+    });
+
+    const gruposAsig = [];
+    const gSin = visiblesAsig.filter((x) => !depDe(x.nombre));
+    const gCon = visiblesAsig.filter((x) => depDe(x.nombre));
+    if (gSin.length) gruposAsig.push({
+      titulo: 'SIN DEPENDENCIA', bg: '#FDF4F4', punto: '#E5484D', col: '#C93A3E',
+      detalle: 'los reclamos que entren por acá no se asignan a nadie',
+      filas: gSin.slice().sort((a, b) => b.uso - a.uso).map(filaAsig),
+    });
+    if (gCon.length) gruposAsig.push({
+      titulo: 'YA TIENEN DUEÑO', bg: '#F3F6F5', punto: '#00B37E', col: '#00794F',
+      detalle: gCon.length + ' de ' + catsRec.length + ' categorías',
+      filas: gCon.slice().sort((a, b) => b.uso - a.uso).map(filaAsig),
+    });
+
+    return {
+      sinSalto: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+      arbol: nodos,
+      hayCta: !!hijo && (hijo.tipo === 'catalogo' || hijo.tipo === 'arbol'),
+      pieArbol: 'Los dos catálogos anidados: cada categoría con sus tipos, y cada tipo con lo que le pide al vecino.',
+      expandirTodo: () => this.setState((st) => ({ abiertoArbol: st.abiertoArbol === 'todo' ? null : 'todo' })),
+      labelExpandir: this.state.abiertoArbol === 'todo' ? 'Colapsar todo' : 'Expandir todo',
+      glifoExpandir: this.state.abiertoArbol === 'todo' ? 'M8 4v16M16 4v16M4 8h16M4 16h16' : 'M12 5v14M5 12h14',
+      filasTram: visiblesTram.map((t) => {
+        const m = modos[t.modo];
+        return {
+          nombre: t.nombre, cat: t.cat, glifo: t.glifo, color: t.color, tinte: d.tinte[t.color] || '#F3F7F5',
+          costo: this.guaranies(t.costo),
+          costoCol: t.costo === 0 ? '#00794F' : '#0D1412',
+          plazo: t.dias === 1 ? 'en 1 día' : 'en ' + t.dias + ' días',
+          modo: m.label, modoBg: m.bg, modoCol: m.col, modoGlifo: m.glifo,
+          requisitos: t.docs + (t.docs === 1 ? ' documento' : ' documentos') + (t.checks ? ' · ' + t.checks + ' validaciones' : ''),
+          uso: String(t.uso), usoNota: 'este año',
+          usoCol: t.uso === 0 ? '#98A3A0' : '#0D1412',
+          editar: () => this.setState({ editaTram: t.nombre }),
+          colBorrar: t.uso === 0 ? '#C93A3E' : '#D5DDDA',
+          opBorrar: t.uso === 0 ? 1 : 0.5,
+          cursorBorrar: t.uso === 0 ? 'pointer' : 'not-allowed',
+          tituloBorrar: t.uso === 0 ? 'Borrar' : 'No se puede borrar: lo iniciaron ' + t.uso + ' vecinos',
+        };
+      }),
+      chipsTram: [
+        chipTram('todos', 'Todos', tram.length, '#C6CFCB'),
+        chipTram('presencial', 'Obligan a ir', presencial.length, '#E5484D'),
+        chipTram('online', 'Se hacen online', online.length, '#00B37E'),
+        chipTram('pesados', 'Piden 3 o más papeles', pesados.length, '#F59E0B'),
+      ],
+      resumenTram: visiblesTram.length + ' de ' + tram.length + ' trámites',
+      pieTram: 'Un trámite con pago al inicio cobra antes de que la municipalidad lo apruebe: si se rechaza, hay que devolver la plata.',
+      colUsoAsig: ladoAsig === 'tramites' ? 'TIPOS' : 'RECLAMOS',
+      acento: acento,
+      temas: [
+        { id: 'oscuro', nombre: 'Oscuro', lienzo: '#141B19', barra: '#0C1211', linea: 'rgba(255,255,255,0.22)' },
+        { id: 'gris', nombre: 'Gris', lienzo: '#2A302E', barra: '#1E2422', linea: 'rgba(255,255,255,0.24)' },
+        { id: 'azul', nombre: 'Azul', lienzo: '#141C2E', barra: '#0E1524', linea: 'rgba(255,255,255,0.22)' },
+        { id: 'claro', nombre: 'Claro', lienzo: '#F6F8FA', barra: '#E6EBF0', linea: 'rgba(13,20,18,0.16)' },
+        { id: 'marfil', nombre: 'Marfil', lienzo: '#FBF9F5', barra: '#F1EDE4', linea: 'rgba(13,20,18,0.14)' },
+      ].map((t) => {
+        const on = (this.state.tema || 'claro') === t.id;
+        return { nombre: t.nombre, lienzo: t.lienzo, barra: t.barra, linea: t.linea,
+          elegir: () => this.setState({ tema: t.id }),
+          borde: on ? acento : 'rgba(13,20,18,0.10)',
+          fondoCard: on ? '#F7FCFA' : '#FFFFFF',
+          peso: on ? 600 : 500, color: on ? '#0D1412' : '#5B6764', tick: on ? 1 : 0 };
+      }),
+      acentos: [
+        { nombre: 'Verde Paraguay Limpio', hex: '#00B37E' },
+        { nombre: 'Verde esmeralda', hex: '#0E9F6E' },
+        { nombre: 'Azul Munify', hex: '#3B82F6' },
+        { nombre: 'Índigo', hex: '#5B5BD6' },
+        { nombre: 'Bordó', hex: '#B4234A' },
+        { nombre: 'Lima NúcleoCheck', hex: '#A8CE1D' },
+      ].map((a) => {
+        const on = acento === a.hex;
+        return { nombre: a.nombre, hex: a.hex, elegir: () => this.setState({ marca: a.hex }),
+          tick: on ? 1 : 0, anillo: on ? '2px' : '0px', borde: on ? '4px' : '0px' };
+      }),
+      nombreAcento: ({ '#00B37E': 'Verde Paraguay Limpio', '#0E9F6E': 'Verde esmeralda', '#3B82F6': 'Azul Munify', '#5B5BD6': 'Índigo', '#B4234A': 'Bordó', '#A8CE1D': 'Lima NúcleoCheck' })[acento] || 'Personalizado',
+      barras: [
+        { id: 'organico', nombre: 'Orgánico' },
+        { id: 'tinte', nombre: 'Tinte' },
+        { id: 'claro', nombre: 'Claro' },
+      ].map((b) => {
+        const on = (this.state.barra || 'organico') === b.id;
+        const lienzo = b.id === 'organico' ? 'linear-gradient(160deg, ' + acento + '14 0%, #FFFFFF 78%)'
+          : b.id === 'tinte' ? acento + '2E' : '#FFFFFF';
+        return { nombre: b.nombre, lienzo: lienzo,
+          textoAlto: 'rgba(13,20,18,0.42)', textoBajo: 'rgba(13,20,18,0.20)',
+          elegir: () => this.setState({ barra: b.id }),
+          borde: on ? acento : 'rgba(13,20,18,0.10)',
+          fondoCard: on ? '#F7FCFA' : '#FFFFFF',
+          peso: on ? 600 : 500, color: on ? '#0D1412' : '#5B6764', tick: on ? 1 : 0 };
+      }),
+      marcaHex: this.state.marca || '#00B37E',
+      veloMarca: this.state.marca || '#00B37E',
+      notaTinte: (this.state.tinte == null ? 0.35 : this.state.tinte) >= 0.9
+        ? 'Al 100% la foto casi no se ve: conviene Suave o Medio'
+        : 'Tiñe la foto con el color del municipio',
+      notaMarca: 'Cada acento viene con su fondo: el gris de la app se tiñe apenas hacia el color de marca',
+      sinBanner: (e) => { if (e && e.preventDefault) e.preventDefault(); },
+      tabsAsig: [
+        { label: 'Reclamos', n: this.catalogoReclamos().length, ir: () => this.setState({ ladoAsig: 'reclamos', filtroAsig: 'sin' }),
+          glifo: 'M5 4h14v17H5zM9 4h6v3H9zM9 12h6M9 16h4',
+          bg: ladoAsig === 'reclamos' ? '#FFFFFF' : 'transparent',
+          sombra: ladoAsig === 'reclamos' ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+          col: ladoAsig === 'reclamos' ? '#0D1412' : '#7A8783',
+          sub: ladoAsig === 'reclamos' ? '#00794F' : '#B4BDBA' },
+        { label: 'Trámites', n: catsTram.length, ir: () => this.setState({ ladoAsig: 'tramites', filtroAsig: 'todas' }),
+          glifo: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5',
+          bg: ladoAsig === 'tramites' ? '#FFFFFF' : 'transparent',
+          sombra: ladoAsig === 'tramites' ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+          col: ladoAsig === 'tramites' ? '#0D1412' : '#7A8783',
+          sub: ladoAsig === 'tramites' ? '#00794F' : '#B4BDBA' },
+      ],
+      gruposAsig: gruposAsig,
+      chipsAsig: [
+        chipAsig('sin', 'Sin asignar', huerfanas.length, '#E5484D'),
+        chipAsig('con', 'Asignadas', cubiertas.length, '#00B37E'),
+        chipAsig('todas', 'Todas', catsRec.length, '#C6CFCB'),
+      ],
+      resumenAsig: visiblesAsig.length + ' de ' + catsRec.length + ' categorías',
+      haySugerencias: huerfanas.filter((x) => sugDe(x.nombre)).length > 0,
+      labelSugerencias: 'Aplicar las ' + huerfanas.filter((x) => sugDe(x.nombre)).length + ' sugerencias',
+      aplicarTodas: () => this.setState((st) => {
+        const n = Object.assign({}, st.asignadas);
+        huerfanas.forEach((x) => { const sug = sugDe(x.nombre); if (sug) n[x.nombre] = sug; });
+        return { asignadas: n };
+      }),
+      pieAsig: huerfanas.length
+        ? 'Una categoría sin dependencia entra a la cola sin dueño: alguien la tiene que derivar a mano.'
+        : 'Todas las categorías tienen dependencia: los ' + (ladoAsig === 'tramites' ? 'trámites' : 'reclamos') + ' se derivan solos al entrar.',
+      veredictoAsig: React.createElement('span', { dangerouslySetInnerHTML: { __html:
+        huerfanas.length
+          ? '<strong style="font-weight: 600; color: #C93A3E;">' + huerfanas.length + ' de ' + catsRec.length + ' categorías no tienen dependencia.</strong> '
+            + 'Por esas entraron <strong style="font-weight: 600; color: #0D1412;">' + enRiesgo + ' de los ' + totalRec + ' reclamos</strong> históricos, y cada uno hubo que derivarlo a mano.'
+          : '<strong style="font-weight: 600; color: #00794F;">Las ' + catsRec.length + ' categorías tienen dependencia.</strong> '
+            + 'Todo reclamo que entra se deriva solo, sin que nadie lo toque.' } }),
+      esAsignacionVals: true,
+      editando: !!ed,
+      cerrarEdicion: () => this.setState({ edita: null, picker: false }),
+      edNombre: ed ? ed.nombre : '',
+      edSubtitulo: ed ? 'Categoría de reclamo · orden ' + (d.filas.indexOf(ed) + 1) : '',
+      edDesc: ed ? ed.desc : '',
+      edGlifo: edGlifo,
+      edColor: edColor,
+      edTinte: d.tinte[edColor] || '#F3F7F5',
+      edSePisa: !!(ed && ed.pisa),
+      edPisa: ed ? ed.pisa : '',
+      togglePicker: () => this.setState((st) => ({ picker: !st.picker })),
+      labelPicker: this.state.picker ? 'Listo' : 'Cambiar',
+      grPicker: this.state.picker ? '1fr' : '0fr',
+      opPicker: this.state.picker ? 1 : 0,
+      iconos: glifos.map((gl) => ({
+        glifo: gl, elegir: () => this.setState({ icono: gl }),
+        bg: gl === edGlifo ? (d.tinte[edColor] || '#F3F7F5') : '#FFFFFF',
+        bd: gl === edGlifo ? edColor : 'rgba(13,20,18,0.10)',
+        color: gl === edGlifo ? edColor : '#7A8783',
+      })),
+      colores: paleta.map((p) => ({
+        nombre: p.nombre, hex: p.hex, elegir: () => this.setState({ color: p.hex }),
+        tick: p.hex === edColor ? 1 : 0,
+        anillo: p.hex === edColor ? '2px' : '0px',
+        borde: p.hex === edColor ? '4px' : '0px',
+      })),
+      edPlazoValor: ed ? (enDias ? String(Math.round(ed.hs / 24)) : String(ed.hs)) : '',
+      enHoras: () => this.setState({ unidad: 'horas' }),
+      enDias: () => this.setState({ unidad: 'dias' }),
+      bgHoras: !enDias ? '#FFFFFF' : 'transparent',
+      shHoras: !enDias ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+      colHoras: !enDias ? '#0D1412' : '#7A8783',
+      bgDias: enDias ? '#FFFFFF' : 'transparent',
+      shDias: enDias ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+      colDias: enDias ? '#0D1412' : '#7A8783',
+      edPlazoNota: ed ? (enDias ? 'son ' + ed.hs + ' horas' : 'son ' + (ed.hs / 24) + ' días') : '',
+      prioridades: [1, 2, 3, 4, 5].map((n) => ({
+        n: String(n), label: etiquetas[n - 1], elegir: () => this.setState({ prio: n }),
+        bg: n === edPrio ? (tonoPrio(n) === '#E5484D' ? '#FDECEC' : tonoPrio(n) === '#F59E0B' ? '#FDF1DF' : '#E7F6F0') : '#FFFFFF',
+        bd: n === edPrio ? tonoPrio(n) : 'rgba(13,20,18,0.10)',
+        col: n === edPrio ? tonoPrio(n) : '#7A8783',
+        colSub: n === edPrio ? tonoPrio(n) : '#B4BDBA',
+      })),
+      edPrioNota: edPrio >= 4
+        ? 'Con prioridad ' + edPrio + ' el reclamo entra directo a Urgentes y aparece arriba en la cola del supervisor.'
+        : 'Define en qué orden lo ve el supervisor. Recién en 4 o 5 el reclamo entra a Urgentes.',
+      edOrden: ed ? String(d.filas.indexOf(ed) + 1) : '',
+      edOrdenNota: ed ? 'Aparece ' + (d.filas.indexOf(ed) === 0 ? 'primera' : 'en la posición ' + (d.filas.indexOf(ed) + 1)) + ' cuando el vecino elige categoría' : '',
+      edUsoTexto: ed ? (ed.uso === 0
+        ? 'Nunca se usó: se puede borrar sin afectar reclamos.'
+        : 'La usan ' + ed.uso + ' reclamos. No se puede borrar; si cambiás el plazo, solo aplica a los nuevos.') : '',
+      edUsoCol: ed && ed.uso === 0 ? '#7A8783' : '#8A6410',
+      edUsoBg: ed && ed.uso === 0 ? '#F3F7F5' : '#FDF8EE',
+      edUsoGlifo: ed && ed.uso === 0
+        ? 'M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12'
+        : 'M12 8v5M12 17h.01',
+      padres: arbol.map((m) => {
+        const on = padre && m.id === padre.id;
+        return { label: m.label, n: m.hijos.length, ir: () => this.setState({ padre: m.id, hijo: m.hijos[0].id, filtro: 'todos' }),
+          linea: on ? '#00B37E' : 'transparent', peso: on ? 600 : 500,
+          color: on ? '#0D1412' : '#5B6764', subColor: on ? '#00794F' : '#B4BDBA' };
+      }),
+      tituloRiel: padre ? padre.label.toUpperCase() : '',
+      hijos: hijos.map((h) => {
+        const on = hijo && h.id === hijo.id;
+        return { label: h.label, n: this.conteoDe(h), ir: () => this.setState({ hijo: h.id, filtro: 'todos' }),
+          bg: on ? '#E7F6F0' : 'transparent', bgHover: on ? '#E7F6F0' : '#EAEEEC',
+          peso: on ? 600 : 500, color: on ? '#00794F' : '#3D4945', subColor: on ? '#4FB894' : '#B4BDBA' };
+      }),
+      tituloHijo: hijo ? hijo.label : '',
+      esCatalogo: !!hijo && hijo.tipo === 'catalogo',
+      esForm: !!hijo && hijo.tipo === 'form',
+      esQr: !!hijo && hijo.tipo === 'qr',
+      esApariencia: !!hijo && hijo.tipo === 'apariencia',
+      esAsignacion: !!hijo && hijo.tipo === 'asignacion',
+      esTramites: !!hijo && hijo.tipo === 'tramites',
+      esArbol: !!hijo && hijo.tipo === 'arbol',
+      esAbmCompleto: !!hijo && hijo.tipo === 'abm',
+      notaAbm: (hijo && notasAbm[hijo.id]) || 'Esta pestaña necesita el ABM completo, no el catálogo simple.',
+      veredicto: hijo && hijo.tipo === 'arbol' ? React.createElement('span', { dangerouslySetInnerHTML: { __html:
+          '<strong style="font-weight: 600; color: #0D1412;">' + this.datosDe('cat-tramite').filas.length + ' categorías y ' + tram.length + ' tipos</strong> en una sola vista, '
+          + 'con los prerrequisitos que enfrenta el vecino en cada uno. '
+          + 'El más pesado, Licencia de conducir, le pide 3 documentos y 4 validaciones.' } })
+        : hijo && hijo.tipo === 'tramites' ? React.createElement('span', { dangerouslySetInnerHTML: { __html:
+          '<strong style="font-weight: 600; color: #C93A3E;">Solo ' + online.length + ' de ' + tram.length + ' trámites se completa sin ir a la municipalidad.</strong> '
+          + 'Y ' + cobraAntes + ' cobran al inicio: el vecino paga antes de saber si se lo aprueban.' } })
+        : hijo && hijo.tipo === 'asignacion' ? React.createElement('span', { dangerouslySetInnerHTML: { __html:
+          huerfanas.length
+            ? '<strong style="font-weight: 600; color: #C93A3E;">' + huerfanas.length + ' de ' + catsRec.length + ' categorías de ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' no tienen dependencia.</strong> '
+              + 'Por esas entraron <strong style="font-weight: 600; color: #0D1412;">' + enRiesgo + ' de los ' + totalRec + ' ' + (ladoAsig === 'tramites' ? 'trámites' : 'reclamos') + '</strong> históricos, y cada uno hubo que derivarlo a mano.'
+            : '<strong style="font-weight: 600; color: #00794F;">Las ' + catsRec.length + ' categorías de ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' tienen dependencia.</strong> '
+              + 'Todo ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' que entra se deriva solo, sin que nadie lo toque.' } })
+        : hijo && hijo.tipo === 'catalogo' ? veredictoCatalogo
+        : (hijo && veredictos[hijo.id]) || 'Se edita con la misma pieza que el resto de la app.',
+      ctaNuevo: (hijo && hijo.tipo === 'arbol') ? 'Nueva dependencia' : d.nuevo,
+      cols: cols,
+      colRespuesta: (hijo && hijo.id === 'cat-reclamo') ? 'PLAZO Y PRIORIDAD' : 'PLAZO',
+      colOrdenLabel: this.state.orden ? 'ARRASTRÁ' : 'ORDEN',
+      cursorOrden: this.state.orden ? 'grab' : 'default',
+      anchoHandle: this.state.orden ? '14px' : '0px',
+      opOrden: this.state.orden ? 1 : 0.25,
+      reordenar: () => this.setState((st) => ({ orden: !st.orden })),
+      labelOrden: this.state.orden ? 'Listo' : 'Reordenar',
+      bgOrden: this.state.orden ? '#E7F6F0' : '#FFFFFF',
+      bdOrden: this.state.orden ? '#C9EBDD' : 'rgba(13,20,18,0.12)',
+      colOrden: this.state.orden ? '#00794F' : '#3D4945',
+      verTabla: () => this.setState({ vista: 'tabla' }),
+      verTarjetas: () => this.setState({ vista: 'tarjetas' }),
+      modoTabla: this.state.vista === 'tabla',
+      modoTarjetas: this.state.vista === 'tarjetas',
+      bgTabla: this.state.vista === 'tabla' ? '#FFFFFF' : 'transparent',
+      shTabla: this.state.vista === 'tabla' ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+      colTabla: this.state.vista === 'tabla' ? '#0D1412' : '#7A8783',
+      bgTarjetas: this.state.vista === 'tarjetas' ? '#FFFFFF' : 'transparent',
+      shTarjetas: this.state.vista === 'tarjetas' ? '0 1px 2px rgba(13,20,18,0.06)' : 'none',
+      colTarjetas: this.state.vista === 'tarjetas' ? '#0D1412' : '#7A8783',
+      estados: [
+        chip('todos', 'Todas', d.filas.length),
+        chip('activos', 'Activas', activas.length),
+        chip('inactivos', 'Inactivas', d.filas.length - activas.length),
+        chip('sinuso', 'Sin usar', sinUso.length),
+      ],
+      resumenFiltro: visibles.length + ' de ' + d.filas.length,
+      pie: sinUso.length
+        ? 'Las filas en uso no se pueden borrar: primero hay que reasignar sus ' + d.unidad + '.'
+        : 'Ninguna fila se puede borrar: todas están en uso.',
+      filas: visibles.map((r, i) => {
+        const off = r.off || apagados.indexOf(r.nombre) > -1;
+        return {
+          orden: String(i + 1),
+          nombre: r.nombre,
+          nota: r.nota,
+          glifo: r.glifo,
+          color: off ? '#98A3A0' : r.color,
+          tinte: off ? '#F3F7F5' : (d.tinte[r.color] || '#F3F7F5'),
+          colorNombre: off ? '#7A8783' : '#0D1412',
+          fondo: off ? '#FCFDFC' : '#FFFFFF',
+          opTarjeta: off ? 0.72 : 1,
+          estado: off ? 'Inactiva' : 'Activa',
+          estadoCol: off ? '#98A3A0' : '#00794F',
+          pistaBg: off ? '#D5DDDA' : '#00B37E',
+          perilla: off ? '2px' : '16px',
+          alternar: () => this.setState((st) => ({
+            apagados: st.apagados.indexOf(r.nombre) > -1
+              ? st.apagados.filter((x) => x !== r.nombre)
+              : st.apagados.concat([r.nombre]),
+          })),
+          desc: r.desc || r.nota,
+          sePisa: !!r.pisa,
+          tituloPisa: r.pisa ? 'Se solapa con «' + r.pisa + '»: el vecino no sabe cuál elegir' : '',
+          sla: r.hs ? (r.hs % 24 === 0 ? (r.hs / 24) + (r.hs === 24 ? ' día' : ' días') : r.hs + ' hs') : '—',
+          prioLabel: r.prio ? ['muy baja', 'baja', 'media', 'alta', 'urgente'][r.prio - 1] : '',
+          puntos: [1, 2, 3, 4, 5].map((n) => ({
+            bg: !r.prio ? '#E3E9E6' : n <= r.prio ? (r.prio >= 4 ? '#E5484D' : r.prio === 3 ? '#F59E0B' : '#00B37E') : '#E3E9E6',
+          })),
+          editar: () => this.setState({ edita: r.nombre, picker: false, unidad: 'auto', prio: null, icono: null, color: null }),
+          uso: r.uso === 0 ? '—' : String(r.uso),
+          usoNota: r.uso === 0 ? 'sin usar' : r.uso === 1 ? d.unidad.replace(/s$/, '') : d.unidad,
+          usoCol: r.uso === 0 ? '#98A3A0' : '#0D1412',
+          colBorrar: r.uso === 0 ? '#C93A3E' : '#D5DDDA',
+          opBorrar: r.uso === 0 ? 1 : 0.5,
+          cursorBorrar: r.uso === 0 ? 'pointer' : 'not-allowed',
+          tituloBorrar: r.uso === 0 ? 'Borrar' : 'No se puede borrar: tiene ' + r.uso + ' ' + d.unidad,
+        };
+      }),
+    };
+  }
+}
+</script>
+</body>
+</html>

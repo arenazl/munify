@@ -2976,3 +2976,682 @@ button.av2-chip:hover { opacity: 0.85; }
   color: var(--pl-tono, var(--pl-green));
   margin-bottom: 4px;
 }
+
+/* ============================================================
+   [CONTROLES v2.5] — piezas del canvas de Configuración
+   ("Configuracion.dc.html", Claude Design 2026-08-03).
+
+   Regla de ingreso al kit: un control que aparece en un diseño y
+   no tenemos se componentiza acá con props y se documenta —
+   nunca se maqueta adentro de la pantalla. Ver
+   STANDARD-Controles-v2.md del paquete de diseño.
+
+   Todo sobre tokens --pl-*: el mismo control se pinta verde en
+   Paraguay Limpio y azul en Munify sin tocar una línea.
+   ============================================================ */
+
+/* --- Tile: cuadrito de icono teñido (lo usan tabla, asignación,
+   árbol y picker). El color lo pone el consumidor inline porque
+   viene de datos; acá sólo la forma. --- */
+.av2-tile {
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--pl-track);
+  color: var(--pl-text-3);
+}
+.av2-tile--lg {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: var(--pl-radius-md);
+}
+
+/* --- Switch ------------------------------------------------- */
+.av2-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.av2-switch:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.av2-switch-pista {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  flex: 0 0 32px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-switch-pista--on { background: var(--pl-green); }
+
+.av2-switch-perilla {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  transition: left var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-switch-pista--on .av2-switch-perilla { left: 16px; background: var(--pl-on-accent); }
+
+.av2-switch--sm .av2-switch-pista { width: 28px; height: 16px; flex: 0 0 28px; }
+.av2-switch--sm .av2-switch-perilla { width: 12px; height: 12px; }
+.av2-switch--sm .av2-switch-pista--on .av2-switch-perilla { left: 14px; }
+
+.av2-switch-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.av2-switch-label {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-switch-desc {
+  font-size: var(--pl-fs-micro);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
+/* --- SegmentedControl --------------------------------------- */
+.av2-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-md);
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+.av2-seg--full { display: flex; width: 100%; }
+.av2-seg--full .av2-seg-op { flex: 1; justify-content: center; }
+
+.av2-seg-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-3);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-seg-op:hover:not(:disabled):not(.av2-seg-op--activo) { color: var(--pl-text); }
+.av2-seg-op:disabled { color: var(--pl-text-disabled); cursor: not-allowed; }
+.av2-seg-op--activo {
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+}
+.av2-seg-op--icono { width: 32px; padding: 0; justify-content: center; }
+
+.av2-seg--sm .av2-seg-op { height: 28px; padding: 0 11px; font-size: var(--pl-fs-micro); }
+.av2-seg--sm .av2-seg-op--icono { width: 28px; padding: 0; }
+
+.av2-seg-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  flex: 0 0 6px;
+}
+.av2-seg-n {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-muted);
+}
+.av2-seg-op--activo .av2-seg-n { color: var(--pl-green-700); }
+
+/* --- Chips de filtro ---------------------------------------- */
+.av2-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.av2-chips-label { margin-right: 2px; }
+
+.av2-chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface);
+  color: var(--pl-text-3);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease), background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-chip-filtro:hover:not(:disabled) { border-color: var(--pl-green-200); }
+.av2-chip-filtro--activo {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+.av2-chip-filtro--cero { color: var(--pl-text-disabled); cursor: not-allowed; }
+.av2-chip-filtro-n { font-size: var(--pl-fs-caption); color: var(--pl-text-muted); }
+.av2-chip-filtro--activo .av2-chip-filtro-n { color: var(--pl-green-700); }
+
+.av2-chip-filtro-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-tono, var(--pl-green));
+  flex: 0 0 6px;
+}
+.av2-chip-filtro--bueno       { --pl-tono: var(--pl-green); }
+.av2-chip-filtro--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-chip-filtro--malo        { --pl-tono: var(--pl-red); }
+
+/* --- MetricCell: número + nota ------------------------------ */
+.av2-metrica { display: block; min-width: 0; }
+.av2-metrica-valor {
+  display: block;
+  font-family: var(--pl-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+.av2-metrica-valor--bueno       { color: var(--pl-green-700); }
+.av2-metrica-valor--advertencia { color: var(--pl-amber-700); }
+.av2-metrica-valor--malo        { color: var(--pl-red-700); }
+.av2-metrica-valor--apagado     { color: var(--pl-text-disabled); }
+.av2-metrica-nota {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+/* --- ScalePicker -------------------------------------------- */
+.av2-escala { display: flex; gap: 6px; }
+.av2-escala-op {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  border: 1.5px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease), background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-escala-op:hover { border-color: var(--pl-green-200); }
+.av2-escala-op--activo {
+  border-color: var(--pl-tono, var(--pl-green));
+  background: color-mix(in srgb, var(--pl-tono, var(--pl-green)) 8%, var(--pl-surface));
+}
+.av2-escala-op--bueno       { --pl-tono: var(--pl-green); }
+.av2-escala-op--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-escala-op--malo        { --pl-tono: var(--pl-red); }
+
+.av2-escala-n {
+  font-family: var(--pl-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pl-text-3);
+}
+.av2-escala-op--activo .av2-escala-n { color: var(--pl-tono, var(--pl-green)); }
+.av2-escala-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-escala-op--activo .av2-escala-label { color: var(--pl-text-2); }
+.av2-escala-nota {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}
+
+/* --- Modo "Reordenar" de la tabla --------------------------- */
+.av2-celda--con-handle { display: flex; align-items: center; gap: 0; min-width: 0; }
+
+.av2-orden-handle {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  flex: 0 0 20px;
+  margin-right: 4px;
+  color: var(--pl-text-faint);
+  cursor: grab;
+  border-radius: var(--pl-radius-sm);
+}
+.av2-orden-handle:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 1px;
+  color: var(--pl-green-700);
+}
+.av2-tabla-fila--orden { cursor: default; user-select: none; }
+.av2-tabla-fila--orden:active .av2-orden-handle { cursor: grabbing; }
+
+/* La fila que se arrastra se apaga; la de destino muestra dónde va a
+   caer. Se marcan con data-attributes (los pone useReorder), así el
+   hook no necesita saber nombres de clase. */
+.av2-tabla-fila[data-arrastrando] { opacity: 0.45; }
+.av2-tabla-fila[data-encima] { box-shadow: inset 0 2px 0 0 var(--pl-green); }
+
+/* --- AssignmentPanel ---------------------------------------- */
+.av2-asig { display: flex; flex-direction: column; gap: 12px; }
+
+.av2-asig-controles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+.av2-asig-buscador {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-muted);
+}
+.av2-asig-buscador input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: none;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text);
+}
+.av2-asig-buscador input::placeholder { color: var(--pl-text-muted); }
+
+.av2-asig-masivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-asig-masivo:hover:not(:disabled) { background: var(--pl-green-600); }
+.av2-asig-masivo:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.av2-asig-filtros { padding-top: 12px; border-top: 1px solid var(--pl-border); }
+
+.av2-asig-tabla {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+
+.av2-asig-grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.5fr) minmax(72px, 96px) minmax(190px, 1.35fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+}
+.av2-asig-encabezado {
+  background: var(--pl-surface-3);
+  border-bottom: 1px solid var(--pl-border);
+}
+.av2-asig-fila { border-bottom: 1px solid var(--pl-border); }
+.av2-asig-fila:hover { background: var(--pl-surface-hover); }
+
+.av2-asig-grupo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: color-mix(in srgb, var(--pl-tono, var(--pl-green)) 5%, var(--pl-surface));
+  border-block: 1px solid var(--pl-border);
+}
+.av2-asig-grupo--bueno       { --pl-tono: var(--pl-green); }
+.av2-asig-grupo--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-asig-grupo--malo        { --pl-tono: var(--pl-red); }
+.av2-asig-grupo-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-tono, var(--pl-green));
+  flex: 0 0 7px;
+}
+.av2-asig-grupo-titulo {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pl-tono, var(--pl-text-2));
+}
+.av2-asig-grupo-detalle {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  min-width: 0;
+}
+
+.av2-asig-entidad { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.av2-asig-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.av2-asig-celda-destino { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.av2-asig-destino { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.av2-asig-combo { flex: 1; min-width: 0; }
+.av2-asig-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  flex: 0 0 6px;
+}
+
+/* Sugerencia: PUNTEADA y en acento, para que no se confunda con un
+   valor confirmado. Es el affordance de "esto todavía no lo decidió
+   nadie". */
+.av2-asig-sugerencia {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px dashed var(--pl-green-200);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  color: var(--pl-green-700);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-asig-sugerencia:hover:not(:disabled) {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green);
+}
+.av2-asig-sugerencia:disabled { opacity: 0.5; cursor: not-allowed; }
+.av2-asig-sugerencia-txt {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.av2-asig-quitar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: none;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+}
+.av2-asig-quitar:hover { background: var(--pl-red-100); color: var(--pl-red-700); }
+
+.av2-asig-pie {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--pl-surface-3);
+  flex-wrap: wrap;
+}
+.av2-asig-pie-txt { font-size: var(--pl-fs-caption); color: var(--pl-text-3); min-width: 0; }
+.av2-asig-pie-dato {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+/* --- TreeList ----------------------------------------------- */
+.av2-arbol {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+
+.av2-arbol-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--pl-border);
+  min-width: 0;
+}
+.av2-arbol-fila--click { cursor: pointer; }
+.av2-arbol-fila--click:hover { background: var(--pl-surface-hover); }
+
+/* Jerarquía por nivel: la rama de arriba se lee como título y las
+   hojas como texto. Sin esto un árbol de tres niveles se ve como una
+   lista con sangría. */
+.av2-arbol-fila--n0 { background: var(--pl-surface-3); }
+.av2-arbol-fila--n0 .av2-arbol-label {
+  font-family: var(--pl-font-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+}
+.av2-arbol-fila--n1 .av2-arbol-label { font-size: 13px; font-weight: 600; }
+.av2-arbol-fila--n2 .av2-arbol-label { font-size: 12.5px; font-weight: 500; }
+
+.av2-arbol-chevron {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 0;
+  background: none;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+  transition: transform 200ms var(--pl-ease);
+}
+.av2-arbol-chevron:disabled { cursor: default; }
+.av2-arbol-chevron--abierto { transform: rotate(90deg); }
+
+.av2-arbol-cuerpo { min-width: 0; flex: 1; }
+.av2-arbol-linea {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 3px;
+}
+.av2-arbol-label { color: var(--pl-text); min-width: 0; }
+.av2-arbol-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.av2-arbol-monto { text-align: right; flex: 0 0 auto; }
+.av2-arbol-acciones { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+
+.av2-arbol-detalle {
+  padding: 14px 18px 16px;
+  background: var(--pl-surface-3);
+  border-bottom: 1px solid var(--pl-border);
+}
+
+.av2-arbol-agregar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--pl-border);
+  background: none;
+  color: var(--pl-green-700);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.av2-arbol-agregar:hover { background: var(--pl-green-050); }
+.av2-arbol-agregar-mas {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 1px dashed var(--pl-green-200);
+  border-radius: var(--pl-radius-sm);
+}
+
+.av2-arbol-pie {
+  padding: 12px 18px;
+  background: var(--pl-surface-3);
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+}
+
+/* --- IconColorPicker ---------------------------------------- */
+.av2-picker { min-width: 0; }
+
+.av2-picker-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--pl-surface-3);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+}
+.av2-picker-preview-txt { min-width: 0; flex: 1; }
+.av2-picker-preview-titulo {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-picker-preview-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.av2-picker-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: 9px;
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.av2-picker-toggle:hover { border-color: var(--pl-green-200); color: var(--pl-green-700); }
+
+.av2-picker-cuerpo { padding-top: 12px; }
+.av2-picker-eyebrow-color { display: block; margin-top: 14px; }
+
+.av2-picker-iconos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.av2-picker-icono {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border: 1.5px solid var(--pl-border);
+  border-radius: 9px;
+  background: var(--pl-surface);
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-picker-icono:hover { border-color: var(--pl-green-200); }
+.av2-picker-icono--activo {
+  border-color: var(--pl-green);
+  background: var(--pl-green-050);
+  color: var(--pl-green-700);
+}
+
+.av2-picker-colores { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+.av2-picker-color {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  color: var(--pl-on-brand);
+  cursor: pointer;
+}
+.av2-picker-color--activo {
+  box-shadow: 0 0 0 2px var(--pl-surface), 0 0 0 4px currentColor;
+}
+.av2-picker-nota {
+  margin: 10px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}

@@ -152,6 +152,27 @@ sugerenciasMun/
 | **Icono dinámico** (por nombre) | `<DynamicIcon name="Building2" />` | imports manuales caso-por-caso |
 | **Loading skeleton** | `<Skeleton variant="card|line|circle" />` | spinner genérico |
 
+**Controles del kit v2** (`components/abmv2/`) — recetas completas en
+`docs/design/paquetes/05_2026-08-03_configuracion/STANDARD-Controles-v2.md`:
+
+| Necesitás… | Usá esto | NO uses |
+|---|---|---|
+| **Encendido / apagado** (activar una fila, un ajuste) | `<Switch checked onChange label? description? />` | `<input type="checkbox">`, toggle a mano |
+| **Elegir entre 2-4 opciones excluyentes** (vistas, lados, unidades) | `<SegmentedControl options value onChange />` | botones sueltos con estado propio |
+| **Chips de filtro con contador** fuera de una tabla | `<FilterChips chips value onChange label />` | píldoras maquetadas por pantalla |
+| **Número + nota en una celda** ("38 / históricos") | columna `kind: 'metric'` o `<MetricCell />` | dos `<span>` a mano |
+| **Escala ordinal corta** (prioridad 1..5) | `<ScalePicker steps value onChange note />` | `ModernSelect` con 5 números |
+| **Reordenar una lista arrastrando** | prop `reorder` del `DataTable`, o `useReorder` suelto | librería de DnD, flechas ad-hoc |
+| **Emparejar dos catálogos** (categoría → dependencia) | `<AssignmentPanel targets groups onAssign />` | tabla con un combo en una columna |
+| **Estructura jerárquica** de 2+ niveles | `<TreeList nodes expandedIds onExpandedChange />` | tabla con columna "padre" |
+| **Elegir icono + color** de una entidad | `<IconColorPicker icons colors preview />` | grid de iconos por pantalla |
+
+> **Regla de ingreso al kit** (acuerdo del dueño, 2026-08-03): un control que
+> aparece en un diseño y no está en estas tablas **se componentiza en
+> `abmv2/`** con props polimórficas y se documenta en el STANDARD — nunca se
+> maqueta adentro de la pantalla. Dos implementaciones de lo mismo es un bug
+> de arquitectura, no una variante.
+
 **Inputs nativos permitidos:** sólo `<input type="text">`, `<input type="number">`,
 `<input type="email">`, `<input type="password">`, `<textarea>` cuando NO existe un
 componente custom equivalente. Y aún así envueltos con el theme (`useTheme()`).

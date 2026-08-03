@@ -18,7 +18,26 @@ pantalla por módulo: se instancia `SemanticAbmPage<Row>` con otra data y otras 
 | `FilterBar.tsx` | Selects (`ModernSelect` envuelto) + `PeriodControl` (envuelve el `PeriodNavigator` del dueño, con "→ Hasta" dinámico) + segmented de estados + resumen. |
 | `DataTable.tsx` | Tabla grid `minmax()`, grupos por fecha/hora con subtotal, filas clickeables, pie con gran total. Exporta `ChipEstado`, `EntityCell`, `Insignia`, `toneDeEstado`. |
 | `SideModal.tsx` | Drawer derecho (detail / create / edit). Exporta `StatusStepper`, `DepartmentTrail`, `CandidateList`, `SideModalField`. |
+| `SettingsShell.tsx` | Página de AJUSTES de tres niveles (grupos → riel → panel). Hermana de `SemanticAbmPage`; el panel llega por `children`. |
+| `EmbedContext.tsx` / `useEmbed.ts` | Contexto de "estoy embebida": apaga la cabecera propia de la pantalla y deja que publique su total (`useReportarTotal`). |
 | `styles/abmv2.css` | Todo el CSS por clases `av2-*` sobre tokens `--pl-*` (importado en `main.tsx`). Cero colores fijos. |
+
+### Controles sueltos [v2.5]
+
+Piezas que se usan ADENTRO de cualquier página. Documentación, recetas y la
+regla de ingreso al kit: **`docs/design/paquetes/05_2026-08-03_configuracion/STANDARD-Controles-v2.md`**.
+
+| Archivo | Piezas |
+|---|---|
+| `Controls.tsx` | `Switch` · `SegmentedControl` · `FilterChips` · `MetricCell` · `ScalePicker` · `Tile` |
+| `useReorder.ts` | Hook de reordenamiento por arrastre + teclado (lo usa el `DataTable` y sirve suelto para tarjetas). |
+| `AssignmentPanel.tsx` | Emparejar filas con destinos: lados, sugerencias punteadas, acción masiva. |
+| `TreeList.tsx` | Árbol de 2+ niveles con expandir/colapsar, chips, cifras y acciones. |
+| `IconColorPicker.tsx` | Icono (lucide por nombre) + color de una entidad, con vista previa. |
+
+**Regla dura:** un control que aparece en un diseño y no está en esta tabla se
+componentiza acá con props y se documenta — nunca se maqueta adentro de una
+pantalla. Dos implementaciones de lo mismo es un bug de arquitectura.
 
 El **ModuleHero es el `SemanticHero` existente** (`components/ui/SemanticHero.tsx`): el orquestador
 lo importa, no lo duplica. Las frases se arman con `seg()` de `lib/semanticHero`.

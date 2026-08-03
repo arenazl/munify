@@ -292,8 +292,10 @@ export interface ColumnSpec<Row = unknown> {
    *  la versión liviana de 'entity' para columnas taxonómicas (categoría,
    *  dependencia, zona) donde el tile completo es demasiado peso visual.
    *  Why (pilotos Reclamos y Personal): ambos repetían el mismo markup
-   *  punto+texto en `cell` custom para esas columnas. */
-  kind?: 'text' | 'entity' | 'chip' | 'date' | 'money' | 'actions' | 'dot';
+   *  punto+texto en `cell` custom para esas columnas.
+   *  [v2.5] Se suma 'metric': número + nota debajo (MetricCellData) — la
+   *  columna "EN USO" del canvas de Configuración. Ver MetricCellData. */
+  kind?: 'text' | 'entity' | 'chip' | 'date' | 'money' | 'actions' | 'dot' | 'metric';
   /** Render custom de la celda. Sin `cell`, el DataTable resuelve un render
    *  por defecto según `kind` (los agentes de Tabla lo documentan). */
   cell?: (row: Row) => ReactNode;
@@ -307,6 +309,31 @@ export interface DotCellData {
   /** Color del punto — valor RUNTIME que viene de datos (categoría/área),
    *  por eso se permite inline. Omitido ⇒ punto neutro por tokens. */
   dotColor?: string;
+}
+
+/**
+ * [v2.5] Datos de la celda kind='metric': un número con su nota debajo
+ * ("9 / históricos", "0 / sin usar"). Es la columna "EN USO" del canvas de
+ * Configuración, y sirve para cualquier lista que quiera responder "¿cuánto
+ * pesa esta fila?" sin abrirla.
+ *
+ * El NÚMERO se pinta en display con `tnum` y la NOTA en muted. El color sale
+ * del `veredicto` (tokens), nunca de un hex: un catálogo sin uso se lee
+ * apagado y uno desbordado se lee en alerta. Sin veredicto queda neutro.
+ *
+ * El SUSTANTIVO de la nota lo pone la página —el kit no sabe si son
+ * "históricos", "trámites" o "empleados"—, igual que el `label` de TableGroup.
+ */
+export interface MetricCellData {
+  /** Número YA formateado por la página ("1.240", "0", "—"). */
+  value: string;
+  /** Renglón chico debajo: qué son esas unidades ("históricos", "sin usar"). */
+  note?: string;
+  /** Tiñe el número. Omitido ⇒ neutro. */
+  veredicto?: Veredicto;
+  /** true ⇒ número apagado (--pl-text-disabled). Para el cero real: "no se
+   *  usó nunca" no es una alerta, es un dato menor. */
+  muted?: boolean;
 }
 
 /**
@@ -441,6 +468,51 @@ export interface DataTableProps<Row = unknown> {
    * texto hardcodeado del DataTable no lo permitía.
    */
   emptyMessage?: string;
+  /**
+   * [v2.5] Reordenamiento por arrastre (ver ReorderSpec). Omitido ⇒ la tabla
+   * no se reordena y no aparece ninguna columna extra: las pantallas
+   * existentes no cambian ni un píxel.
+   */
+  reorder?: ReorderSpec<Row>;
+}
+
+/* ============================================================
+ * [v2.5] Reordenamiento por arrastre — pieza del canvas de Configuración
+ * ============================================================ */
+
+/**
+ * Modo "Reordenar" de una lista ordenable (el `orden` de un catálogo es un
+ * campo del dominio: define en qué secuencia ve el vecino las categorías).
+ *
+ * Es un MODO, no un estado permanente: mientras está apagado la lista se lee
+ * y se ordena por el criterio que quiera la página; al encenderlo aparecen
+ * los handles y las filas se arrastran. Se separó así porque una lista donde
+ * todas las filas son arrastrables SIEMPRE se reordena sin querer al
+ * intentar seleccionar texto.
+ *
+ * Accesible por teclado a propósito: el handle es un botón real y las flechas
+ * mueven la fila. Sin eso el orden sería inalcanzable sin mouse — y en
+ * móviles el drag nativo de HTML5 directamente no existe.
+ *
+ * El componente NO persiste nada: emite el orden nuevo y la página decide
+ * (PATCH por fila, endpoint de bulk, optimista). Tampoco reordena por su
+ * cuenta: las filas siguen llegando por `rows`, así que quien manda es el
+ * estado de la página (un fallo del guardado se ve como la fila volviendo a
+ * su lugar, que es la verdad).
+ */
+export interface ReorderSpec<Row = unknown> {
+  /** true ⇒ modo activo (handles visibles, filas arrastrables). */
+  active: boolean;
+  /**
+   * Soltó una fila en otra posición. Llega la lista COMPLETA en el orden
+   * nuevo (no un índice suelto) porque casi siempre hay que reasignar el
+   * campo `orden` de todas las filas afectadas, no sólo de la que se movió.
+   * `moved` viene aparte para poder mandar un PATCH de una sola fila cuando
+   * el backend lo soporta.
+   */
+  onReorder: (rows: Row[], moved: { row: Row; from: number; to: number }) => void;
+  /** Tooltip del handle. Default: "Arrastrá para reordenar". */
+  handleTitle?: string;
 }
 
 /* ============================================================
@@ -660,4 +732,306 @@ export interface SideModalProps {
   /** Asignación con radios y score. */
   candidates?: CandidateSpec[];
   footer: SideModalFooter;
+}
+
+/* ============================================================
+ * [v2.5] CONTROLES DEL CANVAS DE CONFIGURACIÓN
+ *
+ * Origen: "Configuracion.dc.html" (canvas Claude Design 46976e44,
+ * 2026-08-03). El canvas trajo tres cuerpos que el kit no tenía —una lista
+ * ordenable a mano, un panel de asignación y un árbol— más los controles
+ * chicos que esos cuerpos usan.
+ *
+ * REGLA DE INGRESO AL KIT (acuerdo del dueño, 2026-08-03): cuando un diseño
+ * traiga un control que no tenemos, no se maqueta adentro de la pantalla —
+ * se componentiza acá, con props que lo hagan servir en OTRAS apps, y se
+ * documenta en los STANDARD-*.md que leen los agentes. Por eso ninguno de
+ * estos tipos nombra un catálogo, una dependencia ni un trámite: hablan de
+ * filas, destinos y nodos.
+ * ============================================================ */
+
+/** Tamaño de las piezas chicas. 'sm' es la variante de fila de tabla. */
+export type ControlSize = 'sm' | 'md';
+
+/**
+ * Interruptor de dos estados (activo / inactivo). Reemplaza al checkbox
+ * nativo, que rompe el theme igual que el `<select>`.
+ *
+ * Va en la fila de la tabla (sin label) o en un formulario (con label y
+ * descripción). Es controlado: no guarda estado propio, así el optimismo lo
+ * decide la página.
+ */
+export interface SwitchProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  /** Texto al lado de la perilla. Omitido ⇒ sólo la perilla (fila de tabla). */
+  label?: string;
+  /** Renglón chico bajo el label (formularios). */
+  description?: string;
+  size?: ControlSize;
+  disabled?: boolean;
+  /** Por qué está deshabilitado. Regla del estándar: nunca un control muerto
+   *  sin decir qué falta. Se pinta como `title`. */
+  disabledReason?: string;
+  /** aria-label cuando no hay `label` visible (fila de tabla). */
+  ariaLabel?: string;
+}
+
+/** Opción del segmented. `icon` sin `label` ⇒ botón de sólo icono. */
+export interface SegmentedOption {
+  id: string;
+  label?: string;
+  icon?: LucideIcon;
+  /** Contador a la derecha del label ("Trámites 42"). */
+  count?: number;
+  /** Punto de color a la izquierda — runtime (viene de datos). */
+  dotColor?: string;
+  disabled?: boolean;
+  /** Tooltip; obligatorio de hecho cuando el botón es sólo icono. */
+  title?: string;
+}
+
+/**
+ * Segmented control genérico (píldora hundida con el activo elevado). El kit
+ * ya lo tenía TRES veces maquetado por dentro —vistas de la toolbar, estados
+ * de la FilterBar, orden— y el canvas pide dos más (lado de la asignación,
+ * unidad horas/días). Este es el único que hay que tocar de acá en más.
+ */
+export interface SegmentedControlProps {
+  options: SegmentedOption[];
+  value: string;
+  onChange: (id: string) => void;
+  size?: ControlSize;
+  /** Etiqueta accesible del grupo ("Vista", "Unidad del plazo"). */
+  ariaLabel?: string;
+  /** true ⇒ ocupa todo el ancho disponible repartiendo en partes iguales. */
+  fullWidth?: boolean;
+}
+
+/**
+ * Chip de filtro con contador (y punto de color opcional). Es el mismo
+ * lenguaje que los `statusTabs` pero SUELTO: sirve donde no hay tabla que lo
+ * albergue (el panel de asignación, un panel de ajustes).
+ */
+export interface FilterChip {
+  id: string;
+  label: string;
+  count?: number;
+  /** Tiñe el punto y el chip activo. Omitido ⇒ acento del theme. */
+  veredicto?: Veredicto;
+}
+
+/* --- Panel de asignación ------------------------------------------------ */
+
+/** Destino posible de una asignación (dependencia, responsable, cuadrilla). */
+export interface AssignTarget {
+  value: string;
+  label: string;
+  /** Color del punto — runtime (viene de datos). */
+  dotColor?: string;
+}
+
+/** Fila del panel: la entidad de la izquierda + a quién quedó asignada. */
+export interface AssignRow {
+  id: string | number;
+  label: string;
+  /** Tile de la entidad. Acepta lucide o un nodo ya instanciado. */
+  icon?: LucideIcon | ReactNode;
+  /** Color del tile — runtime. */
+  tileColor?: string;
+  /** Cuánto pesa la fila ("38 · históricos"). Misma pieza que kind='metric'. */
+  metric?: MetricCellData;
+  /** value del AssignTarget actual. null/undefined ⇒ sin asignar. */
+  assignedTo?: string | null;
+  /**
+   * Propuesta del sistema para una fila sin asignar. Se pinta en un botón
+   * PUNTEADO, distinto del combo lleno: el usuario tiene que poder ver de un
+   * vistazo qué está decidido y qué está sugerido. Aplicar es un click.
+   */
+  suggestion?: { value: string; label: string; reason?: string };
+  /** Bloquea el cambio en esta fila (sin permiso, registro del sistema). */
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
+/** Grupo de filas del panel (por rama, por estado, por lo que sea). */
+export interface AssignGroup {
+  key: string;
+  /** Título del grupo, en eyebrow ("SIN ATENDER"). */
+  title: string;
+  /** Renglón de contexto a la derecha del título. */
+  detail?: string;
+  /** Tiñe el punto y el título del grupo. */
+  veredicto?: Veredicto;
+  rows: AssignRow[];
+}
+
+/**
+ * Panel de ASIGNACIÓN: emparejar cada fila de un catálogo con un destino
+ * (categoría → dependencia, zona → cuadrilla, concepto → caja). Es el cuerpo
+ * "asignacion" del canvas.
+ *
+ * Por qué es una pieza propia y no una tabla con un combo en una columna:
+ *  - el estado que importa es "cuántas quedaron sin asignar", y eso se lee en
+ *    los grupos y los chips, no fila por fila;
+ *  - la sugerencia necesita un affordance distinto del valor confirmado
+ *    (punteado vs lleno), cosa que una celda de tabla no expresa;
+ *  - la acción masiva ("aplicar las 6 sugerencias") no tiene dónde vivir en
+ *    el contrato del DataTable.
+ *
+ * Presentacional puro: filtra, busca y agrupa la PÁGINA; el panel pinta y
+ * avisa. Todos los combos son `ModernSelect` (nada de `<select>` nativo).
+ */
+export interface AssignmentPanelProps {
+  /** Lados del mismo problema ("Reclamos" / "Trámites"). Omitido ⇒ sin tabs. */
+  sides?: SegmentedOption[];
+  activeSide?: string;
+  onSideChange?: (id: string) => void;
+
+  search?: string;
+  onSearchChange?: (q: string) => void;
+  searchPlaceholder?: string;
+
+  /**
+   * Acción masiva de sugerencias ("Aplicar las 6 sugerencias"). Se pinta como
+   * CTA primario del panel y sólo cuando hay algo que aplicar — un botón que
+   * no hace nada enseña al usuario a ignorarlo.
+   */
+  bulkAction?: Action;
+
+  filters?: FilterChip[];
+  activeFilter?: string;
+  onFilterChange?: (id: string) => void;
+
+  /** Encabezados de las tres columnas. Default: entidad / "EN USO" / destino. */
+  columnLabels?: { entity?: string; metric?: string; target?: string };
+
+  /** Destinos elegibles (los mismos para todas las filas). */
+  targets: AssignTarget[];
+  groups: AssignGroup[];
+
+  /** Eligió un destino para una fila (o aplicó su sugerencia). */
+  onAssign: (rowId: string | number, targetValue: string) => void;
+  /** Quitó la asignación. Omitido ⇒ el combo no ofrece vaciarse. */
+  onClear?: (rowId: string | number) => void;
+
+  /** Pie del panel: resumen a la izquierda, dato a la derecha. */
+  footer?: { left?: string; right?: string };
+  loading?: boolean;
+  emptyMessage?: string;
+}
+
+/* --- Árbol -------------------------------------------------------------- */
+
+/**
+ * Nodo del árbol. La jerarquía es la de `children`: el componente calcula la
+ * sangría y la tipografía por profundidad (rama fuerte arriba, hoja normal
+ * abajo), así la página no manda medidas.
+ */
+export interface TreeNode {
+  id: string;
+  label: string;
+  /** Tile de icono. Sin icono, el nodo queda con la sangría igual (alineado). */
+  icon?: LucideIcon | ReactNode;
+  /** Color del tile — runtime. */
+  tileColor?: string;
+  /** Renglón chico bajo el label ("3 categorías · 11 trámites"). */
+  sub?: string;
+  /** Píldora a la derecha del label ("6 trámites"). */
+  chip?: { label: string; icon?: LucideIcon; tone?: ChipTone };
+  /** Cifra a la derecha del nodo (costo, plazo, cantidad). */
+  amount?: MetricCellData;
+  /** Acciones del nodo (mismas reglas que RowAction: máximo 2 + menú). */
+  actions?: RowAction<TreeNode>[];
+  children?: TreeNode[];
+  /** Fila punteada al final de los hijos ("+ Agregar categoría"). */
+  addLabel?: string;
+  onAdd?: () => void;
+  /**
+   * Panel que se despliega DEBAJO del nodo cuando está expandido y no tiene
+   * hijos (el detalle de una hoja: requisitos, documentos, validaciones).
+   * Excluyente con `children` en la práctica: si hay ambos, se pintan los dos
+   * y manda el orden (hijos y después el detalle).
+   */
+  detail?: ReactNode;
+}
+
+/**
+ * Árbol jerárquico con expandir/colapsar. Es el cuerpo "arbol" del canvas
+ * (Dependencia → Categoría → Trámite → requisitos), pero no sabe nada de
+ * trámites: sirve para cualquier estructura de 2+ niveles (organigrama,
+ * plan de cuentas, categorías anidadas).
+ *
+ * Controlado si viene `expandedIds`; si no, se maneja solo desde
+ * `defaultExpandedIds`. Se soportan las dos formas porque el "expandir todo"
+ * de la toolbar necesita mandar desde afuera, pero un árbol chico no merece
+ * que la página cargue con ese estado.
+ */
+export interface TreeListProps {
+  nodes: TreeNode[];
+  /** Modo controlado: ids expandidos. */
+  expandedIds?: string[];
+  onExpandedChange?: (ids: string[]) => void;
+  /** Modo no controlado: qué arranca abierto. */
+  defaultExpandedIds?: string[];
+  /** Click en el cuerpo del nodo (abrir el detalle en un drawer). El chevron
+   *  siempre expande, incluso con `onNodeClick` — son dos gestos distintos. */
+  onNodeClick?: (node: TreeNode) => void;
+  /** Pie del árbol ("11 dependencias · 42 trámites"). */
+  footer?: string;
+  loading?: boolean;
+  emptyMessage?: string;
+}
+
+/* --- Pickers ------------------------------------------------------------ */
+
+/** Punto de una escala ordinal (prioridad 1..5, riesgo bajo/alto). */
+export interface ScaleStep {
+  value: number;
+  /** Label corto bajo el número ("Urgente", "Baja"). */
+  label: string;
+  /** Tiñe el punto elegido. Omitido ⇒ acento del theme. */
+  veredicto?: Veredicto;
+}
+
+/**
+ * Selector de escala ordinal: N cajas iguales con el número grande y su
+ * label. Reemplaza al combo para escalas cortas — el usuario compara los
+ * extremos de un vistazo en vez de desplegar una lista.
+ */
+export interface ScalePickerProps {
+  steps: ScaleStep[];
+  value: number | null;
+  onChange: (value: number) => void;
+  /** Renglón que explica qué implica lo elegido. Lo escribe la página. */
+  note?: string;
+  ariaLabel?: string;
+}
+
+/**
+ * Picker de icono + color de una entidad del catálogo (categoría, tipo). Los
+ * dos van juntos a propósito: lo que el usuario elige no es "un icono", es
+ * cómo se va a ver la fila en la app del vecino, y eso se juzga con la
+ * combinación puesta.
+ *
+ * Los iconos son nombres de lucide (los resuelve `DynamicIcon`), así el
+ * catálogo de iconos lo define la app y no el componente. Los colores son
+ * valores runtime que se guardan en la base.
+ */
+export interface IconColorPickerProps {
+  /** Nombres lucide ofrecidos ("Wrench", "Trash2"…). */
+  icons: string[];
+  icon: string | null;
+  onIconChange: (name: string) => void;
+  /** Colores ofrecidos. Cada uno con su nombre para el tooltip. */
+  colors: { name: string; value: string }[];
+  color: string | null;
+  onColorChange: (value: string) => void;
+  /** Vista previa: cómo se ve la entidad con lo elegido. */
+  preview?: { title: string; subtitle?: string };
+  /** Nota al pie del picker (qué significa el color en esta app). */
+  note?: string;
+  /** Arranca cerrado y se abre con un botón: en un formulario largo, 40
+   *  iconos desplegados tapan el resto de los campos. */
+  collapsible?: boolean;
 }

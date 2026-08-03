@@ -46,7 +46,7 @@
 import { isValidElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { MoreHorizontal } from 'lucide-react';
+import { GripVertical, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { estadoLabel } from '../../lib/enums/reclamo';
 import type { Veredicto } from '../../lib/semanticHero';
@@ -57,10 +57,13 @@ import type {
   DataTableProps,
   DotCellData,
   EntityCellData,
+  MetricCellData,
   RowAction,
   TableGroup,
 } from './types';
 import { toneDeEstado } from './estadoTonos';
+import { MetricCell } from './Controls';
+import { useReorder } from './useReorder';
 
 /** [v2.1] Canónicas en types.ts; re-export para los imports existentes
  *  de las páginas (Empleados importa EntityCellData desde './DataTable'). */
@@ -206,6 +209,9 @@ const esEntityData = (v: unknown): v is EntityCellData =>
 const esDotData = (v: unknown): v is DotCellData =>
   typeof v === 'object' && v !== null && typeof (v as DotCellData).label === 'string';
 
+const esMetricData = (v: unknown): v is MetricCellData =>
+  typeof v === 'object' && v !== null && typeof (v as MetricCellData).value === 'string';
+
 /** Render por defecto de una celda según ColumnSpec.kind (ver doc de arriba). */
 function celdaPorDefecto<Row>(col: ColumnSpec<Row>, row: Row): ReactNode {
   const valor = (row as Record<string, unknown>)[col.id];
@@ -231,6 +237,12 @@ function celdaPorDefecto<Row>(col: ColumnSpec<Row>, row: Row): ReactNode {
     case 'dot': {
       if (esDotData(valor)) return <DotCell {...valor} />;
       if (typeof valor === 'string' && valor) return <DotCell label={valor} />;
+      return <span className="av2-tabla-texto">—</span>;
+    }
+    case 'metric': {
+      // [v2.5] Número + nota. Un string suelto también sirve (sin nota).
+      if (esMetricData(valor)) return <MetricCell {...valor} />;
+      if (valor != null && valor !== '') return <MetricCell value={String(valor)} />;
       return <span className="av2-tabla-texto">—</span>;
     }
     case 'text':
@@ -343,9 +355,22 @@ export function DataTable<Row>({
   statusTabs,
   activeStatus,
   onStatusChange,
+  reorder,
 }: DataTableProps<Row>) {
   const [menu, setMenu] = useState<MenuAbierto | null>(null);
   const cerrarMenu = useCallback(() => setMenu(null), []);
+
+  /* [v2.5] Modo "Reordenar". El hook va ACÁ ARRIBA, antes de cualquier return
+     condicional: un hook después del `if (kind === 'board')` rompe el orden de
+     hooks entre renders (React #310). */
+  const reordenActivo = !!reorder?.active && groupBy === 'none';
+  const noop = useCallback(() => {}, []);
+  const { rowProps, handleProps } = useReorder<Row>({
+    rows,
+    rowKey,
+    onReorder: reorder?.onReorder ?? noop,
+    active: reordenActivo,
+  });
 
   /* --- kind='board': PENDIENTE (Planificación, otra fase) --- */
   if (kind === 'board') {
@@ -426,8 +451,10 @@ export function DataTable<Row>({
     );
   };
 
-  const renderFila = (row: Row) => {
-    const clickeable = !!onRowClick;
+  const renderFila = (row: Row, indice = 0) => {
+    // Mientras se reordena, la fila NO abre el detalle: arrastrar y navegar
+    // son gestos que se pisan (el drop termina en un click sintético).
+    const clickeable = !!onRowClick && !reordenActivo;
     const onTecla = (e: KeyboardEvent<HTMLDivElement>) => {
       if (!clickeable) return;
       if (e.key === 'Enter' || e.key === ' ') {
@@ -440,21 +467,49 @@ export function DataTable<Row>({
         key={rowKey(row)}
         role="row"
         tabIndex={clickeable ? 0 : undefined}
-        className={`av2-tabla-grid av2-tabla-fila${clickeable ? ' av2-tabla-fila--click' : ''}`}
+        className={[
+          'av2-tabla-grid av2-tabla-fila',
+          clickeable ? 'av2-tabla-fila--click' : '',
+          reordenActivo ? 'av2-tabla-fila--orden' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         onClick={clickeable ? () => onRowClick!(row) : undefined}
         onKeyDown={onTecla}
+        {...rowProps(row, indice)}
       >
-        {columns.map((col) =>
-          col.kind === 'actions' ? (
-            <span key={col.id} className={`av2-celda ${clasePorAlineado(col.align ?? 'right')}`}>
-              {renderAcciones(row)}
+        {columns.map((col, i) => {
+          const contenido =
+            col.kind === 'actions'
+              ? renderAcciones(row)
+              : col.cell
+                ? col.cell(row)
+                : celdaPorDefecto(col, row);
+          // El handle vive DENTRO de la primera celda y no en una columna
+          // propia: una columna extra movería todo el grid al entrar en modo
+          // orden y la tabla "saltaría" al encenderlo.
+          const conHandle = reordenActivo && i === 0;
+          return (
+            <span
+              key={col.id}
+              role="cell"
+              className={`av2-celda ${clasePorAlineado(
+                col.align ?? (col.kind === 'actions' ? 'right' : undefined),
+              )}${conHandle ? ' av2-celda--con-handle' : ''}`}
+            >
+              {conHandle && (
+                <span
+                  className="av2-orden-handle"
+                  title={reorder?.handleTitle ?? 'Arrastrá para reordenar'}
+                  {...handleProps(row, indice)}
+                >
+                  <GripVertical size={14} strokeWidth={2} />
+                </span>
+              )}
+              {contenido}
             </span>
-          ) : (
-            <span key={col.id} role="cell" className={`av2-celda ${clasePorAlineado(col.align)}`}>
-              {col.cell ? col.cell(row) : celdaPorDefecto(col, row)}
-            </span>
-          ),
-        )}
+          );
+        })}
       </div>
     );
   };

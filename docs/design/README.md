@@ -21,6 +21,7 @@ después cambiaron en el canvas, y ninguna se pisa: se agrega la nueva.
 
 | Paquete | Fecha | Estado |
 |---|---|---|
+| [`paquetes/05_2026-08-03_configuracion/`](paquetes/05_2026-08-03_configuracion/) | 2026-08-03 | **VIGENTE** — Configuración maestro-detalle + **STANDARD de los controles del kit** (los que se agregan cuando un diseño trae uno que no tenemos) |
 | [`paquetes/04_2026-07-31_handoff-v2/`](paquetes/04_2026-07-31_handoff-v2/) | 2026-07-31 | **VIGENTE** — kit v2: STANDARD del ABM semántico, tokens, 18 `.dc` de referencia |
 | [`paquetes/03_2026-07-31_paraguay-limpio/`](paquetes/03_2026-07-31_paraguay-limpio/) | 2026-07-31 | Vigente para la marca Paraguay Limpio (brief, logos, spec del rediseño) |
 | [`paquetes/02_2026-06-12_canvas-v1-curado/`](paquetes/02_2026-06-12_canvas-v1-curado/) | 2026-06-12 | Superado por el 04 |
