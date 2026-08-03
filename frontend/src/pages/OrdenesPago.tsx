@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMSheetFooter, ABMInput, ABMTextarea } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
@@ -607,7 +606,6 @@ export default function OrdenesPago() {
   // ============ Render ============
   return (
     <>
-      <PageHint pageId="contaduria-ordenes" />
 
       <div className="av2-page" data-module="ordenes-pago">
         {/* 1. Cabecera de módulo + acceso al tutorial. */}

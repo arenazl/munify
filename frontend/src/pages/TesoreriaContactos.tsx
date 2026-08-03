@@ -6,11 +6,9 @@ import { UnificarManualModal } from '../components/tesoreria/UnificarManualModal
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 import { StatusPill } from '../components/ui/StatusPill';
@@ -434,12 +432,6 @@ export default function TesoreriaContactos() {
 
   return (
     <>
-      <PageHint pageId="tesoreria-contactos" />
-      <TesoreriaHint titulo="Agenda de Contactos" storageKey="contactos">
-        Acá guardás a las personas con las que hacés pagos. Cada uno
-        puede tener su <b>alias de transferencia</b> y <b>ubicación en el mapa</b>.
-        Podés cargarlos a mano o importar el Excel del intendente.
-      </TesoreriaHint>
 
       <ABMPage
         title="Contactos"

@@ -6,7 +6,6 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
 import { poiApi } from '../lib/api';
 import { estadoActivoColors } from '../lib/enums/inventario';
 import type { PoiTipo } from '../types';
@@ -124,7 +123,6 @@ export default function POITiposConfig() {
   return (
     <div className="h-full flex flex-col">
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="poi-tipos-config" />
       </div>
 
       <StickyPageHeader

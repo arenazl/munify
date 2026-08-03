@@ -6,7 +6,6 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
 import { inventarioApi } from '../lib/api';
 import { naturalezaLabels, naturalezaDescripcion, naturalezaColors, naturalezaIcons, estadoActivoColors } from '../lib/enums/inventario';
 import type { InventarioCategoria, NaturalezaInventario } from '../types';
@@ -133,7 +132,6 @@ export default function InventarioCategoriasConfig() {
   return (
     <div className="h-full flex flex-col">
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="inventario-categorias-config" />
       </div>
 
       <StickyPageHeader

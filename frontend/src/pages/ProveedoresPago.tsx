@@ -5,7 +5,6 @@ import { proveedoresPagoApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { Modal } from '../components/ui/Modal';
-import PageHint from '../components/ui/PageHint';
 
 interface Proveedor {
   proveedor: string;
@@ -137,7 +136,6 @@ export default function ProveedoresPago() {
         title="Proveedores de Pago"
       />
 
-      <PageHint pageId="proveedores-pago" />
 
       {loading ? (
         <div className="flex items-center justify-center h-48">

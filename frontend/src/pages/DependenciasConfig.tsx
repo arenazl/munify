@@ -12,7 +12,6 @@ import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
 import { MapPicker } from '../components/ui/MapPicker';
-import PageHint from '../components/ui/PageHint';
 
 type TipoJerarquico = 'SECRETARIA' | 'DIRECCION';
 
@@ -804,7 +803,6 @@ export default function DependenciasConfig() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="dependencias-config" />
       </div>
       {/* Header sticky */}
       <StickyPageHeader

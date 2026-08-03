@@ -23,8 +23,6 @@ import { Check, CheckCircle2, Edit2, Loader2, SkipForward, Trash2, Wallet, X } f
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
-import PageHint from '../components/ui/PageHint';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PagoMasivoModal } from '../components/tesoreria/PagoMasivoModal';
 import { MunifyTour } from '../components/ui/MunifyTour';
@@ -940,11 +938,6 @@ export default function PagosProgramados() {
 
   return (
     <>
-      <PageHint pageId={TOUR_KEY} />
-      <TesoreriaHint titulo="Pagos programados" storageKey="agenda">
-        Programá pagos <b>recurrentes</b> (sueldos, honorarios, alquileres). El sistema te
-        recuerda cuándo toca pagar y con un click crea el gasto + descuenta la caja correspondiente.
-      </TesoreriaHint>
 
       {/* El estándar v2 no tiene slot de acciones en la cabecera de módulo, así
           que el disparador del tutorial va acá arriba, dockeado a la derecha. */}

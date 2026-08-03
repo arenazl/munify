@@ -15,7 +15,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
 
 type TabType = 'reclamos' | 'tramites';
 
@@ -473,7 +472,6 @@ export default function AsignacionDependencias() {
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: theme.background }}>
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="asignacion-dependencias" />
       </div>
       <StickyPageHeader
         icon={<BookOpen className="h-5 w-5" />}

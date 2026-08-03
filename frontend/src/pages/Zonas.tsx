@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import api, { zonasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import type { Zona } from '../types';
 
 // Tipo para la respuesta de validación de duplicados
@@ -299,7 +298,6 @@ export default function Zonas() {
 
   return (
     <>
-      <PageHint pageId="zonas" />
       <ABMPage
       title="Zonas / Barrios"
       icon={<Map className="h-5 w-5" />}

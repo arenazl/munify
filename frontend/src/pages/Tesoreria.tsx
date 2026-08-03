@@ -17,8 +17,6 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIaTesoreria } from '../hooks/useIaHabilitada';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
-import PageHint from '../components/ui/PageHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 import type { PeriodModo } from '../components/ui/PeriodNavigator';
 import type { DateRange } from '../components/ui/DateRangePicker';
@@ -850,15 +848,6 @@ export default function Tesoreria() {
   return (
     <>
       <div className="pt-3">
-        <PageHint pageId="tesoreria-movimientos" />
-        <TesoreriaHint titulo="Pagos de Tesorería" storageKey="home">
-          Acá cargás los pagos del municipio: sueldos, pagos a proveedores,
-          préstamos, subsidios. Cada pago se asigna a una <b>Secretaría</b> o
-          a un <b>Contacto</b>. Total este mes:{' '}
-          <span className="font-bold" style={{ color: theme.primary }}>
-            ${totalMes.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </span>
-        </TesoreriaHint>
       </div>
 
       {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes Y la

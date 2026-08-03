@@ -7,7 +7,6 @@ import {
 import { auditApi, municipiosApi } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import PageHint from '../../components/ui/PageHint';
 import type {
   AuditFilters, AuditLogItem, AuditLogDetail, AuditStats,
   AuditGroupedRow,
@@ -340,7 +339,6 @@ export default function AuditLogs() {
 
   return (
     <div className="space-y-4">
-      <PageHint pageId="audit-logs" />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">

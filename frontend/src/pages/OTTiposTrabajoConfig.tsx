@@ -6,7 +6,6 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
 import { otTiposTrabajoApi } from '../lib/api';
 import { estadoActivoColors } from '../lib/enums/inventario';
 import type { OTTipoTrabajo } from '../types';
@@ -104,7 +103,6 @@ export default function OTTiposTrabajoConfig() {
   return (
     <div className="h-full flex flex-col">
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="ot-tipos-trabajo-config" />
       </div>
 
       <StickyPageHeader

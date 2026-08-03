@@ -10,11 +10,9 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 import { Sheet } from '../components/ui/Sheet';
 import { ABMPage } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import { contactosApi, gastosApi } from '../lib/api';
 import type { Contacto, Gasto, GastoCuota, TipoContacto } from '../types';
@@ -601,12 +599,6 @@ export default function TesoreriaMapa() {
 
   return (
     <>
-      <PageHint pageId="tesoreria-ubicacion" />
-      <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
-        Cada casita es un contacto con ubicación cargada. Tocá un pin para
-        ver el detalle de los gastos. El tamaño del pin indica cuánto le
-        pagaste en total. Usá los filtros para acotar período y estado.
-      </TesoreriaHint>
 
       <ABMPage
         title="Mapa"

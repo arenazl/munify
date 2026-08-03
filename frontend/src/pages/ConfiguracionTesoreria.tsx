@@ -17,7 +17,6 @@ import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesA
 import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje, Premio, ContaduriaRetencion, ConceptoLiquidacion } from '../types';
 import TesoreriaProyectos from './TesoreriaProyectos';
 
-import PageHint from '../components/ui/PageHint';
 type Tab = 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos' | 'premios' | 'retenciones' | 'conceptos-liq';
 
 export default function ConfiguracionTesoreria() {
@@ -209,7 +208,6 @@ function TiposConceptoTab() {
 
   return (
     <>
-      <PageHint pageId="configuracion-tesoreria" />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {tipos.length} tipos. Categorizan los conceptos de gasto. Cada uno tiene color e ícono propio.
