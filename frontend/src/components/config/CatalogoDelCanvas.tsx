@@ -13,7 +13,7 @@
  * Los cinco KPIs son los del canvas: EN EL CATÁLOGO · ACTIVAS · SIN USAR ·
  * MÁS USADA · SE PISAN.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
 import { EntityCell } from '../abmv2/DataTable';
 import { MetricCell, Switch } from '../abmv2/Controls';
@@ -21,6 +21,7 @@ import { seg } from '../../lib/semanticHero';
 import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
 import type { ColumnSpec, ViewKind } from '../abmv2/types';
 import type { CatalogoSpec, FilaCatalogo } from '../../config/canvasConfigSpec';
+import { CABLEADO_CATALOGO } from './datosDeAjuste';
 
 /** Plazo legible: en días cuando es múltiplo exacto, en horas cuando no. */
 function plazo(hs?: number | null): string {
@@ -62,7 +63,23 @@ export function CatalogoDelCanvas({
   const [vista, setVista] = useState<ViewKind>('table');
   const [estado, setEstado] = useState('todos');
 
-  const filas = spec.filas;
+  const [filasVivo, setFilasVivo] = useState<FilaCatalogo[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    const fetcher = CABLEADO_CATALOGO[moduleKey];
+    if (fetcher) {
+      setCargando(true);
+      fetcher()
+        .then((items) => setFilasVivo(items.length > 0 ? items : null))
+        .catch(() => setFilasVivo(null))
+        .finally(() => setCargando(false));
+    } else {
+      setFilasVivo(null);
+    }
+  }, [moduleKey]);
+
+  const filas = filasVivo || spec.filas;
   const activas = filas.filter((f) => !f.off);
   const conUso = filas.some((f) => typeof f.uso === 'number');
   const sinUsar = conUso ? filas.filter((f) => (f.uso ?? 0) === 0).length : 0;
@@ -239,7 +256,7 @@ export function CatalogoDelCanvas({
       rowKey={(f) => f.nombre}
       rowActions={[]}
       onRowClick={onFila}
-      loading={loading}
+      loading={loading || cargando}
       footer={{
         showing: `Mostrando ${visibles.length} de ${filas.length}`,
         note: regla,

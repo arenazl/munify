@@ -32,10 +32,18 @@ import {
   auditApi,
   conceptosAbmApi,
   conceptosLiquidacionApi,
+  categoriasReclamoApi,
+  categoriasTramiteApi,
+  poiApi,
+  inventarioApi,
+  tiposConceptoApi,
+  tiposEmpleadoApi,
+  parajesApi,
 } from '../../lib/api';
 import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
 import { seg } from '../../lib/semanticHero';
 import type { FilaSpec } from '../../config/canvasAbmSpec';
+import type { FilaCatalogo } from '../../config/canvasConfigSpec';
 
 export interface DatosDeAjuste {
   filas: FilaSpec[];
@@ -981,4 +989,160 @@ export const CABLEADO: Record<string, () => Promise<DatosDeAjuste>> = {
   'tesoreria-conceptos': datosConceptos,
   'conceptos-liq': datosConceptosLiquidacion,
   'tesoreria-conceptos-liq': datosConceptosLiquidacion,
+};
+
+/* ============================================================
+ * Catálogos Simples
+ * ============================================================ */
+
+export async function datosCatReclamo(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await categoriasReclamoApi.getAll();
+    const items: any[] = res.data || [];
+    return items.map((c) => ({
+      nombre: c.nombre,
+      glifo: c.icono || 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z',
+      color: c.color || '#00B37E',
+      desc: c.descripcion || 'Categoría de atención al vecino',
+      hs: c.sla_horas || c.plazo_horas || 48,
+      uso: c.reclamos_count || 0,
+      off: c.activa === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosCatTramite(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await categoriasTramiteApi.getAll();
+    const items: any[] = res.data || [];
+    return items.map((c) => ({
+      nombre: c.nombre,
+      glifo: c.icono || 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      color: c.color || '#3B82F6',
+      desc: c.descripcion || 'Categoría de trámites',
+      tipos: c.tramites_count || 0,
+      off: c.activa === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosPoiTipos(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await poiApi.listTipos();
+    const items: any[] = res.data || [];
+    return items.map((p) => ({
+      nombre: p.nombre,
+      glifo: p.icono || 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z',
+      color: p.color || '#8B5CF6',
+      desc: p.descripcion || 'Punto de interés municipal',
+      uso: p.puntos_count || 0,
+      off: p.activo === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosCatInventario(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await inventarioApi.listCategorias();
+    const items: any[] = res.data || [];
+    return items.map((i) => ({
+      nombre: i.nombre,
+      glifo: i.icono || 'M4 8h16v12H4zM4 8l3-4h10l3 4M9 12h6',
+      color: i.color || '#F59E0B',
+      desc: i.descripcion || 'Categoría de insumos/bienes',
+      uso: i.items_count || 0,
+      off: i.activo === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosCatConceptos(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await tiposConceptoApi.list();
+    const items: any[] = res.data || [];
+    return items.map((c) => ({
+      nombre: c.nombre,
+      glifo: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      color: '#F59E0B',
+      desc: c.codigo || 'Tipo de concepto de gasto',
+      off: c.activo === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosCatConceptosLiq(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await conceptosLiquidacionApi.list();
+    const items: any[] = res.data || [];
+    return items.map((c) => ({
+      nombre: c.nombre,
+      glifo: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      color: '#3B82F6',
+      desc: c.codigo || c.tipo || 'Concepto de haber',
+      off: c.activo === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosCatTiposEmpleado(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await tiposEmpleadoApi.list();
+    const items: any[] = res.data || [];
+    return items.map((t) => ({
+      nombre: t.nombre,
+      glifo: 'M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      color: '#00B37E',
+      desc: t.descripcion || 'Categoría laboral de personal',
+      off: t.activo === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function datosCatParajes(): Promise<FilaCatalogo[]> {
+  try {
+    const res = await parajesApi.list();
+    const items: any[] = res.data || [];
+    return items.map((p) => ({
+      nombre: p.nombre,
+      glifo: 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z',
+      color: '#8B5CF6',
+      desc: p.codigo || 'Localidad / Paraje municipal',
+      off: p.activo === false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export const CABLEADO_CATALOGO: Record<string, () => Promise<FilaCatalogo[]>> = {
+  'cat-reclamo': datosCatReclamo,
+  'categorias-reclamo': datosCatReclamo,
+  'cat-tramite': datosCatTramite,
+  'categorias-tramite': datosCatTramite,
+  'tipos-poi': datosPoiTipos,
+  'poi-tipos': datosPoiTipos,
+  'cat-inv': datosCatInventario,
+  'categorias-inventario': datosCatInventario,
+  conceptos: datosCatConceptos,
+  'tesoreria-conceptos': datosCatConceptos,
+  'conceptos-liq': datosCatConceptosLiq,
+  'tesoreria-conceptos-liq': datosCatConceptosLiq,
+  'tipos-empleado': datosCatTiposEmpleado,
+  'tesoreria-tipos-empleado': datosCatTiposEmpleado,
+  parajes: datosCatParajes,
+  'tesoreria-parajes': datosCatParajes,
 };
