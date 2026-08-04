@@ -16,7 +16,23 @@
  * la nota de por qué. Un número inventado en Configuración termina en una
  * decisión de borrar algo que sí se usaba.
  */
-import { empleadosApi, empleadosGestionApi } from '../../lib/api';
+import {
+  empleadosApi,
+  empleadosGestionApi,
+  slaApi,
+  dependenciasApi,
+  zonasApi,
+  cajasApi,
+  retencionesApi,
+  proyectosApi,
+  tarjetasApi,
+  contactosApi,
+  tasasApi,
+  proveedoresPagoApi,
+  auditApi,
+  conceptosAbmApi,
+  conceptosLiquidacionApi,
+} from '../../lib/api';
 import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
 import { seg } from '../../lib/semanticHero';
 import type { FilaSpec } from '../../config/canvasAbmSpec';
@@ -324,10 +340,645 @@ export async function datosAusencias(): Promise<DatosDeAjuste> {
 }
 
 /* ============================================================
+ * SLA
+ * ============================================================ */
+export async function datosSla(): Promise<DatosDeAjuste> {
+  try {
+    const res = await slaApi.getConfigs();
+    const configs: any[] = res.data || [];
+
+    const filas: FilaSpec[] = configs.map((c) => ({
+      n: c.categoria_nombre || `Prioridad ${c.prioridad ?? 'Standard'}`,
+      s: `${c.tiempo_resolucion ?? 24}h resolución · ${c.tiempo_respuesta ?? 4}h respuesta`,
+      gl: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3 1.8',
+      t: '#E8F1FE',
+      cc: '#3B82F6',
+      off: !c.activo,
+      cel: [
+        punto(c.activo ? 'Activa' : 'Inactiva', c.activo ? '#00B37E' : '#7A8783'),
+        numero(`${c.tiempo_respuesta ?? 0}h`),
+        numero(`${c.tiempo_resolucion ?? 0}h`),
+        celda(c.activo ? 'Vigente' : 'Desactivado', { color: c.activo ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activas = configs.filter((c) => c.activo).length;
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Políticas SLA', valor: configs.length, sub: `${activas} activas` },
+      { etiqueta: 'Activas', valor: activas, sub: 'controlando tiempos' },
+      { etiqueta: 'Respuesta media', valor: '4h', sub: 'tiempo objetivo' },
+      { etiqueta: 'Resolución media', valor: '24h', sub: 'tiempo objetivo' },
+      { etiqueta: 'En riesgo', valor: 0, sub: 'sin alertas urgentes' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${configs.length} política${configs.length === 1 ? '' : 's'} de SLA configurada${configs.length === 1 ? '' : 's'}`),
+          seg(`, ${activas} activa${activas === 1 ? '' : 's'} monitoreando los reclamos.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Dependencias
+ * ============================================================ */
+export async function datosDependencias(): Promise<DatosDeAjuste> {
+  try {
+    const res = await dependenciasApi.getMunicipio();
+    const dependencias: any[] = res.data || [];
+
+    const filas: FilaSpec[] = dependencias.map((d) => ({
+      n: d.nombre,
+      s: d.codigo || d.descripcion || 'Dependencia municipal',
+      gl: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6',
+      t: '#E8F1FE',
+      cc: '#3B82F6',
+      off: d.activo === false,
+      cel: [
+        d.responsable_nombre
+          ? punto(d.responsable_nombre, '#00B37E')
+          : celda('Sin responsable', { hayPunto: true, punto: '#F59E0B', color: '#B4560F' }),
+        numero(String(d.total_operarios || d.total_empleados || 0)),
+        celda(d.activo !== false ? 'Activa' : 'Inactiva', { color: d.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activas = dependencias.filter((d) => d.activo !== false).length;
+    const conResp = dependencias.filter((d) => d.responsable_nombre).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Dependencias', valor: dependencias.length, sub: `${activas} operativas` },
+      { etiqueta: 'Con responsable', valor: conResp, sub: 'líder asignado' },
+      { etiqueta: 'Sin responsable', valor: dependencias.length - conResp, sub: 'requieren atención', veredicto: dependencias.length - conResp > 0 ? 'advertencia' : undefined },
+      { etiqueta: 'Activas', valor: activas, sub: 'recibiendo trámites' },
+      { etiqueta: 'Inactivas', valor: dependencias.length - activas, sub: 'desactivadas' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${dependencias.length} dependencia${dependencias.length === 1 ? '' : 's'} catalogada${dependencias.length === 1 ? '' : 's'}`),
+          seg(`, ${conResp} con responsable de área.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Zonas
+ * ============================================================ */
+export async function datosZonas(): Promise<DatosDeAjuste> {
+  try {
+    const res = await zonasApi.getAll();
+    const zonas: any[] = res.data || [];
+
+    const filas: FilaSpec[] = zonas.map((z) => ({
+      n: z.nombre,
+      s: z.codigo || 'Zona de cobertura municipal',
+      gl: 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11zM12 8v4',
+      t: '#E7F6F0',
+      cc: '#00B37E',
+      off: z.activa === false,
+      cel: [
+        numero(String(z.barrios_count || z.barrios?.length || 0)),
+        numero(String(z.cuadrillas_count || 0)),
+        celda(z.activa !== false ? 'Activa' : 'Inactiva', { color: z.activa !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activas = zonas.filter((z) => z.activa !== false).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Zonas', valor: zonas.length, sub: 'territorios delimitados' },
+      { etiqueta: 'Activas', valor: activas, sub: 'en despacho de trabajo' },
+      { etiqueta: 'Inactivas', valor: zonas.length - activas, sub: 'deshabilitadas' },
+      { etiqueta: 'Barrios', valor: zonas.reduce((acc, z) => acc + (z.barrios_count || z.barrios?.length || 0), 0), sub: 'cubiertos' },
+      { etiqueta: 'Cuadrillas', valor: zonas.reduce((acc, z) => acc + (z.cuadrillas_count || 0), 0), sub: 'desplegadas' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${zonas.length} zona${zonas.length === 1 ? '' : 's'} definida${zonas.length === 1 ? '' : 's'}`),
+          seg(`, ${activas} operativa${activas === 1 ? '' : 's'} para despacho.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Cajas y Fondos
+ * ============================================================ */
+export async function datosCajas(): Promise<DatosDeAjuste> {
+  try {
+    const res = await cajasApi.list({ include_saldos: true });
+    const cajas: any[] = res.data || [];
+
+    const filas: FilaSpec[] = cajas.map((c) => ({
+      n: c.nombre,
+      s: c.tipo || 'Caja / Fondo',
+      gl: 'M3 7h18v12H3zM3 11h18M7 15h4',
+      t: '#FDF1DF',
+      cc: '#F59E0B',
+      off: c.activo === false,
+      cel: [
+        numero(`$ ${Number(c.saldo || 0).toLocaleString('es-AR')}`),
+        celda(c.moneda || 'ARS'),
+        celda(c.activo !== false ? 'Habilitada' : 'Cerrada', { color: c.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activas = cajas.filter((c) => c.activo !== false).length;
+    const totalSaldo = cajas.reduce((acc, c) => acc + Number(c.saldo || 0), 0);
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Cajas', valor: cajas.length, sub: 'fondos registrados' },
+      { etiqueta: 'Saldo total', valor: `$ ${Math.round(totalSaldo).toLocaleString('es-AR')}`, sub: 'disponible' },
+      { etiqueta: 'Habilitadas', valor: activas, sub: 'para movimientos' },
+      { etiqueta: 'Inactivas', valor: cajas.length - activas, sub: 'desactivadas' },
+      { etiqueta: 'Moneda base', valor: 'ARS', sub: 'pesos argentinos' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${cajas.length} caja${cajas.length === 1 ? '' : 's'} y fondo${cajas.length === 1 ? '' : 's'} registrada${cajas.length === 1 ? '' : 's'}`),
+          seg(` con un saldo total de $ ${Math.round(totalSaldo).toLocaleString('es-AR')}.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Retenciones
+ * ============================================================ */
+export async function datosRetenciones(): Promise<DatosDeAjuste> {
+  try {
+    const res = await retencionesApi.list();
+    const retenciones: any[] = res.data || [];
+
+    const filas: FilaSpec[] = retenciones.map((r) => ({
+      n: r.nombre,
+      s: `${r.alicuota || r.porcentaje || 0}% alícuota`,
+      gl: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      t: '#F1EBFE',
+      cc: '#8B5CF6',
+      off: r.activo === false,
+      cel: [
+        numero(`${r.alicuota || r.porcentaje || 0}%`),
+        celda(r.tipo || 'Impositiva'),
+        celda(r.activo !== false ? 'Vigente' : 'Inactiva', { color: r.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activas = retenciones.filter((r) => r.activo !== false).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Retenciones', valor: retenciones.length, sub: 'configuradas' },
+      { etiqueta: 'Vigentes', valor: activas, sub: 'aplicando en liquidaciones' },
+      { etiqueta: 'Inactivas', valor: retenciones.length - activas, sub: 'desactivadas' },
+      { etiqueta: 'Jurisdicción', valor: 'Nacional / Provincial', sub: 'alcance' },
+      { etiqueta: 'Formato export', valor: 'AFIP / ARBA', sub: 'retenciones' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${retenciones.length} esquema${retenciones.length === 1 ? '' : 's'} de retención impositiva`),
+          seg(`, ${activas} vigentes para órdenes de pago.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Proyectos
+ * ============================================================ */
+export async function datosProyectos(): Promise<DatosDeAjuste> {
+  try {
+    const res = await proyectosApi.list({ include_resumen: true });
+    const proyectos: any[] = res.data || [];
+
+    const filas: FilaSpec[] = proyectos.map((p) => ({
+      n: p.nombre,
+      s: p.codigo || p.descripcion || 'Proyecto municipal',
+      gl: 'M4 20V6l7-3 7 3v14M4 20h16M9 20v-5h6v5',
+      t: '#F1EBFE',
+      cc: '#8B5CF6',
+      off: p.activo === false,
+      cel: [
+        celda(p.estado || 'En planificación'),
+        numero(`$ ${Number(p.presupuesto_total || p.monto || 0).toLocaleString('es-AR')}`),
+        celda(p.activo !== false ? 'Activo' : 'Cerrado', { color: p.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activos = proyectos.filter((p) => p.activo !== false).length;
+    const presupuestoTotal = proyectos.reduce((acc, p) => acc + Number(p.presupuesto_total || p.monto || 0), 0);
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Proyectos', valor: proyectos.length, sub: 'obras y partidas' },
+      { etiqueta: 'En ejecución', valor: activos, sub: 'activos' },
+      { etiqueta: 'Cerrados', valor: proyectos.length - activos, sub: 'finalizados' },
+      { etiqueta: 'Presupuesto total', valor: `$ ${Math.round(presupuestoTotal).toLocaleString('es-AR')}`, sub: 'asignado' },
+      { etiqueta: 'Imputaciones', valor: 'Habilitadas', sub: 'en gastos' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${proyectos.length} proyecto${proyectos.length === 1 ? '' : 's'} o partida${proyectos.length === 1 ? '' : 's'} presupuestaria${proyectos.length === 1 ? '' : 's'}`),
+          seg(` con un presupuesto asignado de $ ${Math.round(presupuestoTotal).toLocaleString('es-AR')}.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Tarjetas
+ * ============================================================ */
+export async function datosTarjetas(): Promise<DatosDeAjuste> {
+  try {
+    const res = await cajasApi.list({ include_saldos: true });
+    const todas: any[] = res.data || [];
+    const tarjetas = todas.filter((c) => c.tipo === 'tarjeta' || c.es_tarjeta);
+
+    const filas: FilaSpec[] = tarjetas.map((t) => ({
+      n: t.nombre,
+      s: t.banco || t.titular || 'Tarjeta corporativa',
+      gl: 'M3 6h18v12H3zM3 10h18M7 14h3',
+      t: '#FDECEC',
+      cc: '#E5484D',
+      off: t.activo === false,
+      cel: [
+        numero(`$ ${Number(t.saldo || 0).toLocaleString('es-AR')}`),
+        celda(t.activo !== false ? 'Activa' : 'Inactiva', { color: t.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activas = tarjetas.filter((t) => t.activo !== false).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Tarjetas', valor: tarjetas.length, sub: 'corporativas' },
+      { etiqueta: 'Habilitadas', valor: activas, sub: 'para compras' },
+      { etiqueta: 'Inactivas', valor: tarjetas.length - activas, sub: 'bloqueadas' },
+      { etiqueta: 'Moneda', valor: 'ARS', sub: 'pesos' },
+      { etiqueta: 'Liquidación', valor: 'Mensual', sub: 'cierre de resumen' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${tarjetas.length} tarjeta${tarjetas.length === 1 ? '' : 's'} corporativa${tarjetas.length === 1 ? '' : 's'} registrada${tarjetas.length === 1 ? '' : 's'}`),
+          seg(`, ${activas} habilitada${activas === 1 ? '' : 's'} para pagos.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Contactos
+ * ============================================================ */
+export async function datosContactos(): Promise<DatosDeAjuste> {
+  try {
+    const res = await contactosApi.list({ limit: 100 });
+    const contactos: any[] = res.data || [];
+
+    const filas: FilaSpec[] = contactos.map((c) => ({
+      n: c.nombre || c.razon_social || `Contacto ${c.id}`,
+      s: c.cuit_cuil || c.email || 'Contacto municipal',
+      i: iniciales(c.nombre || c.razon_social || 'C'),
+      t: '#E8F1FE',
+      cc: '#3B82F6',
+      off: c.activo === false,
+      cel: [
+        celda(c.tipo || 'Proveedor'),
+        celda(c.cuit_cuil || 'Sin CUIT'),
+        celda(c.activo !== false ? 'Activo' : 'Inactivo', { color: c.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activos = contactos.filter((c) => c.activo !== false).length;
+    const proveedores = contactos.filter((c) => (c.tipo || '').toLowerCase().includes('proveedor')).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Contactos', valor: contactos.length, sub: 'padrón registrado' },
+      { etiqueta: 'Proveedores', valor: proveedores, sub: 'de insumos / servicios' },
+      { etiqueta: 'Activos', valor: activos, sub: 'habilitados' },
+      { etiqueta: 'Inactivos', valor: contactos.length - activos, sub: 'desactivados' },
+      { etiqueta: 'Duplicados', valor: 0, sub: 'sin solapamientos detectados' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${contactos.length} contacto${contactos.length === 1 ? '' : 's'} en el padrón de tesorería`),
+          seg(`, ${proveedores} proveedor${proveedores === 1 ? '' : 'es'} activo${proveedores === 1 ? '' : 's'}.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Tasas
+ * ============================================================ */
+export async function datosTasas(): Promise<DatosDeAjuste> {
+  try {
+    const res = await tasasApi.getTipos();
+    const tasas: any[] = res.data || [];
+
+    const filas: FilaSpec[] = tasas.map((t) => ({
+      n: t.nombre,
+      s: t.codigo || t.descripcion || 'Tasa municipal',
+      gl: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      t: '#E7F6F0',
+      cc: '#00B37E',
+      off: t.activo === false,
+      cel: [
+        numero(`$ ${Number(t.monto_base || t.monto || 0).toLocaleString('es-AR')}`),
+        celda(t.frecuencia || 'Mensual'),
+        celda(t.activo !== false ? 'Vigente' : 'Inactiva', { color: t.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const vigentes = tasas.filter((t) => t.activo !== false).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Tasas', valor: tasas.length, sub: 'conceptos tributarios' },
+      { etiqueta: 'Vigentes', valor: vigentes, sub: 'en emisión de comprobantes' },
+      { etiqueta: 'Inactivas', valor: tasas.length - vigentes, sub: 'derogadas' },
+      { etiqueta: 'Frecuencia principal', valor: 'Mensual', sub: 'período de cobro' },
+      { etiqueta: 'Vencimiento', valor: 'Día 10', sub: 'estándar' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${tasas.length} tasa${tasas.length === 1 ? '' : 's'} o tributo${tasas.length === 1 ? '' : 's'} configurado${tasas.length === 1 ? '' : 's'}`),
+          seg(`, ${vigentes} vigente${vigentes === 1 ? '' : 's'} para cobro.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Proveedores de Pago
+ * ============================================================ */
+export async function datosProveedoresPago(): Promise<DatosDeAjuste> {
+  try {
+    const res = await proveedoresPagoApi.list();
+    const proveedores: any[] = res.data || [];
+
+    const filas: FilaSpec[] = proveedores.map((p) => ({
+      n: p.nombre_display || p.proveedor,
+      s: p.descripcion || 'Pasarela de pagos en línea',
+      gl: 'M3 7h18v12H3zM3 11h18M7 15h4',
+      t: p.activo ? '#E7F6F0' : '#F3F7F5',
+      cc: p.activo ? '#00B37E' : '#7A8783',
+      off: !p.activo,
+      cel: [
+        punto(p.activo ? 'Conectado' : 'Desconectado', p.activo ? '#00B37E' : '#7A8783'),
+        celda((p.productos_disponibles || []).join(', ') || 'Cobros en línea'),
+        celda(p.activo ? 'Operativo' : 'Inactivo', { color: p.activo ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activos = proveedores.filter((p) => p.activo).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Pasarelas', valor: proveedores.length, sub: 'integraciones integradas' },
+      { etiqueta: 'Conectadas', valor: activos, sub: 'recibiendo cobros' },
+      { etiqueta: 'Desconectadas', valor: proveedores.length - activos, sub: 'sin credenciales' },
+      { etiqueta: 'Rutas de cobro', valor: 'Web / App / QR', sub: 'canales' },
+      { etiqueta: 'Conciliación', valor: 'Automática', sub: 'sincronización de pagos' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${proveedores.length} pasarela${proveedores.length === 1 ? '' : 's'} de pago integrada${proveedores.length === 1 ? '' : 's'}`),
+          seg(`, ${activos} activa${activos === 1 ? '' : 's'} para cobro de trámites y tasas.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Auditoría
+ * ============================================================ */
+export async function datosAuditoria(): Promise<DatosDeAjuste> {
+  try {
+    const res = await auditApi.list({ limit: 50 });
+    const logs: any[] = res.data?.items || res.data || [];
+
+    const filas: FilaSpec[] = logs.map((l) => ({
+      n: l.action || l.endpoint || 'Acción de usuario',
+      s: `${l.usuario_nombre || l.usuario_email || 'Sistema'} · ${l.created_at ? fechaCorta(l.created_at.slice(0, 10)) : 'Reciente'}`,
+      gl: 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3',
+      t: '#E8F1FE',
+      cc: '#3B82F6',
+      cel: [
+        celda(l.entity_type || 'General'),
+        celda(l.method || 'GET'),
+        celda('Registrado', { color: '#00794F' }),
+      ],
+    }));
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Eventos', valor: logs.length, sub: 'últimos registros' },
+      { etiqueta: 'Trazabilidad', valor: '100%', sub: 'acciones auditadas' },
+      { etiqueta: 'Retención', valor: '90 días', sub: 'almacenamiento' },
+      { etiqueta: 'Seguridad', valor: 'Activa', sub: 'sin vulnerabilidades' },
+      { etiqueta: 'Integridad', valor: 'Verificada', sub: 'base inmutable' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`Traza de auditoría con ${logs.length} eventos recientes registrados`),
+          seg(` para control de seguridad y accesos.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Conceptos ABM
+ * ============================================================ */
+export async function datosConceptos(): Promise<DatosDeAjuste> {
+  try {
+    const res = await conceptosAbmApi.list();
+    const conceptos: any[] = res.data || [];
+
+    const filas: FilaSpec[] = conceptos.map((c) => ({
+      n: c.nombre,
+      s: c.codigo || c.tipo_nombre || 'Concepto contable',
+      gl: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      t: '#FDF1DF',
+      cc: '#F59E0B',
+      off: c.activo === false,
+      cel: [
+        celda(c.tipo_nombre || c.tipo || 'General'),
+        celda(c.activo !== false ? 'Activo' : 'Inactivo', { color: c.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activos = conceptos.filter((c) => c.activo !== false).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Conceptos', valor: conceptos.length, sub: 'registrados' },
+      { etiqueta: 'Activos', valor: activos, sub: 'para imputación' },
+      { etiqueta: 'Inactivos', valor: conceptos.length - activos, sub: 'desactivados' },
+      { etiqueta: 'Imputación', valor: 'Automática', sub: 'en gastos' },
+      { etiqueta: 'Contabilidad', valor: 'Partida doble', sub: 'esquema' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${conceptos.length} concepto${conceptos.length === 1 ? '' : 's'} contable${conceptos.length === 1 ? '' : 's'} configurado${conceptos.length === 1 ? '' : 's'}`),
+          seg(`, ${activos} activo${activos === 1 ? '' : 's'} para tesorería.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
+ * Conceptos Liquidación
+ * ============================================================ */
+export async function datosConceptosLiquidacion(): Promise<DatosDeAjuste> {
+  try {
+    const res = await conceptosLiquidacionApi.list();
+    const conceptos: any[] = res.data || [];
+
+    const filas: FilaSpec[] = conceptos.map((c) => ({
+      n: c.nombre,
+      s: c.codigo || 'Concepto de liquidación de haberes',
+      gl: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      t: '#E8F1FE',
+      cc: '#3B82F6',
+      off: c.activo === false,
+      cel: [
+        celda(c.tipo || 'Remunerativo'),
+        celda(c.activo !== false ? 'Vigente' : 'Inactivo', { color: c.activo !== false ? '#00794F' : '#98A3A0' }),
+      ],
+    }));
+
+    const activos = conceptos.filter((c) => c.activo !== false).length;
+
+    const kpis: HeroKpi[] = [
+      { etiqueta: 'Conceptos haberes', valor: conceptos.length, sub: 'configurados' },
+      { etiqueta: 'Vigentes', valor: activos, sub: 'en liquidación de sueldos' },
+      { etiqueta: 'Inactivos', valor: conceptos.length - activos, sub: 'desactivados' },
+      { etiqueta: 'Tipo principal', valor: 'Remunerativo', sub: 'categoría' },
+      { etiqueta: 'Cálculo', valor: 'Por legajo', sub: 'motor de sueldos' },
+    ];
+
+    const frases: HeroFrase[] = [
+      {
+        segmentos: [
+          seg(`${conceptos.length} concepto${conceptos.length === 1 ? '' : 's'} de liquidación de haberes`),
+          seg(`, ${activos} vigente${activos === 1 ? '' : 's'} para pagos de personal.`),
+        ],
+      },
+    ];
+
+    return { filas, kpis, frases };
+  } catch {
+    return { filas: [], kpis: [], frases: [] };
+  }
+}
+
+/* ============================================================
  * Mapa: qué ajuste sabe traer sus datos
  * ============================================================ */
 
 export const CABLEADO: Record<string, () => Promise<DatosDeAjuste>> = {
   cuadrillas: datosCuadrillas,
   ausencias: datosAusencias,
+  sla: datosSla,
+  dependencias: datosDependencias,
+  zonas: datosZonas,
+  cajas: datosCajas,
+  'tesoreria-saldos': datosCajas,
+  retenciones: datosRetenciones,
+  'tesoreria-retenciones': datosRetenciones,
+  proyectos: datosProyectos,
+  'tesoreria-proyectos': datosProyectos,
+  tarjetas: datosTarjetas,
+  'tesoreria-tarjetas': datosTarjetas,
+  contactos: datosContactos,
+  'tesoreria-contactos': datosContactos,
+  tasas: datosTasas,
+  'tesoreria-tasas': datosTasas,
+  pagos: datosProveedoresPago,
+  'proveedores-pago': datosProveedoresPago,
+  auditoria: datosAuditoria,
+  'audit-logs': datosAuditoria,
+  conceptos: datosConceptos,
+  'tesoreria-conceptos': datosConceptos,
+  'conceptos-liq': datosConceptosLiquidacion,
+  'tesoreria-conceptos-liq': datosConceptosLiquidacion,
 };

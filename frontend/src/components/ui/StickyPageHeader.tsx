@@ -148,9 +148,7 @@ export function StickyPageHeader({
   // Modo custom: si hay children, renderizar como antes
   const useCustomMode = !!children;
 
-  // Usar position sticky - se queda fijo cuando llega al top
-  if (embedded) return null;
-
+  // Usar position sticky - se queda fijo cuando llega al top (salvo si está embebido)
   return (
     <>
       {/* Pull-to-refresh indicator */}
@@ -177,9 +175,9 @@ export function StickyPageHeader({
         </div>
       )}
 
-      {/* Header sticky - se pega al top cuando scrolleas */}
+      {/* Header - se pega al top cuando scrolleas (salvo si es embebido) */}
       <div
-        className="sticky z-40 top-0 pt-1 pb-3 transition-transform"
+        className={`${embedded ? 'relative' : 'sticky top-0'} z-40 pt-1 pb-3 transition-transform`}
         style={{
           backgroundColor: theme.background,
           transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
@@ -199,8 +197,8 @@ export function StickyPageHeader({
             children
           ) : (
             <>
-              {/* BackLink + Icono + Título - se oculta en mobile cuando search enfocado */}
-              {(backLink || icon || title) && (
+              {/* BackLink + Icono + Título - se oculta en mobile cuando search enfocado y SIEMPRE en modo embebido */}
+              {(!embedded && (backLink || icon || title)) && (
                 <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
                   {backLink && (
                     <Link
@@ -234,8 +232,8 @@ export function StickyPageHeader({
                 </div>
               )}
 
-              {/* Separador - se oculta en mobile */}
-              {(backLink || icon || title) && onSearchChange && (
+              {/* Separador - se oculta en mobile y en embebido */}
+              {(!embedded && (backLink || icon || title)) && onSearchChange && (
                 <div
                   className="h-8 w-px hidden sm:block flex-shrink-0"
                   style={{ backgroundColor: theme.border }}

@@ -270,10 +270,6 @@ export const accents: AccentOption[] = [
   { id: 'olivo', name: 'Olivo', color: '#65a30d' },
   // Se resuelve por MODO: blanco sobre oscuro, negro sobre claro.
   { id: 'neutro', name: 'Neutro', color: { oscuro: '#fafafa', claro: '#171717' } },
-  // Blanco y negro explícitos: el acento monocromo. A diferencia de `neutro`,
-  // acá el usuario elige el color, no el modo.
-  { id: 'blanco', name: 'Blanco', color: '#fafafa' },
-  { id: 'negro', name: 'Negro', color: '#171717' },
 ];
 
 // ============================================================

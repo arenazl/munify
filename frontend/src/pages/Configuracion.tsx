@@ -1178,239 +1178,105 @@ export default function Configuracion() {
 
       {/* Portada y logo — parte de Apariencia (el canvas los muestra juntos) */}
       {itemGeneral.id === 'apariencia' && (
-      <div
-        className="rounded-xl p-5"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <ImageIcon className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: theme.text }}>
-              Imagen de Portada
-            </h2>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Banner del dashboard (separado del logo)
-            </p>
-          </div>
-        </div>
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ background: '#FFFFFF', border: '1px solid rgba(13,20,18,0.07)', borderRadius: '12px', padding: '18px 20px', minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: '#98A3A0' }}>BANNER DEL TABLERO</span>
+            <p style={{ margin: '9px 0 0', fontSize: '13px', lineHeight: 1.5, color: '#5B6764', textWrap: 'pretty', maxWidth: '68ch' }}>Es la foto que ve el equipo al entrar. Conviene una imagen del municipio, horizontal, con el lado izquierdo despejado: ahí va el título.</p>
 
-        {/* Preview de la imagen actual */}
-        <div className="mb-4">
-          <div
-            className="relative w-full h-40 rounded-xl overflow-hidden"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `2px dashed ${theme.border}`,
-            }}
-          >
-            {portadaPreview || imagenPortadaUrl ? (
-              <>
-                <img
-                  src={portadaPreview || imagenPortadaUrl}
-                  alt="Imagen de portada"
-                  className="w-full h-full object-cover"
-                  style={{ opacity: portadaOpacity }}
-                />
-                {/* Overlay con gradiente similar al dashboard - solo si NO está sin filtro */}
-                {!portadaSinFiltro && (
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${colorPrimario}cc 0%, ${colorSecundario}99 100%)`,
-                    }}
-                  />
+            <div style={{ position: 'relative', marginTop: '14px', height: '300px', borderRadius: '12px', overflow: 'hidden', background: '#EDF1EF' }}>
+              <div style={{ position: 'absolute', inset: 0 }}>
+                {portadaPreview || imagenPortadaUrl ? (
+                  <img src={portadaPreview || imagenPortadaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Banner" />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#98A3A0', fontSize: '13px' }}>
+                    Arrastrá la foto del banner — 2000 × 700 px o más
+                  </div>
                 )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className={`text-sm font-medium ${portadaSinFiltro ? '' : 'text-white'}`} style={{ color: portadaSinFiltro ? theme.text : undefined, textShadow: portadaSinFiltro ? '0 1px 2px rgba(0,0,0,0.5)' : 'none' }}>
-                    Vista previa del banner {portadaSinFiltro ? '(sin filtro)' : '(con filtro)'} - {Math.round(portadaOpacity * 100)}%
-                  </p>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full gap-2">
-                <ImageIcon className="h-10 w-10" style={{ color: theme.textSecondary }} />
-                <p className="text-sm" style={{ color: theme.textSecondary }}>
-                  Sin imagen de portada
-                </p>
+              </div>
+              <div style={{ position: 'absolute', inset: 0, background: theme.primary, opacity: 0.35, mixBlendMode: 'multiply', pointerEvents: 'none', transition: 'opacity 200ms cubic-bezier(0.2,0.8,0.2,1)' }}></div>
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(6,32,24,0.78) 0%, rgba(6,32,24,0.44) 48%, rgba(6,32,24,0.06) 100%)', pointerEvents: 'none' }}></div>
+              <div style={{ position: 'absolute', left: '20px', right: '20px', top: '20px', pointerEvents: 'none' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.11em', color: 'rgba(255,255,255,0.72)' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 12px' }}><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+                  MUNICIPALIDAD · VISTA CONSOLIDADA
+                </span>
+                <span style={{ display: 'block', marginTop: '8px', fontFamily: 'Sora, sans-serif', fontSize: '24px', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.025em', color: '#FFFFFF' }}>{values.nombre_municipio || 'Asunción, Dpto. Central'}</span>
+                <span style={{ display: 'block', marginTop: '6px', fontSize: '12.5px', color: 'rgba(255,255,255,0.82)' }}>Así se va a ver el título sobre tu foto</span>
+              </div>
+              
+              <input
+                ref={portadaInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handlePortadaSelect}
+                className="hidden"
+              />
+              <span onClick={() => portadaInputRef.current?.click()} style={{ position: 'absolute', right: '14px', bottom: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px', height: '28px', padding: '0 11px', background: 'rgba(255,255,255,0.94)', borderRadius: '999px', boxShadow: '0 2px 8px rgba(13,20,18,0.16)', cursor: 'pointer' }} className="hover:bg-white transition-colors">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3D4945" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 13px' }}><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 20h14" /></svg>
+                <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#3D4945' }}>Cambiar foto</span>
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px', padding: '10px 12px', background: '#FAFBFA', borderRadius: '10px', flexWrap: 'wrap' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#98A3A0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 14px' }}><path d="M12 8v5M12 17h.01" /><circle cx="12" cy="12" r="9" /></svg>
+              <span style={{ fontSize: '11.5px', color: '#7A8783', minWidth: 0 }}>El tinte del color de marca y el degradé que protege el título se aplican solos: subí la foto sin retocar.</span>
+            </div>
+
+            <span style={{ display: 'block', height: '1px', background: 'rgba(13,20,18,0.06)', margin: '18px 0' }}></span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', rowGap: '12px' }}>
+              <span style={{ width: '60px', height: '60px', borderRadius: '14px', overflow: 'hidden', background: '#F3F7F5', border: '1px solid rgba(13,20,18,0.07)', flex: '0 0 60px', position: 'relative' }}>
+                {logoPreview || logoUrl ? (
+                  <img src={logoPreview || logoUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Logo" />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#98A3A0', fontSize: '11px', fontWeight: 600 }}>Logo</div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleLogoSelect}
+                  className="hidden"
+                />
+                <div onClick={() => fileInputRef.current?.click()} style={{ position: 'absolute', inset: 0, cursor: 'pointer' }}></div>
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: '#98A3A0' }}>LOGO</span>
+                <span style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#0D1412', marginTop: '5px' }}>PNG con fondo transparente</span>
+                <span style={{ display: 'block', fontSize: '11.5px', color: '#7A8783', marginTop: '3px' }}>512 × 512 px · se usa en el menú y en los comprobantes</span>
+              </span>
+              <span style={{ marginLeft: 'auto', fontSize: '11.5px', lineHeight: 1.45, color: '#98A3A0', maxWidth: '34ch' }}>La app corre white-label: el mismo esqueleto con la marca de cada municipio.</span>
+            </div>
+
+            {/* Acciones de guardado */}
+            {(portadaFile || logoFile) && (
+              <div style={{ marginTop: '20px', display: 'flex', justifySelf: 'flex-start', gap: '10px' }}>
+                {portadaFile && (
+                  <button
+                    onClick={handleSavePortada}
+                    disabled={portadaLoading}
+                    className="py-2 px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200"
+                    style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`, color: '#ffffff' }}
+                  >
+                    {portadaLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Guardar banner
+                  </button>
+                )}
+                {logoFile && (
+                  <button
+                    onClick={handleSaveBranding}
+                    disabled={brandingLoading}
+                    className="py-2 px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200"
+                    style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`, color: '#ffffff' }}
+                  >
+                    {brandingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Guardar logo
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
-
-        {/* Toggle para filtro de portada */}
-        {(portadaPreview || imagenPortadaUrl) && (
-          <div
-            className="mb-4 p-3 rounded-lg flex items-center justify-between"
-            style={{ backgroundColor: theme.backgroundSecondary }}
-          >
-            <div>
-              <p className="text-sm font-medium" style={{ color: theme.text }}>
-                Mostrar sin filtro de color
-              </p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Desactiva el overlay de colores sobre la imagen
-              </p>
-            </div>
-            <button
-              onClick={() => setPortadaSinFiltro(!portadaSinFiltro)}
-              className="relative w-12 h-6 rounded-full transition-colors duration-200"
-              style={{
-                backgroundColor: portadaSinFiltro ? theme.primary : theme.border,
-              }}
-            >
-              <div
-                className="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200"
-                style={{
-                  transform: portadaSinFiltro ? 'translateX(26px)' : 'translateX(4px)',
-                }}
-              />
-            </button>
-          </div>
-        )}
-
-        {/* Slider de opacidad de la portada */}
-        {(portadaPreview || imagenPortadaUrl) && (
-          <div
-            className="mb-4 p-3 rounded-lg"
-            style={{ backgroundColor: theme.backgroundSecondary }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="text-sm font-medium" style={{ color: theme.text }}>
-                  Opacidad de la imagen
-                </p>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  Ajusta qué tanto se ve la imagen sobre el fondo
-                </p>
-              </div>
-              <span className="text-sm font-mono" style={{ color: theme.primary }}>
-                {Math.round(portadaOpacity * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.05"
-              value={portadaOpacity}
-              onChange={(e) => setPortadaOpacity(parseFloat(e.target.value))}
-              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-              style={{
-                background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${((portadaOpacity - 0.1) / 0.9) * 100}%, ${theme.border} ${((portadaOpacity - 0.1) / 0.9) * 100}%, ${theme.border} 100%)`,
-              }}
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs" style={{ color: theme.textSecondary }}>Sutil</span>
-              <span className="text-xs" style={{ color: theme.textSecondary }}>Completa</span>
-            </div>
-          </div>
-        )}
-
-        {/* Botones de acción */}
-        <div className="flex gap-3">
-          <input
-            ref={portadaInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={handlePortadaSelect}
-            className="hidden"
-          />
-          <button
-            onClick={() => portadaInputRef.current?.click()}
-            disabled={portadaLoading}
-            className="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-80"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              color: theme.text,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            <Upload className="h-4 w-4" />
-            Seleccionar imagen
-          </button>
-
-          {portadaFile && (
-            <button
-              onClick={handleSavePortada}
-              disabled={portadaLoading}
-              className="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
-              style={{
-                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                color: '#ffffff',
-              }}
-            >
-              {portadaLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Guardar
-            </button>
-          )}
-
-          {imagenPortadaUrl && !portadaFile && (
-            <button
-              onClick={handleDeletePortada}
-              disabled={portadaLoading}
-              className="py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-80"
-              style={{
-                backgroundColor: '#ef444420',
-                color: '#ef4444',
-                border: '1px solid #ef444440',
-              }}
-            >
-              {portadaLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Eliminar
-            </button>
-          )}
-        </div>
-
-        {portadaFile && (
-          <p className="text-xs mt-2" style={{ color: theme.primary }}>
-            Archivo seleccionado: {portadaFile.name}
-          </p>
-        )}
-
-        <p className="text-xs mt-3" style={{ color: theme.textSecondary }}>
-          PNG, JPG o WebP. Máximo 5MB. Tamaño recomendado: 1920x600 píxeles.
-        </p>
-
-        {/* Botón guardar configuración de portada (filtro + opacidad) */}
-        {(imagenPortadaUrl || portadaPreview) && (
-          <div className="pt-4 mt-4 border-t" style={{ borderColor: theme.border }}>
-            <button
-              onClick={handleSavePortadaConfig}
-              disabled={portadaLoading || !hasPortadaConfigChanges}
-              className="w-full py-3 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{
-                background: hasPortadaConfigChanges
-                  ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
-                  : theme.backgroundSecondary,
-                color: hasPortadaConfigChanges ? '#ffffff' : theme.textSecondary,
-              }}
-            >
-              {portadaLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              {portadaLoading ? 'Guardando...' : 'Guardar portada'}
-            </button>
-          </div>
-        )}
-      </div>
       )}
 
       {/* Tabla de otras configuraciones */}
@@ -1537,23 +1403,7 @@ export default function Configuracion() {
 
       {/* Apariencia — 3 ejes del tema: fondo, acento y barra lateral */}
       {itemGeneral.id === 'apariencia' && (
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <Palette className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: theme.text }}>
-              Apariencia
-            </h2>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Cómo se ve el panel para vos
-            </p>
-          </div>
-        </div>
+      <div style={{ marginTop: '12px' }}>
         <AppearanceSettings
           bgPresets={bgPresetsMeta}
           accents={accentsMeta}
