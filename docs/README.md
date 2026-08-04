@@ -22,6 +22,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`marketing/`](marketing/) | Brochure comercial |
 | [`reels/`](reels/) | Contexto de reels de promoción (doc vivo entre agentes) |
 | [`clientes/`](clientes/) | Docs por cliente (`spn/` = San Pedro Norte: notas, reportes, planillas) |
+| [`design-sync/`](design-sync/) | **Los prototipos de Claude Design en HTML autoejecutable** (doble clic, sin servidor). Es la fuente contra la que se compara la app; no vive en el contexto de ningún agente. Regla global 22 |
 | [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas, y `paquetes/` con cada bajada del canvas fechada (la de número más alto es la vigente) |
 | [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`) — se crea al primer uso |
 | [`historico/`](historico/) | Docs superados, archivados por fecha (`YYYY-MM-DD-titulo.md`) |
