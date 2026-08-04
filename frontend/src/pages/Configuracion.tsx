@@ -16,7 +16,10 @@ import { buildThemeColors } from '../config/themePresets';
 import { useAuth } from '../contexts/AuthContext';
 import { SettingsShell } from '../components/abmv2/SettingsShell';
 import { AbmDeConfiguracion } from '../components/config/AbmDeConfiguracion';
+import { CatalogoDelCanvas } from '../components/config/CatalogoDelCanvas';
+import { PuenteModulo } from '../components/config/PuenteModulo';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../config/canvasAbmSpec';
+import { DATOS_CATALOGO, PUENTE_SPEC } from '../config/canvasConfigSpec';
 import { EmbedProvider } from '../components/abmv2/EmbedContext';
 import { QRCarteleria } from '../components/ui/QRCarteleria';
 import { AppearanceSettings } from '../components/ui/AppearanceSettings';
@@ -114,6 +117,26 @@ const TAB_TESORERIA: Record<string, string> = {
  * como el mockup desde el primer día, y engancharle el endpoint a cada
  * pantalla es un cambio local que no toca el layout.
  */
+/** Ajustes que el prototipo resuelve con el CATÁLOGO simple. */
+const CATALOGO_DE_AJUSTE: Record<string, string> = {
+  'categorias-reclamo': 'cat-reclamo',
+  'categorias-tramite': 'cat-tramite',
+  'poi-tipos': 'tipos-poi',
+  'categorias-inventario': 'cat-inv',
+  'tesoreria-conceptos': 'conceptos',
+  'tesoreria-conceptos-liq': 'conceptos-liq',
+  'tesoreria-tipos-empleado': 'tipos-empleado',
+  'tesoreria-parajes': 'parajes',
+};
+
+/** Ajustes que NO se administran en Configuración: viven en su módulo. */
+const PUENTE_DE_AJUSTE: Record<string, string> = {
+  vecinos: 'vecinos',
+  inventario: 'inv',
+  'tesoreria-contactos': 'contactos',
+  ausencias: 'ausencias',
+};
+
 const SPEC_DE_AJUSTE: Record<string, string> = {
   empleados: 'empleados',
   cuadrillas: 'cuadrillas',
@@ -1570,6 +1593,32 @@ export default function Configuracion() {
               <ConfigTesoreria tabInicial={TAB_TESORERIA[ajusteActivo.id]} />
             </EmbedProvider>
           </Suspense>
+        ) : ajusteActivo
+            && PUENTE_DE_AJUSTE[ajusteActivo.id]
+            && PUENTE_SPEC[PUENTE_DE_AJUSTE[ajusteActivo.id]]
+            && !CON_DATOS_REALES.has(ajusteActivo.id) ? (
+          // Vive en otro módulo: se explica dónde y por qué, en vez de
+          // duplicar su grilla acá (que es lo que venía pasando).
+          <PuenteModulo
+            spec={PUENTE_SPEC[PUENTE_DE_AJUSTE[ajusteActivo.id]]}
+            title={ajusteActivo.label}
+            eyebrow="Configuración"
+            descripcion={DESCRIPCION_AJUSTE[PUENTE_DE_AJUSTE[ajusteActivo.id]]}
+            onIr={() => navigate(ajusteActivo.link)}
+            onIrAjuste={(id) => setActiveItem(id)}
+          />
+        ) : ajusteActivo
+            && CATALOGO_DE_AJUSTE[ajusteActivo.id]
+            && DATOS_CATALOGO[CATALOGO_DE_AJUSTE[ajusteActivo.id]]
+            && !CON_DATOS_REALES.has(ajusteActivo.id) ? (
+          // Catálogo simple del prototipo (nombre, icono, color, activo, orden).
+          <CatalogoDelCanvas
+            spec={DATOS_CATALOGO[CATALOGO_DE_AJUSTE[ajusteActivo.id]]}
+            moduleKey={ajusteActivo.id}
+            title={ajusteActivo.label}
+            eyebrow="Catálogo"
+            descripcion={DESCRIPCION_AJUSTE[CATALOGO_DE_AJUSTE[ajusteActivo.id]]}
+          />
         ) : ajusteActivo
             && SPEC_DE_AJUSTE[ajusteActivo.id]
             && ABM_SPEC[SPEC_DE_AJUSTE[ajusteActivo.id]]

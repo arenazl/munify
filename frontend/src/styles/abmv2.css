@@ -3757,6 +3757,183 @@ button.av2-chip:hover { opacity: 0.85; }
 }
 
 /* ============================================================
+   [PUENTE] — el ajuste que vive en otro módulo.
+
+   Explica dónde se administra y por qué, en vez de duplicar la
+   grilla del módulo. Ver components/config/PuenteModulo.tsx.
+   ============================================================ */
+.pu-cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-green) 6%, var(--pl-surface)) 0%,
+    var(--pl-surface) 62%
+  );
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-green);
+  border-radius: var(--pl-radius-lg);
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.pu-cab-txt { flex: 1 1 340px; min-width: 0; }
+.pu-motivo {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.55;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+  max-width: 76ch;
+}
+.pu-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.pu-cta:hover { background: var(--pl-green-600); }
+
+.pu-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.pu-caja {
+  padding: 16px 18px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  min-width: 0;
+}
+.pu-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pu-lista li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+  min-width: 0;
+}
+.pu-lista svg { flex: 0 0 13px; color: var(--pl-text-muted); }
+
+.pu-atajos { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pu-atajo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.pu-atajo:hover:not(:disabled) { border-color: var(--pl-green-200); background: var(--pl-green-050); }
+.pu-atajo:disabled { cursor: default; }
+.pu-atajo-txt { min-width: 0; flex: 1; }
+.pu-atajo-label {
+  display: block;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.pu-atajo-para {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.pu-atajo svg { flex: 0 0 14px; color: var(--pl-text-muted); }
+
+.pu-muestra {
+  margin-top: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+.pu-muestra-cab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 16px;
+  background: var(--pl-surface-3);
+  border-bottom: 1px solid var(--pl-border);
+  flex-wrap: wrap;
+}
+.pu-muestra-cab svg { color: var(--pl-green-700); flex: 0 0 15px; }
+.pu-muestra-nota {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.pu-muestra-filas { display: flex; flex-direction: column; }
+.pu-fila {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--pl-border);
+  min-width: 0;
+}
+.pu-fila:last-child { border-bottom: 0; }
+.pu-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--pl-radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pu-fila-txt { min-width: 0; flex: 1; }
+.pu-fila-nombre {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pu-fila-detalle {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.pu-fila-cifra {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ============================================================
    [APARIENCIA] — el panel de "Apariencia" del canvas.
 
    UNA tarjeta con tres bloques separados por hairlines: tema del
