@@ -1628,6 +1628,7 @@ export default function Configuracion() {
           // de muestra). Enganchar el endpoint después no cambia el layout.
           <AbmDeConfiguracion
             spec={ABM_SPEC[SPEC_DE_AJUSTE[ajusteActivo.id]]}
+            ajusteId={ajusteActivo.id}
             moduleKey={ajusteActivo.id}
             title={ajusteActivo.label}
             descripcion={DESCRIPCION_AJUSTE[SPEC_DE_AJUSTE[ajusteActivo.id]]}

@@ -16,7 +16,7 @@
  * reglas—, que es lo que hace que todas las pantallas se vean iguales al
  * prototipo aunque las escriban personas distintas.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
 import { ChipEstado, DotCell, EntityCell } from '../abmv2/DataTable';
 import { MetricCell } from '../abmv2/Controls';
@@ -24,6 +24,8 @@ import { seg } from '../../lib/semanticHero';
 import type { HeroFrase, HeroKpi, Veredicto } from '../../lib/semanticHero';
 import type { ColumnSpec, ViewKind } from '../abmv2/types';
 import type { AbmSpec, CeldaSpec, FilaSpec } from '../../config/canvasAbmSpec';
+import { CABLEADO } from './datosDeAjuste';
+import type { DatosDeAjuste } from './datosDeAjuste';
 
 /**
  * El canvas marca la gravedad con COLOR (rojo, ámbar, verde). El kit la marca
@@ -109,6 +111,11 @@ export interface AbmDeConfiguracionProps {
   descripcion?: string;
   /** Datos REALES. Sin esto se pintan las filas del prototipo. */
   datos?: { filas?: FilaSpec[]; kpis?: HeroKpi[]; frases?: HeroFrase[] };
+  /**
+   * Id del ajuste. Si está en `CABLEADO`, el componente trae sus datos reales
+   * solo — así enganchar una pantalla es escribir su función y nada más.
+   */
+  ajusteId?: string;
   /** Alta. Sin handler, el CTA no se renderiza (pantalla de sólo lectura). */
   onNuevo?: () => void;
   onFila?: (fila: FilaSpec, indice: number) => void;
@@ -121,31 +128,50 @@ export function AbmDeConfiguracion({
   title,
   descripcion,
   datos,
+  ajusteId,
   onNuevo,
   onFila,
   loading = false,
 }: AbmDeConfiguracionProps) {
   const [busqueda, setBusqueda] = useState('');
+  // Datos reales del ajuste, si está cableado. Mientras cargan (o si el
+  // cableado falla) se muestran los del prototipo: la pantalla nunca queda en
+  // blanco, y el layout es el mismo en los dos casos.
+  const [reales, setReales] = useState<DatosDeAjuste | null>(null);
+  // Arranca en true cuando el ajuste está cableado: así el efecto sólo APAGA
+  // el flag y no dispara un render en cascada al prenderlo.
+  const [cargando, setCargando] = useState(() => !!(ajusteId && CABLEADO[ajusteId]));
+  useEffect(() => {
+    const traer = ajusteId ? CABLEADO[ajusteId] : undefined;
+    if (!traer) return;
+    let vivo = true;
+    traer()
+      .then((d) => { if (vivo) setReales(d); })
+      .catch((e) => { console.error(`No se pudieron traer los datos de ${ajusteId}:`, e); })
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, [ajusteId]);
   const [vista, setVista] = useState<ViewKind>('table');
   const [chipActivo, setChipActivo] = useState(spec.chips[0]?.[0] ?? 'todos');
 
-  const filas = datos?.filas ?? spec.filas;
+  const filas = datos?.filas ?? reales?.filas ?? spec.filas;
 
   const kpis = useMemo<HeroKpi[]>(
     () =>
       datos?.kpis ??
+      reales?.kpis ??
       spec.kpis.map(([etiqueta, valor, nota, color]) => ({
         etiqueta,
         valor,
         sub: nota,
         veredicto: veredictoDeColor(color),
       })),
-    [datos?.kpis, spec.kpis],
+    [datos?.kpis, reales?.kpis, spec.kpis],
   );
 
   const frases = useMemo<HeroFrase[]>(
-    () => datos?.frases ?? frasesDeVeredicto(spec.ver),
-    [datos?.frases, spec.ver],
+    () => datos?.frases ?? reales?.frases ?? frasesDeVeredicto(spec.ver),
+    [datos?.frases, reales?.frases, spec.ver],
   );
 
   // Las columnas salen de `heads` + `cols` del spec: mismo orden, mismos
@@ -219,7 +245,7 @@ export function AbmDeConfiguracion({
       rowKey={(f) => f.n}
       rowActions={[]}
       onRowClick={onFila ? (f) => onFila(f, filas.indexOf(f)) : undefined}
-      loading={loading}
+      loading={loading || cargando}
       footer={{ showing: `Mostrando ${visibles.length} de ${filas.length}`, note: spec.pie }}
     />
   );
