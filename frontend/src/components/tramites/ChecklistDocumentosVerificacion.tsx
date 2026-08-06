@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../../lib/api';
+import { urlAdjunto } from '../../lib/adjuntos';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ChecklistDocumentos, ChecklistDocumentoItem } from '../../types';
 
@@ -272,7 +273,7 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                   )}
                   {hasDocumento && !esVerificacionVisual && item.documento_url && (
                     <a
-                      href={item.documento_url}
+                      href={urlAdjunto(item.documento_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 hover:underline"

@@ -23,6 +23,7 @@ import { FilterBar } from '../components/abmv2/FilterBar';
 import { DataTable, ChipEstado, EntityCell } from '../components/abmv2/DataTable';
 import type { ChipTone, ColumnSpec, RowAction, StatusTab, ViewKind } from '../components/abmv2/types';
 import { formatFechaAR, parseFechaLocal } from '../lib/tesoreria-helpers';
+import { urlAdjunto } from '../lib/adjuntos';
 import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi, retencionesApi } from '../lib/api';
 import type { OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, Caja, ContaduriaRetencion, RetencionAplicada } from '../types';
 import { ETAPAS_LIST, getEtapaInfo } from '../lib/etapaContable';
@@ -896,7 +897,7 @@ export default function OrdenesPago() {
                 {form.factura_url ? (
                   <div className="flex items-center gap-1.5">
                     <a
-                      href={form.factura_url}
+                      href={urlAdjunto(form.factura_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold truncate"
