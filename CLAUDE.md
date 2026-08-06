@@ -194,16 +194,29 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 3. Verificar: `curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'` vs `dist/index.html` local.
 4. NUNCA `netlify deploy --prod --dir dist` directo (rompe trazabilidad). Solo `git push` → auto-build.
 
-**Backend (Cloud Run):** **Claude NO deploya — el CD lo gestiona Infra.** El flujo de Claude
-termina en el push: **desarrollar → commit + push `origin master` → listo**. Nunca correr
+**Backend (Cloud Run):** **Claude NO deploya — el CD lo gestiona Infra.** Nunca correr
 `gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update` manualmente para
-Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura. **NO se levantan
-servers locales NUNCA** — se trabaja directo sobre los ambientes deployados (ver §"No usar
-localhost"). Si necesitás verificar que un cambio ya está live, esperá el deploy de Infra y
-recién ahí testeá contra el ambiente real — no asumas que está deployado apenas se pushea.
-**Prohibido preguntar** "¿lo commiteo?" o "¿lo pusheo?": eso sí es responsabilidad de Claude por
-defecto. Lo que NUNCA hay que preguntar (ni hacer) es "¿lo deployo?" — la respuesta siempre es que
-no, eso lo dispara Infra.
+Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
+
+> ### El flujo termina en el COMMIT LOCAL (desde 2026-08-06)
+>
+> **Se trabaja local. Claude hace `commit`, NUNCA `git push`.** Ni a `qa` ni, obviamente,
+> a `master`. Un push **es una intervención en la infraestructura del user**: dispara el CD,
+> reconstruye el site de Netlify y toca un ambiente que él usa para probar.
+>
+> El ciclo es: **desarrollar → gates (build / `tsc` / eslint / pyflakes) → commit local →
+> informar**. El push se hace **sólo cuando el user lo pide**, caso por caso.
+>
+> Reparto de ambientes: **local** para desarrollar y ver el cambio funcionando · **`qa`**
+> sólo para pruebas, cuando él lo decide · **producción** para producción.
+>
+> **Prohibido preguntar** "¿lo commiteo?" — el commit local va sin consultar, es
+> responsabilidad de Claude. Lo que no va por iniciativa propia es el **push**, y lo que
+> jamás va es el **deploy** (eso lo dispara Infra).
+>
+> Esto **reemplaza** la regla anterior de "push a `qa` siempre, sin preguntar" y el
+> "NO se levantan servers locales NUNCA": el user pasó a trabajar local porque le resulta
+> mucho más ágil.
 
 **VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero el deploy a
 Cloud Run lo dispara Infra por su cuenta (puede no ser instantáneo). Para saber qué está
@@ -214,13 +227,13 @@ rutas/schemas, o `gcloud run revisions list --service=munify-api --region=us-eas
 significa que ya esté deployado en Cloud Run.
 
 **Notas:**
-- El user no testea local — cada cambio significativo va directo a prod.
+- **El user trabaja local** (desde 2026-08-06). Levantar la app localmente para ver un cambio
+  funcionando es la vía normal, no una excepción.
 - Netlify production branch: `master` (→ prod). **`qa` NO es un preview: es un ambiente COMPLETO**
   (backend `munify-api-qa` + DB `sugerenciasmun-qa` + front `munify-qa.netlify.app`). Flujo de
-  trabajo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. **Podés actualizar `qa`**
-  (desarrollar + pushear a `qa`, e incluso traerte `prod`→`qa` para mantener QA al día — eso nunca
-  toca prod). **Lo que NO hacés es el camino inverso `qa`→`master` (a producción): esa vía es
-  exclusiva de Infra.**
+  trabajo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. `qa` queda **sólo para
+  pruebas, cuando el user lo pide** — Claude no lo actualiza por su cuenta. **El camino
+  `qa`→`master` (a producción) es exclusivo de Infra.**
 - Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
 
 **Carpeta compartida:** tu carpeta propia es `base-compartida/munify/` (= tu `id`). Ahí viven tus
