@@ -87,8 +87,8 @@ export const ARBOL_CONFIG: GrupoConfig[] = [
     ] },
     { id: 'vecino', label: 'Atención al vecino', hijos: [
       { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
-      { id: 'cat-reclamo', label: 'Categorías de reclamo', tipo: 'catalogo', n: '9' },
-      { id: 'arbol-tramite', label: 'Trámites', tipo: 'arbol' },
+      { id: 'cat-reclamo', label: 'Categorías de reclamo', tipo: 'abm', n: '9' },
+      { id: 'arbol-tramite', label: 'Trámites', tipo: 'abm' },
       { id: 'sla', label: 'SLA', tipo: 'abm', n: '9' },
       { id: 'tipos-poi', label: 'Tipos de punto de interés', tipo: 'catalogo', n: '5' },
     ] },

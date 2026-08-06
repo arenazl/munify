@@ -56,6 +56,8 @@ export interface FilaSpec {
   /** Se puede borrar. */
   del?: boolean;
   cel: CeldaSpec[];
+  /** Nodos hijos para layouts en forma de árbol. */
+  hijos?: FilaSpec[];
 }
 
 export interface AbmSpec {
@@ -146,7 +148,6 @@ const g = {
   cuad: 'M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c2.9.4 5 2.3 5 4.5',
   tar: 'M3 6h18v12H3zM3 10h18M7 14h3',
   pro: 'M4 20V6l7-3 7 3v14M4 20h16M9 20v-5h6v5',
-  log: 'M5 4h14v16H5zM9 8h6M9 12h6M9 16h3',
   reloj: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3 1.8',
   tasa: 'M9 7h6M9 12h6M9 17h3M5 3h14v18H5z',
   pago: 'M3 7h18v12H3zM7 15h2M16 11h2',

@@ -26,6 +26,7 @@ import type { ColumnSpec, ViewKind } from '../abmv2/types';
 import type { AbmSpec, CeldaSpec, FilaSpec } from '../../config/canvasAbmSpec';
 import { CABLEADO } from './datosDeAjuste';
 import type { DatosDeAjuste } from './datosDeAjuste';
+import { AccordionTree } from '../abmv2/AccordionTree';
 
 /**
  * El canvas marca la gravedad con COLOR (rojo, ámbar, verde). El kit la marca
@@ -240,6 +241,7 @@ export function AbmDeConfiguracion({
       activeStatus={chipActivo}
       onStatusChange={setChipActivo}
       kind="plain"
+      viewSlots={spec.usaArbol ? { table: <AccordionTree data={visibles} /> } : undefined}
       columns={columnas}
       rows={visibles}
       rowKey={(f) => f.n}

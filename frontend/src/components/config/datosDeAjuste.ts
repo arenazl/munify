@@ -1001,7 +1001,7 @@ export async function datosCatReclamo(): Promise<FilaCatalogo[]> {
     const items: any[] = res.data || [];
     return items.map((c) => ({
       nombre: c.nombre,
-      glifo: c.icono || 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z',
+      glifo: (c.icono && (c.icono.startsWith('M') || c.icono.startsWith('m'))) ? c.icono : 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z',
       color: c.color || '#00B37E',
       desc: c.descripcion || 'Categoría de atención al vecino',
       hs: c.sla_horas || c.plazo_horas || 48,
@@ -1019,7 +1019,7 @@ export async function datosCatTramite(): Promise<FilaCatalogo[]> {
     const items: any[] = res.data || [];
     return items.map((c) => ({
       nombre: c.nombre,
-      glifo: c.icono || 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
+      glifo: (c.icono && (c.icono.startsWith('M') || c.icono.startsWith('m'))) ? c.icono : 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z',
       color: c.color || '#3B82F6',
       desc: c.descripcion || 'Categoría de trámites',
       tipos: c.tramites_count || 0,

@@ -62,6 +62,8 @@ import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
 import Onboarding from './pages/Onboarding';
 import MunicipioHome from './pages/MunicipioHome';
+import ConfiguracionMockup from './pages/ConfiguracionMockup/ConfiguracionMockup';
+
 import CapturaMovil from './pages/CapturaMovil';
 import CapturaMovilFake from './pages/CapturaMovilFake';
 import GestionCuadrillas from './pages/GestionCuadrillas';
@@ -195,6 +197,9 @@ export const router = createBrowserRouter([
 
   // === RUTA RAÍZ - Redirección inteligente ===
   { path: '/', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <RootRedirect /> },
+
+  // === MOCKUP SIN AUTENTICACIÓN ===
+  { path: '/configuracion-mockup', element: <ConfiguracionMockup /> },
 
   // === RUTAS PROTEGIDAS (Panel de Gestión) ===
   {

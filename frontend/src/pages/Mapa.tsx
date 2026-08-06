@@ -1996,6 +1996,12 @@ export default function Mapa() {
     const u = resolverUmbrales();
     const total = reclamosFiltrados.length;
 
+    if (total === 0) {
+      if (loadingMore) {
+        return [{ texto: 'Buscando reclamos en el historial...', tono: 'neutro' }];
+      }
+    }
+
     switch (pregunta) {
       case 'repiten': {
         if (total === 0) return [{ texto: 'No hay reclamos que mirar con este filtro.' }];
@@ -2119,6 +2125,7 @@ export default function Mapa() {
     }
   }, [
     loading,
+    loadingMore,
     reclamos.length,
     pregunta,
     reclamosFiltrados,

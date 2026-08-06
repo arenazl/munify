@@ -1,0 +1,43 @@
+# Ignore third-party dependency folders
+**/node_modules/
+**/__pycache__/
+**/.venv/
+**/env/
+**/venv/
+**/ENV/
+
+# Ignore build artifacts and outputs
+**/dist/
+**/build/
+**/*.zip
+**/*.tar.gz
+**/*.rar
+
+# Ignore IDE / tooling files
+**/.vscode/
+**/.idea/
+**/.claude/
+**/.netlify/
+**/.continue/
+**/.auto-claude/
+
+# Ignore heavy/media assets
+/par-limpio/
+/reels/
+/sofi/
+/docs/design/_media/
+**/*.mp4
+**/*.mov
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+
+# Ignore logs and backups
+**/*.log
+/build.log
+/dtmp_bart.txt
+**/_backup_*.json
+
+# Ignore version control systems
+**/.git/

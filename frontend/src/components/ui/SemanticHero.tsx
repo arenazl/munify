@@ -128,7 +128,7 @@ export function SemanticHero({
   // sola vez al montar y leer `.current` durante el render está prohibido.
   const [menosMovimiento] = useState(usaMenosMovimiento);
 
-  const validas = frases.filter((f) => f.segmentos.length > 0);
+  const validas = (frases || []).filter((f) => Boolean(f?.segmentos && f.segmentos.length > 0));
   const total = validas.length;
   const varias = total > 1;
 

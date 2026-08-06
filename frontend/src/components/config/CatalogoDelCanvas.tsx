@@ -14,6 +14,7 @@
  * MÁS USADA · SE PISAN.
  */
 import { useMemo, useState, useEffect } from 'react';
+import { icons as LucideIcons } from 'lucide-react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
 import { EntityCell } from '../abmv2/DataTable';
 import { MetricCell, Switch } from '../abmv2/Controls';
@@ -154,19 +155,30 @@ export function CatalogoDelCanvas({
         header: 'Nombre y descripción',
         width: 'minmax(220px, 2.2fr)',
         kind: 'entity',
-        cell: (f) => (
-          <EntityCell
-            icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={f.color}
-                strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d={f.glifo} />
-              </svg>
-            }
-            tileColor={f.color}
-            title={f.nombre}
-            subtitle={f.desc ?? (typeof f.nota === 'string' ? f.nota : undefined)}
-          />
-        ),
+        cell: (f) => {
+          const rawGlifo = (f.glifo || '').trim();
+          // SVG paths usually start with M or m. Lucide icon names are PascalCase (no spaces, letters and numbers).
+          const isLucide = /^[A-Z][a-zA-Z0-9]*$/.test(rawGlifo);
+          const LucideIcon = isLucide ? (LucideIcons as any)[rawGlifo] : null;
+          
+          return (
+            <EntityCell
+              icon={
+                LucideIcon ? (
+                  <LucideIcon size={16} color={f.color} strokeWidth={1.9} aria-hidden />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={f.color}
+                    strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d={rawGlifo} />
+                  </svg>
+                )
+              }
+              tileColor={f.color}
+              title={f.nombre}
+              subtitle={f.desc ?? (typeof f.nota === 'string' ? f.nota : undefined)}
+            />
+          );
+        },
       },
     ];
 
