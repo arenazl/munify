@@ -3,6 +3,7 @@ import { FileText, Upload, CheckCircle2, AlertTriangle, ExternalLink, Loader2 } 
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cenatApi } from '../../lib/api';
+import { urlAdjunto } from '../../lib/adjuntos';
 import { BRAND } from '../../brands';
 
 /**
@@ -115,7 +116,7 @@ export function CenatAdjunto({ solicitudId }: { solicitudId: number }) {
 
       {status.tiene_adjunto && status.adjunto_url && (
         <a
-          href={status.adjunto_url}
+          href={urlAdjunto(status.adjunto_url)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"

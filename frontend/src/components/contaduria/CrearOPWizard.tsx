@@ -15,6 +15,7 @@ import {
   Paperclip, Upload, ExternalLink, Loader2, Percent,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { urlAdjunto } from '../../lib/adjuntos';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { MoneyInput } from '../ui/MoneyInput';
@@ -374,7 +375,7 @@ export function CrearOPWizard({ open, onClose, onSuccess }: Props) {
             {facturaUrl ? (
               <div className="flex items-center gap-1.5">
                 <a
-                  href={facturaUrl}
+                  href={urlAdjunto(facturaUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold truncate"

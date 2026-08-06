@@ -15,6 +15,7 @@ import { MoneyInput } from '../ui/MoneyInput';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
 import { formatFechaAR, parseFechaLocal } from '../../lib/tesoreria-helpers';
+import { urlAdjunto } from '../../lib/adjuntos';
 import type {
   Gasto, GastoCuota, EstadoGastoCuota, Contacto, Caja,
   DestinoGasto, TipoFinanciacion, FormaPago, FrecuenciaRecurrencia,
@@ -877,7 +878,7 @@ export function GastoDetalleSheet({
                   >
                     <FileText className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
                     <a
-                      href={editForm.factura_url}
+                      href={urlAdjunto(editForm.factura_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 truncate hover:underline"
@@ -1083,7 +1084,7 @@ export function GastoDetalleSheet({
           </div>
           {gasto.factura_url ? (
             <div className="gs-adjuntos">
-              <a className="gs-adjunto" href={gasto.factura_url} target="_blank" rel="noopener noreferrer">
+              <a className="gs-adjunto" href={urlAdjunto(gasto.factura_url)} target="_blank" rel="noopener noreferrer">
                 <FileText className="h-3.5 w-3.5" />
                 {gasto.nro_factura || 'Factura adjunta'}
                 <span className="gs-adjunto-meta">abrir</span>

@@ -18,6 +18,7 @@ import type {
 } from '../../types';
 
 import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_COLORS } from '../../lib/contactoIcons';
+import { urlAdjunto } from '../../lib/adjuntos';
 
 interface Props {
   open: boolean;
@@ -675,7 +676,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
             {facturaUrl ? (
               <div className="flex items-center gap-1.5">
                 <a
-                  href={facturaUrl}
+                  href={urlAdjunto(facturaUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold truncate"
