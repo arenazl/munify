@@ -12,6 +12,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Carpeta | Qué tiene |
 |---|---|
 | [`plataforma/`](plataforma/) | Arquitectura, deploy, testing, refactors de referencia, schema/OpenAPI |
+| [`produccion/`](produccion/) | **Incidentes de producción y requerimientos operativos**: qué falló, la causa verificada, cómo se resolvió y qué mirar si vuelve a pasar |
 | [`salesbot/`](salesbot/) | Specs de la integración SalesBot ↔ Munify (API, turnos, verificación) |
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
@@ -26,6 +27,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas, y `paquetes/` con cada bajada del canvas fechada (la de número más alto es la vigente) |
 | [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`) — se crea al primer uso |
 | [`historico/`](historico/) | Docs superados, archivados por fecha (`YYYY-MM-DD-titulo.md`) |
+| [`antigravity/`](antigravity/) | Archivo histórico de Antigravity (herramienta dada de baja): scripts de extracción del prototipo de Configuración + capturas. El código que produjo NO está acá, sigue vivo en `frontend/src/` |
 | [`legacy/`](legacy/) | Archivo histórico pre-criterio (congelado; no mover, no borrar) |
 
 ## Para qué leer cada cosa
@@ -33,6 +35,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Querés... | Leé |
 |---|---|
 | Entender qué es Munify, módulos, roles, multi-tenant | [`plataforma/01-arquitectura.md`](plataforma/01-arquitectura.md) |
+| **Un adjunto de Cloudinary no se ve / da 401 / se baja en vez de abrirse** | [`produccion/01-incidente-cloudinary-pdf.md`](produccion/01-incidente-cloudinary-pdf.md) — el checkbox de la consola que bloquea PDF, y los 6 gotchas de Cloudinary (qa y prod comparten cuenta, la URL con versión sirve la respuesta vieja, el query string no bustea el caché) |
 | Tocar UI o backend (patrones, componentes, reglas) | [`../BUILD_GUIDE.md`](../BUILD_GUIDE.md) (canónico, en root) |
 | Saber cómo se deploya | [`plataforma/02-deploy.md`](plataforma/02-deploy.md) |
 | Hacer testing manual de un módulo | [`plataforma/03-testing.md`](plataforma/03-testing.md) |
@@ -42,11 +45,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
 | Consolidar tesorería / entender el plan Persona + prueba de paridad | [`tesoreria/01-consolidacion-analisis.md`](tesoreria/01-consolidacion-analisis.md) |
-| **RETOMAR CONFIGURACIÓN (prototipo copiado, cableado a medias — empezá por acá)** | [`handoffs/2026-08-03_prototipo-configuracion-y-cableado.md`](handoffs/2026-08-03_prototipo-configuracion-y-cableado.md) — cómo está armado, la receta para cablear una pantalla, qué falta en orden, y el bug del StickyPageHeader que oculta los botones |
-| **Agregar un control al kit v2, o seguir migrando Configuración al canvas** | [`handoffs/2026-08-03_kit-controles-y-migracion-config.md`](handoffs/2026-08-03_kit-controles-y-migracion-config.md) — 11 piezas nuevas + la regla de ingreso al kit, 5 pantallas migradas, cómo queda el ambiente local, y el hallazgo de los 8 scripts con credenciales |
-| **Cómo quedó Configuración (maestro-detalle de 3 niveles)** | [`handoffs/2026-08-03_configuracion-maestro-detalle.md`](handoffs/2026-08-03_configuracion-maestro-detalle.md) |
-| **Reordenar Configuración/Catálogos y acotar Apariencia (especificado, sin implementar)** | [`handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md`](handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md) — 5 grupos por FK real; temas de 40 a 6 + acento independiente; topbar solo luna/sol |
-| **Retomar el rollout v2 del canvas (ola 1: 8 pantallas en qa, validaciones a ojo, huecos de backend)** | [`handoffs/2026-08-02_rollout-v2-canvas-ola1.md`](handoffs/2026-08-02_rollout-v2-canvas-ola1.md) |
+| **Retomar Configuración (trabajo en curso)** | ver la sección [Configuración · orden de lectura](#configuración--orden-de-lectura) abajo — son 5 docs y conviene leerlos en orden |
 | Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
 | **Promover a prod la Tarjeta de crédito como caja (qué necesita Infra)** | [`handoffs/2026-07-23_promocion-tarjeta-credito.md`](handoffs/2026-07-23_promocion-tarjeta-credito.md) — sin migración; único paso manual = crear la caja con `codigo=TARJETA` |
 | **Retomar en frío el 2026-07-06 (Reclamos COMPLETO en qa + bloqueo de ambiente + regla "nunca DB directo")** | [`handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md`](handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md) |
@@ -64,6 +63,23 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Qué se le comunicó/arregló a San Pedro Norte | [`clientes/spn/`](clientes/spn/) |
 | Curación de gastos históricos SPN (estado + cómo retomar) | [`clientes/spn/02-curacion-gastos-historicos.md`](clientes/spn/02-curacion-gastos-historicos.md) |
 | Módulo Inventario + cruce con OT (estado + qué falta) | [`handoffs/2026-07-03_modulo-inventario-y-ot-formato.md`](handoffs/2026-07-03_modulo-inventario-y-ot-formato.md) |
+
+## Configuración · orden de lectura
+
+Es el tema con más docs y todos son del mismo par de días, así que el índice de
+arriba no alcanza para saber por dónde entrar. Leerlos en este orden:
+
+| # | Doc | Para qué |
+|---|---|---|
+| 1 | [`handoffs/2026-08-03_prototipo-configuracion-y-cableado.md`](handoffs/2026-08-03_prototipo-configuracion-y-cableado.md) | **Empezá por acá.** Cómo está armado, la receta para cablear una pantalla, qué falta en orden, y el bug del StickyPageHeader que oculta los botones |
+| 2 | [`handoffs/2026-08-03_configuracion-maestro-detalle.md`](handoffs/2026-08-03_configuracion-maestro-detalle.md) | Cómo quedó el maestro-detalle de 3 niveles |
+| 3 | [`handoffs/2026-08-03_kit-controles-y-migracion-config.md`](handoffs/2026-08-03_kit-controles-y-migracion-config.md) | Agregar un control al kit v2: las 11 piezas nuevas, la regla de ingreso, las 5 pantallas migradas |
+| 4 | [`handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md`](handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md) | Lo especificado y **no implementado**: 5 grupos por FK real, temas de 40 a 6 + acento independiente, topbar sólo luna/sol |
+| 5 | [`handoffs/2026-08-02_rollout-v2-canvas-ola1.md`](handoffs/2026-08-02_rollout-v2-canvas-ola1.md) | El rollout v2 del canvas: 8 pantallas en qa, validaciones a ojo, huecos de backend |
+
+El prototipo contra el que se compara está en [`design-sync/`](design-sync/) — se abre
+con doble clic, sin servidor. Es **especificación, no código**: se implementa con los
+componentes del kit y los tokens, nunca copiando el markup (regla global 22).
 
 ## ¿Dónde va un doc nuevo?
 
