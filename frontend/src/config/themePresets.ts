@@ -310,8 +310,10 @@ export function resolveAccentColor(accentId: string | null | undefined, modo: Th
   return typeof acento.color === 'string' ? acento.color : acento.color[modo];
 }
 
-/** Fondo del sidebar según el eje 3, derivado del tema y del acento activo. */
-function sidebarColor(tema: BgTheme, acento: string, modo: SidebarMode): string {
+/** Fondo del sidebar según el eje 3, derivado del tema y del acento activo.
+ *  Exportada para que el selector de Apariencia previsualice EXACTAMENTE la
+ *  barra que va a quedar, no una aproximación. */
+export function sidebarColor(tema: BgTheme, acento: string, modo: SidebarMode): string {
   // Las tres opciones NO son colores propios: son la MISMA idea con distinta
   // intensidad — el acento lavado sobre la base del tema. Por eso la barra
   // siempre pertenece al tema (nunca una barra blanca sobre un tema oscuro,

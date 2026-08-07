@@ -9,6 +9,7 @@ import SidebarTabs, { SidebarTabItem } from './components/SidebarTabs';
 import { PantallaDeAjuste } from '../../components/config/PantallaDeAjuste';
 import PanelFormulario from './panels/PanelFormulario';
 import PanelApariencia from './panels/PanelApariencia';
+import type { TemaItem, AcentoItem, BarraItem } from './panels/PanelApariencia';
 import PanelQr from './panels/PanelQr';
 import CatalogoDelCanvas from '../../components/config/CatalogoDelCanvas';
 import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
@@ -24,6 +25,7 @@ import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
 import type { FilaCatalogo } from './panels/PanelCatalogo';
 import type { GrupoAsig, TabAsig } from './panels/PanelAsignacion';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getBgTheme, resolveAccentColor, sidebarColor, type SidebarMode } from '../../config/themePresets';
 import { useSuperAdmin } from '../../hooks/useSuperAdmin';
 import { 
   cargarDatosFormularioMuni, 
@@ -34,7 +36,12 @@ import {
 } from './data/datosRealesConfig';
 
 export default function Configuracion() {
-  const { theme, setPreset, setAccent, alternarModo } = useTheme();
+  const {
+    theme, setPreset, setAccent,
+    currentPresetId, currentAccentId, currentMode,
+    currentSidebarMode, setSidebarMode,
+    presets, accents, sidebarOptions,
+  } = useTheme();
   const { isSuperAdmin } = useSuperAdmin();
   /* El grupo Super Admin (auditoría, suscripciones, config del sidebar) es
      cross-tenant: un admin municipal no tiene nada que hacer ahí y verlo
@@ -82,6 +89,70 @@ export default function Configuracion() {
   const hijo =
     padre.hijos.find(h => h.id === hijosActivos[padre.id]) ?? padre.hijos[0];
   const hijoId = hijo.id;
+
+  /* --- Apariencia: las muestras salen del motor de temas REAL -------------
+     Los 6 temas de fondo, TODOS los acentos y los 3 modos de barra vienen de
+     `themePresets` vía ThemeContext — mismo catálogo, misma persistencia que
+     la luna/sol de la topbar. Nada de listas duplicadas acá. */
+  const temasApariencia = useMemo<TemaItem[]>(() => {
+    const orden = [...presets].sort((a, b) => (a.modo === b.modo ? 0 : a.modo === 'oscuro' ? -1 : 1));
+    return orden.map((t) => {
+      const activa = t.id === currentPresetId;
+      const claro = t.modo === 'claro';
+      return {
+        id: t.id,
+        nombre: t.name,
+        borde: activa ? theme.primary : 'var(--pl-border)',
+        fondoCard: 'var(--pl-surface)',
+        lienzo: t.base,
+        barra: claro
+          ? `color-mix(in srgb, ${t.base} 94%, #0d1412)`
+          : `color-mix(in srgb, ${t.base} 90%, #ffffff)`,
+        linea: claro ? 'rgba(13,20,18,0.14)' : 'rgba(255,255,255,0.16)',
+        peso: activa ? 600 : 500,
+        color: activa ? 'var(--pl-text)' : 'var(--pl-text-2)',
+        tick: activa ? 1 : 0,
+      };
+    });
+  }, [presets, currentPresetId, theme.primary]);
+
+  const acentosApariencia = useMemo<AcentoItem[]>(
+    () =>
+      accents.map((a) => {
+        const activo = a.id === currentAccentId;
+        return {
+          id: a.id,
+          nombre: a.name,
+          hex: resolveAccentColor(a.id, currentMode),
+          // El panel usa estos valores como radios del anillo de selección.
+          anillo: activo ? '2.5px' : '0px',
+          borde: activo ? '4.5px' : '0px',
+          tick: activo ? 1 : 0,
+        };
+      }),
+    [accents, currentAccentId, currentMode],
+  );
+
+  const barrasApariencia = useMemo<BarraItem[]>(() => {
+    const tema = getBgTheme(currentPresetId);
+    const acentoColor = resolveAccentColor(currentAccentId, currentMode);
+    const claro = tema.modo === 'claro';
+    return sidebarOptions.map((m) => {
+      const activa = m.id === currentSidebarMode;
+      return {
+        id: m.id,
+        nombre: m.name,
+        borde: activa ? theme.primary : 'var(--pl-border)',
+        fondoCard: 'var(--pl-surface)',
+        lienzo: sidebarColor(tema, acentoColor, m.id as SidebarMode),
+        textoAlto: claro ? 'rgba(13,20,18,0.6)' : 'rgba(255,255,255,0.75)',
+        textoBajo: claro ? 'rgba(13,20,18,0.25)' : 'rgba(255,255,255,0.3)',
+        peso: activa ? 600 : 500,
+        color: activa ? 'var(--pl-text)' : 'var(--pl-text-2)',
+        tick: activa ? 1 : 0,
+      };
+    });
+  }, [sidebarOptions, currentSidebarMode, currentPresetId, currentAccentId, currentMode, theme.primary]);
 
   /* --- Buscador de ajustes -----------------------------------------
      Son 40 pantallas repartidas en 8 grupos: sin buscador hay que saber
@@ -327,14 +398,12 @@ export default function Configuracion() {
               tono="bueno"
             >
               <PanelApariencia
-                veloMarca={theme.primary} acento={theme.primary} nombreAcento="Verde Bosque"
-                temas={[]} acentos={[]} barras={[]}
-                onTemaSelect={(id) => {
-                  if (id === 't3') alternarModo();
-                  else setPreset(id as any);
-                }}
-                onAcentoSelect={(id) => setAccent(id as any)}
-                onBarraSelect={() => {}}
+                veloMarca={theme.primary} acento={theme.primary}
+                nombreAcento={accents.find((a) => a.id === currentAccentId)?.name ?? ''}
+                temas={temasApariencia} acentos={acentosApariencia} barras={barrasApariencia}
+                onTemaSelect={setPreset}
+                onAcentoSelect={setAccent}
+                onBarraSelect={(id) => setSidebarMode(id as SidebarMode)}
               />
             </PantallaDeAjuste>
           )}

@@ -127,7 +127,7 @@ export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas
       <div style={{ background: 'var(--pl-surface)', border: '1px solid var(--pl-border)', borderRadius: '12px', padding: '18px 20px', marginTop: '12px', minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: 'var(--pl-text-faint)' }}>TEMA DEL PANEL</span>
         <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--pl-text-muted)', marginTop: '5px' }}>El acento se aplica sobre cualquier tema.</span>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '9px', marginTop: '11px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '9px', marginTop: '11px' }}>
           {temas.map(t => (
             <span 
               key={t.id}
