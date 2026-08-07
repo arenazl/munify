@@ -45,10 +45,19 @@ import { seg } from '../../lib/semanticHero';
 import type { FilaSpec } from '../../config/canvasAbmSpec';
 import type { FilaCatalogo } from '../../config/canvasConfigSpec';
 
+/** Chip de estado con conteo REAL. Sin `match` el chip informa pero no filtra. */
+export interface ChipDeAjuste {
+  label: string;
+  count: number;
+  match?: (fila: FilaSpec) => boolean;
+}
+
 export interface DatosDeAjuste {
   filas: FilaSpec[];
   kpis: HeroKpi[];
   frases: HeroFrase[];
+  /** Chips con conteos reales. Si faltan, los del spec se muestran SIN número. */
+  chips?: ChipDeAjuste[];
 }
 
 /* ============================================================
@@ -452,40 +461,74 @@ export async function datosZonas(): Promise<DatosDeAjuste> {
     const res = await zonasApi.getAll();
     const zonas: any[] = res.data || [];
 
-    const filas: FilaSpec[] = zonas.map((z) => ({
-      n: z.nombre,
-      s: z.codigo || 'Zona de cobertura municipal',
-      gl: 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11zM12 8v4',
-      t: '#E7F6F0',
-      cc: '#00B37E',
-      off: z.activa === false,
-      cel: [
-        numero(String(z.barrios_count || z.barrios?.length || 0)),
-        numero(String(z.cuadrillas_count || 0)),
-        celda(z.activa !== false ? 'Activa' : 'Inactiva', { color: z.activa !== false ? '#00794F' : '#98A3A0' }),
-      ],
-    }));
+    /* Lo que /api/zonas trae de verdad: `activo` (no `activa`), `reclamos_count`
+       y `cuadrillas_count`. Barrios y resueltos por zona NO existen en el
+       modelo: en su lugar van reclamos, participación sobre el total y estado
+       — datos reales de esta misma sección (regla del prototipo). */
+    const totalReclamos = zonas.reduce((acc, z) => acc + (z.reclamos_count || 0), 0);
+    const conCuadrilla = new Set(
+      zonas.filter((z) => (z.cuadrillas_count || 0) > 0).map((z) => z.nombre),
+    );
 
-    const activas = zonas.filter((z) => z.activa !== false).length;
+    const filas: FilaSpec[] = zonas.map((z) => {
+      const reclamos = z.reclamos_count || 0;
+      const cuadrillas = z.cuadrillas_count || 0;
+      const pct = totalReclamos ? Math.round((reclamos / totalReclamos) * 100) : 0;
+      return {
+        n: z.nombre,
+        s: z.codigo || 'Zona de cobertura municipal',
+        gl: 'M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11zM12 8v4',
+        t: '#E7F6F0',
+        cc: '#00B37E',
+        off: z.activo === false,
+        cel: [
+          numero(String(cuadrillas), cuadrillas === 0 ? { color: '#B4560F' } : {}),
+          numero(String(reclamos), reclamos === 0 ? { color: '#98A3A0' } : {}),
+          numero(totalReclamos ? `${pct}%` : '—', { color: '#98A3A0' }),
+          celda(z.activo !== false ? 'Activa' : 'Inactiva', { color: z.activo !== false ? '#00794F' : '#98A3A0' }),
+        ],
+      };
+    });
+
+    const activas = zonas.filter((z) => z.activo !== false).length;
+    const sinCuadrilla = zonas.length - conCuadrilla.size;
+    const totalCuadrillas = zonas.reduce((acc, z) => acc + (z.cuadrillas_count || 0), 0);
 
     const kpis: HeroKpi[] = [
       { etiqueta: 'Zonas', valor: zonas.length, sub: 'territorios delimitados' },
       { etiqueta: 'Activas', valor: activas, sub: 'en despacho de trabajo' },
-      { etiqueta: 'Inactivas', valor: zonas.length - activas, sub: 'deshabilitadas' },
-      { etiqueta: 'Barrios', valor: zonas.reduce((acc, z) => acc + (z.barrios_count || z.barrios?.length || 0), 0), sub: 'cubiertos' },
-      { etiqueta: 'Cuadrillas', valor: zonas.reduce((acc, z) => acc + (z.cuadrillas_count || 0), 0), sub: 'desplegadas' },
+      {
+        etiqueta: 'Sin cuadrilla',
+        valor: sinCuadrilla,
+        sub: sinCuadrilla ? 'reclamos sin equipo' : 'todas cubiertas',
+        veredicto: sinCuadrilla > 0 ? 'advertencia' : undefined,
+      },
+      { etiqueta: 'Cuadrillas', valor: totalCuadrillas, sub: 'desplegadas' },
+      { etiqueta: 'Reclamos', valor: totalReclamos, sub: 'georreferenciados' },
     ];
 
     const frases: HeroFrase[] = [
       {
         segmentos: [
-          seg(`${zonas.length} zona${zonas.length === 1 ? '' : 's'} definida${zonas.length === 1 ? '' : 's'}`),
-          seg(`, ${activas} operativa${activas === 1 ? '' : 's'} para despacho.`),
+          seg(`${zonas.length} zona${zonas.length === 1 ? '' : 's'} definida${zonas.length === 1 ? '' : 's'}`, 'bueno'),
+          seg(` con ${totalReclamos} reclamo${totalReclamos === 1 ? '' : 's'} georreferenciado${totalReclamos === 1 ? '' : 's'}.`),
+          ...(sinCuadrilla > 0
+            ? [
+                seg(` ${sinCuadrilla} no ${sinCuadrilla === 1 ? 'tiene' : 'tienen'} cuadrilla`, 'advertencia'),
+                seg(': los reclamos de ahí entran sin equipo asignado.'),
+              ]
+            : []),
         ],
       },
     ];
 
-    return { filas, kpis, frases };
+    const chips: ChipDeAjuste[] = [
+      { label: 'Todas', count: zonas.length },
+      { label: 'Con cuadrilla', count: conCuadrilla.size, match: (f) => conCuadrilla.has(f.n) },
+      { label: 'Sin cuadrilla', count: sinCuadrilla, match: (f) => !conCuadrilla.has(f.n) },
+    ];
+
+    return { filas, kpis, frases, chips };
   } catch {
     return { filas: [], kpis: [], frases: [] };
   }

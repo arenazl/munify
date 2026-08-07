@@ -68,7 +68,10 @@ export function ArbolDelCanvas({ onNuevo }: ArbolDelCanvasProps) {
       searchPlaceholder="Buscar categoría o trámite…"
       search={busqueda}
       onSearchChange={setBusqueda}
-      viewSlots={{ arbol: data ? <PanelArbol tramites={visibles} /> : null }}
+      /* La clave `arbol` recién existe cuando hay datos: SemanticAbmPage decide
+         con `in`, y un slot presente con null se lee como "vista sin cuerpo" en
+         vez de caer al loading. */
+      viewSlots={data ? { arbol: <PanelArbol tramites={visibles} /> } : undefined}
       activeView="arbol"
       views={['arbol']}
       onViewChange={() => {}}

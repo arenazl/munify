@@ -150,35 +150,41 @@ export async function cargarAsignacionReal(): Promise<{
   gruposAsig: GrupoAsig[];
   pieAsig: string;
 }> {
+  /* La asignación REAL vive en las dependencias DEL MUNICIPIO: cada una trae
+     sus categorías con `include_assignments`. Las categorías no tienen ningún
+     campo `dependencia_defecto_id` — cruzar contra el catálogo global (44
+     dependencias que este municipio ni habilitó) mostraba todo sin asignar. */
   const [cRes, dRes] = await Promise.all([
     categoriasReclamoApi.getAll(true),
-    dependenciasApi.getCatalogo(),
+    dependenciasApi.getMunicipio({ include_assignments: true }),
   ]);
 
   const cats = (cRes.data || []) as any[];
   const deps = (dRes.data || []) as any[];
 
+  const duenioDe = new Map<number, any>();
+  deps.forEach((d) => (d.categorias || []).forEach((c: any) => duenioDe.set(c.id, d)));
+
   const tabsAsig: TabAsig[] = deps.map((d, i) => ({
     id: String(d.id),
     label: d.nombre,
-    n: cats.filter((c) => c.dependencia_defecto_id === d.id).length,
-    glifo: 'Building2',
+    n: (d.categorias || []).length,
+    glifo: d.icono || 'Building2',
     col: d.color || '#00794F',
     sub: '#98A3A0',
-    bd: i === 0 ? 'rgba(13,20,18,0.18)' : 'rgba(13,20,18,0.07)',
     bg: i === 0 ? '#FFFFFF' : '#F6F8F7',
     sombra: 'none',
   }));
 
   const filasAsig: FilaAsig[] = cats.map((c) => {
-    const depAsignada = deps.find((d) => d.id === c.dependencia_defecto_id);
+    const depAsignada = duenioDe.get(c.id);
     return {
       id: String(c.id),
       nombre: c.nombre,
       tinte: `${c.color || '#00794F'}15`,
       color: c.color || '#00794F',
       glifo: c.icono || 'Tag',
-      uso: c.uso_conteo ?? 0,
+      uso: c.en_uso ?? 0,
       usoCol: '#0D1412',
       usoNota: 'reclamos históricos',
       asignada: !!depAsignada,
@@ -188,11 +194,13 @@ export async function cargarAsignacionReal(): Promise<{
     };
   });
 
+  const asignadas = filasAsig.filter((f) => f.asignada).length;
+
   const gruposAsig: GrupoAsig[] = [
     {
       id: 'g1',
       titulo: 'Reglas de distribución automática por categoría',
-      detalle: `${cats.length} categorías asignadas a dependencias`,
+      detalle: `${asignadas} de ${cats.length} categorías con dependencia`,
       punto: '#00794F',
       col: '#00794F',
       bg: '#F6F8F7',
@@ -202,74 +210,88 @@ export async function cargarAsignacionReal(): Promise<{
 
   return {
     tabsAsig,
-    haySugerencias: true,
-    labelSugerencias: 'Reglas automáticas activas',
+    haySugerencias: asignadas > 0,
+    labelSugerencias: `${asignadas} regla${asignadas === 1 ? '' : 's'} activa${asignadas === 1 ? '' : 's'}`,
     gruposAsig,
-    pieAsig: `Mostrando ${cats.length} reglas de asignación`,
+    pieAsig: `Mostrando ${cats.length} categorías · ${asignadas} con dependencia asignada`,
   };
 }
 
 export async function cargarArbolReal(): Promise<any[]> {
   try {
-    const { tramitesApi, categoriasTramiteApi, dependenciasApi } = await import('../../../lib/api');
+    const { tramitesApi, categoriasTramiteApi } = await import('../../../lib/api');
+    /* El vínculo dependencia → trámite es REAL y viene por `include_assignments`
+       en las dependencias DEL MUNICIPIO (las categorías de trámite no tienen
+       dependencia propia — agrupar por ella metía todo en un "Otras Categorías"
+       ficticio). El detalle de cada trámite (documentos, modo) sale de
+       /api/tramites, que es quien lo trae completo. */
     const [cRes, tRes, dRes] = await Promise.all([
       categoriasTramiteApi.getAll(true),
       tramitesApi.getAll(),
-      dependenciasApi ? dependenciasApi.getCatalogo() : Promise.resolve({ data: [] })
+      dependenciasApi.getMunicipio({ include_assignments: true }),
     ]);
     const categorias = (cRes.data || []) as any[];
     const tramites = (tRes.data || []) as any[];
     const dependencias = (dRes.data || []) as any[];
 
-    // Build hierarchical tree: Dependencia -> Categoría -> Trámite
-    const dependenciasMap = new Map();
-    dependencias.forEach(d => {
-      dependenciasMap.set(d.id, { ...d, categorias: [] });
-    });
+    const catDe = new Map(categorias.map((c) => [c.id, c]));
+    const detalleDe = new Map(tramites.map((t) => [t.id, t]));
 
-    const categoriasSinDependencia: any[] = [];
-
-    categorias.forEach(c => {
-      const trs = tramites.filter(t => t.categoria_tramite_id === c.id);
-      const catNode = {
-        id: c.id,
-        nombre: c.nombre,
-        activa: c.activo !== false,
-        tramites: trs.map(t => ({
-          id: t.id,
-          nombre: t.nombre,
-          glifo: t.icono || c.icono || 'FileText',
-          color: c.color || '#3B82F6',
-          dias: t.sla_dias || 3,
-          costo: t.costo || 0,
-          modo: t.online ? 'online' : 'sinturno',
-          pago: t.costo ? 'inicio' : 'sin',
-          docs: 0,
-          checks: 0,
-          uso: t.solicitudes_conteo || 0
-        }))
+    const nodoTramite = (t: any) => {
+      const cat = catDe.get(t.categoria_tramite_id);
+      const modoAtencion = String(t.modo_atencion || '');
+      return {
+        id: t.id,
+        nombre: t.nombre,
+        glifo: t.icono || cat?.icono || 'FileText',
+        color: cat?.color || '#3B82F6',
+        dias: t.tiempo_estimado_dias || 0,
+        costo: Number(t.costo) || 0,
+        modo: modoAtencion.includes('online') ? 'online' : modoAtencion.includes('con_turno') ? 'turno' : 'sinturno',
+        prerrequisitos: (t.documentos_requeridos || []).map((d: any) => ({
+          nombre: d.nombre,
+          obligatorio: !!d.obligatorio,
+        })),
       };
+    };
 
-      if (c.dependencia_id && dependenciasMap.has(c.dependencia_id)) {
-        dependenciasMap.get(c.dependencia_id).categorias.push(catNode);
-      } else {
-        categoriasSinDependencia.push(catNode);
-      }
-    });
+    /** Agrupa trámites por su categoría, en el orden del catálogo. */
+    const agrupar = (trs: any[]) => {
+      const porCat = new Map<number, any>();
+      trs.forEach((t) => {
+        const cat = catDe.get(t.categoria_tramite_id);
+        const clave = cat?.id ?? -1;
+        if (!porCat.has(clave)) {
+          porCat.set(clave, {
+            id: clave,
+            nombre: cat?.nombre ?? 'Sin categoría',
+            activa: cat?.activo !== false,
+            tramites: [],
+          });
+        }
+        porCat.get(clave).tramites.push(nodoTramite(t));
+      });
+      return Array.from(porCat.values());
+    };
 
-    const result = Array.from(dependenciasMap.values()).filter(d => d.categorias.length > 0).map(d => ({
-      id: d.id,
-      nombre: d.nombre,
-      tipo: 'dependencia',
-      hijos: d.categorias
-    }));
+    const usados = new Set<number>();
+    const result = dependencias
+      .filter((d) => (d.tramites || []).length > 0)
+      .map((d) => {
+        const conDetalle = (d.tramites || []).map((t: any) => {
+          usados.add(t.id);
+          return detalleDe.get(t.id) || t;
+        });
+        return { id: d.id, nombre: d.nombre, tipo: 'dependencia', hijos: agrupar(conDetalle) };
+      });
 
-    if (categoriasSinDependencia.length > 0) {
+    const sueltos = tramites.filter((t) => !usados.has(t.id));
+    if (sueltos.length > 0) {
       result.push({
         id: 'sin-dep',
-        nombre: 'Otras Categorías',
+        nombre: 'Sin dependencia asignada',
         tipo: 'dependencia',
-        hijos: categoriasSinDependencia
+        hijos: agrupar(sueltos),
       });
     }
 

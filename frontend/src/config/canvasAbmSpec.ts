@@ -291,25 +291,29 @@ export const ABM_SPEC: Record<string, AbmSpec> = {
     pie: 'La dependencia con reclamos en cola no se puede borrar: primero hay que reasignar sus categorías.',
   },
 
+  /* Zonas: el canvas pedía BARRIOS y RESUELTOS por zona, datos que el modelo
+     no tiene. En su lugar van cuadrillas, reclamos, participación sobre el
+     total y estado — todos reales de /api/zonas (regla: otro dato REAL de la
+     misma sección, nunca el número del mockup ni el hueco). */
   zonas: {
     eyebrow: 'CATÁLOGOS · TERRITORIO', acento: AZ, tinte: '#F5F8FD',
-    ver: '<strong>18 zonas</strong> cubren los 24 barrios. <strong style="color: #B4560F;">Seis barrios no están en ninguna zona</strong>: los reclamos de ahí entran sin cuadrilla asignada.',
-    kpis: [['ZONAS', '18', 'sobre 24 barrios', ''], ['BARRIOS CUBIERTOS', '18', '75% del municipio', ''], ['SIN COBERTURA', '6', 'sin cuadrilla asignada', A], ['CON CUADRILLA', '13', 'de las 18 zonas', ''], ['RECLAMOS', '244', 'georreferenciados', '']],
+    ver: '<strong>18 zonas</strong> definidas. <strong style="color: #B4560F;">Cinco no tienen cuadrilla asignada</strong>: los reclamos de ahí entran sin equipo.',
+    kpis: [['ZONAS', '18', 'territorios delimitados', ''], ['ACTIVAS', '18', 'en despacho de trabajo', ''], ['SIN CUADRILLA', '5', 'reclamos sin equipo', A], ['CUADRILLAS', '13', 'desplegadas', ''], ['RECLAMOS', '244', 'georreferenciados', '']],
     pista: ['LAS ZONAS SE DIBUJAN EN EL MAPA', 'Acá se editan el nombre, la cuadrilla y el estado. El polígono de cada zona se ajusta sobre el mapa, no en esta grilla.', 'Abrir el mapa de zonas'],
-    buscar: 'Buscar zona o barrio…', cta: 'Nueva zona',
+    buscar: 'Buscar zona…', cta: 'Nueva zona',
     selects: [['Cuadrilla', 'Todas'], ['Cobertura', 'Todas']],
     chips: [['Todas', 18], ['Con cuadrilla', 13], ['Sin cuadrilla', 5]],
-    heads: [['ZONA', 'left'], ['BARRIOS', 'left'], ['CUADRILLA', 'left'], ['RECLAMOS', 'right'], ['RESUELTOS', 'right'], ['ACCIONES', 'right']],
-    cols: 'minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1.1fr) 104px 112px 104px', min: '1000px',
+    heads: [['ZONA', 'left'], ['CUADRILLAS', 'right'], ['RECLAMOS', 'right'], ['DEL TOTAL', 'right'], ['ESTADO', 'left'], ['ACCIONES', 'right']],
+    cols: 'minmax(0, 1.6fr) 112px 104px 104px minmax(0, 0.9fr) 104px', min: '1000px',
     filas: [
-      { n: 'Zona 1 · Centro', s: 'Radio céntrico', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Microcentro, Catedral', { color: '#7A8783' }), c('Cuadrilla 2', { punto: CI }), num('63'), num('68%', { color: '#00794F' })] },
-      { n: 'Zona 2 · Villa Morra', s: 'Corredor este', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Villa Morra, Recoleta', { color: '#7A8783' }), c('Cuadrilla 4', { punto: V }), num('52'), num('54%', { color: '#00794F' })] },
-      { n: 'Zona 3 · Sajonia', s: 'Franja sur', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Sajonia, Tacumbú', { color: '#7A8783' }), c('Cuadrilla 1', { punto: A }), num('41'), num('38%', { color: '#B4560F' })] },
-      { n: 'Zona 4 · Trinidad', s: 'Franja norte', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Santísima Trinidad', { color: '#7A8783' }), c('Cuadrilla 3', { punto: A }), num('34'), num('31%', { color: '#B4560F' })] },
-      { n: 'Zona 5 · Zeballos Cué', s: 'Periferia norte', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [c('Zeballos Cué, Loma Pytã', { color: '#7A8783' }), c('Cuadrilla 6', { punto: VI }), num('22'), num('18%', { color: '#C93A3E' })] },
-      { n: 'Zona 18 · Chacarita', s: 'Sin cuadrilla', gl: g.zona, t: tG, cc: '#7A8783', cel: [c('Chacarita Alta y Baja', { color: '#7A8783' }), c('Sin asignar', { punto: A, color: '#B4560F' }), num('19'), num('0%', { color: '#C93A3E' })] },
+      { n: 'Zona 1 · Centro', s: 'AS-CENT-01', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [num('1'), num('63'), num('26%', { color: '#7A8783' }), c('Activa', { color: '#00794F' })] },
+      { n: 'Zona 2 · Villa Morra', s: 'AS-VMOR-02', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [num('1'), num('52'), num('21%', { color: '#7A8783' }), c('Activa', { color: '#00794F' })] },
+      { n: 'Zona 3 · Sajonia', s: 'AS-SAJO-03', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [num('1'), num('41'), num('17%', { color: '#7A8783' }), c('Activa', { color: '#00794F' })] },
+      { n: 'Zona 4 · Trinidad', s: 'AS-TRIN-04', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [num('1'), num('34'), num('14%', { color: '#7A8783' }), c('Activa', { color: '#00794F' })] },
+      { n: 'Zona 5 · Zeballos Cué', s: 'AS-ZEBA-05', gl: g.zona, t: tAZ, cc: '#1D6FD1', cel: [num('1'), num('22'), num('9%', { color: '#7A8783' }), c('Activa', { color: '#00794F' })] },
+      { n: 'Zona 18 · Chacarita', s: 'AS-COST-18', gl: g.zona, t: tG, cc: '#7A8783', cel: [num('0', { color: '#B4560F' }), num('19'), num('8%', { color: '#7A8783' }), c('Activa', { color: '#00794F' })] },
     ],
-    pie: 'Borrar una zona deja sus barrios sin cobertura: los reclamos entran sin cuadrilla.',
+    pie: 'Borrar una zona deja su territorio sin cobertura: los reclamos entran sin cuadrilla.',
   },
 
   inv: {

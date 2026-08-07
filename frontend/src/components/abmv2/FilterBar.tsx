@@ -349,7 +349,9 @@ export function FilterBar({
                 aria-pressed={activo}
               >
                 {tab.label}
-                <span className="av2-estado-conteo">{tab.count.toLocaleString('es-AR')}</span>
+                {tab.count !== undefined && (
+                  <span className="av2-estado-conteo">{tab.count.toLocaleString('es-AR')}</span>
+                )}
               </button>
             );
           })}

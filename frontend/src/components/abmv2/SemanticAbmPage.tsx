@@ -251,7 +251,9 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
          `in` (y no `?.[activeView] ?? …`) para respetar un slot null
          EXPLÍCITO de la página ("esta vista no lleva cuerpo"). --- */
   const tieneSlot = !!viewSlots && activeView in viewSlots;
-  if (import.meta.env.DEV && !tieneSlot && activeView !== 'table') {
+  /* Mientras `loading`, que el slot todavía no exista es normal (la página lo
+     monta recién con datos): ni warning ni cuerpo vacío — esqueleto. */
+  if (import.meta.env.DEV && !tieneSlot && activeView !== 'table' && !loading) {
     console.warn(
       `SemanticAbmPage[${moduleKey}]: la vista '${activeView}' no tiene slot en ` +
         "`viewSlots` y solo 'table' cae al DataTable estándar — el cuerpo queda vacío.",
@@ -259,6 +261,8 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
   }
   const cuerpo = tieneSlot ? (
     viewSlots?.[activeView]
+  ) : activeView !== 'table' && loading ? (
+    <div className="av2-skeleton" style={{ minHeight: 220 }} aria-busy />
   ) : activeView === 'table' ? (
     <DataTable<Row>
       kind={kind}

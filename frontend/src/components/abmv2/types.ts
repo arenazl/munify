@@ -221,11 +221,13 @@ export interface SelectSpec {
 }
 
 /** Tab del segmented de estados. count 0 ⇒ se pinta `--pl-text-disabled`
- *  y NO es clickeable. Nunca duplicar estos conteos en tarjetas. */
+ *  y NO es clickeable. count ausente ⇒ el conteo no se conoce: el tab queda
+ *  clickeable y SIN número (nunca un número inventado al lado de datos
+ *  reales). Nunca duplicar estos conteos en tarjetas. */
 export interface StatusTab {
   id: string;
   label: string;
-  count: number;
+  count?: number;
 }
 
 /** Valor del PeriodControl (obligatorio en toda lista con fechas).

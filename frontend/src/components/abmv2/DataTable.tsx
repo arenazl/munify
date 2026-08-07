@@ -621,7 +621,7 @@ export function DataTable<Row>({
                 onClick={cero || !onStatusChange ? undefined : () => onStatusChange(tab.id)}
               >
                 {tab.label}
-                <span className="av2-ttab-n">{tab.count}</span>
+                {tab.count !== undefined && <span className="av2-ttab-n">{tab.count}</span>}
               </button>
             );
           })}

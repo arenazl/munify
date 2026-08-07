@@ -215,14 +215,30 @@ export function AbmDeConfiguracion({
     });
   }, [spec.cols, spec.heads]);
 
-  const chips = spec.chips.map(([label, count]) => ({ id: label, label, count }));
+  /* Chips: con datos reales mandan los del cableado (conteo real y filtro).
+     Si el cableado no los define, quedan los labels del spec SIN conteo: un
+     número del prototipo al lado de filas reales se lee como real. */
+  const chipsReales = reales?.chips;
+  const chips = useMemo(() => {
+    if (chipsReales) return chipsReales.map((c) => ({ id: c.label, label: c.label, count: c.count }));
+    return spec.chips.map(([label, count]) => ({
+      id: label,
+      label,
+      count: hayDatosReales ? undefined : count,
+    }));
+  }, [chipsReales, spec.chips, hayDatosReales]);
+
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return filas;
-    return filas.filter(
-      (f) => f.n.toLowerCase().includes(q) || (f.s ?? '').toLowerCase().includes(q),
-    );
-  }, [filas, busqueda]);
+    const chipMatch = chipsReales?.find((c) => c.label === chipActivo)?.match;
+    let out = chipMatch ? filas.filter(chipMatch) : filas;
+    if (q) {
+      out = out.filter(
+        (f) => f.n.toLowerCase().includes(q) || (f.s ?? '').toLowerCase().includes(q),
+      );
+    }
+    return out;
+  }, [filas, busqueda, chipActivo, chipsReales]);
 
   return (
     <SemanticAbmPage<FilaSpec>
