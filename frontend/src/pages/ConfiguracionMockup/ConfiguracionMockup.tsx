@@ -11,10 +11,14 @@ import PanelQr from './panels/PanelQr';
 import CatalogoDelCanvas from '../../components/config/CatalogoDelCanvas';
 import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
 import ArbolDelCanvas from '../../components/config/ArbolDelCanvas';
-import PanelAbm from './panels/PanelAbm';
 import AbmDeConfiguracion from '../../components/config/AbmDeConfiguracion';
-import PanelArbol from './panels/PanelArbol';
 import { MockData } from './data/mockData';
+import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
+// OJO: hay DOS `FilaCatalogo` en el repo — el del spec del canvas
+// (`canvasConfigSpec`) y el del panel. `cargarCatalogoReal` devuelve el del
+// panel, que es el que va acá. Unificarlos es deuda abierta.
+import type { FilaCatalogo } from './panels/PanelCatalogo';
+import type { GrupoAsig, TabAsig } from './panels/PanelAsignacion';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
   cargarDatosFormularioMuni, 
@@ -122,7 +126,11 @@ export default function ConfiguracionMockup() {
   
   let data: any = null;
   if (tipo === 'abm') {
-    data = MockData.abmSpec ? MockData.abmSpec(hijoId) : null;
+    // El spec sale de `canvasAbmSpec` (copia tipada del canvas), no del mock:
+    // es la misma estructura para las 17 entidades y no arrastra los hex del
+    // prototipo. Las FILAS de acá son de muestra; las reales las trae el
+    // propio `AbmDeConfiguracion` con `ajusteId`.
+    data = ABM_SPEC[hijoId] ?? (MockData.abmSpec ? MockData.abmSpec(hijoId) : null);
   } else if (tipo === 'asignacion') {
     data = asigReal || (MockData.puenteSpec ? MockData.puenteSpec(hijoId) : null);
   } else if (tipo === 'catalogo') {
@@ -215,11 +223,15 @@ export default function ConfiguracionMockup() {
           )}
 
           {tipo === 'abm' && data && (
-            <AbmDeConfiguracion 
-              spec={data} 
-              title={hijo.label} 
-              moduleKey={hijoId} 
-              embedded={true}
+            <AbmDeConfiguracion
+              spec={data}
+              title={hijo.label}
+              moduleKey={hijoId}
+              descripcion={DESCRIPCION_AJUSTE[hijoId]}
+              // Sin `ajusteId` el componente nunca mira `CABLEADO` y pinta las
+              // filas de muestra del canvas. Con él, cada pantalla trae sus
+              // datos del municipio sola.
+              ajusteId={hijoId}
             />
           )}
 

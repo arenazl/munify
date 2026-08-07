@@ -89,6 +89,9 @@ export interface AbmSpec {
   filas: FilaSpec[];
   /** La regla de la entidad, al pie. */
   pie: string;
+  /** La entidad se lee como jerarquía, no como grilla plana: el cuerpo lo pone
+   *  `AccordionTree` en vez de la tabla (categoría → trámite → requisitos). */
+  usaArbol?: boolean;
 }
 
 type OpcionesCelda = {
@@ -151,6 +154,8 @@ const g = {
   reloj: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7.5V12l3 1.8',
   tasa: 'M9 7h6M9 12h6M9 17h3M5 3h14v18H5z',
   pago: 'M3 7h18v12H3zM7 15h2M16 11h2',
+  /** Traza de auditoría: reloj que retrocede (lo que ya pasó). */
+  log: 'M3 3v5h5M3.05 13A9 9 0 1 0 6 5.3L3 8M12 7v5l4 2',
 };
 
 export const ABM_SPEC: Record<string, AbmSpec> = {

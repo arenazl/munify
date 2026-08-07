@@ -291,10 +291,15 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
  * ============================================================ */
 
 export function FilterBar({
-  selects,
+  // Defaults a propósito: `SemanticAbmPage` declara ambas OPCIONALES y las pasa
+  // tal cual, así que una pantalla sin filtros (el árbol de trámites, por caso)
+  // llega acá con `undefined` y un `.length` a ciegas se lleva puesta la
+  // pantalla entera vía ErrorBoundary. Una pieza del kit no puede romperse
+  // porque el consumidor omitió algo que su contrato marca opcional.
+  selects = [],
   period,
   onPeriodChange,
-  statusTabs,
+  statusTabs = [],
   activeStatus,
   onStatusChange,
   sortSpec,

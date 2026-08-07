@@ -1,24 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronRight, Folder, FileCheck, CircleParking, Info, Plus } from 'lucide-react';
-import type { FilaSpec } from '../../../config/canvasAbmSpec';
-
-// A simple Switch component placeholder, replace with your actual Switch component if you have one.
-const Switch = ({ checked, onCheckedChange }: { checked: boolean, onCheckedChange: (c: boolean) => void }) => (
-  <div 
-    onClick={() => onCheckedChange(!checked)}
-    style={{ 
-      width: '32px', height: '18px', borderRadius: '9px', 
-      background: checked ? '#00B37E' : '#D5DDDA', 
-      position: 'relative', cursor: 'pointer', transition: 'background 0.2s' 
-    }}
-  >
-    <div style={{ 
-      position: 'absolute', top: '2px', left: checked ? '16px' : '2px', 
-      width: '14px', height: '14px', borderRadius: '7px', 
-      background: '#FFF', boxShadow: '0 1px 2px rgba(0,0,0,0.2)', transition: 'left 0.2s' 
-    }} />
-  </div>
-);
+import type { FilaSpec } from '../../config/canvasAbmSpec';
+import { Switch } from './Controls';
 
 export interface AccordionTreeProps {
   data: FilaSpec[];
@@ -156,7 +139,7 @@ export function AccordionTree({ data }: AccordionTreeProps) {
     <div style={{ background: '#FFFFFF', border: '1px solid rgba(13,20,18,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(13,20,18,0.08)', background: '#FAFBFA' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Switch checked={agruparDep} onCheckedChange={setAgruparDep} />
+          <Switch checked={agruparDep} onChange={setAgruparDep} ariaLabel="Agrupar por dependencia" />
           <span style={{ fontSize: '13px', fontWeight: 500, color: '#3D4945' }}>Agrupar por dependencia</span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>

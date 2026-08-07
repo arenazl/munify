@@ -53,7 +53,9 @@ import type { HeroFrase, HeroKpi, Veredicto } from '../../lib/semanticHero';
 export type ListKind = 'plain' | 'money' | 'schedule' | 'board';
 
 /** Vistas del segmented de la toolbar. 'day'/'week' solo en kind='schedule'. */
-export type ViewKind = 'cards' | 'table' | 'guided' | 'day' | 'week';
+/** 'arbol': jerarquía expandible (categoría → trámite → requisitos). El cuerpo
+ *  lo pone la página por `viewSlots.arbol` — el kit trae `AccordionTree`. */
+export type ViewKind = 'cards' | 'table' | 'guided' | 'day' | 'week' | 'arbol';
 
 /** Tonos semánticos de chips/estados (paleta StatusPill del estándar):
  *  azul = recibido/completado · ámbar = en curso/pendiente ·

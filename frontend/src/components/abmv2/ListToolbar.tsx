@@ -36,6 +36,7 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
+  FolderTree,
   LayoutGrid,
   ListChecks,
   Plus,
@@ -53,6 +54,7 @@ const VISTA_META: Record<ViewKind, { icon: LucideIcon; label: string }> = {
   guided: { icon: ListChecks, label: 'Guiada' },
   day: { icon: CalendarDays, label: 'Día' },
   week: { icon: CalendarRange, label: 'Semana' },
+  arbol: { icon: FolderTree, label: 'Árbol' },
 };
 
 /**
