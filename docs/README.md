@@ -45,7 +45,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
 | Consolidar tesorería / entender el plan Persona + prueba de paridad | [`tesoreria/01-consolidacion-analisis.md`](tesoreria/01-consolidacion-analisis.md) |
-| **Retomar Configuración (trabajo en curso)** | ver la sección [Configuración · orden de lectura](#configuración--orden-de-lectura) abajo — son 5 docs y conviene leerlos en orden |
+| **Retomar Configuración (trabajo en curso)** | [`handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md`](handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md) — **empezá por acá**, es el más nuevo y corrige dos cosas de los anteriores. Después, la sección [Configuración · orden de lectura](#configuración--orden-de-lectura) |
 | Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
 | **Promover a prod la Tarjeta de crédito como caja (qué necesita Infra)** | [`handoffs/2026-07-23_promocion-tarjeta-credito.md`](handoffs/2026-07-23_promocion-tarjeta-credito.md) — sin migración; único paso manual = crear la caja con `codigo=TARJETA` |
 | **Retomar en frío el 2026-07-06 (Reclamos COMPLETO en qa + bloqueo de ambiente + regla "nunca DB directo")** | [`handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md`](handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md) |
@@ -71,7 +71,8 @@ arriba no alcanza para saber por dónde entrar. Leerlos en este orden:
 
 | # | Doc | Para qué |
 |---|---|---|
-| 1 | [`handoffs/2026-08-03_prototipo-configuracion-y-cableado.md`](handoffs/2026-08-03_prototipo-configuracion-y-cableado.md) | **Empezá por acá.** Cómo está armado, la receta para cablear una pantalla, qué falta en orden, y el bug del StickyPageHeader que oculta los botones |
+| 0 | [`handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md`](handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md) | **EMPEZÁ POR ACÁ — es el vigente.** Mapa de archivos, flujo de datos, qué quedó roto con sus pistas, y las decisiones que no se re-discuten. Corrige dos cosas del #1: el gate `npx tsc --noEmit` **no chequea nada** en este repo, y el bug del StickyPageHeader **ya está arreglado** |
+| 1 | [`handoffs/2026-08-03_prototipo-configuracion-y-cableado.md`](handoffs/2026-08-03_prototipo-configuracion-y-cableado.md) | Cómo se armó el prototipo y la receta para cablear una pantalla. ⚠️ Su §3.1 (bug del StickyPageHeader) y su "compilando" están **superados** por el #0 |
 | 2 | [`handoffs/2026-08-03_configuracion-maestro-detalle.md`](handoffs/2026-08-03_configuracion-maestro-detalle.md) | Cómo quedó el maestro-detalle de 3 niveles |
 | 3 | [`handoffs/2026-08-03_kit-controles-y-migracion-config.md`](handoffs/2026-08-03_kit-controles-y-migracion-config.md) | Agregar un control al kit v2: las 11 piezas nuevas, la regla de ingreso, las 5 pantallas migradas |
 | 4 | [`handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md`](handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md) | Lo especificado y **no implementado**: 5 grupos por FK real, temas de 40 a 6 + acento independiente, topbar sólo luna/sol |
