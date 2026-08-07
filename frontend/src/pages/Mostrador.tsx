@@ -4,7 +4,7 @@ import {
   FileText, CheckCircle2, AlertTriangle, Check,
   ClipboardList, ShieldCheck, ArrowRight,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search,
-  Sparkles, X, Edit3, IdCard, Smartphone, QrCode,
+  X, Edit3, IdCard, Smartphone, QrCode,
   Mail, MapPin, Banknote, Clock, CalendarClock,
 } from 'lucide-react';
 import ReservarTurnoSheet from '../components/turnos/ReservarTurnoSheet';
@@ -53,11 +53,14 @@ interface VecinoEncontrado {
 
 type Paso = 'identificar' | 'hub';
 
-/** Pasos del flujo de atención. El número lo pinta la POSICIÓN (contrato
- *  `StepsSpec` de abmv2/types.ts), no viene en los datos. */
-const PASOS: { id: Paso; label: string }[] = [
+/** Pasos del flujo de atención (canvas Mostrador.dc.html: 3 chips). El 3°
+ *  no es un estado de esta pantalla: la carga pasa en el módulo elegido
+ *  (Reclamos / Trámites / Turnos) con el vecino precargado — por eso el chip
+ *  existe pero no es clickeable. */
+const PASOS: { id: Paso | 'cargar'; label: string; deshabilitado?: boolean }[] = [
   { id: 'identificar', label: 'Identificar al vecino' },
-  { id: 'hub', label: 'Cargar la gestión' },
+  { id: 'hub', label: 'Elegir gestión' },
+  { id: 'cargar', label: 'Cargar la gestión', deshabilitado: true },
 ];
 
 /**
@@ -288,7 +291,9 @@ export default function Mostrador() {
                 <button
                   type="button"
                   className={`av2-step av2-step--${estado}`}
-                  onClick={() => irAPaso(p.id)}
+                  onClick={p.deshabilitado ? undefined : () => irAPaso(p.id as Paso)}
+                  disabled={p.deshabilitado}
+                  title={p.deshabilitado ? 'La carga pasa en el módulo elegido, con el vecino precargado' : undefined}
                   aria-current={estado === 'activo' ? 'step' : undefined}
                 >
                   <span className="av2-step-num av2-tnum" aria-hidden>
@@ -422,48 +427,83 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual, o
   onCargarManual: (dniPrefill?: string) => void;
   onReclamoAnonimo: () => void;
 }) {
-  const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
+  /* Canvas Mostrador.dc.html: dos maneras de identificar en un SEGMENTED
+     (una card a la vez, max ~560px), no dos columnas a la par. El fallback
+     de "vecino nuevo" es la pestaña Por celular. */
+  const [modo, setModo] = useState<'buscar' | 'celular'>('buscar');
   const [faseCelular, setFaseCelular] = useState<FaseCelular>('idle');
   const chip = CHIP_FASE[faseCelular];
 
   return (
     <div className="space-y-3 mt-3">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
-        {/* Columna izquierda — DNI (familia verde de la referencia) */}
-        <ColumnaModo
-          color="var(--pl-green)"
-          fondo="var(--pl-green-100)"
-          icon={<IdCard className="w-[17px] h-[17px]" />}
-          label="Por DNI"
-          sub="Vecino ya registrado en el padrón"
-        >
-          <PanelDni
-            onUsar={onClienteRegistrado}
-            onCargarManual={onCargarManual}
-            onBuscarPorNombre={() => setBusquedaLibreAbierta((v) => !v)}
-          />
-        </ColumnaModo>
+      <div
+        className="inline-flex items-center gap-1 p-1"
+        role="tablist"
+        aria-label="Cómo identificar al vecino"
+        style={{ backgroundColor: 'var(--pl-surface-3)', borderRadius: 'var(--pl-radius-md)' }}
+      >
+        {([
+          { id: 'buscar' as const, label: 'Buscar vecino', icon: <Search className="w-3.5 h-3.5" /> },
+          { id: 'celular' as const, label: 'Por celular', icon: <Smartphone className="w-3.5 h-3.5" /> },
+        ]).map((t) => {
+          const activo = modo === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={activo}
+              onClick={() => setModo(t.id)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold transition-all"
+              style={{
+                backgroundColor: activo ? 'var(--pl-surface)' : 'transparent',
+                color: activo ? 'var(--pl-text)' : 'var(--pl-text-muted)',
+                borderRadius: 'var(--pl-radius-sm)',
+                boxShadow: activo ? '0 1px 2px var(--pl-border-strong)' : 'none',
+              }}
+            >
+              {t.icon}
+              {t.label}
+              {t.id === 'celular' && chip && !activo && (
+                <span className={`av2-chip-estado av2-chip-estado--${chip.tono}`}>{chip.label}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Columna derecha — Celular / RENAPER (familia azul de la referencia) */}
-        <ColumnaModo
-          color="var(--pl-blue)"
-          fondo="var(--pl-blue-100)"
-          icon={<Smartphone className="w-[17px] h-[17px]" />}
-          label="Con el celular del vecino"
-          sub="DNI + selfie validados contra RENAPER"
-          chip={chip ? <span className={`av2-chip-estado av2-chip-estado--${chip.tono}`}>{chip.label}</span> : undefined}
-        >
-          <PanelCelular
-            onAprobado={onBiometriaOk}
-            onCargarManual={onCargarManual}
-            onFase={setFaseCelular}
-          />
-        </ColumnaModo>
+      <div className="max-w-[560px]">
+        {modo === 'buscar' ? (
+          <ColumnaModo
+            color="var(--pl-green)"
+            fondo="var(--pl-green-100)"
+            icon={<Search className="w-[17px] h-[17px]" />}
+            label="Buscar vecino"
+            sub="Por DNI o por nombre y apellido"
+          >
+            <PanelBuscarVecino onUsar={onClienteRegistrado} onCargarManual={onCargarManual} />
+          </ColumnaModo>
+        ) : (
+          <ColumnaModo
+            color="var(--pl-blue)"
+            fondo="var(--pl-blue-100)"
+            icon={<Smartphone className="w-[17px] h-[17px]" />}
+            label="Por celular"
+            sub="Generamos un QR · RENAPER + selfie del lado del vecino"
+            chip={chip ? <span className={`av2-chip-estado av2-chip-estado--${chip.tono}`}>{chip.label}</span> : undefined}
+          >
+            <PanelCelular
+              onAprobado={onBiometriaOk}
+              onCargarManual={onCargarManual}
+              onFase={setFaseCelular}
+            />
+          </ColumnaModo>
+        )}
       </div>
 
       {/* Escape hatch de la pantalla: reclamo sin identificar (solo reclamos). */}
       <div
-        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs"
+        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs max-w-[560px]"
         style={{
           backgroundColor: 'var(--pl-surface)',
           border: '1px solid var(--pl-border)',
@@ -476,13 +516,6 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual, o
           Reclamo anónimo
         </button>
       </div>
-
-      {busquedaLibreAbierta && (
-        <BusquedaLibre
-          onUsar={onClienteRegistrado}
-          onCargarManual={onCargarManual}
-        />
-      )}
     </div>
   );
 }
@@ -535,17 +568,19 @@ function ColumnaModo({ color, fondo, icon, label, sub, chip, children }: {
 }
 
 // ============================================================
-// PanelDni — input compacto + resultados enriquecidos
+// PanelBuscarVecino — UN solo input reactivo (canvas): DNI o nombre y
+// apellido, autocomplete desde 2 caracteres, selección con banda verde y
+// "Continuar". Reemplaza al par input-DNI + búsqueda libre.
 // ============================================================
-function PanelDni({ onUsar, onCargarManual, onBuscarPorNombre }: {
+function PanelBuscarVecino({ onUsar, onCargarManual }: {
   onUsar: (v: VecinoEncontrado) => void;
   onCargarManual: (dniPrefill?: string) => void;
-  onBuscarPorNombre: () => void;
 }) {
-  const [dni, setDni] = useState('');
+  const [q, setQ] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [resultados, setResultados] = useState<VecinoEncontrado[] | null>(null);
   const [sinResultados, setSinResultados] = useState(false);
+  const [seleccionado, setSeleccionado] = useState<VecinoEncontrado | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -553,25 +588,41 @@ function PanelDni({ onUsar, onCargarManual, onBuscarPorNombre }: {
     return () => clearTimeout(t);
   }, []);
 
-  const buscar = async () => {
-    if (!dni.trim()) return;
-    setBuscando(true);
-    setSinResultados(false);
-    setResultados(null);
-    try {
-      const r = await operadorApi.buscarVecino(dni.trim());
-      if (r.data.length === 0) setSinResultados(true);
-      else setResultados(r.data);
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(msg || 'Error buscando vecino');
-    } finally {
-      setBuscando(false);
+  /* Búsqueda reactiva con debounce. Si lo tipeado es un DNI (solo dígitos,
+     7+), va por el índice exacto de documento; si no, por nombre/DNI parcial.
+     Tipear de nuevo levanta la selección (canvas). */
+  useEffect(() => {
+    setSeleccionado(null);
+    const term = q.trim();
+    if (term.length < 2) {
+      setResultados(null);
+      setSinResultados(false);
+      return;
     }
-  };
+    const t = setTimeout(async () => {
+      setBuscando(true);
+      try {
+        const digitos = term.replace(/\D/g, '');
+        const esDniCompleto = digitos.length >= 7 && /^[\d.\s]+$/.test(term);
+        const r = await operadorApi.buscarVecino(
+          esDniCompleto ? digitos : undefined,
+          esDniCompleto ? undefined : term,
+        );
+        setResultados(r.data);
+        setSinResultados(r.data.length === 0);
+      } catch (e: unknown) {
+        const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        toast.error(msg || 'Error buscando vecino');
+      } finally {
+        setBuscando(false);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const limpiar = () => {
-    setDni('');
+    setQ('');
+    setSeleccionado(null);
     setResultados(null);
     setSinResultados(false);
     inputRef.current?.focus();
@@ -579,96 +630,103 @@ function PanelDni({ onUsar, onCargarManual, onBuscarPorNombre }: {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      if (resultados && resultados.length > 0) onUsar(resultados[0]);
-      else buscar();
+      if (seleccionado) onUsar(seleccionado);
+      else if (resultados && resultados.length > 0) setSeleccionado(resultados[0]);
     }
     if (e.key === 'Escape') limpiar();
   };
 
+  const dniTipeado = q.replace(/\D/g, '');
+
   return (
     <div className="w-full flex flex-col flex-1">
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2 px-3 h-10"
+        style={{
+          backgroundColor: 'var(--pl-surface)',
+          border: '1px solid var(--pl-border-strong)',
+          borderRadius: 'var(--pl-radius-md)',
+        }}
+      >
+        <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--pl-text-faint)' }} />
+        <input
+          ref={inputRef}
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="DNI o nombre y apellido"
+          className="flex-1 min-w-0 bg-transparent outline-none text-sm font-semibold"
+          style={{ color: 'var(--pl-text)' }}
+        />
+        {buscando && <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" style={{ color: 'var(--pl-text-faint)' }} />}
+        {q && !buscando && (
+          <button
+            type="button"
+            onClick={limpiar}
+            className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ color: 'var(--pl-text-faint)' }}
+            title="Limpiar (ESC)"
+            aria-label="Limpiar"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Selección hecha: banda verde con el vecino y el Continuar (canvas). */}
+      {seleccionado && (
         <div
-          className="flex items-center gap-2 px-3 h-9 flex-1 min-w-0"
+          className="mt-3 p-3 flex flex-wrap items-center gap-3"
           style={{
-            backgroundColor: 'var(--pl-surface)',
-            border: '1px solid var(--pl-border-strong)',
-            borderRadius: 'var(--pl-radius-md)',
+            backgroundColor: 'var(--pl-green-050)',
+            border: '1px solid var(--pl-green-200)',
+            borderRadius: 'var(--pl-radius-lg)',
           }}
         >
-          <Search className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--pl-text-faint)' }} />
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="numeric"
-            value={dni}
-            onChange={(e) => { setDni(e.target.value.replace(/\D/g, '').slice(0, 9)); setSinResultados(false); }}
-            onKeyDown={handleKeyDown}
-            placeholder="DNI sin puntos"
-            className="av2-tnum flex-1 min-w-0 bg-transparent outline-none text-sm font-semibold tracking-wider"
-            style={{ color: 'var(--pl-text)' }}
-            maxLength={9}
-          />
-          {dni && !buscando && (
-            <button
-              type="button"
-              onClick={limpiar}
-              className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ color: 'var(--pl-text-faint)' }}
-              title="Limpiar (ESC)"
-              aria-label="Limpiar"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div
+            className="w-10 h-10 flex items-center justify-center text-sm font-bold flex-shrink-0"
+            style={{ backgroundColor: 'var(--pl-green-100)', color: 'var(--pl-green-700)', borderRadius: 'var(--pl-radius-md)' }}
+          >
+            {(seleccionado.nombre?.[0] || '?')}{(seleccionado.apellido?.[0] || '')}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold truncate" style={{ color: 'var(--pl-text)' }}>
+              {seleccionado.nombre} {seleccionado.apellido}
+            </p>
+            <p className="text-[11px] av2-tnum" style={{ color: 'var(--pl-green-700)' }}>
+              DNI {seleccionado.dni}{seleccionado.telefono ? ` · ${seleccionado.telefono}` : ''}
+            </p>
+          </div>
+          <button type="button" onClick={() => onUsar(seleccionado)} className="av2-btn-primario flex-shrink-0">
+            Continuar
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={buscar}
-          disabled={buscando || !dni.trim()}
-          className="av2-btn-primario flex-shrink-0"
-        >
-          {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          Buscar
-        </button>
-      </div>
+      )}
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
-        <span className="inline-flex items-center gap-1">
-          <Sparkles className="w-3 h-3" style={{ color: 'var(--pl-green)' }} />
-          Si no está en el padrón, validá con RENAPER (columna de al lado).
-        </span>
-      </div>
-
-      {resultados && resultados.length > 0 && (
-        <div className="mt-4">
+      {/* Sugerencias en vivo (se ocultan al seleccionar). */}
+      {!seleccionado && resultados && resultados.length > 0 && (
+        <div className="mt-3">
           <div className="flex items-center justify-between mb-2">
             <p className="av2-eyebrow">
               {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
             </p>
             <p className="text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>
-              <Kbd>↵</Kbd> usa el primero
+              <Kbd>↵</Kbd> elige el primero
             </p>
           </div>
           <div className="space-y-2">
             {resultados.map((v, i) => (
-              <ResultadoVecino key={v.user_id} vecino={v} selected={i === 0} onUsar={onUsar} />
+              <ResultadoVecino key={v.user_id} vecino={v} selected={i === 0} onUsar={setSeleccionado} />
             ))}
           </div>
         </div>
       )}
 
-      {sinResultados && <AvisoSinPadron dni={dni} onCargarManual={onCargarManual} />}
-
-      {/* Salidas del modo DNI, ancladas al pie de la tarjeta (referencia). */}
-      <div className="flex gap-2 mt-auto pt-4 flex-wrap">
-        <button type="button" onClick={onBuscarPorNombre} className="av2-btn-secundario">
-          Buscar por nombre
-        </button>
-        <button type="button" onClick={() => onCargarManual()} className="av2-btn-secundario">
-          Cargar vecino a mano
-        </button>
-      </div>
+      {!seleccionado && sinResultados && (
+        <AvisoSinPadron dni={dniTipeado.length >= 7 ? dniTipeado : undefined} onCargarManual={onCargarManual} />
+      )}
     </div>
   );
 }
@@ -693,10 +751,10 @@ function AvisoSinPadron({ dni, onCargarManual }: {
       <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden />
       <div className="flex-1 text-xs">
         <p className="font-semibold">
-          {dni ? `No hay vecino con el DNI ${dni} en el padrón` : 'Sin coincidencias en el padrón'}
+          {dni ? `No hay vecino con el DNI ${dni} en el padrón` : 'No hay vecino con esos datos en el padrón'}
         </p>
         <p className="opacity-80 mt-0.5">
-          Validalo con el celular (columna de al lado) o cargá los datos a mano.
+          Validalo con el celular (pestaña de al lado) o cargá los datos a mano.
         </p>
         <button
           type="button"
@@ -768,99 +826,6 @@ function ResultadoVecino({ vecino: v, selected, onUsar }: {
 }
 
 // ============================================================
-// BusquedaLibre
-// ============================================================
-function BusquedaLibre({ onUsar, onCargarManual }: {
-  onUsar: (v: VecinoEncontrado) => void;
-  onCargarManual: (dniPrefill?: string) => void;
-}) {
-  const [q, setQ] = useState('');
-  const [buscando, setBuscando] = useState(false);
-  const [resultados, setResultados] = useState<VecinoEncontrado[] | null>(null);
-  const [sinResultados, setSinResultados] = useState(false);
-
-  const buscar = async () => {
-    const term = q.trim();
-    if (term.length < 2) {
-      toast.error('Mínimo 2 caracteres');
-      return;
-    }
-    setBuscando(true);
-    setSinResultados(false);
-    setResultados(null);
-    try {
-      const r = await operadorApi.buscarVecino(undefined, term);
-      if (r.data.length === 0) setSinResultados(true);
-      else setResultados(r.data);
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(msg || 'Error buscando vecino');
-    } finally {
-      setBuscando(false);
-    }
-  };
-
-  return (
-    <div
-      className="p-5 space-y-3 w-full"
-      style={{
-        backgroundColor: 'var(--pl-surface)',
-        border: '1px solid var(--pl-border)',
-        borderRadius: 'var(--pl-radius-lg)',
-      }}
-    >
-      <div>
-        <p
-          className="text-[15px] font-bold"
-          style={{ color: 'var(--pl-text)', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}
-        >
-          Buscar por nombre, apellido o DNI parcial
-        </p>
-        <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--pl-text-muted)' }}>
-          Útil cuando el vecino no se acuerda el DNI completo.
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
-          placeholder="Ej: Pérez · Juan · 30217"
-          className="flex-1 min-w-0 px-3 h-9 text-sm outline-none"
-          style={{
-            backgroundColor: 'var(--pl-surface)',
-            color: 'var(--pl-text)',
-            border: '1px solid var(--pl-border-strong)',
-            borderRadius: 'var(--pl-radius-md)',
-          }}
-        />
-        <button
-          type="button"
-          onClick={buscar}
-          disabled={buscando || q.trim().length < 2}
-          className="av2-btn-primario flex-shrink-0"
-        >
-          {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          Buscar
-        </button>
-      </div>
-
-      {resultados && resultados.length > 0 && (
-        <div className="space-y-2">
-          {resultados.map((v, i) => (
-            <ResultadoVecino key={v.user_id} vecino={v} selected={i === 0} onUsar={onUsar} />
-          ))}
-        </div>
-      )}
-
-      {sinResultados && <AvisoSinPadron onCargarManual={onCargarManual} />}
-    </div>
-  );
-}
-
-// ============================================================
 // Hub — VecinoStrip + 4 GestionCards + RecentActivity
 // ============================================================
 function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTurno, onReset }: {
@@ -915,10 +880,12 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
         </span>
       </div>
 
+      {/* Colores por gestión según el canvas: Reclamo ámbar, Trámite verde
+          destacado, Turno azul, Tasas ocre. */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <GestionCard
-          color="var(--pl-blue)"
-          fondo="var(--pl-blue-100)"
+          color="var(--pl-amber)"
+          fondo="var(--pl-amber-100)"
           icon={<AlertTriangle className="w-5 h-5" />}
           kbd="R"
           title="Reclamo"
@@ -934,25 +901,27 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTu
           title="Trámite"
           subtitle={tramiteHabilitado
             ? 'Iniciar trámite. Mandá requisitos por WhatsApp o imprimí el PDF.'
-            : 'Requiere validar la identidad del vecino con RENAPER (opción "Por celular").'}
+            : 'Requiere validar la identidad del vecino con RENAPER (pestaña "Por celular").'}
           contextBadge={tramiteHabilitado ? undefined : { tone: 'red', text: 'Requiere RENAPER' }}
+          pie={tramiteHabilitado ? 'Ayuda a clasificar' : undefined}
           highlighted={tramiteHabilitado}
           ctaLabel={tramiteHabilitado ? 'Iniciar trámite' : 'Falta RENAPER'}
           onStart={irTramiteGuard}
         />
         <GestionCard
-          color="var(--pl-amber)"
-          fondo="var(--pl-amber-100)"
+          color="var(--pl-blue)"
+          fondo="var(--pl-blue-100)"
           icon={<CalendarClock className="w-5 h-5" />}
           kbd="U"
           title="Turno"
           subtitle="Tomar turno para un trámite presencial (el vecino se va con día y hora)"
+          pie="Turno-first"
           ctaLabel="Tomar turno"
           onStart={onIrTurno}
         />
         <GestionCard
-          color="var(--pl-text-3)"
-          fondo="var(--pl-track)"
+          color="var(--pl-amber-strong)"
+          fondo="var(--pl-amber-100)"
           icon={<Banknote className="w-5 h-5" />}
           kbd="D"
           title="Tasas"
@@ -1033,16 +1002,18 @@ function VecinoStrip({ vecino, kycSessionId, onReset }: {
       </div>
       <button type="button" onClick={onReset} className="av2-btn-secundario flex-shrink-0">
         <RefreshCcw className="w-3.5 h-3.5" aria-hidden />
-        Cambiar vecino
+        Cambiar
       </button>
     </div>
   );
 }
 
 // ============================================================
-// GestionCard — card con context badge, kbd y CTA
+// GestionCard — card del canvas: tile de color arriba-izq, kbd arriba-der,
+// watermark del icono al fondo, y pie separado por borde con el dato
+// contextual a la izquierda y el CTA con flecha a la derecha.
 // ============================================================
-function GestionCard({ color, fondo, icon, kbd, title, subtitle, contextBadge, highlighted, ctaLabel, onStart }: {
+function GestionCard({ color, fondo, icon, kbd, title, subtitle, contextBadge, pie, highlighted, ctaLabel, onStart }: {
   color: string;
   fondo: string;
   icon: React.ReactNode;
@@ -1050,6 +1021,8 @@ function GestionCard({ color, fondo, icon, kbd, title, subtitle, contextBadge, h
   title: string;
   subtitle: string;
   contextBadge?: { tone: 'amber' | 'blue' | 'red' | 'gray' | 'green'; text: string };
+  /** Dato contextual del pie (solo texto REAL o descriptor, nunca números inventados). */
+  pie?: string;
   highlighted?: boolean;
   ctaLabel: string;
   onStart: () => void;
@@ -1058,14 +1031,22 @@ function GestionCard({ color, fondo, icon, kbd, title, subtitle, contextBadge, h
     <button
       type="button"
       onClick={onStart}
-      className="text-left p-4 flex flex-col transition-all hover:shadow-lg"
+      className="relative overflow-hidden text-left p-4 flex flex-col transition-all hover:shadow-lg min-h-[176px]"
       style={{
         backgroundColor: 'var(--pl-surface)',
-        border: '1px solid var(--pl-border)',
-        borderLeft: `3px solid ${color}`,
+        border: `1px solid ${highlighted ? 'var(--pl-green-200)' : 'var(--pl-border)'}`,
         borderRadius: 'var(--pl-radius-lg)',
       }}
     >
+      {/* Watermark del icono (canvas): gigante, casi invisible, decorativo. */}
+      <span
+        aria-hidden
+        className="absolute -right-3 -top-3 pointer-events-none [&>svg]:w-24 [&>svg]:h-24"
+        style={{ color, opacity: 0.06 }}
+      >
+        {icon}
+      </span>
+
       <div className="flex items-center gap-2 mb-3">
         <div
           className="w-10 h-10 flex items-center justify-center"
@@ -1089,11 +1070,17 @@ function GestionCard({ color, fondo, icon, kbd, title, subtitle, contextBadge, h
       <p className="text-xs flex-1 mb-3 leading-relaxed" style={{ color: 'var(--pl-text-muted)' }}>
         {subtitle}
       </p>
-      <div className="flex items-center justify-between gap-2 mt-auto flex-wrap">
+      <div
+        className="flex items-center justify-between gap-2 mt-auto pt-2.5 flex-wrap"
+        style={{ borderTop: '1px solid var(--pl-border)' }}
+      >
         {contextBadge && (
           <span className={`av2-chip-estado av2-chip-estado--${contextBadge.tone}`}>
             {contextBadge.text}
           </span>
+        )}
+        {!contextBadge && pie && (
+          <span className="text-[11px]" style={{ color: 'var(--pl-text-muted)' }}>{pie}</span>
         )}
         <span className="inline-flex items-center gap-1 text-xs font-semibold ml-auto" style={{ color }}>
           {ctaLabel}

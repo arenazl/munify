@@ -12,6 +12,7 @@ exactamente lo que pasó con Configuración.
 | Archivo | Qué es |
 |---|---|
 | `Configuracion.dc.html` | El prototipo COMPLETO de Configuración: 8 grupos, 40 pantallas, los 17 ABM con sus KPIs, los catálogos, los puentes, el árbol de trámites, la asignación y Apariencia. Navegable: se cambian solapas, se abre el drawer, se alternan estados. |
+| `Mostrador.dc.html` | La consola del operador de ventanilla, VIGENTE al 2026-08-07 (reemplaza a los dos `mostrador-*.dc.html` de `docs/design/paquetes/04`, que eran idénticos entre sí). Flujo de 3 pasos: identificar (segmented Buscar vecino / Por celular con QR+RENAPER) → elegir gestión (4 cards con atajos R/T/U/D) → cargar. ALCANCE decidido por el dueño: se implementa HASTA la elección; la carga pasa en los módulos reales (Reclamos/Trámites/Turno) con el vecino precargado — el paso 3 embebido del prototipo se ignora. |
 | `support.js` | Runtime de Claude Design (`x-dc`). Sin esto el HTML no renderiza. |
 | `image-slot.js` | El componente de las fotos arrastrables del prototipo. |
 

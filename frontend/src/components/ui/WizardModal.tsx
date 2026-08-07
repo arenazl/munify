@@ -159,12 +159,15 @@ export function WizardModal({
     }
     .wizard-modal-content {
       width: 100%;
-      max-width: ${aiPanel ? '1200px' : '900px'};
+      /* Un poco más angosto y con el acento verde ARRIBA (pedido del dueño,
+         2026-08-07): el modal se lee como pieza del kit, no como página. */
+      max-width: ${aiPanel ? '1040px' : '760px'};
       max-height: calc(100vh - 48px);
       margin: 0 !important;
       display: flex;
       flex-direction: column;
       border-radius: 16px;
+      border-top: 3px solid var(--pl-green);
       overflow: hidden;
       transform: ${isVisible ? 'scale(1)' : 'scale(0.95)'};
       opacity: ${isVisible ? 1 : 0};
