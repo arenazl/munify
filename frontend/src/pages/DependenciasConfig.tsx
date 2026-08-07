@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dependenciasApi, categoriasReclamoApi, categoriasTramiteApi, tramitesApi } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -133,6 +134,7 @@ type FilterType = 'todos' | 'reclamos' | 'tramites';
 export default function DependenciasConfig() {
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { municipioActual } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
 
   const [loading, setLoading] = useState(true);
@@ -290,9 +292,15 @@ export default function DependenciasConfig() {
 
     setSearchingAddress(true);
     try {
-      // Agregar contexto de Buenos Aires para mejores resultados
+      /* El contexto geográfico sale del país del tenant (`municipios.pais`).
+         AR conserva el "Buenos Aires, Argentina" que ya estaba; otro país
+         busca ahí — con el contexto clavado en Argentina, una dirección de
+         Asunción daba 0 resultados. */
+      const pais = (municipioActual?.pais || 'AR').toUpperCase();
+      const NOMBRE_PAIS: Record<string, string> = { AR: 'Argentina', PY: 'Paraguay', UY: 'Uruguay' };
+      const contexto = pais === 'AR' ? ', Buenos Aires, Argentina' : NOMBRE_PAIS[pais] ? `, ${NOMBRE_PAIS[pais]}` : '';
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Buenos Aires, Argentina&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(`${query}${contexto}`)}&countrycodes=${pais.toLowerCase()}&limit=5&addressdetails=1`,
         { headers: { 'Accept-Language': 'es' } }
       );
       const data = await response.json();
@@ -302,7 +310,7 @@ export default function DependenciasConfig() {
     } finally {
       setSearchingAddress(false);
     }
-  }, []);
+  }, [municipioActual]);
 
   // Debounce para búsqueda de direcciones
   useEffect(() => {

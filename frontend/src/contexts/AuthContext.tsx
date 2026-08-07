@@ -11,6 +11,8 @@ export interface Municipio {
   id: number;
   nombre: string;
   codigo: string;
+  /** ISO-2 del país del tenant (AR, PY…). Ausente = AR (legacy). */
+  pais?: string;
   color_primario?: string;
   color_secundario?: string;
   logo_url?: string;

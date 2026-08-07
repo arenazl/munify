@@ -235,12 +235,22 @@ export function DireccionAutocomplete({
           return Array.isArray(res.data) ? res.data : [];
         };
 
-        const searchQuery = `${trimmed}, Buenos Aires, Argentina`;
+        /* El país sale del tenant (`municipios.pais`, ISO-2). Con AR se
+           conserva el contexto "Buenos Aires, Argentina" que ya estaba en
+           producción; con cualquier otro país el geocoder busca AHÍ — sin
+           esto, un vecino de Asunción no podía cargar la dirección de su
+           reclamo (0 resultados con el filtro clavado en 'ar'). */
+        const pais = (municipioActual?.pais || 'AR').toUpperCase();
+        const codigoPais = pais.toLowerCase();
+        const NOMBRE_PAIS: Record<string, string> = { AR: 'Argentina', PY: 'Paraguay', UY: 'Uruguay' };
+        const contextoPais = pais === 'AR' ? 'Buenos Aires, Argentina' : NOMBRE_PAIS[pais] ?? '';
+
+        const searchQuery = contextoPais ? `${trimmed}, ${contextoPais}` : trimmed;
 
         // 1) Primer intento: viewbox + bounded=1 (estrictamente dentro del área)
         let data: DireccionSuggestion[] = await fetchFromProxy({
           q: searchQuery,
-          countrycodes: 'ar',
+          countrycodes: codigoPais,
           limit: 15,
           ...(viewbox ? { viewbox, bounded: 1 } : {}),
         });
@@ -249,7 +259,7 @@ export function DireccionAutocomplete({
         if (data.length === 0 && viewbox) {
           data = await fetchFromProxy({
             q: searchQuery,
-            countrycodes: 'ar',
+            countrycodes: codigoPais,
             limit: 15,
             viewbox,
           });
@@ -258,17 +268,17 @@ export function DireccionAutocomplete({
         // 3) Fallback: agregar nombre del municipio a la query
         if (data.length === 0 && municipioSimple) {
           data = await fetchFromProxy({
-            q: `${trimmed}, ${municipioSimple}, Buenos Aires, Argentina`,
-            countrycodes: 'ar',
+            q: contextoPais ? `${trimmed}, ${municipioSimple}, ${contextoPais}` : `${trimmed}, ${municipioSimple}`,
+            countrycodes: codigoPais,
             limit: 15,
           });
         }
 
-        // 4) Fallback: sólo query + Argentina
+        // 4) Fallback: sólo query + país
         if (data.length === 0) {
           data = await fetchFromProxy({
-            q: `${trimmed}, Argentina`,
-            countrycodes: 'ar',
+            q: NOMBRE_PAIS[pais] ? `${trimmed}, ${NOMBRE_PAIS[pais]}` : trimmed,
+            countrycodes: codigoPais,
             limit: 15,
           });
         }
