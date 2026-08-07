@@ -240,6 +240,10 @@ export async function cargarArbolReal(): Promise<any[]> {
     const nodoTramite = (t: any) => {
       const cat = catDe.get(t.categoria_tramite_id);
       const modoAtencion = String(t.modo_atencion || '');
+      /* "Validaciones" del canvas = los requiere_* del modelo que el vecino
+         tiene que pasar (KYC, DNI, facial, CENAT). */
+      const validaciones = [t.requiere_kyc, t.requiere_validacion_dni, t.requiere_validacion_facial, t.requiere_cenat]
+        .filter(Boolean).length;
       return {
         id: t.id,
         nombre: t.nombre,
@@ -248,10 +252,15 @@ export async function cargarArbolReal(): Promise<any[]> {
         dias: t.tiempo_estimado_dias || 0,
         costo: Number(t.costo) || 0,
         modo: modoAtencion.includes('online') ? 'online' : modoAtencion.includes('con_turno') ? 'turno' : 'sinturno',
+        docs: (t.documentos_requeridos || []).length,
+        validaciones,
         prerrequisitos: (t.documentos_requeridos || []).map((d: any) => ({
           nombre: d.nombre,
           obligatorio: !!d.obligatorio,
         })),
+        /* El objeto crudo de /api/tramites: la edición del árbol lo necesita
+           entero (documentos con id, flags de pago/KYC, etc.). */
+        raw: t,
       };
     };
 
@@ -266,6 +275,7 @@ export async function cargarArbolReal(): Promise<any[]> {
             id: clave,
             nombre: cat?.nombre ?? 'Sin categoría',
             activa: cat?.activo !== false,
+            raw: cat ?? null,
             tramites: [],
           });
         }
@@ -285,13 +295,23 @@ export async function cargarArbolReal(): Promise<any[]> {
         return { id: d.id, nombre: d.nombre, tipo: 'dependencia', hijos: agrupar(conDetalle) };
       });
 
+    /* Al nodo suelto van (a) trámites que ninguna dependencia atiende y (b)
+       categorías SIN trámites — recién creadas, por ejemplo. Sin esto, una
+       categoría nueva no aparecía en el árbol y el alta parecía no funcionar. */
     const sueltos = tramites.filter((t) => !usados.has(t.id));
-    if (sueltos.length > 0) {
+    const catsVisibles = new Set<number>();
+    result.forEach((d) => d.hijos.forEach((c: any) => catsVisibles.add(c.id)));
+    const extraHijos = agrupar(sueltos);
+    extraHijos.forEach((c: any) => catsVisibles.add(c.id));
+    const vacias = categorias
+      .filter((c) => !catsVisibles.has(c.id))
+      .map((c) => ({ id: c.id, nombre: c.nombre, activa: c.activo !== false, raw: c, tramites: [] }));
+    if (extraHijos.length > 0 || vacias.length > 0) {
       result.push({
         id: 'sin-dep',
         nombre: 'Sin dependencia asignada',
         tipo: 'dependencia',
-        hijos: agrupar(sueltos),
+        hijos: [...extraHijos, ...vacias],
       });
     }
 

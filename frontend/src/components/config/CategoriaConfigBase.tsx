@@ -143,7 +143,7 @@ interface CategoriaSugerida {
   rubro?: string;
 }
 
-const ICONOS_DISPONIBLES = [
+export const ICONOS_DISPONIBLES = [
   'Lightbulb', 'Construction', 'Trash2', 'Sparkles', 'TreeDeciduous',
   'TrafficCone', 'Droplets', 'Bug', 'Dog', 'Volume2',
   'Car', 'Store', 'HardHat', 'Map', 'CreditCard',
@@ -153,8 +153,10 @@ const ICONOS_DISPONIBLES = [
 
 /** Los colores del catálogo son DATOS (se guardan en la fila), no tokens del
  *  theme: son la paleta que el municipio usa para distinguir sus categorías
- *  en el mapa y en las listas. Por eso van con nombre, para el tooltip. */
-const COLORES_DISPONIBLES = [
+ *  en el mapa y en las listas. Por eso van con nombre, para el tooltip.
+ *  Exportados junto con los iconos: cualquier alta de entidad de catálogo
+ *  (p. ej. la del árbol de Trámites) elige de la MISMA paleta. */
+export const COLORES_DISPONIBLES = [
   { name: 'Ámbar', value: '#f59e0b' },
   { name: 'Piedra', value: '#78716c' },
   { name: 'Esmeralda', value: '#10b981' },

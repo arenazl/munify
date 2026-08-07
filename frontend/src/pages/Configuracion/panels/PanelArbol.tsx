@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as LucideIcons from 'lucide-react';
 
 export interface PanelArbolProps {
   tramites: any[]; // The hierarchical data from cargarArbolReal
+  /** Alta de un trámite dentro de una categoría (el hijo). */
+  onNuevoTramite?: (categoriaId: number | null) => void;
+  /** Edición de un trámite existente (recibe el objeto RAW de la API). */
+  onEditarTramite?: (tramiteRaw: any) => void;
+  /** Alta de una categoría de trámite. */
+  onNuevaCategoria?: () => void;
+  /** Edición de una categoría (recibe el objeto RAW de la API). */
+  onEditarCategoria?: (categoriaRaw: any) => void;
 }
 
 // Component to render dynamic Lucide icons or fallback to path
@@ -16,12 +24,31 @@ const DynamicIcon = ({ name, color, size = 15, pathProps = {} }: { name: string,
   return <Icon color={color || "currentColor"} size={size} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" />;
 };
 
-export default function PanelArbol({ tramites }: PanelArbolProps) {
+export default function PanelArbol({ tramites, onNuevoTramite, onEditarTramite, onNuevaCategoria, onEditarCategoria }: PanelArbolProps) {
   // State for expanded nodes. Store node IDs.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  /* "Expandir todo" abre TODOS los niveles de una (dependencias, categorías y
+     trámites): es la vista de control del canvas. El label alterna a
+     "Contraer todo" cuando ya está todo abierto. */
+  const todosLosIds = useMemo(() => {
+    const ids: string[] = [];
+    tramites.forEach((dep: any) => {
+      ids.push(`dep-${dep.id}`);
+      (dep.hijos || []).forEach((cat: any) => {
+        ids.push(`cat-${cat.id}`);
+        (cat.tramites || []).forEach((t: any) => ids.push(`t-${t.id}`));
+      });
+    });
+    return ids;
+  }, [tramites]);
+  const todoAbierto = todosLosIds.length > 0 && todosLosIds.every((id) => expanded[id]);
+  const alternarTodo = () => {
+    setExpanded(todoAbierto ? {} : Object.fromEntries(todosLosIds.map((id) => [id, true])));
   };
 
   const renderPrerrequisito = (req: any, idx: number) => (
@@ -42,9 +69,14 @@ export default function PanelArbol({ tramites }: PanelArbolProps) {
   const renderTramite = (t: any) => {
     const id = `t-${t.id}`;
     const isExpanded = !!expanded[id];
-    const mBg = t.modo === 'turno' ? '#E8F1FE' : (t.modo === 'online' ? 'var(--pl-green-050)' : '#FDF1DF');
-    const mCol = t.modo === 'turno' ? '#1D6FD1' : (t.modo === 'online' ? 'var(--pl-green-700)' : 'var(--pl-amber-strong)');
-    const mLabel = t.modo === 'turno' ? 'Con turno' : (t.modo === 'online' ? '100% online' : 'Sin turno');
+    const mBg = t.modo === 'turno' ? '#E8F1FE' : (t.modo === 'online' ? 'var(--pl-green-050)' : 'color-mix(in srgb, var(--pl-red-700) 10%, transparent)');
+    const mCol = t.modo === 'turno' ? '#1D6FD1' : (t.modo === 'online' ? 'var(--pl-green-700)' : 'var(--pl-red-700)');
+    const mLabel = t.modo === 'turno' ? 'Con turno' : (t.modo === 'online' ? '100% online' : 'Sin turno, hay que ir');
+    /* "2 documentos · 1 validación" — la carga que enfrenta el vecino. */
+    const partes: string[] = [];
+    if (t.docs > 0) partes.push(`${t.docs} documento${t.docs === 1 ? '' : 's'}`);
+    if (t.validaciones > 0) partes.push(`${t.validaciones} validaci${t.validaciones === 1 ? 'ón' : 'ones'}`);
+    const carga = partes.join(' · ');
 
     return (
       <React.Fragment key={id}>
@@ -59,20 +91,37 @@ export default function PanelArbol({ tramites }: PanelArbolProps) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d={t.glifo} /></svg>
             )}
           </span>
-          <span style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--pl-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.nombre}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', height: '20px', padding: '0 8px', borderRadius: '6px', background: mBg, fontSize: '10.5px', fontWeight: 600, color: mCol, whiteSpace: 'nowrap' }}>{mLabel}</span>
+          <span style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--pl-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.nombre}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', height: '20px', padding: '0 8px', borderRadius: '6px', background: mBg, fontSize: '10.5px', fontWeight: 600, color: mCol, whiteSpace: 'nowrap' }}>{mLabel}</span>
+            </span>
+            {carga && <span style={{ fontSize: '11px', color: 'var(--pl-text-muted)' }}>{carga}</span>}
           </span>
-          <span title="Editar" style={{ display: 'grid', placeItems: 'center', width: '32px', height: '32px', borderRadius: '9px', cursor: 'pointer', flex: '0 0 32px' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-surface-2)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+          {(t.costo > 0 || t.dias > 0) && (
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px', flex: '0 0 auto' }}>
+              {t.costo > 0 && (
+                <span style={{ fontFamily: 'Sora, sans-serif', fontSize: '13px', fontWeight: 700, color: 'var(--pl-text)', fontFeatureSettings: "'tnum'" }}>
+                  $ {Number(t.costo).toLocaleString('es-AR')}
+                </span>
+              )}
+              {t.dias > 0 && (
+                <span style={{ fontSize: '11px', color: 'var(--pl-text-muted)' }}>en {t.dias} día{t.dias === 1 ? '' : 's'}</span>
+              )}
+            </span>
+          )}
+          <span title="Editar" onClick={(e) => { e.stopPropagation(); onEditarTramite?.(t.raw); }} style={{ display: 'grid', placeItems: 'center', width: '32px', height: '32px', borderRadius: '9px', cursor: 'pointer', flex: '0 0 32px' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-surface-2)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
             <LucideIcons.Pencil size={15} color="var(--pl-text-muted)" />
           </span>
         </div>
 
         {isExpanded && (t.prerrequisitos || []).map((req: any, idx: number) => renderPrerrequisito(req, idx))}
-        
+
         {isExpanded && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px', paddingLeft: '116px', background: 'var(--pl-surface-2)', borderBottom: '1px solid var(--pl-border)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', height: '30px', padding: '0 10px', borderRadius: '6px', border: '1px dashed var(--pl-border-strong)', background: 'var(--pl-surface)' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-surface-2)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-surface)'; }}>
+            {/* Los documentos se gestionan en la edición del trámite: este CTA
+                abre el sheet directo en vez de un editor aparte. */}
+            <span onClick={() => onEditarTramite?.(t.raw)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', height: '30px', padding: '0 10px', borderRadius: '6px', border: '1px dashed var(--pl-border-strong)', background: 'var(--pl-surface)' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-surface-2)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-surface)'; }}>
               <LucideIcons.Plus size={14} color="var(--pl-text-2)" />
               <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--pl-text-2)' }}>Nuevo prerrequisito</span>
             </span>
@@ -101,16 +150,18 @@ export default function PanelArbol({ tramites }: PanelArbolProps) {
               <span style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--pl-text-2)' }}>{cat.tramites?.length || 0} tipos</span>
             </span>
           </span>
-          <span title="Editar" style={{ display: 'grid', placeItems: 'center', width: '32px', height: '32px', borderRadius: '9px', cursor: 'pointer', flex: '0 0 32px' }}>
-            <LucideIcons.Pencil size={15} color="var(--pl-text-muted)" />
-          </span>
+          {cat.raw && (
+            <span title="Editar" onClick={(e) => { e.stopPropagation(); onEditarCategoria?.(cat.raw); }} style={{ display: 'grid', placeItems: 'center', width: '32px', height: '32px', borderRadius: '9px', cursor: 'pointer', flex: '0 0 32px' }}>
+              <LucideIcons.Pencil size={15} color="var(--pl-text-muted)" />
+            </span>
+          )}
         </div>
-        
+
         {isExpanded && (cat.tramites || []).map((t: any) => renderTramite(t))}
-        
+
         {isExpanded && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', paddingLeft: '84px', background: 'var(--pl-surface-2)', borderBottom: '1px solid var(--pl-border)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px dashed var(--pl-green-200)', background: 'var(--pl-surface)' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-green-050)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-surface)'; }}>
+            <span onClick={() => onNuevoTramite?.(typeof cat.id === 'number' ? cat.id : null)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px dashed var(--pl-green-200)', background: 'var(--pl-surface)' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-green-050)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-surface)'; }}>
               <LucideIcons.Plus size={14} color="var(--pl-green-700)" />
               <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--pl-green-700)' }}>Nuevo tipo de trámite en {cat.nombre}</span>
             </span>
@@ -146,9 +197,9 @@ export default function PanelArbol({ tramites }: PanelArbolProps) {
         
         {isExpanded && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', paddingLeft: '48px', background: 'var(--pl-surface)', borderBottom: '1px solid var(--pl-border)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px dashed var(--pl-green-200)', background: 'var(--pl-surface)' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-green-050)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-surface)'; }}>
+            <span onClick={() => onNuevaCategoria?.()} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px dashed var(--pl-green-200)', background: 'var(--pl-surface)' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-green-050)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-surface)'; }}>
               <LucideIcons.Plus size={14} color="var(--pl-green-700)" />
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--pl-green-700)' }}>Nueva categoría en {dep.nombre}</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--pl-green-700)' }}>Nueva categoría de trámite</span>
             </span>
           </div>
         )}
@@ -158,6 +209,18 @@ export default function PanelArbol({ tramites }: PanelArbolProps) {
 
   return (
     <div style={{ marginTop: '0px' }}>
+      {tramites.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <button
+            type="button"
+            onClick={alternarTodo}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--pl-border)', background: 'var(--pl-surface)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--pl-text-2)' }}
+          >
+            {todoAbierto ? <LucideIcons.Minus size={14} /> : <LucideIcons.Plus size={14} />}
+            {todoAbierto ? 'Contraer todo' : 'Expandir todo'}
+          </button>
+        </div>
+      )}
       {/* TREE CONTENT */}
       <div style={{ background: 'var(--pl-surface)', border: '1px solid var(--pl-border)', borderRadius: '12px', overflow: 'hidden' }}>
         {tramites.map((dep: any) => renderDependencia(dep))}

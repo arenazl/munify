@@ -1,36 +1,95 @@
 /**
  * ArbolDelCanvas — el catálogo de trámites leído como jerarquía.
  *
- * Categoría → tipo de trámite → requisitos. El cuerpo NO es una grilla: entra
- * por `viewSlots.arbol`, y por eso las props de tabla van en neutro (el kit las
- * pide igual; ver nota abajo).
+ * Dependencia del municipio → categoría → tipo de trámite → prerrequisitos.
+ * El cuerpo NO es una grilla: entra por `viewSlots.arbol`, y por eso las props
+ * de tabla van en neutro (el kit las pide igual; ver nota abajo).
  *
- * La dependencia se muestra como DATO, no como control: acá se da de alta el
- * trámite, y a quién le toca atenderlo se decide en la pestaña Asignación. Un
- * segundo lugar para editar el mismo vínculo es cómo aparecen las dos verdades.
+ * Unifica las DOS pantallas viejas de producción (Categorías de Trámite y
+ * Catálogo de Trámites): misma información y mismas operaciones, en una sola
+ * vista. Las altas y ediciones reusan los flujos existentes de producción
+ * (`tramiteFlows`) — acá no se reinventa ningún formulario.
+ *
+ * La dependencia se muestra como DATO, no como control: a quién le toca
+ * atender cada trámite se decide en la pestaña Asignación.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
 import PanelArbol from '../../pages/Configuracion/panels/PanelArbol';
 import { cargarArbolReal } from '../../pages/Configuracion/data/datosRealesConfig';
+import { AltaTramiteWizard, EdicionTramiteSheet } from './tramiteFlows';
+import { CategoriaTramiteSheet } from './CategoriaTramiteSheet';
+import { seg } from '../../lib/semanticHero';
+import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
+import { useReportarTotal } from '../abmv2/useEmbed';
 
-export interface ArbolDelCanvasProps {
-  /** Alta de un tipo de trámite. Sin handler el CTA no se dibuja. */
-  onNuevo?: () => void;
-}
-
-export function ArbolDelCanvas({ onNuevo }: ArbolDelCanvasProps) {
+export function ArbolDelCanvas() {
   const [data, setData] = useState<any[] | null>(null);
   const [busqueda, setBusqueda] = useState('');
 
-  useEffect(() => {
+  const recargar = useCallback(() => {
     cargarArbolReal().then(setData).catch(console.error);
   }, []);
+  useEffect(() => { recargar(); }, [recargar]);
 
-  const totalCategorias = (data || []).reduce((acc: number, dep: any) => acc + (dep.hijos?.length || 0), 0);
-  const totalTramites = (data || []).reduce((acc: number, dep: any) => {
-    return acc + (dep.hijos?.reduce((acc2: number, cat: any) => acc2 + (cat.tramites?.length || 0), 0) || 0);
-  }, 0);
+  /* --- Sheets: alta de trámite (wizard de producción), edición de trámite y
+         alta/edición de categoría. El árbol es el dueño de sus flujos. --- */
+  const [altaTramite, setAltaTramite] = useState<{ abierta: boolean; categoriaId: number | null }>({ abierta: false, categoriaId: null });
+  const [tramiteEnEdicion, setTramiteEnEdicion] = useState<any | null>(null);
+  const [sheetCategoria, setSheetCategoria] = useState<{ abierta: boolean; categoria: any | null }>({ abierta: false, categoria: null });
+
+  /* Totales SIN duplicar: una categoría puede aparecer bajo dos dependencias
+     si sus trámites se reparten; el hero cuenta entidades, no nodos. */
+  const tramitesPlanos = useMemo(
+    () => (data || []).flatMap((dep: any) => (dep.hijos || []).flatMap((c: any) => c.tramites || [])),
+    [data],
+  );
+  const totalCategorias = useMemo(
+    () => new Set((data || []).flatMap((dep: any) => (dep.hijos || []).map((c: any) => c.id))).size,
+    [data],
+  );
+  const tramitesUnicos = useMemo(() => {
+    const vistos = new Map<number, any>();
+    tramitesPlanos.forEach((t: any) => vistos.set(t.id, t));
+    return Array.from(vistos.values());
+  }, [tramitesPlanos]);
+  useReportarTotal(data ? tramitesUnicos.length : undefined);
+
+  const masPesado = useMemo(() => {
+    if (!tramitesUnicos.length) return null;
+    return tramitesUnicos.slice().sort((a, b) => (b.docs + b.validaciones) - (a.docs + a.validaciones))[0];
+  }, [tramitesUnicos]);
+
+  const conCosto = tramitesUnicos.filter((t) => t.costo > 0).length;
+  const online = tramitesUnicos.filter((t) => t.modo === 'online').length;
+
+  const kpis: HeroKpi[] = [
+    { etiqueta: 'Categorías', valor: totalCategorias, sub: 'carpetas del catálogo' },
+    { etiqueta: 'Tipos', valor: tramitesUnicos.length, sub: 'trámites concretos' },
+    {
+      etiqueta: 'Más pesado',
+      valor: masPesado ? masPesado.docs + masPesado.validaciones : '—',
+      sub: masPesado ? masPesado.nombre : 'sin trámites cargados',
+      veredicto: masPesado && masPesado.docs + masPesado.validaciones >= 4 ? 'advertencia' : undefined,
+    },
+    { etiqueta: 'Con costo', valor: conCosto, sub: 'pagan tasa' },
+    { etiqueta: '100% online', valor: online, sub: 'sin ir al municipio' },
+  ];
+
+  const frases: HeroFrase[] = [
+    {
+      segmentos: [
+        seg(`${totalCategorias} categoría${totalCategorias === 1 ? '' : 's'} y ${tramitesUnicos.length} tipo${tramitesUnicos.length === 1 ? '' : 's'}`, 'bueno'),
+        seg(' en una sola vista, con los prerrequisitos que enfrenta el vecino en cada uno.'),
+        ...(masPesado && masPesado.docs + masPesado.validaciones > 0
+          ? [
+              seg(` El más pesado, ${masPesado.nombre},`),
+              seg(` le pide ${masPesado.docs} documento${masPesado.docs === 1 ? '' : 's'} y ${masPesado.validaciones} validaci${masPesado.validaciones === 1 ? 'ón' : 'ones'}.`, 'advertencia'),
+            ]
+          : []),
+      ],
+    },
+  ];
 
   /* El buscador filtra la rama entera: si el texto matchea la categoría se
      conserva completa; si matchea sólo un trámite, queda la categoría con ese
@@ -55,45 +114,79 @@ export function ArbolDelCanvas({ onNuevo }: ArbolDelCanvasProps) {
   }, [data, busqueda]);
 
   return (
-    <SemanticAbmPage
-      moduleKey="arbol-tramite"
-      title="Trámites"
-      description={`${totalCategorias} categorías y ${totalTramites} tipos en una sola vista, con los prerrequisitos que enfrenta el vecino en cada uno.`}
-      primaryAction={onNuevo ? { label: 'Nuevo tipo de trámite', onClick: onNuevo } : undefined}
-      pista={{
-        titulo: 'Arrancá con la estructura sugerida y complejizala cuando la necesites.',
-        texto: 'Nada se aplica sin que lo confirmes: la sugerencia queda marcada en el árbol para que la revises rama por rama.',
-      }}
-      loading={!data}
-      searchPlaceholder="Buscar categoría o trámite…"
-      search={busqueda}
-      onSearchChange={setBusqueda}
-      /* La clave `arbol` recién existe cuando hay datos: SemanticAbmPage decide
-         con `in`, y un slot presente con null se lee como "vista sin cuerpo" en
-         vez de caer al loading. */
-      viewSlots={data ? { arbol: <PanelArbol tramites={visibles} /> } : undefined}
-      activeView="arbol"
-      views={['arbol']}
-      onViewChange={() => {}}
-      /* El cuerpo entra por `viewSlots`, así que no hay grilla que describir.
-         El contrato de SemanticAbmPage pide igual las props de tabla: van en
-         neutro. Cuando el kit las vuelva opcionales para páginas con slot,
-         este bloque se borra entero. */
-      kind="plain"
-      columns={[]}
-      rows={[]}
-      rowKey={(_r: unknown, i?: number) => String(i ?? 0)}
-      rowActions={[]}
-      selects={[]}
-      statusTabs={[]}
-      activeStatus="todos"
-      onStatusChange={() => {}}
-      footer={{
-        showing: `${totalCategorias} categorías · ${totalTramites} tipos`,
-        note: 'Quién atiende cada trámite se define en Asignación, no acá.',
-      }}
-      embedded={true}
-    />
+    <>
+      <SemanticAbmPage
+        moduleKey="arbol-tramite"
+        title="Trámites"
+        hero={{ etiqueta: 'ATENCIÓN AL VECINO · TRÁMITES', frases, kpis }}
+        primaryAction={{
+          label: 'Nueva categoría de trámite',
+          onClick: () => setSheetCategoria({ abierta: true, categoria: null }),
+        }}
+        pista={{
+          titulo: 'Arrancá con la estructura sugerida y complejizala cuando la necesites.',
+          texto: 'Nada se aplica sin que lo confirmes: la sugerencia queda marcada en el árbol para que la revises rama por rama.',
+        }}
+        loading={!data}
+        searchPlaceholder="Buscar dependencia, categoría o trámite…"
+        search={busqueda}
+        onSearchChange={setBusqueda}
+        /* La clave `arbol` recién existe cuando hay datos: SemanticAbmPage
+           decide con `in`, y un slot presente con null se lee como "vista sin
+           cuerpo" en vez de caer al loading. */
+        viewSlots={data ? {
+          arbol: (
+            <PanelArbol
+              tramites={visibles}
+              onNuevoTramite={(categoriaId) => setAltaTramite({ abierta: true, categoriaId })}
+              onEditarTramite={(raw) => setTramiteEnEdicion(raw)}
+              onNuevaCategoria={() => setSheetCategoria({ abierta: true, categoria: null })}
+              onEditarCategoria={(raw) => setSheetCategoria({ abierta: true, categoria: raw })}
+            />
+          ),
+        } : undefined}
+        activeView="arbol"
+        views={['arbol']}
+        onViewChange={() => {}}
+        /* El cuerpo entra por `viewSlots`, así que no hay grilla que describir.
+           El contrato de SemanticAbmPage pide igual las props de tabla: van en
+           neutro. Cuando el kit las vuelva opcionales para páginas con slot,
+           este bloque se borra entero. */
+        kind="plain"
+        columns={[]}
+        rows={[]}
+        rowKey={(_r: unknown, i?: number) => String(i ?? 0)}
+        rowActions={[]}
+        selects={[]}
+        statusTabs={[]}
+        activeStatus="todos"
+        onStatusChange={() => {}}
+        footer={{
+          showing: `${totalCategorias} categorías · ${tramitesUnicos.length} tipos`,
+          note: 'Quién atiende cada trámite se define en Asignación, no acá.',
+        }}
+        embedded={true}
+      />
+
+      <AltaTramiteWizard
+        open={altaTramite.abierta}
+        categoriaInicial={altaTramite.categoriaId}
+        onClose={() => setAltaTramite({ abierta: false, categoriaId: null })}
+        onGuardado={recargar}
+      />
+      <EdicionTramiteSheet
+        open={tramiteEnEdicion !== null}
+        tramite={tramiteEnEdicion}
+        onClose={() => setTramiteEnEdicion(null)}
+        onGuardado={recargar}
+      />
+      <CategoriaTramiteSheet
+        open={sheetCategoria.abierta}
+        categoria={sheetCategoria.categoria}
+        onClose={() => setSheetCategoria({ abierta: false, categoria: null })}
+        onGuardado={recargar}
+      />
+    </>
   );
 }
 
