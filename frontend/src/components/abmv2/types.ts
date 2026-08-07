@@ -123,6 +123,18 @@ export interface ModuleHeroProps {
   frases: HeroFrase[];
   /** Stat strip DENTRO del hero (nada de KPIs sueltos arriba). */
   kpis?: HeroKpi[];
+  /**
+   * Cuánto hero pide la pantalla. Pass-through a `SemanticHero`.
+   *
+   * - `'full'` (default): frase + stat strip de KPIs.
+   * - `'simple'`: sólo la barra con el color del veredicto y la frase.
+   *
+   * Existe porque no toda pantalla tiene cinco números que contar. Un
+   * formulario de datos, un generador de QR o el selector de apariencia no
+   * tienen stat strip: con `'full'` prometen una que queda vacía, y sin hero
+   * se salen de la familia visual del resto del módulo.
+   */
+  size?: 'full' | 'simple';
   className?: string;
 }
 

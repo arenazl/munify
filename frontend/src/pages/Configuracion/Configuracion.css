@@ -353,16 +353,21 @@
 
 /* --- Cuerpo -------------------------------------------------------- */
 
+/* El riel es NAVEGACIÓN, no contenido: se lleva lo mínimo y todo lo que sobra
+   va al panel. Con 236px fijos + gap, en pantallas medianas la tabla del panel
+   perdía la última columna. `clamp` lo deja encogerse hasta 168px antes de que
+   el contenido empiece a sufrir, y no lo deja pasar de 212px por más ancho que
+   haya — un riel de tres ítems no gana nada siendo más ancho. */
 .config-cuerpo {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: clamp(168px, 15vw, 212px) minmax(0, 1fr);
+  gap: 16px;
   padding: 18px 20px 40px;
   align-items: start;
 }
 
 /* El riel se apila arriba cuando no hay ancho para las dos columnas. */
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .config-cuerpo { grid-template-columns: minmax(0, 1fr); }
   .config-riel {
     position: static;
@@ -374,7 +379,19 @@
   .config-riel-item { width: auto; }
 }
 
-.config-panel { min-width: 0; }
+/* `min-width: 0` es lo que permite que un hijo de grid se achique por debajo de
+   su contenido. Sin eso una tabla ancha empuja la columna y desborda la página
+   entera en vez de scrollear adentro suyo. */
+.config-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Nada del panel puede sacar scroll horizontal a la página: si una tabla no
+   entra, scrollea dentro de su propia tarjeta. */
+.config-panel :is(table, .av2-tabla, [class*='overflow']) {
+  max-width: 100%;
+}
 
 @keyframes latido {
   0% { opacity: .5; transform: scale(1); }

@@ -62,6 +62,20 @@ interface SemanticHeroProps {
    *  Regla del estándar: el hero va SIEMPRE primero en la página con sus KPIs
    *  adentro (orden: frase → KPIs → acciones); nada de filas de KPI sueltas. */
   kpis?: HeroKpi[];
+  /**
+   * Cuánto hero pide la pantalla.
+   *
+   * - `'full'` (default): la pieza entera — texto semántico + strip de KPIs.
+   *   Para pantallas con varios números que contar.
+   * - `'simple'`: SÓLO el borde teñido con el color del veredicto y el texto.
+   *   Sin KPIs y con menos aire. No toda pantalla tiene cinco números para
+   *   explotar (Apariencia, el QR, los datos del municipio): ahí un hero
+   *   completo con la strip vacía es una promesa que no se cumple, y una
+   *   pantalla sin ningún hero rompe la familia con el resto.
+   *
+   * En `'simple'` los `kpis` se ignoran aunque vengan — el tamaño manda.
+   */
+  size?: 'full' | 'simple';
   /** Cada cuánto rota. Por defecto 10 s. */
   intervaloMs?: number;
   /** Cortar la rotación automática (las flechas y los puntos siguen andando). */
@@ -116,6 +130,7 @@ export function SemanticHero({
   etiqueta,
   frases,
   kpis,
+  size = 'full',
   intervaloMs = INTERVALO_ROTACION_MS,
   sinAutoRotacion,
   className,
@@ -165,7 +180,7 @@ export function SemanticHero({
 
   return (
     <section
-      className={`sh-card pl-tinte-tono ${tono ? `sh-card--${tono}` : ''} ${className || ''}`}
+      className={`sh-card pl-tinte-tono ${tono ? `sh-card--${tono}` : ''} ${size === 'simple' ? 'sh-card--simple' : ''} ${className || ''}`}
       aria-label={etiqueta}
       onMouseEnter={() => setDetenido(true)}
       onMouseLeave={() => setDetenido(false)}
@@ -228,7 +243,9 @@ export function SemanticHero({
         ))}
       </div>
 
-      {kpis && kpis.length > 0 && (
+      {/* En 'simple' la strip no va aunque vengan kpis: la pantalla ya declaró
+          que no tiene números que contar, y el tamaño manda sobre los datos. */}
+      {size === 'full' && kpis && kpis.length > 0 && (
         <div className="sh-kpis">
           {kpis.map((k, i) => (
             <div key={i} className="sh-kpi">

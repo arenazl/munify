@@ -32,6 +32,28 @@
 .sh-card--advertencia { --pl-tono: var(--pl-amber-strong); }
 .sh-card--malo { --pl-tono: var(--pl-red); }
 
+/* [size="simple"] — el hero de las pantallas que no tienen números que contar.
+   Queda el borde con el color del veredicto y la frase, nada más.
+
+   No toda pantalla tiene cinco KPIs para explotar (los datos del municipio, el
+   QR, Apariencia). Con el hero completo, la strip vacía promete un dato que no
+   existe; sin ningún hero, esas pantallas se salen de la familia del resto. La
+   variante chica resuelve las dos cosas: misma pieza, misma barra de veredicto,
+   menos aire. */
+.sh-card--simple {
+  margin-bottom: 12px;
+  padding: 13px 16px;
+}
+
+/* La frase baja un escalón: sin KPIs abajo no necesita el peso de titular. */
+.sh-card--simple .sh-frase {
+  font-size: var(--pl-fs-body);
+  line-height: 1.5;
+}
+
+/* Sin strip, el aire entre etiqueta y frase sobra. */
+.sh-card--simple .sh-head { margin-bottom: 4px; }
+
 /* El gradiente que NACE ARRIBA en el color del veredicto lo pone la clase
    utilitaria `.pl-tinte-tono` ([TINTE POR TONO] en pl-tokens.css), que el
    componente agrega junto a `sh-card`. Antes entraba en diagonal desde el

@@ -11,8 +11,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
-import PanelArbol from '../../pages/ConfiguracionMockup/panels/PanelArbol';
-import { cargarArbolReal } from '../../pages/ConfiguracionMockup/data/datosRealesConfig';
+import PanelArbol from '../../pages/Configuracion/panels/PanelArbol';
+import { cargarArbolReal } from '../../pages/Configuracion/data/datosRealesConfig';
 
 export interface ArbolDelCanvasProps {
   /** Alta de un tipo de trámite. Sin handler el CTA no se dibuja. */

@@ -219,8 +219,31 @@ async def delete_sla_config(
     return {"message": "Configuración eliminada"}
 
 
-async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: int, municipio_id: int) -> dict:
-    """Obtener configuración de SLA aplicable a un reclamo"""
+async def get_sla_for_reclamo(
+    db: AsyncSession,
+    categoria_id: int,
+    prioridad: int,
+    municipio_id: int,
+    cache: Optional[dict] = None,
+) -> dict:
+    """
+    Obtener configuración de SLA aplicable a un reclamo.
+
+    `cache` es un dict que vive lo que dura UNA request. Sin él, esta función
+    se llamaba una vez por reclamo y hace hasta 3 queries (específica ->
+    por categoría -> general del municipio): con 244 reclamos y la base en
+    otro continente eso daba 33 segundos, y como el navegador sólo abre 6
+    conexiones por host, el endpoint se comía una en TODAS las pantallas y
+    las demás requests morían con "Network Error".
+
+    La configuración depende sólo de (municipio, categoría, prioridad), y de
+    esas combinaciones hay pocas: memoizarla baja de 244 llamadas a las que
+    realmente son distintas.
+    """
+    clave = (municipio_id, categoria_id, prioridad)
+    if cache is not None and clave in cache:
+        return cache[clave]
+
     # Multi-tenant: filtrar por municipio_id
     # Buscar SLA específico para categoría y prioridad
     result = await db.execute(
@@ -260,18 +283,24 @@ async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: in
         config = result.scalar_one_or_none()
 
     if config:
-        return {
+        valores = {
             "tiempo_respuesta": config.tiempo_respuesta,
             "tiempo_resolucion": config.tiempo_resolucion,
             "tiempo_alerta_amarilla": config.tiempo_alerta_amarilla
         }
+    else:
+        # Valores por defecto si no hay configuración
+        valores = {
+            "tiempo_respuesta": 24,
+            "tiempo_resolucion": 72,
+            "tiempo_alerta_amarilla": 48
+        }
 
-    # Valores por defecto si no hay configuración
-    return {
-        "tiempo_respuesta": 24,
-        "tiempo_resolucion": 72,
-        "tiempo_alerta_amarilla": 48
-    }
+    # El default también se cachea: si esta categoría no tiene SLA, las otras
+    # 40 filas de la misma categoría tampoco lo van a tener.
+    if cache is not None:
+        cache[clave] = valores
+    return valores
 
 
 @router.get("/estado-reclamos", response_model=List[SLAEstadoReclamo])
@@ -306,11 +335,17 @@ async def get_sla_estado_reclamos(
     estados_sla = []
     ahora = datetime.utcnow()
 
+    # Una sola config por (categoría, prioridad) para todo el lote, en vez de
+    # una consulta por reclamo. Ver la nota en `get_sla_for_reclamo`.
+    cache_sla: dict = {}
+
     for r in reclamos:
         nivel_prioridad = _NIVEL_SLA_POR_PRIORIDAD_OT.get(
             prioridad_ot_por_reclamo.get(r.id), _NIVEL_SLA_DEFAULT
         )
-        sla_config = await get_sla_for_reclamo(db, r.categoria_id, nivel_prioridad, current_user.municipio_id)
+        sla_config = await get_sla_for_reclamo(
+            db, r.categoria_id, nivel_prioridad, current_user.municipio_id, cache=cache_sla
+        )
 
         tiempo_transcurrido = (ahora - r.created_at.replace(tzinfo=None)).total_seconds() / 3600
 

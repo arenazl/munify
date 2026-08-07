@@ -34,7 +34,6 @@ import CategoriasTramiteConfig from './pages/CategoriasTramiteConfig';
 import TramitesConfig from './pages/TramitesConfig';
 import ProveedoresPago from './pages/ProveedoresPago';
 import Zonas from './pages/Zonas';
-import Configuracion from './pages/Configuracion';
 import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamoPage from './pages/NuevoReclamoPage';
@@ -62,7 +61,7 @@ import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
 import Onboarding from './pages/Onboarding';
 import MunicipioHome from './pages/MunicipioHome';
-import ConfiguracionMockup from './pages/ConfiguracionMockup/ConfiguracionMockup';
+import Configuracion from './pages/Configuracion/Configuracion';
 
 import CapturaMovil from './pages/CapturaMovil';
 import CapturaMovilFake from './pages/CapturaMovilFake';
@@ -198,8 +197,6 @@ export const router = createBrowserRouter([
   // === RUTA RAÍZ - Redirección inteligente ===
   { path: '/', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <RootRedirect /> },
 
-  // === MOCKUP SIN AUTENTICACIÓN ===
-  { path: '/configuracion-mockup', element: <ConfiguracionMockup /> },
 
   // === RUTAS PROTEGIDAS (Panel de Gestión) ===
   {
