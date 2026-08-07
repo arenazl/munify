@@ -568,7 +568,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
             }}
             className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none focus:ring-2 transition-all"
             style={{
-              backgroundColor: theme.backgroundSecondary,
+              backgroundColor: theme.card,
               border: `1px solid ${theme.primary}40`,
               color: theme.text,
               boxShadow: `0 2px 8px ${theme.primary}15`,
@@ -1105,7 +1105,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
               value={form.email_solicitante}
               onChange={e => setForm({ ...form, email_solicitante: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
             />
           </div>
           <div>
@@ -1118,7 +1118,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
               value={form.telefono_solicitante}
               onChange={e => setForm({ ...form, telefono_solicitante: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
             />
           </div>
         </div>
@@ -1148,7 +1148,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
             value={form.asunto}
             onChange={e => setForm({ ...form, asunto: e.target.value })}
             className="w-full px-3 py-2 rounded-xl text-sm"
-            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
           />
           <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>
             Mínimo 10 caracteres ({form.asunto.length}/10)
@@ -1164,7 +1164,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
             value={form.descripcion}
             onChange={e => setForm({ ...form, descripcion: e.target.value })}
             className="w-full px-3 py-2 rounded-xl text-sm resize-none"
-            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
           />
         </div>
       </div>
