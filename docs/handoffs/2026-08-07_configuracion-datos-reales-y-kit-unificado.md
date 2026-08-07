@@ -1,5 +1,39 @@
 # Handoff · Configuración: datos reales, kit unificado y lo que quedó roto
 
+> ## ACTUALIZACIÓN 2 — 2026-08-07, ronda "cablear la totalidad" (commits `4bea087`, `15c13fb`, `aad5ea2`)
+>
+> Mandato del dueño: "cablear la totalidad de la Configuración", súper admin
+> AFUERA por ahora, y **Trámites es el gran tema** (unifica las 2 pantallas
+> viejas de prod: misma info, UX del canvas).
+>
+> - **Trámites COMPLETO**: hero semántico real, alta de categoría (sheet
+>   propio, `CategoriaTramiteSheet`) y de tipo de trámite (el wizard REAL de
+>   prod, extraído a `components/config/tramiteFlows.tsx` — TramitesConfig
+>   bajó de 1286 a 325 líneas consumiéndolo), edición con documentos desde el
+>   lápiz, "Expandir todo". CTA dice "Nueva categoría de trámite", NO "Nueva
+>   dependencia". Verificado con Playwright: los 3 sheets abren con datos
+>   reales y la categoría llega preseleccionada desde la rama.
+> - **Empleados** cableado (`datosEmpleados`): sin respaldo / sin zona /
+>   chips que filtran. **Vecinos e Inventario** = pantalla PUENTE del canvas
+>   (`PuenteDeModulo`) con dato real (reclamos totales; bajo el mínimo).
+>   **WhatsApp e IA** = puentes a sus pantallas completas (mostraban el form
+>   del muni, contenido de otra pestaña).
+> - **Catálogo DESACOPLADO de operaciones** (decisión del dueño 2026-08-07:
+>   "el catálogo lista, no cuenta"): sin columna "En uso" ni KPIs de uso.
+> - **Kit**: `rowKey` acepta índice (homónimos duplicaban keys y React omitía
+>   filas — pasó con Contactos); `StatusTab.count` opcional.
+> - **Barrido Playwright de las 28 pantallas del tenant: 28/28 sin errores de
+>   consola ni requests rotas.** Build + tsc + eslint en verde (los ~90 `any`
+>   preexistentes del mock condenado siguen ahí).
+> - **PENDIENTE (decisión del dueño)**: QR de cartelería — promete "reclamo ya
+>   ubicado" pero el wizard del vecino no acepta ubicación por URL ni hay
+>   endpoint de carteles; opciones: deep-link en el wizard (módulo central,
+>   pide OK) o dejarlo para otra fase. — Altas de los demás ABM
+>   (zonas/cuadrillas/cajas/…): `ALTA_DE_AJUSTE` sigue vacío para esas.
+>   — "Sugerir estructura" del canvas: sin backend, no se dibujó.
+>   — Portar a APP_GUIDE: `SemanticHero size`, `StatusTab.count?`, `rowKey`
+>   con índice.
+
 > ## ACTUALIZACIÓN — 2026-08-07, sesión 2 (commits `b16799d`, `5d30eaa`, `bfa6c69`)
 >
 > **Todo el §3 quedó RESUELTO y verificado en la app local con Playwright**
