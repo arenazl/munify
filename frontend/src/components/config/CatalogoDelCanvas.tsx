@@ -23,6 +23,7 @@ import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
 import type { ColumnSpec, ViewKind } from '../abmv2/types';
 import type { CatalogoSpec, FilaCatalogo } from '../../config/canvasConfigSpec';
 import { CABLEADO_CATALOGO } from './datosDeAjuste';
+import { useReportarTotal } from '../abmv2/useEmbed';
 
 /** Plazo legible: en días cuando es múltiplo exacto, en horas cuando no. */
 function plazo(hs?: number | null): string {
@@ -81,6 +82,8 @@ export function CatalogoDelCanvas({
   }, [moduleKey]);
 
   const filas = filasVivo || spec.filas;
+  // Sólo el número real llega al contador del riel; el de muestra no. */
+  useReportarTotal(filasVivo ? filasVivo.length : undefined);
   const activas = filas.filter((f) => !f.off);
   const conUso = filas.some((f) => typeof f.uso === 'number');
   const sinUsar = conUso ? filas.filter((f) => (f.uso ?? 0) === 0).length : 0;

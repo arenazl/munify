@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Search, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { BRAND } from '../../brands';
 import './ConfiguracionMockup.css';
 import MainTabs, { MainTabItem } from './components/MainTabs';
 import SidebarTabs, { SidebarTabItem } from './components/SidebarTabs';
@@ -12,6 +14,7 @@ import CatalogoDelCanvas from '../../components/config/CatalogoDelCanvas';
 import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
 import ArbolDelCanvas from '../../components/config/ArbolDelCanvas';
 import AbmDeConfiguracion from '../../components/config/AbmDeConfiguracion';
+import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import { MockData } from './data/mockData';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
 // OJO: hay DOS `FilaCatalogo` en el repo — el del spec del canvas
@@ -65,6 +68,40 @@ export default function ConfiguracionMockup() {
   const hijoId = hijosActivos[padreActivo] || padre.hijos[0].id;
   const hijo = padre.hijos.find(h => h.id === hijoId)!;
 
+  /* --- Buscador de ajustes -----------------------------------------
+     Son 40 pantallas repartidas en 8 grupos: sin buscador hay que saber
+     de memoria en cuál vive cada cosa. Busca sobre TODOS los grupos, no
+     sólo el abierto, que es el caso en el que sirve. */
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
+  const [consulta, setConsulta] = useState('');
+  const inputBuscar = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (buscadorAbierto) inputBuscar.current?.focus();
+  }, [buscadorAbierto]);
+
+  useEffect(() => {
+    const alTeclado = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setBuscadorAbierto(true);
+      }
+      if (e.key === 'Escape') setBuscadorAbierto(false);
+    };
+    window.addEventListener('keydown', alTeclado);
+    return () => window.removeEventListener('keydown', alTeclado);
+  }, []);
+
+  const resultados = useMemo(() => {
+    const q = consulta.trim().toLowerCase();
+    if (!q) return [];
+    return arbol.flatMap((p: any) =>
+      p.hijos
+        .filter((h: any) => h.label.toLowerCase().includes(q) || p.label.toLowerCase().includes(q))
+        .map((h: any) => ({ grupoId: p.id, grupo: p.label, id: h.id, label: h.label })),
+    );
+  }, [consulta, arbol]);
+
   // Cargar datos reales según el tab activo
   const cargarPanelReal = useCallback(async () => {
     if (hijoId === 'muni') {
@@ -107,18 +144,45 @@ export default function ConfiguracionMockup() {
     setSearchParams({ tab: padreActivo, sub: id }, { replace: true });
   };
 
+  /* Contadores del riel. Los del árbol son del prototipo (Dependencias decía
+     11 y hay 5). Cada pantalla publica su total REAL por `reportarTotal` en
+     cuanto lo carga, y ese gana sobre el número de muestra. */
+  const [totales, setTotales] = useState<Record<string, number>>({});
+  const reportarTotal = useCallback((slotId: string, total: number) => {
+    setTotales((prev) => (prev[slotId] === total ? prev : { ...prev, [slotId]: total }));
+  }, []);
+
+  /** Salta a un ajuste de cualquier grupo (lo usa el buscador). */
+  const irAlAjuste = (grupoId: string, ajusteId: string) => {
+    setPadreActivo(grupoId);
+    setHijosActivos(prev => ({ ...prev, [grupoId]: ajusteId }));
+    setSearchParams({ tab: grupoId, sub: ajusteId }, { replace: true });
+    setBuscadorAbierto(false);
+    setConsulta('');
+  };
+
+  /**
+   * El total que publicó la pantalla, o NADA.
+   *
+   * A propósito no cae al número del prototipo: "Dependencias 11" cuando hay 5
+   * es un dato inventado que se lee como real, y el riel es justo donde se
+   * mira de reojo sin entrar. Un hueco no engaña a nadie; el número aparece
+   * en cuanto la pantalla carga lo suyo.
+   */
+  const totalDe = (h: any): number | '' => (totales[h.id] !== undefined ? totales[h.id] : '');
+
   const mainTabsData: MainTabItem[] = arbol.map(p => ({
     id: p.id,
     label: p.label,
     isActive: p.id === padreActivo,
-    n: p.hijos.reduce((sum: number, h: any) => sum + (h.n ? parseInt(h.n.toString().replace('.', ''), 10) : 0), 0) || ''
+    n: p.hijos.reduce((sum: number, h: any) => sum + (Number(totalDe(h)) || 0), 0) || ''
   }));
 
   const sidebarTabsData: SidebarTabItem[] = padre.hijos.map((h: any) => ({
     id: h.id,
     label: h.label,
     isActive: h.id === hijoId,
-    n: h.n !== undefined ? parseInt(h.n.toString().replace('.', ''), 10) : ''
+    n: totalDe(h),
   }));
 
   const tituloRiel = padre.label.toUpperCase();
@@ -142,31 +206,73 @@ export default function ConfiguracionMockup() {
   }
 
   return (
-    <div className="config-mockup-wrapper">
-      <div style={{ background: '#F1F4F2', padding: '24px 20px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px', flexWrap: 'wrap', rowGap: '14px' }}>
-          <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.11em', color: '#7A8783' }}>CONFIGURACIÓN · PARAGUAY LIMPIO</span>
-            <h1 style={{ margin: '8px 0 0', fontFamily: 'Sora, sans-serif', fontSize: '28px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.03em', color: '#0D1412', textWrap: 'pretty' }}>Cómo está armado el municipio</h1>
-            <p style={{ margin: '10px 0 0', fontSize: '13.5px', lineHeight: 1.55, color: '#5B6764', textWrap: 'pretty', maxWidth: '76ch' }}>Las listas y las reglas que usa toda la app: quién atiende cada cosa, en cuántos días y qué le pide al vecino.</p>
+    <div className="config-wrapper">
+      <div className="config-hero">
+        <div className="config-hero-fila">
+          <div className="config-hero-texto">
+            {/* La marca sale de BRAND (host/ruta), no escrita a mano: con
+                "PARAGUAY LIMPIO" fijo, Munify mostraba la marca ajena. */}
+            <span className="config-eyebrow">CONFIGURACIÓN · {BRAND.name.toUpperCase()}</span>
+            <h1 className="config-titulo">Cómo está armado el municipio</h1>
+            <p className="config-bajada">
+              Las listas y las reglas que usa toda la app: quién atiende cada cosa, en cuántos días y qué le pide al vecino.
+            </p>
           </div>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '36px', padding: '0 12px', background: '#FFFFFF', border: '1px solid rgba(13,20,18,0.12)', borderRadius: '11px', minWidth: '240px', flex: '0 0 auto', marginTop: '22px' }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" strokeWidth="2" strokeLinecap="round" style={{ flex: '0 0 15px' }}>
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <span style={{ fontSize: '12.5px', color: '#9AA5A1', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Buscar un ajuste</span>
-            <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#9AA5A1', border: '1px solid rgba(13,20,18,0.1)', borderRadius: '5px', padding: '1px 4px', flex: '0 0 auto' }}>⌘K</span>
-          </span>
+          {buscadorAbierto ? (
+            <div className="config-buscar config-buscar--abierto">
+              <Search size={15} strokeWidth={2} aria-hidden />
+              <input
+                ref={inputBuscar}
+                className="config-buscar-input"
+                value={consulta}
+                onChange={(e) => setConsulta(e.target.value)}
+                placeholder="Buscar un ajuste…"
+                aria-label="Buscar un ajuste"
+              />
+              <button
+                type="button"
+                className="config-buscar-cerrar"
+                onClick={() => { setBuscadorAbierto(false); setConsulta(''); }}
+                aria-label="Cerrar el buscador"
+              >
+                <X size={14} strokeWidth={2} aria-hidden />
+              </button>
+              {!!resultados.length && (
+                <ul className="config-buscar-lista">
+                  {resultados.map((r) => (
+                    <li key={`${r.grupoId}-${r.id}`}>
+                      <button type="button" onClick={() => irAlAjuste(r.grupoId, r.id)}>
+                        <span className="config-buscar-ajuste">{r.label}</span>
+                        <span className="config-buscar-grupo">{r.grupo}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!!consulta.trim() && !resultados.length && (
+                <p className="config-buscar-vacio">Ningún ajuste se llama así.</p>
+              )}
+            </div>
+          ) : (
+            <button type="button" className="config-buscar" onClick={() => setBuscadorAbierto(true)}>
+              <Search size={15} strokeWidth={2} aria-hidden />
+              <span className="config-buscar-texto">Buscar un ajuste</span>
+              <span className="config-buscar-atajo">Ctrl K</span>
+            </button>
+          )}
         </div>
       </div>
 
       <MainTabs tabs={mainTabsData} onTabClick={handlePadreClick} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '236px minmax(0, 1fr)', gap: '20px', padding: '18px 20px 40px', alignItems: 'start' }}>
+      <div className="config-cuerpo">
         <SidebarTabs tituloRiel={tituloRiel} tabs={sidebarTabsData} onTabClick={handleHijoClick} />
 
-        <div style={{ minWidth: 0 }}>
+        {/* El panel embebe pantallas COMPLETAS: el provider les avisa que el
+            título ya lo puso este contenedor, y les da por dónde publicar su
+            total para el contador del riel. */}
+        <EmbedProvider slotId={hijoId} reportarTotal={reportarTotal}>
+        <div className="config-panel">
           {tipo === 'form' && (
             <>
               <PanelHeader titulo={hijo.label} veredicto="Identidad y contacto público del municipio." />
@@ -240,6 +346,7 @@ export default function ConfiguracionMockup() {
           )}
 
         </div>
+        </EmbedProvider>
       </div>
     </div>
   );

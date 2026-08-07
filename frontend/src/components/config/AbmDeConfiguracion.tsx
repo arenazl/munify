@@ -27,6 +27,7 @@ import type { AbmSpec, CeldaSpec, FilaSpec } from '../../config/canvasAbmSpec';
 import { CABLEADO } from './datosDeAjuste';
 import type { DatosDeAjuste } from './datosDeAjuste';
 import { AccordionTree } from '../abmv2/AccordionTree';
+import { useReportarTotal } from '../abmv2/useEmbed';
 
 /**
  * El canvas marca la gravedad con COLOR (rojo, ámbar, verde). El kit la marca
@@ -156,6 +157,12 @@ export function AbmDeConfiguracion({
   const [chipActivo, setChipActivo] = useState(spec.chips[0]?.[0] ?? 'todos');
 
   const filas = datos?.filas ?? reales?.filas ?? spec.filas;
+
+  /* El contador del riel sale de acá. Sólo se publica cuando el número es
+     REAL: con las filas de muestra del canvas el riel diría 6 dependencias
+     porque el prototipo dibujó seis, que es peor que decir 11. */
+  const hayDatosReales = !!(datos?.filas || reales?.filas);
+  useReportarTotal(hayDatosReales ? filas.length : undefined);
 
   const kpis = useMemo<HeroKpi[]>(
     () =>

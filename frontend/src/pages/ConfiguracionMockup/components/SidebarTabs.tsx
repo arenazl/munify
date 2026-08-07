@@ -1,4 +1,10 @@
-import React from 'react';
+/**
+ * SidebarTabs — el riel de subpantallas del grupo activo.
+ *
+ * Presentacional puro, clases `config-riel-*` sobre tokens --pl-*. En pantalla
+ * angosta el CSS lo apila arriba en fila envolvente: el grid de dos columnas
+ * no entra y el riel no puede comerse el ancho del panel.
+ */
 
 export interface SidebarTabItem {
   id: string;
@@ -15,41 +21,20 @@ interface SidebarTabsProps {
 
 export default function SidebarTabs({ tituloRiel, tabs, onTabClick }: SidebarTabsProps) {
   return (
-    <aside style={{ position: 'sticky', top: '74px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: '#98A3A0', padding: '0 10px 8px' }}>
-        {tituloRiel}
-      </span>
-      {tabs.map(h => {
-        const bg = h.isActive ? '#E3E9E6' : 'transparent';
-        const bgHover = h.isActive ? '#E3E9E6' : 'rgba(13,20,18,0.04)';
-        const peso = h.isActive ? 600 : 500;
-        const color = h.isActive ? '#0D1412' : '#3D4945';
-        const subColor = h.isActive ? '#0D1412' : '#7A8783';
-
-        return (
-          <span 
-            key={h.id}
-            onClick={() => onTabClick(h.id)} 
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '10px', 
-              minHeight: '36px', padding: '7px 10px', 
-              borderRadius: '9px', background: bg, 
-              cursor: 'pointer' 
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = bgHover; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = bg; }}
-          >
-            <span style={{ fontSize: '13px', fontWeight: peso, lineHeight: 1.35, color: color, minWidth: 0, textWrap: 'pretty' }}>
-              {h.label}
-            </span>
-            {h.n && (
-              <span style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: 600, color: subColor, whiteSpace: 'nowrap', fontFeatureSettings: "'tnum'" }}>
-                {h.n}
-              </span>
-            )}
-          </span>
-        );
-      })}
+    <aside className="config-riel">
+      <span className="config-riel-titulo">{tituloRiel}</span>
+      {tabs.map((h) => (
+        <button
+          key={h.id}
+          type="button"
+          aria-current={h.isActive ? 'page' : undefined}
+          onClick={() => onTabClick(h.id)}
+          className={`config-riel-item${h.isActive ? ' config-riel-item--activo' : ''}`}
+        >
+          <span className="config-riel-label">{h.label}</span>
+          {!!h.n && <span className="config-riel-n">{h.n}</span>}
+        </button>
+      ))}
     </aside>
   );
 }
