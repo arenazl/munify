@@ -85,27 +85,24 @@ export function CatalogoDelCanvas({
   // Sólo el número real llega al contador del riel; el de muestra no. */
   useReportarTotal(filasVivo ? filasVivo.length : undefined);
   const activas = filas.filter((f) => !f.off);
-  const conUso = filas.some((f) => typeof f.uso === 'number');
-  const sinUsar = conUso ? filas.filter((f) => (f.uso ?? 0) === 0).length : 0;
-  const masUsada = conUso
-    ? filas.slice().sort((a, b) => (b.uso ?? 0) - (a.uso ?? 0))[0]
-    : undefined;
   const sePisan = filas.filter((f) => (f.pisa ?? '').trim()).length;
+  /* El catálogo habla SÓLO del catálogo: cuántos reclamos usó cada entrada es
+     dato OPERATIVO y vive en el módulo Reclamos, no acá (decisión del dueño,
+     2026-08-07: "el catálogo lista, no cuenta operaciones"). */
+  const conPlazo = filas.filter((f) => typeof f.hs === 'number' && f.hs);
+  const masExigente = conPlazo.length
+    ? conPlazo.slice().sort((a, b) => (a.hs ?? 0) - (b.hs ?? 0))[0]
+    : undefined;
 
   const kpis = useMemo<HeroKpi[]>(
     () => [
       { etiqueta: 'En el catálogo', valor: filas.length, sub: 'entradas cargadas' },
       { etiqueta: 'Activas', valor: activas.length, sub: 'se ofrecen en la app' },
+      { etiqueta: 'Inactivas', valor: filas.length - activas.length, sub: 'ocultas para el vecino' },
       {
-        etiqueta: 'Sin usar',
-        valor: conUso ? sinUsar : '—',
-        sub: !conUso ? 'sin dato de uso' : sinUsar ? 'se pueden borrar' : 'todas tienen uso',
-        veredicto: conUso && sinUsar > 0 ? 'advertencia' : undefined,
-      },
-      {
-        etiqueta: 'Más usada',
-        valor: masUsada?.uso ?? '—',
-        sub: masUsada?.nombre ?? 'sin dato de uso',
+        etiqueta: 'Más exigente',
+        valor: masExigente ? plazo(masExigente.hs) : '—',
+        sub: masExigente?.nombre ?? 'sin plazos definidos',
       },
       {
         etiqueta: 'Se pisan',
@@ -114,20 +111,14 @@ export function CatalogoDelCanvas({
         veredicto: sePisan > 0 ? 'advertencia' : undefined,
       },
     ],
-    [filas.length, activas.length, conUso, sinUsar, masUsada, sePisan],
+    [filas.length, activas.length, masExigente, sePisan],
   );
 
   const frases = useMemo<HeroFrase[]>(() => {
     const primera = [
       seg(`${filas.length} en el catálogo, ${activas.length} activas.`, 'bueno'),
+      seg(' El orden de la lista es el que ve el vecino al elegir.'),
     ];
-    if (masUsada && (masUsada.uso ?? 0) > 0) {
-      primera.push(seg(` «${masUsada.nombre}» concentra ${masUsada.uso} ${spec.unidad}`));
-      if (sinUsar > 0) primera.push(seg(` y ${sinUsar} no se usaron nunca`, 'advertencia'));
-      primera.push(seg('.'));
-    } else {
-      primera.push(seg(' El orden de la lista es el que ve el vecino al elegir.'));
-    }
     const fs: HeroFrase[] = [{ segmentos: primera }];
     if (sePisan > 0) {
       fs.push({
@@ -138,14 +129,13 @@ export function CatalogoDelCanvas({
       });
     }
     return fs;
-  }, [filas.length, activas.length, masUsada, sinUsar, sePisan, spec.unidad]);
+  }, [filas.length, activas.length, sePisan]);
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return filas.filter((f) => {
       if (estado === 'activos' && f.off) return false;
       if (estado === 'inactivos' && !f.off) return false;
-      if (estado === 'sinuso' && (f.uso ?? 0) !== 0) return false;
       if (!q) return true;
       return f.nombre.toLowerCase().includes(q) || (f.desc ?? '').toLowerCase().includes(q);
     });
@@ -205,23 +195,8 @@ export function CatalogoDelCanvas({
       });
     }
 
-    if (conUso) {
-      cols.push({
-        id: 'uso',
-        header: 'En uso',
-        width: 'minmax(100px, 0.7fr)',
-        align: 'right',
-        kind: 'metric',
-        cell: (f) => (
-          <MetricCell
-            value={String(f.uso ?? 0)}
-            note={(f.uso ?? 0) === 0 ? 'sin usar' : spec.unidad}
-            muted={(f.uso ?? 0) === 0}
-          />
-        ),
-      });
-    }
-
+    /* Sin columna "En uso": cuántas operaciones usó cada entrada es dato del
+       módulo operativo, no del catálogo (decisión del dueño, 2026-08-07). */
     cols.push(
       {
         id: 'activo',
@@ -240,7 +215,7 @@ export function CatalogoDelCanvas({
     );
     return cols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filas, conUso, spec.unidad]);
+  }, [filas]);
 
   return (
     <SemanticAbmPage<FilaCatalogo>
@@ -261,7 +236,6 @@ export function CatalogoDelCanvas({
         { id: 'todos', label: 'Todas', count: filas.length },
         { id: 'activos', label: 'Activas', count: activas.length },
         { id: 'inactivos', label: 'Inactivas', count: filas.length - activas.length },
-        ...(conUso ? [{ id: 'sinuso', label: 'Sin usar', count: sinUsar }] : []),
       ]}
       activeStatus={estado}
       onStatusChange={setEstado}

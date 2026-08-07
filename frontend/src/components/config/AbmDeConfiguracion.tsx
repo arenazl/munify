@@ -267,7 +267,9 @@ export function AbmDeConfiguracion({
       viewSlots={spec.usaArbol ? { table: <AccordionTree data={visibles} /> } : undefined}
       columns={columnas}
       rows={visibles}
-      rowKey={(f) => f.n}
+      /* El nombre solo no alcanza: dos contactos homónimos duplicaban la key
+         y React omitía filas. */
+      rowKey={(f, i) => `${f.n}-${i ?? 0}`}
       rowActions={[]}
       onRowClick={onFila ? (f) => onFila(f, filas.indexOf(f)) : undefined}
       loading={loading || cargando}

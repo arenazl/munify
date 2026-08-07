@@ -112,6 +112,111 @@ const iniciales = (nombre: string, apellido?: string) =>
   ((nombre?.[0] ?? '') + (apellido?.[0] ?? nombre?.[1] ?? '')).toUpperCase();
 
 /* ============================================================
+ * Empleados
+ * ============================================================ */
+
+export async function datosEmpleados(): Promise<DatosDeAjuste> {
+  const [resEmpleados, resZonas, resDeps] = await Promise.all([
+    empleadosApi.getAll(),
+    zonasApi.getAll(),
+    dependenciasApi.getMunicipio(),
+  ]);
+  const empleados: any[] = resEmpleados.data || [];
+  const zonas: any[] = resZonas.data || [];
+  const deps: any[] = resDeps.data || [];
+
+  const zonaDe = new Map<number, string>(zonas.map((z) => [z.id, z.nombre]));
+  const depDe = new Map<number, string>(deps.map((d) => [d.id, d.nombre]));
+
+  const activos = empleados.filter((e) => e.activo !== false);
+  const operarios = activos.filter((e) => (e.tipo || 'operario') !== 'administrativo');
+  const admins = activos.length - operarios.length;
+
+  /* "Sin respaldo" = especialidades que dependen de UNA persona: si esa
+     persona falta, nadie la cubre. Es EL dato de esta pantalla. */
+  const porEspecialidad = new Map<string, number>();
+  activos.forEach((e) => {
+    const esp = (e.especialidad || 'Sin especialidad').trim();
+    porEspecialidad.set(esp, (porEspecialidad.get(esp) || 0) + 1);
+  });
+  const sinRespaldo = Array.from(porEspecialidad.values()).filter((n) => n === 1).length;
+  const sinZona = activos.filter((e) => !e.zona_id).length;
+  const categoriasDistintas = new Set(activos.map((e) => e.categoria_principal_id).filter(Boolean)).size;
+
+  const setOperarios = new Set(operarios.map((e) => `${e.nombre} ${e.apellido ?? ''}`.trim()));
+  const setInactivos = new Set(
+    empleados.filter((e) => e.activo === false).map((e) => `${e.nombre} ${e.apellido ?? ''}`.trim()),
+  );
+
+  const filas: FilaSpec[] = empleados.map((e) => {
+    const nombre = `${e.nombre} ${e.apellido ?? ''}`.trim();
+    const colorCat = e.categoria_principal?.color || '#00B37E';
+    const esAdmin = (e.tipo || 'operario') === 'administrativo';
+    return {
+      n: nombre,
+      s: e.telefono || 'Sin teléfono',
+      i: iniciales(e.nombre, e.apellido),
+      t: TINTES[colorCat] ?? '#E7F6F0',
+      cc: colorCat,
+      off: e.activo === false,
+      cel: [
+        celda(esAdmin ? 'Administrativo' : 'Operario', {
+          esChip: true,
+          chipBg: '',
+          chipCol: esAdmin ? '#3B82F6' : '#7A8783',
+        }),
+        e.especialidad
+          ? punto(e.especialidad, colorCat)
+          : celda('Sin especialidad', { hayPunto: true, punto: '#98A3A0', color: '#98A3A0' }),
+        e.zona_id && zonaDe.has(e.zona_id)
+          ? celda(zonaDe.get(e.zona_id)!, { hayPunto: true, punto: '#98A3A0', color: '#7A8783' })
+          : celda('Sin zona', { hayPunto: true, punto: '#F59E0B', color: '#B4560F' }),
+        e.municipio_dependencia_id && depDe.has(e.municipio_dependencia_id)
+          ? punto(depDe.get(e.municipio_dependencia_id)!, colorCat)
+          : celda('Sin dependencia', { hayPunto: true, punto: '#98A3A0', color: '#98A3A0' }),
+      ],
+    };
+  });
+
+  const kpis: HeroKpi[] = [
+    { etiqueta: 'Activos', valor: activos.length, sub: `${operarios.length} operario${operarios.length === 1 ? '' : 's'} · ${admins} administrativo${admins === 1 ? '' : 's'}` },
+    { etiqueta: 'Especialidades', valor: porEspecialidad.size, sub: categoriasDistintas ? `de ${categoriasDistintas} categorías` : 'oficios distintos' },
+    {
+      etiqueta: 'Sin respaldo',
+      valor: sinRespaldo,
+      sub: sinRespaldo ? 'una sola persona cada una' : 'todas cubiertas',
+      veredicto: sinRespaldo > 0 ? 'advertencia' : undefined,
+    },
+    { etiqueta: 'Sin zona', valor: sinZona, sub: sinZona ? 'fuera del despacho' : 'todos con territorio', veredicto: sinZona > 0 ? 'advertencia' : undefined },
+    { etiqueta: 'Inactivos', valor: empleados.length - activos.length, sub: 'fuera del plantel' },
+  ];
+
+  const frases: HeroFrase[] = [
+    {
+      segmentos: [
+        seg(`${activos.length} empleado${activos.length === 1 ? '' : 's'} activo${activos.length === 1 ? '' : 's'}`, 'bueno'),
+        seg(`, ${operarios.length} operario${operarios.length === 1 ? '' : 's'} y ${admins} administrativo${admins === 1 ? '' : 's'}.`),
+        ...(sinRespaldo > 0
+          ? [
+              seg(` ${sinRespaldo} especialidad${sinRespaldo === 1 ? ' depende' : 'es dependen'} de una sola persona`, 'advertencia'),
+              seg(': si esa persona falta, nadie la cubre.'),
+            ]
+          : []),
+      ],
+    },
+  ];
+
+  const chips: ChipDeAjuste[] = [
+    { label: 'Todos', count: empleados.length },
+    { label: 'Operarios', count: operarios.length, match: (f) => setOperarios.has(f.n) && !setInactivos.has(f.n) },
+    { label: 'Administrativos', count: admins, match: (f) => !setOperarios.has(f.n) && !setInactivos.has(f.n) },
+    { label: 'Inactivos', count: empleados.length - activos.length, match: (f) => setInactivos.has(f.n) },
+  ];
+
+  return { filas, kpis, frases, chips };
+}
+
+/* ============================================================
  * Cuadrillas
  * ============================================================ */
 
@@ -1007,6 +1112,7 @@ export async function datosConceptosLiquidacion(): Promise<DatosDeAjuste> {
  * ============================================================ */
 
 export const CABLEADO: Record<string, () => Promise<DatosDeAjuste>> = {
+  empleados: datosEmpleados,
   cuadrillas: datosCuadrillas,
   ausencias: datosAusencias,
   sla: datosSla,

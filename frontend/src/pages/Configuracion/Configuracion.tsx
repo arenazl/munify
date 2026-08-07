@@ -15,6 +15,7 @@ import CatalogoDelCanvas from '../../components/config/CatalogoDelCanvas';
 import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
 import ArbolDelCanvas from '../../components/config/ArbolDelCanvas';
 import AbmDeConfiguracion from '../../components/config/AbmDeConfiguracion';
+import PuenteDeModulo from '../../components/config/PuenteDeModulo';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
@@ -27,13 +28,14 @@ import type { GrupoAsig, TabAsig } from './panels/PanelAsignacion';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getBgTheme, resolveAccentColor, sidebarColor, type SidebarMode } from '../../config/themePresets';
 import { useSuperAdmin } from '../../hooks/useSuperAdmin';
-import { 
-  cargarDatosFormularioMuni, 
-  guardarDatosFormularioMuni, 
-  cargarCatalogoReal, 
+import {
+  cargarDatosFormularioMuni,
+  guardarDatosFormularioMuni,
+  cargarCatalogoReal,
   cargarAsignacionReal,
-  type DatosFormularioMuni 
+  type DatosFormularioMuni
 } from './data/datosRealesConfig';
+import { dashboardApi, inventarioApi } from '../../lib/api';
 
 export default function Configuracion() {
   const {
@@ -62,7 +64,7 @@ export default function Configuracion() {
     vecino: 'vecinos',
     catalogos: 'dependencias',
     inventario: 'inv',
-    tesoreria: 'conceptos',
+    tesoreria: 'conceptos-liq',
     integraciones: 'pagos',
     super: 'auditoria'
   });
@@ -188,6 +190,11 @@ export default function Configuracion() {
     );
   }, [consulta, arbol]);
 
+  /* Datos reales de las pantallas PUENTE (Vecinos, Inventario): un número
+     cierto para el veredicto y, si existe, la mini-lista de solo lectura. */
+  const [puenteVecinos, setPuenteVecinos] = useState<{ total: number } | null>(null);
+  const [puenteInv, setPuenteInv] = useState<{ total: number; bajoStock: any[] } | null>(null);
+
   // Cargar datos reales según el tab activo
   const cargarPanelReal = useCallback(async () => {
     if (hijoId === 'muni') {
@@ -199,6 +206,13 @@ export default function Configuracion() {
     } else if (hijoId === 'asignacion') {
       const asigData = await cargarAsignacionReal();
       setAsigReal(asigData);
+    } else if (hijoId === 'vecinos') {
+      const res = await dashboardApi.getStats();
+      setPuenteVecinos({ total: res.data?.total ?? 0 });
+    } else if (hijoId === 'inv') {
+      const res = await inventarioApi.listItems({ limit: 500 });
+      const items: any[] = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+      setPuenteInv({ total: items.length, bajoStock: items.filter((i) => i.bajo_stock) });
     }
   }, [hijoId]);
 
@@ -366,7 +380,58 @@ export default function Configuracion() {
             total para el contador del riel. */}
         <EmbedProvider slotId={hijoId} reportarTotal={reportarTotal}>
         <div className="config-panel">
-          {tipo === 'form' && (
+          {/* WhatsApp e IA tienen su pantalla completa: puente, no un form
+              ajeno (antes las tres pestañas `form` mostraban los datos del
+              municipio, que era directamente otro contenido). */}
+          {tipo === 'form' && hijoId === 'wa' && (
+            <PantallaDeAjuste
+              eyebrow={`${padre.label.toUpperCase()} · WHATSAPP`}
+              veredicto="La línea de WhatsApp por la que entran reclamos y salen los avisos de estado."
+              resaltado="entran reclamos y salen los avisos"
+              tono="bueno"
+            >
+              <PuenteDeModulo
+                configuraAca={[
+                  { label: 'Categorías de reclamo', nota: 'Lo que el bot le ofrece al vecino', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
+                  { label: 'Asignación', nota: 'A quién se deriva lo que entra por WhatsApp', grupoId: 'catalogos', ajusteId: 'asignacion' },
+                ]}
+                viveEn={{
+                  titulo: 'Vive en Integraciones',
+                  motivo: 'La línea, las plantillas y el estado de la conexión se gestionan en su pantalla completa.',
+                  checklist: ['Conectar o rotar la línea', 'Probar el envío de avisos', 'Ver el estado de la conexión'],
+                  botonLabel: 'Abrir WhatsApp',
+                  ruta: '/gestion/whatsapp',
+                }}
+                onIrAlAjuste={irAlAjuste}
+              />
+            </PantallaDeAjuste>
+          )}
+
+          {tipo === 'form' && hijoId === 'ia' && (
+            <PantallaDeAjuste
+              eyebrow={`${padre.label.toUpperCase()} · IA`}
+              veredicto="Clasificación automática de reclamos y redacción de respuestas al vecino."
+              resaltado="Clasificación automática"
+              tono="bueno"
+            >
+              <PuenteDeModulo
+                configuraAca={[
+                  { label: 'Categorías de reclamo', nota: 'Las clases entre las que la IA elige', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
+                  { label: 'Asignación', nota: 'Las reglas que la IA sugiere completar', grupoId: 'catalogos', ajusteId: 'asignacion' },
+                ]}
+                viveEn={{
+                  titulo: 'Vive en Integraciones',
+                  motivo: 'El proveedor, el modelo y las pruebas de clasificación se gestionan en su pantalla completa.',
+                  checklist: ['Elegir proveedor y modelo', 'Probar la clasificación con un texto real', 'Ver el estado de la conexión'],
+                  botonLabel: 'Abrir configuración de IA',
+                  ruta: '/gestion/configuracion-ia',
+                }}
+                onIrAlAjuste={irAlAjuste}
+              />
+            </PantallaDeAjuste>
+          )}
+
+          {tipo === 'form' && hijoId !== 'wa' && hijoId !== 'ia' && (
             <PantallaDeAjuste
               eyebrow={`${padre.label.toUpperCase()} · IDENTIDAD`}
               veredicto={
@@ -435,7 +500,79 @@ export default function Configuracion() {
             />
           )}
 
-          {tipo === 'abm' && data && (
+          {/* Vecinos e Inventario son PUENTES (canvas): el módulo vive en otro
+              lado; acá se llega, no se edita. Antes eran ABMs con filas de
+              muestra ("Vecinos 3.412" inventado). */}
+          {tipo === 'abm' && hijoId === 'vecinos' && (
+            <PantallaDeAjuste
+              eyebrow={`${padre.label.toUpperCase()} · PADRÓN`}
+              veredicto={
+                puenteVecinos
+                  ? `El padrón vive en Atención al vecino: acá se llega, no se edita. Sus vecinos ya cargaron ${puenteVecinos.total.toLocaleString('es-AR')} reclamos.`
+                  : 'El padrón vive en Atención al vecino: acá se llega, no se edita.'
+              }
+              resaltado={puenteVecinos ? `${puenteVecinos.total.toLocaleString('es-AR')} reclamos` : undefined}
+              tono="bueno"
+            >
+              <PuenteDeModulo
+                configuraAca={[
+                  { label: 'Categorías de reclamo', nota: 'Lo que el vecino elige al cargar', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
+                  { label: 'Trámites', nota: 'El catálogo con sus prerrequisitos', grupoId: 'vecino', ajusteId: 'arbol-tramite' },
+                  { label: 'SLA', nota: 'Los plazos que la app le promete', grupoId: 'vecino', ajusteId: 'sla' },
+                ]}
+                viveEn={{
+                  titulo: 'Vive en Atención al vecino',
+                  motivo: 'El padrón tiene identidad, historial y notificaciones: es operación diaria, no configuración.',
+                  checklist: ['Ver el legajo y el historial de cada vecino', 'Validar identidad (KYC)', 'Contactarlo desde la app'],
+                  botonLabel: 'Abrir el padrón de vecinos',
+                  ruta: '/gestion/usuarios',
+                }}
+                onIrAlAjuste={irAlAjuste}
+              />
+            </PantallaDeAjuste>
+          )}
+
+          {tipo === 'abm' && hijoId === 'inv' && (
+            <PantallaDeAjuste
+              eyebrow={`${padre.label.toUpperCase()} · DEPÓSITO`}
+              veredicto={
+                puenteInv
+                  ? `${puenteInv.total} artículos en el depósito${puenteInv.bajoStock.length ? `, ${puenteInv.bajoStock.length} bajo el mínimo.` : ', ninguno bajo el mínimo.'}`
+                  : 'El inventario vive en Operaciones: acá se llega, no se edita.'
+              }
+              resaltado={puenteInv?.bajoStock.length ? `${puenteInv.bajoStock.length} bajo el mínimo` : undefined}
+              tono={puenteInv?.bajoStock.length ? 'malo' : 'bueno'}
+            >
+              <PuenteDeModulo
+                configuraAca={[
+                  { label: 'Categorías de inventario', nota: 'Las familias en las que se agrupa el depósito', grupoId: 'inventario', ajusteId: 'cat-inv' },
+                ]}
+                viveEn={{
+                  titulo: 'Vive en Operaciones',
+                  motivo: 'El stock se mueve con las órdenes de trabajo: entradas, salidas y reservas son operación, no configuración.',
+                  checklist: ['Cargar entradas y salidas', 'Reservar materiales para una OT', 'Ver el stock por depósito'],
+                  botonLabel: 'Abrir el inventario',
+                  ruta: '/gestion/inventario',
+                }}
+                lista={
+                  puenteInv && puenteInv.bajoStock.length
+                    ? {
+                        titulo: 'Lo que está bajo el mínimo',
+                        filas: puenteInv.bajoStock.slice(0, 3).map((i: any) => ({
+                          nombre: i.nombre,
+                          sub: i.categoria_nombre,
+                          valor: `${i.stock_actual} de ${i.stock_minimo} ${i.unidad ?? ''}`.trim(),
+                          valorColor: 'var(--pl-red-700)',
+                        })),
+                      }
+                    : undefined
+                }
+                onIrAlAjuste={irAlAjuste}
+              />
+            </PantallaDeAjuste>
+          )}
+
+          {tipo === 'abm' && hijoId !== 'vecinos' && hijoId !== 'inv' && data && (
             <AbmDeConfiguracion
               key={`${hijoId}-${recarga}`}
               spec={data}
@@ -452,7 +589,7 @@ export default function Configuracion() {
             />
           )}
 
-          {tipo === 'arbol' && data && (
+          {tipo === 'arbol' && (
             <ArbolDelCanvas />
           )}
 
