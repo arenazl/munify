@@ -1417,7 +1417,9 @@ export class MockDataService {
             : '<strong style="font-weight: 600; color: #00794F;">Las ' + catsRec.length + ' categorías de ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' tienen dependencia.</strong> '
               + 'Todo ' + (ladoAsig === 'tramites' ? 'trámite' : 'reclamo') + ' que entra se deriva solo, sin que nadie lo toque.' } })
         : (hijo && this.descripcion(hijo.id)) || (hijo && veredictos[hijo.id]) || '',
-      ctaNuevo: spec ? spec.cta : (hijo && hijo.tipo === 'arbol') ? 'Nueva dependencia' : d.nuevo,
+      // En el árbol se da de alta el TRÁMITE. Las dependencias se dan de alta
+      // en Catálogos, y a quién le toca cada trámite se decide en Asignación.
+      ctaNuevo: spec ? spec.cta : (hijo && hijo.tipo === 'arbol') ? 'Nuevo tipo de trámite' : d.nuevo,
       cols: cols,
       colRespuesta: (hijo && hijo.id === 'cat-reclamo') ? 'PLAZO Y PRIORIDAD' : 'PLAZO',
       colOrdenLabel: this.state.orden ? 'ARRASTRÁ' : 'ORDEN',

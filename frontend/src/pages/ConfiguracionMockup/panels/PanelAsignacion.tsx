@@ -1,4 +1,5 @@
 import React from 'react';
+import { Glifo } from '../../../components/abmv2/Glifo';
 
 export interface TabAsig {
   id: string;
@@ -107,9 +108,7 @@ export default function PanelAsignacion({
               onClick={() => onTabClick(t.id)} 
               style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', height: '32px', padding: '0 14px', borderRadius: '8px', background: t.bg, boxShadow: t.sombra, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 14px' }}>
-                <path d={t.glifo} />
-              </svg>
+              <Glifo glifo={t.glifo} size={14} color={t.col} strokeWidth={2} fallback="Building2" />
               <span style={{ fontSize: '12.5px', fontWeight: 600, color: t.col }}>{t.label}</span>
               <span style={{ fontSize: '11.5px', fontWeight: 600, color: t.sub, fontFeatureSettings: "'tnum'" }}>{t.n}</span>
             </span>
@@ -177,9 +176,7 @@ export default function PanelAsignacion({
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                   <span style={{ display: 'grid', placeItems: 'center', width: '30px', height: '30px', borderRadius: '9px', background: r.tinte, flex: '0 0 30px' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={r.color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                      <path d={r.glifo} />
-                    </svg>
+                    <Glifo glifo={r.glifo} size={16} color={r.color} />
                   </span>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: '#0D1412', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.nombre}</span>
                 </span>
