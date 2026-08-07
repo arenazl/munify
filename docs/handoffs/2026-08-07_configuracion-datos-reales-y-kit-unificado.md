@@ -1,5 +1,37 @@
 # Handoff · Configuración: datos reales, kit unificado y lo que quedó roto
 
+> ## ACTUALIZACIÓN — 2026-08-07, sesión 2 (commits `b16799d`, `5d30eaa`, `bfa6c69`)
+>
+> **Todo el §3 quedó RESUELTO y verificado en la app local con Playwright**
+> (login Asunción muni 146, consola limpia, 0 requests rotas):
+>
+> - **§3.1 Trámites**: el fix del slot aplicado + la jerarquía ahora es REAL —
+>   dependencia del muni → categoría → trámite (con `include_assignments`),
+>   documentos como prerrequisitos. El "Otras Categorías" era ficción: las
+>   categorías de trámite NO tienen dependencia; el vínculo real es
+>   dependencia→trámite.
+> - **§3.2 Asignación**: el `Network Error` NO se reprodujo (era transitorio,
+>   probablemente reload de uvicorn con requests en vuelo). El bug REAL era
+>   otro: se cruzaba contra el catálogo global (44 deps) por
+>   `dependencia_defecto_id`, campo que las categorías NO TIENEN. Ahora cruza
+>   por las categorías de cada dependencia del municipio: 6 de 17 asignadas,
+>   uso real (`en_uso`).
+> - **§3.3 Zonas**: la causa era "la forma del objeto": la API trae `activo`
+>   (no `activa`), `reclamos_count` y `cuadrillas_count`, y NO trae barrios ni
+>   resueltos. Columnas nuevas (reales): CUADRILLAS · RECLAMOS · DEL TOTAL ·
+>   ESTADO. Chips con conteo real que FILTRAN (con/sin cuadrilla).
+> - **Chips honestos en todos los ABM**: `StatusTab.count` es opcional; con
+>   datos reales los conteos del prototipo se ocultan.
+> - **§6.1 DireccionAutocomplete**: RESUELTO — `countrycodes` y contexto salen
+>   de `municipios.pais` (AR conserva el comportamiento exacto de prod).
+>   Verificado: "Palma 500" da 5 resultados con `py`, 0 con `ar`. Mismo fix en
+>   `DependenciasConfig`.
+> - **Apariencia**: cableada al motor de temas real (6 fondos, 13 acentos, 3
+>   barras, de `themePresets` vía ThemeContext, con persistencia). Pedido del
+>   dueño: mostrar TODOS los acentos. El banner "Cambiar foto" sigue sin
+>   upload (existe `municipiosApi.updateImagenPortada` para cablearlo).
+> - **§3.4 (altas)**: sigue abierto — decisión del dueño en curso.
+
 **Fecha:** 2026-08-07
 **Rama:** `qa` · **5 commits locales SIN pushear**
 **Build:** verde (`npm run build`, ~48s) · TypeScript en 0 errores
