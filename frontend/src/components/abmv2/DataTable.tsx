@@ -464,7 +464,7 @@ export function DataTable<Row>({
     };
     return (
       <div
-        key={rowKey(row)}
+        key={rowKey(row, indice)}
         role="row"
         tabIndex={clickeable ? 0 : undefined}
         className={[

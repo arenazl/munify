@@ -470,8 +470,9 @@ export interface DataTableProps<Row = unknown> {
   /** Grupos precomputados por la página cuando groupBy ≠ 'none'.
    *  Si vienen, tienen prioridad sobre `rows`. */
   groups?: TableGroup<Row>[];
-  /** Key estable por fila (id de la entidad). */
-  rowKey: (row: Row) => string | number;
+  /** Key estable por fila (id de la entidad). El índice llega segundo para
+   *  desempatar filas homónimas cuando la entidad no trae id. */
+  rowKey: (row: Row, index?: number) => string | number;
   rowActions: RowAction<Row>[];
   /** Click en la fila abre el SideModal de detalle (cursor pointer). */
   onRowClick?: (row: Row) => void;
@@ -667,7 +668,7 @@ export interface SemanticAbmPageProps<Row = unknown> {
   activeStatus: string;
   onStatusChange: (id: string) => void;
   onPeriodChange?: (value: PeriodControlValue) => void;
-  rowKey: (row: Row) => string | number;
+  rowKey: (row: Row, index?: number) => string | number;
   onRowClick?: (row: Row) => void;
 }
 
