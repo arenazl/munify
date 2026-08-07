@@ -37,6 +37,8 @@ class MunicipioPublic(BaseModel):
     id: int
     nombre: str
     codigo: str
+    # ISO-3166 alpha-2: en que pais busca direcciones el autocomplete.
+    pais: str = "AR"
     latitud: float
     longitud: float
     radio_km: float

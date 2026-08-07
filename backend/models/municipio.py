@@ -19,6 +19,10 @@ class Municipio(Base):
     descripcion = Column(Text, nullable=True)
 
     # Ubicacion geografica
+    # ISO-3166 alpha-2. Lo consume el autocomplete de direcciones para no
+    # buscar en el pais equivocado: con 'ar' fijo, en Asuncion no devolvia
+    # NADA y el vecino no podia cargar la direccion de su reclamo.
+    pais = Column(String(2), nullable=False, default="AR", server_default="AR")
     latitud = Column(Float, nullable=False)  # Centro del municipio
     longitud = Column(Float, nullable=False)
     radio_km = Column(Float, default=10.0)  # Radio aproximado de cobertura en km

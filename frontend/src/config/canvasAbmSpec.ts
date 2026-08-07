@@ -272,6 +272,9 @@ export const ABM_SPEC: Record<string, AbmSpec> = {
     ver: '<strong>11 dependencias</strong> atienden las 17 categorías. <strong style="color: #C93A3E;">Servicios Públicos concentra 6 categorías y 210 reclamos</strong>; tres dependencias no reciben nada.',
     kpis: [['DEPENDENCIAS', '11', '10 activas · 1 inactiva', ''], ['CON CATEGORÍAS', '8', 'las otras 3 no reciben', A], ['MÁS CARGADA', '210', 'Servicios Públicos', R], ['SIN RESPONSABLE', '2', 'nadie a cargo', A], ['EN COLA', '244', 'reclamos repartidos', '']],
     pista: null,
+    /* El municipio PUEDE crear las suyas: le damos un catálogo de arranque,
+       pero si tiene una Secretaría de Vialidad propia la da de alta él. Lo que
+       no elige el municipio son los MÓDULOS que usa — eso es facturación. */
     buscar: 'Buscar dependencia o responsable…', cta: 'Nueva dependencia',
     selects: [['Tipo', 'Todas'], ['Estado', 'Todos']],
     chips: [['Todas', 11], ['Con cola', 8], ['Sin trabajo', 3]],

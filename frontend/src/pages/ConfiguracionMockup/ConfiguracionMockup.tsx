@@ -15,6 +15,7 @@ import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
 import ArbolDelCanvas from '../../components/config/ArbolDelCanvas';
 import AbmDeConfiguracion from '../../components/config/AbmDeConfiguracion';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
+import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
 // OJO: hay DOS `FilaCatalogo` en el repo — el del spec del canvas
@@ -143,6 +144,13 @@ export default function ConfiguracionMockup() {
     setHijosActivos(prev => ({ ...prev, [padreActivo]: id }));
     setSearchParams({ tab: padreActivo, sub: id }, { replace: true });
   };
+
+  /* Alta del ajuste activo. `recarga` se incrementa al guardar: va como `key`
+     del panel, que es la forma más barata de que la pantalla vuelva a pedir
+     sus datos sin que este contenedor sepa cómo los trae. */
+  const [altaAbierta, setAltaAbierta] = useState(false);
+  const [recarga, setRecarga] = useState(0);
+  const SheetDeAlta = ALTA_DE_AJUSTE[hijoId];
 
   /* Contadores del riel. Los del árbol son del prototipo (Dependencias decía
      11 y hay 5). Cada pantalla publica su total REAL por `reportarTotal` en
@@ -330,6 +338,7 @@ export default function ConfiguracionMockup() {
 
           {tipo === 'abm' && data && (
             <AbmDeConfiguracion
+              key={`${hijoId}-${recarga}`}
               spec={data}
               title={hijo.label}
               moduleKey={hijoId}
@@ -338,6 +347,9 @@ export default function ConfiguracionMockup() {
               // filas de muestra del canvas. Con él, cada pantalla trae sus
               // datos del municipio sola.
               ajusteId={hijoId}
+              // Sin sheet de alta no se dibuja el CTA: mejor sin botón que con
+              // un botón que no hace nada.
+              onNuevo={SheetDeAlta ? () => setAltaAbierta(true) : undefined}
             />
           )}
 
@@ -348,6 +360,14 @@ export default function ConfiguracionMockup() {
         </div>
         </EmbedProvider>
       </div>
+
+      {SheetDeAlta && (
+        <SheetDeAlta
+          open={altaAbierta}
+          onClose={() => setAltaAbierta(false)}
+          onGuardado={() => setRecarga((n) => n + 1)}
+        />
+      )}
     </div>
   );
 }
