@@ -3142,10 +3142,13 @@ export default function Mapa() {
   // móvil, LO QUE ESTÉ SELECCIONADO. Mientras corre muestra el rango real.
   const continuacionConsulta: ConsultaAccion = {
     id: 'timelapse',
-    // En reposo el botón queda REDONDO, sólo con el play: con texto competía
-    // con la oración y en tablet se le encimaba. Mientras reproduce sí hay
-    // algo que decir —el rango que se está viendo— y ahí vuelve el texto.
-    label: tlEstado === 'reproduciendo' ? (rangoTimelapseLabel ?? 'Pausar') : '',
+    /* Con "Evolución" el botón se explica: el play pelado se leía como
+       "aplicar filtros" (feedback del dueño, 2026-08-13) — y los combos ya
+       aplican solos, así que ese malentendido era puro costo. */
+    // Una sola palabra: no compite con la oración ni se encima en tablet
+    // (el label largo "Ver la evolución" sí lo hacía). Mientras reproduce,
+    // el texto pasa a ser el rango que se está viendo.
+    label: tlEstado === 'reproduciendo' ? (rangoTimelapseLabel ?? 'Pausar') : 'Evolución',
     titulo:
       tlEstado === 'reproduciendo'
         ? 'Pausar'

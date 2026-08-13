@@ -362,6 +362,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     set('--pl-surface-hover', mix(theme.card, theme.text, 0.05));
     set('--pl-track', mix(theme.card, theme.text, 0.08));
     set('--pl-sidebar-bg', theme.sidebar);
+    // El shell v2 pinta el sidebar con --pl-sidebar. Sin este puente, el eje
+    // "Fondo de la barra lateral" de Apariencia no hacía NADA en desktop
+    // (el token quedaba sin definir y el CSS caía al fondo por defecto).
+    set('--pl-sidebar', theme.sidebar);
     set('--pl-text', theme.text);
     set('--pl-text-2', mix(theme.text, theme.textSecondary, 0.45));
     set('--pl-text-3', theme.textSecondary);

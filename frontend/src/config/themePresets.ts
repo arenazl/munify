@@ -230,11 +230,15 @@ export const bgThemes: BgTheme[] = [
     acentos: ['ambar', 'olivo', 'verde', 'negro'] },
 
   // ---- OSCUROS ----
-  { id: 'negro', name: 'Negro', modo: 'oscuro', base: '#0d0d0d', acentoRecomendado: 'blanco',
+  /* Los tres oscuros tienen que distinguirse DE UN VISTAZO (feedback del
+     dueño 2026-08-13: "gris, negro y azul los veo muy similares"):
+     negro = negro casi puro · gris = carbón claramente más claro y neutro ·
+     azul = azul marino con matiz visible, de la familia del acento azul. */
+  { id: 'negro', name: 'Negro', modo: 'oscuro', base: '#0a0a0a', acentoRecomendado: 'blanco',
     acentos: ['blanco', 'ambar', 'turquesa', 'celeste'] },
-  { id: 'gris', name: 'Gris', modo: 'oscuro', base: '#1e1e1e', acentoRecomendado: 'celeste',
+  { id: 'gris', name: 'Gris', modo: 'oscuro', base: '#26282d', acentoRecomendado: 'celeste',
     acentos: ['celeste', 'turquesa', 'ambar', 'blanco'] },
-  { id: 'azul', name: 'Azul', modo: 'oscuro', base: '#0a0f1a', acentoRecomendado: 'indigo',
+  { id: 'azul', name: 'Azul', modo: 'oscuro', base: '#101d36', acentoRecomendado: 'indigo',
     acentos: ['indigo', 'turquesa', 'celeste', 'blanco'] },
 ];
 
@@ -327,15 +331,20 @@ export function sidebarColor(tema: BgTheme, acento: string, modo: SidebarMode): 
   // En los temas oscuros la mezcla necesita un punto más para percibirse: el
   // ojo distingue peor entre tonos oscuros que entre claros.
   const claro = tema.modo === 'claro';
+  /* Intensidades bien separadas (feedback del dueño 2026-08-13: "Tinte,
+     Orgánico y Claro son muy parecidos"): tinte se NOTA, orgánico se
+     insinúa, claro es casi el fondo con un escalón. */
   const intensidad =
-    modo === 'tinte' ? (claro ? 0.22 : 0.3)
-    : modo === 'organico' ? (claro ? 0.1 : 0.14)
-    : (claro ? 0.035 : 0.06);
+    modo === 'tinte' ? (claro ? 0.32 : 0.45)
+    : modo === 'organico' ? (claro ? 0.14 : 0.2)
+    : (claro ? 0.03 : 0.05);
 
   const teñida = mixColors(tema.base, acento, intensidad);
   // Además del tinte, un escalón de luminosidad contra el fondo para que la
-  // barra se separe aunque el acento sea casi del color de la base.
-  return claro ? darken(teñida, 4) : lighten(teñida, 4);
+  // barra se separe aunque el acento sea casi del color de la base. El
+  // escalón también distingue: "claro" se separa más por LUZ que por tinte.
+  const escalon = modo === 'claro' ? 7 : 4;
+  return claro ? darken(teñida, escalon) : lighten(teñida, escalon);
 }
 
 /**
