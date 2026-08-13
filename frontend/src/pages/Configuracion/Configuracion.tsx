@@ -59,9 +59,10 @@ export default function Configuracion() {
   const [padreActivo, setPadreActivo] = useState(urlPadre || arbol[0].id);
   const [hijosActivos, setHijosActivos] = useState<Record<string, string>>({
     general: 'muni',
+    municipio: 'dependencias',
     personal: 'empleados',
-    vecino: 'vecinos',
-    catalogos: 'dependencias',
+    reclamos: 'cat-reclamo',
+    tramites: 'arbol-tramite',
     inventario: 'inv',
     tesoreria: 'conceptos-liq',
     integraciones: 'pagos',

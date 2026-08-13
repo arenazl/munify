@@ -11,6 +11,14 @@ export class MockDataService {
   // Estructura del brief. `tipo` decide qué cuerpo entra en el tab hijo:
   // catalogo = el ABM genérico (nombre, icono, color, activo, orden),
   // form / qr = cuerpos propios, abm = el SemanticAbmPage completo.
+  //
+  // OJO — DUPLICADO CONOCIDO: `canvasConfigSpec.ARBOL_CONFIG` tiene una copia
+  // de esta estructura (con `tipo` divergentes). LA QUE RENDERIZA ES ESTA.
+  // Cualquier cambio de reparto va en las DOS hasta que se unifiquen.
+  //
+  // Reparto Opción 1 (decisión del dueño 2026-08-13): pestañas por MÓDULO +
+  // "Municipio" transversal. Ausencias NO va: la carga es operación
+  // (GestionAusencias); si el tipo se vuelve catálogo, entra como tal.
   arbol() {
     return [
       { id: 'general', label: 'General', hijos: [
@@ -18,22 +26,25 @@ export class MockDataService {
         { id: 'qr', label: 'QR de cartelería', tipo: 'qr', n: '14' },
         { id: 'apariencia', label: 'Apariencia', tipo: 'apariencia' },
       ] },
+      { id: 'municipio', label: 'Municipio', hijos: [
+        { id: 'dependencias', label: 'Dependencias', tipo: 'abm', n: '11' },
+        { id: 'asignacion', label: 'Asignaciones', tipo: 'asignacion', n: '11' },
+        { id: 'zonas', label: 'Zonas', tipo: 'abm', n: '18' },
+        { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
+        { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
+      ] },
       { id: 'personal', label: 'Personal', hijos: [
         { id: 'empleados', label: 'Empleados', tipo: 'abm', n: '86' },
         { id: 'cuadrillas', label: 'Cuadrillas', tipo: 'abm', n: '7' },
-        { id: 'ausencias', label: 'Ausencias', tipo: 'abm', n: '12' },
+        { id: 'tipos-empleado', label: 'Tipos de empleado', tipo: 'catalogo', n: '5' },
       ] },
-      { id: 'vecino', label: 'Atención al vecino', hijos: [
-        { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
+      { id: 'reclamos', label: 'Reclamos', hijos: [
         { id: 'cat-reclamo', label: 'Categorías de reclamo', tipo: 'catalogo', n: '9' },
-        { id: 'arbol-tramite', label: 'Trámites', tipo: 'arbol' },
         { id: 'sla', label: 'SLA', tipo: 'abm', n: '9' },
         { id: 'tipos-poi', label: 'Tipos de punto de interés', tipo: 'catalogo', n: '5' },
       ] },
-      { id: 'catalogos', label: 'Catálogos', hijos: [
-        { id: 'dependencias', label: 'Dependencias', tipo: 'abm', n: '11' },
-        { id: 'asignacion', label: 'Asignación', tipo: 'asignacion', n: '11' },
-        { id: 'zonas', label: 'Zonas', tipo: 'abm', n: '18' },
+      { id: 'tramites', label: 'Trámites', hijos: [
+        { id: 'arbol-tramite', label: 'Trámites', tipo: 'arbol' },
       ] },
       { id: 'inventario', label: 'Inventario', hijos: [
         { id: 'inv', label: 'Inventario', tipo: 'abm', n: '240' },
@@ -41,10 +52,8 @@ export class MockDataService {
       ] },
       { id: 'tesoreria', label: 'Tesorería', hijos: [
         { id: 'conceptos-liq', label: 'Conceptos de liquidación', tipo: 'catalogo', n: '9' },
-        { id: 'tipos-empleado', label: 'Tipos de empleado', tipo: 'catalogo', n: '5' },
         { id: 'cajas', label: 'Cajas y fondos', tipo: 'abm', n: '4' },
         { id: 'retenciones', label: 'Retenciones', tipo: 'abm', n: '6' },
-        { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
         { id: 'proyectos', label: 'Proyectos', tipo: 'abm', n: '8' },
         { id: 'tarjetas', label: 'Tarjetas', tipo: 'abm', n: '3' },
         { id: 'contactos', label: 'Contactos', tipo: 'abm', n: '148' },
