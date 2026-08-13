@@ -186,6 +186,117 @@ TURNOS_VIVOS = [
 # ============================================================
 # Bloque 1 — garantías previas: zona_id + integrantes en TODAS las cuadrillas.
 # ============================================================
+async def _garantizar_asignaciones(db: AsyncSession, muni_id: int) -> dict:
+    """La plantilla demo se muestra COMPLETA en Asignación: toda categoría de
+    reclamo queda con dependencia y todo trámite con oficina del turnero.
+
+    El mapeo es determinístico por palabra clave (con fallback por índice),
+    igual criterio que el resto del script: nada de random, y en re-run no
+    toca lo que ya está asignado (solo completa huecos).
+    """
+    from models.dependencia import Dependencia
+    from models.municipio_dependencia import MunicipioDependencia
+    from models.municipio_dependencia_categoria import MunicipioDependenciaCategoria
+
+    deps_rows = (await db.execute(
+        select(MunicipioDependencia, Dependencia.nombre)
+        .join(Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
+        .where(
+            MunicipioDependencia.municipio_id == muni_id,
+            MunicipioDependencia.activo == True,  # noqa: E712
+        )
+        .order_by(MunicipioDependencia.id)
+    )).all()
+    if not deps_rows:
+        print("[asignaciones] el municipio no tiene dependencias — nada que asignar")
+        return {"cats": 0, "tramites": 0}
+
+    # Qué dependencia atiende cada cosa, por vocabulario. El orden importa:
+    # la primera regla que matchea gana.
+    REGLAS = [
+        (("transito", "tránsito", "semaforo", "semáforo", "vehiculo", "vehículo",
+          "estacionamiento", "señalizacion", "señalización", "licencia", "transporte"),
+         ("tránsito", "transito", "movilidad")),
+        (("animal", "plaga", "zoonosis", "mascota", "fumig"),
+         ("zoonosis", "salud animal")),
+        (("ruido", "convivencia", "seguridad", "cableado"),
+         ("seguridad",)),
+        (("bache", "vereda", "obra", "calzada", "pavimento", "construccion",
+          "construcción", "catastro", "mensura", "dominio"),
+         ("obras",)),
+        (("alumbrado", "higiene", "residuo", "basura", "arbolado", "plaza",
+          "espacio", "agua", "cloaca", "desague", "desagüe", "poda", "ambiente",
+          "recoleccion", "recolección", "habilitacion", "habilitación", "tasa",
+          "certificado", "residencia"),
+         ("servicios", "ambiente")),
+    ]
+
+    def dep_para(texto: str, fallback_idx: int):
+        t = texto.lower()
+        for claves, claves_dep in REGLAS:
+            if any(k in t for k in claves):
+                for md, nombre in deps_rows:
+                    if any(kd in nombre.lower() for kd in claves_dep):
+                        return md
+        return deps_rows[fallback_idx % len(deps_rows)][0]
+
+    # 1) Categorías de reclamo sin dependencia
+    cats = (await db.execute(
+        select(CategoriaReclamo).where(
+            CategoriaReclamo.municipio_id == muni_id,
+            CategoriaReclamo.activo == True,  # noqa: E712
+        ).order_by(CategoriaReclamo.id)
+    )).scalars().all()
+    ya_asignadas = set((await db.execute(
+        select(MunicipioDependenciaCategoria.categoria_id).where(
+            MunicipioDependenciaCategoria.municipio_id == muni_id
+        )
+    )).scalars().all())
+    cats_nuevas = 0
+    for i, c in enumerate(cats):
+        if c.id in ya_asignadas:
+            continue
+        md = dep_para(f"{c.nombre} {c.descripcion or ''}", i)
+        db.add(MunicipioDependenciaCategoria(
+            municipio_id=muni_id,
+            dependencia_id=md.dependencia_id,
+            categoria_id=c.id,
+            municipio_dependencia_id=md.id,
+            activo=True,
+        ))
+        cats_nuevas += 1
+
+    # 2) Trámites sin oficina del turnero
+    trams = (await db.execute(
+        select(Tramite).where(
+            Tramite.municipio_id == muni_id,
+            Tramite.activo == True,  # noqa: E712
+        ).order_by(Tramite.id)
+    )).scalars().all()
+    dep_ids_muni = [md.id for md, _n in deps_rows]
+    con_oficina = set((await db.execute(
+        select(MunicipioDependenciaTramite.tramite_id).where(
+            MunicipioDependenciaTramite.municipio_dependencia_id.in_(dep_ids_muni)
+        )
+    )).scalars().all())
+    trams_nuevos = 0
+    for i, t in enumerate(trams):
+        if t.id in con_oficina:
+            continue
+        md = dep_para(t.nombre, i)
+        db.add(MunicipioDependenciaTramite(
+            municipio_dependencia_id=md.id,
+            tramite_id=t.id,
+            activo=True,
+        ))
+        trams_nuevos += 1
+
+    await db.flush()
+    print(f"[asignaciones] {cats_nuevas} categorías y {trams_nuevos} trámites asignados "
+          f"(lo ya asignado no se toca)")
+    return {"cats": cats_nuevas, "tramites": trams_nuevos}
+
+
 async def _garantizar_cuadrillas(db: AsyncSession, muni_id: int) -> dict:
     cuadrillas = (await db.execute(
         select(Cuadrilla).where(Cuadrilla.municipio_id == muni_id).order_by(Cuadrilla.id)
@@ -634,6 +745,7 @@ async def main():
             return
 
         resumen = {}
+        resumen["asignaciones"] = await _garantizar_asignaciones(db, muni.id)
         resumen["cuadrillas"] = await _garantizar_cuadrillas(db, muni.id)
         await db.commit()
 
@@ -659,6 +771,8 @@ async def main():
         await db.commit()
 
         print(f"\nOK — Paraguay Limpio (Asunción) capa OPERATIVA lista. muni_id={muni.id}")
+        print(f"  asignaciones: {resumen['asignaciones']['cats']} categorías y "
+              f"{resumen['asignaciones']['tramites']} trámites completados")
         print(f"  cuadrillas: {resumen['cuadrillas']['con_zona']} con zona, "
               f"{resumen['cuadrillas']['miembros_creados']} integrantes nuevos")
         print(f"  reclamos vivos: {resumen['reclamos']['creados']} creados, "

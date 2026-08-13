@@ -6,7 +6,6 @@ import {
   configuracionApi
 } from '../../../lib/api';
 import type { FilaCatalogo } from '../panels/PanelCatalogo';
-import type { GrupoAsig, TabAsig, FilaAsig } from '../panels/PanelAsignacion';
 
 export interface DatosFormularioMuni {
   nombreMunicipio: string;
@@ -143,78 +142,137 @@ export async function cargarCatalogoReal(hijoId: string): Promise<{ veredicto: s
   return { veredicto: '', filas: [], pie: '' };
 }
 
-export async function cargarAsignacionReal(): Promise<{
-  tabsAsig: TabAsig[];
-  haySugerencias: boolean;
-  labelSugerencias: string;
-  gruposAsig: GrupoAsig[];
-  pieAsig: string;
-}> {
-  /* La asignación REAL vive en las dependencias DEL MUNICIPIO: cada una trae
-     sus categorías con `include_assignments`. Las categorías no tienen ningún
-     campo `dependencia_defecto_id` — cruzar contra el catálogo global (44
-     dependencias que este municipio ni habilitó) mostraba todo sin asignar. */
-  const [cRes, dRes] = await Promise.all([
-    categoriasReclamoApi.getAll(true),
-    dependenciasApi.getMunicipio({ include_assignments: true }),
-  ]);
+/* ============================================================
+ * Asignación — quién atiende cada cosa, en los DOS mundos:
+ *   reclamos: categoría de reclamo → dependencia (1 nivel)
+ *   tramites: categoría de trámite → dependencia (la categoría ARRASTRA
+ *             sus tipos: el vínculo real del turnero es por trámite, vía
+ *             MunicipioDependenciaTramite)
+ * Todo con endpoints existentes; ninguna sugerencia inventada.
+ * ============================================================ */
 
-  const cats = (cRes.data || []) as any[];
-  const deps = (dRes.data || []) as any[];
+export type ModoAsignacion = 'reclamos' | 'tramites';
 
-  const duenioDe = new Map<number, any>();
-  deps.forEach((d) => (d.categorias || []).forEach((c: any) => duenioDe.set(c.id, d)));
+export interface FilaAsignacion {
+  id: number;
+  nombre: string;
+  glifo: string;
+  color: string;
+  uso: number;
+  usoNota: string;
+  /** muniDep asignada (null = huérfana). En trámites, la dep de sus tipos. */
+  depId: number | null;
+  depNombre: string | null;
+  depColor: string | null;
+  /** Trámites: los tipos están repartidos en MÁS de una dependencia. */
+  depMixta?: boolean;
+  /** Trámites: ids de los tipos que arrastra la categoría. */
+  tipoIds?: number[];
+}
 
-  const tabsAsig: TabAsig[] = deps.map((d, i) => ({
-    id: String(d.id),
-    label: d.nombre,
-    n: (d.categorias || []).length,
-    glifo: d.icono || 'Building2',
-    col: d.color || '#00794F',
-    sub: '#98A3A0',
-    bg: i === 0 ? '#FFFFFF' : '#F6F8F7',
-    sombra: 'none',
+export interface DepAsignable {
+  /** id de MunicipioDependencia (el que usan asignarCategorias / turnos). */
+  id: number;
+  /** id del catálogo global (el que espera el endpoint de IA). */
+  dependenciaId: number;
+  nombre: string;
+  color: string | null;
+  descripcion?: string | null;
+  categoriaIds: number[];
+}
+
+export interface DatosAsignacion {
+  modo: ModoAsignacion;
+  filas: FilaAsignacion[];
+  deps: DepAsignable[];
+  usoTotal: number;
+  usoSinAsignar: number;
+}
+
+export async function cargarAsignacion(modo: ModoAsignacion): Promise<DatosAsignacion> {
+  const { categoriasTramiteApi, tramitesApi } = await import('../../../lib/api');
+  const dRes = await dependenciasApi.getMunicipio({ include_assignments: true });
+  const depsRaw = (dRes.data || []) as any[];
+
+  const deps: DepAsignable[] = depsRaw.map((d) => ({
+    id: d.id,
+    dependenciaId: d.dependencia_id,
+    nombre: d.nombre,
+    color: d.color || null,
+    descripcion: d.descripcion || null,
+    categoriaIds: (d.categorias || []).map((c: any) => c.id),
   }));
 
-  const filasAsig: FilaAsig[] = cats.map((c) => {
-    const depAsignada = duenioDe.get(c.id);
+  if (modo === 'reclamos') {
+    const cRes = await categoriasReclamoApi.getAll(true);
+    const cats = (cRes.data || []) as any[];
+
+    const duenioDe = new Map<number, any>();
+    depsRaw.forEach((d) => (d.categorias || []).forEach((c: any) => duenioDe.set(c.id, d)));
+
+    const filas: FilaAsignacion[] = cats.map((c) => {
+      const dep = duenioDe.get(c.id);
+      return {
+        id: c.id,
+        nombre: c.nombre,
+        glifo: c.icono || 'Tag',
+        color: c.color || '#00794F',
+        uso: c.en_uso ?? 0,
+        usoNota: (c.en_uso ?? 0) === 1 ? 'histórico' : 'históricos',
+        depId: dep ? dep.id : null,
+        depNombre: dep ? dep.nombre : null,
+        depColor: dep ? dep.color || null : null,
+      };
+    });
+
+    const usoTotal = filas.reduce((a, f) => a + f.uso, 0);
+    const usoSinAsignar = filas.filter((f) => !f.depId).reduce((a, f) => a + f.uso, 0);
+    return { modo, filas, deps, usoTotal, usoSinAsignar };
+  }
+
+  /* Trámites: la fila es la CATEGORÍA de trámite; su dependencia se deriva de
+     dónde están sus tipos. Si los tipos se reparten entre varias, se marca
+     mixta (se muestra, no se inventa una sola). */
+  const [ctRes, tRes] = await Promise.all([
+    categoriasTramiteApi.getAll(true),
+    tramitesApi.getAll(),
+  ]);
+  const catsT = (ctRes.data || []) as any[];
+  const tramites = (tRes.data || []) as any[];
+
+  const depDeTramite = new Map<number, any>();
+  depsRaw.forEach((d) => (d.tramites || []).forEach((t: any) => depDeTramite.set(t.id, d)));
+
+  const filas: FilaAsignacion[] = catsT.map((c) => {
+    const tipos = tramites.filter((t) => t.categoria_tramite_id === c.id);
+    const depsDeTipos = new Map<number, any>();
+    tipos.forEach((t) => {
+      const d = depDeTramite.get(t.id);
+      if (d) depsDeTipos.set(d.id, d);
+    });
+    const asignados = tipos.filter((t) => depDeTramite.has(t.id)).length;
+    const unica = depsDeTipos.size === 1 && asignados === tipos.length && tipos.length > 0
+      ? Array.from(depsDeTipos.values())[0]
+      : null;
+    const mixta = depsDeTipos.size > 1 || (asignados > 0 && asignados < tipos.length);
     return {
-      id: String(c.id),
+      id: c.id,
       nombre: c.nombre,
-      tinte: `${c.color || '#00794F'}15`,
-      color: c.color || '#00794F',
-      glifo: c.icono || 'Tag',
-      uso: c.en_uso ?? 0,
-      usoCol: '#0D1412',
-      usoNota: 'reclamos históricos',
-      asignada: !!depAsignada,
-      dep: depAsignada ? depAsignada.nombre : undefined,
-      depColor: depAsignada ? depAsignada.color || '#00794F' : undefined,
-      sinAsignar: !depAsignada,
+      glifo: c.icono || 'Folder',
+      color: c.color || '#3B82F6',
+      uso: tipos.length,
+      usoNota: tipos.length === 1 ? 'tipo' : 'tipos',
+      depId: unica ? unica.id : mixta ? Array.from(depsDeTipos.values())[0]?.id ?? null : null,
+      depNombre: unica ? unica.nombre : mixta ? 'Varias oficinas' : null,
+      depColor: unica ? unica.color || null : null,
+      depMixta: mixta,
+      tipoIds: tipos.map((t) => t.id),
     };
   });
 
-  const asignadas = filasAsig.filter((f) => f.asignada).length;
-
-  const gruposAsig: GrupoAsig[] = [
-    {
-      id: 'g1',
-      titulo: 'Reglas de distribución automática por categoría',
-      detalle: `${asignadas} de ${cats.length} categorías con dependencia`,
-      punto: '#00794F',
-      col: '#00794F',
-      bg: '#F6F8F7',
-      filas: filasAsig,
-    },
-  ];
-
-  return {
-    tabsAsig,
-    haySugerencias: asignadas > 0,
-    labelSugerencias: `${asignadas} regla${asignadas === 1 ? '' : 's'} activa${asignadas === 1 ? '' : 's'}`,
-    gruposAsig,
-    pieAsig: `Mostrando ${cats.length} categorías · ${asignadas} con dependencia asignada`,
-  };
+  const usoTotal = filas.reduce((a, f) => a + f.uso, 0);
+  const usoSinAsignar = filas.filter((f) => !f.depId && !f.depMixta).reduce((a, f) => a + f.uso, 0);
+  return { modo, filas, deps, usoTotal, usoSinAsignar };
 }
 
 export async function cargarArbolReal(): Promise<any[]> {

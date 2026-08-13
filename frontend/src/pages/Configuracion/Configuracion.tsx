@@ -25,7 +25,6 @@ import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
 // (`canvasConfigSpec`) y el del panel. `cargarCatalogoReal` devuelve el del
 // panel, que es el que va acá. Unificarlos es deuda abierta.
 import type { FilaCatalogo } from './panels/PanelCatalogo';
-import type { GrupoAsig, TabAsig } from './panels/PanelAsignacion';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getBgTheme, resolveAccentColor, sidebarColor, type SidebarMode } from '../../config/themePresets';
 import { useSuperAdmin } from '../../hooks/useSuperAdmin';
@@ -33,7 +32,6 @@ import {
   cargarDatosFormularioMuni,
   guardarDatosFormularioMuni,
   cargarCatalogoReal,
-  cargarAsignacionReal,
   type DatosFormularioMuni
 } from './data/datosRealesConfig';
 import { dashboardApi, inventarioApi } from '../../lib/api';
@@ -74,7 +72,6 @@ export default function Configuracion() {
   const [datosMuni, setDatosMuni] = useState<DatosFormularioMuni | null>(null);
   const [savingMuni, setSavingMuni] = useState(false);
   const [catalogoReal, setCatalogoReal] = useState<{ veredicto: string; filas: FilaCatalogo[]; pie: string } | null>(null);
-  const [asigReal, setAsigReal] = useState<{ tabsAsig: TabAsig[]; haySugerencias: boolean; labelSugerencias: string; gruposAsig: GrupoAsig[]; pieAsig: string } | null>(null);
 
   useEffect(() => {
     if (urlPadre && urlPadre !== padreActivo) setPadreActivo(urlPadre);
@@ -204,9 +201,6 @@ export default function Configuracion() {
     } else if (['tipos-poi', 'cat-inv', 'cat-reclamo'].includes(hijoId)) {
       const catData = await cargarCatalogoReal(hijoId);
       setCatalogoReal(catData);
-    } else if (hijoId === 'asignacion') {
-      const asigData = await cargarAsignacionReal();
-      setAsigReal(asigData);
     } else if (hijoId === 'vecinos') {
       const res = await dashboardApi.getStats();
       setPuenteVecinos({ total: res.data?.total ?? 0 });
@@ -304,7 +298,8 @@ export default function Configuracion() {
     // propio `AbmDeConfiguracion` con `ajusteId`.
     data = ABM_SPEC[hijoId] ?? (MockData.abmSpec ? MockData.abmSpec(hijoId) : null);
   } else if (tipo === 'asignacion') {
-    data = asigReal || (MockData.puenteSpec ? MockData.puenteSpec(hijoId) : null);
+    // La pantalla se autoabastece (AsignacionDelCanvas trae sus datos).
+    data = null;
   } else if (tipo === 'catalogo') {
     data = catalogoReal || MockData.datosDe(hijoId);
   } else if (tipo === 'arbol') {
@@ -499,10 +494,7 @@ export default function Configuracion() {
           )}
 
           {tipo === 'asignacion' && (
-            <AsignacionDelCanvas 
-              title={hijo.label} 
-              veredicto={(data as any)?.veredicto || ''} 
-            />
+            <AsignacionDelCanvas title={hijo.label} />
           )}
 
           {/* Vecinos e Inventario son PUENTES (canvas): el módulo vive en otro
