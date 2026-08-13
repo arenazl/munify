@@ -541,10 +541,26 @@ async def registrar_con_didit(
             )
         user.password_hash = get_password_hash(body.password)
     else:
-        dq = await db.execute(
-            select(User).where(User.dni == datos["dni"], User.nivel_verificacion >= 2)
-        )
-        existente = dq.scalar_one_or_none()
+        # Sandbox demo: si el registro es para un municipio DEMO, el DNI se
+        # valida SOLO dentro de ese municipio. La cuenta real de la misma
+        # persona en un muni productivo (o en otra demo) no bloquea la
+        # demostración. En municipios productivos el chequeo sigue siendo
+        # global, como siempre.
+        es_demo_destino = False
+        if municipio_id_final is not None:
+            mdq = await db.execute(
+                select(Municipio).where(Municipio.id == municipio_id_final)
+            )
+            muni_destino = mdq.scalar_one_or_none()
+            es_demo_destino = bool(muni_destino and muni_destino.es_demo)
+
+        condiciones = [User.dni == datos["dni"], User.nivel_verificacion >= 2]
+        if es_demo_destino:
+            condiciones.append(User.municipio_id == municipio_id_final)
+        # first() y no scalar_one_or_none(): con el sandbox puede haber más de
+        # una cuenta verificada con el mismo DNI repartida entre municipios.
+        dq = await db.execute(select(User).where(*condiciones))
+        existente = dq.scalars().first()
         if existente:
             raise HTTPException(
                 status_code=400,

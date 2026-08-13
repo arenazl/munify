@@ -538,6 +538,72 @@ def _normalizar_codigo(nombre: str) -> str:
     return s
 
 
+class LiberarDniDemoRequest(BaseModel):
+    dni: str
+
+
+@router.post("/demo/liberar-dni")
+async def liberar_dni_demo(
+    body: LiberarDniDemoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN])),
+):
+    """
+    Libera un DNI para volver a registrarse en las demos.
+
+    Herramienta del demostrador: cada registro real (QR + foto del DNI) deja
+    un vecino verificado con ese DNI, y la próxima demo lo rechaza como "ya
+    registrado". Esto ANONIMIZA esos vecinos (dni y email a placeholder,
+    verificación a cero) SOLO en municipios demo — el mismo DNI como cliente
+    real de un municipio productivo (San Pedro Norte) jamás se toca. No borra
+    usuarios: sus reclamos/historial de demo siguen colgando del registro
+    anónimo, así no se rompe ninguna FK.
+    """
+    dni_limpio = "".join(c for c in body.dni if c.isdigit())
+    if len(dni_limpio) < 6:
+        raise HTTPException(status_code=400, detail="DNI inválido")
+
+    # Solo se opera DESDE un municipio demo.
+    mq = await db.execute(
+        select(Municipio).where(Municipio.id == current_user.municipio_id)
+    )
+    muni_actual = mq.scalar_one_or_none()
+    if not (muni_actual and muni_actual.es_demo):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta herramienta sólo está disponible en municipios demo.",
+        )
+
+    # Vecinos con ese DNI en CUALQUIER municipio demo. El join con es_demo
+    # es el guardarraíl: un tenant productivo nunca entra en el resultado.
+    q = await db.execute(
+        select(User, Municipio.nombre)
+        .join(Municipio, User.municipio_id == Municipio.id)
+        .where(
+            User.dni == dni_limpio,
+            Municipio.es_demo == True,  # noqa: E712 — comparación SQL
+            User.rol == RolUsuario.VECINO,
+        )
+    )
+    filas = q.all()
+
+    municipios_afectados: list[str] = []
+    for usuario, muni_nombre in filas:
+        usuario.dni = None
+        usuario.email = f"liberado+{usuario.id}@demo.local"
+        usuario.cuenta_verificada = False
+        usuario.nivel_verificacion = 0
+        usuario.didit_session_id = None
+        municipios_afectados.append(muni_nombre)
+
+    await db.commit()
+    return {
+        "liberados": len(municipios_afectados),
+        "municipios": sorted(set(municipios_afectados)),
+        "dni": dni_limpio,
+    }
+
+
 @router.post("/crear-demo", response_model=MunicipioDemoResponse)
 async def crear_municipio_demo(
     data: MunicipioDemoCreate,

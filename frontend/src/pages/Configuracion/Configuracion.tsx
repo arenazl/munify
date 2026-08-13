@@ -16,6 +16,7 @@ import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
 import ArbolDelCanvas from '../../components/config/ArbolDelCanvas';
 import AbmDeConfiguracion from '../../components/config/AbmDeConfiguracion';
 import PuenteDeModulo from '../../components/config/PuenteDeModulo';
+import DemoDniCard from '../../components/config/DemoDniCard';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
@@ -442,16 +443,20 @@ export default function Configuracion() {
               resaltado={datosMuni?.nombrePublico ? `"${datosMuni.nombrePublico}"` : undefined}
               tono={datosMuni?.nombrePublico ? 'bueno' : undefined}
             >
-              <PanelFormulario
-                nombreMunicipio={datosMuni?.nombreMunicipio}
-                nombrePublico={datosMuni?.nombrePublico}
-                ruc={datosMuni?.ruc}
-                departamento={datosMuni?.departamento}
-                telefono={datosMuni?.telefono}
-                email={datosMuni?.email}
-                saving={savingMuni}
-                onSave={handleSaveMuni}
-              />
+              <>
+                <PanelFormulario
+                  nombreMunicipio={datosMuni?.nombreMunicipio}
+                  nombrePublico={datosMuni?.nombrePublico}
+                  ruc={datosMuni?.ruc}
+                  departamento={datosMuni?.departamento}
+                  telefono={datosMuni?.telefono}
+                  email={datosMuni?.email}
+                  saving={savingMuni}
+                  onSave={handleSaveMuni}
+                />
+                {/* Sólo aparece en municipios demo (el propio card lo decide). */}
+                <DemoDniCard />
+              </>
             </PantallaDeAjuste>
           )}
 

@@ -662,6 +662,14 @@ export const configuracionApi = {
 // Municipios
 export const municipiosApi = {
   getAll: () => api.get('/municipios'),
+  // Herramienta del demostrador: anonimiza los vecinos con ese DNI en TODOS
+  // los municipios demo para poder re-registrarse con el QR (el guard de
+  // es_demo vive en el backend; un tenant productivo jamás se toca).
+  liberarDniDemo: (dni: string) =>
+    api.post<{ liberados: number; municipios: string[]; dni: string }>(
+      '/municipios/demo/liberar-dni',
+      { dni },
+    ),
   // Resumen real por muni para la vista Suscripciones del superadmin
   adminResumen: () => api.get('/municipios/admin/resumen'),
   getPublic: () => api.get('/municipios/public'),
