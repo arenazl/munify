@@ -26,6 +26,8 @@ export interface PanelAsignacionProps {
   onAsignar: (fila: FilaAsignacion, depId: number | null) => void;
   /** Mientras guarda, los combos quedan deshabilitados. */
   guardando: boolean;
+  /** Primera carga de un mundo: skeleton ADENTRO de la tabla (el shell queda). */
+  cargando?: boolean;
   labelIA: string;
   aplicandoIA: boolean;
   onIA: () => void;
@@ -40,7 +42,7 @@ const TONOS = {
 
 export default function PanelAsignacion({
   modo, onModo, conteoReclamos, conteoTramites, filas, deps,
-  onAsignar, guardando, labelIA, aplicandoIA, onIA, pie, resumen,
+  onAsignar, guardando, cargando = false, labelIA, aplicandoIA, onIA, pie, resumen,
 }: PanelAsignacionProps) {
   const [busqueda, setBusqueda] = useState('');
   const [chip, setChip] = useState<'todas' | 'sin' | 'con'>('todas');
@@ -160,7 +162,7 @@ export default function PanelAsignacion({
             >
               <span style={{ width: '6px', height: '6px', borderRadius: '999px', background: c.tono ? TONOS[c.tono].punto : 'var(--pl-text-faint)' }}></span>
               <span style={{ fontSize: '12.5px', fontWeight: 600, color: activo ? 'var(--pl-text)' : 'var(--pl-text-2)' }}>{c.label}</span>
-              <span className="av2-tnum" style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--pl-text-faint)' }}>{c.n}</span>
+              <span className="av2-tnum" style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--pl-text-faint)' }}>{cargando ? '—' : c.n}</span>
             </button>
           );
         })}
@@ -174,13 +176,17 @@ export default function PanelAsignacion({
           <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: 'var(--pl-text-faint)' }}>QUIÉN LOS ATIENDE</span>
         </div>
 
-        {visibles.length === 0 && (
+        {cargando && [0, 1, 2, 3].map((i) => (
+          <div key={i} className="av2-skeleton" style={{ height: '44px', margin: '10px 16px', borderRadius: '10px' }} aria-busy />
+        ))}
+
+        {!cargando && visibles.length === 0 && (
           <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: '12.5px', color: 'var(--pl-text-muted)' }}>
             Nada que mostrar con este filtro.
           </div>
         )}
 
-        {visibles.map((r) => (
+        {!cargando && visibles.map((r) => (
           <div
             key={r.id}
             style={{ boxSizing: 'border-box', display: 'grid', minWidth: '540px', gridTemplateColumns: 'minmax(180px, 1.5fr) 90px minmax(210px, 1.35fr)', alignItems: 'center', gap: '14px', padding: '8px 16px', borderBottom: '1px solid var(--pl-border)' }}

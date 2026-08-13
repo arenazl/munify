@@ -36,7 +36,11 @@ export interface AsignacionDelCanvasProps {
 
 export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
   const [modo, setModo] = useState<ModoAsignacion>('reclamos');
-  const [datos, setDatos] = useState<DatosAsignacion | null>(null);
+  /* Caché por mundo: cambiar de segmented NO borra la pantalla ni refetchea —
+     cada mundo se trae UNA vez y el switch es instantáneo (pedido del dueño
+     2026-08-13: nada de "postback"). Se invalida sólo al guardar/IA. */
+  const [cache, setCache] = useState<Partial<Record<ModoAsignacion, DatosAsignacion>>>({});
+  const datos = cache[modo] ?? null;
   const [conteos, setConteos] = useState<{ reclamos: number | null; tramites: number | null }>({ reclamos: null, tramites: null });
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -47,7 +51,7 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
     setError(null);
     cargarAsignacion(m)
       .then((d) => {
-        setDatos(d);
+        setCache((prev) => ({ ...prev, [m]: d }));
         setConteos((prev) => ({ ...prev, [m]: d.filas.length }));
       })
       .catch((e) => {
@@ -56,7 +60,9 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
       });
   }, []);
 
-  useEffect(() => { setDatos(null); recargar(modo); }, [modo, recargar]);
+  useEffect(() => {
+    if (!cache[modo]) recargar(modo);
+  }, [modo, cache, recargar]);
 
   /* El contador del riel = huérfanas del mundo activo (canvas: baja en vivo
      al asignar). */
@@ -189,16 +195,20 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
       resaltado={cabecera.resaltado}
       tono={cabecera.tono}
     >
-      {!datos ? (
+      {/* El skeleton de pantalla completa es SOLO del primer render de la
+          pestaña; el cambio de mundo mantiene el shell (segmented, chips,
+          tabla) y carga adentro. */}
+      {!datos && !cache.reclamos && !cache.tramites ? (
         <div className="av2-skeleton" style={{ minHeight: 220 }} aria-busy />
       ) : (
         <PanelAsignacion
           modo={modo}
           onModo={setModo}
+          cargando={!datos}
           conteoReclamos={conteos.reclamos}
           conteoTramites={conteos.tramites}
           filas={filas}
-          deps={datos.deps.map((d) => ({ id: d.id, nombre: d.nombre, color: d.color }))}
+          deps={(datos ?? cache.reclamos ?? cache.tramites)!.deps.map((d) => ({ id: d.id, nombre: d.nombre, color: d.color }))}
           labelIA={huerfanas > 0 ? `Autoasignar con IA (${huerfanas})` : 'Reasignar con IA'}
           aplicandoIA={aplicandoIA}
           onIA={() => setConfirmandoIA(true)}

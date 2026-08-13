@@ -389,7 +389,7 @@ export default function Configuracion() {
               <PuenteDeModulo
                 configuraAca={[
                   { label: 'Categorías de reclamo', nota: 'Lo que el bot le ofrece al vecino', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
-                  { label: 'Asignación', nota: 'A quién se deriva lo que entra por WhatsApp', grupoId: 'catalogos', ajusteId: 'asignacion' },
+                  { label: 'Asignaciones', nota: 'A quién se deriva lo que entra por WhatsApp', grupoId: 'catalogos', ajusteId: 'asignacion' },
                 ]}
                 viveEn={{
                   titulo: 'Vive en Integraciones',
@@ -413,7 +413,7 @@ export default function Configuracion() {
               <PuenteDeModulo
                 configuraAca={[
                   { label: 'Categorías de reclamo', nota: 'Las clases entre las que la IA elige', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
-                  { label: 'Asignación', nota: 'Las reglas que la IA sugiere completar', grupoId: 'catalogos', ajusteId: 'asignacion' },
+                  { label: 'Asignaciones', nota: 'Las reglas que la IA sugiere completar', grupoId: 'catalogos', ajusteId: 'asignacion' },
                 ]}
                 viveEn={{
                   titulo: 'Vive en Integraciones',
