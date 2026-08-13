@@ -196,8 +196,8 @@ export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarH
         <Bell className={`${sidebarMode ? 'h-5 w-5' : 'h-4 w-4'} ${isOpen ? '' : 'group-hover:animate-wiggle'}`} strokeWidth={sidebarMode ? 2 : 3} />
         {unreadCount > 0 && (
           <span
-            className={`absolute ${sidebarMode ? '-top-0.5 -right-0.5 min-w-[16px] h-[16px] text-[9px]' : '-top-1 -right-1 min-w-[14px] h-[14px] text-[8px]'} flex items-center justify-center font-bold text-white rounded-full`}
-            style={{ backgroundColor: '#ef4444' }}
+            className={`absolute ${sidebarMode ? '-top-0.5 -right-0.5 min-w-[16px] h-[16px] text-[9px]' : 'top-0 right-0 min-w-[14px] h-[14px] text-[8px]'} flex items-center justify-center font-bold leading-none text-white rounded-full`}
+            style={{ backgroundColor: 'var(--pl-red)' }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>

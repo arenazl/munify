@@ -12,6 +12,9 @@
  *     categoría (la categoría arrastra sus tipos).
  *   - IA: los auto-asignar existentes; APLICAN el mapa completo del mundo
  *     activo (por eso el ConfirmModal antes).
+ *
+ * La celda de la derecha es el ModernSelect del kit (searchable): un nivel,
+ * listado entero de secretarías, en los dos mundos por igual.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -24,9 +27,7 @@ import {
   type ModoAsignacion,
 } from '../../pages/Configuracion/data/datosRealesConfig';
 import { dependenciasApi, turnosApi } from '../../lib/api';
-import { Sheet } from '../ui/Sheet';
 import { ConfirmModal } from '../ui/ConfirmModal';
-import { Glifo } from '../abmv2/Glifo';
 import { useReportarTotal } from '../abmv2/useEmbed';
 
 export interface AsignacionDelCanvasProps {
@@ -38,7 +39,6 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
   const [datos, setDatos] = useState<DatosAsignacion | null>(null);
   const [conteos, setConteos] = useState<{ reclamos: number | null; tramites: number | null }>({ reclamos: null, tramites: null });
   const [error, setError] = useState<string | null>(null);
-  const [pickerFila, setPickerFila] = useState<FilaAsignacion | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [confirmandoIA, setConfirmandoIA] = useState(false);
   const [aplicandoIA, setAplicandoIA] = useState(false);
@@ -95,19 +95,19 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
     }
   };
 
-  const elegirDependencia = async (depDestinoId: number | null) => {
-    if (!pickerFila || !datos) return;
+  const asignar = async (fila: FilaAsignacion, depDestinoId: number | null) => {
+    if (!datos) return;
+    if (fila.depId === depDestinoId && !fila.depMixta) return; // sin cambio real
     setGuardando(true);
     try {
-      if (modo === 'reclamos') await asignarReclamo(pickerFila, depDestinoId);
-      else await asignarTramites(pickerFila, depDestinoId);
+      if (modo === 'reclamos') await asignarReclamo(fila, depDestinoId);
+      else await asignarTramites(fila, depDestinoId);
       const destino = datos.deps.find((d) => d.id === depDestinoId);
       toast.success(
         destino
-          ? `${pickerFila.nombre} ahora la atiende ${destino.nombre}.`
-          : `${pickerFila.nombre} quedó sin dependencia.`,
+          ? `${fila.nombre} ahora la atiende ${destino.nombre}.`
+          : `${fila.nombre} quedó sin dependencia.`,
       );
-      setPickerFila(null);
       recargar(modo);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -198,11 +198,12 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
           conteoReclamos={conteos.reclamos}
           conteoTramites={conteos.tramites}
           filas={filas}
-          depsNodo={datos.deps.map((d) => ({ id: d.id, nombre: d.nombre, color: d.color }))}
+          deps={datos.deps.map((d) => ({ id: d.id, nombre: d.nombre, color: d.color }))}
           labelIA={huerfanas > 0 ? `Autoasignar con IA (${huerfanas})` : 'Reasignar con IA'}
           aplicandoIA={aplicandoIA}
           onIA={() => setConfirmandoIA(true)}
-          onElegir={setPickerFila}
+          onAsignar={asignar}
+          guardando={guardando}
           pie={
             modo === 'reclamos'
               ? 'Una categoría sin dependencia entra a la cola sin dueño: alguien la tiene que derivar a mano.'
@@ -211,69 +212,6 @@ export function AsignacionDelCanvas({ title }: AsignacionDelCanvasProps) {
           resumen={`${filas.length - huerfanas} de ${filas.length} categorías`}
         />
       )}
-
-      {/* --- Picker: asignar / cambiar / quitar --- */}
-      <Sheet
-        open={pickerFila !== null}
-        onClose={() => setPickerFila(null)}
-        title={pickerFila ? `¿Quién atiende ${pickerFila.nombre}?` : ''}
-        description={
-          modo === 'tramites'
-            ? 'La categoría arrastra todos sus tipos de trámite a la oficina elegida.'
-            : 'Los reclamos nuevos de esta categoría se derivan solos a la dependencia elegida.'
-        }
-      >
-        <div className="space-y-2">
-          {(datos?.deps ?? []).map((d) => {
-            const actual = pickerFila?.depId === d.id && !pickerFila?.depMixta;
-            return (
-              <button
-                key={d.id}
-                type="button"
-                disabled={guardando}
-                onClick={() => elegirDependencia(d.id)}
-                className="w-full text-left p-3 flex items-center gap-3 transition-all"
-                style={{
-                  backgroundColor: actual ? 'var(--pl-green-050)' : 'var(--pl-surface)',
-                  border: `1px solid ${actual ? 'var(--pl-green-200)' : 'var(--pl-border)'}`,
-                  borderRadius: 'var(--pl-radius-md)',
-                  cursor: guardando ? 'wait' : 'pointer',
-                }}
-              >
-                <span
-                  className="w-8 h-8 flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${d.color || '#00794F'}15`, borderRadius: 'var(--pl-radius-sm)' }}
-                >
-                  <Glifo glifo="Building2" size={15} color={d.color || 'var(--pl-green-700)'} fallback="Building2" />
-                </span>
-                <span className="min-w-0 flex-1 text-[13px] font-semibold" style={{ color: 'var(--pl-text)' }}>
-                  {d.nombre}
-                </span>
-                {actual && (
-                  <span className="av2-chip-estado av2-chip-estado--green">Actual</span>
-                )}
-              </button>
-            );
-          })}
-          {pickerFila?.depId && (
-            <button
-              type="button"
-              disabled={guardando}
-              onClick={() => elegirDependencia(null)}
-              className="w-full text-center p-2.5 text-[12.5px] font-semibold"
-              style={{
-                color: 'var(--pl-red-700)',
-                background: 'transparent',
-                border: '1px dashed var(--pl-border-strong)',
-                borderRadius: 'var(--pl-radius-md)',
-                cursor: guardando ? 'wait' : 'pointer',
-              }}
-            >
-              Quitar la dependencia (vuelve a la cola sin dueño)
-            </button>
-          )}
-        </div>
-      </Sheet>
 
       <ConfirmModal
         isOpen={confirmandoIA}

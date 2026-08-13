@@ -486,7 +486,7 @@ export function FilterChipRow({
               {chip.icon && (
                 <span
                   className={`flex-shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5 sm:[&>svg]:h-4 sm:[&>svg]:w-4 ${isLoading ? 'animate-pulse' : ''}`}
-                  style={{ color: isActive ? '#ffffff' : chipColor }}
+                  style={{ color: isActive ? theme.primaryText : chipColor }}
                 >
                   {chip.icon}
                 </span>
@@ -494,14 +494,14 @@ export function FilterChipRow({
               {/* Label solo en desktop */}
               <span
                 className={`hidden sm:inline text-xs font-medium whitespace-nowrap ${isLoading ? 'animate-pulse' : ''}`}
-                style={{ color: isActive ? '#ffffff' : chipColor }}
+                style={{ color: isActive ? theme.primaryText : chipColor }}
               >
                 {chip.label}
               </span>
               {chip.count !== undefined && (
                 <span
                   className={`text-[9px] sm:text-[10px] font-bold ${isLoading ? 'animate-pulse' : ''}`}
-                  style={{ color: isActive ? '#ffffff' : chipColor }}
+                  style={{ color: isActive ? theme.primaryText : chipColor }}
                 >
                   {chip.count}
                 </span>

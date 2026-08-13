@@ -86,7 +86,7 @@ export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas
               </svg>
               MUNICIPALIDAD · VISTA CONSOLIDADA
             </span>
-            <span style={{ display: 'block', marginTop: '8px', fontFamily: 'Sora, sans-serif', fontSize: '24px', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.025em', color: 'var(--pl-surface)' }}>Asunción, Dpto. Central</span>
+            <span style={{ display: 'block', marginTop: '8px', fontFamily: 'Sora, sans-serif', fontSize: '24px', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.025em', color: 'var(--pl-on-brand)' }}>Asunción, Dpto. Central</span>
             <span style={{ display: 'block', marginTop: '6px', fontSize: '12.5px', color: 'rgba(255,255,255,0.82)' }}>Así se va a ver el título sobre tu foto</span>
           </div>
           <span 
@@ -167,7 +167,7 @@ export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas
               title={a.nombre} 
               style={{ display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '999px', background: a.hex, cursor: 'pointer', boxShadow: `0 0 0 ${a.anillo} var(--pl-surface), 0 0 0 ${a.borde} ${a.hex}` }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--pl-surface)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: a.tick }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--pl-on-accent)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: a.tick }}>
                 <path d="m4 12 5 5L20 6" />
               </svg>
             </span>

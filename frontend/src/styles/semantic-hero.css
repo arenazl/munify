@@ -205,7 +205,7 @@
 .sh-accion--primaria {
   background: var(--pl-green);
   border-color: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
   box-shadow: var(--pl-shadow-card);
 }
 .sh-accion--primaria:hover { background: var(--pl-green-700); }

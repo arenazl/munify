@@ -319,14 +319,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     set('--pl-green-200', mix(theme.card, p, 0.30));
     set('--pl-green-100', mix(theme.card, p, 0.16));
     set('--pl-green-050', mix(theme.card, p, 0.08));
-    set('--pl-on-brand', theme.primaryText);
-    // Lo que va ENCIMA del acento sólido (ícono del botón "+" de la barra
-    // inferior, número dentro de una barra llena, etc.): casi-blanco sobre
-    // acentos oscuros, casi-negro sobre acentos claros. Se decide por la
-    // LUMINANCIA del acento, no por si el tema es claro u oscuro — un tema
-    // oscuro puede tener acento amarillo, y ahí el blanco no se lee.
-    // Sale del theme, así que ninguna marca necesita su propio hardcodeo.
-    set('--pl-on-accent', isLight(p) ? '#101614' : '#ffffff');
+    // Tinta SOBRE EL BANNER de marca (hero). El banner es oscuro SIEMPRE
+    // (abajo se normaliza el acento del hero a oscuro), así que la tinta es
+    // fija clara — NO depende del acento. No confundir con --pl-on-accent.
+    set('--pl-on-brand', '#ffffff');
+    // Lo que va ENCIMA del acento sólido (botones, badges, pills activas):
+    // blanco sobre acentos oscuros, tinta oscura sobre acentos claros. UNA
+    // sola fuente: theme.primaryText (misma regla de luminancia en todo el
+    // kit). Sale del theme, ninguna marca necesita su propio hardcodeo.
+    set('--pl-on-accent', theme.primaryText);
 
     // Semánticos: ÚNICAS constantes = los 3 matices universales (warning/
     // danger/info). Todas sus variantes (texto accesible, superficie suave)
@@ -384,17 +385,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       ? '0 6px 20px rgba(13,20,18,.10), 0 2px 6px rgba(13,20,18,.06)'
       : '0 6px 20px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.35)');
 
-    // Hero: gradiente del acento + veils sobre foto, todo derivado del primary
-    set('--pl-hero-gradient', `linear-gradient(180deg, ${p} 0%, ${darken(p, 25)} 100%)`);
+    // Hero: gradiente del acento + veils sobre foto. El banner es OSCURO
+    // SIEMPRE: con acentos claros (olivo, ámbar) el acento se pre-oscurece
+    // sólo acá — el color de marca se insinúa, no tiñe la foto (pedido del
+    // dueño 2026-08-13). Con acentos oscuros pHero === p: queda como estaba.
+    const pHero = isLight(p) ? darken(p, 26) : p;
+    set('--pl-hero-gradient', `linear-gradient(180deg, ${pHero} 0%, ${darken(pHero, 25)} 100%)`);
     set('--pl-hero-veil',
-      `linear-gradient(96deg, ${alpha(darken(p, 38), 0.90)} 0%, ${alpha(darken(p, 30), 0.62)} 42%, ` +
-      `${alpha(p, 0.18)} 78%, ${alpha(lighten(p, 8), 0.06)} 100%)`);
+      `linear-gradient(96deg, ${alpha(darken(pHero, 38), 0.90)} 0%, ${alpha(darken(pHero, 30), 0.62)} 42%, ` +
+      `${alpha(pHero, 0.18)} 78%, ${alpha(lighten(pHero, 8), 0.06)} 100%)`);
     set('--pl-hero-fade',
-      `linear-gradient(180deg, ${alpha(darken(p, 42), 0.28)} 0%, rgba(0,0,0,0) 30%, ${alpha(darken(p, 42), 0.42)} 100%)`);
+      `linear-gradient(180deg, ${alpha(darken(pHero, 42), 0.28)} 0%, rgba(0,0,0,0) 30%, ${alpha(darken(pHero, 42), 0.42)} 100%)`);
     set('--pl-hero-strip',
-      `linear-gradient(180deg, ${alpha(darken(p, 45), 0.62)} 0%, ${alpha(darken(p, 45), 0.82)} 100%)`);
+      `linear-gradient(180deg, ${alpha(darken(pHero, 45), 0.62)} 0%, ${alpha(darken(pHero, 45), 0.82)} 100%)`);
     // Fondo del botón outline DEL HERO: acento casi negro al 50% (no scrim neutro)
-    set('--pl-hero-scrim', alpha(darken(p, 45), 0.50));
+    set('--pl-hero-scrim', alpha(darken(pHero, 45), 0.50));
 
     // Aplicar al body directamente
     document.body.style.backgroundColor = theme.background;

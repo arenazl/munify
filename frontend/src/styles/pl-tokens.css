@@ -62,6 +62,7 @@
      antes del bridge) --- */
   --pl-green: var(--color-primary, #1b7a3d);
   --pl-on-brand: #ffffff;
+  --pl-on-accent: #ffffff;
   --pl-bg: var(--bg-primary, #1a1a1d);
   --pl-surface: var(--bg-card, #222226);
   --pl-text: var(--text-primary, #eef2ea);

@@ -147,29 +147,15 @@ const isLightColor = (hex: string): boolean => luminanciaDe(hex) > 0.5;
 const TINTA_OSCURA = '#1e293b';
 const TINTA_CLARA = '#ffffff';
 
-/** Luminancia WCAG (sRGB linealizado) — sólo para decidir contrastes. */
-const luminanciaWcag = (hex: string): number => {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const canal = (v: number) => {
-    const s = v / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * canal(num >> 16) + 0.7152 * canal((num >> 8) & 0xff) + 0.0722 * canal(num & 0xff);
-};
-
-const contraste = (a: string, b: string): number => {
-  const [alto, bajo] = [luminanciaWcag(a), luminanciaWcag(b)].sort((x, y) => y - x);
-  return (alto + 0.05) / (bajo + 0.05);
-};
-
 /**
- * Texto sobre una superficie de color (el acento): el que MÁS contraste da.
- * Se decide por contraste real y no por un umbral de luminancia, porque los
- * acentos que caen justo en el límite (el olivo, por ejemplo) quedaban con
- * texto blanco a 3.1:1 — ilegible. Así siempre gana la tinta correcta.
+ * Texto sobre una superficie de color (el acento): REGLA ÚNICA por luminancia
+ * (decisión del dueño 2026-08-13): acento oscuro → tinta clara, acento claro →
+ * tinta oscura. Es la MISMA vara que `--pl-on-accent`, así todo el kit elige
+ * la tinta igual (antes convivían dos fórmulas y el mismo acento daba texto
+ * blanco en un control y negro en otro).
  */
 const tintaSobre = (fondo: string): string =>
-  contraste(TINTA_CLARA, fondo) >= contraste(TINTA_OSCURA, fondo) ? TINTA_CLARA : TINTA_OSCURA;
+  isLightColor(fondo) ? TINTA_OSCURA : TINTA_CLARA;
 
 /**
  * Deriva los 13 campos de `ThemeColors` a partir de tres colores.

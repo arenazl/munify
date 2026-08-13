@@ -39,7 +39,7 @@
   border: none;
   border-radius: var(--pl-radius-pill);
   background: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
   cursor: pointer;
   transition: background var(--pl-dur-ui) var(--pl-ease),
               transform var(--pl-dur-ui) var(--pl-ease);
@@ -156,7 +156,7 @@
 .mtl-vel-btn:hover { color: var(--pl-text); }
 .mtl-vel-btn--activo {
   background: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
 }
 
 /* --- Botones de icono y salida ------------------------------ */

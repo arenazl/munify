@@ -158,7 +158,7 @@ export default function PanelFormulario({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            style={{ display: 'inline-flex', alignItems: 'center', height: '34px', padding: '0 15px', borderRadius: '10px', background: 'var(--pl-green)', fontSize: '12.5px', fontWeight: 600, color: 'var(--pl-surface)', border: 'none', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}
+            style={{ display: 'inline-flex', alignItems: 'center', height: '34px', padding: '0 15px', borderRadius: '10px', background: 'var(--pl-green)', fontSize: '12.5px', fontWeight: 600, color: 'var(--pl-on-accent)', border: 'none', cursor: 'pointer', opacity: saving ? 0.7 : 1 }}
           >
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>

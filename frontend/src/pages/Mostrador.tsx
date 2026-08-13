@@ -1568,7 +1568,7 @@ function QrStepRow({ done, current, index, label, sub }: {
         className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0 text-[10.5px] font-bold"
         style={{
           backgroundColor: done ? 'var(--pl-green)' : current ? 'var(--pl-blue-100)' : 'var(--pl-track)',
-          color: done ? 'var(--pl-on-brand)' : current ? 'var(--pl-blue-700)' : 'var(--pl-text-3)',
+          color: done ? 'var(--pl-on-accent)' : current ? 'var(--pl-blue-700)' : 'var(--pl-text-3)',
         }}
       >
         {done ? <Check className="w-3 h-3" strokeWidth={3} /> : index}

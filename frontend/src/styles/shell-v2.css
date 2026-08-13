@@ -656,7 +656,7 @@
   display: grid;
   place-items: center;
   background: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
 }
 
 .sv2-minibadge--alerta {
@@ -1086,7 +1086,7 @@
   height: 28px;
   border-radius: var(--pl-radius-pill);
   background: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
   display: grid;
   place-items: center;
   font-size: var(--pl-fs-micro);

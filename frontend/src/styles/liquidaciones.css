@@ -31,7 +31,7 @@
 .liq-check--on {
   background: var(--pl-green);
   border-color: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
 }
 
 /* Texto de urgencia próxima (la vencida usa .av2-money--bad del kit). */
@@ -56,7 +56,7 @@
   border: 0;
   border-radius: var(--pl-radius-pill);
   background: var(--pl-green);
-  color: var(--pl-on-brand);
+  color: var(--pl-on-accent);
   font-family: inherit;
   font-size: var(--pl-fs-micro);
   font-weight: 600;

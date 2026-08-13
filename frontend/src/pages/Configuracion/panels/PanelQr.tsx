@@ -27,7 +27,7 @@ export default function PanelQr() {
         </div>
         <div style={{ display: 'flex', gap: '8px', marginTop: '18px', flexWrap: 'wrap' }}>
           <span 
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', height: '36px', padding: '0 15px', borderRadius: '11px', background: 'var(--pl-green)', fontSize: '13px', fontWeight: 600, color: 'var(--pl-surface)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', height: '36px', padding: '0 15px', borderRadius: '11px', background: 'var(--pl-green)', fontSize: '13px', fontWeight: 600, color: 'var(--pl-on-accent)', cursor: 'pointer', whiteSpace: 'nowrap' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--pl-green-600)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--pl-green)'; }}
           >

@@ -81,7 +81,9 @@ export function primaryButtonStyle(
   const { base, hover } = resolvePrimaryColors(variant, themePrimary, themePrimaryHover);
   return {
     background: `linear-gradient(${GRADIENT_ANGLE}, ${base} 0%, ${hover} 100%)`,
-    color: '#ffffff',
+    // Tinta sobre el acento: la regla vive en el token (--pl-on-accent =
+    // theme.primaryText). Las variantes semanticas son oscuras fijas -> blanco.
+    color: variant === 'primary' ? 'var(--pl-on-accent)' : '#ffffff',
     boxShadow: `0 4px 14px ${base}${SHADOW_OPACITY}`,
   };
 }
