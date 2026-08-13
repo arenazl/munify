@@ -388,8 +388,8 @@ export default function Configuracion() {
             >
               <PuenteDeModulo
                 configuraAca={[
-                  { label: 'Categorías de reclamo', nota: 'Lo que el bot le ofrece al vecino', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
-                  { label: 'Asignaciones', nota: 'A quién se deriva lo que entra por WhatsApp', grupoId: 'catalogos', ajusteId: 'asignacion' },
+                  { label: 'Categorías de reclamo', nota: 'Lo que el bot le ofrece al vecino', grupoId: 'reclamos', ajusteId: 'cat-reclamo' },
+                  { label: 'Asignaciones', nota: 'A quién se deriva lo que entra por WhatsApp', grupoId: 'municipio', ajusteId: 'asignacion' },
                 ]}
                 viveEn={{
                   titulo: 'Vive en Integraciones',
@@ -412,8 +412,8 @@ export default function Configuracion() {
             >
               <PuenteDeModulo
                 configuraAca={[
-                  { label: 'Categorías de reclamo', nota: 'Las clases entre las que la IA elige', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
-                  { label: 'Asignaciones', nota: 'Las reglas que la IA sugiere completar', grupoId: 'catalogos', ajusteId: 'asignacion' },
+                  { label: 'Categorías de reclamo', nota: 'Las clases entre las que la IA elige', grupoId: 'reclamos', ajusteId: 'cat-reclamo' },
+                  { label: 'Asignaciones', nota: 'Las reglas que la IA sugiere completar', grupoId: 'municipio', ajusteId: 'asignacion' },
                 ]}
                 viveEn={{
                   titulo: 'Vive en Integraciones',
@@ -513,9 +513,9 @@ export default function Configuracion() {
             >
               <PuenteDeModulo
                 configuraAca={[
-                  { label: 'Categorías de reclamo', nota: 'Lo que el vecino elige al cargar', grupoId: 'vecino', ajusteId: 'cat-reclamo' },
-                  { label: 'Trámites', nota: 'El catálogo con sus prerrequisitos', grupoId: 'vecino', ajusteId: 'arbol-tramite' },
-                  { label: 'SLA', nota: 'Los plazos que la app le promete', grupoId: 'vecino', ajusteId: 'sla' },
+                  { label: 'Categorías de reclamo', nota: 'Lo que el vecino elige al cargar', grupoId: 'reclamos', ajusteId: 'cat-reclamo' },
+                  { label: 'Trámites', nota: 'El catálogo con sus prerrequisitos', grupoId: 'tramites', ajusteId: 'arbol-tramite' },
+                  { label: 'SLA', nota: 'Los plazos que la app le promete', grupoId: 'reclamos', ajusteId: 'sla' },
                 ]}
                 viveEn={{
                   titulo: 'Vive en Atención al vecino',

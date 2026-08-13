@@ -80,22 +80,33 @@ export const ARBOL_CONFIG: GrupoConfig[] = [
       { id: 'qr', label: 'QR de cartelería', tipo: 'qr', n: '14' },
       { id: 'apariencia', label: 'Apariencia', tipo: 'apariencia' },
     ] },
+    /* Opción 1 del reparto (decisión del dueño 2026-08-13): pestañas por
+       MÓDULO de negocio + "Municipio" como transversal (estructura, derivación,
+       geografía y padrón). La semántica de objeto (catálogo vs regla) ordena
+       ADENTRO de cada pestaña: primero listas, después reglas. Los ids de los
+       hijos NO cambian (los loaders cablean por ajusteId). */
+    { id: 'municipio', label: 'Municipio', hijos: [
+      { id: 'dependencias', label: 'Dependencias', tipo: 'abm', n: '11' },
+      { id: 'asignacion', label: 'Asignaciones', tipo: 'asignacion', n: '11' },
+      { id: 'zonas', label: 'Zonas', tipo: 'abm', n: '18' },
+      { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
+      { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
+    ] },
     { id: 'personal', label: 'Personal', hijos: [
       { id: 'empleados', label: 'Empleados', tipo: 'abm', n: '86' },
       { id: 'cuadrillas', label: 'Cuadrillas', tipo: 'abm', n: '7' },
-      { id: 'ausencias', label: 'Ausencias', tipo: 'abm', n: '12' },
+      /* Ausencias NO va acá: la carga es OPERACIÓN (vive en GestionAusencias).
+         Si algún día el tipo de ausencia se vuelve catálogo configurable, acá
+         entra "Tipos de ausencia" — hoy es un string libre del modelo. */
+      { id: 'tipos-empleado', label: 'Tipos de empleado', tipo: 'catalogo', n: '5' },
     ] },
-    { id: 'vecino', label: 'Atención al vecino', hijos: [
-      { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
+    { id: 'reclamos', label: 'Reclamos', hijos: [
       { id: 'cat-reclamo', label: 'Categorías de reclamo', tipo: 'abm', n: '9' },
-      { id: 'arbol-tramite', label: 'Trámites', tipo: 'abm' },
       { id: 'sla', label: 'SLA', tipo: 'abm', n: '9' },
       { id: 'tipos-poi', label: 'Tipos de punto de interés', tipo: 'catalogo', n: '5' },
     ] },
-    { id: 'catalogos', label: 'Catálogos', hijos: [
-      { id: 'dependencias', label: 'Dependencias', tipo: 'abm', n: '11' },
-      { id: 'asignacion', label: 'Asignación', tipo: 'asignacion', n: '11' },
-      { id: 'zonas', label: 'Zonas', tipo: 'abm', n: '18' },
+    { id: 'tramites', label: 'Trámites', hijos: [
+      { id: 'arbol-tramite', label: 'Trámites', tipo: 'abm' },
     ] },
     { id: 'inventario', label: 'Inventario', hijos: [
       { id: 'inv', label: 'Inventario', tipo: 'abm', n: '240' },
@@ -104,10 +115,8 @@ export const ARBOL_CONFIG: GrupoConfig[] = [
     { id: 'tesoreria', label: 'Tesorería', hijos: [
       { id: 'conceptos', label: 'Conceptos', tipo: 'catalogo', n: '22' },
       { id: 'conceptos-liq', label: 'Conceptos de liquidación', tipo: 'catalogo', n: '9' },
-      { id: 'tipos-empleado', label: 'Tipos de empleado', tipo: 'catalogo', n: '5' },
       { id: 'cajas', label: 'Cajas y fondos', tipo: 'abm', n: '4' },
       { id: 'retenciones', label: 'Retenciones', tipo: 'abm', n: '6' },
-      { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
       { id: 'proyectos', label: 'Proyectos', tipo: 'abm', n: '8' },
       { id: 'tarjetas', label: 'Tarjetas', tipo: 'abm', n: '3' },
       { id: 'contactos', label: 'Contactos', tipo: 'abm', n: '148' },

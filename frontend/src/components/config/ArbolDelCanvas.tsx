@@ -1,7 +1,9 @@
 /**
  * ArbolDelCanvas — el catálogo de trámites leído como jerarquía.
  *
- * Dependencia del municipio → categoría → tipo de trámite → prerrequisitos.
+ * Categoría → tipo de trámite → prerrequisitos. La dependencia NO es un nivel
+ * (decisión del dueño 2026-08-13): arriba va una banda de chips de referencia
+ * que además filtra; la relación se edita en Asignaciones.
  * El cuerpo NO es una grilla: entra por `viewSlots.arbol`, y por eso las props
  * de tabla van en neutro (el kit las pide igual; ver nota abajo).
  *
@@ -16,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
 import PanelArbol from '../../pages/Configuracion/panels/PanelArbol';
-import { cargarArbolReal } from '../../pages/Configuracion/data/datosRealesConfig';
+import { cargarArbolReal, type ArbolTramites } from '../../pages/Configuracion/data/datosRealesConfig';
 import { AltaTramiteWizard, EdicionTramiteSheet } from './tramiteFlows';
 import { CategoriaTramiteSheet } from './CategoriaTramiteSheet';
 import { seg } from '../../lib/semanticHero';
@@ -24,8 +26,11 @@ import type { HeroFrase, HeroKpi } from '../../lib/semanticHero';
 import { useReportarTotal } from '../abmv2/useEmbed';
 
 export function ArbolDelCanvas() {
-  const [data, setData] = useState<any[] | null>(null);
+  const [data, setData] = useState<ArbolTramites | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  /* Banda de dependencias: referencia arriba, jamás un nivel de la grilla.
+     Tocar un chip filtra el árbol a lo que esa oficina atiende. */
+  const [depFiltro, setDepFiltro] = useState<'todas' | 'sin' | number>('todas');
 
   const recargar = useCallback(() => {
     cargarArbolReal().then(setData).catch(console.error);
@@ -38,21 +43,21 @@ export function ArbolDelCanvas() {
   const [tramiteEnEdicion, setTramiteEnEdicion] = useState<any | null>(null);
   const [sheetCategoria, setSheetCategoria] = useState<{ abierta: boolean; categoria: any | null }>({ abierta: false, categoria: null });
 
-  /* Totales SIN duplicar: una categoría puede aparecer bajo dos dependencias
-     si sus trámites se reparten; el hero cuenta entidades, no nodos. */
-  const tramitesPlanos = useMemo(
-    () => (data || []).flatMap((dep: any) => (dep.hijos || []).flatMap((c: any) => c.tramites || [])),
+  const categorias = useMemo(() => data?.categorias ?? [], [data]);
+  const totalCategorias = categorias.length;
+  const tramitesUnicos = useMemo(
+    () => categorias.flatMap((c: any) => c.tramites || []),
+    [categorias],
+  );
+  /* Qué trámites tienen dueño (para el chip "Sin dependencia"). */
+  const asignados = useMemo(
+    () => new Set((data?.deps ?? []).flatMap((d) => d.tramiteIds)),
     [data],
   );
-  const totalCategorias = useMemo(
-    () => new Set((data || []).flatMap((dep: any) => (dep.hijos || []).map((c: any) => c.id))).size,
-    [data],
+  const sinDepCount = useMemo(
+    () => tramitesUnicos.filter((t: any) => !asignados.has(t.id)).length,
+    [tramitesUnicos, asignados],
   );
-  const tramitesUnicos = useMemo(() => {
-    const vistos = new Map<number, any>();
-    tramitesPlanos.forEach((t: any) => vistos.set(t.id, t));
-    return Array.from(vistos.values());
-  }, [tramitesPlanos]);
   useReportarTotal(data ? tramitesUnicos.length : undefined);
 
   const masPesado = useMemo(() => {
@@ -101,34 +106,43 @@ export function ArbolDelCanvas() {
         },
       ];
 
-  /* El buscador filtra la rama entera: si el texto matchea la categoría se
-     conserva completa; si matchea sólo un trámite, queda la categoría con ese
-     trámite. Sin esto el input estaría de adorno. */
+  /* El filtro compone: primero el chip de dependencia (deja sólo los tipos
+     que esa oficina atiende), después el buscador sobre la rama entera — si
+     el texto matchea la categoría se conserva completa; si matchea sólo un
+     trámite, queda la categoría con ese trámite. */
   const visibles = useMemo(() => {
+    let cats = categorias;
+    if (depFiltro !== 'todas') {
+      const deDep = depFiltro === 'sin'
+        ? null
+        : new Set((data?.deps ?? []).find((d) => d.id === depFiltro)?.tramiteIds ?? []);
+      cats = cats
+        .map((cat: any) => {
+          const tramites = (cat.tramites || []).filter((t: any) =>
+            depFiltro === 'sin' ? !asignados.has(t.id) : deDep!.has(t.id),
+          );
+          return tramites.length ? { ...cat, tramites } : null;
+        })
+        .filter(Boolean);
+    }
     const q = busqueda.trim().toLowerCase();
-    if (!q || !data) return data || [];
+    if (!q) return cats;
     const coincide = (v: unknown) => String(v ?? '').toLowerCase().includes(q);
-    return data
-      .map((dep: any) => {
-        if (coincide(dep.nombre ?? dep.n)) return dep;
-        const hijos = (dep.hijos || [])
-          .map((cat: any) => {
-            if (coincide(cat.nombre ?? cat.n)) return cat;
-            const tramites = (cat.tramites || []).filter((t: any) => coincide(t.nombre ?? t.n));
-            return tramites.length ? { ...cat, tramites } : null;
-          })
-          .filter(Boolean);
-        return hijos.length ? { ...dep, hijos } : null;
+    return cats
+      .map((cat: any) => {
+        if (coincide(cat.nombre ?? cat.n)) return cat;
+        const tramites = (cat.tramites || []).filter((t: any) => coincide(t.nombre ?? t.n));
+        return tramites.length ? { ...cat, tramites } : null;
       })
       .filter(Boolean);
-  }, [data, busqueda]);
+  }, [categorias, data, depFiltro, asignados, busqueda]);
 
   return (
     <>
       <SemanticAbmPage
         moduleKey="arbol-tramite"
         title="Trámites"
-        hero={{ etiqueta: 'ATENCIÓN AL VECINO · TRÁMITES', frases, kpis }}
+        hero={{ etiqueta: 'TRÁMITES · CATÁLOGO', frases, kpis }}
         primaryAction={{
           label: 'Nueva categoría de trámite',
           onClick: () => setSheetCategoria({ abierta: true, categoria: null }),
@@ -138,7 +152,7 @@ export function ArbolDelCanvas() {
           texto: 'Nada se aplica sin que lo confirmes: la sugerencia queda marcada en el árbol para que la revises rama por rama.',
         }}
         loading={!data}
-        searchPlaceholder="Buscar dependencia, categoría o trámite…"
+        searchPlaceholder="Buscar categoría o trámite…"
         search={busqueda}
         onSearchChange={setBusqueda}
         /* La clave `arbol` recién existe cuando hay datos: SemanticAbmPage
@@ -146,13 +160,45 @@ export function ArbolDelCanvas() {
            cuerpo" en vez de caer al loading. */
         viewSlots={data ? {
           arbol: (
-            <PanelArbol
-              tramites={visibles}
-              onNuevoTramite={(categoriaId) => setAltaTramite({ abierta: true, categoriaId })}
-              onEditarTramite={(raw) => setTramiteEnEdicion(raw)}
-              onNuevaCategoria={() => setSheetCategoria({ abierta: true, categoria: null })}
-              onEditarCategoria={(raw) => setSheetCategoria({ abierta: true, categoria: raw })}
-            />
+            <>
+              {/* Banda de dependencias: REFERENCIA arriba (y filtro), nunca
+                  un nivel de la grilla — la relación se edita en Asignaciones. */}
+              {data.deps.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', rowGap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: 'var(--pl-text-faint)', marginRight: '2px' }}>QUIÉN ATIENDE</span>
+                  {([
+                    { clave: 'todas' as const, nombre: 'Todas', color: null, n: tramitesUnicos.length },
+                    ...data.deps.map((d) => ({ clave: d.id as number | 'todas' | 'sin', nombre: d.nombre, color: d.color, n: d.tramiteIds.length })),
+                    ...(sinDepCount > 0 ? [{ clave: 'sin' as const, nombre: 'Sin dependencia', color: 'var(--pl-red-700)', n: sinDepCount }] : []),
+                  ]).map((c) => {
+                    const activo = depFiltro === c.clave;
+                    return (
+                      <button
+                        key={String(c.clave)}
+                        type="button"
+                        onClick={() => setDepFiltro(activo ? 'todas' : c.clave)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '7px', height: '30px', padding: '0 12px', borderRadius: '999px',
+                          border: `1px solid ${activo ? 'var(--pl-border-strong)' : 'var(--pl-border)'}`,
+                          background: activo ? 'var(--pl-surface)' : 'transparent', cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '999px', background: c.color ?? 'var(--pl-text-faint)', flex: '0 0 6px' }}></span>
+                        <span style={{ fontSize: '12.5px', fontWeight: 600, color: activo ? 'var(--pl-text)' : 'var(--pl-text-2)', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</span>
+                        <span className="av2-tnum" style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--pl-text-faint)' }}>{c.n}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <PanelArbol
+                tramites={visibles}
+                onNuevoTramite={(categoriaId) => setAltaTramite({ abierta: true, categoriaId })}
+                onEditarTramite={(raw) => setTramiteEnEdicion(raw)}
+                onNuevaCategoria={() => setSheetCategoria({ abierta: true, categoria: null })}
+                onEditarCategoria={(raw) => setSheetCategoria({ abierta: true, categoria: raw })}
+              />
+            </>
           ),
         } : undefined}
         activeView="arbol"
@@ -173,7 +219,7 @@ export function ArbolDelCanvas() {
         onStatusChange={() => {}}
         footer={{
           showing: `${totalCategorias} categorías · ${tramitesUnicos.length} tipos`,
-          note: 'Quién atiende cada trámite se define en Asignación, no acá.',
+          note: 'Quién atiende cada trámite se define en Asignaciones, no acá.',
         }}
         embedded={true}
       />

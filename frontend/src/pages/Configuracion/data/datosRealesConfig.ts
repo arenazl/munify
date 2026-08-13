@@ -275,14 +275,20 @@ export async function cargarAsignacion(modo: ModoAsignacion): Promise<DatosAsign
   return { modo, filas, deps, usoTotal, usoSinAsignar };
 }
 
-export async function cargarArbolReal(): Promise<any[]> {
+export interface ArbolTramites {
+  /** El árbol de verdad: categoría de trámite → tipos. SIN dependencias. */
+  categorias: any[];
+  /** Banda de referencia/filtro de arriba: qué atiende cada dependencia. */
+  deps: { id: number; nombre: string; color: string | null; tramiteIds: number[] }[];
+}
+
+export async function cargarArbolReal(): Promise<ArbolTramites> {
   try {
     const { tramitesApi, categoriasTramiteApi } = await import('../../../lib/api');
-    /* El vínculo dependencia → trámite es REAL y viene por `include_assignments`
-       en las dependencias DEL MUNICIPIO (las categorías de trámite no tienen
-       dependencia propia — agrupar por ella metía todo en un "Otras Categorías"
-       ficticio). El detalle de cada trámite (documentos, modo) sale de
-       /api/tramites, que es quien lo trae completo. */
+    /* El árbol es CATÁLOGO puro: categoría → tipos (decisión del dueño
+       2026-08-13). Quién atiende cada trámite se define en Asignaciones — la
+       dependencia NO es un nivel de la grilla. Sí vuelve aparte, como banda de
+       chips de referencia/filtro arriba del árbol. */
     const [cRes, tRes, dRes] = await Promise.all([
       categoriasTramiteApi.getAll(true),
       tramitesApi.getAll(),
@@ -293,7 +299,6 @@ export async function cargarArbolReal(): Promise<any[]> {
     const dependencias = (dRes.data || []) as any[];
 
     const catDe = new Map(categorias.map((c) => [c.id, c]));
-    const detalleDe = new Map(tramites.map((t) => [t.id, t]));
 
     const nodoTramite = (t: any) => {
       const cat = catDe.get(t.categoria_tramite_id);
@@ -342,40 +347,27 @@ export async function cargarArbolReal(): Promise<any[]> {
       return Array.from(porCat.values());
     };
 
-    const usados = new Set<number>();
-    const result = dependencias
-      .filter((d) => (d.tramites || []).length > 0)
-      .map((d) => {
-        const conDetalle = (d.tramites || []).map((t: any) => {
-          usados.add(t.id);
-          return detalleDe.get(t.id) || t;
-        });
-        return { id: d.id, nombre: d.nombre, tipo: 'dependencia', hijos: agrupar(conDetalle) };
-      });
-
-    /* Al nodo suelto van (a) trámites que ninguna dependencia atiende y (b)
-       categorías SIN trámites — recién creadas, por ejemplo. Sin esto, una
-       categoría nueva no aparecía en el árbol y el alta parecía no funcionar. */
-    const sueltos = tramites.filter((t) => !usados.has(t.id));
-    const catsVisibles = new Set<number>();
-    result.forEach((d) => d.hijos.forEach((c: any) => catsVisibles.add(c.id)));
-    const extraHijos = agrupar(sueltos);
-    extraHijos.forEach((c: any) => catsVisibles.add(c.id));
+    /* TODOS los trámites agrupados por su categoría, más las categorías SIN
+       trámites (recién creadas) — sin esto, una categoría nueva no aparecía
+       en el árbol y el alta parecía no funcionar. */
+    const result = agrupar(tramites);
+    const catsVisibles = new Set(result.map((c: any) => c.id));
     const vacias = categorias
       .filter((c) => !catsVisibles.has(c.id))
       .map((c) => ({ id: c.id, nombre: c.nombre, activa: c.activo !== false, raw: c, tramites: [] }));
-    if (extraHijos.length > 0 || vacias.length > 0) {
-      result.push({
-        id: 'sin-dep',
-        nombre: 'Sin dependencia asignada',
-        tipo: 'dependencia',
-        hijos: [...extraHijos, ...vacias],
-      });
-    }
 
-    return result;
+    const deps = dependencias
+      .filter((d) => (d.tramites || []).length > 0)
+      .map((d) => ({
+        id: d.id,
+        nombre: d.nombre,
+        color: d.color || null,
+        tramiteIds: (d.tramites || []).map((t: any) => t.id),
+      }));
+
+    return { categorias: [...result, ...vacias], deps };
   } catch (error) {
     console.error("Error loading arbol data:", error);
-    return [];
+    return { categorias: [], deps: [] };
   }
 }
