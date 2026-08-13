@@ -63,33 +63,43 @@ export function ArbolDelCanvas() {
   const conCosto = tramitesUnicos.filter((t) => t.costo > 0).length;
   const online = tramitesUnicos.filter((t) => t.modo === 'online').length;
 
-  const kpis: HeroKpi[] = [
-    { etiqueta: 'Categorías', valor: totalCategorias, sub: 'carpetas del catálogo' },
-    { etiqueta: 'Tipos', valor: tramitesUnicos.length, sub: 'trámites concretos' },
-    {
-      etiqueta: 'Más pesado',
-      valor: masPesado ? masPesado.docs + masPesado.validaciones : '—',
-      sub: masPesado ? masPesado.nombre : 'sin trámites cargados',
-      veredicto: masPesado && masPesado.docs + masPesado.validaciones >= 4 ? 'advertencia' : undefined,
-    },
-    { etiqueta: 'Con costo', valor: conCosto, sub: 'pagan tasa' },
-    { etiqueta: '100% online', valor: online, sub: 'sin ir al municipio' },
-  ];
+  /* Mientras el árbol carga, el hero no inventa: etiquetas con "—" y frase
+     de carga (misma regla que el resto de Configuración). */
+  const kpis: HeroKpi[] = !data
+    ? ['Categorías', 'Tipos', 'Más pesado', 'Con costo', '100% online'].map((etiqueta) => ({
+        etiqueta,
+        valor: '—',
+        sub: 'cargando…',
+      }))
+    : [
+        { etiqueta: 'Categorías', valor: totalCategorias, sub: 'carpetas del catálogo' },
+        { etiqueta: 'Tipos', valor: tramitesUnicos.length, sub: 'trámites concretos' },
+        {
+          etiqueta: 'Más pesado',
+          valor: masPesado ? masPesado.docs + masPesado.validaciones : '—',
+          sub: masPesado ? masPesado.nombre : 'sin trámites cargados',
+          veredicto: masPesado && masPesado.docs + masPesado.validaciones >= 4 ? 'advertencia' : undefined,
+        },
+        { etiqueta: 'Con costo', valor: conCosto, sub: 'pagan tasa' },
+        { etiqueta: '100% online', valor: online, sub: 'sin ir al municipio' },
+      ];
 
-  const frases: HeroFrase[] = [
-    {
-      segmentos: [
-        seg(`${totalCategorias} categoría${totalCategorias === 1 ? '' : 's'} y ${tramitesUnicos.length} tipo${tramitesUnicos.length === 1 ? '' : 's'}`, 'bueno'),
-        seg(' en una sola vista, con los prerrequisitos que enfrenta el vecino en cada uno.'),
-        ...(masPesado && masPesado.docs + masPesado.validaciones > 0
-          ? [
-              seg(` El más pesado, ${masPesado.nombre},`),
-              seg(` le pide ${masPesado.docs} documento${masPesado.docs === 1 ? '' : 's'} y ${masPesado.validaciones} validaci${masPesado.validaciones === 1 ? 'ón' : 'ones'}.`, 'advertencia'),
-            ]
-          : []),
-      ],
-    },
-  ];
+  const frases: HeroFrase[] = !data
+    ? [{ segmentos: [seg('Trayendo el catálogo de trámites…')] }]
+    : [
+        {
+          segmentos: [
+            seg(`${totalCategorias} categoría${totalCategorias === 1 ? '' : 's'} y ${tramitesUnicos.length} tipo${tramitesUnicos.length === 1 ? '' : 's'}`, 'bueno'),
+            seg(' en una sola vista, con los prerrequisitos que enfrenta el vecino en cada uno.'),
+            ...(masPesado && masPesado.docs + masPesado.validaciones > 0
+              ? [
+                  seg(` El más pesado, ${masPesado.nombre},`),
+                  seg(` le pide ${masPesado.docs} documento${masPesado.docs === 1 ? '' : 's'} y ${masPesado.validaciones} validaci${masPesado.validaciones === 1 ? 'ón' : 'ones'}.`, 'advertencia'),
+                ]
+              : []),
+          ],
+        },
+      ];
 
   /* El buscador filtra la rama entera: si el texto matchea la categoría se
      conserva completa; si matchea sólo un trámite, queda la categoría con ese

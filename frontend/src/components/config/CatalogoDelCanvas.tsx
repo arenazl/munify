@@ -81,7 +81,12 @@ export function CatalogoDelCanvas({
     }
   }, [moduleKey]);
 
-  const filas = filasVivo || spec.filas;
+  /* Un catálogo CABLEADO nunca muestra las filas del prototipo: mientras
+     carga va el skeleton con "—" — un número inventado se lee como real
+     (misma regla que AbmDeConfiguracion). */
+  const cableada = !!CABLEADO_CATALOGO[moduleKey];
+  const filas = filasVivo ?? (cableada ? [] : spec.filas);
+  const sinDatosAun = cableada && !filasVivo;
   // Sólo el número real llega al contador del riel; el de muestra no. */
   useReportarTotal(filasVivo ? filasVivo.length : undefined);
   const activas = filas.filter((f) => !f.off);
@@ -94,8 +99,15 @@ export function CatalogoDelCanvas({
     ? conPlazo.slice().sort((a, b) => (a.hs ?? 0) - (b.hs ?? 0))[0]
     : undefined;
 
-  const kpis = useMemo<HeroKpi[]>(
-    () => [
+  const kpis = useMemo<HeroKpi[]>(() => {
+    if (sinDatosAun) {
+      return ['En el catálogo', 'Activas', 'Inactivas', 'Más exigente', 'Se pisan'].map((etiqueta) => ({
+        etiqueta,
+        valor: '—',
+        sub: cargando ? 'cargando…' : 'sin datos',
+      }));
+    }
+    return [
       { etiqueta: 'En el catálogo', valor: filas.length, sub: 'entradas cargadas' },
       { etiqueta: 'Activas', valor: activas.length, sub: 'se ofrecen en la app' },
       { etiqueta: 'Inactivas', valor: filas.length - activas.length, sub: 'ocultas para el vecino' },
@@ -110,11 +122,17 @@ export function CatalogoDelCanvas({
         sub: sePisan ? 'nombres parecidos' : 'ninguna se repite',
         veredicto: sePisan > 0 ? 'advertencia' : undefined,
       },
-    ],
-    [filas.length, activas.length, masExigente, sePisan],
-  );
+    ];
+  }, [filas.length, activas.length, masExigente, sePisan, sinDatosAun, cargando]);
 
   const frases = useMemo<HeroFrase[]>(() => {
+    if (sinDatosAun) {
+      return [{
+        segmentos: [
+          seg(cargando ? 'Trayendo el catálogo del municipio…' : 'No se pudieron traer los datos del catálogo.'),
+        ],
+      }];
+    }
     const primera = [
       seg(`${filas.length} en el catálogo, ${activas.length} activas.`, 'bueno'),
       seg(' El orden de la lista es el que ve el vecino al elegir.'),
@@ -129,7 +147,7 @@ export function CatalogoDelCanvas({
       });
     }
     return fs;
-  }, [filas.length, activas.length, sePisan]);
+  }, [filas.length, activas.length, sePisan, sinDatosAun, cargando]);
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();

@@ -156,7 +156,13 @@ export function AbmDeConfiguracion({
   const [vista, setVista] = useState<ViewKind>('table');
   const [chipActivo, setChipActivo] = useState(spec.chips[0]?.[0] ?? 'todos');
 
-  const filas = datos?.filas ?? reales?.filas ?? spec.filas;
+  /* Una pantalla CABLEADA nunca muestra los números del prototipo: mientras
+     carga van las etiquetas con "—" y el skeleton — un número inventado al
+     lado de un hero completo se lee como real (regla del dueño; con Aiven
+     lento la carga dura segundos y "148 contactos" falsos quedan a la vista).
+     El spec sólo pinta pantallas SIN cablear, que son mockup declarado. */
+  const cableada = !!(ajusteId && CABLEADO[ajusteId]);
+  const filas = datos?.filas ?? reales?.filas ?? (cableada ? [] : spec.filas);
 
   /* El contador del riel sale de acá. Sólo se publica cuando el número es
      REAL: con las filas de muestra del canvas el riel diría 6 dependencias
@@ -164,23 +170,36 @@ export function AbmDeConfiguracion({
   const hayDatosReales = !!(datos?.filas || reales?.filas);
   useReportarTotal(hayDatosReales ? filas.length : undefined);
 
-  const kpis = useMemo<HeroKpi[]>(
-    () =>
-      datos?.kpis ??
-      reales?.kpis ??
-      spec.kpis.map(([etiqueta, valor, nota, color]) => ({
+  const kpis = useMemo<HeroKpi[]>(() => {
+    if (datos?.kpis) return datos.kpis;
+    if (reales?.kpis) return reales.kpis;
+    if (cableada) {
+      return spec.kpis.map(([etiqueta]) => ({
         etiqueta,
-        valor,
-        sub: nota,
-        veredicto: veredictoDeColor(color),
-      })),
-    [datos?.kpis, reales?.kpis, spec.kpis],
-  );
+        valor: '—',
+        sub: cargando ? 'cargando…' : 'sin datos',
+      }));
+    }
+    return spec.kpis.map(([etiqueta, valor, nota, color]) => ({
+      etiqueta,
+      valor,
+      sub: nota,
+      veredicto: veredictoDeColor(color),
+    }));
+  }, [datos?.kpis, reales?.kpis, spec.kpis, cableada, cargando]);
 
-  const frases = useMemo<HeroFrase[]>(
-    () => datos?.frases ?? reales?.frases ?? frasesDeVeredicto(spec.ver),
-    [datos?.frases, reales?.frases, spec.ver],
-  );
+  const frases = useMemo<HeroFrase[]>(() => {
+    if (datos?.frases) return datos.frases;
+    if (reales?.frases) return reales.frases;
+    if (cableada) {
+      return [{
+        segmentos: [
+          seg(cargando ? 'Trayendo los datos del municipio…' : 'No se pudieron traer los datos de esta pantalla.'),
+        ],
+      }];
+    }
+    return frasesDeVeredicto(spec.ver);
+  }, [datos?.frases, reales?.frases, spec.ver, cableada, cargando]);
 
   // Las columnas salen de `heads` + `cols` del spec: mismo orden, mismos
   // anchos, misma alineación que el prototipo.
