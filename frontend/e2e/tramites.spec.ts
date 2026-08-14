@@ -22,7 +22,10 @@ async function vecinoCreaSolicitud(page: Page, caso: CasoTramite, id: string): P
   await cerrarAvisos(page);
   await page.getByRole('button', { name: 'Nuevo Trámite' }).click();
   await page.getByPlaceholder(/Empezá a escribir/).fill(caso.tramite);
-  await page.getByText(caso.tramite, { exact: false }).last().click();
+  // El resultado es un BOTÓN cuyo nombre accesible arranca con el trámite.
+  const resultado = page.getByRole('button', { name: caso.tramite }).first();
+  await resultado.waitFor({ state: 'visible', timeout: 20_000 });
+  await resultado.click();
 
   // Solicitante: viene prellenado del perfil; se completa lo que falte y la
   // marca va en el detalle adicional.
@@ -40,32 +43,44 @@ async function vecinoReservaTurno(page: Page, caso: CasoTramite): Promise<void> 
   await page.goto('/gestion/mis-turnos');
   await cerrarAvisos(page);
   await page.getByRole('button', { name: 'Reservar turno' }).first().click();
-  // Elegir la solicitud recién creada (la más reciente de ese trámite).
-  const comboSolicitud = page.getByText(/Elegí una solicitud|Elegí un trámite/).first();
-  await comboSolicitud.waitFor({ state: 'visible', timeout: 15_000 });
-  await comboSolicitud.click();
-  await page.getByRole('option', { name: caso.tramite }).first()
-    .or(page.getByText(caso.tramite, { exact: false }).last()).first().click();
-  // Primer horario disponible.
-  await page.getByText('Horarios disponibles').waitFor({ state: 'visible', timeout: 25_000 });
-  const slot = page.locator('button', { hasText: /^\d{1,2}:\d{2}/ }).first();
-  await slot.waitFor({ state: 'visible', timeout: 20_000 });
+  const tituloSheet = page.getByRole('heading', { name: 'Reservar turno' });
+  await tituloSheet.waitFor({ state: 'visible', timeout: 15_000 });
+
+  // El turno es PARA LA SOLICITUD ya creada: pestaña "Para un trámite ya
+  // iniciado" + combo de solicitud (la más reciente de ese trámite = la
+  // nuestra, con un solo worker no hay carreras).
+  await page.getByRole('button', { name: 'Para un trámite ya iniciado' }).click();
+  await page.getByText('Elegí una solicitud').first().click();
+  // Las opciones listan el CÓDIGO de solicitud (SOL-...), ordenadas de la más
+  // reciente a la más vieja: la primera es la recién creada (worker único).
+  await page.getByText(/^SOL-\d{4}-\d+$/).first().click();
+
+  // Primer horario disponible: el orden de la agenda es parte de lo probado.
+  const slot = page.getByRole('button', { name: /^\d{1,2}:\d{2}/ }).first();
+  await slot.waitFor({ state: 'visible', timeout: 25_000 });
   await slot.click();
-  const confirmar = page.getByRole('button', { name: 'Confirmar turno' });
-  await expect(confirmar).toBeEnabled({ timeout: 10_000 });
-  await confirmar.click();
-  await expect(confirmar).toBeHidden({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Confirmar turno' }).click();
+  // El éxito REAL es que el sheet cierre (el botón cambia de label mientras
+  // reserva: no sirve como señal).
+  await expect(tituloSheet).toBeHidden({ timeout: 45_000 });
 }
 
-/** Abre en la bandeja de gestión la solicitud MÁS RECIENTE de ese trámite en un estado dado. */
-async function gestorAbreSolicitud(page: Page, caso: CasoTramite, estado: RegExp): Promise<void> {
+/**
+ * Abre en la bandeja de gestión la solicitud MÁS RECIENTE de ese trámite,
+ * ESE vecino y ese estado. El scope por vecino evita tocar solicitudes del
+ * seed u otras corridas (las filas no muestran la marca del caso).
+ */
+async function gestorAbreSolicitud(page: Page, caso: CasoTramite, vecinoNombre: string, estado: RegExp): Promise<void> {
   await page.goto('/gestion/tramites');
   await cerrarAvisos(page);
-  const fila = page.getByRole('row', { name: new RegExp(caso.tramite) }).filter({ hasText: estado }).first()
-    .or(page.locator(`text=${caso.tramite}`).first());
-  await fila.first().waitFor({ state: 'visible', timeout: 30_000 });
-  await page.waitForTimeout(800);
-  await fila.first().click();
+  const fila = page.getByRole('row')
+    .filter({ hasText: caso.tramite })
+    .filter({ hasText: vecinoNombre })
+    .filter({ hasText: estado })
+    .first();
+  await fila.waitFor({ state: 'visible', timeout: 30_000 });
+  await page.waitForTimeout(900);
+  await fila.getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 }).catch(async () => { await fila.click(); });
 }
 
 for (const caso of tenant.tramites) {
@@ -81,15 +96,39 @@ for (const caso of tenant.tramites) {
 
     // 2) El gestor la pone en curso y la finaliza.
     const { ctx: ctxGestor, page: gestion } = await contextoDe(browser, 'admin');
-    await gestorAbreSolicitud(gestion, caso, /Recibido/i);
-    await gestion.getByRole('button', { name: 'Poner en Curso' }).click();
-    // Tras la acción puede cerrar el sheet o refrescar: reabrir en curso.
-    await gestion.waitForTimeout(1_500);
-    const finalizar = gestion.getByRole('button', { name: 'Finalizar', exact: true }).first();
-    if (!(await finalizar.isVisible().catch(() => false))) {
-      await gestorAbreSolicitud(gestion, caso, /En Curso/i);
+    const vecinoNombre = tenant.login.nombres?.[vecinoRol] ?? '';
+    await gestorAbreSolicitud(gestion, caso, vecinoNombre, /Recibido/i);
+    await gestion.waitForTimeout(900); // settle de la animación del sheet
+
+    // REGLA DE NEGOCIO REAL: recibido → en curso exige TODOS los documentos
+    // obligatorios verificados; al verificar el último, la solicitud avanza
+    // SOLA a en curso. Cada doc tiene SU botón (el botón no desaparece al
+    // verificar: se clickea cada uno UNA vez, por índice).
+    const verificadores = gestion.getByRole('button', { name: 'Verificado sin archivo' });
+    // La sección Documentos carga ASYNC: esperar el primer verificador antes
+    // de contar (si a los 15s no hay ninguno, el trámite no pide docs).
+    await verificadores.first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+    const totalDocs = await verificadores.count();
+    for (let i = 0; i < totalDocs; i++) {
+      await verificadores.nth(i).click();
+      await gestion.waitForTimeout(1_800); // cada verificación escribe en la DB real
     }
-    await finalizar.waitFor({ state: 'visible', timeout: 20_000 });
+
+    // Con los docs verificados (o sin docs), el pase a en curso es manual.
+    // La señal de ÉXITO es el toast del backend, no el botón (cambia de
+    // label mientras guarda).
+    const ponerEnCurso = gestion.getByRole('button', { name: 'Poner en Curso' });
+    if (await ponerEnCurso.isVisible().catch(() => false)) {
+      await ponerEnCurso.click();
+      await expect(gestion.getByText('Trámite en curso').first()).toBeVisible({ timeout: 25_000 });
+    }
+
+    // Finalizar (reabriendo en curso: las acciones cierran o refrescan el sheet).
+    const finalizar = gestion.getByRole('button', { name: 'Finalizar', exact: true }).first();
+    if (!(await finalizar.waitFor({ state: 'visible', timeout: 12_000 }).then(() => true).catch(() => false))) {
+      await gestorAbreSolicitud(gestion, caso, vecinoNombre, /En Curso/i);
+      await finalizar.waitFor({ state: 'visible', timeout: 25_000 });
+    }
     await finalizar.click();
     // Nota/confirmación si la pide.
     const dialogo = gestion.locator('[role="dialog"]').last();

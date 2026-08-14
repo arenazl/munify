@@ -48,6 +48,8 @@ export interface Tenant {
     tipo: 'picker';
     /** rol lógico → texto del botón de persona en el picker de la demo. */
     personas: Record<string, string>;
+    /** rol lógico → nombre visible en las filas de gestión (para scopear). */
+    nombres?: Record<string, string>;
   };
   reclamos: CasoReclamo[];
   tramites: CasoTramite[];

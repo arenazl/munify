@@ -294,6 +294,10 @@
       "sup-TRANSITO_VIAL": "Dirección de Tránsito y Seguridad Vial",
       "sup-ZOONOSIS": "Dirección de Zoonosis y Salud Animal",
       "sup-SEGURIDAD": "Secretaría de Seguridad"
+    },
+    "nombres": {
+      "vecino": "Derlis González",
+      "vecino-2": "Liz Benítez"
     }
   }
 }
