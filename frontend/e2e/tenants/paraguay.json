@@ -1,0 +1,299 @@
+{
+  "id": "paraguay",
+  "nombre": "Paraguay Limpio - Asunción",
+  "rutaMarca": "/asuncion",
+  "password": "demo123",
+  "usuarios": {
+    "admin": "admin@asuncion.demo.com",
+    "vecinos": [
+      "vecino@asuncion.demo.com",
+      "vecino-liz@asuncion.demo.com",
+      "vecino-rodrigo@asuncion.demo.com"
+    ],
+    "supervisores": {
+      "SERVICIOS_PUBLICOS": "supervisor-servicios-publicos@asuncion.demo.com",
+      "OBRAS_PUBLICAS": "supervisor-obras-publicas@asuncion.demo.com",
+      "TRANSITO_VIAL": "supervisor-transito-vial@asuncion.demo.com",
+      "ZOONOSIS": "supervisor-zoonosis@asuncion.demo.com",
+      "SEGURIDAD": "supervisor-seguridad@asuncion.demo.com"
+    }
+  },
+  "reclamos": [
+    {
+      "caso": 1,
+      "categoria": "Alumbrado público",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Avda. Mariscal López 1450",
+      "detalle": "Columna sin luz hace tres noches, cuadra completamente a oscuras.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 2,
+      "categoria": "Bacheo y calles",
+      "dep": "OBRAS_PUBLICAS",
+      "direccion": "Cerro Corá esq. Tacuary",
+      "detalle": "Bache profundo en la senda del colectivo, ya reventó dos cubiertas.",
+      "circuito": "ot"
+    },
+    {
+      "caso": 3,
+      "categoria": "Recolección de residuos",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Barrio Obrero, calle Lomas Valentinas 820",
+      "detalle": "Hace cuatro días que no pasa el recolector, se acumulan bolsas.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 4,
+      "categoria": "Semaforos",
+      "dep": "TRANSITO_VIAL",
+      "direccion": "Eusebio Ayala esq. RI 4 Curupayty",
+      "detalle": "Semáforo en amarillo intermitente desde ayer en hora pico.",
+      "circuito": "ot"
+    },
+    {
+      "caso": 5,
+      "categoria": "Animales sueltos",
+      "dep": "ZOONOSIS",
+      "direccion": "Plaza Uruguaya, lado Estación",
+      "detalle": "Jauría de cinco perros sin dueño molestando a los que cruzan la plaza.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 6,
+      "categoria": "Higiene urbana",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Mercado 4, sobre Silvio Pettirossi",
+      "detalle": "Basural creciendo en la vereda del mercado, olor insoportable.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 7,
+      "categoria": "Ruidos y convivencia",
+      "dep": "SEGURIDAD",
+      "direccion": "Palma esq. 14 de Mayo",
+      "detalle": "Local nocturno con parlantes en la vereda hasta las 4 AM.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 8,
+      "categoria": "Veredas en mal estado",
+      "dep": "OBRAS_PUBLICAS",
+      "direccion": "Azara 950, frente a la escuela",
+      "detalle": "Baldosas levantadas por raíces, una señora ya se cayó.",
+      "circuito": "ot"
+    },
+    {
+      "caso": 9,
+      "categoria": "Plagas y control",
+      "dep": "ZOONOSIS",
+      "direccion": "Tacumbú, zona costera, calle Amancio González",
+      "detalle": "Agua estancada con larvas de mosquito, piden fumigación por dengue.",
+      "circuito": "ot"
+    },
+    {
+      "caso": 10,
+      "categoria": "Arbolado y espacios verdes",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Parque Carlos Antonio López, sector juegos",
+      "detalle": "Rama gruesa quebrada colgando sobre los juegos infantiles.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 11,
+      "categoria": "Agua y cloacas",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Dr. Molas López 1230",
+      "detalle": "Pérdida de agua potable corriendo por la calzada hace una semana.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 12,
+      "categoria": "Tránsito y señalización",
+      "dep": "TRANSITO_VIAL",
+      "direccion": "Choferes del Chaco esq. Madame Lynch",
+      "detalle": "Cartel de PARE caído después del temporal, cruce peligroso.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 13,
+      "categoria": "Cableado suelto",
+      "dep": "SEGURIDAD",
+      "direccion": "Brasil esq. Fulgencio R. Moreno",
+      "detalle": "Cable cortado colgando a la altura de una persona en la esquina.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 14,
+      "categoria": "Desagues y pluviales",
+      "dep": "OBRAS_PUBLICAS",
+      "direccion": "Avda. Fernando de la Mora 2680",
+      "detalle": "Boca de tormenta tapada, con la lluvia de anoche se inundó la esquina.",
+      "circuito": "ot"
+    },
+    {
+      "caso": 15,
+      "categoria": "Estacionamiento indebido",
+      "dep": "TRANSITO_VIAL",
+      "direccion": "Estrella 680, frente al acceso de ambulancias",
+      "detalle": "Autos estacionados bloqueando la salida de ambulancias todos los días.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 16,
+      "categoria": "Plazas y juegos",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Plaza Italia, sector mangrullo",
+      "detalle": "Hamaca rota con el hierro al descubierto, peligro para los chicos.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 17,
+      "categoria": "Vehiculos abandonados",
+      "dep": "TRANSITO_VIAL",
+      "direccion": "México 1520, sobre la vereda",
+      "detalle": "Furgoneta abandonada hace meses, sin ruedas y con vidrios rotos.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 18,
+      "categoria": "Alumbrado público",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Costanera José Asunción Flores, tramo norte",
+      "detalle": "Diez luminarias seguidas apagadas en la costanera.",
+      "circuito": "ot"
+    },
+    {
+      "caso": 19,
+      "categoria": "Recolección de residuos",
+      "dep": "SERVICIOS_PUBLICOS",
+      "direccion": "Barrio San Jerónimo, escalinata principal",
+      "detalle": "Contenedor desbordado desde el fin de semana en la escalinata.",
+      "circuito": "resolver"
+    },
+    {
+      "caso": 20,
+      "categoria": "Bacheo y calles",
+      "dep": "OBRAS_PUBLICAS",
+      "direccion": "Última Milla esq. Santísima Trinidad",
+      "detalle": "Hundimiento de calzada creciendo con cada lluvia.",
+      "circuito": "ot"
+    }
+  ],
+  "tramites": [
+    {
+      "caso": 1,
+      "tramite": "Licencia de conducir - Primera vez",
+      "conTurno": true
+    },
+    {
+      "caso": 2,
+      "tramite": "Renovación de licencia de conducir",
+      "conTurno": true
+    },
+    {
+      "caso": 3,
+      "tramite": "Habilitación comercial",
+      "conTurno": true
+    },
+    {
+      "caso": 4,
+      "tramite": "Renovación de habilitación comercial",
+      "conTurno": false
+    },
+    {
+      "caso": 5,
+      "tramite": "Permiso de obra menor",
+      "conTurno": false
+    },
+    {
+      "caso": 6,
+      "tramite": "Certificado de libre deuda municipal",
+      "conTurno": true
+    },
+    {
+      "caso": 7,
+      "tramite": "Pago de tasa de recolección de residuos",
+      "conTurno": false
+    },
+    {
+      "caso": 8,
+      "tramite": "Certificado de residencia",
+      "conTurno": true
+    },
+    {
+      "caso": 9,
+      "tramite": "Permiso de poda de árbol",
+      "conTurno": false
+    },
+    {
+      "caso": 10,
+      "tramite": "Habilitación de transporte de alimentos",
+      "conTurno": true
+    },
+    {
+      "caso": 11,
+      "tramite": "Licencia de conducir - Primera vez",
+      "conTurno": true
+    },
+    {
+      "caso": 12,
+      "tramite": "Renovación de licencia de conducir",
+      "conTurno": true
+    },
+    {
+      "caso": 13,
+      "tramite": "Habilitación comercial",
+      "conTurno": true
+    },
+    {
+      "caso": 14,
+      "tramite": "Certificado de libre deuda municipal",
+      "conTurno": true
+    },
+    {
+      "caso": 15,
+      "tramite": "Certificado de residencia",
+      "conTurno": true
+    },
+    {
+      "caso": 16,
+      "tramite": "Permiso de obra menor",
+      "conTurno": false
+    },
+    {
+      "caso": 17,
+      "tramite": "Permiso de poda de árbol",
+      "conTurno": false
+    },
+    {
+      "caso": 18,
+      "tramite": "Habilitación de transporte de alimentos",
+      "conTurno": true
+    },
+    {
+      "caso": 19,
+      "tramite": "Renovación de habilitación comercial",
+      "conTurno": false
+    },
+    {
+      "caso": 20,
+      "tramite": "Pago de tasa de recolección de residuos",
+      "conTurno": false
+    }
+  ],
+  "login": {
+    "tipo": "picker",
+    "personas": {
+      "admin": "Administrador",
+      "vecino": "Derlis",
+      "vecino-2": "Liz",
+      "campo": "Gustavo Benítez",
+      "sup-SERVICIOS_PUBLICOS": "Secretaría de Servicios Públicos y Ambiente",
+      "sup-OBRAS_PUBLICAS": "Secretaría de Obras Públicas",
+      "sup-TRANSITO_VIAL": "Dirección de Tránsito y Seguridad Vial",
+      "sup-ZOONOSIS": "Dirección de Zoonosis y Salud Animal",
+      "sup-SEGURIDAD": "Secretaría de Seguridad"
+    }
+  }
+}
