@@ -105,12 +105,33 @@ export async function loginPersonaUI(page: Page, tenant: Tenant, rol: string): P
   await page.waitForFunction(() => !!localStorage.getItem('token'), undefined, { timeout: 15_000 });
 }
 
+/**
+ * El sheet "Las bloqueaste sin querer" reaparece en momentos aleatorios y
+ * tapa clicks. Se lo apaga en la RAÍZ: sus flags de "ya mostrado" quedan
+ * seteados ANTES de que la app arranque (claves de
+ * NotificationActivationSheet.tsx). cerrarAvisos() queda de respaldo.
+ */
+const STUB_AVISOS = `
+  try {
+    localStorage.setItem('notif_activation_denied_shown', String(Date.now()));
+    localStorage.setItem('notif_activation_post_creation_shown', String(Date.now()));
+    localStorage.setItem('notif_activation_dismiss_count', '99');
+    localStorage.setItem('notif_activation_last_dismissal', String(Date.now()));
+  } catch (e) { /* almacenamiento no disponible: el respaldo es cerrarAvisos */ }
+`;
+
+export async function contextoNuevo(browser: Browser, opts: { storageState?: string } = {}): Promise<BrowserContext> {
+  const ctx = await browser.newContext({
+    ...(opts.storageState ? { storageState: opts.storageState } : {}),
+    permissions: ['notifications'],
+  });
+  await ctx.addInitScript(STUB_AVISOS);
+  return ctx;
+}
+
 /** Abre un contexto ya logueado con la sesión guardada de ese rol. */
 export async function contextoDe(browser: Browser, rol: string): Promise<{ ctx: BrowserContext; page: Page }> {
-  const ctx = await browser.newContext({
-    storageState: rutaStorageState(rol),
-    permissions: ['notifications'], // sin esto, el sheet "Las bloqueaste sin querer" tapa la UI
-  });
+  const ctx = await contextoNuevo(browser, { storageState: rutaStorageState(rol) });
   const page = await ctx.newPage();
   return { ctx, page };
 }

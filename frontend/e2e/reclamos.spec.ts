@@ -89,47 +89,95 @@ for (const caso of tenant.reclamos) {
     await gestorAbreReclamo(gestion, caso);
 
     // Reglas de negocio del pase a en curso: (1) elegir QUIÉN lo va a hacer
-    // (primer candidato sugerido — el ranking del sistema es parte de lo que
-    // se prueba) y (2) escribir QUÉ se va a hacer (queda en el historial).
+    // (primer candidato sugerido) y (2) escribir QUÉ se va a hacer. El sheet
+    // admite "sin candidatos cargados — podés avanzar igual": si la búsqueda
+    // de sugeridos no trae radios, se avanza sin asignar.
     const candidato = gestion.getByRole('radio').first();
-    await candidato.waitFor({ state: 'visible', timeout: 15_000 });
-    await candidato.click();
+    const sinCandidatos = gestion.getByText(/sin candidatos cargados/i).first();
+    await expect(candidato.or(sinCandidatos)).toBeVisible({ timeout: 30_000 });
+    if (await candidato.isVisible().catch(() => false)) await candidato.click();
     await gestion.getByRole('textbox', { name: /Qué se va a hacer/i })
       .fill(`${id} Se programa cuadrilla para atender el pedido.`);
-    const pasar = gestion.getByRole('button', { name: 'Pasar a en curso' });
-    await expect(pasar).toBeEnabled({ timeout: 15_000 });
-    await pasar.click();
-    // La acción cierra el sheet y la fila queda "En Curso".
-    await expect(gestion.getByRole('row', { name: id }).first()).toContainText(/En Curso/i, { timeout: 20_000 });
 
-    // Reabrir para FINALIZAR: panel "Finalizar Trabajo" → resultado
-    // "Finalizado" → describir la resolución → Finalizar.
-    await gestorAbreReclamo(gestion, caso);
-    const notaFinal = `${id} Trabajo realizado, se repuso el servicio.`;
-    const panelFinalizar = gestion.getByRole('button', { name: 'Finalizar Trabajo' });
-    const descripcion = gestion.getByRole('textbox', { name: /cómo se resolvió/i });
-    // El panel puede venir abierto con "Finalizado" preseleccionado: sólo se
-    // abre si la descripción no está a la vista, y sólo se toca el resultado
-    // si el submit sigue deshabilitado (clickearlo de más lo DESelecciona).
-    if (!(await descripcion.isVisible().catch(() => false))) await panelFinalizar.click();
-    await descripcion.waitFor({ state: 'visible', timeout: 15_000 });
-    await descripcion.fill(notaFinal);
-    const submit = gestion.getByRole('button', { name: 'Finalizar', exact: true });
-    if (!(await submit.isEnabled().catch(() => false))) {
-      await gestion.getByRole('button', { name: 'Finalizado', exact: true }).click();
-      if (!(await descripcion.inputValue().catch(() => ''))) await descripcion.fill(notaFinal);
+    if (caso.circuito === 'ot') {
+      // Variante OT: en vez de asignación simple, "+ Nueva orden de trabajo".
+      // La OT se crea y vincula EN EL ACTO (toast con su número) y nace con
+      // el MISMO título del reclamo (nuestra marca). El reclamo queda
+      // Recibido hasta que el operario la trabaja.
+      const comboOt = gestion.getByRole('button', { name: /Asignación simple/ }).first()
+        .or(gestion.locator('p', { hasText: 'Orden de trabajo' }).locator('xpath=following-sibling::button[1]').first());
+      await comboOt.first().click();
+      await gestion.getByText('+ Nueva orden de trabajo').click();
+      await expect(gestion.getByText(/creada y vinculada/i).first()).toBeVisible({ timeout: 25_000 });
+      await ctxGestor.close();
+
+      // La orden la completa el ADMIN: la OT queda asignada al candidato que
+      // rankeó el sistema (varía por categoría) y el operario logueado sólo
+      // ve las SUYAS — el admin ve todas, así el caso es determinístico. La
+      // bandeja del operario queda ejercitada por su login del setup.
+      // Se tilda "Finalizar también el reclamo vinculado": el cierre cascadea
+      // al reclamo y le avisa al vecino.
+      const { ctx: ctxCampo, page: campo } = await contextoDe(browser, 'admin');
+      await campo.goto('/gestion/ordenes-trabajo');
+      await cerrarAvisos(campo);
+      // La lista no tiene buscador: filtrar por "Asignada" y cargar más hasta
+      // que aparezca la fila de NUESTRA orden (título = la marca del caso).
+      await campo.getByRole('button', { name: /^Asignada/ }).first().click().catch(() => {});
+      const filaOt = campo.getByText(id, { exact: false }).first();
+      for (let i = 0; i < 8 && !(await filaOt.isVisible().catch(() => false)); i++) {
+        const cargarMas = campo.getByRole('button', { name: /Cargar más/i }).first();
+        if (await cargarMas.isVisible().catch(() => false)) await cargarMas.click();
+        else await campo.waitForTimeout(1_000);
+      }
+      await filaOt.click();
+      // Completar exige "Qué se hizo" y se tilda la cascada al reclamo.
+      const queSeHizo = campo.getByPlaceholder(/Qué se hizo/);
+      await queSeHizo.waitFor({ state: 'visible', timeout: 20_000 });
+      await queSeHizo.fill(`${id} Trabajo de campo realizado por la cuadrilla.`);
+      await campo.getByText(/Finalizar también/).click();
+      const completar = campo.getByRole('button', { name: 'Completar', exact: true }).first();
+      await expect(completar).toBeEnabled({ timeout: 10_000 });
+      await completar.click();
+      await ctxCampo.close();
+    } else {
+      const pasar = gestion.getByRole('button', { name: 'Pasar a en curso' });
+      await expect(pasar).toBeEnabled({ timeout: 15_000 });
+      await pasar.click();
+      // La acción cierra el sheet y la fila queda "En Curso".
+      await expect(gestion.getByRole('row', { name: id }).first()).toContainText(/En Curso/i, { timeout: 25_000 });
+      // Reabrir para FINALIZAR: panel "Finalizar Trabajo" → resultado
+      // "Finalizado" → describir la resolución → Finalizar.
+      await gestorAbreReclamo(gestion, caso);
+      const notaFinal = `${id} Trabajo realizado, se repuso el servicio.`;
+      const panelFinalizar = gestion.getByRole('button', { name: 'Finalizar Trabajo' });
+      const descripcion = gestion.getByRole('textbox', { name: /cómo se resolvió/i });
+      // El panel puede venir abierto con "Finalizado" preseleccionado: sólo se
+      // abre si la descripción no está a la vista, y sólo se toca el resultado
+      // si el submit sigue deshabilitado (clickearlo de más lo DESelecciona).
+      if (!(await descripcion.isVisible().catch(() => false))) await panelFinalizar.click();
+      await descripcion.waitFor({ state: 'visible', timeout: 15_000 });
+      await descripcion.fill(notaFinal);
+      const submit = gestion.getByRole('button', { name: 'Finalizar', exact: true });
+      if (!(await submit.isEnabled().catch(() => false))) {
+        await gestion.getByRole('button', { name: 'Finalizado', exact: true }).click();
+        if (!(await descripcion.inputValue().catch(() => ''))) await descripcion.fill(notaFinal);
+      }
+      await expect(submit).toBeEnabled({ timeout: 10_000 });
+      await submit.click();
+      await expect(gestion.getByRole('row', { name: id }).first()).toContainText(/Finalizado/i, { timeout: 25_000 });
+      await ctxGestor.close();
     }
-    await expect(submit).toBeEnabled({ timeout: 10_000 });
-    await submit.click();
-    await expect(gestion.getByRole('row', { name: id }).first()).toContainText(/Finalizado/i, { timeout: 25_000 });
-    await ctxGestor.close();
 
-    // 3) El vecino ve el cierre.
+    // 3) El vecino ve el CIERRE (no sólo la tarjeta: el estado final).
     const { ctx: ctxFin, page: fin } = await contextoDe(browser, 'vecino');
     await fin.goto('/gestion/mis-reclamos');
     await cerrarAvisos(fin);
-    const tarjeta = fin.getByText(id, { exact: false }).first();
-    await expect(tarjeta).toBeVisible({ timeout: 20_000 });
+    // El buscador del vecino no matchea por título: se filtra por la
+    // DIRECCIÓN del caso (única en la matriz) y se verifica la tarjeta.
+    const buscadorVecino = fin.getByPlaceholder(/Buscar en mis reclamos/i);
+    if (await buscadorVecino.isVisible().catch(() => false)) await buscadorVecino.fill(caso.direccion);
+    await expect(fin.getByText(id, { exact: false }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(fin.getByText(/Finalizado/i).first()).toBeVisible({ timeout: 20_000 });
     await ctxFin.close();
   });
 }
