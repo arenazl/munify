@@ -17,7 +17,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   outputDir: './.artifacts',
-  timeout: 120_000,
+  // Los circuitos doc-pesados (licencia: wizard + turno + 3 verificaciones)
+  // superan los 2 min contra la DB de QA cargada.
+  timeout: 240_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,

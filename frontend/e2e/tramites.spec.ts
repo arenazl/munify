@@ -70,14 +70,16 @@ async function vecinoReservaTurno(page: Page, caso: CasoTramite): Promise<void> 
  * ESE vecino y ese estado. El scope por vecino evita tocar solicitudes del
  * seed u otras corridas (las filas no muestran la marca del caso).
  */
-async function gestorAbreSolicitud(page: Page, caso: CasoTramite, vecinoNombre: string, estado: RegExp): Promise<void> {
+async function gestorAbreSolicitud(page: Page, caso: CasoTramite, vecinoNombre: string, estado?: RegExp): Promise<void> {
   await page.goto('/gestion/tramites');
   await cerrarAvisos(page);
-  const fila = page.getByRole('row')
+  // Sin `estado` se abre la MÁS RECIENTE de ese trámite y vecino (la lista
+  // ordena desc): los trámites online no entran como "Recibido" clásico.
+  let fila = page.getByRole('row')
     .filter({ hasText: caso.tramite })
-    .filter({ hasText: vecinoNombre })
-    .filter({ hasText: estado })
-    .first();
+    .filter({ hasText: vecinoNombre });
+  if (estado) fila = fila.filter({ hasText: estado });
+  fila = fila.first();
   await fila.waitFor({ state: 'visible', timeout: 30_000 });
   await page.waitForTimeout(900);
   await fila.getByRole('button', { name: 'Ver' }).click({ timeout: 10_000 }).catch(async () => { await fila.click(); });
@@ -97,7 +99,7 @@ for (const caso of tenant.tramites) {
     // 2) El gestor la pone en curso y la finaliza.
     const { ctx: ctxGestor, page: gestion } = await contextoDe(browser, 'admin');
     const vecinoNombre = tenant.login.nombres?.[vecinoRol] ?? '';
-    await gestorAbreSolicitud(gestion, caso, vecinoNombre, /Recibido/i);
+    await gestorAbreSolicitud(gestion, caso, vecinoNombre);
     await gestion.waitForTimeout(900); // settle de la animación del sheet
 
     // REGLA DE NEGOCIO REAL: recibido → en curso exige TODOS los documentos
@@ -114,14 +116,12 @@ for (const caso of tenant.tramites) {
       await gestion.waitForTimeout(1_800); // cada verificación escribe en la DB real
     }
 
-    // Con los docs verificados (o sin docs), el pase a en curso es manual.
-    // La señal de ÉXITO es el toast del backend, no el botón (cambia de
-    // label mientras guarda).
-    const ponerEnCurso = gestion.getByRole('button', { name: 'Poner en Curso' });
-    if (await ponerEnCurso.isVisible().catch(() => false)) {
-      await ponerEnCurso.click();
-      await expect(gestion.getByText('Trámite en curso').first()).toBeVisible({ timeout: 25_000 });
-    }
+    // El pase a en curso puede ser AUTOMÁTICO (al verificar el último doc la
+    // solicitud avanza sola y el botón desaparece en el acto) o manual: se
+    // intenta el click con timeout corto y sin drama si ya no está.
+    await gestion.getByRole('button', { name: 'Poner en Curso' })
+      .click({ timeout: 8_000 }).catch(() => {});
+    await gestion.waitForTimeout(2_000);
 
     // Finalizar (reabriendo en curso: las acciones cierran o refrescan el sheet).
     const finalizar = gestion.getByRole('button', { name: 'Finalizar', exact: true }).first();

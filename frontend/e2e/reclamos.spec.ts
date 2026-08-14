@@ -88,18 +88,28 @@ for (const caso of tenant.reclamos) {
     const { ctx: ctxGestor, page: gestion } = await contextoDe(browser, gestor);
     await gestorAbreReclamo(gestion, caso);
 
-    // Reglas de negocio del pase a en curso: (1) elegir QUIÉN lo va a hacer
-    // (primer candidato sugerido) y (2) escribir QUÉ se va a hacer. El sheet
-    // admite "sin candidatos cargados — podés avanzar igual": si la búsqueda
-    // de sugeridos no trae radios, se avanza sin asignar.
-    const candidato = gestion.getByRole('radio').first();
-    const sinCandidatos = gestion.getByText(/sin candidatos cargados/i).first();
-    await expect(candidato.or(sinCandidatos)).toBeVisible({ timeout: 30_000 });
-    if (await candidato.isVisible().catch(() => false)) await candidato.click();
+    // VARIANTE de negocio: reclamo HUÉRFANO (su categoría no tiene
+    // dependencia) — el sheet no ofrece candidatos ni OT; la app permite
+    // pasarlo a en curso con el plan escrito (la derivación fina vive en
+    // Asignaciones). En el circuito normal: (1) elegir QUIÉN lo va a hacer
+    // y (2) escribir QUÉ se va a hacer.
+    const huerfano = await gestion.getByText(/Sin dependencia asignada todavía/i).first()
+      .isVisible().catch(() => false);
+    if (!huerfano) {
+      const candidato = gestion.getByRole('radio').first();
+      const sinCandidatos = gestion.getByText(/sin candidatos cargados/i).first();
+      // El scoring de candidatos puede tardar MUCHO en dependencias con poca
+      // gente (Zoonosis, Seguridad): primero se espera a que el spinner
+      // "Buscando candidatos sugeridos…" termine, después se decide.
+      await gestion.getByText(/Buscando candidatos/i).first()
+        .waitFor({ state: 'hidden', timeout: 90_000 }).catch(() => {});
+      await expect(candidato.or(sinCandidatos)).toBeVisible({ timeout: 20_000 });
+      if (await candidato.isVisible().catch(() => false)) await candidato.click();
+    }
     await gestion.getByRole('textbox', { name: /Qué se va a hacer/i })
       .fill(`${id} Se programa cuadrilla para atender el pedido.`);
 
-    if (caso.circuito === 'ot') {
+    if (caso.circuito === 'ot' && !huerfano) {
       // Variante OT: en vez de asignación simple, "+ Nueva orden de trabajo".
       // La OT se crea y vincula EN EL ACTO (toast con su número) y nace con
       // el MISMO título del reclamo (nuestra marca). El reclamo queda
