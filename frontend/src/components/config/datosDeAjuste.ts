@@ -516,38 +516,57 @@ export async function datosDependencias(): Promise<DatosDeAjuste> {
     const res = await dependenciasApi.getMunicipio();
     const dependencias: any[] = res.data || [];
 
-    const filas: FilaSpec[] = dependencias.map((d) => ({
-      n: d.nombre,
-      s: d.codigo || d.descripcion || 'Dependencia municipal',
-      gl: 'M4 21V8l8-5 8 5v13M9 21v-6h6v6',
-      t: '#E8F1FE',
-      cc: '#3B82F6',
-      off: d.activo === false,
-      cel: [
-        d.responsable_nombre
-          ? punto(d.responsable_nombre, '#00B37E')
-          : celda('Sin responsable', { hayPunto: true, punto: '#F59E0B', color: '#B4560F' }),
-        numero(String(d.total_operarios || d.total_empleados || 0)),
-        celda(d.activo !== false ? 'Activa' : 'Inactiva', { color: d.activo !== false ? '#00794F' : '#98A3A0' }),
-      ],
-    }));
+    /* El ADN REAL de cada dependencia: icono y color propios (los edita el
+       lápiz), tipo jerárquico y de gestión, y los conteos que la API ya
+       manda. NUNCA el código interno (SERVICIOS_PUBLICOS) como subtítulo. */
+    const GESTION: Record<string, { label: string; color: string }> = {
+      RECLAMO: { label: 'Reclamos', color: '#3B82F6' },
+      TRAMITE: { label: 'Trámites', color: '#8B5CF6' },
+      AMBOS: { label: 'Ambos', color: '#00B37E' },
+    };
+    const filas: FilaSpec[] = dependencias.map((d) => {
+      const color = d.color || '#6366f1';
+      const gestion = GESTION[d.tipo_gestion] || GESTION.AMBOS;
+      const esDireccion = d.tipo_jerarquico === 'DIRECCION';
+      return {
+        n: d.nombre,
+        s: [esDireccion ? 'Dirección' : 'Secretaría', d.descripcion || null].filter(Boolean).join(' · '),
+        icono: d.icono || (esDireccion ? 'Building2' : 'Landmark'),
+        t: `${color}22`,
+        cc: color,
+        off: d.activo === false,
+        raw: d,
+        cel: [
+          celda(gestion.label, { hayPunto: true, punto: gestion.color, color: gestion.color }),
+          numero(String(d.categorias_count ?? 0)),
+          numero(String(d.tramites_count ?? 0)),
+          numero(String(d.direcciones_count ?? 0)),
+        ],
+      };
+    });
 
-    const activas = dependencias.filter((d) => d.activo !== false).length;
-    const conResp = dependencias.filter((d) => d.responsable_nombre).length;
+    const secretarias = dependencias.filter((d) => d.tipo_jerarquico !== 'DIRECCION').length;
+    const direcciones = dependencias.length - secretarias;
+    const sinTrabajo = dependencias.filter((d) => !(d.categorias_count || d.tramites_count)).length;
+    const conTrabajo = dependencias.length - sinTrabajo;
 
     const kpis: HeroKpi[] = [
-      { etiqueta: 'Dependencias', valor: dependencias.length, sub: `${activas} operativas` },
-      { etiqueta: 'Con responsable', valor: conResp, sub: 'líder asignado' },
-      { etiqueta: 'Sin responsable', valor: dependencias.length - conResp, sub: 'requieren atención', veredicto: dependencias.length - conResp > 0 ? 'advertencia' : undefined },
-      { etiqueta: 'Activas', valor: activas, sub: 'recibiendo trámites' },
-      { etiqueta: 'Inactivas', valor: dependencias.length - activas, sub: 'desactivadas' },
+      { etiqueta: 'Dependencias', valor: dependencias.length, sub: `${secretarias} secretarías · ${direcciones} direcciones` },
+      { etiqueta: 'Con trabajo', valor: conTrabajo, sub: 'atienden categorías o trámites' },
+      { etiqueta: 'Sin trabajo', valor: sinTrabajo, sub: 'nada asignado todavía', veredicto: sinTrabajo > 0 ? 'advertencia' : undefined },
+      { etiqueta: 'Categorías', valor: dependencias.reduce((a, d) => a + (d.categorias_count ?? 0), 0), sub: 'de reclamo asignadas' },
+      { etiqueta: 'Trámites', valor: dependencias.reduce((a, d) => a + (d.tramites_count ?? 0), 0), sub: 'asignados' },
     ];
 
     const frases: HeroFrase[] = [
       {
         segmentos: [
-          seg(`${dependencias.length} dependencia${dependencias.length === 1 ? '' : 's'} catalogada${dependencias.length === 1 ? '' : 's'}`),
-          seg(`, ${conResp} con responsable de área.`),
+          seg(`${dependencias.length} dependencia${dependencias.length === 1 ? '' : 's'} en el organigrama`, 'bueno'),
+          seg(
+            sinTrabajo > 0
+              ? `; ${sinTrabajo} sin nada asignado todavía — se reparte en Asignaciones.`
+              : '; todas atienden algo. El reparto fino vive en Asignaciones.',
+          ),
         ],
       },
     ];

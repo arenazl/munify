@@ -47,6 +47,10 @@ export interface FilaSpec {
   i?: string;
   /** Path del glifo del tile (cosas). */
   gl?: string;
+  /** Nombre de icono lucide (tiene prioridad sobre `gl` si está). */
+  icono?: string;
+  /** Objeto crudo de la API, para que la pantalla cablee edición. */
+  raw?: unknown;
   /** Tinte del tile. */
   t?: string;
   /** Color del icono/iniciales. */
@@ -275,20 +279,20 @@ export const ABM_SPEC: Record<string, AbmSpec> = {
     /* El municipio PUEDE crear las suyas: le damos un catálogo de arranque,
        pero si tiene una Secretaría de Vialidad propia la da de alta él. Lo que
        no elige el municipio son los MÓDULOS que usa — eso es facturación. */
-    buscar: 'Buscar dependencia o responsable…', cta: 'Nueva dependencia',
+    buscar: 'Buscar dependencia…', cta: 'Nueva dependencia',
     selects: [['Tipo', 'Todas'], ['Estado', 'Todos']],
-    chips: [['Todas', 11], ['Con cola', 8], ['Sin trabajo', 3]],
-    heads: [['DEPENDENCIA', 'left'], ['RESPONSABLE', 'left'], ['CATEGORÍAS', 'right'], ['EN COLA', 'right'], ['CUADRILLAS', 'right'], ['ACCIONES', 'right']],
-    cols: 'minmax(0, 1.6fr) minmax(0, 1.2fr) 112px 104px 112px 104px', min: '1020px',
+    chips: [['Todas', 11], ['Con trabajo', 8], ['Sin trabajo', 3]],
+    heads: [['DEPENDENCIA', 'left'], ['ATIENDE', 'left'], ['CATEGORÍAS', 'right'], ['TRÁMITES', 'right'], ['DIRECCIONES', 'right'], ['ACCIONES', 'right']],
+    cols: 'minmax(0, 1.8fr) minmax(0, 0.9fr) 112px 104px 112px 104px', min: '1020px',
     filas: [
-      { n: 'Secretaría de Servicios Públicos', s: 'Higiene, alumbrado y verde', gl: g.dep, t: tV, cc: '#00794F', cel: [c('Rocío Giménez', { punto: V }), num('6'), num('210', { color: '#C93A3E' }), num('4')] },
-      { n: 'Secretaría de Obras Públicas', s: 'Bacheo, agua y cloacas', gl: g.dep, t: tA, cc: '#B4560F', cel: [c('Arnaldo Cantero', { punto: A }), num('4'), num('131')  , num('2')] },
-      { n: 'Dirección de Tránsito y Seguridad Vial', s: 'Semáforos y señalización', gl: g.dep, t: tR, cc: '#C93A3E', cel: [c('Néstor Ayala', { punto: R }), num('3'), num('71'), num('1')] },
-      { n: 'Dirección de Zoonosis y Bromatología', s: 'Animales y plagas', gl: g.dep, t: tVI, cc: '#6D3FD4', cel: [c('Graciela Espínola', { punto: VI }), num('2'), num('19'), num('1')] },
-      { n: 'Secretaría de Seguridad', s: 'Ruidos y convivencia', gl: g.dep, t: tAZ, cc: '#1D6FD1', cel: [c('Carolina Franco', { punto: AZ }), num('1'), num('9'), num('0')] },
-      { n: 'Dirección de Catastro', s: 'Sin categorías asignadas', gl: g.dep, t: tG, cc: '#7A8783', del: true, cel: [c('Sin responsable', { punto: A, color: '#B4560F' }), num('0', { color: '#98A3A0' }), num('0', { color: '#98A3A0' }), num('0', { color: '#98A3A0' })] },
+      { n: 'Secretaría de Servicios Públicos', s: 'Secretaría · Higiene, alumbrado y verde', gl: g.dep, t: tV, cc: '#00794F', cel: [c('Ambos', { punto: V }), num('6'), num('3'), num('2')] },
+      { n: 'Secretaría de Obras Públicas', s: 'Secretaría · Bacheo, agua y cloacas', gl: g.dep, t: tA, cc: '#B4560F', cel: [c('Ambos', { punto: V }), num('4'), num('2'), num('1')] },
+      { n: 'Dirección de Tránsito y Seguridad Vial', s: 'Dirección · Semáforos y señalización', gl: g.dep, t: tR, cc: '#C93A3E', cel: [c('Ambos', { punto: V }), num('3'), num('2'), num('0')] },
+      { n: 'Dirección de Zoonosis y Bromatología', s: 'Dirección · Animales y plagas', gl: g.dep, t: tVI, cc: '#6D3FD4', cel: [c('Reclamos', { punto: AZ }), num('2'), num('0'), num('0')] },
+      { n: 'Secretaría de Seguridad', s: 'Secretaría · Ruidos y convivencia', gl: g.dep, t: tAZ, cc: '#1D6FD1', cel: [c('Reclamos', { punto: AZ }), num('1'), num('0'), num('0')] },
+      { n: 'Dirección de Catastro', s: 'Dirección · Sin categorías asignadas', gl: g.dep, t: tG, cc: '#7A8783', del: true, cel: [c('Trámites', { punto: VI }), num('0', { color: '#98A3A0' }), num('1'), num('0', { color: '#98A3A0' })] },
     ],
-    pie: 'La dependencia con reclamos en cola no se puede borrar: primero hay que reasignar sus categorías.',
+    pie: 'El lápiz edita la identidad (icono y color se ven en toda la app) y el contacto local. Quién atiende qué se reparte en Asignaciones.',
   },
 
   /* Zonas: el canvas pedía BARRIOS y RESUELTOS por zona, datos que el modelo

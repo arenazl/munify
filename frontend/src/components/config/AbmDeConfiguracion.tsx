@@ -17,12 +17,14 @@
  * prototipo aunque las escriban personas distintas.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { SemanticAbmPage } from '../abmv2/SemanticAbmPage';
 import { ChipEstado, DotCell, EntityCell } from '../abmv2/DataTable';
 import { MetricCell } from '../abmv2/Controls';
+import { Glifo } from '../abmv2/Glifo';
 import { seg } from '../../lib/semanticHero';
 import type { HeroFrase, HeroKpi, Veredicto } from '../../lib/semanticHero';
-import type { ColumnSpec, ViewKind } from '../abmv2/types';
+import type { ColumnSpec, RowAction, ViewKind } from '../abmv2/types';
 import type { AbmSpec, CeldaSpec, FilaSpec } from '../../config/canvasAbmSpec';
 import { CABLEADO } from './datosDeAjuste';
 import type { DatosDeAjuste } from './datosDeAjuste';
@@ -121,6 +123,8 @@ export interface AbmDeConfiguracionProps {
   /** Alta. Sin handler, el CTA no se renderiza (pantalla de sólo lectura). */
   onNuevo?: () => void;
   onFila?: (fila: FilaSpec, indice: number) => void;
+  /** Edición: con handler aparece el lápiz por fila (columna ACCIONES). */
+  onEditarFila?: (fila: FilaSpec) => void;
   loading?: boolean;
 }
 
@@ -133,6 +137,7 @@ export function AbmDeConfiguracion({
   ajusteId,
   onNuevo,
   onFila,
+  onEditarFila,
   loading = false,
 }: AbmDeConfiguracionProps) {
   const [busqueda, setBusqueda] = useState('');
@@ -218,7 +223,13 @@ export function AbmDeConfiguracion({
           ? (fila: FilaSpec) => (
               <EntityCell
                 initials={fila.i}
-                icon={fila.gl ? <GlifoTile path={fila.gl} color={fila.cc} /> : undefined}
+                icon={
+                  fila.icono
+                    ? <Glifo glifo={fila.icono} size={16} color={fila.cc} />
+                    : fila.gl
+                      ? <GlifoTile path={fila.gl} color={fila.cc} />
+                      : undefined
+                }
                 tileColor={fila.cc}
                 title={fila.n}
                 subtitle={fila.s}
@@ -289,7 +300,9 @@ export function AbmDeConfiguracion({
       /* El nombre solo no alcanza: dos contactos homónimos duplicaban la key
          y React omitía filas. */
       rowKey={(f, i) => `${f.n}-${i ?? 0}`}
-      rowActions={[]}
+      rowActions={onEditarFila ? ([
+        { id: 'editar', label: 'Editar', icon: Pencil, onClick: (f) => onEditarFila(f) },
+      ] as RowAction<FilaSpec>[]) : []}
       onRowClick={onFila ? (f) => onFila(f, filas.indexOf(f)) : undefined}
       loading={loading || cargando}
       footer={{ showing: `Mostrando ${visibles.length} de ${filas.length}`, note: spec.pie }}

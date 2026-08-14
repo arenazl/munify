@@ -448,8 +448,19 @@ async def actualizar_dependencia_municipio(
         setattr(md, field, value)
 
     await db.commit()
-    await db.refresh(md)
-    return md
+    # Recargar con TODO lo que el response_model serializa: refresh() pierde
+    # las relaciones y el lazy-load durante la serialización (fuera del
+    # contexto async) revienta con MissingGreenlet → 500 con el update hecho.
+    result = await db.execute(
+        select(MunicipioDependencia)
+        .options(
+            selectinload(MunicipioDependencia.dependencia),
+            selectinload(MunicipioDependencia.categorias_asignadas)
+            .selectinload(MunicipioDependenciaCategoria.categoria),
+        )
+        .where(MunicipioDependencia.id == municipio_dependencia_id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/municipio/{municipio_dependencia_id}", status_code=status.HTTP_204_NO_CONTENT)

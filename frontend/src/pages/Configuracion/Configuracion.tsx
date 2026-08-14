@@ -16,6 +16,7 @@ import AsignacionDelCanvas from '../../components/config/AsignacionDelCanvas';
 import ArbolDelCanvas from '../../components/config/ArbolDelCanvas';
 import AbmDeConfiguracion from '../../components/config/AbmDeConfiguracion';
 import PuenteDeModulo from '../../components/config/PuenteDeModulo';
+import DependenciaSheet, { type DependenciaEditable } from '../../components/config/DependenciaSheet';
 import DemoDniCard from '../../components/config/DemoDniCard';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
@@ -245,6 +246,8 @@ export default function Configuracion() {
      sus datos sin que este contenedor sepa cómo los trae. */
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [recarga, setRecarga] = useState(0);
+  // Dependencia en edición (sheet del ADN: identidad + contacto local).
+  const [depEnEdicion, setDepEnEdicion] = useState<DependenciaEditable | null>(null);
   const SheetDeAlta = ALTA_DE_AJUSTE[hijoId];
 
   /* Contadores del riel. Los del árbol son del prototipo (Dependencias decía
@@ -584,8 +587,19 @@ export default function Configuracion() {
               // Sin sheet de alta no se dibuja el CTA: mejor sin botón que con
               // un botón que no hace nada.
               onNuevo={SheetDeAlta ? () => setAltaAbierta(true) : undefined}
+              // Dependencias edita su ADN (identidad + contacto) con el lápiz.
+              onEditarFila={hijoId === 'dependencias'
+                ? (fila) => setDepEnEdicion((fila.raw as DependenciaEditable) ?? null)
+                : undefined}
             />
           )}
+
+          <DependenciaSheet
+            open={depEnEdicion !== null}
+            dependencia={depEnEdicion}
+            onClose={() => setDepEnEdicion(null)}
+            onGuardado={() => setRecarga((r) => r + 1)}
+          />
 
           {tipo === 'arbol' && (
             <ArbolDelCanvas />
