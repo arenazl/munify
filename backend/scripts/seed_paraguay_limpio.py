@@ -11,9 +11,10 @@ Qué crea (idempotente — seguro de correr N veces; NO duplica):
   - Municipio "Asunción, Departamento Central" (codigo `asuncion`), branding verde,
     es_demo=True (expone la botonera de login rápido).
   - 20 categorías default (10 reclamo + 10 trámite).
-  - 5 dependencias operativas (Servicios Públicos, Obras Públicas, Tránsito, Zoonosis,
-    Seguridad) del catálogo global + su mapeo categoría → dependencia (cubre las 10
-    categorías de reclamo sin huérfanos).
+  - Las 12 dependencias del catálogo global habilitadas (organigrama COMPLETO), de las
+    cuales 5 son OPERATIVAS (Servicios Públicos, Obras Públicas, Tránsito, Zoonosis,
+    Seguridad) con supervisor y contenido demo + mapeo categoría → dependencia (cubre
+    las 10 categorías de reclamo sin huérfanos).
   - 68 barrios REALES del catálogo oficial VigiCanPY/MSPBS, geocodificados con
     Nominatim (66/68 con coords; 2 sin coord conocida quedan en NULL — nunca coords
     inventadas).
@@ -27,8 +28,9 @@ Qué crea (idempotente — seguro de correr N veces; NO duplica):
     DE TRABAJO (materiales, horas, estado, notas de cierre) y cruce con INVENTARIO
     (activos reservados + consumibles descontados). 2 casos trabados por falta de
     insumos (OT BLOQUEADA + nota explícita "a la espera de reposición de inventario").
-  - 10 trámites completos (con documentos requeridos) + 10 solicitudes en estados
-    variados (solicitante = vecinos), mapeadas a su dependencia cuando corresponde.
+  - 13 trámites completos (con documentos requeridos; TODA categoría de trámite queda
+    con al menos 1 tipo y TODO trámite con su dependencia) + 10 solicitudes en estados
+    variados (solicitante = vecinos), mapeadas a su dependencia.
   - Inventario (activos + consumibles) coherente con los materiales de las OT.
   - SLA configs por categoría.
   - TODOS los módulos opt-in HABILITADOS (visibles en el sidebar): ordenes_trabajo,
@@ -177,11 +179,36 @@ BARRIOS_ASUNCION = [
 ]
 
 # ============================================================
-# Dependencias operativas (5) + mapeo categoría de reclamo -> dependencia.
+# Dependencias: organigrama COMPLETO + subset operativo.
 # Los códigos existen en el catálogo global (services/dependencias_default.py).
-# El mapeo cubre las 10 categorías default sin huérfanos.
 # ============================================================
-DEPENDENCIAS = ["SERVICIOS_PUBLICOS", "OBRAS_PUBLICAS", "TRANSITO_VIAL", "ZOONOSIS", "SEGURIDAD"]
+# Se habilitan las 12 dependencias del catálogo canónico para que Asunción
+# tenga el organigrama real y completo (regla del dueño: catálogos SIEMPRE
+# completos — antes se habilitaban solo 5 y el organigrama quedaba mocho).
+DEPENDENCIAS = [
+    "ATENCION_VECINO",
+    "OBRAS_PUBLICAS",
+    "SERVICIOS_PUBLICOS",
+    "TRANSITO_VIAL",
+    "SEGURIDAD",
+    "ZOONOSIS",
+    "CATASTRO",
+    "RENTAS",
+    "HABILITACIONES",
+    "OBRAS_PARTICULARES",
+    "BROMATOLOGIA",
+    "DESARROLLO_SOCIAL",
+]
+
+# Subset OPERATIVO (curado): solo estas 5 reciben supervisor con login demo y
+# concentran los reclamos/OT de ejemplo. El resto del organigrama queda
+# habilitado (visible y asignable) pero sin bandeja cargada — el set operativo
+# de la demo sigue chico y curado (regla 3).
+DEPENDENCIAS_OPERATIVAS = [
+    "SERVICIOS_PUBLICOS", "OBRAS_PUBLICAS", "TRANSITO_VIAL", "ZOONOSIS", "SEGURIDAD",
+]
+
+# Mapeo categoría de reclamo -> dependencia (cubre las 10 default sin huérfanos).
 DEP_CATEGORIAS_MAP = {
     "SERVICIOS_PUBLICOS": [
         "Alumbrado público", "Recolección de residuos",
@@ -627,9 +654,19 @@ OTS_EXTRA = [
 ]
 
 # ============================================================
-# 10 trámites completos (categoria_tramite por nombre; docs requeridos).
-# `dep` = dependencia (de las 5 activas) que lo gestiona, o None si ninguna
-# de las 5 aplica (se mapea con MunicipioDependenciaTramite cuando hay dep).
+# 13 trámites completos (categoria_tramite por nombre; docs requeridos).
+# Regla del dueño: TODA categoría de trámite default tiene al menos 1 tipo y
+# TODO trámite tiene dependencia (`dep` NUNCA es None — con el organigrama de
+# 12 habilitado siempre hay una dep con afinidad semántica; el mapeo canónico
+# categoría→dep sale de TIPOS_A_DEPENDENCIAS de
+# scripts/seed_chacabuco_dependencias.py). Se mapea vía
+# MunicipioDependenciaTramite.
+# Los 3 últimos son de COMPLETITUD de catálogo (Catastro / Desarrollo Social /
+# Cementerios, que quedaban con 0 tipos): estructura desde los seeds canónicos
+# (scripts/seed_10_demos.py y scripts/seed_tramites_sugeridos.py); el costo en
+# guaraníes es valor DEMO en la escala de este archivo (la fuente canónica
+# trae precios argentinos). SOLICITUDES no los referencia, así el set
+# operativo sigue acotado (regla 3).
 # ============================================================
 TRAMITES = [
     {"nombre": "Licencia de conducir - Primera vez", "cat": "Tránsito y Transporte", "dep": "TRANSITO_VIAL",
@@ -643,13 +680,13 @@ TRAMITES = [
      "dias": 5, "costo": 180000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 20,
      "docs": [("Cédula de identidad", "Copia del documento", True),
               ("Licencia anterior", "Licencia a renovar", True)]},
-    {"nombre": "Habilitación comercial", "cat": "Habilitaciones Comerciales", "dep": None,
+    {"nombre": "Habilitación comercial", "cat": "Habilitaciones Comerciales", "dep": "HABILITACIONES",
      "descripcion": "Habilitación para la apertura de un nuevo comercio o actividad comercial.",
      "dias": 30, "costo": 450000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True),
               ("Plano del local", "Plano firmado por profesional", True),
               ("Constancia de RUC", "Inscripción tributaria vigente", True)]},
-    {"nombre": "Renovación de habilitación comercial", "cat": "Habilitaciones Comerciales", "dep": None,
+    {"nombre": "Renovación de habilitación comercial", "cat": "Habilitaciones Comerciales", "dep": "HABILITACIONES",
      "descripcion": "Renovación anual de la habilitación comercial vigente.",
      "dias": 10, "costo": 200000.0, "tipo_pago": "boton_pago", "modo": "presencial_sin_turno", "turno_min": 30,
      "docs": [("Habilitación anterior", "Constancia de la habilitación a renovar", True)]},
@@ -658,7 +695,7 @@ TRAMITES = [
      "dias": 20, "costo": 150000.0, "tipo_pago": "boton_pago", "modo": "presencial_sin_turno", "turno_min": 30,
      "docs": [("Cédula del propietario", "Copia del documento", True),
               ("Croquis de obra", "Plano o croquis firmado", True)]},
-    {"nombre": "Certificado de libre deuda municipal", "cat": "Tasas y Tributos", "dep": None,
+    {"nombre": "Certificado de libre deuda municipal", "cat": "Tasas y Tributos", "dep": "RENTAS",
      "descripcion": "Certificado que acredita la inexistencia de deudas con la Municipalidad.",
      "dias": 5, "costo": 60000.0, "tipo_pago": "boton_pago", "modo": "online", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True),
@@ -667,7 +704,7 @@ TRAMITES = [
      "descripcion": "Liquidación y pago de la tasa municipal de recolección de residuos.",
      "dias": 1, "costo": 90000.0, "tipo_pago": "boton_pago", "modo": "online", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True)]},
-    {"nombre": "Certificado de residencia", "cat": "Certificados y Documentación", "dep": None,
+    {"nombre": "Certificado de residencia", "cat": "Certificados y Documentación", "dep": "ATENCION_VECINO",
      "descripcion": "Constancia que acredita el domicilio del solicitante en la ciudad.",
      "dias": 3, "costo": 40000.0, "tipo_pago": "boton_pago", "modo": "presencial_sin_turno", "turno_min": 15,
      "docs": [("Cédula de identidad", "Copia del documento", True),
@@ -677,12 +714,28 @@ TRAMITES = [
      "dias": 12, "costo": 0.0, "tipo_pago": None, "modo": "presencial_sin_turno", "turno_min": 20,
      "docs": [("Cédula del solicitante", "Copia del documento", True),
               ("Foto del árbol", "Foto que muestre el estado del árbol", False)]},
-    {"nombre": "Habilitación de transporte de alimentos", "cat": "Salud y Bromatología", "dep": None,
+    {"nombre": "Habilitación de transporte de alimentos", "cat": "Salud y Bromatología", "dep": "BROMATOLOGIA",
      "descripcion": "Habilitación bromatológica de vehículos de transporte de alimentos.",
      "dias": 15, "costo": 300000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 30,
      "docs": [("Cédula del titular", "Copia del documento", True),
               ("Cédula verde del vehículo", "Documento del vehículo", True),
               ("Certificado de desinfección", "Emitido por empresa habilitada", True)]},
+    # --- Completitud de catálogo (categorías que quedaban con 0 tipos) ---
+    {"nombre": "Certificado catastral", "cat": "Catastro", "dep": "CATASTRO",
+     "descripcion": "Certificado con los datos catastrales del inmueble.",
+     "dias": 10, "costo": 80000.0, "tipo_pago": "boton_pago", "modo": "online", "turno_min": 30,
+     "docs": [("Cédula de identidad", "Copia del documento", True),
+              ("Título de propiedad o partida", "Documento que acredite la titularidad del inmueble", True)]},
+    {"nombre": "Tarjeta alimentaria", "cat": "Desarrollo Social", "dep": "DESARROLLO_SOCIAL",
+     "descripcion": "Inscripción al programa municipal de asistencia alimentaria.",
+     "dias": 15, "costo": 0.0, "tipo_pago": None, "modo": "presencial_sin_turno", "turno_min": 20,
+     "docs": [("Cédula de identidad", "Copia del documento", True),
+              ("Constancia de ingresos o informe social", "Documentación que respalde la situación socioeconómica", True)]},
+    {"nombre": "Concesión de parcela en cementerio", "cat": "Cementerios", "dep": "ATENCION_VECINO",
+     "descripcion": "Solicitud de concesión de parcela en el cementerio municipal.",
+     "dias": 30, "costo": 350000.0, "tipo_pago": "boton_pago", "modo": "presencial_con_turno", "turno_min": 30,
+     "docs": [("Cédula de identidad", "Copia del documento", True),
+              ("Certificado de defunción", "Documentación del fallecido", True)]},
 ]
 
 # 10 solicitudes de ejemplo: (indice_tramite, indice_vecino, estado)
@@ -747,7 +800,8 @@ async def _get_or_create_muni(db: AsyncSession) -> Municipio:
 
 
 # ============================================================
-# Dependencias (5) + mapeo categoría->dep. Idempotente por código.
+# Dependencias (las 12 del catálogo global) + mapeo categoría->dep.
+# Idempotente por código.
 # ============================================================
 async def _seed_dependencias(db: AsyncSession, muni_id: int, cats: dict) -> dict:
     cat_deps = (await db.execute(
@@ -828,9 +882,14 @@ async def _seed_usuarios(db: AsyncSession, muni_id: int, muni_deps: dict) -> dic
     admin = await ensure_user("admin@asuncion.demo.com", nombre="Administración",
                               apellido="Municipal", rol=RolUsuario.ADMIN)
 
-    # Un supervisor por dependencia (nombre bonito desde el catálogo).
+    # Un supervisor por dependencia OPERATIVA (nombre bonito desde el catálogo).
+    # Las demás dependencias del organigrama quedan sin login demo a propósito:
+    # habilitadas y asignables, pero sin bandeja cargada (regla 3).
     supervisores_by_dep = {}
-    for cod, md in muni_deps.items():
+    for cod in DEPENDENCIAS_OPERATIVAS:
+        md = muni_deps.get(cod)
+        if not md:
+            continue
         dep_obj = await db.get(Dependencia, md.dependencia_id)
         dep_nombre = dep_obj.nombre if dep_obj else cod
         sup = await ensure_user(

@@ -202,6 +202,134 @@ TRAMITES_DEMO = [
 ]
 
 # ============================================================
+# Completitud del catálogo de trámites (regla del dueño: NINGUNA categoría
+# de trámite queda con 0 tipos en la demo)
+# ============================================================
+# Mapeo categoría de trámite → dependencia responsable. Fuente canónica:
+# TIPOS_A_DEPENDENCIAS de scripts/seed_chacabuco_dependencias.py (el "mapeo
+# consciente" tipo de trámite → dependencia), traducido a los nombres default
+# de CATEGORIAS_TRAMITE_DEFAULT (services/categorias_seed.py). Se usa para los
+# trámites de TRAMITES_CATALOGO_EXTRA (los de TRAMITES_DEMO ya traen su
+# dep_codigo curado inline).
+CATEGORIA_TRAMITE_DEP_MAP = {
+    "Tránsito y Transporte": "TRANSITO_VIAL",
+    "Habilitaciones Comerciales": "HABILITACIONES",
+    "Obras Particulares": "OBRAS_PARTICULARES",
+    "Catastro": "CATASTRO",
+    "Tasas y Tributos": "RENTAS",
+    "Salud y Bromatología": "BROMATOLOGIA",
+    # "Espacio Público" → HABILITACIONES en la fuente (permisos de uso).
+    "Espacios Públicos": "HABILITACIONES",
+    # "Documentación Personal" → ATENCION_VECINO en la fuente.
+    "Certificados y Documentación": "ATENCION_VECINO",
+    "Desarrollo Social": "DESARROLLO_SOCIAL",
+    # "Cementerio" → ATENCION_VECINO en la fuente (no hay dep específica).
+    "Cementerios": "ATENCION_VECINO",
+}
+
+# Trámites de completitud: 1 tipo por cada categoría de trámite default que
+# TRAMITES_DEMO no cubre (Catastro, Salud y Bromatología, Espacios Públicos,
+# Certificados y Documentación, Desarrollo Social, Cementerios). Fuentes
+# canónicas: nombre/descripción/tiempo/costo de TRAMITES_CATALOGO de
+# scripts/seed_10_demos.py (el catálogo por categoría del pipeline de demos)
+# y documentos del rubro homólogo en scripts/seed_tramites_sugeridos.py.
+# `solo_catalogo=True` = completan el catálogo pero NO generan solicitudes de
+# ejemplo — el set operativo de la demo sigue curado y acotado (regla 3).
+TRAMITES_CATALOGO_EXTRA = [
+    {
+        "nombre": "Certificado de dominio",
+        "descripcion": "Solicitud de certificado de titularidad de un inmueble en el municipio.",
+        "categoria_tramite_nombre": "Catastro",
+        "tiempo_estimado_dias": 7,
+        "costo": 1500.0,
+        "tipo_pago": "rapipago",
+        "momento_pago": "fin",
+        "modo_atencion": "online",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Partida inmobiliaria", "Número de partida o título de propiedad del inmueble", True),
+        ],
+    },
+    {
+        "nombre": "Carnet de manipulación de alimentos",
+        "descripcion": "Certificado obligatorio para personal de gastronomía y comercios alimenticios.",
+        "categoria_tramite_nombre": "Salud y Bromatología",
+        "tiempo_estimado_dias": 7,
+        "costo": 2500.0,
+        "tipo_pago": "boton_pago",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_con_turno",
+        "duracion_turno_min": 30,
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Análisis clínicos", "Estudios exigidos por el área de bromatología", True),
+        ],
+    },
+    {
+        "nombre": "Permiso de uso de plaza",
+        "descripcion": "Autorización para realizar un evento público en plaza o espacio verde municipal.",
+        "categoria_tramite_nombre": "Espacios Públicos",
+        "tiempo_estimado_dias": 10,
+        "costo": 3000.0,
+        "tipo_pago": "boton_pago",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_sin_turno",
+        "solo_catalogo": True,
+        "documentos": [
+            ("Descripción del evento", "Detalle de la actividad, fecha y horario propuestos", True),
+            ("Seguro de responsabilidad civil", "Póliza que cubra el evento", True),
+        ],
+    },
+    {
+        "nombre": "Certificado de residencia",
+        "descripcion": "Acreditación de domicilio dentro del municipio para trámites administrativos.",
+        "categoria_tramite_nombre": "Certificados y Documentación",
+        "tiempo_estimado_dias": 2,
+        "costo": 500.0,
+        "tipo_pago": "rapipago",
+        "momento_pago": "fin",
+        "modo_atencion": "online",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Servicio a nombre del solicitante", "Factura de un servicio que acredite el domicilio", True),
+        ],
+    },
+    {
+        "nombre": "Tarjeta alimentaria",
+        "descripcion": "Inscripción al programa de asistencia alimentaria para familias en situación vulnerable.",
+        "categoria_tramite_nombre": "Desarrollo Social",
+        "tiempo_estimado_dias": 15,
+        "costo": 0.0,
+        "tipo_pago": None,
+        "momento_pago": None,
+        "modo_atencion": "presencial_sin_turno",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Constancia de AUH o ingresos", "Documentación que respalde la situación socioeconómica", True),
+        ],
+    },
+    {
+        "nombre": "Renovación de bóveda",
+        "descripcion": "Renovación del derecho de uso de bóveda familiar en el cementerio municipal.",
+        "categoria_tramite_nombre": "Cementerios",
+        "tiempo_estimado_dias": 5,
+        "costo": 12000.0,
+        "tipo_pago": "adhesion_debito",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_sin_turno",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Concesión anterior", "Constancia del derecho de uso a renovar", True),
+        ],
+    },
+]
+
+# ============================================================
 # Zonas (offsets sobre el centro del muni, ~2km de radio)
 # ============================================================
 ZONAS_DEMO = [
@@ -767,9 +895,11 @@ async def seed_demo_completo(
     )
     cats_tramite = {c.nombre: c for c in r.scalars().all()}
 
-    tramites_creados = []
-    tramite_to_dep: dict[int, int] = {}  # tramite.id → muni_dep.id (post-flush)
-    for i, t_data in enumerate(TRAMITES_DEMO):
+    # Se crean los trámites OPERATIVOS (TRAMITES_DEMO, con solicitudes/turnos)
+    # y los de COMPLETITUD (TRAMITES_CATALOGO_EXTRA): así ninguna categoría de
+    # trámite del default queda con 0 tipos.
+    tramites_creados: list[tuple] = []  # [(Tramite, t_data del seed)]
+    for i, t_data in enumerate(TRAMITES_DEMO + TRAMITES_CATALOGO_EXTRA):
         cat = cats_tramite.get(t_data["categoria_tramite_nombre"])
         if not cat:
             continue
@@ -801,13 +931,19 @@ async def seed_demo_completo(
             documentos_requeridos=docs,
         )
         db.add(tramite)
-        tramites_creados.append((tramite, t_data.get("dep_codigo")))
+        tramites_creados.append((tramite, t_data))
     await db.flush()
 
     # Mapeo trámite → dependencia (tabla pivot MunicipioDependenciaTramite).
     # Esto permite auto-asignar la dep al crear una solicitud desde el vecino.
+    # Regla: CERO trámites huérfanos — el dep_codigo curado del seed manda y,
+    # si el trámite no lo trae, se resuelve por su categoría con el mapa
+    # canónico CATEGORIA_TRAMITE_DEP_MAP.
     from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
-    for tramite, dep_codigo in tramites_creados:
+    for tramite, t_data in tramites_creados:
+        dep_codigo = t_data.get("dep_codigo") or CATEGORIA_TRAMITE_DEP_MAP.get(
+            t_data["categoria_tramite_nombre"]
+        )
         if not dep_codigo:
             continue
         muni_dep = muni_deps.get(dep_codigo)
@@ -819,8 +955,12 @@ async def seed_demo_completo(
             activo=True,
         ))
     await db.flush()
-    # Back-compat: resto del código espera list de Tramite
-    tramites_creados = [t for t, _ in tramites_creados]
+    # Solo los trámites de TRAMITES_DEMO llevan actividad de ejemplo
+    # (solicitudes) — los `solo_catalogo` completan el catálogo sin sumar
+    # ruido al set operativo curado (regla 3).
+    tramites_operativos = [
+        (t, d) for t, d in tramites_creados if not d.get("solo_catalogo")
+    ]
 
     # ------------------------------------------------------------------
     # 4. Crear usuarios demo
@@ -1199,7 +1339,8 @@ async def seed_demo_completo(
     reclamos_creados = len(reclamos_creados_list)
     await db.flush()
 
-    # 9. Solicitudes de ejemplo: 2 por trámite del catálogo (estados variados).
+    # 9. Solicitudes de ejemplo: 2 por trámite OPERATIVO (estados variados) —
+    # los trámites `solo_catalogo` no generan solicitudes (regla 3).
     # Genera datos de demo realistas. El vecino demo es solicitante de la mitad;
     # el resto se genera como "otro vecino" sin user asociado (solo datos de contacto).
     solicitudes_creadas = 0
@@ -1227,7 +1368,7 @@ async def seed_demo_completo(
         EstadoSolicitud.FINALIZADO,
     ]
 
-    for t_idx, tramite in enumerate(tramites_creados):
+    for t_idx, (tramite, t_data) in enumerate(tramites_operativos):
         for j in range(2):
             sol_idx = t_idx * 2 + j
             _sh = int(hashlib.sha1(f"{codigo}-sol-{sol_idx}".encode()).hexdigest(), 16)
@@ -1242,16 +1383,16 @@ async def seed_demo_completo(
             )
             _dni_sol = _dni_demo if es_del_vecino else str(30_000_000 + (_sh % 18_000_000))
 
-            # Buscar dep asignada para este trámite. Si no hay match, fallback
-            # a una dependencia random del muni para no dejar la solicitud
-            # huérfana (causaba que las queries por dependencia las omitieran).
+            # Buscar dep asignada para este trámite (el t_data del seed viaja
+            # junto al Tramite, así el índice nunca se desalinea). Si no hay
+            # match, fallback a una dependencia random del muni para no dejar
+            # la solicitud huérfana (las queries por dependencia la omitirían).
             dep_id_sol = None
-            if t_idx < len(TRAMITES_DEMO):
-                dep_code = TRAMITES_DEMO[t_idx].get("dep_codigo")
-                if dep_code:
-                    muni_dep_obj = muni_deps.get(dep_code)
-                    if muni_dep_obj:
-                        dep_id_sol = muni_dep_obj.id
+            dep_code = t_data.get("dep_codigo")
+            if dep_code:
+                muni_dep_obj = muni_deps.get(dep_code)
+                if muni_dep_obj:
+                    dep_id_sol = muni_dep_obj.id
             if dep_id_sol is None and muni_deps:
                 import random as _random
                 dep_id_sol = _random.choice(list(muni_deps.values())).id

@@ -190,16 +190,21 @@ async def _garantizar_asignaciones(db: AsyncSession, muni_id: int) -> dict:
     """La plantilla demo se muestra COMPLETA en Asignación: toda categoría de
     reclamo queda con dependencia y todo trámite con oficina del turnero.
 
-    El mapeo es determinístico por palabra clave (con fallback por índice),
-    igual criterio que el resto del script: nada de random, y en re-run no
-    toca lo que ya está asignado (solo completa huecos).
+    El mapeo es determinístico por palabra clave contra el CÓDIGO canónico de
+    la dependencia (services/dependencias_default.py) — nada de random ni de
+    reparto por índice — y en re-run no toca lo que ya está asignado (solo
+    completa huecos). El fallback es SIEMPRE Atención al Vecino (la mesa de
+    entradas que deriva; mismo criterio que "Otros" → ATENCION_VECINO en
+    scripts/seed_chacabuco_dependencias.py): el viejo fallback por índice
+    repartía huérfanas en cualquier dependencia y así nacían asignaciones
+    absurdas tipo "Bacheo → Zoonosis".
     """
     from models.dependencia import Dependencia
     from models.municipio_dependencia import MunicipioDependencia
     from models.municipio_dependencia_categoria import MunicipioDependenciaCategoria
 
     deps_rows = (await db.execute(
-        select(MunicipioDependencia, Dependencia.nombre)
+        select(MunicipioDependencia, Dependencia.codigo)
         .join(Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
         .where(
             MunicipioDependencia.municipio_id == muni_id,
@@ -210,35 +215,59 @@ async def _garantizar_asignaciones(db: AsyncSession, muni_id: int) -> dict:
     if not deps_rows:
         print("[asignaciones] el municipio no tiene dependencias — nada que asignar")
         return {"cats": 0, "tramites": 0}
+    md_por_codigo = {cod: md for md, cod in deps_rows}
 
-    # Qué dependencia atiende cada cosa, por vocabulario. El orden importa:
-    # la primera regla que matchea gana.
+    # Qué dependencia (por código canónico) atiende cada cosa, por vocabulario.
+    # El orden importa: la primera regla que matchea gana — las más específicas
+    # van primero (ej. "transporte de alimentos" es Bromatología, no Tránsito).
+    # Cada regla lista códigos en orden de preferencia: si el muni no tiene la
+    # dependencia preferida habilitada, prueba la siguiente.
     REGLAS = [
+        (("bromatolog", "alimento", "libreta sanitaria"),
+         ("BROMATOLOGIA", "SERVICIOS_PUBLICOS")),
+        # Ruidos ANTES que Tránsito: la descripción de "Ruidos y convivencia"
+        # menciona "vehículos" y caía absurda en Tránsito si se evaluaba después.
+        (("ruido", "convivencia", "seguridad"),
+         ("SEGURIDAD",)),
         (("transito", "tránsito", "semaforo", "semáforo", "vehiculo", "vehículo",
-          "estacionamiento", "señalizacion", "señalización", "licencia", "transporte"),
-         ("tránsito", "transito", "movilidad")),
+          "estacionamiento", "señaliza", "senaliza", "licencia", "transporte"),
+         ("TRANSITO_VIAL",)),
         (("animal", "plaga", "zoonosis", "mascota", "fumig"),
-         ("zoonosis", "salud animal")),
-        (("ruido", "convivencia", "seguridad", "cableado"),
-         ("seguridad",)),
-        (("bache", "vereda", "obra", "calzada", "pavimento", "construccion",
-          "construcción", "catastro", "mensura", "dominio"),
-         ("obras",)),
-        (("alumbrado", "higiene", "residuo", "basura", "arbolado", "plaza",
-          "espacio", "agua", "cloaca", "desague", "desagüe", "poda", "ambiente",
-          "recoleccion", "recolección", "habilitacion", "habilitación", "tasa",
-          "certificado", "residencia"),
-         ("servicios", "ambiente")),
+         ("ZOONOSIS",)),
+        (("catastr", "mensura", "dominio", "parcelario", "inmueble", "nomenclatura"),
+         ("CATASTRO",)),
+        (("tasa", "tributo", "deuda", "boleta", "contribuyente", "moratoria"),
+         ("RENTAS",)),
+        (("habilitacion", "habilitación", "comercio", "publicitari", "feria", "evento"),
+         ("HABILITACIONES",)),
+        (("social", "alimentaria", "subsidio", "beca", "pension", "pensión"),
+         ("DESARROLLO_SOCIAL",)),
+        (("obra menor", "construccion", "construcción", "refaccion", "refacción",
+          "plano", "demolicion", "demolición"),
+         ("OBRAS_PARTICULARES", "OBRAS_PUBLICAS")),
+        (("bache", "vereda", "obra", "calzada", "pavimento", "zanja"),
+         ("OBRAS_PUBLICAS",)),
+        (("cementerio", "boveda", "bóveda", "inhumacion", "inhumación",
+          "certificado", "residencia", "documentacion", "documentación",
+          "constancia", "expediente"),
+         ("ATENCION_VECINO",)),
+        (("alumbrado", "luminaria", "higiene", "residuo", "basura", "arbolado",
+          "plaza", "espacio", "agua", "cloaca", "desague", "desagüe", "poda",
+          "ambiente", "recolec"),
+         ("SERVICIOS_PUBLICOS",)),
     ]
 
-    def dep_para(texto: str, fallback_idx: int):
+    def dep_para(texto: str):
         t = texto.lower()
-        for claves, claves_dep in REGLAS:
+        for claves, codigos in REGLAS:
             if any(k in t for k in claves):
-                for md, nombre in deps_rows:
-                    if any(kd in nombre.lower() for kd in claves_dep):
+                for cod in codigos:
+                    md = md_por_codigo.get(cod)
+                    if md:
                         return md
-        return deps_rows[fallback_idx % len(deps_rows)][0]
+        # Sin match semántico: a la mesa de entradas, nunca a una dependencia
+        # arbitraria. Si el muni no tiene Atención al Vecino, la primera.
+        return md_por_codigo.get("ATENCION_VECINO") or deps_rows[0][0]
 
     # 1) Categorías de reclamo sin dependencia
     cats = (await db.execute(
@@ -253,10 +282,10 @@ async def _garantizar_asignaciones(db: AsyncSession, muni_id: int) -> dict:
         )
     )).scalars().all())
     cats_nuevas = 0
-    for i, c in enumerate(cats):
+    for c in cats:
         if c.id in ya_asignadas:
             continue
-        md = dep_para(f"{c.nombre} {c.descripcion or ''}", i)
+        md = dep_para(f"{c.nombre} {c.descripcion or ''}")
         db.add(MunicipioDependenciaCategoria(
             municipio_id=muni_id,
             dependencia_id=md.dependencia_id,
@@ -280,10 +309,10 @@ async def _garantizar_asignaciones(db: AsyncSession, muni_id: int) -> dict:
         )
     )).scalars().all())
     trams_nuevos = 0
-    for i, t in enumerate(trams):
+    for t in trams:
         if t.id in con_oficina:
             continue
-        md = dep_para(t.nombre, i)
+        md = dep_para(t.nombre)
         db.add(MunicipioDependenciaTramite(
             municipio_dependencia_id=md.id,
             tramite_id=t.id,
