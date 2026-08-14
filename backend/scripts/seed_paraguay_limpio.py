@@ -1617,9 +1617,13 @@ async def _seed_tramites(db: AsyncSession, muni_id: int, cats_tram: dict,
 # ============================================================
 async def _seed_solicitudes(db: AsyncSession, muni_id: int, usuarios: dict,
                            muni_deps: dict) -> int:
-    # Borrar solicitudes previas del muni (y su historial) para recrearlas ricas.
-    await db.execute(text("DELETE FROM historial_solicitudes WHERE solicitud_id IN "
-                          "(SELECT id FROM solicitudes WHERE municipio_id = :m)"), {"m": muni_id})
+    # Borrar solicitudes previas del muni (y TODAS sus hijas por FK, en orden)
+    # para recrearlas ricas. Las hijas son las 4 que referencian solicitudes
+    # en el schema (documentos, historial, pagos, turnos): con el uso real de
+    # la demo cualquiera puede tener filas.
+    for hija in ("documentos_solicitudes", "historial_solicitudes", "pago_sesiones", "turnos"):
+        await db.execute(text(f"DELETE FROM {hija} WHERE solicitud_id IN "
+                              "(SELECT id FROM solicitudes WHERE municipio_id = :m)"), {"m": muni_id})
     await db.execute(text("DELETE FROM solicitudes WHERE municipio_id = :m"), {"m": muni_id})
     await db.flush()
 
