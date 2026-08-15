@@ -18,9 +18,13 @@ import { BrandMark } from '../brands/BrandMark';
  *   3. Lo persiste (localStorage + IndexedDB) para que `/login` lo levante.
  *   4. Redirige a `/login`.
  *   Si el código no existe -> vuelve a `/demo`.
+ *
+ * El código llega por la URL o, cuando la marca tiene ruta propia y el path no
+ * lo nombra (`/py/asuncion`), por prop desde el router.
  */
-export default function MunicipioAcceso() {
-  const { codigo } = useParams<{ codigo: string }>();
+export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: string } = {}) {
+  const { codigo: codigoDeLaUrl } = useParams<{ codigo: string }>();
+  const codigo = codigoFijo || codigoDeLaUrl;
   const navigate = useNavigate();
   const [error, setError] = useState(false);
 

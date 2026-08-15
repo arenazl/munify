@@ -3,13 +3,15 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
 import ReclamoLegacyRedirect from './components/ReclamoLegacyRedirect';
-import { BRAND } from './brands';
+import { BRAND, ACCESOS_DE_MARCA, rutaDeAcceso } from './brands';
 
 // Mono-tenant (BRAND.municipioCodigo presente): el "home" de la marca es el
 // acceso directo a SU municipio (login con botonera), nunca el generador de
 // demos ni la grilla de Munify. El ruteo cerrado se deriva de esa propiedad
 // semántica del brand, no de un flag "soy white-label".
-const BRAND_HOME = BRAND.municipioCodigo ? `/${BRAND.municipioCodigo}` : '/login';
+// La ruta puede no ser `/<codigo>`: una marca con `rutaAcceso` entra por la
+// suya (`/py/asuncion`) para no pisarse con otra marca del mismo municipio.
+const BRAND_HOME = BRAND.municipioCodigo ? (rutaDeAcceso(BRAND) as string) : '/login';
 
 // Pages
 import Landing from './pages/Landing';
@@ -450,6 +452,14 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // Accesos de marca con ruta propia (/py/asuncion -> muni 'asuncion' con la
+  // marca Munify). Van ANTES del comodín de un tramo y llevan el código
+  // adentro, porque el path ya no lo dice.
+  ...ACCESOS_DE_MARCA.map(({ ruta, codigo }) => ({
+    path: ruta,
+    element: <MunicipioAcceso codigo={codigo} />,
+  })),
 
   // Acceso directo por código de municipio: /<codigo> -> login del muni.
   // Va al final: las rutas estáticas de arriba tienen prioridad de match.
