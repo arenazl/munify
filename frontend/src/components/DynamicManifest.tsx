@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { loadMunicipioSync } from '../utils/municipioStorage';
-import { BRAND } from '../brands';
+import { BRAND, rutaDeAcceso } from '../brands';
 
 /**
  * Componente que actualiza el manifest de la PWA, el `<title>` del documento,
@@ -84,9 +84,13 @@ export default function DynamicManifest() {
           name: BRAND.name,
           short_name: BRAND.name,
           description: BRAND.tagline || BRAND.title,
-          // Con municipio conocido, la PWA arranca directo en su home; si no,
-          // en la raíz (el ruteo mono-tenant resuelve solo).
-          start_url: data?.codigo ? `${origin}/home?municipio=${data.codigo}` : `${origin}/`,
+          // La PWA arranca SIEMPRE por la puerta de la marca (`/py/asuncion`,
+          // `/asuncion`), no por una ruta genérica. La marca se resuelve por el
+          // PATH: con `start_url` en `/home?municipio=...` la app instalada
+          // abría sin marca — como Munify multi-tenant — y terminaba en el
+          // generador de demos. Con la ruta de la marca, el arranque es siempre
+          // el mismo y siempre correcto. Sin ruta propia (Munify), la raíz.
+          start_url: `${origin}${rutaDeAcceso(BRAND) ?? '/'}`,
           display: 'standalone',
           background_color: '#ffffff', // splash a juego con los tiles blancos del icono
           theme_color: BRAND.primary,

@@ -142,6 +142,21 @@ const HOST_TO_BRAND: Record<string, string> = {
 
 /** Dónde se recuerda la marca elegida por URL, mientras dure la pestaña. */
 const CLAVE_MARCA_SESION = 'brand_id';
+/** Ídem, pero PERSISTENTE — sólo se lee con la PWA instalada (ver abajo). */
+const CLAVE_MARCA_INSTALADA = 'brand_id_pwa';
+
+/** ¿La app corre como PWA instalada (sin barra de direcciones)? */
+function esAppInstalada(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return (
+      window.matchMedia?.('(display-mode: standalone)').matches === true ||
+      (window.navigator as { standalone?: boolean }).standalone === true
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Tramos de la ruta de entrada: 'py/asuncion' -> ['py', 'asuncion']. */
 function tramosDeAcceso(b: Brand): string[] {
@@ -227,9 +242,13 @@ function resolveBrandId(): string {
     if (porRuta) {
       try {
         window.sessionStorage.setItem(CLAVE_MARCA_SESION, porRuta.id);
+        // Persistente: la PWA instalada arranca sin que nadie escriba la URL,
+        // así que necesita recordar por qué puerta entró. En el navegador NO se
+        // lee (ver abajo), para que la URL siga mandando siempre.
+        window.localStorage.setItem(CLAVE_MARCA_INSTALADA, porRuta.id);
       } catch {
-        // Navegación privada sin sessionStorage: la marca vale para esta
-        // vista igual, sólo no sobrevive al cambio de ruta.
+        // Navegación privada sin storage: la marca vale para esta vista igual,
+        // sólo no sobrevive al cambio de ruta.
       }
       return porRuta.id;
     }
@@ -239,6 +258,21 @@ function resolveBrandId(): string {
       if (recordada && BRANDS[recordada]) return recordada;
     } catch {
       // Sin sessionStorage se sigue con el resto de la cadena.
+    }
+
+    // PWA instalada: no hay barra de direcciones donde escribir otra URL, y el
+    // arranque puede caer en un path que no nombra la marca (`/gestion`, `/login`
+    // tras un cierre). Sin esto, la app instalada de la demo abría como Munify
+    // genérico y terminaba en el generador de demos. En el navegador esta clave
+    // se IGNORA a propósito: ahí la URL es la fuente de verdad y recordar una
+    // marca dejaría el dominio pegado a ella.
+    if (esAppInstalada()) {
+      try {
+        const instalada = window.localStorage.getItem(CLAVE_MARCA_INSTALADA);
+        if (instalada && BRANDS[instalada]) return instalada;
+      } catch {
+        // sin localStorage: sigue la cadena
+      }
     }
   }
   const env = (import.meta.env.VITE_BRAND as string | undefined)?.trim();
