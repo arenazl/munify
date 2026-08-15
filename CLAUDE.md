@@ -106,6 +106,17 @@ Inventario completo y demás reemplazos: **BUILD_GUIDE.md §5 y §6**.
 - Lista + Sheet en la misma ruta. Click en card abre Sheet en modo edición.
 - **NUNCA** rutas `/<entidad>/nuevo`, `/<entidad>/:id`, `/<entidad>/:id/edit`.
 
+### 6.bis. Pantallas NUEVAS = kit abmv2. `ABMPage` es LEGACY.
+Toda pantalla nueva se arma con el kit `components/abmv2/` — `SemanticAbmPage`
+como composición mayor, o sus PIEZAS sueltas (hero semántico y sus variantes,
+strip de 5 KPIs con veredictos, acciones por frase, filtros, las tres vistas,
+`DataTable` con sus kinds, `SideModal`, píldoras adaptativas↔combo,
+`IconColorPicker`). Es un gran componente hecho de partes: una pantalla puede
+usar una pieza o todo. **Prohibido implementar pantallas nuevas sobre
+`components/ui/ABMPage`** (queda sólo para las viejas aún no migradas).
+*Why:* el dueño detectó implementaciones nuevas cayendo al ABMPage viejo
+(2026-08-14). El estándar estético vive en el kit, no en cada pantalla.
+
 ### 7. Multi-tenant (backend)
 - TODA query con `municipio_id` filtra por `current_user.municipio_id`. Sin excepciones.
 
