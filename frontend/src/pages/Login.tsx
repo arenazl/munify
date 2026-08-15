@@ -9,6 +9,7 @@ import { API_URL } from '../lib/api';
 import { fetchJsonRetry } from '../lib/fetchRetry';
 import { BRAND, marcaDeMunicipio } from '../brands';
 import { BrandMark } from '../brands/BrandMark';
+import { mix } from '../lib/colorUtils';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -236,7 +237,31 @@ export default function Login() {
   // auth (handleSubmit, quickLogin, Google) del login estándar. La marca elige
   // este layout por su config (BRAND.loginLayout), no por un flag white-label.
   if (BRAND.loginLayout === 'split') {
-    const accent = municipioColor;
+    // Esta pantalla es la PORTADA DE LA MARCA, no la del municipio: el acento
+    // sale de `BRAND.primary` y no del color guardado en la ficha del muni.
+    // Importa cuando dos marcas comparten tenant — la demo Munify vive sobre el
+    // municipio de Paraguay Limpio, cuyo `color_primario` es verde, y sin esto
+    // se pintaba de verde una pantalla que es azul. Para Paraguay Limpio da el
+    // mismo color de siempre (su `primary` ES el verde de la ficha).
+    const accent = BRAND.primary;
+    // Fondos del hero TEÑIDOS con el acento sobre un casi-negro neutro. Antes
+    // eran tres verdes fijos, que es justo lo que no puede tener un shell
+    // white-label. Las proporciones están elegidas para reproducir los verdes
+    // originales de Paraguay Limpio.
+    const tintaBase = '#05070a';
+    const fondoHero = mix(tintaBase, accent, 0.10);
+    const gradienteHero = `linear-gradient(160deg, ${mix(tintaBase, accent, 0.28)} 0%, ${mix(tintaBase, accent, 0.15)} 60%, ${fondoHero} 100%)`;
+    // Tramo acentuado del nombre: el MISMO token que usa el sidebar
+    // (`BRAND.accent`), para que el lockup no viva en dos verdes distintos.
+    const nameAccent = BRAND.accent || accent;
+    // Marcas de una sola palabra: el corte lo da `nameAccentIndex`, igual que
+    // en el sidebar ("Muni" + "fy"). Las multi-palabra cortan por el espacio.
+    const [nombreBase, nombreAcento] = (() => {
+      const partes = BRAND.name.split(' ');
+      if (partes.length > 1) return [partes[0], ` ${partes.slice(1).join(' ')}`];
+      const corte = BRAND.nameAccentIndex;
+      return corte ? [BRAND.name.slice(0, corte), BRAND.name.slice(corte)] : [BRAND.name, ''];
+    })();
     const features = [
       { Icon: AlertCircle, t: 'Reportá', s: 'RECLAMOS EN 1 MINUTO' },
       { Icon: Building2, t: 'Seguí', s: 'ESTADO EN TIEMPO REAL' },
@@ -244,11 +269,11 @@ export default function Login() {
       { Icon: Wrench, t: 'Resolvé', s: 'CUADRILLAS Y OT' },
     ];
     return (
-      <div className="min-h-screen w-full flex flex-col lg:flex-row text-white" style={{ background: '#06130b' }}>
+      <div className="min-h-screen w-full flex flex-col lg:flex-row text-white" style={{ background: fondoHero }}>
         {/* ===== HERO (izquierda) ===== */}
         <div
           className="relative lg:w-1/2 flex flex-col justify-between gap-10 p-8 sm:p-12 lg:p-16 overflow-hidden"
-          style={{ background: 'linear-gradient(160deg, #0d2a1a 0%, #071a0f 60%, #06130b 100%)' }}
+          style={{ background: gradienteHero }}
         >
           <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-25" style={{ background: accent }} />
           <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full blur-3xl opacity-10" style={{ background: accent }} />
@@ -261,10 +286,8 @@ export default function Login() {
             <BrandMark size={82} className="flex-shrink-0" />
             <div className="leading-tight">
               <div className="text-[32px] font-extrabold tracking-tight" style={{ fontFamily: BRAND.nameFont }}>
-                <span className="text-white">{BRAND.name.split(' ')[0]}</span>
-                {BRAND.name.split(' ').length > 1 && (
-                  <span style={{ color: '#6fce85' }}> {BRAND.name.split(' ').slice(1).join(' ')}</span>
-                )}
+                <span className="text-white">{nombreBase}</span>
+                {nombreAcento !== '' && <span style={{ color: nameAccent }}>{nombreAcento}</span>}
               </div>
               <div className="text-[10px] font-semibold tracking-[0.25em] mt-1" style={{ color: accent }}>PLATAFORMA CIUDADANA</div>
             </div>
@@ -276,7 +299,7 @@ export default function Login() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.03]" style={{ fontFamily: BRAND.nameFont }}>
               De tu reclamo<br />a la <span style={{ color: accent }}>solución.</span>
             </h1>
-            <p className="mt-6 text-base lg:text-lg text-emerald-50/70 leading-relaxed">
+            <p className="mt-6 text-base lg:text-lg text-white/70 leading-relaxed">
               {BRAND.tagline || 'Reclamos, trámites y seguimiento en tiempo real, en una sola plataforma.'}
             </p>
 
@@ -285,13 +308,13 @@ export default function Login() {
                 <div key={t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
                   <Icon className="h-5 w-5 mb-2" style={{ color: accent }} />
                   <div className="font-bold text-sm">{t}</div>
-                  <div className="text-[10px] text-emerald-50/45 tracking-wide mt-0.5">{s}</div>
+                  <div className="text-[10px] text-white/45 tracking-wide mt-0.5">{s}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="relative flex items-center gap-2 text-[11px] text-emerald-50/40">
+          <div className="relative flex items-center gap-2 text-[11px] text-white/40">
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: accent }} />
             Sistema operativo · SSL · JWT 24h · 2026 {BRAND.name}
           </div>
@@ -304,7 +327,7 @@ export default function Login() {
               <Sparkles className="h-6 w-6" style={{ color: accent }} />
             </div>
             <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
-            <p className="text-emerald-50/60 mt-1 mb-6">Elegí un perfil para entrar a la demo</p>
+            <p className="text-white/60 mt-1 mb-6">Elegí un perfil para entrar a la demo</p>
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/25 text-red-300 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
@@ -315,7 +338,7 @@ export default function Login() {
               const vecinos = demoUsers.filter(u => u.rol === 'vecino');
               const empleados = demoUsers.filter(u => u.rol === 'empleado');
               const Heading = ({ t }: { t: string }) => (
-                <div className="text-[10px] font-bold tracking-[0.2em] text-emerald-50/40 mb-2">{t}</div>
+                <div className="text-[10px] font-bold tracking-[0.2em] text-white/40 mb-2">{t}</div>
               );
               return (
                 <div className="space-y-4 mb-5">
@@ -328,7 +351,7 @@ export default function Login() {
                         onClick={() => quickLogin(u.email, 'demo123')}
                         disabled={loading}
                         className="w-full flex items-center gap-3 p-3.5 rounded-2xl text-left transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 shadow-lg"
-                        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#06130b' }}
+                        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: fondoHero }}
                       >
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-black/15">
                           <Shield className="h-5 w-5" />
@@ -360,11 +383,11 @@ export default function Login() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-bold text-white truncate">{dep.nombre_dependencia}</div>
-                              <div className="text-[11px] text-emerald-50/50 truncate">
+                              <div className="text-[11px] text-white/50 truncate">
                                 {dep.reclamos_count} {dep.reclamos_count === 1 ? 'reclamo' : 'reclamos'} · {dep.tramites_count} {dep.tramites_count === 1 ? 'trámite' : 'trámites'}
                               </div>
                             </div>
-                            <ChevronRight className="h-4 w-4 text-emerald-50/30 flex-shrink-0" />
+                            <ChevronRight className="h-4 w-4 text-white/30 flex-shrink-0" />
                           </button>
                         ))}
                       </div>
@@ -390,7 +413,7 @@ export default function Login() {
                             </div>
                             <div className="min-w-0 w-full">
                               <div className="text-[11px] font-bold text-white truncate">{u.nombre}</div>
-                              <div className="text-[9px] text-emerald-50/45 truncate">Ciudadano</div>
+                              <div className="text-[9px] text-white/45 truncate">Ciudadano</div>
                             </div>
                           </button>
                         ))}
@@ -417,7 +440,7 @@ export default function Login() {
                             </div>
                             <div className="min-w-0">
                               <div className="text-[11px] font-bold text-white truncate">{u.nombre_completo}</div>
-                              <div className="text-[9px] text-emerald-50/45 truncate">Órdenes de trabajo</div>
+                              <div className="text-[9px] text-white/45 truncate">Órdenes de trabajo</div>
                             </div>
                           </button>
                         ))}
@@ -430,7 +453,7 @@ export default function Login() {
 
             <div className="flex items-center gap-3 my-5">
               <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] tracking-[0.2em] text-emerald-50/40">O</span>
+              <span className="text-[10px] tracking-[0.2em] text-white/40">O</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
 
@@ -448,7 +471,7 @@ export default function Login() {
               )}
             </button>
 
-            <p className="text-center text-emerald-50/40 text-xs mt-6">
+            <p className="text-center text-white/40 text-xs mt-6">
               {demoUsers.length > 0 ? 'Acceso de demostración' : 'Acceso'} · {municipioNombre}
             </p>
           </div>
