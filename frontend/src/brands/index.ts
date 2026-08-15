@@ -118,6 +118,12 @@ const BRANDS: Record<string, Brand> = {
     municipioCodigo: 'asuncion',
     rutaAcceso: 'py/asuncion',
     loginLayout: 'split', // el hero de acceso de la demo, con identidad Munify
+    // PWA con identidad Munify: con `iconPath` el manifest entra por la rama de
+    // MARCA (nombre "Munify", theme_color azul, apple-touch-icon y meta de
+    // título de iOS propios). Sin esto caía en la rama del municipio y la app
+    // instalada se guardaba como "Asunción, Dpto. Central" con la barra en el
+    // verde de la ficha. `icons/` es el set estático de Munify, ya completo.
+    iconPath: 'icons',
     // Identidad de color de MARCA, no del municipio: la ficha del muni 146
     // guarda el verde de Paraguay Limpio (`color_primario` #1b7a3d) y sin esto
     // la demo arrancaría verde. El acento que elija el usuario en Apariencia
@@ -160,6 +166,24 @@ function marcaPorRuta(pathname: string): Brand | null {
     if (slug.every((tramo, i) => tramos[i] === tramo)) return b;
   }
   return null;
+}
+
+/**
+ * Qué logo institucional corresponde mostrar: el del municipio, o ninguno
+ * porque manda la marca. ÚNICO punto de decisión — el shell (desktop, mobile,
+ * dashboard del vecino) pregunta acá en vez de leer `logo_url` crudo.
+ *
+ * En una marca MONO-TENANT la identidad visual la pone la marca, no la ficha
+ * del municipio: dos marcas pueden compartir el mismo tenant (Paraguay Limpio
+ * y la demo Munify viven las dos sobre el municipio 146, cuya ficha guarda el
+ * logo de Paraguay Limpio). Devolver null hace que el shell caiga en
+ * `BrandMark`, que ya resuelve el logo de la marca activa.
+ *
+ * Munify multi-tenant no cambia: sigue mostrando el logo que cargó cada muni.
+ */
+export function logoDelMunicipio(url?: string | null): string | null {
+  if (BRAND.municipioCodigo) return null;
+  return url || null;
 }
 
 /** Ruta de entrada de una marca mono-tenant ('/py/asuncion'), o null. */

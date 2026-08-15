@@ -9,7 +9,7 @@ import { alpha, lighten } from '../lib/colorUtils';
 import { BentoMenu, type BentoItem } from './ui/BentoMenu';
 import { getNavigation, isMobileDevice } from '../config/navigation';
 import { BrandMark } from '../brands/BrandMark';
-import { BRAND } from '../brands';
+import { BRAND, logoDelMunicipio } from '../brands';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { useNavBadges } from './shell/useNavBadges';
 import { PageTransition } from './ui/PageTransition';
@@ -879,28 +879,23 @@ export default function Layout() {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Centro: Logo + Nombre del municipio. Marca con logo propio
-              (white-label) → el SVG de marca limpio, sin recuadro. Munify →
-              logo_url del muni en su badge, como siempre. */}
+          {/* Centro: Logo + Nombre del municipio. Quién manda lo decide
+              `logoDelMunicipio` (único punto): en marca mono-tenant devuelve
+              null y va el SVG de marca limpio, sin recuadro; en Munify
+              multi-tenant, el logo del muni en su badge, como siempre. */}
           <div className="flex-1 flex items-center justify-center gap-2 mx-2">
-            {BRAND.Logo ? (
-              <BrandMark size={26} className="flex-shrink-0" />
-            ) : (
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${theme.primary}20` }}
-              >
-                {municipioActual?.logo_url ? (
-                  <img
-                    src={municipioActual.logo_url}
-                    alt={municipioActual.nombre}
-                    className="w-5 h-5 object-contain"
-                  />
-                ) : (
-                  <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
-                )}
-              </div>
-            )}
+            {(() => {
+              const logoMuni = logoDelMunicipio(municipioActual?.logo_url);
+              if (!logoMuni) return <BrandMark size={26} className="flex-shrink-0" />;
+              return (
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${theme.primary}20` }}
+                >
+                  <img src={logoMuni} alt={municipioActual?.nombre} className="w-5 h-5 object-contain" />
+                </div>
+              );
+            })()}
             <h1 className="text-sm font-semibold truncate" style={{ color: theme.text }}>
               {municipioActual?.nombre?.replace('Municipalidad de ', '') || 'Municipio'}
             </h1>

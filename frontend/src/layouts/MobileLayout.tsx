@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home, Plus, ClipboardList, User, LogOut, FileCheck, Building2, Loader2 } from 'lucide-react';
+import { Home, Plus, ClipboardList, User, LogOut, FileCheck, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 // alpha() entiende cualquier formato de color; pegar digitos al final de
 // un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
 import { alpha } from '../lib/colorUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificacionesDropdown } from '../components/NotificacionesDropdown';
+import { BrandMark } from '../brands/BrandMark';
+import { logoDelMunicipio } from '../brands';
 import { FabActionSheet } from '../components/mobile/FabActionSheet';
 import { API_URL } from '../lib/api';
 
@@ -90,8 +92,11 @@ export default function MobileLayout() {
     || localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '')
     || 'Mi Municipio';
 
-  // Logo y color del municipio
-  const logoUrl = municipioActual?.logo_url || null;
+  // Logo y color del municipio. El logo pasa por `logoDelMunicipio`: en una
+  // marca mono-tenant manda la marca y devuelve null (el header cae en
+  // BrandMark) — si no, la demo Munify sobre el municipio de Paraguay Limpio
+  // mostraría el logo de la otra marca.
+  const logoUrl = logoDelMunicipio(municipioActual?.logo_url);
   const colorPrimario = municipioActual?.color_primario || theme.primary;
 
   const tabs = [
@@ -117,25 +122,24 @@ export default function MobileLayout() {
         {/* Espacio izquierdo (para balance visual) */}
         <div className="w-10"></div>
 
-        {/* Centro: Logo + Nombre del municipio */}
+        {/* Centro: Logo + Nombre del municipio. Sin logo del muni (marca
+            mono-tenant o municipio que no cargó el suyo) va la marca activa,
+            SUELTA: el badge con fill es para la imagen del municipio, no para
+            un logo de marca. */}
         <div className="flex-1 flex items-center justify-center gap-2">
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: `linear-gradient(135deg, ${alpha(colorPrimario, 0.15)}, ${alpha(colorPrimario, 0.06)})`,
-              border: `1px solid ${alpha(colorPrimario, 0.19)}`,
-            }}
-          >
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={nombreMunicipio}
-                className="w-5 h-5 object-contain"
-              />
-            ) : (
-              <Building2 className="h-4 w-4" style={{ color: colorPrimario }} />
-            )}
-          </div>
+          {logoUrl ? (
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: `linear-gradient(135deg, ${alpha(colorPrimario, 0.15)}, ${alpha(colorPrimario, 0.06)})`,
+                border: `1px solid ${alpha(colorPrimario, 0.19)}`,
+              }}
+            >
+              <img src={logoUrl} alt={nombreMunicipio} className="w-5 h-5 object-contain" />
+            </div>
+          ) : (
+            <BrandMark size={26} className="flex-shrink-0" />
+          )}
           <h1 className="text-sm font-semibold truncate" style={{ color: theme.text }}>
             {nombreMunicipio}
           </h1>
