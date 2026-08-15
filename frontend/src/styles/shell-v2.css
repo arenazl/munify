@@ -95,8 +95,14 @@
   text-overflow: ellipsis;
 }
 
-/* El tramo acentuado del nombre lleva el color de MARCA (BRAND.accent),
-   que es un valor runtime — va inline en el componente. */
+/* El tramo acentuado del nombre ("fy" de Munify, "Limpio" de Paraguay Limpio)
+   sigue el ACENTO ACTIVO del tema, no un color fijo de marca: si el usuario
+   elige otro acento en Apariencia, el nombre acompaña. `--pl-green` es el
+   token del acento vivo (nombre heredado del kit, el valor es theme.primary).
+   Antes iba inline con `BRAND.accent` y quedaba verde sobre cualquier tema. */
+.sv2-nombre-acento {
+  color: var(--pl-green);
+}
 
 .sv2-subtitulo {
   font-size: var(--pl-fs-micro);

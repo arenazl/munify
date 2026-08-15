@@ -517,7 +517,11 @@ export default function Layout() {
                   return (
                     <>
                       {head}
-                      {tail && <span style={{ color: BRAND.accent }}>{tail}</span>}
+                      {/* El tramo acentuado sigue el ACENTO ACTIVO del tema
+                          (mismo criterio que el shell v2), no el color fijo de
+                          marca: si el usuario cambia el acento en Apariencia,
+                          el nombre acompaña en vez de quedarse verde. */}
+                      {tail && <span className="sv2-nombre-acento">{tail}</span>}
                     </>
                   );
                 })()}

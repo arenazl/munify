@@ -71,23 +71,22 @@ createRoot(document.getElementById('root')!).render(
   </GoogleOAuthProvider>,
 )
 
+// Auto-update NO invasivo (estándar de la carpeta compartida, 6-GUIA-PWA.md):
+// al detectar un build nuevo se avisa con un popup PERSISTENTE abajo a la
+// derecha y la recarga la dispara EL USUARIO. Antes había un
+// `setTimeout(reload, 5000)` que recargaba igual a los 5 segundos: si estabas
+// cargando un reclamo o llenando un formulario, te lo comía. La única recarga
+// automática que sobrevive es el chunk-guard de `autoUpdate.ts` (ahí la app ya
+// está rota y recargar es rescate, no interrupción).
 setupAutoUpdate({
   pollIntervalMs: 30_000,
   mode: 'prompt',
   onUpdateAvailable: ({ reload }) => {
-    const appName = BRAND.name
-    if (typeof toast !== 'undefined' && toast.info) {
-      toast.info(`🚀 Nueva versión de ${appName} instalada`, {
-        description: 'La aplicación se actualizará para cargar los cambios.',
-        action: {
-          label: 'Actualizar ahora',
-          onClick: () => reload(),
-        },
-        duration: 15_000,
-      })
-    }
-    setTimeout(() => {
-      reload()
-    }, 5000)
+    toast(`Hay una versión nueva de ${BRAND.name}`, {
+      description: 'Actualizá cuando quieras — hasta que toques, seguís trabajando.',
+      action: { label: 'Actualizar', onClick: () => reload() },
+      duration: Infinity,
+      position: 'bottom-right',
+    })
   },
 })

@@ -522,11 +522,13 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
           <BrandMark size={26} variant="sidebar" />
         </Link>
         <div className="sv2-marca-textos">
-          {/* BRAND.nameFont y BRAND.accent son valores runtime de marca
-              (white-label): inline permitido, igual que en el shell viejo. */}
+          {/* BRAND.nameFont es un valor runtime de marca: inline permitido. El
+              color del tramo acentuado NO: sale de `--pl-green` (el acento vivo
+              del tema) via `.sv2-nombre-acento`, para que acompañe al acento que
+              el usuario elige en Apariencia en vez de quedarse en el de marca. */}
           <span className="sv2-nombre" style={{ fontFamily: BRAND.nameFont }}>
             {nombreBase}
-            {nombreAcento !== '' && <span style={{ color: BRAND.accent }}>{nombreAcento}</span>}
+            {nombreAcento !== '' && <span className="sv2-nombre-acento">{nombreAcento}</span>}
           </span>
           {subtitulo && <span className="sv2-subtitulo">{subtitulo}</span>}
         </div>
