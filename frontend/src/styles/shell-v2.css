@@ -56,21 +56,21 @@
 }
 
 /* Tile del logo (clickeable: vuelve al dashboard) */
+/* Logo SUELTO, sin tile: nada de fill ni marco atrás de la marca. El fondo que
+   había (`--pl-green-050` + borde) es un token verde del kit y se leía como un
+   recuadro pegado al logo, peor todavía en un shell de otra marca. La caja se
+   mantiene en 36px para no mover el header. */
 .sv2-logo {
   width: 36px;
   height: 36px;
   flex: 0 0 36px;
-  border-radius: var(--pl-radius-md);
-  background: var(--pl-green-050);
-  border: 1px solid var(--pl-border);
   display: grid;
   place-items: center;
-  overflow: hidden;
   text-decoration: none;
-  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+  transition: opacity var(--pl-dur-ui) var(--pl-ease);
 }
 .sv2-logo:hover {
-  border-color: var(--pl-green-200);
+  opacity: 0.75;
 }
 
 .sv2-logo--tile {
