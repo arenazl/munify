@@ -65,7 +65,7 @@ async def migrate():
 ## REGLAS DURAS DE DESARROLLO (NO NEGOCIABLES)
 
 ### 1. DRY — componentes compartidos
-- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo a `components/ui/`.
+- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo al kit `components/abmv2/` (regla 6.bis — la carpeta vieja no recibe piezas nuevas).
 - Variaciones se manejan con **props**, no duplicando componentes (ej. `<ReclamoCard showCreador />`, NO `<ReclamoCardVecino>` + `<ReclamoCardSupervisor>`).
 - **Antes de crear** un componente nuevo, buscar en `components/ui/` (correr `python scripts/generate_ui_inventory.py` si dudás del inventario actual).
 
