@@ -1505,17 +1505,22 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // sueltos, todas las pantallas con las mismas piezas del kit.
   const heroKpis: HeroKpi[] = useMemo(() => {
     if (!resumen) return [];
+    const u = resolverUmbrales();
     const porEstado = resumen.por_estado || {};
     const total = resumen.total || 0;
     const recibidos = (porEstado['recibido'] || 0) + (porEstado['iniciado'] || 0);
+    const enPago = porEstado['pendiente_pago'] || 0;
     const enCurso = porEstado['en_curso'] || 0;
     const finalizados = porEstado['finalizado'] || 0;
     const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+    // Estándar del hero: SIEMPRE 5 KPIs, los más importantes primero, y el
+    // VALOR pintado por veredicto (el componente es dumb: el padre decide).
     return [
       { etiqueta: 'TOTAL', valor: total.toLocaleString('es-AR'), sub: `${resumen.hoy || 0} hoy` },
-      { etiqueta: 'RECIBIDOS', valor: recibidos.toLocaleString('es-AR'), sub: `${pct(recibidos)}% del total` },
+      { etiqueta: 'RECIBIDOS', valor: recibidos.toLocaleString('es-AR'), sub: 'sin atender', veredicto: veredictoMasEsPeor(recibidos, u.sinAsignar) },
+      { etiqueta: 'EN PAGO', valor: enPago.toLocaleString('es-AR'), sub: 'esperando el pago', veredicto: enPago > 0 ? 'advertencia' : undefined },
       { etiqueta: 'EN CURSO', valor: enCurso.toLocaleString('es-AR'), sub: `${pct(enCurso)}% del total` },
-      { etiqueta: 'FINALIZADOS', valor: finalizados.toLocaleString('es-AR'), sub: `${pct(finalizados)}% del total` },
+      { etiqueta: 'FINALIZADOS', valor: finalizados.toLocaleString('es-AR'), sub: `${pct(finalizados)}% del total`, veredicto: 'bueno' },
     ];
   }, [resumen]);
 
@@ -1560,6 +1565,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             veredictoTasa(pctFinalizados, u.tasaResolucion),
           ),
           seg('.'),
+        ],
+        // Estándar del hero: TODA frase lleva al menos una acción abajo —
+        // sin botones el pie del banner queda como un hueco.
+        acciones: [
+          { label: 'Ver finalizados', onClick: () => setFiltroEstado('finalizado'), primaria: true },
+          { label: 'Mostrador', to: '/gestion/mostrador' },
         ],
       });
     }

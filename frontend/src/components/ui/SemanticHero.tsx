@@ -147,6 +147,26 @@ export function SemanticHero({
   const total = validas.length;
   const varias = total > 1;
 
+  // --- Guardas del ESTÁNDAR (sólo dev) ---------------------------------
+  // El componente es DUMB: no decide colores ni contenidos — el padre manda
+  // (veredicto por KPI, acciones por frase). Estas guardas avisan cuando el
+  // padre no cumple el contrato del estándar, que es donde se arregla:
+  //   1. Hero completo = SIEMPRE 5 KPIs, los más importantes primero
+  //      (con 4 el strip queda vacío; con 6 no entra).
+  //   2. TODA frase lleva al menos una acción abajo (sin botones el pie del
+  //      banner queda como un hueco).
+  useEffect(() => {
+    if (!import.meta.env.DEV || size !== 'full') return;
+    if (kpis && kpis.length > 0 && kpis.length !== 5) {
+      console.warn(`[SemanticHero] "${etiqueta}": el estándar pide 5 KPIs y llegaron ${kpis.length}. Los más importantes primero; si no hay 5 números reales, la pantalla va con size="simple".`);
+    }
+    const sinAcciones = validas.filter((f) => !f.acciones || f.acciones.length === 0).length;
+    if (validas.length > 0 && sinAcciones > 0) {
+      console.warn(`[SemanticHero] "${etiqueta}": ${sinAcciones} frase(s) del carrusel sin acciones — toda frase lleva al menos un botón abajo.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- diagnóstico dev: alcanza con los conteos
+  }, [size, etiqueta, kpis?.length, validas.length]);
+
   const ir = useCallback(
     (destino: number, desde: number) => {
       if (total === 0) return;
