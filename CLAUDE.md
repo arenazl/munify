@@ -114,8 +114,14 @@ strip de 5 KPIs con veredictos, acciones por frase, filtros, las tres vistas,
 `IconColorPicker`). Es un gran componente hecho de partes: una pantalla puede
 usar una pieza o todo. **Prohibido implementar pantallas nuevas sobre
 `components/ui/ABMPage`** (queda sólo para las viejas aún no migradas).
-*Why:* el dueño detectó implementaciones nuevas cayendo al ABMPage viejo
-(2026-08-14). El estándar estético vive en el kit, no en cada pantalla.
+**La carpeta de controles vieja (`components/ui/`) está DEPRECADA como
+canon**: no se agrega nada ahí; los controles que el kit aún consume desde
+ahí (combo moderno, píldoras adaptativas, date pickers…) se MIGRAN a la
+suite v2 con el concepto nuevo — tontos (el padre declara contenido y
+colores) y POLIMÓRFICOS/adaptables al contenedor (píldoras cuando entran,
+combo cuando no; la forma la decide el espacio).
+*Why:* el dueño detectó implementaciones nuevas cayendo al ABM y controles
+viejos (2026-08-14). El estándar estético vive en el kit, no en cada pantalla.
 
 ### 7. Multi-tenant (backend)
 - TODA query con `municipio_id` filtra por `current_user.municipio_id`. Sin excepciones.
@@ -123,7 +129,8 @@ usar una pieza o todo. **Prohibido implementar pantallas nuevas sobre
 ### 8. Emojis Unicode prohibidos
 - Cero emojis en UI, código, commits, labels. Sólo iconos `lucide-react` vía `<DynamicIcon name="Building2" />` o import directo.
 
-### 9. Header de ABMPage: input al 100%, botón "Nuevo" anclado a la derecha
+### 9. [SÓLO LEGACY] Header de ABMPage: input al 100%, botón "Nuevo" anclado a la derecha
+> Aplica únicamente al MANTENIMIENTO de pantallas viejas sin migrar (regla 6.bis).
 La primera línea de toda pantalla ABM (la del título + input + controles + botón "Nuevo") **siempre tiene que llegar al 100% del ancho disponible**, con esta distribución horizontal:
 
 ```
@@ -140,7 +147,8 @@ Reglas:
 
 **How to apply:** Ante cualquier ABMPage nuevo o existente, jamás pasar `searchMaxWidth`. Si encontrás `searchMaxWidth={N}` en código existente, borralo en el mismo cambio.
 
-### 9.bis. ABMPage acepta `toolbar` Y `headerActions` juntos — NO silenciar uno
+### 9.bis. [SÓLO LEGACY] ABMPage acepta `toolbar` Y `headerActions` juntos — NO silenciar uno
+> Aplica únicamente al MANTENIMIENTO de pantallas viejas sin migrar (regla 6.bis).
 Hoy `ABMPage` compone ambas props si vienen juntas: primero las acciones del `toolbar` (chips/combos/toggles), después los botones extra del `headerActions` (ej: "Unificar duplicados" en `TesoreriaContactos`).
 
 **Why:** Antes el código hacía `effectiveHeaderActions = toolbar ? renderToolbarActions() : headerActions` — o sea, si la página pasaba ambos, **se perdían silenciosamente los botones de headerActions**. Bug real: el botón "Unificar duplicados" estuvo invisible en prod durante varias semanas en 4 páginas (TesoreriaContactos, OrdenesPago, SueldosEmpleados, Tesoreria) sin que nadie se diera cuenta hasta que un user lo reportó.
