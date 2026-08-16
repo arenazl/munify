@@ -1536,10 +1536,13 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     const finalizados = porEstado['finalizado'] || 0;
     const frases: HeroFrase[] = [];
 
+    // Mismo criterio que el tablero de reclamos: el titular es el UNIVERSO de
+    // solicitudes, no el día. Un día sin ingresos dejaba "Hoy entraron 0
+    // solicitudes", que además de sonar mal mide lo que menos importa.
     frases.push({
       segmentos: [
-        seg('Hoy entraron '),
-        seg(`${resumen.hoy.toLocaleString('es-AR')} solicitudes`),
+        seg('Tenemos '),
+        seg(`${resumen.total.toLocaleString('es-AR')} ${resumen.total === 1 ? 'solicitud' : 'solicitudes'}`),
         seg('; hay '),
         seg(
           `${recibidos.toLocaleString('es-AR')} recibidas sin atender`,
@@ -1547,6 +1550,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         ),
         seg(' y '),
         seg(`${enCurso.toLocaleString('es-AR')} en curso`, 'bueno'),
+        seg(
+          resumen.hoy > 0
+            ? `. Hoy entraron ${resumen.hoy.toLocaleString('es-AR')} ${resumen.hoy === 1 ? 'nueva' : 'nuevas'}`
+            : '. Hoy todavía no entró ninguna nueva',
+          resumen.hoy > 0 ? 'bueno' : undefined,
+        ),
         seg('.'),
       ],
       acciones: [

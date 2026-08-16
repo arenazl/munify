@@ -590,32 +590,45 @@ export default function Dashboard() {
     const u = resolverUmbrales();
     const frases: HeroFrase[] = [];
 
-    // (a) El día en reclamos: lo que entró, lo que nadie tomó y lo que espera
-    // el cierre del supervisor.
+    // (a) El estado del UNIVERSO de reclamos: cuántos son, cuántos resolvimos y
+    // qué queda. El día es la coda, no el titular.
+    //
+    // Antes esta frase abría con "Hoy entraron N reclamos nuevos": un día sin
+    // ingresos la dejaba en "Hoy entraron 0 reclamos nuevos" — mal dicho (un
+    // cero no se enuncia así) y encima midiendo lo que menos importa. Un
+    // tablero de gestión habla de lo que tiene para resolver, no del reloj: el
+    // universo está SIEMPRE, el día puede estar vacío sin que eso sea noticia.
     if (stats && metricasAccion) {
       const esperando = metricasAccion.esperando_visto_bueno ?? 0;
+      const abiertos = contarAbiertos(stats);
+      const enCurso = stats.por_estado?.en_curso ?? 0;
+      // "Por atender" = abiertos que todavía nadie empezó. Nunca negativo, por
+      // si el backend cuenta algún estado que no está en el mapa.
+      const porAtender = Math.max(abiertos - enCurso, 0);
+      const cerrados = Math.max(stats.total - abiertos, 0);
+      const tasa = stats.total > 0 ? Math.round((cerrados / stats.total) * 100) : 0;
       frases.push({
         segmentos: [
-          seg('Hoy entraron '),
-          // Que entren reclamos POR EL SISTEMA es buena noticia: significa que
-          // el canal está vivo. En cero no se pinta nada — un cero no es un
-          // logro que festejar en verde.
-          seg(
-            `${stats.hoy} ${stats.hoy === 1 ? 'reclamo nuevo' : 'reclamos nuevos'}`,
-            stats.hoy > 0 ? 'bueno' : undefined,
-          ),
-          seg(', hay '),
-          seg(
-            `${metricasAccion.sin_asignar} sin asignar`,
-            veredictoMasEsPeor(metricasAccion.sin_asignar, u.sinAsignar),
-          ),
+          seg('Tenemos '),
+          seg(`${stats.total} ${stats.total === 1 ? 'reclamo' : 'reclamos'}`),
+          seg(' y resolvimos el '),
+          seg(`${tasa}%`, veredictoTasa(tasa, u.tasaResolucion)),
+          seg('. Quedan '),
+          seg(`${porAtender} por atender`, veredictoMasEsPeor(porAtender, u.sinAsignar)),
           seg(' y '),
-          // Antes acá iba "trabajos programados" con el veredicto 'bueno'
-          // FIJO: un 0 se pintaba de verde como si fuera un logro. Ahora es
-          // una cola real, y cuanto más alta, peor.
+          seg(`${enCurso} en proceso`),
+          seg('; '),
+          // Cola real del supervisor: cuanto más alta, peor (un 0 sí es bueno).
           seg(
-            `${esperando} ${esperando === 1 ? 'esperando tu visto bueno' : 'esperando tu visto bueno'}`,
+            `${esperando} ${esperando === 1 ? 'espera' : 'esperan'} tu visto bueno`,
             veredictoMasEsPeor(esperando, u.sinAsignar),
+          ),
+          // El día, dicho como se dice: sin ingresos no se enuncia un cero.
+          seg(
+            stats.hoy > 0
+              ? `. Hoy entraron ${stats.hoy} ${stats.hoy === 1 ? 'nuevo' : 'nuevos'}`
+              : '. Hoy todavía no entró ninguno nuevo',
+            stats.hoy > 0 ? 'bueno' : undefined,
           ),
           seg('.'),
         ],
