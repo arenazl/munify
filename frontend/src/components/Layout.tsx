@@ -864,10 +864,16 @@ export default function Layout() {
       {/* Header sticky solo mobile */}
       {isMobile && (
         <header
-          className="fixed top-0 left-0 right-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-sm lg:hidden"
+          className="fixed top-0 left-0 right-0 z-40 px-4 pb-3 flex items-center justify-between backdrop-blur-sm lg:hidden"
           style={{
             backgroundColor: `${theme.card}f0`,
             borderBottom: `1px solid ${theme.border}`,
+            // La PWA se dibuja DEBAJO de la barra de estado (viewport-fit=cover
+            // + status-bar-style translúcida), así que el header tiene que
+            // bajar lo que mida el notch / Dynamic Island. Nunca un número
+            // fijo: cambia por modelo, y en Android/desktop el inset vale 0
+            // — de ahí el mínimo de 12px.
+            paddingTop: 'max(env(safe-area-inset-top), 12px)',
           }}
         >
           {/* Hamburguesa */}
@@ -950,7 +956,10 @@ export default function Layout() {
           className="px-3 sm:px-6 pb-3 sm:pb-6 relative"
           style={{
             color: theme.text,
-            paddingTop: isMobile ? '64px' : undefined, // Espacio para el header sticky mobile
+            // Header sticky mobile + la safe area del teléfono: el header baja
+            // lo que mida el notch, así que el contenido tiene que acompañar o
+            // el primer bloque queda tapado.
+            paddingTop: isMobile ? 'calc(64px + env(safe-area-inset-top, 0px))' : undefined,
             paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar en mobile
             zIndex: 1,
           }}

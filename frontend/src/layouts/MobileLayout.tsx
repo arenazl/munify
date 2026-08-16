@@ -111,12 +111,15 @@ export default function MobileLayout() {
     <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
       {/* Header sticky con glassmorphism */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between"
+        className="fixed top-0 left-0 right-0 z-50 px-4 pb-3 flex items-center justify-between"
         style={{
           backgroundColor: `${alpha(theme.card, 0.91)}`,
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           borderBottom: `1px solid ${alpha(theme.border, 0.25)}`,
+          // Ver la nota del header del shell: la PWA dibuja bajo la barra de
+          // estado, así que el título baja lo que mida el notch de cada modelo.
+          paddingTop: 'max(env(safe-area-inset-top), 12px)',
         }}
       >
         {/* Espacio izquierdo (para balance visual) */}
@@ -161,7 +164,10 @@ export default function MobileLayout() {
       </header>
 
       {/* Main Content */}
-      <main style={{ paddingTop: '64px', paddingBottom: '100px', minHeight: '100vh' }}>
+      {/* El header crece con la safe area del teléfono, así que el contenido
+          arranca más abajo en la misma medida: con los 64px fijos de antes, el
+          primer bloque quedaba debajo del header en los modelos con notch. */}
+      <main style={{ paddingTop: 'calc(64px + env(safe-area-inset-top, 0px))', paddingBottom: '100px', minHeight: '100vh' }}>
         <Outlet />
       </main>
 
