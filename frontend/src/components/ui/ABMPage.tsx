@@ -1,3 +1,24 @@
+/**
+ * @deprecated ABM VIEJO. No recibe pantallas nuevas.
+ * ---------------------------------------------------------------------------
+ * Sigue vivo SÓLO para mantener las pantallas que ya estaban construidas sobre
+ * él (la lista exacta está en `eslint.config.js`, que además impide que crezca:
+ * cualquier archivo fuera de esa lista que lo importe rompe el lint).
+ *
+ * Una pantalla nueva se arma con el kit `components/abmv2`: `SemanticAbmPage`
+ * como composición completa, o sus piezas sueltas —PageHeader, ListToolbar,
+ * FilterBar, DataTable, SideModal, CardGrid—, que se usan de a una o todas
+ * juntas.
+ *
+ * La razón de fondo no es estética: el kit se PROYECTA solo a mobile. Su
+ * DataTable tiene dos renderers —columnas en ancho, fichas en angosto, elegido
+ * por el ancho del contenedor— alimentados por `RolesSemanticos`. Este control
+ * no: apila columnas y por eso las pantallas que lo usan se ven mal en el
+ * teléfono. Migrar una pantalla es, casi siempre, escribir su mapa de roles.
+ *
+ * Ver: CLAUDE.md regla 6.bis · components/abmv2/README.md ·
+ *      APP_GUIDE/components/v2/abmv2/PROYECCION-MOBILE.md
+ */
 import { ReactNode, useState, useEffect } from 'react';
 import { useEmbed } from '../abmv2/useEmbed';
 import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
