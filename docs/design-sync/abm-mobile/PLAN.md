@@ -68,10 +68,14 @@ dibujarlos de nuevo, que es justo lo que el documento pide evitar.
 - Swipe (umbral 70px, tope 190px, `touch-action: pan-y`), long-press → selección
   múltiple, cierre de la ficha abierta al scrollear.
 
-## Fase 6 — Detalle y hub central
+## Fase 6 — Detalle (y NO el hub)
 
-- Detalle a pantalla completa desde la derecha; botón central de la tab bar como hub de
-  secciones.
+- Detalle a pantalla completa desde la derecha, con una acción primaria fija abajo.
+- **El panel del botón central "Más" NO se rehace.** Decisión del dueño (2026-08-16): el
+  panel dinámico que ya tiene la app —piezas de distintos tamaños, jerarquía por urgencia,
+  reclamos y trámites según contexto— es superior a los tres niveles fijos del handoff, y
+  se conserva. Sólo se puede adaptar su CSS para que hable el mismo idioma visual. Ver la
+  sección "EXCEPCIÓN al handoff" en `GUIA.md`.
 
 ## Cierre de cada fase
 

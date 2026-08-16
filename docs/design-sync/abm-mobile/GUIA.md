@@ -211,9 +211,31 @@ ABMs.**
 | Filas de la tabla | → | **Fichas**: card blanca, borde 1px, radio 13, gap 8 sobre el fondo. **Sin divisorias de borde a borde.** |
 | Agrupador por fecha | → | Se queda: chip de fecha sticky + conteo del grupo. Es lo que da ritmo al scroll. |
 | Columna de acciones | → | **Swipe a la izquierda** revela 2 acciones. **Long-press** entra en selección múltiple con barra inferior de acciones masivas. |
-| Botón "Nuevo" | → | Botón primario en la zona de control sticky, al lado del buscador: acompaña al filtro y siempre está a la vista. El botón central elevado de la tab bar queda reservado al **hub de secciones, no a crear**. |
+| Botón "Nuevo" | → | Botón primario en la zona de control sticky, al lado del buscador: acompaña al filtro y siempre está a la vista. El botón central elevado de la tab bar queda reservado al **hub de secciones, no a crear**. (Sobre el contenido del hub, ver la excepción de abajo.) |
 | Modal de detalle | → | Pantalla completa que entra **desde la derecha**, con una acción primaria fija abajo y el resto en menú. |
 | Paginador | → | **Scroll infinito** con conteo al pie. Nada de números de página. |
+
+## EXCEPCIÓN al handoff — el panel del botón central ("Más")
+
+**Decisión del dueño, 2026-08-16. Es la única parte del handoff que NO se aplica.**
+
+El handoff describe el panel del botón central como tres niveles fijos (card primaria de
+creación, par de atajos 2-up, herramientas bajo un rótulo). **Ese diseño se descarta.**
+
+Se mantiene el panel que la app ya tiene, porque su enfoque es superior: es un panel
+**dinámico**, con piezas de distintos tamaños, que **jerarquiza por urgencia** — lo que
+está más urgente se remarca y ocupa más— y ofrece reclamos y trámites según el contexto.
+Un panel de tres niveles fijos no puede hacer eso: trata igual a lo que vence hoy y a lo
+que no pasa nada.
+
+Alcance de la excepción:
+- **Se conserva:** el comportamiento, la jerarquía por urgencia y el criterio de qué
+  mostrar. Es la filosofía de la app, no la del prototipo.
+- **Se puede adaptar:** el CSS —superficie, tipografía, radios, movimiento— para que hable
+  el mismo idioma visual que el resto de la proyección mobile.
+
+**El resto del handoff se sigue tal cual**: el manejo de filtros, el hero semántico, la
+grilla y la ficha de cada ítem quedan como los definió el diseñador.
 
 ## 06 · Lo que hace que se vea nuestro y no una tabla vieja
 
