@@ -1550,13 +1550,16 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         ),
         seg(' y '),
         seg(`${enCurso.toLocaleString('es-AR')} en curso`, 'bueno'),
+        // El punto va PEGADO al segmento anterior y la coda arranca con el
+        // espacio: al partirse el renglón en mobile, si no, quedaba un "."
+        // solitario abriendo la línea siguiente.
+        seg('. '),
         seg(
           resumen.hoy > 0
-            ? `. Hoy entraron ${resumen.hoy.toLocaleString('es-AR')} ${resumen.hoy === 1 ? 'nueva' : 'nuevas'}`
-            : '. Hoy todavía no entró ninguna nueva',
+            ? `Hoy entraron ${resumen.hoy.toLocaleString('es-AR')} ${resumen.hoy === 1 ? 'nueva' : 'nuevas'}.`
+            : 'Hoy todavía no entró ninguna nueva.',
           resumen.hoy > 0 ? 'bueno' : undefined,
         ),
-        seg('.'),
       ],
       acciones: [
         { label: 'Mostrador', to: '/gestion/mostrador', primaria: true },

@@ -623,14 +623,17 @@ export default function Dashboard() {
             `${esperando} ${esperando === 1 ? 'espera' : 'esperan'} tu visto bueno`,
             veredictoMasEsPeor(esperando, u.sinAsignar),
           ),
+          // El punto pegado al segmento previo y la coda con el espacio
+          // adelante: al partir el renglón en mobile, si no, el "." quedaba
+          // solo abriendo la línea siguiente.
+          seg('. '),
           // El día, dicho como se dice: sin ingresos no se enuncia un cero.
           seg(
             stats.hoy > 0
-              ? `. Hoy entraron ${stats.hoy} ${stats.hoy === 1 ? 'nuevo' : 'nuevos'}`
-              : '. Hoy todavía no entró ninguno nuevo',
+              ? `Hoy entraron ${stats.hoy} ${stats.hoy === 1 ? 'nuevo' : 'nuevos'}.`
+              : 'Hoy todavía no entró ninguno nuevo.',
             stats.hoy > 0 ? 'bueno' : undefined,
           ),
-          seg('.'),
         ],
         acciones: [
           { label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true },

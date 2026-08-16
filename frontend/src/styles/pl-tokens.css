@@ -33,6 +33,10 @@
   --pl-tracking-display: -0.02em;
   --pl-tracking-hero:    -0.025em;
 
+  /* Ancho útil de contenido: lo usan las superficies del kit para no
+     desbordar el viewport en pantallas angostas. */
+  --pl-content-max: 100%;
+
   /* --- Espaciado (base 4) --- */
   --pl-space-1: 4px;  --pl-space-2: 8px;  --pl-space-3: 12px;
   --pl-space-4: 16px; --pl-space-5: 20px; --pl-space-6: 24px;
@@ -167,4 +171,34 @@
     color-mix(in srgb, var(--pl-tono, var(--pl-green)) 1.2%, transparent) 34%,
     transparent 62%
   );
+}
+
+/* ============================================================
+   ESCALA MOBILE — un solo lugar, lo hereda TODO el kit.
+
+   Los tokens de arriba están dimensionados para desktop y no tenían
+   ninguna media query: el mismo titular de 38px que respira en un
+   monitor se come cuatro renglones en un teléfono de 390px, y la
+   frase semántica de 20px empujaba los KPIs abajo del pliegue.
+
+   Acá NO se redefine ningún componente: se re-dimensionan los mismos
+   tokens. Cualquier pieza del kit (hero, KPIs, cards, tablas) queda
+   proporcional en mobile sin tocar su CSS ni su markup.
+
+   `--pl-fs-input` NO baja de 16px a propósito: menos que eso hace que
+   iOS haga auto-zoom al enfocar el campo.
+   ============================================================ */
+@media (max-width: 640px) {
+  :root {
+    --pl-fs-hero:       25px;   /* titular de pantalla (era 38) */
+    --pl-fs-hero-line:  16.5px; /* frase semántica (era 20) */
+    --pl-fs-kpi:        26px;   /* número de KPI (era 34) */
+    --pl-fs-card-title: 14px;   /* título de card (era 15) */
+
+    /* El aire también escala: con el padding de desktop, una card de
+       390px se queda sin ancho para su propio contenido. */
+    --pl-space-6:  18px;
+    --pl-space-8:  22px;
+    --pl-space-10: 26px;
+  }
 }
