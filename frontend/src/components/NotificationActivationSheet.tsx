@@ -239,11 +239,17 @@ export function NotificationActivationSheet() {
 
   return (
     <>
-      {/* Overlay oscuro detras (deja visible la parte superior atenuada). */}
+      {/* Velo oscuro detrás, SIN capturar el toque.
+          Este cartel NO lo pidió el usuario: se abre solo a los dos segundos
+          de entrar. Con `pointer-events: auto` (el default) su capa a pantalla
+          completa se quedaba con TODOS los gestos —`elementFromPoint` en el
+          medio de la pantalla devolvía este div— y la app entera dejaba de
+          scrollear en el teléfono hasta cerrarlo. Un aviso que aparece solo no
+          puede secuestrar la pantalla: acá sólo atenúa, y se cierra con la X o
+          con "ahora no". */}
       <div
-        onClick={dismiss}
         className="fixed inset-0 z-[100] animate-in fade-in duration-200"
-        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }}
         aria-hidden="true"
       />
 
