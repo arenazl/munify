@@ -1,62 +1,97 @@
-# Plan de implementación — renderer mobile del ABM Semántico
+# Plan de implementación — proyección mobile del ABM Semántico
 
-> Ver `README.md` de esta carpeta para la especificación. Acá va sólo el **orden** y el
-> estado. Cada fase se cierra probando a 360px y 390px.
+> Ver `README.md` de esta carpeta para la especificación completa. Acá va el **criterio**,
+> el **orden** y el estado.
 
-## Por qué en este orden
+## Las tres reglas que gobiernan todo
 
-El handoff pide un renderer, no pantallas. Pero el renderer se apoya en una config por
-ROLES que hoy no existe: la config declara columnas. Así que primero se define el mapa de
-roles (fase 1), después se dibuja la ficha que los consume (fase 2), y recién ahí tiene
-sentido mover el resto de la pantalla (fases 3+). Al revés se pinta una pantalla y no
-queda renderer.
+**1. Un control, dos renderers — NO un componente nuevo.**
+El renderer mobile vive DENTRO de las piezas del kit que ya existen. No se crea un
+`FichaMobile` suelto, no se agrega un `if (isMobile)` en las pantallas de Munify, y no se
+duplica nada. Una pieza que hoy dibuja columnas pasa a saber dibujarse de dos maneras; el
+ancho de **su contenedor** elige cuál.
 
-## Fase 1 — Roles en la config del ABM
+**2. Agnóstico y en el catálogo.**
+Todo esto es librería, no Munify. Se construye sin una sola referencia a reclamos,
+trámites ni municipios, y se deja en `APP_GUIDE/components/v2/abmv2/` (LEY 0 de la
+carpeta compartida). Munify lo CONSUME. La misma pieza tiene que servir para un CRM o un
+ecommerce sin tocarle una línea: lo que cambia es el mapa de roles que le pasa el padre.
 
-- Tipo `RolesSemanticos` en `components/abmv2/types.ts`: `identity`, `taxonomy`,
-  `headline`, `actor`, `context`, `state`, `elapsed`, `actions`, `group_by`.
-- Mapa de roles para **Reclamos** (la entidad de referencia) y **Trámites**.
-- La vista de escritorio NO se toca: sigue leyendo sus columnas. Los roles conviven.
+**3. Piezas tontas y sueltas.**
+Cada parte —hero semántico, zona de control, lista/ficha, panel de filtros— recibe TODO
+por props: contenido, colores, acciones. No sabe qué pasa arriba, no busca datos, no
+conoce al resto. Una pantalla puede usar una sola pieza o todas. El padre declara; el
+hijo dibuja.
 
-## Fase 2 — `FichaRegistro` (los 4 slots)
+**Corolario de las tres:** nada de `@media (max-width: …)`. **Container queries**, porque
+el mismo ABM puede vivir embebido en un panel angosto de escritorio y ahí también
+corresponde la proyección mobile. El dato es el ancho del contenedor, no el de la
+ventana. (Sección 04 de la guía; el handoff lo marca como no negociable.)
 
-- Componente nuevo en el kit, alimentado sólo por los roles.
-- Ficha pastel de categoría (34px), píldora de estado, `elapsed`, truncado por slot.
-- Reemplaza a `FilaLista` en angosto para Reclamos y Trámites.
+## Por qué el orden es este
+
+El renderer se apoya en una config por ROLES que hoy no existe: la config declara
+columnas, y una columna es un concepto de escritorio — no se proyecta. Primero el mapa de
+roles (fase 1), después la ficha que los consume (fase 2), y recién ahí el resto. Al
+revés se pinta una pantalla linda y no queda renderer: Trámites y Cobros habría que
+dibujarlos de nuevo, que es justo lo que el documento pide evitar.
+
+## Fase 1 — Roles en el contrato del control
+
+- `RolesSemanticos` en `abmv2/types.ts`: `identity`, `taxonomy`, `headline`, `actor`,
+  `context`, `state`, `elapsed`, `actions`, `group_by`. Cada rol es un accessor + su
+  formato, declarado por el padre.
+- Los roles conviven con las columnas: el renderer de escritorio sigue leyendo columnas y
+  no se toca.
+- Mapa de roles para Reclamos y Trámites (en Munify, que es el consumidor).
+
+## Fase 2 — La lista aprende a dibujarse como fichas
+
+- `DataTable` (o la pieza de lista del kit) gana su segundo renderer: los 4 slots del
+  handoff, alimentados SÓLO por los roles.
+- Container query sobre el contenedor de la lista: angosto → fichas, ancho → columnas.
+  No se renderiza el renderer que no corresponde (nada de `display:none` sobre 50 filas).
 
 ## Fase 3 — Zona de control de una línea
 
-- Buscador + "Nuevo" + botón de filtros con badge. Todo lo demás sale de la fila.
-- Publicar `--ctl-h` medido, y derivar de ahí el `top` de los sticky.
+- Buscador + acción primaria + botón de filtros con badge. Todo lo demás sale de la fila
+  y se va al panel.
+- Altura medida y publicada como `--ctl-h`; los sticky de abajo derivan su `top` de ahí.
 
 ## Fase 4 — Panel de filtros (bottom sheet)
 
-- Distribución de estados + lista con conteo y porcentaje; orden en chips; una fila por
-  filtro con sub-sheet; pie con "Ver N …".
+- Distribución de estados, orden en chips, una fila por filtro con su sub-sheet, pie con
+  el conteo del resultado.
 
 ## Fase 5 — Gestos
 
-- Swipe (umbral 70px, tope 190px, `touch-action: pan-y`), long-press a selección
+- Swipe (umbral 70px, tope 190px, `touch-action: pan-y`), long-press → selección
   múltiple, cierre de la ficha abierta al scrollear.
 
 ## Fase 6 — Detalle y hub central
 
-- Detalle a pantalla completa desde la derecha; botón central como hub de secciones.
+- Detalle a pantalla completa desde la derecha; botón central de la tab bar como hub de
+  secciones.
+
+## Cierre de cada fase
+
+Se porta la pieza agnóstica a `APP_GUIDE/components/v2/abmv2/` en el MISMO cambio, y se
+prueba a **360px** y a 390px, con la tipografía del sistema al **130%**.
 
 ## Estado
 
 | Fase | Estado |
 |---|---|
-| 1 · Roles | pendiente |
-| 2 · Ficha | pendiente |
-| 3 · Control | pendiente |
-| 4 · Filtros | pendiente |
+| 1 · Roles en el contrato | pendiente |
+| 2 · Lista → fichas | pendiente |
+| 3 · Zona de control | pendiente |
+| 4 · Panel de filtros | pendiente |
 | 5 · Gestos | pendiente |
 | 6 · Detalle + hub | pendiente |
 
 ## Lo que YA se arregló del mobile (no es parte de este handoff)
 
-Antes de que llegara este paquete se corrigieron bugs de shell que afectaban a todo:
-viewport de PWA (zoom/arrastre/safe-area), scroll muerto por un velo a pantalla completa,
-escala tipográfica mobile en los tokens, y la toolbar que se cortaba. Están en la rama
-`qa`; el renderer se construye encima de eso.
+Bugs de shell que afectaban a toda la app y estaban tapando cualquier mejora de diseño:
+viewport de PWA (zoom, arrastre, safe-area del notch), scroll muerto por un velo a
+pantalla completa que capturaba todos los gestos, escala tipográfica mobile en los tokens
+y la toolbar que se cortaba. Están en `qa`. El renderer se construye encima de eso.
