@@ -39,6 +39,11 @@ export interface Brand {
   rutaAcceso?: string;
   /** Logo como componente SVG (editable, fondo transparente). Preferido sobre logoSrc. */
   Logo?: ComponentType<{ size?: number; className?: string; title?: string }>;
+  /** Manifest propio servido como ARCHIVO (relativo a /public). Cuando está,
+   *  el `<link rel="manifest">` apunta a ese archivo en vez del blob generado
+   *  en runtime: Safari ignora los manifests `blob:` y, sin esto, la PWA se
+   *  instala con el manifest.json estático (start_url "/"). */
+  manifestPath?: string;
   /** Carpeta (relativa a /public) con los iconos PWA propios de la marca:
    *  icon-*.png, apple-touch-icon.png, icon-maskable-512x512.png. Si se setea,
    *  el manifest dinámico + el apple-touch-icon usan ESTOS (así la PWA se
@@ -124,6 +129,12 @@ const BRANDS: Record<string, Brand> = {
     // instalada se guardaba como "Asunción, Dpto. Central" con la barra en el
     // verde de la ficha. `icons/` es el set estático de Munify, ya completo.
     iconPath: 'icons',
+    // Manifest servido como ARCHIVO REAL. El manifest dinámico se monta con
+    // una `blob:` URL y Safari NO la lee: al "Agregar a inicio" caía en el
+    // manifest.json estático, cuyo `start_url` es "/" — la raíz sin marca, o
+    // sea el generador de demos. Con un archivo http normal, iOS lee el
+    // start_url correcto.
+    manifestPath: 'manifest-munify-py.json',
     // Identidad de color de MARCA, no del municipio: la ficha del muni 146
     // guarda el verde de Paraguay Limpio (`color_primario` #1b7a3d) y sin esto
     // la demo arrancaría verde. El acento que elija el usuario en Apariencia

@@ -24,8 +24,14 @@ export default function DynamicManifest() {
     // IMPORTANTE: en un blob las URLs relativas no resuelven — todas las URLs
     // del manifest (start_url, scope, icons) deben ser absolutas.
     const setManifest = (manifest: Record<string, unknown>) => {
-      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-      const manifestUrl = URL.createObjectURL(blob);
+      // Si la marca publica su manifest como ARCHIVO, gana ese: Safari no lee
+      // los `blob:` y, sin archivo, la instalación en iPhone cae al
+      // manifest.json estático (start_url "/", o sea la app sin marca).
+      const manifestUrl = BRAND.manifestPath
+        ? `${window.location.origin}/${BRAND.manifestPath}`
+        : URL.createObjectURL(
+            new Blob([JSON.stringify(manifest)], { type: 'application/json' }),
+          );
 
       let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
       if (manifestLink) {

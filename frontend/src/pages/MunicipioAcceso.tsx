@@ -4,6 +4,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
 import { saveMunicipio } from '../utils/municipioStorage';
 import { BrandMark } from '../brands/BrandMark';
+import Login from './Login';
 
 /**
  * Acceso directo por código de municipio: `app.munify.com.ar/<codigo>`.
@@ -27,6 +28,20 @@ export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: strin
   const codigo = codigoFijo || codigoDeLaUrl;
   const navigate = useNavigate();
   const [error, setError] = useState(false);
+  /**
+   * Ruta de entrada de una MARCA (`/py/asuncion`): el login se muestra acá
+   * mismo, sin cambiar la URL.
+   *
+   * No es un detalle de prolijidad. En iOS, "Agregar a inicio" toma como
+   * start_url LA URL QUE ESTÁ ABIERTA (Safari ignora el manifest servido por
+   * blob:), y la PWA instalada corre con un storage propio, separado del
+   * navegador — no hereda la marca recordada. Si acá navegáramos a `/login`,
+   * la app instalada arrancaría en una ruta que no nombra la marca, abriría
+   * como Munify multi-tenant y caería en el generador de demos. Manteniendo
+   * la URL, la marca viaja en el propio start_url.
+   */
+  const esRutaDeMarca = Boolean(codigoFijo);
+  const [municipioListo, setMunicipioListo] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +69,10 @@ export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: strin
           });
           localStorage.setItem('municipio_actual_id', String(data.id));
 
-          if (!cancelled) navigate('/login', { replace: true });
+          if (!cancelled) {
+            if (esRutaDeMarca) setMunicipioListo(true);
+            else navigate('/login', { replace: true });
+          }
           return;
         } catch (e) {
           const status = (e as { response?: { status?: number } })?.response?.status;
@@ -70,11 +88,15 @@ export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: strin
       setTimeout(() => navigate('/demo', { replace: true }), 1800);
     };
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [codigo, navigate]);
+  }, [codigo, navigate, esRutaDeMarca]);
+
+  // Municipio cargado y ruta de marca: el login se rinde ACÁ, con la URL
+  // intacta (ver la nota de arriba sobre el start_url de la PWA en iOS).
+  if (municipioListo) return <Login />;
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-5 px-6">
