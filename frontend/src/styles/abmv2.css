@@ -150,6 +150,47 @@
 }
 
 /* ============================================================
+   TOOLBAR EN MOBILE — que ENTRE, en vez de cortarse.
+
+   La fila está pensada para escritorio: buscador elástico + bloque
+   derecho que "nunca encoge" (`flex: 0 0 auto`) y se dockea a la
+   derecha. En un teléfono de 390px ese bloque —selector de vistas,
+   orden y el CTA "+ Nuevo…"— no entra, y como la fila no wrapeaba,
+   el botón principal quedaba cortado por el borde de la pantalla:
+   la acción más importante de la pantalla, a medio dibujar.
+
+   Acá la fila pasa a dos renglones: el buscador ocupa el ancho
+   completo y los controles bajan a su propia línea, con las vistas a
+   la izquierda y el CTA dockeado a la derecha. Un solo lugar: lo
+   heredan todas las pantallas del kit.
+   ============================================================ */
+@media (max-width: 640px) {
+  .av2-toolbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  /* El buscador se queda con el primer renglón entero. */
+  .av2-toolbar-buscador { flex: 1 1 100%; }
+  /* El divisor vertical entre buscador y controles no tiene sentido
+     cuando dejan de estar en la misma línea. */
+  .av2-toolbar > .av2-divisor { display: none; }
+  .av2-toolbar-derecha {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    row-gap: 8px;
+  }
+  /* El CTA puede encogerse antes que salirse; su texto no se parte. */
+  .av2-toolbar-derecha .av2-btn-primario,
+  .av2-toolbar-derecha .av2-btn-secundario {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+/* ============================================================
    [TOOLBAR] — ListToolbar
    [buscador ── flex ── ⌘K] │ [vistas] [orden] [CTA verde]
    El bloque derecho NO encoge; el buscador sí.
