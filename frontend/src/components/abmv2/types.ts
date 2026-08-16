@@ -295,6 +295,49 @@ export interface FilterBarProps {
 /** Columna de la tabla. TODA columna con `minmax()` en el track — nunca px
  *  fijos junto a tracks flexibles. El dinero SIEMPRE en la última columna
  *  de datos, alineado a la derecha. */
+/**
+ * ROLES SEMÁNTICOS — la unidad de declaración que SÍ se puede proyectar.
+ *
+ * Una columna es un concepto de escritorio: tiene ancho, orden y alineación, y
+ * nada de eso significa algo en una ficha de celular. Por eso el control no se
+ * declara sólo con columnas: cada campo declara QUÉ ROL CUMPLE en el registro,
+ * y cada renderer interpreta ese rol como puede.
+ *
+ *   renderer de columnas → dibuja las `columns` en el orden declarado
+ *   renderer de fichas   → dibuja estos roles en sus 4 slots fijos
+ *
+ * Los dos leen de la MISMA declaración: comparten datos, filtros, estado y
+ * acciones, y no comparten una sola regla de layout. Agregar una entidad nueva
+ * al sistema es mapear estos roles — no se escribe UI de celular, ya existe.
+ *
+ * Cada rol es una función que extrae el dato de la fila. Un rol que no aplica
+ * se omite y el renderer se acomoda; ninguno es obligatorio salvo `headline`,
+ * que es lo único que identifica al registro para una persona.
+ */
+export interface RolesSemanticos<Row = unknown> {
+  /** El código o número del registro. Slot 1, junto a la taxonomía. */
+  identity?: (row: Row) => string | null | undefined;
+  /** Categoría/tipo, con su color. Slot 1: punto de color + texto con elipsis. */
+  taxonomy?: (row: Row) => { label: string; color?: string; icon?: string } | null | undefined;
+  /** La frase que identifica al registro. Slot 2. Lo ÚNICO que puede ocupar
+   *  dos líneas en toda la ficha (clamp 2). */
+  headline: (row: Row) => string;
+  /** Quién, y de qué área. Slot 3, primera línea, con elipsis. */
+  actor?: (row: Row) => string | null | undefined;
+  /** Dónde, cuánto, o cuándo vence. Slot 3, segunda línea, con elipsis.
+   *  Si una entidad "necesita un quinto dato" en la lista, casi siempre ese
+   *  dato era el context. */
+  context?: (row: Row) => string | null | undefined;
+  /** Estado con su semántica de color. Slot 4: píldora arriba. El `tono`
+   *  entra en la escala del kit; no se inventan colores por entidad. */
+  state?: (row: Row) => { label: string; tono?: string } | null | undefined;
+  /** Tiempo relativo ("hace 3 d"). Slot 4: abajo de la píldora. */
+  elapsed?: (row: Row) => string | null | undefined;
+  /** Importe, para las entidades que lo tengan. Reemplaza a `elapsed` en el
+   *  slot 4 cuando ambos están declarados. */
+  amount?: (row: Row) => string | null | undefined;
+}
+
 export interface ColumnSpec<Row = unknown> {
   id: string;
   /** Encabezado eyebrow (10px/700, tracking .09em). Rotular también ACCIONES. */
@@ -461,6 +504,10 @@ export interface DataTableProps<Row = unknown> {
   activeStatus?: string;
   onStatusChange?: (id: string) => void;
   columns: ColumnSpec<Row>[];
+  /** Los mismos datos, declarados por ROL. Es lo que consume el renderer de
+   *  fichas cuando el CONTENEDOR es angosto (ver RolesSemanticos). Sin roles,
+   *  el control se comporta como siempre: sólo dibuja columnas. */
+  roles?: RolesSemanticos<Row>;
   /** 'date' (money/plain con fecha) · 'hour' (schedule) · 'none'. */
   groupBy?: 'date' | 'hour' | 'none';
   /** true en kind='money': subtotal por grupo en la columna del importe. */

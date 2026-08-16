@@ -19,7 +19,7 @@ import { PageHeader } from '../components/abmv2/PageHeader';
 import { ListToolbar } from '../components/abmv2/ListToolbar';
 import { FilterBar } from '../components/abmv2/FilterBar';
 import { DataTable, EntityCell, ChipEstado } from '../components/abmv2/DataTable';
-import type { ColumnSpec, RowAction, StatusTab, TableGroup, ViewKind } from '../components/abmv2/types';
+import type { ColumnSpec, RolesSemanticos, RowAction, StatusTab, TableGroup, ViewKind } from '../components/abmv2/types';
 import * as LucideIcons from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
@@ -382,6 +382,30 @@ function aFilaReclamo(r: Reclamo, onClick: () => void): FilaListaItem {
     onClick,
   };
 }
+
+/**
+ * ROLES SEMÁNTICOS de Reclamos — la declaración que consume el renderer de
+ * fichas del control cuando el contenedor es angosto.
+ *
+ * No dibuja nada: dice qué papel cumple cada campo del reclamo. El control se
+ * encarga del layout. Agregar una entidad nueva al sistema es escribir un mapa
+ * como este; no se escribe UI de celular.
+ */
+const ROLES_RECLAMO: RolesSemanticos<Reclamo> = {
+  identity: (r) => `#${r.id}`,
+  taxonomy: (r) =>
+    r.categoria ? { label: r.categoria.nombre, color: r.categoria.color || undefined } : null,
+  headline: (r) => r.titulo,
+  // Quién lo pidió y qué área lo tiene: las dos cosas que ubican al registro.
+  actor: (r) => {
+    const vecino = r.creador ? `${r.creador.nombre} ${r.creador.apellido}`.trim() : null;
+    const area = r.dependencia_asignada?.nombre || null;
+    return [vecino, area].filter(Boolean).join(' · ') || null;
+  },
+  context: (r) => r.direccion || r.zona?.nombre || null,
+  state: (r) => ({ label: estadoLabels[r.estado] || r.estado, tono: tonoDeEstado(r.estado) }),
+  elapsed: (r) => haceCuanto(r.created_at),
+};
 
 export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }: ReclamosProps) {
   const { theme } = useTheme();
@@ -3442,25 +3466,14 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
               </div>
             ) : activeView === 'guided' ? (
               <div className="mt-3">{inboxView}</div>
-            ) : esAngosto ? (
-              /* En un telefono no hay tabla ni grilla que sirvan: la tabla
-                 obliga a scrollear de costado y la tarjeta grande deja menos
-                 de dos items por pantalla. La vista elegida (tabla/tarjetas)
-                 es una preferencia de ESCRITORIO; en angosto siempre manda la
-                 lista, que muestra lo necesario para decidir si abrir —que
-                 es, de quien y hace cuanto— con el estado como barra de color
-                 al costado. */
-              filteredReclamos.length === 0 ? (
-                <section className="av2-tabla">
-                  <div className="av2-tabla-vacia">{mensajeVacio}</div>
-                </section>
-              ) : (
-                <FilaLista
-                  ariaLabel="Reclamos"
-                  items={filteredReclamos.map((r) => aFilaReclamo(r, () => openViewSheet(r)))}
-                />
-              )
-            ) : activeView === 'cards' ? (
+            ) : activeView === 'cards' && !esAngosto ? (
+              /* La grilla de tarjetas es una preferencia de ESCRITORIO: en
+                 angosto deja menos de dos ítems por pantalla. Ahí cae al
+                 control, que se proyecta solo a fichas (ver abajo).
+                 La lista a mano que había acá se fue: el renderer mobile ya no
+                 es un parche de esta página, es el otro dibujo del control
+                 —mismos datos, mismos filtros, mismas acciones— declarado con
+                 ROLES_RECLAMO. Ver docs/design-sync/abm-mobile/GUIA.md. */
               filteredReclamos.length === 0 ? (
                 <section className="av2-tabla">
                   <div className="av2-tabla-vacia">{mensajeVacio}</div>
@@ -3486,6 +3499,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
               <DataTable<Reclamo>
                 kind="plain"
                 columns={columnasTabla}
+                roles={ROLES_RECLAMO}
                 groupBy="date"
                 groups={gruposTabla}
                 rows={[]}

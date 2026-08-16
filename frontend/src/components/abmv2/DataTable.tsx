@@ -64,6 +64,7 @@ import type {
 import { toneDeEstado } from './estadoTonos';
 import { MetricCell } from './Controls';
 import { useReorder } from './useReorder';
+import { ListaDeFichas, useAnchoAngosto } from './FichaRegistro';
 
 /** [v2.1] Canónicas en types.ts; re-export para los imports existentes
  *  de las páginas (Empleados importa EntityCellData desde './DataTable'). */
@@ -341,6 +342,7 @@ const MENSAJE_VACIO =
 export function DataTable<Row>({
   kind,
   columns,
+  roles,
   groupBy = 'none',
   showGroupSubtotal = false,
   rows,
@@ -359,6 +361,12 @@ export function DataTable<Row>({
 }: DataTableProps<Row>) {
   const [menu, setMenu] = useState<MenuAbierto | null>(null);
   const cerrarMenu = useCallback(() => setMenu(null), []);
+
+  /* [proyección mobile] El control tiene DOS renderers y el ancho de SU
+     contenedor elige cuál —no el de la ventana: el ABM puede vivir embebido en
+     un panel angosto de escritorio y ahí también corresponde la ficha. El hook
+     va acá arriba, antes de cualquier return condicional (orden de hooks). */
+  const { ref: refAncho, angosto } = useAnchoAngosto<HTMLDivElement>();
 
   /* [v2.5] Modo "Reordenar". El hook va ACÁ ARRIBA, antes de cualquier return
      condicional: un hook después del `if (kind === 'board')` rompe el orden de
@@ -396,6 +404,33 @@ export function DataTable<Row>({
 
   const usarGrupos = groupBy !== 'none' && !!groups?.length;
   const totalFilas = usarGrupos ? groups!.reduce((n, g) => n + g.rows.length, 0) : rows.length;
+
+  /* --- RENDERER DE FICHAS ---------------------------------------------
+     Contenedor angosto + roles declarados ⇒ el control se dibuja como lista
+     de fichas. Se RETORNA acá: la grilla no se esconde con display:none, no
+     se renderiza — si no, quedan N filas de DOM invisibles con sus listeners
+     y su costo de layout. El `angosto === null` del primer frame cae a la
+     grilla de siempre y no hace saltar la lista. */
+  if (angosto === true && roles) {
+    const gruposFichas = usarGrupos
+      ? groups!.map((g) => ({ titulo: g.title ?? g.key ?? null, filas: g.rows }))
+      : [{ titulo: null, filas: rows }];
+    return (
+      <section className="av2-tabla av2-tabla--fichas" ref={refAncho}>
+        {loading ? (
+          <div className="av2-tabla-vacia">Cargando…</div>
+        ) : (
+          <ListaDeFichas
+            grupos={gruposFichas}
+            roles={roles}
+            rowKey={rowKey}
+            onRowClick={onRowClick}
+            vacio={emptyMessage}
+          />
+        )}
+      </section>
+    );
+  }
 
   const abrirMenu = (e: MouseEvent<HTMLButtonElement>, filaKey: string | number) => {
     e.stopPropagation();
@@ -602,7 +637,12 @@ export function DataTable<Row>({
     );
 
   return (
-    <section className="av2-tabla">
+    /* La ref del medidor va acá y NO sólo en el renderer de fichas: si
+       colgara únicamente de aquél, el observer nunca llegaría a montarse
+       —el renderer de fichas no se dibuja hasta que la medición diga que
+       el contenedor es angosto, y la medición no existe hasta que se
+       monte. Huevo y gallina. Este contenedor está en los dos caminos. */
+    <section className="av2-tabla" ref={refAncho}>
       {/* Tabs de estado subrayadas (diseño canvas): viven en el tope de la
           tarjeta de la tabla, no en la FilterBar. */}
       {statusTabs && statusTabs.length > 0 && (
