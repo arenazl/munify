@@ -221,6 +221,35 @@ export function rutaDeAcceso(b: Brand): string | null {
 }
 
 /**
+ * A dónde mandar una APP INSTALADA que arrancó sin marca en la URL, o null si
+ * no corresponde tocar nada.
+ *
+ * Una PWA guarda su `start_url` el día que se instala y no lo vuelve a leer:
+ * las que se agregaron antes de que la marca publicara su manifest arrancan en
+ * la raíz y caen en el generador de demos. Este rescate las lleva a la puerta
+ * de la marca — primero la que quedó recordada en este dispositivo y, si no
+ * hay, la única marca con ruta propia (no hay ambigüedad posible mientras
+ * exista una sola).
+ *
+ * Sólo con la app instalada: en el navegador la URL es la fuente de verdad y
+ * la raíz debe seguir llevando al acceso de siempre.
+ */
+export function rutaDeAccesoInstalada(): string | null {
+  if (typeof window === 'undefined' || !esAppInstalada()) return null;
+  let recordada: string | null = null;
+  try {
+    recordada = window.localStorage.getItem(CLAVE_MARCA_INSTALADA);
+  } catch {
+    recordada = null;
+  }
+  const marca =
+    (recordada && BRANDS[recordada]) ||
+    Object.values(BRANDS).find((b) => b.rutaAcceso && b.municipioCodigo) ||
+    null;
+  return marca ? rutaDeAcceso(marca) : null;
+}
+
+/**
  * Accesos que el router tiene que registrar a mano: los de ruta propia. El
  * `/:codigo` genérico sólo matchea UN tramo, así que `/py/asuncion` no le
  * llega. Cada entrada dice qué municipio abrir, independiente del path.

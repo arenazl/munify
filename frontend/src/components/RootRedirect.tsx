@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
+import { rutaDeAccesoInstalada } from '../brands';
 
 /**
  * Componente que maneja la redirección inteligente en la ruta raíz.
@@ -31,6 +32,23 @@ export default function RootRedirect() {
     const municipioParam = searchParams.get('municipio');
     if (municipioParam) {
       navigate(`/demo?municipio=${municipioParam}`, { replace: true });
+      return;
+    }
+
+    // APP INSTALADA que arranca en la raíz: va a la puerta de la marca, no al
+    // generador de demos.
+    //
+    // Una PWA ya instalada tiene su `start_url` CONGELADO desde el día que se
+    // agregó al inicio — iOS no lo vuelve a leer aunque el manifest cambie. Las
+    // instaladas antes de que la marca publicara su manifest arrancan en "/", y
+    // ahí caían en la grilla de demos de Munify: la app instalada de un tenant
+    // mostrando el catálogo de otros municipios.
+    //
+    // Sólo aplica con la app instalada (standalone). En el navegador la raíz
+    // sigue llevando al acceso de siempre, porque ahí la URL es la que manda.
+    const puertaDeMarca = rutaDeAccesoInstalada();
+    if (puertaDeMarca) {
+      navigate(puertaDeMarca, { replace: true });
       return;
     }
 
