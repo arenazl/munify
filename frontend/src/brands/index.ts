@@ -127,8 +127,10 @@ const BRANDS: Record<string, Brand> = {
     // MARCA (nombre "Munify", theme_color azul, apple-touch-icon y meta de
     // título de iOS propios). Sin esto caía en la rama del municipio y la app
     // instalada se guardaba como "Asunción, Dpto. Central" con la barra en el
-    // verde de la ficha. `icons/` es el set estático de Munify, ya completo.
-    iconPath: 'icons',
+    // verde de la ficha.
+    // Set propio (generate-icons-munify.cjs) y no el estático `icons/`: ahí el
+    // mark estaba descentrado y el ícono instalado se veía torcido.
+    iconPath: 'brand/munify-py',
     // Manifest servido como ARCHIVO REAL. El manifest dinámico se monta con
     // una `blob:` URL y Safari NO la lee: al "Agregar a inicio" caía en el
     // manifest.json estático, cuyo `start_url` es "/" — la raíz sin marca, o
