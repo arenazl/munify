@@ -119,10 +119,9 @@ def descargar_regiones(osm_id_municipio: str, nombre_municipio: str,
         # lo que ya tiene contorno. Overpass corta lotes al azar, asi que una
         # sola corrida rara vez trae las regiones completas; corriendo de nuevo
         # se completan las que faltan en vez de empezar de cero cada vez.
-        for regs in datos.get("niveles", {}).values():
+        for nivel_previo, regs in datos.get("niveles", {}).items():
             for r in regs:
-                if r.get("poligono"):
-                    previo[r["osm_id"]] = r
+                previo[r["osm_id"]] = {**r, "_nivel": nivel_previo}
 
     rel = osm_id_municipio.split("/")[-1]
     area = 3600000000 + int(rel)
@@ -149,7 +148,7 @@ def descargar_regiones(osm_id_municipio: str, nombre_municipio: str,
                 out tags center;
                 """)
                 ids = [e["id"] for e in cruda.get("elements", [])
-                       if f"relation/{e['id']}" not in previo]
+                       if not (previo.get(f"relation/{e['id']}") or {}).get("poligono")]
                 geom: dict[int, dict] = {}
                 for i in range(0, len(ids), 12):
                     lote = ",".join(str(x) for x in ids[i:i + 12])
@@ -185,6 +184,23 @@ def descargar_regiones(osm_id_municipio: str, nombre_municipio: str,
                 "poligono": poligono,
             })
         time.sleep(2)  # cortesia con el servicio publico
+
+    # NUNCA guardar menos de lo que ya se tenia. Overpass falla un nivel entero
+    # cada tanto, y sin esto una corrida con suerte mala pisa el cache bueno y
+    # se pierde todo lo bajado antes. Lo que no vino en ESTA corrida se conserva
+    # de la anterior.
+    vistos = {r["osm_id"] for regs in por_nivel.values() for r in regs}
+    recuperadas = 0
+    for osm_ref, r in previo.items():
+        if osm_ref in vistos:
+            continue
+        nivel_previo = r.pop("_nivel", None)
+        if not nivel_previo:
+            continue
+        por_nivel.setdefault(nivel_previo, []).append(r)
+        recuperadas += 1
+    if recuperadas:
+        fallos.append(f"{recuperadas} regiones conservadas de la corrida anterior")
 
     if not por_nivel:
         raise OsmNoDisponible("; ".join(fallos) or "sin regiones")
