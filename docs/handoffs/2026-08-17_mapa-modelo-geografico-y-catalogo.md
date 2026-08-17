@@ -300,3 +300,18 @@ Francisco Solano López.
 
 **No pushear suelto**: el criterio acordado es un solo deploy con el bloque
 terminado.
+
+## Los reclamos de Asunción son de DEMO — y eso habilita re-sembrarlos
+
+Están marcados en `reclamos.referencia` como `[DEMO-MAPA] MV-0001`. No hay
+vecinos reales detrás, así que se pueden mover sin costo.
+
+**La corrección que falta:** hoy caen sobre esquinas REALES de Asunción (bien),
+pero repartidas sin relación con los barrios, y el barrio se les asignó por
+cercanía. Una vez cargados los polígonos, conviene **re-sembrarlos dentro del
+contorno de su barrio**, para que "cae adentro de" sea cierto de verdad. Con
+datos de demo el re-reparto es gratis; con datos reales no se podría.
+
+Orden correcto: bajar contornos → cargarlos a la base → re-sembrar los reclamos
+dentro de cada polígono → recién ahí los KPIs por barrio y por distrito son
+consistentes con lo que se dibuja.
