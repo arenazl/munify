@@ -35,6 +35,8 @@ import {
   Eraser,
   Building2,
   LocateFixed,
+  Maximize2,
+  Minimize2,
   MapPinned,
   Pause,
   Play,
@@ -1332,6 +1334,58 @@ export default function Mapa() {
   const lienzoRef = useRef<HTMLDivElement>(null);
   const [mapaAlto, setMapaAlto] = useState(MAPA_ALTO_MIN);
 
+  /**
+   * Pantalla completa del mapa.
+   *
+   * Se pide la Fullscreen API del navegador —que además esconde su propia
+   * barra, que es lo que uno quiere cuando abre un mapa a pantalla completa— y
+   * si el navegador la rechaza se cae a un modo expandido por CSS, que clava
+   * el mapa sobre el viewport. El caso real del segundo camino es Safari de
+   * iPhone: sólo acepta fullscreen sobre <video>, así que sobre un div siempre
+   * falla. No hace falta avisarle a Leaflet: el ResizeObserver de
+   * <InvalidarAlRedimensionar /> ve el cambio de tamaño y se reajusta solo.
+   */
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  const [expandidoCss, setExpandidoCss] = useState(false);
+
+  const alternarPantallaCompleta = useCallback(async () => {
+    const el = lienzoRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => {});
+      return;
+    }
+    if (expandidoCss) { setExpandidoCss(false); setPantallaCompleta(false); return; }
+    try {
+      await el.requestFullscreen();
+    } catch {
+      logMapa('fullscreen nativo rechazado -> modo expandido por CSS');
+      setExpandidoCss(true);
+      setPantallaCompleta(true);
+    }
+  }, [expandidoCss]);
+
+  // La salida puede venir por Escape o por el botón del navegador, no sólo por
+  // el nuestro: el estado se sincroniza con lo que dice el documento.
+  useEffect(() => {
+    const alCambiar = () => {
+      const activo = !!document.fullscreenElement;
+      setPantallaCompleta(activo || expandidoCss);
+    };
+    document.addEventListener('fullscreenchange', alCambiar);
+    return () => document.removeEventListener('fullscreenchange', alCambiar);
+  }, [expandidoCss]);
+
+  // En modo expandido por CSS no hay Escape del navegador: se lo damos.
+  useEffect(() => {
+    if (!expandidoCss) return;
+    const alaTecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setExpandidoCss(false); setPantallaCompleta(false); }
+    };
+    document.addEventListener('keydown', alaTecla);
+    return () => document.removeEventListener('keydown', alaTecla);
+  }, [expandidoCss]);
+
   useEffect(() => {
     const recalcular = () => {
       const el = lienzoRef.current;
@@ -1514,21 +1568,18 @@ export default function Mapa() {
    * de estados sería ruido, porque el estado ya lo fijó la pregunta.
    */
   /**
-   * Color del pin: manda EL ÁREA que atiende el reclamo.
+   * Color del pin: la RESPUESTA A LA PREGUNTA (o el estado, sin pregunta).
    *
-   * Antes mandaba el tinte de la pregunta y los ciento y pico de pines salían
-   * todos del mismo color: el mapa mostraba dónde, nunca de quién. La
-   * respuesta a la pregunta sigue estando —en el titular, en el rótulo y en el
-   * tooltip de cada pin—, pero el color pasa a contestar algo que el mapa no
-   * decía. Sin área asignada se cae al tinte de la pregunta, como antes.
+   * Las dos señales del pin dicen cosas distintas y no se pisan: el COLOR
+   * contesta lo que se preguntó —qué tan atrasado, en qué estado— y el GLIFO
+   * dice de qué área es. Se probó con el color por área y se volvió: el color
+   * es la señal que se lee de un vistazo sobre cien pines, y tiene que quedar
+   * para lo que cambia según la pregunta. La pertenencia no cambia nunca, así
+   * que le alcanza con la silueta.
    */
   const colorDelPin = useCallback(
-    (r: Reclamo) => {
-      const area = r.dependencia_asignada ? areaPorId.get(r.dependencia_asignada.id) : undefined;
-      if (area) return area.color;
-      return preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado);
-    },
-    [areaPorId, preguntaConfig, tintesMapa],
+    (r: Reclamo) => (preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado)),
+    [preguntaConfig, tintesMapa],
   );
 
   /** Glifo del pin: el del área. `undefined` hasta que el icono termina de cargar. */
@@ -3419,7 +3470,7 @@ export default function Mapa() {
       {/* ============================ MODO RECLAMOS ============================ */}
       {!isPuntos && (
         <>
-      <div className="av2-mapa" ref={lienzoRef}>
+      <div className={`av2-mapa${expandidoCss ? ' av2-mapa--expandido' : ''}`} ref={lienzoRef}>
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}
         <div
@@ -3497,10 +3548,9 @@ export default function Mapa() {
                   <Tooltip direction="top" offset={[0, -42]} permanent={false}>
                     <div className="font-medium text-sm">{r.titulo}</div>
                     <div className="text-xs text-gray-500">{r.direccion}</div>
+                    {/* El nombre del área: es lo que decodifica el glifo del pin. */}
                     {r.dependencia_asignada?.nombre && (
-                      <div className="text-xs font-medium" style={{ color: colorDelPin(r) }}>
-                        {r.dependencia_asignada.nombre}
-                      </div>
+                      <div className="text-xs font-medium">{r.dependencia_asignada.nombre}</div>
                     )}
                   </Tooltip>
                 </Marker>
@@ -3546,6 +3596,18 @@ export default function Mapa() {
             una barra arriba. Mismo tratamiento visual que la leyenda de
             densidad (superficie, borde y sombra flotante de los tokens). */}
         <div className="av2-mapa-controles">
+          <button
+            type="button"
+            className={`av2-mapa-ctrl${pantallaCompleta ? ' av2-mapa-ctrl--activo' : ''}`}
+            onClick={alternarPantallaCompleta}
+            aria-pressed={pantallaCompleta}
+            title={pantallaCompleta ? 'Salir de pantalla completa (Esc)' : 'Ver el mapa a pantalla completa'}
+            aria-label={pantallaCompleta ? 'Salir de pantalla completa' : 'Ver el mapa a pantalla completa'}
+          >
+            {pantallaCompleta
+              ? <Minimize2 size={16} strokeWidth={2} aria-hidden />
+              : <Maximize2 size={16} strokeWidth={2} aria-hidden />}
+          </button>
           <button
             type="button"
             className="av2-mapa-ctrl"

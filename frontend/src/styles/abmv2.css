@@ -2466,6 +2466,32 @@ button.av2-chip:hover { opacity: 0.85; }
   min-height: 420px;
 }
 
+/* --- PANTALLA COMPLETA ---------------------------------------------------
+   Dos caminos para el mismo resultado, porque la Fullscreen API no existe en
+   Safari de iPhone sobre un div (sólo la acepta en <video>): si el navegador
+   la soporta manda `:fullscreen`, y si no, la clase `--expandido` clava el
+   mapa sobre el viewport. En ambos casos el lienzo pasa a ocupar todo el alto
+   disponible: si quedara el alto elástico, la pantalla completa mostraría el
+   mapa de siempre con bandas muertas arriba y abajo.
+
+   El alto va por `dvh` para que la barra del navegador del teléfono, que
+   aparece y desaparece al scrollear, no deje al mapa cortado. */
+.av2-mapa:fullscreen { margin-top: 0; border: 0; border-radius: 0; }
+.av2-mapa:fullscreen .av2-mapa-lienzo { height: 100%; min-height: 0; }
+
+.av2-mapa--expandido {
+  position: fixed;
+  inset: 0;
+  z-index: var(--pl-z-modal, 1000);
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+}
+.av2-mapa--expandido .av2-mapa-lienzo {
+  height: 100dvh;
+  min-height: 0;
+}
+
 /* --- Leyenda de densidad, flotante abajo a la izquierda. La rampa NO es
    una paleta propia: son los tres matices de VEREDICTO (bueno →
    advertencia → malo), los mismos que colorea el heatmap. --- */
