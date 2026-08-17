@@ -655,6 +655,12 @@ button.av2-chip:hover { opacity: 0.85; }
   font-feature-settings: 'tnum';
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  /* Es el ÚLTIMO de la fila y con `nowrap` puro empuja: un resumen largo
+     (el de un filtro que nombra la entidad elegida) desbordaba la tarjeta.
+     Con esto encoge y corta antes de romper la barra. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* --- Mobile: inputs a 16px para que iOS no haga zoom (estándar
@@ -664,7 +670,17 @@ button.av2-chip:hover { opacity: 0.85; }
   .av2-toolbar-buscador { flex-basis: 100%; }
   /* El divisor sobra cuando cada bloque cae en su propia línea. */
   .av2-toolbar > .av2-divisor { display: none; }
-  .av2-filtro-resumen { margin-left: 0; }
+  /* Ya cayó a su propia línea: ahí conviene que ENVUELVA y se lea entero,
+     en vez de cortarse con puntos suspensivos como en escritorio. */
+  .av2-filtro-resumen {
+    margin-left: 0;
+    white-space: normal;
+    overflow: visible;
+    flex-basis: 100%;
+  }
+  /* Los selects se reparten la fila en vez de estirarse con el nombre que
+     tengan adentro (una obra larga se comía el ancho entero). */
+  .av2-select-grupo { flex: 1 1 auto; max-width: 100%; }
 }
 
 /* ============================================================
@@ -694,7 +710,12 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-select-grupo:hover,
 .av2-select-grupo:focus-within { border-color: var(--pl-green-200); }
 
-.av2-select-modern { min-width: 96px; }
+/* Tope de ancho: el trigger del ModernSelect crece con el texto de la opción
+   elegida y un nombre largo (una obra, una dependencia) estiraba el control
+   hasta romper la fila. El span interno ya viene con `truncate`, así que
+   acotando el contenedor el valor se corta solo. Mismo criterio que el
+   `max-width: 180px` del patrón `.av2-select-valor`. */
+.av2-select-modern { min-width: 96px; max-width: 190px; }
 .av2-select-modern > button {
   background: transparent !important; /* pisa el style inline del theme */
   border: 0 !important;               /* idem */

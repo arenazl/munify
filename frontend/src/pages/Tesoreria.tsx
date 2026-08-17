@@ -32,10 +32,10 @@ import type {
 import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { formatFechaAR, parseFechaLocal } from '../lib/tesoreria-helpers';
-import { gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
+import { gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, proyectosApi } from '../lib/api';
 import { conceptoIcon } from '../lib/conceptoIcons';
 import { contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS, TIPO_CONTACTO_LABELS_SINGULAR } from '../lib/contactoIcons';
-import type { Gasto, FormaPago, Contacto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja } from '../types';
+import type { Gasto, FormaPago, Contacto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja, Proyecto } from '../types';
 
 const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   efectivo: 'Efectivo',
@@ -95,6 +95,10 @@ export default function Tesoreria() {
   // Filtro de tipo de concepto eliminado — listado plano de conceptos.
   const tipoConceptoFiltro = '';
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
+  // Proyecto (obra/partida a la que se imputan gastos). Filtra SERVER-side: un
+  // gasto puede estar repartido entre varios proyectos, asi que no alcanza con
+  // mirar la pagina cargada.
+  const [proyectoFiltro, setProyectoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
 
   // Navegador de periodos. modo: 'mes' | 'anio'. mes/anio = filtro activo.
@@ -114,6 +118,7 @@ export default function Tesoreria() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
 
@@ -142,6 +147,7 @@ export default function Tesoreria() {
       if (search.trim()) params.search = search.trim();
       if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
       if (cajaFiltro) params.caja_id = parseInt(cajaFiltro, 10);
+      if (proyectoFiltro) params.proyecto_id = parseInt(proyectoFiltro, 10);
       if (rangoActivo) { params.desde = rangoFechas.desde; params.hasta = rangoFechas.hasta; }
       else if (!todosLosMeses && modoPeriodo === 'mes') {
         // Filtro temporal por mes: primer dia y ultimo dia
@@ -205,12 +211,25 @@ export default function Tesoreria() {
     }
   };
 
+  // Proyectos CON resumen: el combo los lista y, al elegir uno, el resumen da
+  // el total imputado de TODO el proyecto (el server ya lo calcula sobre el
+  // universo completo — la pagina cargada solo tiene 50 gastos y mentiria).
+  const fetchProyectos = async () => {
+    try {
+      const res = await proyectosApi.list({ activo: true, include_resumen: true, limit: 500 });
+      setProyectos(res.data || []);
+    } catch {
+      setProyectos([]);
+    }
+  };
+
   useEffect(() => {
     if (!esGestor) return;
     fetchDependencias();
     fetchContactos();
     fetchCatalogoConceptos();
     fetchTiposEmpleado();
+    fetchProyectos();
   }, [esGestor]);
 
   // Re-fetch gastos cada vez que cambia un filtro server-side o la paginacion.
@@ -220,7 +239,7 @@ export default function Tesoreria() {
     if (!esGestor) return;
     fetchGastos();
     /* eslint-disable-next-line */
-  }, [esGestor, page, pageSize, dependenciaFiltro, cajaFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+  }, [esGestor, page, pageSize, dependenciaFiltro, cajaFiltro, proyectoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
 
   // Search con debounce
   useEffect(() => {
@@ -516,6 +535,46 @@ export default function Tesoreria() {
     return sortByPresence(items, ordering.dependencia);
   }, [dependencias, ordering.dependencia]);
 
+  // Opciones de proyecto: primero los ACTIVOS y, dentro de cada tramo, el de
+  // mas plata imputada arriba (es el que se consulta). Los nombres de obra son
+  // largos: el combo pasa a buscador solo (searchable > 8 opciones).
+  const proyectoOptions = useMemo(() => {
+    const peso = (p: Proyecto) => parseFloat(p.resumen?.total_imputado || '0');
+    return [...proyectos]
+      .sort((a, b) => {
+        const activoA = a.estado === 'activo' ? 0 : 1;
+        const activoB = b.estado === 'activo' ? 0 : 1;
+        return activoA !== activoB ? activoA - activoB : peso(b) - peso(a);
+      })
+      .map(p => ({ value: String(p.id), label: p.nombre }));
+  }, [proyectos]);
+
+  const proyectoSel = useMemo(
+    () => proyectos.find(p => String(p.id) === proyectoFiltro) || null,
+    [proyectos, proyectoFiltro],
+  );
+
+  /**
+   * Resumen de la barra de filtros.
+   *
+   * Con un proyecto elegido NO se muestra la suma de la pagina: cada gasto
+   * puede estar repartido entre varias obras, asi que sumar `monto_pesos`
+   * daria de mas (un gasto de $1M imputado $200k a esta obra sumaria $1M). El
+   * numero que vale es el `total_imputado` que el server calcula sobre TODO el
+   * universo del proyecto — y ese es, ademas, el dato que se pidio ver:
+   * cuanto lleva gastado la obra.
+   */
+  const resumenFiltro = useMemo(() => {
+    const cant = `${totales.cantidad} ${totales.cantidad === 1 ? 'movimiento' : 'movimientos'}`;
+    if (!proyectoSel) return `${cant} · ${fmtMoney(totales.totalPesos)}`;
+    const imputado = parseFloat(proyectoSel.resumen?.total_imputado || '0');
+    const pct = proyectoSel.resumen?.porcentaje_presupuesto;
+    const total = `Total del proyecto: ${fmtMoney(imputado)}`;
+    return pct != null
+      ? `${cant} · ${total} · ${Math.round(pct)}% del presupuesto`
+      : `${cant} · ${total}`;
+  }, [totales, proyectoSel]);
+
   // ===================================================================
   // Mapeo al contrato del estándar (SemanticAbmPage)
   // ===================================================================
@@ -552,6 +611,18 @@ export default function Tesoreria() {
       options: [{ value: '', label: 'Todas' }, ...cajaOptions],
       onChange: setCajaFiltro,
     },
+    // Sin proyectos cargados el combo no se dibuja: una obra por municipio es
+    // opt-in y una barra con un select muerto ("Todos" y nada mas) ocupa lugar
+    // en la fila sin dar nada.
+    ...(proyectoOptions.length > 0
+      ? [{
+          id: 'proyecto',
+          label: 'Proyecto',
+          value: proyectoFiltro,
+          options: [{ value: '', label: 'Todos' }, ...proyectoOptions],
+          onChange: (v: string) => { setProyectoFiltro(v); setPage(1); },
+        } satisfies SelectSpec]
+      : []),
   ];
 
   // --- PeriodControl: mapea el estado de periodo existente al contrato.
@@ -902,7 +973,7 @@ export default function Tesoreria() {
         statusTabs={statusTabs}
         activeStatus={estadoFiltro}
         onStatusChange={(id) => setEstadoFiltro(id as EstadoAgregado | '')}
-        filterSummary={`${totales.cantidad} ${totales.cantidad === 1 ? 'movimiento' : 'movimientos'} · ${fmtMoney(totales.totalPesos)}`}
+        filterSummary={resumenFiltro}
         kind="money"
         columns={columns}
         groupBy="date"
