@@ -44,10 +44,10 @@ import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
 import { CalendarView } from '../components/ui/CalendarView';
-import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
+import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, proyectosApi } from '../lib/api';
 import { conceptoIcon } from '../lib/conceptoIcons';
 import { contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS } from '../lib/contactoIcons';
-import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja } from '../types';
+import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja, Proyecto } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   contado: '#10b981',
@@ -103,6 +103,10 @@ export default function Tesoreria() {
   // Filtro de tipo de concepto eliminado — listado plano de conceptos.
   const tipoConceptoFiltro = '';
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
+  // Proyecto (obra/partida a la que se imputan gastos). Filtra SERVER-side: un
+  // gasto puede estar repartido entre varios proyectos, asi que no alcanza con
+  // mirar la pagina cargada.
+  const [proyectoFiltro, setProyectoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
 
   // Navegador de periodos. modo: 'mes' | 'anio'. mes/anio = filtro activo.
@@ -122,6 +126,7 @@ export default function Tesoreria() {
   const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
 
@@ -149,6 +154,30 @@ export default function Tesoreria() {
     return () => { cancelled = true; };
   }, []);
 
+  // Los memos del filtro de proyecto van ACA ARRIBA, y no junto al resto de las
+  // opciones del toolbar, a proposito: debajo hay un `return` por rol y todos
+  // los hooks que quedan despues de esa linea se llaman condicionalmente
+  // (react-hooks/rules-of-hooks los marca). No se suma a esa deuda.
+  //
+  // Orden del combo: primero las obras ACTIVAS y, dentro de cada tramo, la de
+  // mas plata imputada arriba, que es la que se consulta.
+  const proyectoOptions = useMemo(() => {
+    const peso = (p: Proyecto) => parseFloat(p.resumen?.total_imputado || '0');
+    const items = [...proyectos]
+      .sort((a, b) => {
+        const activoA = a.estado === 'activo' ? 0 : 1;
+        const activoB = b.estado === 'activo' ? 0 : 1;
+        return activoA !== activoB ? activoA - activoB : peso(b) - peso(a);
+      })
+      .map(p => ({ value: String(p.id), label: p.nombre }));
+    return [{ value: '', label: 'Proyecto' }, ...items];
+  }, [proyectos]);
+
+  const proyectoSel = useMemo(
+    () => proyectos.find(p => String(p.id) === proyectoFiltro) || null,
+    [proyectos, proyectoFiltro],
+  );
+
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (
       <div className="p-6">
@@ -169,6 +198,7 @@ export default function Tesoreria() {
       if (search.trim()) params.search = search.trim();
       if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
       if (cajaFiltro) params.caja_id = parseInt(cajaFiltro, 10);
+      if (proyectoFiltro) params.proyecto_id = parseInt(proyectoFiltro, 10);
       if (rangoActivo) { params.desde = rangoFechas.desde; params.hasta = rangoFechas.hasta; }
       else if (!todosLosMeses && modoPeriodo === 'mes') {
         // Filtro temporal por mes: primer dia y ultimo dia
@@ -235,11 +265,24 @@ export default function Tesoreria() {
     }
   };
 
+  // Proyectos CON resumen: el combo los lista y, al elegir uno, el resumen da
+  // el total imputado de TODO el proyecto (el server ya lo calcula sobre el
+  // universo completo — la pagina cargada solo tiene 50 gastos y mentiria).
+  const fetchProyectos = async () => {
+    try {
+      const res = await proyectosApi.list({ activo: true, include_resumen: true, limit: 500 });
+      setProyectos(res.data || []);
+    } catch {
+      setProyectos([]);
+    }
+  };
+
   useEffect(() => {
     fetchDependencias();
     fetchContactos();
     fetchCatalogoConceptos();
     fetchTiposEmpleado();
+    fetchProyectos();
   }, []);
 
   // Re-fetch gastos cada vez que cambia un filtro server-side o la paginacion.
@@ -248,7 +291,7 @@ export default function Tesoreria() {
   useEffect(() => {
     fetchGastos();
     /* eslint-disable-next-line */
-  }, [page, pageSize, dependenciaFiltro, cajaFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+  }, [page, pageSize, dependenciaFiltro, cajaFiltro, proyectoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
 
   // Search con debounce
   useEffect(() => {
@@ -640,6 +683,18 @@ export default function Tesoreria() {
         options: cajaOptions.filter(o => o.value !== ''),
         searchable: true,
         minWidth: 180,
+      },
+      {
+        key: 'proyecto',
+        placeholder: 'Proyecto',
+        value: proyectoFiltro,
+        onChange: (v) => { setProyectoFiltro(v); setPage(1); },
+        options: proyectoOptions.filter(o => o.value !== ''),
+        searchable: true,
+        minWidth: 190,
+        // Sin obras cargadas el combo no se dibuja: los proyectos son opt-in por
+        // municipio y un select muerto ocupa lugar en la fila sin dar nada.
+        visible: proyectos.length > 0,
       },
     ],
     customAfterCombos: [
@@ -1240,7 +1295,28 @@ export default function Tesoreria() {
                 ({totales.cantidad} {totales.cantidad === 1 ? 'pago' : 'pagos'})
               </span>
             </div>
-            {totales.totalImputado > 0 && (
+            {/*
+              Con una obra elegida NO se muestra la suma de la pagina: cada gasto
+              puede estar repartido entre varios proyectos, asi que sumar lo
+              listado da de mas (un gasto de $1M imputado $200k a esta obra
+              sumaria $1M). El numero que vale es el total_imputado que el server
+              calcula sobre TODO el universo del proyecto — y es, ademas, el dato
+              que se queria ver: cuanto lleva gastado la obra.
+            */}
+            {proyectoSel ? (
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
+                <span className="text-xs" style={{ color: theme.textSecondary }}>Total de la obra:</span>
+                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
+                  ${parseFloat(proyectoSel.resumen?.total_imputado || '0').toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+                {proyectoSel.resumen?.porcentaje_presupuesto != null && (
+                  <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                    ({Math.round(proyectoSel.resumen.porcentaje_presupuesto)}% del presupuesto)
+                  </span>
+                )}
+              </div>
+            ) : totales.totalImputado > 0 ? (
               <div className="flex items-center gap-2">
                 <Briefcase className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
                 <span className="text-xs" style={{ color: theme.textSecondary }}>Imputado a proyectos:</span>
@@ -1248,7 +1324,7 @@ export default function Tesoreria() {
                   ${totales.totalImputado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                 </span>
               </div>
-            )}
+            ) : null}
             {totales.totalUsd > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: theme.textSecondary }}>USD equiv.:</span>

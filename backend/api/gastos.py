@@ -268,13 +268,21 @@ def _generar_cuotas(gasto: Gasto) -> List[GastoCuota]:
 # ============================================================
 
 def _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependencia_id,
-                                concepto, search, desde, hasta, estado_pago, caja_id=None):
+                                concepto, search, desde, hasta, estado_pago, caja_id=None,
+                                proyecto_id=None):
     """Construye query con filtros (sin offset/limit/order_by/options).
     Reutilizable para list paginado + count."""
     query = select(Gasto).where(
         Gasto.municipio_id == municipio_id,
         Gasto.activo == True,  # noqa: E712
     )
+    if proyecto_id:
+        # Los gastos imputados a este proyecto. Va por subquery y NO por join:
+        # la relacion es N:M y un join duplicaria filas (rompiendo el
+        # X-Total-Count y la paginacion) apenas un gasto toque dos proyectos.
+        query = query.where(Gasto.id.in_(
+            select(GastoProyecto.gasto_id).where(GastoProyecto.proyecto_id == proyecto_id)
+        ))
     if destino_tipo:
         query = query.where(Gasto.destino_tipo == destino_tipo)
     if contacto_id:
@@ -338,6 +346,7 @@ async def list_gastos(
     hasta: Optional[date] = None,
     estado_pago: Optional[str] = None,
     caja_id: Optional[int] = None,
+    proyecto_id: Optional[int] = Query(None, description="Solo gastos imputados a este proyecto"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
@@ -347,7 +356,8 @@ async def list_gastos(
     municipio_id = get_effective_municipio_id(request, current_user)
 
     base = _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependencia_id,
-                                       concepto, search, desde, hasta, estado_pago, caja_id)
+                                       concepto, search, desde, hasta, estado_pago, caja_id,
+                                       proyecto_id)
 
     # Total filtrado (sin paginar) para que el frontend calcule paginas
     count_q = select(func.count()).select_from(base.subquery())
