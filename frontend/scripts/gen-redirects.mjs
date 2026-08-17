@@ -9,25 +9,24 @@ if (!origin) {
 }
 const o = origin.replace(/\/+$/, '')
 
-// HOME_PATH (opcional, por SITE): a dónde manda la RAÍZ del sitio.
+// SIN redirect de raíz en el borde (a propósito).
 //
-// Existe para los sites que sirven UNA sola puerta —un tenant, una demo— y no
-// el acceso multi-municipio de Munify. Sin esta variable no cambia nada: la
-// raíz entra a la app y el ruteo decide, como siempre.
+// Hubo un `HOME_PATH` que mandaba "/" a la puerta de una marca con un 302, para
+// alcanzar a las PWA ya instaladas (su `start_url` queda congelado en "/" y no
+// se re-lee). El problema: el borde NO puede distinguir una app instalada de un
+// navegador, así que ese 302 se llevaba puesto a todo el mundo — escribir el
+// dominio pelado terminaba en el tenant de la demo. En un dominio multi-tenant
+// la raíz es de Munify y la URL manda siempre.
 //
-// Por qué en el borde y no en el front: una PWA ya instalada tiene su
-// `start_url` CONGELADO desde el día que se agregó al inicio (iOS no lo vuelve
-// a leer), y arranca en "/" pase lo que pase. Redirigir acá es lo único que
-// alcanza a esa app sin reinstalarla — no depende del bundle, del storage ni
-// de que el JS llegue a correr.
-const home = (process.env.HOME_PATH || '').trim()
-const reglaHome = home ? `/           ${home}           302\n` : ''
+// El rescate de la PWA instalada vive en el front (`rutaDeAccesoInstalada`),
+// que sí sabe si corre en modo standalone y sólo actúa con la marca que ese
+// dispositivo recordó.
 
 const body = `# GENERADO en build desde BACKEND_ORIGIN. NO hardcodear hosts acá.
-${reglaHome}/api/*      ${o}/api/:splat      200!
+/api/*      ${o}/api/:splat      200!
 /static/*   ${o}/static/:splat   200!
 /uploads/*  ${o}/uploads/:splat  200!
 /*          /index.html          200
 `
 writeFileSync('dist/_redirects', body)
-console.log(`[gen-redirects] dist/_redirects -> ${o}${home ? ` (raíz -> ${home})` : ''}`)
+console.log(`[gen-redirects] dist/_redirects -> ${o}`)

@@ -242,10 +242,11 @@ export function rutaDeAccesoInstalada(): string | null {
   } catch {
     recordada = null;
   }
-  const marca =
-    (recordada && BRANDS[recordada]) ||
-    Object.values(BRANDS).find((b) => b.rutaAcceso && b.municipioCodigo) ||
-    null;
+  // SOLO la marca por la que este dispositivo entró realmente. Sin recuerdo no
+  // se adivina: antes se caía en "la única marca con ruta propia" y eso mandaba
+  // a la demo de Asunción CUALQUIER app instalada, incluida la de Munify
+  // genérico o la de otro municipio. Sin marca, la raíz sigue su curso normal.
+  const marca = (recordada && BRANDS[recordada]) || null;
   return marca ? rutaDeAcceso(marca) : null;
 }
 
@@ -274,11 +275,35 @@ export const ACCESOS_DE_MARCA: Array<{ ruta: string; codigo: string }> = Object.
  *
  * El HOST va primero y la RUTA después a propósito: en el dominio propio de
  * una marca no hay forma de salirse de ella escribiendo otra URL.
+ *
+ * EXCEPCIÓN A LOS PASOS 3-4 — LA RAÍZ DESPEGA LA MARCA. Escribir el dominio
+ * pelado en el navegador tiene que devolver SIEMPRE al acceso de Munify,
+ * aunque un rato antes se haya visitado `/py/asuncion` en esa misma pestaña.
+ * El recuerdo existe para que la marca sobreviva el salto interno de la SPA
+ * (`/asuncion` → `/login`), no para dejar el dominio pegado a un tenant: sin
+ * esto, una marca mono-tenant se llevaba puestas también `/demo`,
+ * `/bienvenido` y el resto de las rutas que redirigen a su home.
+ * Con la app INSTALADA no aplica: ahí no hay barra de direcciones donde
+ * escribir otra URL, así que el recuerdo es la única señal de por qué puerta
+ * entró y es justo el caso que rescata `rutaDeAccesoInstalada()`.
  */
 function resolveBrandId(): string {
   if (typeof window !== 'undefined') {
     const byHost = HOST_TO_BRAND[window.location.hostname];
     if (byHost && BRANDS[byHost]) return byHost;
+
+    const enRaiz = window.location.pathname.replace(/\/+$/, '') === '';
+    if (enRaiz && !esAppInstalada()) {
+      try {
+        window.sessionStorage.removeItem(CLAVE_MARCA_SESION);
+      } catch {
+        // sin storage no hay nada pegado que limpiar
+      }
+      const envRaiz = (import.meta.env.VITE_BRAND as string | undefined)?.trim();
+      // VITE_BRAND sí manda: es la identidad del SITE (el build de la marca),
+      // no algo que el usuario haya arrastrado navegando.
+      return envRaiz && BRANDS[envRaiz] ? envRaiz : 'munify';
+    }
 
     const porRuta = marcaPorRuta(window.location.pathname);
     if (porRuta) {
