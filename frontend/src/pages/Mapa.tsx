@@ -564,6 +564,24 @@ const createPinIcon = (color: string, glifo?: string) =>
     popupAnchor: [0, -42],
   });
 
+// =====================================================================
+// DIAGNÓSTICO DEL MAPA
+// =====================================================================
+// El mapa decide qué dibuja a través de varias capas encadenadas (pregunta →
+// alcance → tiempo → modo de dibujo) y cuando lo que se ve no coincide con lo
+// que se espera, desde afuera no hay forma de saber en cuál se perdió. Estos
+// logs cuentan cada eslabón.
+//
+// Se apagan desde la consola con: localStorage.setItem('mapaDebug', '0')
+const debugMapa = () => {
+  try { return localStorage.getItem('mapaDebug') !== '0'; } catch { return true; }
+};
+const logMapa = (evento: string, datos?: unknown) => {
+  if (!debugMapa()) return;
+  if (datos === undefined) console.log(`[mapa] ${evento}`);
+  else console.log(`[mapa] ${evento}`, datos);
+};
+
 /**
  * Glifo de un icono lucide como markup SVG, listo para meter en el HTML de un
  * divIcon de Leaflet.
@@ -583,15 +601,20 @@ async function cargarGlifo(nombre: string): Promise<string | null> {
   const cacheado = glifoCache.get(kebab);
   if (cacheado) return cacheado;
   const importer = dynamicIconImports[kebab as keyof typeof dynamicIconImports];
-  if (!importer) return null;
+  if (!importer) {
+    logMapa(`glifo "${nombre}" -> NO EXISTE en lucide (buscado como "${kebab}")`);
+    return null;
+  }
   try {
     const mod = await importer();
     const svg = renderToStaticMarkup(
       createElement(mod.default, { size: 12, strokeWidth: 2.75, color: 'currentColor' }),
     );
     glifoCache.set(kebab, svg);
+    logMapa(`glifo "${kebab}" resuelto (${svg.length} chars)`);
     return svg;
-  } catch {
+  } catch (e) {
+    logMapa(`glifo "${kebab}" FALLO al renderizar`, e);
     return null;
   }
 }
@@ -1408,12 +1431,22 @@ export default function Mapa() {
   const [glifosArea, setGlifosArea] = useState<Record<string, string>>({});
   useEffect(() => {
     let vivo = true;
+    logMapa(
+      `areas detectadas en los datos: ${dependenciasDisponibles.length}`,
+      dependenciasDisponibles.map((d) => ({
+        id: d.id, nombre: d.nombre, reclamos: d.count, color: d.color, icono: d.icono,
+      })),
+    );
     const nombres = Array.from(new Set(dependenciasDisponibles.map((d) => d.icono)));
-    if (nombres.length === 0) return;
+    if (nombres.length === 0) {
+      logMapa('sin areas -> no hay glifos que cargar (todos los pines caen al tinte de la pregunta)');
+      return;
+    }
     Promise.all(nombres.map(async (n) => [n, await cargarGlifo(n)] as const)).then((pares) => {
       if (!vivo) return;
       const nuevos: Record<string, string> = {};
       for (const [n, svg] of pares) if (svg) nuevos[n] = svg;
+      logMapa(`glifos: ${Object.keys(nuevos).length} de ${nombres.length} resueltos`, nombres);
       setGlifosArea((prev) => ({ ...prev, ...nuevos }));
     });
     return () => { vivo = false; };
@@ -1565,6 +1598,35 @@ export default function Mapa() {
     () => aplicarTiempo(reclamosAlcance),
     [aplicarTiempo, reclamosAlcance],
   );
+
+  // Radiografía de lo que se está por dibujar. Lo importante es `sinArea`: un
+  // reclamo sin dependencia asignada no puede tomar color de área y cae al
+  // tinte de la pregunta — si son todos, el mapa se ve de un solo color por
+  // más que la lógica de áreas esté bien.
+  useEffect(() => {
+    if (!debugMapa()) return;
+    const porColor = new Map<string, number>();
+    let sinArea = 0;
+    let sinCoords = 0;
+    let conGlifo = 0;
+    for (const r of reclamosFiltrados) {
+      if (!r.dependencia_asignada) sinArea += 1;
+      if (r.latitud == null || r.longitud == null) sinCoords += 1;
+      if (glifoDelPin(r)) conGlifo += 1;
+      const c = colorDelPin(r);
+      porColor.set(c, (porColor.get(c) || 0) + 1);
+    }
+    logMapa(`render · pregunta="${pregunta || 'todo'}" · dibujo="${dibujoMapa}"`, {
+      dibujados: reclamosFiltrados.length,
+      sinAreaAsignada: sinArea,
+      sinCoordenadas: sinCoords,
+      conGlifo,
+      colores: Object.fromEntries(porColor),
+    });
+    if (porColor.size === 1 && reclamosFiltrados.length > 1) {
+      logMapa('OJO: un solo color para todos los pines. Causa probable: ninguno tiene area asignada, o el modo de dibujo no usa pines.');
+    }
+  }, [reclamosFiltrados, colorDelPin, glifoDelPin, pregunta, dibujoMapa]);
 
   // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
   // La ventana móvil recorta sobre esto y el remate compara la primera ventana
