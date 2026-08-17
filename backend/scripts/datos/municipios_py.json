@@ -1,0 +1,1884 @@
+[
+ {
+  "nombre": "Bahía Negra",
+  "departamento": "Alto Paraguay",
+  "alias": [],
+  "cod_ine": "1704",
+  "cod_departamento": "17"
+ },
+ {
+  "nombre": "Capitán Carmelo Peralta",
+  "departamento": "Alto Paraguay",
+  "alias": [
+   "Carmelo Peralta"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Fuerte Olimpo",
+  "departamento": "Alto Paraguay",
+  "alias": [],
+  "cod_ine": "1701",
+  "cod_departamento": "17"
+ },
+ {
+  "nombre": "Puerto Casado",
+  "departamento": "Alto Paraguay",
+  "alias": [],
+  "cod_ine": "1702",
+  "cod_departamento": "17"
+ },
+ {
+  "nombre": "Ciudad del Este",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1001",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Doctor Juan León Mallorquín",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Doctor Raúl Peña",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Domingo Martínez de Irala",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1003",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Hernandarias",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1005",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Iruña",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1019",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Itakyry",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1006",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Juan Emilio O'Leary",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Los Cedrales",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1010",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Mbaracayú",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1017",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Minga Guazú",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1011",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Minga Porá",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1016",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Naranjal",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1014",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Presidente Franco",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1002",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "San Alberto",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1018",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "San Cristóbal",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1012",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Santa Fe del Paraná",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1020",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Santa Rita",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1013",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Santa Rosa del Monday",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1015",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Tavapy",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1021",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Yguazú",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1009",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Ñacunday",
+  "departamento": "Alto Paraná",
+  "alias": [],
+  "cod_ine": "1008",
+  "cod_departamento": "10"
+ },
+ {
+  "nombre": "Bella Vista Norte",
+  "departamento": "Amambay",
+  "alias": [
+   "Bella Vista"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Capitán Bado",
+  "departamento": "Amambay",
+  "alias": [],
+  "cod_ine": "1303",
+  "cod_departamento": "13"
+ },
+ {
+  "nombre": "Cerro Corá",
+  "departamento": "Amambay",
+  "alias": [
+   "Chirigüelo"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Karapaí",
+  "departamento": "Amambay",
+  "alias": [
+   "Carapaí"
+  ],
+  "cod_ine": "1305",
+  "cod_departamento": "13"
+ },
+ {
+  "nombre": "Pedro Juan Caballero",
+  "departamento": "Amambay",
+  "alias": [],
+  "cod_ine": "1301",
+  "cod_departamento": "13"
+ },
+ {
+  "nombre": "Zanja Pytá",
+  "departamento": "Amambay",
+  "alias": [],
+  "cod_ine": "1304",
+  "cod_departamento": "13"
+ },
+ {
+  "nombre": "Asunción",
+  "departamento": "Asunción",
+  "alias": [],
+  "cod_ine": "0000",
+  "cod_departamento": "00"
+ },
+ {
+  "nombre": "Boquerón",
+  "departamento": "Boquerón",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Filadelfia",
+  "departamento": "Boquerón",
+  "alias": [],
+  "cod_ine": "1604",
+  "cod_departamento": "16"
+ },
+ {
+  "nombre": "Loma Plata",
+  "departamento": "Boquerón",
+  "alias": [],
+  "cod_ine": "1605",
+  "cod_departamento": "16"
+ },
+ {
+  "nombre": "Mariscal José Félix Estigarribia",
+  "departamento": "Boquerón",
+  "alias": [
+   "Mariscal Estigarribia"
+  ],
+  "cod_ine": "1602",
+  "cod_departamento": "16"
+ },
+ {
+  "nombre": "3 de Febrero",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0518",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Caaguazú",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0502",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Carayao",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0503",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Coronel Oviedo",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0501",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Doctor Cecilio Báez",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Doctor J. Eulogio Estigarribia",
+  "departamento": "Caaguazú",
+  "alias": [
+   "Campo 9",
+   "Campo Nueve"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Doctor Juan Manuel Frutos",
+  "departamento": "Caaguazú",
+  "alias": [
+   "Pastoreo"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "José Domingo Ocampos",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0515",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "La Pastora",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0517",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Mariscal Francisco Solano López",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0516",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Nueva Londres",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0508",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Nueva Toledo",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0522",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "R.I. 3 Corrales",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0513",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Raúl Arsenio Oviedo",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0514",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Repatriación",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0507",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "San Joaquín",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0509",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "San José de los Arroyos",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0510",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Santa Rosa del Mbutuy",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0505",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Simón Bolívar",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0519",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Tembiaporá",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0521",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Vaquería",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0520",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "Yhú",
+  "departamento": "Caaguazú",
+  "alias": [],
+  "cod_ine": "0511",
+  "cod_departamento": "05"
+ },
+ {
+  "nombre": "3 de Mayo",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0611",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Abai",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0602",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Buena Vista",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0603",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Caazapá",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0601",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Coronel Maciel",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Doctor Moisés S. Bertoni",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Fulgencio Yegros",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "General Higinio Morínigo",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "San Juan Nepomuceno",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0607",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Tavaí",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0608",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Yuty",
+  "departamento": "Caazapá",
+  "alias": [],
+  "cod_ine": "0610",
+  "cod_departamento": "06"
+ },
+ {
+  "nombre": "Corpus Christi",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1402",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Curuguaty",
+  "departamento": "Canindeyú",
+  "alias": [
+   "Villa Curuguaty"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "General Francisco Caballero Álvarez",
+  "departamento": "Canindeyú",
+  "alias": [
+   "Francisco Caballero Álvarez"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Itanará",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1405",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Katueté",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1408",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "La Paloma del Espíritu Santo",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1409",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Laurel",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Maracaná",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Nueva Esperanza",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1410",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Puerto Adela",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Salto del Guairá",
+  "departamento": "Canindeyú",
+  "alias": [
+   "Saltos del Guairá"
+  ],
+  "cod_ine": "1401",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Villa Ygatimí",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1404",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Yasy Cañy",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1411",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Yby Pytã",
+  "departamento": "Canindeyú",
+  "alias": [
+   "Yby Pytane",
+   "Yby Pyta"
+  ],
+  "cod_ine": "1413",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Ybyrarobaná",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1412",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Ypejhú",
+  "departamento": "Canindeyú",
+  "alias": [],
+  "cod_ine": "1406",
+  "cod_departamento": "14"
+ },
+ {
+  "nombre": "Areguá",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1101",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Capiatá",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1102",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Fernando de la Mora",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1103",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Guarambaré",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1104",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Itauguá",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1106",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Itá",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1105",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "J. Augusto Saldívar",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1119",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Lambaré",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1107",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Limpio",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1108",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Luque",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1109",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Mariano Roque Alonso",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1110",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Nueva Italia",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1111",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "San Antonio",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1113",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "San Lorenzo",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1114",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Villa Elisa",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1115",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Villeta",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1116",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Ypacaraí",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1117",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Ypané",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1118",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Ñemby",
+  "departamento": "Central",
+  "alias": [],
+  "cod_ine": "1112",
+  "cod_departamento": "11"
+ },
+ {
+  "nombre": "Arroyito",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Azote'y",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0108",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Belén",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0102",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Concepción",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0101",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Horqueta",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0103",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Itacuá",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Loreto",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0104",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Paso Barreto",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0111",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Paso Horqueta",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "San Alfredo",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0110",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "San Carlos del Apa",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0105",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "San Lázaro",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0106",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Sargento José Félix López",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0109",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Yby Ya'u",
+  "departamento": "Concepción",
+  "alias": [],
+  "cod_ine": "0107",
+  "cod_departamento": "01"
+ },
+ {
+  "nombre": "Altos",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0302",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Arroyos y Esteros",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0303",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Atyrá",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0304",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Caacupé",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0301",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Caraguatay",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0305",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Emboscada",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0306",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Eusebio Ayala",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0307",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Isla Pucú",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0308",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Itacurubí de la Cordillera",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0309",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Juan de Mena",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0310",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Loma Grande",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0311",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Mbocayaty del Yhaguy",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0312",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Nueva Colombia",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0313",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Piribebuy",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0314",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Primero de Marzo",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0315",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "San Bernardino",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0316",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "San José Obrero",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0320",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Santa Elena",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0317",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Tobatí",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0318",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Valenzuela",
+  "departamento": "Cordillera",
+  "alias": [],
+  "cod_ine": "0319",
+  "cod_departamento": "03"
+ },
+ {
+  "nombre": "Borja",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0402",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Coronel Martínez",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0404",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Doctor Botrell",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Eugenio A. Garay",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Félix Pérez Cardozo",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0405",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Independencia",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0407",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Itapé",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0408",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Iturbe",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0409",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "José Fassardi",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0410",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "José Mauricio Troche",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Mbocayaty del Guairá",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Natalicio Talavera",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0412",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Paso Yobái",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0417",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "San Salvador",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0414",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Tebicuary",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0418",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Villarrica",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0401",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Yataity",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0415",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Ñumí",
+  "departamento": "Guairá",
+  "alias": [],
+  "cod_ine": "0413",
+  "cod_departamento": "04"
+ },
+ {
+  "nombre": "Alto Verá",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0725",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Bella Vista",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "1302",
+  "cod_departamento": "13"
+ },
+ {
+  "nombre": "Cambyretá",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0703",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Capitán Meza",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0704",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Capitán Miranda",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0705",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Carlos Antonio López",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0709",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Carmen del Paraná",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0707",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Coronel Bogado",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0708",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Edelira",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0723",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Encarnación",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0701",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Fram",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0711",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "General Artigas",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0712",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "General José María Delgado",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Hohenau",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0714",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Itapúa Poty",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0730",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Jesús de Tavarangué",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "José Leandro Oviedo",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0716",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "La Paz",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0726",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Mayor Otaño",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Natalio",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0710",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Nueva Alborada",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0706",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Obligado",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0717",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Pirapó",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0729",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "San Cosme y Damián",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0719",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "San Juan del Paraná",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0728",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "San Pedro del Paraná",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0720",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "San Rafael del Paraná",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0721",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Tomás Romero Pereira",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0724",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Trinidad",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0722",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Yatytay",
+  "departamento": "Itapúa",
+  "alias": [],
+  "cod_ine": "0727",
+  "cod_departamento": "07"
+ },
+ {
+  "nombre": "Ayolas",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": "0802",
+  "cod_departamento": "08"
+ },
+ {
+  "nombre": "San Ignacio Guazú",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "San Juan Bautista",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "San Miguel",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": "0804",
+  "cod_departamento": "08"
+ },
+ {
+  "nombre": "San Patricio",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": "0805",
+  "cod_departamento": "08"
+ },
+ {
+  "nombre": "Santa María de Fe",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Santa Rosa Misiones",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Santiago",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": "0808",
+  "cod_departamento": "08"
+ },
+ {
+  "nombre": "Villa Florida",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": "0809",
+  "cod_departamento": "08"
+ },
+ {
+  "nombre": "Yabebyry",
+  "departamento": "Misiones",
+  "alias": [],
+  "cod_ine": "0810",
+  "cod_departamento": "08"
+ },
+ {
+  "nombre": "Acahay",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0902",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Caapucú",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0903",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Carapeguá",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0905",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Escobar",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0906",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "General Bernardino Caballero",
+  "departamento": "Paraguarí",
+  "alias": [
+   "Caballero"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "La Colmena",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0907",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "María Antonia",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Mbuyapey",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0908",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Paraguarí",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0901",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Pirayú",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0909",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Quiindy",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0910",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Quyquyhó",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0911",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "San Roque González de Santa Cruz",
+  "departamento": "Paraguarí",
+  "alias": [
+   "Roque González de Santacruz"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Sapucai",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0913",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Tebicuarymí",
+  "departamento": "Paraguarí",
+  "alias": [
+   "Tebicuary-Mí"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Yaguarón",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0915",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Ybycuí",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0916",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Ybytymí",
+  "departamento": "Paraguarí",
+  "alias": [],
+  "cod_ine": "0917",
+  "cod_departamento": "09"
+ },
+ {
+  "nombre": "Benjamín Aceval",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1502",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "Campo Aceval",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "General José María Bruguez",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1509",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "José Falcón",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1506",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "Nanawa",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1505",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "Nueva Asunción",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Puerto Pinasco",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1503",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "Teniente 1º Manuel Irala Fernández",
+  "departamento": "Presidente Hayes",
+  "alias": [
+   "Irala Fernández"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Teniente Esteban Martínez",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1508",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "Villa Hayes",
+  "departamento": "Presidente Hayes",
+  "alias": [],
+  "cod_ine": "1504",
+  "cod_departamento": "15"
+ },
+ {
+  "nombre": "25 de Diciembre",
+  "departamento": "San Pedro",
+  "alias": [
+   "Veinticinco de Diciembre"
+  ],
+  "cod_ine": "0212",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Antequera",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0202",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Capiibary",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0217",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Choré",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0203",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "General Elizardo Aquino",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0204",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "General Resquín",
+  "departamento": "San Pedro",
+  "alias": [
+   "General Isidoro Resquín",
+   "General Francisco Isidoro Resquín"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Guayaibí",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Itacurubí del Rosario",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0205",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Liberación",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0220",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Lima",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0206",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Nueva Germania",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0207",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "San Estanislao",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0208",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "San José del Rosario",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "San Pablo",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0209",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "San Pedro del Ycuamandyyú",
+  "departamento": "San Pedro",
+  "alias": [
+   "San Pedro de Ycuamandiyú"
+  ],
+  "cod_ine": "0201",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "San Vicente Pancholo",
+  "departamento": "San Pedro",
+  "alias": [
+   "San Vicente"
+  ],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Santa Rosa del Aguaray",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0218",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Tacuatí",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0210",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Union",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0211",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Villa del Rosario",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0213",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Yataity del Norte",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0215",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Yrybucuá",
+  "departamento": "San Pedro",
+  "alias": [],
+  "cod_ine": "0219",
+  "cod_departamento": "02"
+ },
+ {
+  "nombre": "Alberdi",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1202",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Cerrito",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1203",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Desmochados",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1204",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "General José Eduvigis Díaz",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Guazucuá",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Humaitá",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1207",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Isla Umbú",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1208",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Laureles",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1209",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Mayor José De Jesús Martínez",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Paso de Patria",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1211",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Pilar",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1201",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "San Juan Bautista del Ñeembucú",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": null,
+  "cod_departamento": null
+ },
+ {
+  "nombre": "Tacuaras",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1213",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Villa Franca",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1214",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Villa Oliva",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1215",
+  "cod_departamento": "12"
+ },
+ {
+  "nombre": "Villalbín",
+  "departamento": "Ñeembucú",
+  "alias": [],
+  "cod_ine": "1216",
+  "cod_departamento": "12"
+ }
+]

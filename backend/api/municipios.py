@@ -430,29 +430,56 @@ async def obtener_usuarios_dependencias(
 
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
+PAISES_CATALOGO = {"AR", "PY"}
+
+
+@router.get("/catalogo")
+async def buscar_municipios_catalogo(
+    q: str = "",
+    pais: str = "AR",
+    db: AsyncSession = Depends(get_db),
+):
+    """Autocomplete PÚBLICO del catálogo oficial de municipios.
+
+    Sólo se puede crear una demo con un municipio REAL elegido de esta lista.
+    Fuentes: Argentina, dataset georef de datos.gob.ar (2.082); Paraguay,
+    registro del INE + las intendencias creadas después del censo 2012 (263).
+
+    Busca por nombre Y por ALIAS: un municipio se conoce por más de un nombre
+    —el oficial de la ley y el que usa la gente— y quien crea la demo escribe
+    el que conoce ("Campo 9", no "Doctor J. Eulogio Estigarribia").
+
+    La provincia/departamento desambigua homónimos: hay 6 'San Martín' en
+    Argentina y dos 'Asunción' en Paraguay.
+    """
+    q = (q or "").strip()
+    pais = (pais or "AR").upper()
+    if pais not in PAISES_CATALOGO:
+        raise HTTPException(status_code=400, detail=f"País no soportado: {pais}")
+    if len(q) < 2:
+        return []
+    rows = (await db.execute(text("""
+        SELECT id, nombre, provincia, lat, lng, pais, alias
+        FROM municipios_catalogo
+        WHERE pais = :pais AND (nombre LIKE :patt OR alias LIKE :patt)
+        ORDER BY (nombre LIKE :prefijo) DESC, CHAR_LENGTH(nombre), nombre
+        LIMIT 10
+    """), {"pais": pais, "patt": f"%{q}%", "prefijo": f"{q}%"})).fetchall()
+    return [
+        {"id": r[0], "nombre": r[1], "provincia": r[2],
+         "lat": float(r[3]), "lng": float(r[4]), "pais": r[5],
+         "alias": [a for a in (r[6] or "").split("|") if a]}
+        for r in rows
+    ]
+
+
 @router.get("/argentina")
 async def buscar_municipios_argentina(
     q: str = "",
     db: AsyncSession = Depends(get_db),
 ):
-    """Autocomplete PÚBLICO del catálogo oficial de municipios argentinos
-    (tabla municipios_argentina, dataset georef de datos.gob.ar, 2.082
-    municipios con centroide). Devuelve top 10 por nombre; la provincia
-    desambigua homónimos (hay 6 'San Martín' en el país)."""
-    q = (q or "").strip()
-    if len(q) < 2:
-        return []
-    rows = (await db.execute(text("""
-        SELECT id, nombre, provincia, lat, lng FROM municipios_argentina
-        WHERE nombre LIKE :patt
-        ORDER BY (nombre LIKE :prefijo) DESC, CHAR_LENGTH(nombre), nombre
-        LIMIT 10
-    """), {"patt": f"%{q}%", "prefijo": f"{q}%"})).fetchall()
-    return [
-        {"id": r[0], "nombre": r[1], "provincia": r[2],
-         "lat": float(r[3]), "lng": float(r[4])}
-        for r in rows
-    ]
+    """DEPRECADO: quedó del catálogo mono-país. Usar `/catalogo?pais=AR`."""
+    return await buscar_municipios_catalogo(q=q, pais="AR", db=db)
 
 
 @router.get("", response_model=List[MunicipioDetalle])

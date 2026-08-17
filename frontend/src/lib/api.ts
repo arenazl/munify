@@ -712,12 +712,15 @@ export const municipiosApi = {
       codigo: string;
       redirect_path: string;
     }>('/municipios/crear-demo', { nombre, ...(geo || {}) }),
-  // Autocomplete del catálogo OFICIAL de municipios argentinos (tabla local
-  // municipios_argentina, cargada una vez desde georef — sin API externa en runtime).
-  buscarArgentina: (q: string) =>
-    api.get<Array<{ id: string; nombre: string; provincia: string; lat: number; lng: number }>>(
-      '/municipios/argentina', { params: { q } },
-    ),
+  // Autocomplete del catálogo OFICIAL de municipios (tabla local
+  // municipios_catalogo, cargada una vez — sin API externa en runtime).
+  // Busca por nombre Y por alias: quien crea la demo escribe el nombre que
+  // conoce ("Campo 9"), no el de la ley.
+  buscarCatalogo: (q: string, pais: string) =>
+    api.get<Array<{
+      id: string; nombre: string; provincia: string;
+      lat: number; lng: number; pais: string; alias: string[];
+    }>>('/municipios/catalogo', { params: { q, pais } }),
   eliminarDemo: (codigo: string) => api.delete(`/municipios/demo/${codigo}`),
   update: (id: number, data: object) => api.put(`/municipios/${id}`, data),
   delete: (id: number) => api.delete(`/municipios/${id}`),

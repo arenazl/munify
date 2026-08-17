@@ -1,0 +1,138 @@
+# Handoff — el mapa, el modelo geográfico y el catálogo de municipios
+
+> Sesión del 2026-08-17 (madrugada). Todo lo de acá está **decidido con el
+> dueño**, salvo lo marcado como abierto. La propuesta visual del mapa está
+> publicada aparte: https://claude.ai/code/artifact/fa830f73-84ca-44e6-87c4-81294d4995af
+
+## Lo primero: el propósito de la pantalla
+
+El mapa **no es un mapa**: es un instrumento que contesta preguntas de gestión,
+y el dibujo es la evidencia de una frase que ya está escrita arriba. El que lo
+usa es un intendente, no un analista: viene a decidir a dónde manda la cuadrilla
+el lunes. Cualquier pieza que no conteste algo, sobra.
+
+## Las cuatro capas de datos, y su cobertura REAL
+
+Esto es lo que hace que una demo funcione en cualquier municipio. Medido, no
+supuesto:
+
+| Capa | Fuente | Cobertura | Estado |
+|---|---|---|---|
+| 1 · Que el municipio exista | Catálogos oficiales (georef AR, INE PY) | **100%** | AR 2.082 cargado · PY 263 generado |
+| 2 · Límite del municipio | OSM `admin_level=8` | **46% en PY** (122 de 263) | sirve para encuadrar, no se puede depender |
+| 3 · Calles y esquinas | OSM | alta, incluso en pueblos chicos | 3.000 esquinas de Asunción cacheadas |
+| 4 · Barrios | OSM `admin_level=10` | baja salvo capitales | Asunción 66 con geometría |
+
+**La demo se apoya en la capa 3, nunca en la 4.** Los reclamos se siembran sobre
+esquinas REALES del municipio, tenga barrios o no. Si hay barrios oficiales se
+usan como zonas; si no, se cargan a mano (interfaz a construir) o por importación
+externa. Decisión del dueño.
+
+**Sin verificar:** que un pueblo chico tenga sus calles en OSM. Es el supuesto que
+sostiene la capa 3. **Medirlo antes de construir** con un municipio real de la
+lista de prospectos.
+
+## El modelo geográfico y operativo
+
+El orden es: **municipio → regiones geográficas → asignación de cuadrillas**.
+
+- **La geografía mide, no reparte.** Las regiones sirven para saber dónde se
+  concentra el problema. No hay "sector de la Cuadrilla B".
+- **El perfil de la cuadrilla es fijo y por oficio** (Eléctrica_01, Bacheo_02):
+  las herramientas y la gente no cambian todos los días.
+- **Su asignación geográfica es dinámica**: el municipio decide con el mapa a la
+  vista qué cuadrilla entra a qué sector, y lo revisa cuando la demanda se mueve.
+  Es un despacho temporal, no una propiedad.
+- **El criterio es el volumen DE ESE OFICIO en ese sector**, no el volumen total.
+  Mandar bacheo a un sector cargado de cloacas es mover gente hacia un número que
+  no puede bajar.
+- **La zona recomendada puede existir** (conocimiento del terreno) pero NO filtra
+  candidatas: entra sólo en el último desempate, junto a la distancia. Hay que
+  medir cuántas asignaciones salen de ella — si nunca salen, se volvió una regla
+  encubierta.
+
+Criterios de asignación, en orden: **especialidad** (filtro duro) → urgencia →
+acumulación → capacidad libre → distancia (sólo desempata). La distancia va
+última a propósito: si pesa de más, el modelo territorial vuelve por la ventana.
+
+## Hallazgos verificados contra QA (muni 146, Asunción)
+
+- **1365 reclamos**, ago 2025 – ago 2026. 95% georreferenciados. 1333 con zona.
+- **La semilla NO era el problema.** Lo que falla es la pantalla.
+- **Los KPIs mienten mientras carga**: el mapa trae los reclamos de a lotes de
+  100 y los indicadores se pintan con el primer lote. De ahí el "0 de 18 barrios"
+  y el "todo dentro del SLA" conviviendo con "162 atrasados". Es el arreglo más
+  barato y el de mayor riesgo si lo ve un cliente.
+- **Las zonas actuales son barrios disfrazados.** Las 18 "zonas" se llaman
+  Microcentro, Tacumbú, Villa Morra. Asunción tiene oficialmente **6 distritos**
+  (Santísima Trinidad, La Recoleta, San Roque, La Encarnación, La Catedral,
+  Santa María) que agrupan **68 barrios**: la jerarquía que buscábamos ya existe
+  y es oficial. No hace falta IA para agrupar ciudades grandes.
+- **Casi la mitad de la demanda no tiene cuadrilla.** 12 oficios entran, 4
+  cuadrillas existen: Higiene urbana (138), Agua y cloacas (109), Tránsito (86),
+  Arbolado (84) y otros ~222 reclamos no los cubre nadie. Ese número no aparece
+  en ninguna pantalla y es probablemente el dato más accionable del sistema.
+- **`cuadrilla_categorias` ya existe** (con `es_principal`): el modelo soporta que
+  una cuadrilla cubra varios oficios. Hoy sin usar — la especialidad es texto
+  libre que no cruza con nada.
+- **El recorrido corre en falso** en las preguntas sin período: el filtro temporal
+  está desactivado a propósito pero la animación quedó prendida, así que el
+  cursor avanza y ningún pin se mueve. Y el "+2600%" compara datos filtrados
+  contra sin filtrar.
+
+## El catálogo de municipios
+
+Generado y sin commitear en `backend/scripts/datos/`:
+
+- `municipios_py.json` — **263 intendencias**, 18 departamentos, 19 con alias de
+  búsqueda, 215 con código del INE.
+- `generar_municipios_py.py` — lo reconstruye desde las fuentes.
+- `intendencias_paraguay.md` (listado del dueño, 255) y `distritos_py_ine.json`
+  (INE censo 2012, 250).
+
+Los 8 que faltaban para 263: Itacuá (Concepción); San José del Rosario, San
+Vicente Pancholo, Villa del Rosario, Yrybucuá (San Pedro); Laurel (Canindeyú);
+José Falcón, Nueva Asunción (Presidente Hayes). Varios son distritos creados
+entre 2020 y 2021, por eso no están en el censo 2012.
+
+**Los alias son cobertura de búsqueda, no basura**: quien crea la demo escribe
+"Campo 9", no "Doctor J. Eulogio Estigarribia". El buscador matchea por ambos.
+
+**Abierto:** la tabla de reconciliación daba "Zanja Pytã" como alias de General
+Francisco Caballero Álvarez (Canindeyú), pero Zanja Pytá es municipio propio de
+Amambay. NO se cargó como alias — fusionaría dos municipios distintos.
+
+## Lo que falta construir
+
+1. **Catálogo multi-país**: columnas `pais`, `osm_id` y `alias`; cargar los 263;
+   endpoint con parámetro de país; **tres banderas SVG** (Argentina por defecto,
+   Uruguay y Paraguay) en el alta de demo. Sin emoji: SVG. Uruguay quedó fuera
+   del alcance por ahora — se midió y OSM lo tiene granular (628 localidades).
+2. **Servicio de importar regiones**, con dos consumidores: el botón del ABM de
+   Zonas (se muestra durante la demo) y la semilla. Requiere `osm_id` y
+   `poligono` en `zonas` — hoy sólo guarda un punto.
+3. **Los KPIs que no mientan mientras cargan.**
+4. **El recorrido como narración**: paradas en los momentos que importan, quietas
+   el tiempo de leerlas, métricas del tramo al costado y una frase que diga qué
+   cambió. Se caen los controles 1x/2x/4x.
+5. **Cuadrillas por oficio** cableadas con `cuadrilla_categorias`, y reparto de
+   los reclamos.
+
+## Reglas de trabajo que salieron de esta sesión
+
+- **Un solo deploy por bloque terminado.** Salieron 6 deploys en una madrugada y
+  dos se pisaron entre sí. Se acumula en commits locales y se sube una vez.
+- **Nada de dominios nuevos para demos.** `munify.com.ar/py` le diría a un
+  intendente paraguayo que entra a un sistema argentino. La identidad paraguaya
+  va por host propio cuando el cliente se formalice.
+- **Overpass no se consulta en vivo.** En veinte minutos devolvió un 504 y un
+  429. Todo lo de OSM se baja una vez y se persiste.
+
+## Deuda que sigue viva
+
+- **React #310 latente en `Tesoreria.tsx` de producción**: el `return` por rol
+  está antes de la mitad de los hooks (24 de sus 31 errores de ESLint). En `qa`
+  ya está resuelto con `esGestor`; en prod no.
+- **Fase 3 del ABM mobile sin commitear** en el working tree
+  (`FilterBar`, `ListToolbar`, `abmv2.css`). Ver
+  `docs/design-sync/abm-mobile/HANDOFF.md`.

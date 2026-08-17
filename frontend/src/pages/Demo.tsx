@@ -8,6 +8,7 @@ import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { BanderaPais } from '../components/ui/BanderaPais';
 
 interface Municipio {
   id: number;
@@ -21,10 +22,19 @@ interface Municipio {
 interface MuniArg {
   id: string;
   nombre: string;
+  /** Provincia (AR) o departamento (PY). Es lo que desambigua homónimos. */
   provincia: string;
   lat: number;
   lng: number;
+  pais?: string;
+  alias?: string[];
 }
+
+/** Países con catálogo cargado. El orden es el de las banderas. */
+const PAISES = [
+  { cod: 'AR' as const, nombre: 'Argentina' },
+  { cod: 'PY' as const, nombre: 'Paraguay' },
+];
 
 const PLACEHOLDER_CITIES = ['Pergamino', 'San Pedro', 'Salta', 'Tandil', 'Rosario', 'Bariloche'];
 const MAX_NAME = 40;
@@ -45,6 +55,9 @@ export default function Demo() {
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   // Autocomplete del catálogo oficial: solo se puede crear una demo con un
   // municipio REAL elegido de la lista (basta de "Pepito Pepito").
+  // País del catálogo. Argentina por defecto (es el que más se usa); cambiarlo
+  // limpia la selección hecha, porque un municipio pertenece a un solo país.
+  const [pais, setPais] = useState<'AR' | 'PY'>('AR');
   const [sugerencias, setSugerencias] = useState<MuniArg[]>([]);
   const [muniSel, setMuniSel] = useState<MuniArg | null>(null);
   const [showSug, setShowSug] = useState(false);
@@ -58,13 +71,13 @@ export default function Demo() {
     if (q.length < 2) { setSugerencias([]); setShowSug(false); return; }
     setBuscando(true);
     const id = setTimeout(() => {
-      municipiosApi.buscarArgentina(q)
+      municipiosApi.buscarCatalogo(q, pais)
         .then((r) => { setSugerencias(r.data || []); setShowSug(true); setHlIdx(0); })
         .catch(() => setSugerencias([]))
         .finally(() => setBuscando(false));
     }, 220);
     return () => clearTimeout(id);
-  }, [nuevoNombre, muniSel]);
+  }, [nuevoNombre, muniSel, pais]);
 
   const elegirMuni = (m: MuniArg) => {
     setMuniSel(m);
@@ -262,6 +275,39 @@ export default function Demo() {
               <span className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">
                 Crear demo en vivo
               </span>
+              {/* País del catálogo. Va acá arriba y no como combo: son pocos y
+                  la bandera se reconoce de un golpe. Cambiarlo limpia lo
+                  tipeado, porque las sugerencias son de otro país. */}
+              <div className="ml-auto flex items-center gap-1" role="group" aria-label="País del catálogo">
+                {PAISES.map((p) => {
+                  const activo = pais === p.cod;
+                  return (
+                    <button
+                      key={p.cod}
+                      type="button"
+                      onClick={() => {
+                        if (activo) return;
+                        setPais(p.cod);
+                        setMuniSel(null);
+                        setSugerencias([]);
+                        setShowSug(false);
+                      }}
+                      aria-pressed={activo}
+                      title={p.nombre}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
+                        activo
+                          ? 'border-blue-400 bg-blue-50 shadow-sm'
+                          : 'border-transparent opacity-50 hover:opacity-90 hover:bg-slate-50'
+                      }`}
+                    >
+                      <BanderaPais pais={p.cod} size={13} />
+                      <span className={`text-[11px] font-semibold ${activo ? 'text-blue-700' : 'text-slate-500'}`}>
+                        {p.cod}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 min-w-0 relative">
