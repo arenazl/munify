@@ -136,3 +136,33 @@ Amambay. NO se cargó como alias — fusionaría dos municipios distintos.
 - **Fase 3 del ABM mobile sin commitear** en el working tree
   (`FilterBar`, `ListToolbar`, `abmv2.css`). Ver
   `docs/design-sync/abm-mobile/HANDOFF.md`.
+
+## Pendiente inmediato: selección de barrios/distritos en el mapa
+
+Pedido del dueño al cierre de la sesión. La base ya tiene todo lo necesario:
+6 distritos (zonas), 51 barrios colgando de ellos y 1.056 reclamos repartidos.
+
+**Qué tiene que hacer:** el usuario elige un barrio o un distrito y el mapa lo
+marca — lo resalta y recorta los datos a esa selección.
+
+**Cómo lo armaría:**
+
+1. **Se dibujan siempre los barrios**, nunca los distritos por separado. Cada
+   barrio se pinta con el color de su distrito, así los seis se leen igual y
+   además se puede bajar al detalle sin pedir más datos. No hace falta fusionar
+   geometrías (ni `geopandas` ni `shapely`): visualmente da el mismo resultado.
+2. **Elegir un distrito** resalta sus barrios como un bloque. **Elegir un
+   barrio** resalta sólo ese. Un clic en el mapa y el combo de arriba tienen que
+   quedar sincronizados: son la misma selección vista de dos formas.
+3. **La selección recorta todo lo demás** — KPIs, listado y titular. Si el
+   titular sigue hablando del municipio entero mientras el mapa muestra un
+   barrio, vuelve el problema de que la pantalla afirma una cosa y dibuja otra.
+4. **Los 17 barrios sin distrito** se dibujan en gris neutro, seleccionables
+   igual. No se los pinta con el color de un distrito al que no sabemos si
+   pertenecen.
+
+**Lo que falta antes:** cargar los contornos a la base con
+`scripts/cargar_regiones_municipio.py` (no toca la red, copia lo ya bajado). La
+bajada de OSM quedó en ~34 de 66 contornos y se completa corriendo de nuevo
+`services/osm_regiones.descargar_regiones(..., forzar=True)`, que ahora es
+incremental y ya no pisa lo bueno.
