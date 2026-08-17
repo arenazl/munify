@@ -1,4 +1,6 @@
-import { useEffect, useState, useMemo, useRef, useCallback, Fragment } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback, Fragment, createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import dynamicIconImports from 'lucide-react/dynamicIconImports';
 import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -509,23 +511,90 @@ const fechaEje = (ms: number, escala: EscalaElectro) =>
     : fechaCorta(ms);
 
 // =====================================================================
-// Pin con color por estado
+// IDENTIDAD VISUAL DE CADA ÁREA (dependencia)
 // =====================================================================
-const createPinIcon = (color: string) =>
+// Cada área se reconoce por DOS señales a la vez: su color y su glifo. Con
+// una sola no alcanza — los pines se apilan y hay daltonismo; con las dos, la
+// silueta distingue aunque el color no se lea.
+//
+// Lo primero es SIEMPRE lo que el municipio configuró en la dependencia
+// (`color` / `icono`). Estas listas son el paracaídas para el área que quedó
+// sin configurar: se reparten por posición, así que son estables entre
+// renders y dos áreas nunca comparten señal mientras haya cupo.
+const COLORES_AREA = [
+  '#2563eb', '#16a34a', '#d97706', '#9333ea',
+  '#0891b2', '#db2777', '#65a30d', '#c2410c',
+];
+const ICONOS_AREA = [
+  'wrench', 'construction', 'traffic-cone', 'dog',
+  'shield', 'trash-2', 'droplet', 'lightbulb',
+];
+
+/** Color del área: el configurado manda; si no hay, uno estable por posición. */
+const colorDeArea = (color: string | undefined | null, idx: number) =>
+  color || COLORES_AREA[idx % COLORES_AREA.length];
+
+/** Glifo del área: el configurado manda; si no hay, uno estable por posición. */
+const iconoDeArea = (icono: string | undefined | null, idx: number) =>
+  icono || ICONOS_AREA[idx % ICONOS_AREA.length];
+
+// =====================================================================
+// Pin: gota del color del área, con el glifo del área adentro
+// =====================================================================
+// `glifo` es el SVG del icono lucide ya renderizado a markup (lo precarga la
+// página: los imports de lucide son asíncronos y Leaflet necesita HTML
+// sincrónico). Sin glifo se dibuja el punto blanco de siempre, así que el pin
+// nunca queda a medio dibujar mientras el icono viaja.
+const createPinIcon = (color: string, glifo?: string) =>
   L.divIcon({
     className: 'custom-pin-marker',
     html: `
       <div style="position: relative; width: 30px; height: 42px;">
         <svg width="30" height="42" viewBox="0 0 30 42" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M15 0C6.716 0 0 6.716 0 15c0 10.5 15 27 15 27s15-16.5 15-27C30 6.716 23.284 0 15 0z" fill="${color}"/>
-          <circle cx="15" cy="15" r="7" fill="white"/>
+          <circle cx="15" cy="15" r="9" fill="white"/>
         </svg>
+        ${glifo
+          ? `<div style="position:absolute;top:6px;left:9px;width:12px;height:12px;color:${color};">${glifo}</div>`
+          : ''}
       </div>
     `,
     iconSize: [30, 42],
     iconAnchor: [15, 42],
     popupAnchor: [0, -42],
   });
+
+/**
+ * Glifo de un icono lucide como markup SVG, listo para meter en el HTML de un
+ * divIcon de Leaflet.
+ *
+ * Por qué con cache y asincrónico: lucide entrega los iconos por import
+ * dinámico (uno por archivo, para no arrastrar el set entero al bundle), y
+ * Leaflet arma el marcador con un string HTML sincrónico. Se resuelve una vez
+ * por icono y queda cacheado a nivel módulo: son 5 o 6 áreas, no 160 pines.
+ */
+const glifoCache = new Map<string, string>();
+
+async function cargarGlifo(nombre: string): Promise<string | null> {
+  const kebab = nombre
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+  const cacheado = glifoCache.get(kebab);
+  if (cacheado) return cacheado;
+  const importer = dynamicIconImports[kebab as keyof typeof dynamicIconImports];
+  if (!importer) return null;
+  try {
+    const mod = await importer();
+    const svg = renderToStaticMarkup(
+      createElement(mod.default, { size: 12, strokeWidth: 2.75, color: 'currentColor' }),
+    );
+    glifoCache.set(kebab, svg);
+    return svg;
+  } catch {
+    return null;
+  }
+}
 
 // =====================================================================
 // Marker de POI (modo Puntos): círculo relleno con el color del tipo.
@@ -1293,7 +1362,12 @@ export default function Mapa() {
   // =================================================================
   // Lista de dependencias presentes en los datos
   const dependenciasDisponibles = useMemo(() => {
-    const map = new Map<number, { id: number; nombre: string; color: string; count: number }>();
+    // `color`/`icono` entran como vienen de la config (pueden faltar) y salen
+    // ya resueltos abajo, con el reparto por posición.
+    const map = new Map<
+      number,
+      { id: number; nombre: string; color?: string | null; icono?: string | null; count: number }
+    >();
     for (const r of reclamos) {
       const d = r.dependencia_asignada;
       if (!d) continue;
@@ -1304,12 +1378,46 @@ export default function Mapa() {
         map.set(id, {
           id,
           nombre: d.nombre || `Dependencia #${id}`,
-          color: d.color || '#6366f1',
+          color: d.color,
+          icono: d.icono,
           count: 1,
         });
     }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+    // El color y el glifo de reserva se reparten DESPUÉS de ordenar: la señal
+    // de cada área queda atada a su posición (la que más reclamos tiene, la
+    // primera) y no al orden en que aparecieron en el listado, que cambia con
+    // cualquier filtro.
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count)
+      .map((d, idx) => ({
+        ...d,
+        color: colorDeArea(d.color, idx),
+        icono: iconoDeArea(d.icono, idx),
+      }));
   }, [reclamos]);
+
+  /** Señal visual por área, para resolver el pin de cada reclamo en O(1). */
+  const areaPorId = useMemo(() => {
+    const m = new Map<number, { color: string; icono: string }>();
+    for (const d of dependenciasDisponibles) m.set(d.id, { color: d.color, icono: d.icono });
+    return m;
+  }, [dependenciasDisponibles]);
+
+  // Glifos de las áreas presentes, resueltos una vez. Son tantos como áreas
+  // (cinco o seis), no como reclamos.
+  const [glifosArea, setGlifosArea] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let vivo = true;
+    const nombres = Array.from(new Set(dependenciasDisponibles.map((d) => d.icono)));
+    if (nombres.length === 0) return;
+    Promise.all(nombres.map(async (n) => [n, await cargarGlifo(n)] as const)).then((pares) => {
+      if (!vivo) return;
+      const nuevos: Record<string, string> = {};
+      for (const [n, svg] of pares) if (svg) nuevos[n] = svg;
+      setGlifosArea((prev) => ({ ...prev, ...nuevos }));
+    });
+    return () => { vivo = false; };
+  }, [dependenciasDisponibles]);
 
   // Rango temporal del dataset
   const dateRange = useMemo(() => {
@@ -1372,9 +1480,31 @@ export default function Mapa() {
    * todo es alerta y en "qué resolvimos" todo es éxito — repetir ahí la paleta
    * de estados sería ruido, porque el estado ya lo fijó la pregunta.
    */
+  /**
+   * Color del pin: manda EL ÁREA que atiende el reclamo.
+   *
+   * Antes mandaba el tinte de la pregunta y los ciento y pico de pines salían
+   * todos del mismo color: el mapa mostraba dónde, nunca de quién. La
+   * respuesta a la pregunta sigue estando —en el titular, en el rótulo y en el
+   * tooltip de cada pin—, pero el color pasa a contestar algo que el mapa no
+   * decía. Sin área asignada se cae al tinte de la pregunta, como antes.
+   */
   const colorDelPin = useCallback(
-    (r: Reclamo) => (preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado)),
-    [preguntaConfig, tintesMapa],
+    (r: Reclamo) => {
+      const area = r.dependencia_asignada ? areaPorId.get(r.dependencia_asignada.id) : undefined;
+      if (area) return area.color;
+      return preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado);
+    },
+    [areaPorId, preguntaConfig, tintesMapa],
+  );
+
+  /** Glifo del pin: el del área. `undefined` hasta que el icono termina de cargar. */
+  const glifoDelPin = useCallback(
+    (r: Reclamo) => {
+      const area = r.dependencia_asignada ? areaPorId.get(r.dependencia_asignada.id) : undefined;
+      return area ? glifosArea[area.icono] : undefined;
+    },
+    [areaPorId, glifosArea],
   );
 
   // 1) Categoría
@@ -3299,12 +3429,17 @@ export default function Mapa() {
                 <Marker
                   key={r.id}
                   position={[r.latitud!, r.longitud!]}
-                  icon={createPinIcon(colorDelPin(r))}
+                  icon={createPinIcon(colorDelPin(r), glifoDelPin(r))}
                   eventHandlers={{ click: () => handleMarkerClick(r) }}
                 >
                   <Tooltip direction="top" offset={[0, -42]} permanent={false}>
                     <div className="font-medium text-sm">{r.titulo}</div>
                     <div className="text-xs text-gray-500">{r.direccion}</div>
+                    {r.dependencia_asignada?.nombre && (
+                      <div className="text-xs font-medium" style={{ color: colorDelPin(r) }}>
+                        {r.dependencia_asignada.nombre}
+                      </div>
+                    )}
                   </Tooltip>
                 </Marker>
               ))}
