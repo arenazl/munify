@@ -1568,18 +1568,24 @@ export default function Mapa() {
    * de estados sería ruido, porque el estado ya lo fijó la pregunta.
    */
   /**
-   * Color del pin: la RESPUESTA A LA PREGUNTA (o el estado, sin pregunta).
+   * Color del pin: EL ÁREA que atiende el reclamo.
    *
-   * Las dos señales del pin dicen cosas distintas y no se pisan: el COLOR
-   * contesta lo que se preguntó —qué tan atrasado, en qué estado— y el GLIFO
-   * dice de qué área es. Se probó con el color por área y se volvió: el color
-   * es la señal que se lee de un vistazo sobre cien pines, y tiene que quedar
-   * para lo que cambia según la pregunta. La pertenencia no cambia nunca, así
-   * que le alcanza con la silueta.
+   * Las dos señales van juntas y dicen lo mismo —de quién es— porque así se
+   * reconoce el área de un vistazo: el color a distancia, el glifo de cerca y
+   * para quien no distingue bien los colores. Un mapa de un solo color sólo
+   * contesta "dónde", que es lo que ya se ve sin pintar nada.
+   *
+   * La respuesta a la pregunta no se pierde: vive en el titular, en el rótulo
+   * del mapa y en el tooltip de cada pin. Sin área asignada, el pin cae al
+   * tinte de la pregunta.
    */
   const colorDelPin = useCallback(
-    (r: Reclamo) => (preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado)),
-    [preguntaConfig, tintesMapa],
+    (r: Reclamo) => {
+      const area = r.dependencia_asignada ? areaPorId.get(r.dependencia_asignada.id) : undefined;
+      if (area) return area.color;
+      return preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado);
+    },
+    [areaPorId, preguntaConfig, tintesMapa],
   );
 
   /** Glifo del pin: el del área. `undefined` hasta que el icono termina de cargar. */
