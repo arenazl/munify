@@ -315,3 +315,28 @@ datos de demo el re-reparto es gratis; con datos reales no se podría.
 Orden correcto: bajar contornos → cargarlos a la base → re-sembrar los reclamos
 dentro de cada polígono → recién ahí los KPIs por barrio y por distrito son
 consistentes con lo que se dibuja.
+
+## Los dos pedidos que quedaron abiertos (dichos por el dueño al cierre)
+
+1. **Dibujar los distritos en el mapa.** No como polígono fusionado: se pintan
+   los barrios con el color de su distrito (ver la sección de selección más
+   arriba). Requiere cargar los contornos primero — hoy `barrios.poligono` está
+   en NULL, aunque el cache ya los tiene bajados.
+
+2. **Que "mostrar por barrio" sea una opción de la narrativa del banner.** Hoy
+   el titular narra siempre sobre el municipio entero ("162 reclamos llevan más
+   de 30 días, 35 de ellos en San Roque"). Tiene que poder narrar por barrio,
+   igual que las cuatro preguntas: misma frase, otro nivel de agregación. La
+   base ya lo soporta — `reclamos.barrio_id` y `reclamos.zona_id` están poblados
+   y son consistentes entre sí.
+
+## Estado final de los datos al cerrar la sesión
+
+1298 reclamos re-asignados al barrio más cercano a su coordenada, heredando su
+distrito. Reparto: La Encarnación 313 · La Recoleta 279 · Santísima Trinidad 221
+· San Roque 216 · La Catedral 152 · Santa María 121 · 63 sin distrito (son los
+que no tienen coordenada).
+
+El KPI "barrios alcanzados" decía **"10 de 6"**: eran 261 reclamos apuntando a
+zonas viejas desactivadas mientras el denominador contaba las 6 activas. Se
+limpiaron y ahora dice 6 de 6.
