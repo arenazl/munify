@@ -1667,22 +1667,12 @@ export default function Mapa() {
     return reclamosPorDependencia.filter((r) => r.zona?.id === distritoSel);
   }, [reclamosPorDependencia, distritoSel]);
 
-  /** Cuántos reclamos tiene cada distrito, para el conteo de la oración. */
-  const conteoPorDistrito = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const r of reclamosPorDependencia) {
-      const id = r.zona?.id;
-      if (id != null) m.set(id, (m.get(id) || 0) + 1);
-    }
-    return m;
-  }, [reclamosPorDependencia]);
 
   // 3) ALCANCE DE LA PREGUNTA (sin mirar el tiempo). Es lo que reemplaza al
   //    viejo filtro de estado suelto: cada pregunta ya declara qué estados le
   //    importan. Sólo en "ver todo" manda el combo de estado de la oración —
   //    así nunca queda un filtro invisible recortando por detrás.
-  const reclamosAlcance = useMemo(() => {
-    const base = reclamosPorLugar;
+  const aplicarAlcance = useCallback((base: Reclamo[]) => {
     switch (pregunta) {
       case 'atrasado':
         return base.filter(
@@ -1696,7 +1686,12 @@ export default function Mapa() {
       default:
         return filtroEstado ? base.filter((r) => r.estado === filtroEstado) : base;
     }
-  }, [reclamosPorLugar, pregunta, filtroEstado]);
+  }, [pregunta, filtroEstado]);
+
+  const reclamosAlcance = useMemo(
+    () => aplicarAlcance(reclamosPorLugar),
+    [aplicarAlcance, reclamosPorLugar],
+  );
 
   // 4) TIEMPO. El time-lapse (ventana móvil) MANDA sobre el preset, y hay
   //    preguntas donde el período no significa nada ("lo atrasado" es viejo por
@@ -1752,6 +1747,58 @@ export default function Mapa() {
       logMapa('OJO: un solo color para todos los pines. Causa probable: ninguno tiene area asignada, o el modo de dibujo no usa pines.');
     }
   }, [reclamosFiltrados, colorDelPin, glifoDelPin, pregunta, dibujoMapa]);
+
+  /**
+   * El universo que ve CADA combo de la oración: todos los filtros aplicados
+   * menos el suyo.
+   *
+   * Sin esto los combos mienten. Con "última semana" elegido, el combo de lugar
+   * seguía diciendo "La Recoleta (120)" —el total histórico— mientras el mapa,
+   * que sí recorta por fecha, no dibujaba nada. El número prometía algo que la
+   * pantalla no podía mostrar.
+   *
+   * Cada combo se excluye a sí mismo a propósito: si el lugar se contara con el
+   * lugar ya aplicado, el único distrito con reclamos sería el elegido y no se
+   * podría cambiar a otro.
+   */
+  const universoSin = useCallback(
+    (excluir: 'categoria' | 'dependencia' | 'lugar' | 'periodo') => {
+      let l = reclamos;
+      if (excluir !== 'categoria' && filtroCategoria) {
+        l = l.filter((r) => String(r.categoria?.id ?? 'otros') === filtroCategoria);
+      }
+      if (excluir !== 'dependencia' && filtroDependencia != null) {
+        l = l.filter((r) => r.dependencia_asignada?.id === filtroDependencia);
+      }
+      if (excluir !== 'lugar' && distritoSel != null) {
+        l = l.filter((r) => r.zona?.id === distritoSel);
+      }
+      // La pregunta NO se excluye nunca: es el marco, no un filtro más.
+      l = aplicarAlcance(l);
+      return excluir === 'periodo' ? l : aplicarTiempo(l);
+    },
+    [reclamos, filtroCategoria, filtroDependencia, distritoSel, aplicarAlcance, aplicarTiempo],
+  );
+
+  /** Cuántos reclamos tiene cada área bajo el resto de los filtros. */
+  const conteoPorDependencia = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of universoSin('dependencia')) {
+      const id = r.dependencia_asignada?.id;
+      if (id != null) m.set(id, (m.get(id) || 0) + 1);
+    }
+    return m;
+  }, [universoSin]);
+
+  /** Cuántos reclamos tiene cada distrito bajo el resto de los filtros. */
+  const conteoPorDistrito = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of universoSin('lugar')) {
+      const id = r.zona?.id;
+      if (id != null) m.set(id, (m.get(id) || 0) + 1);
+    }
+    return m;
+  }, [universoSin]);
 
   // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
   // La ventana móvil recorta sobre esto y el remate compara la primera ventana
@@ -1916,10 +1963,9 @@ export default function Mapa() {
     // se listaban todas y se podía armar "Recolección de residuos a cargo de
     // Tránsito", que no existe y devolvía cero: la dependencia contiene a las
     // categorías, no al revés.
-    const universo =
-      filtroDependencia == null
-        ? reclamos
-        : reclamos.filter((r) => r.dependencia_asignada?.id === filtroDependencia);
+    // Antes sólo miraba el área; ahora respeta también lugar, período y la
+    // pregunta, para que el número del combo sea el que el mapa puede dibujar.
+    const universo = universoSin('categoria');
     for (const r of universo) {
       const c = r.categoria;
       const key = c?.id != null ? String(c.id) : 'otros';
@@ -1935,11 +1981,11 @@ export default function Mapa() {
     }
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
     // `filtroDependencia` va SÍ o SÍ en las deps: el memo lo lee para armar el
-    // universo. Sin él, el combo "Tipo" quedaba congelado con las 10 categorías
-    // del municipio aunque se eligiera un área, y se podían armar combinaciones
-    // que no existen ("Tránsito y señalización a cargo de Zoonosis") que siempre
-    // devolvían cero -> "Nada que dibujar para esta consulta".
-  }, [reclamos, filtroDependencia, theme.textSecondary]);
+    // El universo sale de `universoSin('categoria')`: todos los filtros de la
+    // oración menos éste. Sin eso el combo quedaba congelado y se podían armar
+    // combinaciones que no existen ("Tránsito y señalización a cargo de
+    // Zoonosis") que siempre devolvían cero -> "Nada que dibujar".
+  }, [universoSin, theme.textSecondary]);
 
   const conteosPorEstado = useMemo(() => {
     return reclamosPorTiempo.reduce((acc, r) => {
@@ -3425,10 +3471,14 @@ export default function Mapa() {
       buscable: dependenciasDisponibles.length > 6,
       opciones: [
         { value: '', label: 'todas las áreas' },
-        ...dependenciasDisponibles.map((d) => ({
-          value: String(d.id),
-          label: `${d.nombre} (${d.count})`,
-        })),
+        // El conteo sale del universo con los OTROS filtros aplicados, no del
+        // total del área: si dice 12 y el mapa dibuja 0, el combo miente.
+        ...dependenciasDisponibles
+          .filter((d) => (conteoPorDependencia.get(d.id) || 0) > 0 || d.id === filtroDependencia)
+          .map((d) => ({
+            value: String(d.id),
+            label: `${d.nombre} (${conteoPorDependencia.get(d.id) || 0})`,
+          })),
       ],
       onChange: (v) => {
         setFiltroDependencia(v === '' ? null : Number(v));
@@ -3464,10 +3514,15 @@ export default function Mapa() {
       buscable: regiones.distritos.length > 6,
       opciones: [
         { value: '', label: 'todo el municipio' },
-        ...regiones.distritos.map((d) => ({
-          value: String(d.id),
-          label: `${d.nombre} (${conteoPorDistrito.get(d.id) || 0})`,
-        })),
+        // Los distritos sin nada que mostrar bajo los filtros actuales salen de
+        // la lista: elegirlos daría un mapa vacío. El elegido se conserva
+        // siempre, para poder volver atrás.
+        ...regiones.distritos
+          .filter((d) => (conteoPorDistrito.get(d.id) || 0) > 0 || d.id === distritoSel)
+          .map((d) => ({
+            value: String(d.id),
+            label: `${d.nombre} (${conteoPorDistrito.get(d.id) || 0})`,
+          })),
       ],
       onChange: (v: string) => setDistritoSel(v === '' ? null : Number(v)),
     } satisfies ConsultaFiltro] : []),
