@@ -87,8 +87,14 @@ def _anillo_exterior(el: dict) -> list[list[float]] | None:
     Los huecos (`inner`) se ignoran a proposito: para pintar un barrio no
     aportan. Si un dia hace falta precision catastral, hay que armarlos.
     """
-    tramos = [m["geometry"] for m in el.get("members", [])
-              if m.get("role") in ("outer", "") and m.get("geometry")]
+    # Sólo el borde EXTERIOR. Si la relación declara roles, se toman únicamente
+    # los `outer`: los `inner` son huecos —una laguna, un parque enclavado— y
+    # colarlos en el anillo dibuja líneas que cortan el barrio por adentro. Si
+    # ningún miembro declara rol, se toman todos: hay relaciones sin roles y ahí
+    # todos los tramos son el borde.
+    miembros = [m for m in el.get("members", []) if m.get("geometry")]
+    con_rol = [m for m in miembros if m.get("role") == "outer"]
+    tramos = [m["geometry"] for m in (con_rol or miembros)]
     if not tramos:
         geo = el.get("geometry")
         if not geo:

@@ -3671,7 +3671,12 @@ export default function Mapa() {
                  Va PRIMERO para que quede debajo de los pines. Con un distrito
                  elegido, los demás no se ocultan: se atenúan, así se sigue
                  viendo dónde está parado uno dentro del municipio. */}
-            {verRegiones && regiones.barrios.map((b) => {
+            {/* CADA MODO, SU CAPA. Con densidad el heatmap ya contesta la
+                pregunta, y encimarle los barrios sumaba una quinta capa sobre
+                las zonas calientes, los rótulos y el coverage: el mapa dejaba
+                de leerse. El territorio se dibuja con pines, donde es el fondo
+                sobre el que caen. */}
+            {verRegiones && dibujoMapa !== 'densidad' && regiones.barrios.map((b) => {
               const activo = distritoSel == null || b.zona_id === distritoSel;
               const color = colorDistrito(b.zona_id);
               return (
@@ -3680,10 +3685,13 @@ export default function Mapa() {
                   positions={b.poligono}
                   pathOptions={{
                     color,
-                    weight: activo ? 1.6 : 0.6,
-                    opacity: activo ? 0.85 : 0.25,
+                    // El distrito no elegido se atenúa pero SIGUE leyéndose:
+                    // con menos opacidad quedaba invisible y parecía que el
+                    // mapa dibujaba sólo el elegido.
+                    weight: activo ? 2 : 1.1,
+                    opacity: activo ? 0.95 : 0.55,
                     fillColor: color,
-                    fillOpacity: activo ? 0.13 : 0.03,
+                    fillOpacity: activo ? 0.18 : 0.07,
                   }}
                   eventHandlers={{
                     click: () => setDistritoSel((d) => (d === b.zona_id ? null : b.zona_id)),
@@ -3819,7 +3827,7 @@ export default function Mapa() {
               ? <Minimize2 size={16} strokeWidth={2} aria-hidden />
               : <Maximize2 size={16} strokeWidth={2} aria-hidden />}
           </button>
-          {regiones.barrios.length > 0 && (
+          {regiones.barrios.length > 0 && dibujoMapa !== 'densidad' && (
             <button
               type="button"
               className={`av2-mapa-ctrl${verRegiones ? ' av2-mapa-ctrl--activo' : ''}`}
