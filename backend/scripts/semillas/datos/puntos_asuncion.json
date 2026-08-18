@@ -1,0 +1,268 @@
+{
+ "municipio": "Asuncion",
+ "pedidos": 20,
+ "resueltos": 19,
+ "llamadas_nominatim": 31,
+ "areas": [
+  {
+   "nombre": "La Encarnacion",
+   "puntos_del_anillo": 87
+  },
+  {
+   "nombre": "Sta. Maria De Asuncion",
+   "puntos_del_anillo": 194
+  },
+  {
+   "nombre": "San Roque",
+   "puntos_del_anillo": 248
+  },
+  {
+   "nombre": "La Catedral",
+   "puntos_del_anillo": 185
+  },
+  {
+   "nombre": "Stma. Trinidad",
+   "puntos_del_anillo": 252
+  },
+  {
+   "nombre": "La Recoleta",
+   "puntos_del_anillo": 551
+  }
+ ],
+ "nucleo_urbano": [
+  -25.2800459,
+  -57.6343814
+ ],
+ "puntos": [
+  {
+   "lat": -25.285084,
+   "lon": -57.643959,
+   "zona_nombre": "La Encarnacion",
+   "zona_id": null,
+   "direccion": "Manduvirá 921",
+   "calle": "Manduvirá",
+   "altura": "921",
+   "barrio": "La Encarnación",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.278074,
+   "lon": -57.650774,
+   "zona_nombre": "La Encarnacion",
+   "zona_id": null,
+   "direccion": "Río de La Plata",
+   "calle": "Río de La Plata",
+   "altura": null,
+   "barrio": "Doctor Francia",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.358713,
+   "lon": -57.645226,
+   "zona_nombre": "Sta. Maria De Asuncion",
+   "zona_id": null,
+   "direccion": "Avenida Presidente Juan Domingo Perón 4382",
+   "calle": "Avenida Presidente Juan Domingo Perón",
+   "altura": "4382",
+   "barrio": "Itá Enramada",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.353764,
+   "lon": -57.652893,
+   "zona_nombre": "Sta. Maria De Asuncion",
+   "zona_id": null,
+   "direccion": "Costanera General Patricio Escobar",
+   "calle": "Costanera General Patricio Escobar",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.328154,
+   "lon": -57.650462,
+   "zona_nombre": "Sta. Maria De Asuncion",
+   "zona_id": null,
+   "direccion": "Teniente Lidio Cantalupi",
+   "calle": "Teniente Lidio Cantalupi",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.270571,
+   "lon": -57.632948,
+   "zona_nombre": "San Roque",
+   "zona_id": null,
+   "direccion": "Camino Club Mbigua",
+   "calle": "Camino Club Mbigua",
+   "altura": null,
+   "barrio": "San Felipe",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.295531,
+   "lon": -57.600183,
+   "zona_nombre": "San Roque",
+   "zona_id": null,
+   "direccion": "Doctor Fernando Abente Haedo",
+   "calle": "Doctor Fernando Abente Haedo",
+   "altura": null,
+   "barrio": "Recoleta",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.269887,
+   "lon": -57.62104,
+   "zona_nombre": "San Roque",
+   "zona_id": null,
+   "direccion": "Costanera José Asunción Flores",
+   "calle": "Costanera José Asunción Flores",
+   "altura": null,
+   "barrio": "Las Mercedes",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.291725,
+   "lon": -57.638428,
+   "zona_nombre": "La Catedral",
+   "zona_id": null,
+   "direccion": "Avenida Doctor José Gaspar Rodriguez de Francia y Velasco 244",
+   "calle": "Avenida Doctor José Gaspar Rodriguez de Francia y Velasco",
+   "altura": "244",
+   "barrio": "General Díaz",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.317704,
+   "lon": -57.636543,
+   "zona_nombre": "La Catedral",
+   "zona_id": null,
+   "direccion": "Mayor José Martí",
+   "calle": "Mayor José Martí",
+   "altura": null,
+   "barrio": "Republicano",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.239464,
+   "lon": -57.579246,
+   "zona_nombre": "Stma. Trinidad",
+   "zona_id": null,
+   "direccion": "Coronel Carlos M. Boveda",
+   "calle": "Coronel Carlos M. Boveda",
+   "altura": null,
+   "barrio": "Botánico",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.225013,
+   "lon": -57.572874,
+   "zona_nombre": "Stma. Trinidad",
+   "zona_id": null,
+   "direccion": "20 de Julio",
+   "calle": "20 de Julio",
+   "altura": null,
+   "barrio": "Zeballos Cué",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.242016,
+   "lon": -57.551303,
+   "zona_nombre": "Stma. Trinidad",
+   "zona_id": null,
+   "direccion": "Teniente Segundo Augustín Caballero Carillo",
+   "calle": "Teniente Segundo Augustín Caballero Carillo",
+   "altura": null,
+   "barrio": "Zeballos Cué",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.274016,
+   "lon": -57.565389,
+   "zona_nombre": "Stma. Trinidad",
+   "zona_id": null,
+   "direccion": "Doctor Hipólito Carrón",
+   "calle": "Doctor Hipólito Carrón",
+   "altura": null,
+   "barrio": "Madame Lynch",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.238857,
+   "lon": -57.543756,
+   "zona_nombre": "Stma. Trinidad",
+   "zona_id": null,
+   "direccion": "Poeta Mauricio Schvartzman",
+   "calle": "Poeta Mauricio Schvartzman",
+   "altura": null,
+   "barrio": "De la Residenta",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.30272,
+   "lon": -57.560887,
+   "zona_nombre": "La Recoleta",
+   "zona_id": null,
+   "direccion": "Avenida Mariscal Francisco Solano López",
+   "calle": "Avenida Mariscal Francisco Solano López",
+   "altura": null,
+   "barrio": "Luis Alberto de Herrera",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.311567,
+   "lon": -57.580892,
+   "zona_nombre": "La Recoleta",
+   "zona_id": null,
+   "direccion": "Coronel Camilo Recalde",
+   "calle": "Coronel Camilo Recalde",
+   "altura": null,
+   "barrio": "Los Laureles",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.297031,
+   "lon": -57.581847,
+   "zona_nombre": "La Recoleta",
+   "zona_id": null,
+   "direccion": "General Charles de Gaulle",
+   "calle": "General Charles de Gaulle",
+   "altura": null,
+   "barrio": "Recoleta",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.288051,
+   "lon": -57.545184,
+   "zona_nombre": "La Recoleta",
+   "zona_id": null,
+   "direccion": "Teniente Primero Nicolás Cazenave",
+   "calle": "Teniente Primero Nicolás Cazenave",
+   "altura": null,
+   "barrio": "Ytay",
+   "ciudad": "Asunción",
+   "fuente": "nominatim"
+  }
+ ],
+ "fuente": "OpenStreetMap / Nominatim -- ODbL",
+ "fuente_area": "INFONA (division oficial de Paraguay)"
+}
