@@ -1486,7 +1486,10 @@ export default function Mapa() {
   // barrios y no distritos fusionados permite ver los dos niveles a la vez —
   // cada barrio se pinta con el color de su distrito.
   const [regiones, setRegiones] = useState<{
-    distritos: Array<{ id: number; nombre: string; barrios: number }>;
+    distritos: Array<{
+      id: number; nombre: string; barrios: number;
+      poligono: [number, number][] | null;
+    }>;
     barrios: Array<{
       id: number; nombre: string; zona_id: number | null;
       zona_nombre: string | null; poligono: [number, number][];
@@ -3671,37 +3674,63 @@ export default function Mapa() {
                  Va PRIMERO para que quede debajo de los pines. Con un distrito
                  elegido, los demás no se ocultan: se atenúan, así se sigue
                  viendo dónde está parado uno dentro del municipio. */}
-            {/* CADA MODO, SU CAPA. Con densidad el heatmap ya contesta la
-                pregunta, y encimarle los barrios sumaba una quinta capa sobre
-                las zonas calientes, los rótulos y el coverage: el mapa dejaba
-                de leerse. El territorio se dibuja con pines, donde es el fondo
-                sobre el que caen. */}
-            {verRegiones && dibujoMapa !== 'densidad' && regiones.barrios.map((b) => {
-              const activo = distritoSel == null || b.zona_id === distritoSel;
-              const color = colorDistrito(b.zona_id);
+            {/* EL DISTRITO ELEGIDO SIEMPRE SE MARCA, en cualquier modo. Sin
+                esto, al elegir un distrito el mapa de calor se recortaba pero
+                no se veía DÓNDE: cambiaba el dato y no el lugar. Es sólo su
+                contorno —un trazo, sin relleno— así que no compite ni con el
+                heatmap ni con los pines. */}
+            {distritoSel != null && (() => {
+              const d = regiones.distritos.find((x) => x.id === distritoSel);
+              if (!d?.poligono) return null;
               return (
                 <Polygon
-                  key={`region-${b.id}`}
-                  positions={b.poligono}
+                  key={`distrito-${d.id}`}
+                  positions={d.poligono}
+                  pathOptions={{
+                    color: colorDistrito(d.id),
+                    weight: 3,
+                    opacity: 0.9,
+                    fill: false,
+                    dashArray: '6 4',
+                  }}
+                  interactive={false}
+                />
+              );
+            })()}
+
+            {/* LOS 6 DISTRITOS, no los 57 barrios. Seis áreas grandes se
+                leen de un vistazo; cincuenta y siete manchitas de colores no
+                dicen nada y encima tapan los pines. El barrio sigue estando en
+                el dato —cada reclamo sabe el suyo— pero no se dibuja: no es lo
+                que se mira desde la altura del municipio.
+
+                En modo densidad NO se pintan: el heatmap ya contesta y el
+                relleno lo taparía. Ahí sólo queda el contorno del elegido. */}
+            {verRegiones && regiones.distritos.map((d) => {
+              if (!d.poligono) return null;
+              const elegido = distritoSel === d.id;
+              const densidad = dibujoMapa === 'densidad';
+              if (densidad && !elegido) return null;
+              const color = colorDistrito(d.id);
+              return (
+                <Polygon
+                  key={`distrito-${d.id}`}
+                  positions={d.poligono}
                   pathOptions={{
                     color,
-                    // El distrito no elegido se atenúa pero SIGUE leyéndose:
-                    // con menos opacidad quedaba invisible y parecía que el
-                    // mapa dibujaba sólo el elegido.
-                    weight: activo ? 2 : 1.1,
-                    opacity: activo ? 0.95 : 0.55,
+                    weight: elegido ? 3 : 1.5,
+                    opacity: elegido ? 0.95 : 0.6,
                     fillColor: color,
-                    fillOpacity: activo ? 0.18 : 0.07,
+                    fillOpacity: densidad ? 0 : (elegido ? 0.22 : 0.08),
+                    dashArray: densidad ? '6 4' : undefined,
                   }}
                   eventHandlers={{
-                    click: () => setDistritoSel((d) => (d === b.zona_id ? null : b.zona_id)),
+                    click: () => setDistritoSel((x) => (x === d.id ? null : d.id)),
                   }}
                 >
                   <Tooltip sticky>
-                    <div className="font-medium text-sm">{b.nombre}</div>
-                    <div className="text-xs" style={{ color }}>
-                      {b.zona_nombre || 'sin distrito'}
-                    </div>
+                    <div className="font-medium text-sm" style={{ color }}>{d.nombre}</div>
+                    <div className="text-xs text-gray-500">{d.barrios} barrios</div>
                   </Tooltip>
                 </Polygon>
               );

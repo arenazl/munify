@@ -103,17 +103,28 @@ async def regiones_mapa(
             "poligono": [[p[1], p[0]] for p in puntos],
         })
 
-    distritos = (await db.execute(text("""
-        SELECT z.id, z.nombre, COUNT(b.id) AS barrios
+    filas_d = (await db.execute(text("""
+        SELECT z.id, z.nombre, z.poligono, COUNT(b.id) AS barrios
         FROM zonas z LEFT JOIN barrios b ON b.zona_id = z.id
         WHERE z.municipio_id = :m AND z.activo = 1
-        GROUP BY z.id, z.nombre ORDER BY z.nombre
+        GROUP BY z.id, z.nombre, z.poligono ORDER BY z.nombre
     """), {"m": municipio_id})).mappings().all()
 
-    return {
-        "distritos": [dict(d) for d in distritos],
-        "barrios": barrios,
-    }
+    # El distrito viaja CON su contorno: es lo que permite marcarlo en el mapa
+    # sin dibujar sus barrios uno por uno --- necesario, por ejemplo, sobre el
+    # mapa de calor, donde pintar 57 barrios taparia la respuesta.
+    distritos = []
+    for d in filas_d:
+        try:
+            pts = json.loads(d["poligono"]) if d["poligono"] else None
+        except (TypeError, ValueError):
+            pts = None
+        distritos.append({
+            "id": d["id"], "nombre": d["nombre"], "barrios": d["barrios"],
+            "poligono": [[p[1], p[0]] for p in pts] if pts else None,
+        })
+
+    return {"distritos": distritos, "barrios": barrios}
 
 
 @router.get("/{zona_id}", response_model=ZonaResponse)

@@ -471,7 +471,11 @@ export const zonasApi = {
   // distrito pertenecen. El poligono ya viene como [[lat, lng], ...], que es
   // el orden que espera Leaflet.
   regionesMapa: () => api.get<{
-    distritos: Array<{ id: number; nombre: string; barrios: number }>;
+    distritos: Array<{
+      id: number; nombre: string; barrios: number;
+      /** Contorno oficial del distrito, ya en [lat, lng]. */
+      poligono: [number, number][] | null;
+    }>;
     barrios: Array<{
       id: number; nombre: string; zona_id: number | null;
       zona_nombre: string | null; poligono: [number, number][];
