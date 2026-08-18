@@ -1,6 +1,7 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from typing import List
 
 from core.database import get_db
@@ -141,3 +142,64 @@ async def delete_zona(
     zona.activo = False
     await db.commit()
     return {"message": "Zona desactivada"}
+
+
+# =====================================================================
+# REGIONES PARA EL MAPA
+# =====================================================================
+@router.get("/regiones-mapa")
+async def regiones_mapa(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Los barrios del municipio con su contorno, y a que distrito pertenecen.
+
+    Es lo que el mapa necesita para DIBUJAR areas en vez de puntos. Se devuelven
+    los barrios y no los distritos fusionados a proposito: pintando cada barrio
+    con el color de su distrito se ven las dos cosas a la vez, y se puede bajar
+    al detalle sin pedir nada mas. Fusionar poligonos exigiria geometria
+    computacional en el server para un resultado visual identico.
+
+    El poligono viaja como [[lat, lng], ...] — el orden que espera Leaflet. En
+    la base esta guardado al reves ([lon, lat], que es el orden de GeoJSON), asi
+    que se invierte aca y no en el navegador: es una vuelta por barrio, no 60
+    vueltas en el cliente.
+    """
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    filas = (await db.execute(text("""
+        SELECT b.id, b.nombre, b.poligono, b.zona_id, z.nombre AS zona_nombre
+        FROM barrios b
+        LEFT JOIN zonas z ON z.id = b.zona_id AND z.activo = 1
+        WHERE b.municipio_id = :m AND b.poligono IS NOT NULL
+        ORDER BY z.nombre, b.nombre
+    """), {"m": municipio_id})).mappings().all()
+
+    barrios = []
+    for f in filas:
+        try:
+            puntos = json.loads(f["poligono"])
+        except (TypeError, ValueError):
+            continue
+        if not puntos:
+            continue
+        barrios.append({
+            "id": f["id"],
+            "nombre": f["nombre"],
+            "zona_id": f["zona_id"],
+            "zona_nombre": f["zona_nombre"],
+            "poligono": [[p[1], p[0]] for p in puntos],
+        })
+
+    distritos = (await db.execute(text("""
+        SELECT z.id, z.nombre, COUNT(b.id) AS barrios
+        FROM zonas z LEFT JOIN barrios b ON b.zona_id = z.id
+        WHERE z.municipio_id = :m AND z.activo = 1
+        GROUP BY z.id, z.nombre ORDER BY z.nombre
+    """), {"m": municipio_id})).mappings().all()
+
+    return {
+        "distritos": [dict(d) for d in distritos],
+        "barrios": barrios,
+    }

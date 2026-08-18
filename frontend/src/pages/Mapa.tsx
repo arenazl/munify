@@ -34,6 +34,7 @@ import {
   MapPinOff,
   Eraser,
   Building2,
+  Layers,
   LocateFixed,
   Maximize2,
   Minimize2,
@@ -1480,6 +1481,53 @@ export default function Mapa() {
     return m;
   }, [dependenciasDisponibles]);
 
+  // ---- REGIONES DEL MUNICIPIO (distritos y barrios con su contorno) ----
+  // Se piden una vez: son el mapa base, no cambian con los filtros. Dibujar
+  // barrios y no distritos fusionados permite ver los dos niveles a la vez —
+  // cada barrio se pinta con el color de su distrito.
+  const [regiones, setRegiones] = useState<{
+    distritos: Array<{ id: number; nombre: string; barrios: number }>;
+    barrios: Array<{
+      id: number; nombre: string; zona_id: number | null;
+      zona_nombre: string | null; poligono: [number, number][];
+    }>;
+  }>({ distritos: [], barrios: [] });
+  const [verRegiones, setVerRegiones] = useState(true);
+  const [distritoSel, setDistritoSel] = useState<number | null>(null);
+
+  useEffect(() => {
+    zonasApi.regionesMapa()
+      .then((r) => {
+        setRegiones(r.data);
+        logMapa(`regiones: ${r.data.distritos.length} distritos · ${r.data.barrios.length} barrios con contorno`);
+      })
+      .catch(() => setRegiones({ distritos: [], barrios: [] }));
+  }, []);
+
+  /**
+   * Las plantillas de la oración con el lugar adentro.
+   *
+   * El segmento se INSERTA en vez de estar escrito en cada plantilla porque no
+   * siempre corresponde: un municipio sin distritos cargados no tiene lugar que
+   * elegir, y dejar un "{lugar}" fijo mostraría un hueco en la frase. Va antes
+   * de los dos puntos —donde la oración pasa a explicar la pregunta— o, si no
+   * los hay, antes del punto final.
+   */
+  const preguntasConLugar = useMemo(() => {
+    if (regiones.distritos.length <= 1) return PREGUNTAS;
+    const conLugar = (t: string) => (t.includes(':')
+      ? t.replace(':', ', en {lugar}:')
+      : t.replace(/\.$/, ', en {lugar}.'));
+    return PREGUNTAS.map((q) => ({ ...q, plantilla: conLugar(q.plantilla) }));
+  }, [regiones.distritos.length]);
+
+  /** Color de cada distrito: estable por su posición en la lista. */
+  const colorDistrito = useCallback((zonaId: number | null | undefined) => {
+    if (zonaId == null) return '#94a3b8';  // sin distrito: gris, no se le inventa uno
+    const idx = regiones.distritos.findIndex((d) => d.id === zonaId);
+    return idx < 0 ? '#94a3b8' : COLORES_AREA[idx % COLORES_AREA.length];
+  }, [regiones.distritos]);
+
   // Glifos de las áreas presentes, resueltos una vez. Son tantos como áreas
   // (cinco o seis), no como reclamos.
   const [glifosArea, setGlifosArea] = useState<Record<string, string>>({});
@@ -1609,12 +1657,32 @@ export default function Mapa() {
     return reclamosPorCategoria.filter(r => r.dependencia_asignada?.id === filtroDependencia);
   }, [reclamosPorCategoria, filtroDependencia]);
 
+  // 2.bis) LUGAR. El distrito recorta el universo igual que el área, y por eso
+  //    va antes del alcance de la pregunta: todo lo que se cuente después —el
+  //    titular, los KPIs, los paneles— habla del distrito elegido y no del
+  //    municipio entero. Si recortara sólo el dibujo, la pantalla afirmaría una
+  //    cosa mientras muestra otra.
+  const reclamosPorLugar = useMemo(() => {
+    if (distritoSel == null) return reclamosPorDependencia;
+    return reclamosPorDependencia.filter((r) => r.zona?.id === distritoSel);
+  }, [reclamosPorDependencia, distritoSel]);
+
+  /** Cuántos reclamos tiene cada distrito, para el conteo de la oración. */
+  const conteoPorDistrito = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of reclamosPorDependencia) {
+      const id = r.zona?.id;
+      if (id != null) m.set(id, (m.get(id) || 0) + 1);
+    }
+    return m;
+  }, [reclamosPorDependencia]);
+
   // 3) ALCANCE DE LA PREGUNTA (sin mirar el tiempo). Es lo que reemplaza al
   //    viejo filtro de estado suelto: cada pregunta ya declara qué estados le
   //    importan. Sólo en "ver todo" manda el combo de estado de la oración —
   //    así nunca queda un filtro invisible recortando por detrás.
   const reclamosAlcance = useMemo(() => {
-    const base = reclamosPorDependencia;
+    const base = reclamosPorLugar;
     switch (pregunta) {
       case 'atrasado':
         return base.filter(
@@ -1628,7 +1696,7 @@ export default function Mapa() {
       default:
         return filtroEstado ? base.filter((r) => r.estado === filtroEstado) : base;
     }
-  }, [reclamosPorDependencia, pregunta, filtroEstado]);
+  }, [reclamosPorLugar, pregunta, filtroEstado]);
 
   // 4) TIEMPO. El time-lapse (ventana móvil) MANDA sobre el preset, y hay
   //    preguntas donde el período no significa nada ("lo atrasado" es viejo por
@@ -3353,6 +3421,25 @@ export default function Mapa() {
       ],
       onChange: (v) => handleCategoriaChange(v === '' ? null : v),
     },
+    // El LUGAR entra en la oración como un filtro más — la pantalla ya tiene la
+    // convención de que los filtros se leen dentro de la frase. Sólo aparece si
+    // el municipio tiene distritos cargados: en un pueblo chico no hay nada que
+    // elegir y un combo con una sola opción ocupa lugar sin decir nada.
+    ...(regiones.distritos.length > 1 ? [{
+      id: 'lugar',
+      etiqueta: 'Lugar',
+      valor: distritoSel == null ? '' : String(distritoSel),
+      anchoMin: 180,
+      buscable: regiones.distritos.length > 6,
+      opciones: [
+        { value: '', label: 'todo el municipio' },
+        ...regiones.distritos.map((d) => ({
+          value: String(d.id),
+          label: `${d.nombre} (${conteoPorDistrito.get(d.id) || 0})`,
+        })),
+      ],
+      onChange: (v: string) => setDistritoSel(v === '' ? null : Number(v)),
+    } satisfies ConsultaFiltro] : []),
     {
       id: 'periodo',
       etiqueta: 'Período',
@@ -3460,7 +3547,7 @@ export default function Mapa() {
         {!isPuntos && (
           <ConsultaGuiada
             titulo="¿Qué querés ver en el mapa?"
-            preguntas={PREGUNTAS}
+            preguntas={preguntasConLugar}
             valor={pregunta}
             onChange={handlePreguntaChange}
             filtros={filtrosConsulta}
@@ -3493,6 +3580,38 @@ export default function Mapa() {
             <FitBoundsToMarkers reclamos={reclamosFiltrados} signal={fitSignal} />
             <MapController target={mapTarget} />
             <InvalidarAlRedimensionar />
+
+            {/* ---- REGIONES: cada barrio pintado con el color de su distrito ----
+                 Va PRIMERO para que quede debajo de los pines. Con un distrito
+                 elegido, los demás no se ocultan: se atenúan, así se sigue
+                 viendo dónde está parado uno dentro del municipio. */}
+            {verRegiones && regiones.barrios.map((b) => {
+              const activo = distritoSel == null || b.zona_id === distritoSel;
+              const color = colorDistrito(b.zona_id);
+              return (
+                <Polygon
+                  key={`region-${b.id}`}
+                  positions={b.poligono}
+                  pathOptions={{
+                    color,
+                    weight: activo ? 1.6 : 0.6,
+                    opacity: activo ? 0.85 : 0.25,
+                    fillColor: color,
+                    fillOpacity: activo ? 0.13 : 0.03,
+                  }}
+                  eventHandlers={{
+                    click: () => setDistritoSel((d) => (d === b.zona_id ? null : b.zona_id)),
+                  }}
+                >
+                  <Tooltip sticky>
+                    <div className="font-medium text-sm">{b.nombre}</div>
+                    <div className="text-xs" style={{ color }}>
+                      {b.zona_nombre || 'sin distrito'}
+                    </div>
+                  </Tooltip>
+                </Polygon>
+              );
+            })}
 
             {/* Coverage por dependencia */}
             {filtroDependencia != null && showCoverage && coveragePoints.length >= 3 && (
@@ -3614,6 +3733,18 @@ export default function Mapa() {
               ? <Minimize2 size={16} strokeWidth={2} aria-hidden />
               : <Maximize2 size={16} strokeWidth={2} aria-hidden />}
           </button>
+          {regiones.barrios.length > 0 && (
+            <button
+              type="button"
+              className={`av2-mapa-ctrl${verRegiones ? ' av2-mapa-ctrl--activo' : ''}`}
+              onClick={() => setVerRegiones((v) => !v)}
+              aria-pressed={verRegiones}
+              title={verRegiones ? 'Ocultar los barrios' : 'Mostrar los barrios'}
+              aria-label={verRegiones ? 'Ocultar los barrios' : 'Mostrar los barrios'}
+            >
+              <Layers size={16} strokeWidth={2} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             className="av2-mapa-ctrl"

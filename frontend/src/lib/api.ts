@@ -467,6 +467,16 @@ export const zonasApi = {
   create: (data: Record<string, unknown>) => api.post('/zonas', data).then(res => { invalidateCache('/zonas'); return res; }),
   update: (id: number, data: Record<string, unknown>) => api.put(`/zonas/${id}`, data).then(res => { invalidateCache('/zonas'); return res; }),
   delete: (id: number) => api.delete(`/zonas/${id}`).then(res => { invalidateCache('/zonas'); return res; }),
+  // Contornos para DIBUJAR el mapa: los barrios con su poligono y a que
+  // distrito pertenecen. El poligono ya viene como [[lat, lng], ...], que es
+  // el orden que espera Leaflet.
+  regionesMapa: () => api.get<{
+    distritos: Array<{ id: number; nombre: string; barrios: number }>;
+    barrios: Array<{
+      id: number; nombre: string; zona_id: number | null;
+      zona_nombre: string | null; poligono: [number, number][];
+    }>;
+  }>('/zonas/regiones-mapa'),
 };
 
 // Dependencias (nuevo modelo desacoplado)
