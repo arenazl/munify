@@ -78,22 +78,53 @@ def _consultar(query: str, timeout: int = 200) -> dict:
 def _anillo_exterior(el: dict) -> list[list[float]] | None:
     """Contorno de una relacion de OSM como lista [lon, lat].
 
-    Se queda con los tramos `outer`. Los huecos (`inner`) se ignoran a
-    proposito: para pintar un barrio en un mapa no aportan y complican el
-    poligono. Si un dia hace falta precision catastral, hay que armarlos.
+    OJO: los tramos (`way`) de una relacion vienen EN ORDEN ARBITRARIO y con
+    orientacion arbitraria. Concatenarlos como llegan produce un garabato —el
+    trazo salta de un extremo del barrio al otro— y eso fue exactamente lo que
+    paso la primera vez. Hay que ENCADENARLOS: buscar el tramo que empieza (o
+    termina) donde termino el anterior, y darlo vuelta si hace falta.
+
+    Los huecos (`inner`) se ignoran a proposito: para pintar un barrio no
+    aportan. Si un dia hace falta precision catastral, hay que armarlos.
     """
-    tramos = [m.get("geometry") or [] for m in el.get("members", [])
+    tramos = [m["geometry"] for m in el.get("members", [])
               if m.get("role") in ("outer", "") and m.get("geometry")]
     if not tramos:
         geo = el.get("geometry")
         if not geo:
             return None
         tramos = [geo]
-    puntos: list[list[float]] = []
-    for tramo in tramos:
-        for p in tramo:
-            puntos.append([round(p["lon"], 6), round(p["lat"], 6)])
-    return puntos or None
+
+    def igual(a, b, tol=1e-7):
+        return abs(a["lat"] - b["lat"]) < tol and abs(a["lon"] - b["lon"]) < tol
+
+    restantes = [list(t) for t in tramos if len(t) >= 2]
+    if not restantes:
+        return None
+    anillo = restantes.pop(0)
+
+    # Se encadena mientras haya un tramo que continue el extremo actual. Si en
+    # una vuelta entera no se engancha ninguno, el borde esta partido en piezas
+    # inconexas y se corta ahi: mejor un contorno incompleto que uno cruzado.
+    avanzo = True
+    while restantes and avanzo:
+        avanzo = False
+        for i, t in enumerate(restantes):
+            if igual(t[0], anillo[-1]):
+                anillo.extend(t[1:])
+            elif igual(t[-1], anillo[-1]):
+                anillo.extend(list(reversed(t))[1:])
+            elif igual(t[-1], anillo[0]):
+                anillo = t[:-1] + anillo
+            elif igual(t[0], anillo[0]):
+                anillo = list(reversed(t))[:-1] + anillo
+            else:
+                continue
+            restantes.pop(i)
+            avanzo = True
+            break
+
+    return [[round(p["lon"], 6), round(p["lat"], 6)] for p in anillo] or None
 
 
 def _centro(el: dict) -> tuple[float | None, float | None]:
