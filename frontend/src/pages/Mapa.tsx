@@ -3220,14 +3220,44 @@ export default function Mapa() {
     }
   };
 
+  /**
+   * De qué habla el informe.
+   *
+   * Marcar un rectángulo a mano sirve para un recorte cualquiera —una obra, un
+   * operativo—, pero cuando el municipio tiene distritos, lo que un intendente
+   * pide es "el informe de La Recoleta", no una caja aproximada dibujada a
+   * pulso. Si hay un distrito elegido, ese es el ámbito; el rectángulo lo pisa
+   * porque es más específico y lo acaba de dibujar el usuario.
+   */
+  const ambitoInforme = useMemo(() => {
+    if (drawnBBox) {
+      return {
+        tipo: 'area' as const,
+        reclamos: reclamosEnBBox,
+        nombre: 'el área marcada',
+        detalle: `Coordenadas: ${drawnBBox.minLat.toFixed(5)}, ${drawnBBox.minLng.toFixed(5)} → ${drawnBBox.maxLat.toFixed(5)}, ${drawnBBox.maxLng.toFixed(5)}`,
+      };
+    }
+    if (distritoSel != null) {
+      const d = regiones.distritos.find((x) => x.id === distritoSel);
+      return {
+        tipo: 'distrito' as const,
+        reclamos: reclamosFiltrados,
+        nombre: d?.nombre ?? 'el distrito',
+        detalle: `Distrito: ${d?.nombre ?? '—'} · ${d?.barrios ?? 0} barrios`,
+      };
+    }
+    return null;
+  }, [drawnBBox, reclamosEnBBox, distritoSel, regiones.distritos, reclamosFiltrados]);
+
   // =================================================================
   // Export PDF de zona dibujada
   // =================================================================
   const exportZonaPdf = () => {
-    if (!drawnBBox || reclamosEnBBox.length === 0) return;
+    if (!ambitoInforme || ambitoInforme.reclamos.length === 0) return;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const kpis = computeKPIs(reclamosEnBBox);
-    const zonas = topZonas(reclamosEnBBox, 5, 150);
+    const kpis = computeKPIs(ambitoInforme.reclamos);
+    const zonas = topZonas(ambitoInforme.reclamos, 5, 150);
 
     const W = doc.internal.pageSize.getWidth();
     const margin = 15;
@@ -3235,7 +3265,12 @@ export default function Mapa() {
 
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('Reporte de Zona — Mapa de Reclamos', margin, y);
+    doc.text(
+      ambitoInforme.tipo === 'distrito'
+        ? `Reporte de ${ambitoInforme.nombre} — Mapa de Reclamos`
+        : 'Reporte de Zona — Mapa de Reclamos',
+      margin, y,
+    );
     y += 8;
 
     doc.setFontSize(10);
@@ -3243,11 +3278,7 @@ export default function Mapa() {
     doc.setTextColor(100);
     doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, margin, y);
     y += 6;
-    doc.text(
-      `Coordenadas: ${drawnBBox.minLat.toFixed(5)}, ${drawnBBox.minLng.toFixed(5)} → ${drawnBBox.maxLat.toFixed(5)}, ${drawnBBox.maxLng.toFixed(5)}`,
-      margin,
-      y,
-    );
+    doc.text(ambitoInforme.detalle, margin, y);
     y += 10;
     doc.setTextColor(0);
 
@@ -3868,12 +3899,12 @@ export default function Mapa() {
           <span className="av2-panel-caption">PDF con el detalle de los reclamos del área</span>
         </div>
         <div className="av2-informe-fila">
-          {!drawnBBox ? (
+          {!ambitoInforme ? (
             <>
               <p className="av2-informe-texto">
-                Marcá un área del mapa y descargás el detalle de esos reclamos en PDF:
-                los indicadores del área, las cinco zonas que más repiten y el listado
-                reclamo por reclamo.
+                {regiones.distritos.length > 1
+                  ? 'Elegí un distrito arriba y el informe sale solo, o marcá un área a mano para un recorte cualquiera: los indicadores, las cinco zonas que más repiten y el listado reclamo por reclamo.'
+                  : 'Marcá un área del mapa y descargás el detalle de esos reclamos en PDF: los indicadores del área, las cinco zonas que más repiten y el listado reclamo por reclamo.'}
               </p>
               <div className="av2-informe-acciones">
                 <button
@@ -3890,31 +3921,42 @@ export default function Mapa() {
             <>
               <p className="av2-informe-texto">
                 <span className="av2-informe-resumen">
-                  {reclamosEnBBox.length}{' '}
-                  {reclamosEnBBox.length === 1 ? 'reclamo' : 'reclamos'}
+                  {ambitoInforme.reclamos.length}{' '}
+                  {ambitoInforme.reclamos.length === 1 ? 'reclamo' : 'reclamos'}
                 </span>{' '}
-                en el área marcada.{' '}
-                {reclamosEnBBox.length === 0
-                  ? 'Movete o marcá otra zona: así el informe saldría vacío.'
+                en {ambitoInforme.nombre}.{' '}
+                {ambitoInforme.reclamos.length === 0
+                  ? 'Así el informe saldría vacío.'
                   : 'Eso es lo que va a salir en el informe.'}
               </p>
               <div className="av2-informe-snapshot">
-                <ZonaSnapshot reclamos={reclamosEnBBox} theme={theme} />
+                <ZonaSnapshot reclamos={ambitoInforme.reclamos} theme={theme} />
               </div>
               <div className="av2-informe-acciones">
                 <button
                   type="button"
                   className="av2-btn-primario"
                   onClick={exportZonaPdf}
-                  disabled={reclamosEnBBox.length === 0}
+                  disabled={ambitoInforme.reclamos.length === 0}
                 >
                   <FileDown size={14} strokeWidth={2} aria-hidden />
                   Descargar el informe
                 </button>
-                <button type="button" className="av2-btn-secundario" onClick={clearDrawnBBox}>
-                  <X size={14} strokeWidth={2} aria-hidden />
-                  Borrar el área
-                </button>
+                {ambitoInforme.tipo === 'area' ? (
+                  <button type="button" className="av2-btn-secundario" onClick={clearDrawnBBox}>
+                    <X size={14} strokeWidth={2} aria-hidden />
+                    Borrar el área
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`av2-btn-secundario${drawMode ? ' av2-btn-secundario--activo' : ''}`}
+                    onClick={handleToggleDraw}
+                  >
+                    <Square size={14} strokeWidth={2} aria-hidden />
+                    {drawMode ? 'Cancelar el marcado' : 'Marcar un área más chica'}
+                  </button>
+                )}
               </div>
             </>
           )}
