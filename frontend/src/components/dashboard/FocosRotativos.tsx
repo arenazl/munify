@@ -25,7 +25,10 @@ import HeatmapWidget from '../ui/HeatmapWidget';
 import { useCarruselAuto } from '../../lib/useCarruselAuto';
 
 /** Cada cuánto salta al foco siguiente. */
-const INTERVALO_MS = 7000;
+// Cada foco se queda el DOBLE de tiempo que antes (7s -> 14s).
+// La frase que acompaña al gráfico hay que leerla, no alcanzar a verla: a
+// 7 segundos el panel cambiaba antes de que uno terminara de entenderlo.
+const INTERVALO_MS = 14000;
 /** Zoom al encuadrar un foco: la cuadra, no la ciudad. */
 const ZOOM_FOCO = 16;
 

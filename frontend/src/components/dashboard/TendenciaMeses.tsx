@@ -24,7 +24,10 @@ import { Pause, Play, ChevronRight } from 'lucide-react';
 import { useCarruselAuto } from '../../lib/useCarruselAuto';
 
 /** Cada cuánto pasa al mes siguiente. */
-const INTERVALO_MS = 6000;
+// Cada mes se queda el DOBLE de tiempo que antes (6s -> 12s).
+// La frase que acompaña al gráfico hay que leerla, no alcanzar a verla: a
+// 6 segundos el panel cambiaba antes de que uno terminara de entenderlo.
+const INTERVALO_MS = 12000;
 
 /**
  * Días que tiene que llevar el mes en curso para entrar a la comparación.
