@@ -3710,7 +3710,10 @@ export default function Mapa() {
               if (!d.poligono) return null;
               const elegido = distritoSel === d.id;
               const densidad = dibujoMapa === 'densidad';
-              if (densidad && !elegido) return null;
+              // En densidad se dibujan LOS SEIS igual, como contorno punteado y
+              // sin relleno: son la referencia de dónde cae el calor. Antes se
+              // dibujaba sólo el elegido, así que sin elección el mapa quedaba
+              // sin ninguna división a la vista.
               const color = colorDistrito(d.id);
               return (
                 <Polygon
@@ -3856,14 +3859,14 @@ export default function Mapa() {
               ? <Minimize2 size={16} strokeWidth={2} aria-hidden />
               : <Maximize2 size={16} strokeWidth={2} aria-hidden />}
           </button>
-          {regiones.barrios.length > 0 && dibujoMapa !== 'densidad' && (
+          {regiones.distritos.length > 0 && (
             <button
               type="button"
               className={`av2-mapa-ctrl${verRegiones ? ' av2-mapa-ctrl--activo' : ''}`}
               onClick={() => setVerRegiones((v) => !v)}
               aria-pressed={verRegiones}
-              title={verRegiones ? 'Ocultar los barrios' : 'Mostrar los barrios'}
-              aria-label={verRegiones ? 'Ocultar los barrios' : 'Mostrar los barrios'}
+              title={verRegiones ? 'Ocultar los distritos' : 'Mostrar los distritos'}
+              aria-label={verRegiones ? 'Ocultar los distritos' : 'Mostrar los distritos'}
             >
               <Layers size={16} strokeWidth={2} aria-hidden />
             </button>
