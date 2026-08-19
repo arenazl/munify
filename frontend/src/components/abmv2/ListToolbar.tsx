@@ -43,6 +43,7 @@ import {
   Rows3,
   Search,
 } from 'lucide-react';
+import { useAnchoAngosto } from './FichaRegistro';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Action, ListToolbarProps, ViewKind } from './types';
@@ -108,8 +109,21 @@ export function ListToolbar({
   /* [v2.1] Índice del paso activo. -1 (id desconocido) ⇒ todos pendientes. */
   const idxPasoActivo = steps ? steps.items.findIndex((p) => p.id === steps.activo) : -1;
 
+  /* [proyección mobile] En angosto la zona de control es UNA SOLA LÍNEA:
+     buscador, acción primaria y filtros. Nada más.
+
+     El selector de vistas NO se achica: se elimina. A este ancho los tres
+     modos se ven igual —la lista se dibuja como fichas cualquiera sea el
+     elegido— así que ofrecer la opción es ruido. Los pasos de flujo y la
+     acción secundaria tampoco entran: crecen con la configuración de cada
+     pantalla, y una fila cuyo alto depende de la entidad es justamente lo que
+     hace que el control se coma media pantalla. Ver la sección 05 de
+     PROYECCION-MOBILE.md (tabla de conversión). */
+  const { ref: refAncho, angosto } = useAnchoAngosto<HTMLDivElement>();
+  const compacto = angosto === true;
+
   return (
-    <div className="av2-toolbar">
+    <div className="av2-toolbar" ref={refAncho}>
       {/* label como wrapper: click en cualquier parte enfoca el input */}
       <label className="av2-toolbar-buscador">
         <Search size={16} strokeWidth={2} aria-hidden />
@@ -125,7 +139,7 @@ export function ListToolbar({
       <span className="av2-divisor" aria-hidden />
 
       <div className="av2-toolbar-derecha">
-        {views.length > 1 && (
+        {views.length > 1 && !compacto && (
           <div className="av2-seg-vistas" role="group" aria-label="Vista del listado">
             {views.map((vista) => {
               const meta = VISTA_META[vista];
@@ -150,7 +164,7 @@ export function ListToolbar({
 
         {/* [v2.1] Chips numerados de flujo, entre las vistas y las acciones.
             En flujos tipo Mostrador lo usual es steps SIN CTA. */}
-        {steps && steps.items.length > 0 && (
+        {steps && steps.items.length > 0 && !compacto && (
           <div className="av2-steps" role="group" aria-label="Pasos del flujo">
             {steps.items.map((paso, i) => {
               const estado =
@@ -175,7 +189,7 @@ export function ListToolbar({
           </div>
         )}
 
-        {secondaryAction && <BotonAccion action={secondaryAction} />}
+        {secondaryAction && !compacto && <BotonAccion action={secondaryAction} />}
         {/* [v2.1] CTA opcional: sin primaryAction no hay botón primario. */}
         {primaryAction && <BotonAccion action={primaryAction} primario />}
       </div>

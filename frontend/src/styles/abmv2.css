@@ -4476,3 +4476,157 @@ button.av2-chip:hover { opacity: 0.85; }
   color: var(--pl-text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* [FILTROS EN ANGOSTO] — la fila de selects sale del flujo y pasa a un panel.
+   Ver PROYECCION-MOBILE.md §05: si la cantidad de elementos de una fila
+   depende de la CONFIGURACIÓN y no del diseño, esa fila no va en la pantalla. */
+.av2-filterbar--compacta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px 12px;
+}
+.av2-filtros-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;               /* hit target real, no el dibujo */
+  padding: 0 14px;
+  border-radius: var(--pl-radius-md);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.av2-filtros-boton:active { transform: scale(0.97); }
+.av2-filtros-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.av2-filtros-resumen {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+.av2-filtros-panel {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+/* Los estados como LISTA vertical con su conteo: escala a 8 o a 40 sin tocar
+   el layout, que es lo que las píldoras en fila no pueden hacer. */
+.av2-filtros-estados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.av2-filtros-estado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-2);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  cursor: pointer;
+  text-align: left;
+}
+.av2-filtros-estado b { font-variant-numeric: tabular-nums; color: var(--pl-text-3); }
+.av2-filtros-estado--activo { background: var(--pl-green-050); color: var(--pl-text); }
+.av2-filtros-estado:disabled { opacity: 0.45; cursor: default; }
+
+/* [FILTROS EN ANGOSTO] — la fila de selects sale del flujo y pasa a un panel.
+   Ver PROYECCION-MOBILE.md §05: si la cantidad de elementos de una fila
+   depende de la CONFIGURACIÓN y no del diseño, esa fila no va en la pantalla. */
+.av2-filterbar--compacta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px 12px;
+}
+.av2-filtros-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;               /* hit target real, no el dibujo */
+  padding: 0 14px;
+  border-radius: var(--pl-radius-md);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.av2-filtros-boton:active { transform: scale(0.97); }
+.av2-filtros-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.av2-filtros-resumen {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+.av2-filtros-panel {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+/* Los estados como LISTA vertical con su conteo: escala a 8 o a 40 sin tocar
+   el layout, que es lo que las píldoras en fila no pueden hacer. */
+.av2-filtros-estados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.av2-filtros-estado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-2);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  cursor: pointer;
+  text-align: left;
+}
+.av2-filtros-estado b { font-variant-numeric: tabular-nums; color: var(--pl-text-3); }
+.av2-filtros-estado--activo { background: var(--pl-green-050); color: var(--pl-text); }
+.av2-filtros-estado:disabled { opacity: 0.45; cursor: default; }

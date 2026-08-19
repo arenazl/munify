@@ -29,6 +29,8 @@
 import { ArrowRight, ArrowUpDown, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
+import { useState } from 'react';
+import { useAnchoAngosto } from './FichaRegistro';
 import type { PeriodModo } from '../ui/PeriodNavigator';
 import type {
   FilterBarProps,
@@ -316,7 +318,106 @@ export function FilterBar({
   if (!haySelects && !hayPeriodo && !hayTabs && !hayOrden && !filterSummary) return null;
 
   return (
-    <div className="av2-filterbar">
+    <FilterBarCuerpo
+      selects={selects}
+      period={period}
+      onPeriodChange={onPeriodChange}
+      statusTabs={statusTabs}
+      activeStatus={activeStatus}
+      onStatusChange={onStatusChange}
+      sortSpec={sortSpec}
+      filterSummary={filterSummary}
+    />
+  );
+}
+
+/**
+ * El cuerpo de la barra. Se separó del componente público por una razón
+ * concreta: acá adentro viven los hooks del panel, y en el público estaban
+ * detrás de un `return null` (la barra sin nada que filtrar no se dibuja).
+ * Un hook después de un return condicional rompe el orden de hooks entre
+ * renders — React #310. Con la guarda arriba y los hooks acá, no hay forma
+ * de que eso vuelva a pasar.
+ */
+function FilterBarCuerpo({
+  selects = [],
+  period,
+  onPeriodChange,
+  statusTabs = [],
+  activeStatus,
+  onStatusChange,
+  sortSpec,
+  filterSummary,
+}: FilterBarProps) {
+  const haySelects = selects.length > 0;
+  const hayPeriodo = period !== undefined;
+  const hayTabs = statusTabs.length > 0;
+  const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
+
+  /* [proyección mobile] En angosto los filtros NO viven en el flujo de la
+     pantalla: viven en un panel que se abre con un botón.
+
+     No es una preferencia estética. La cantidad de selects, de estados y de
+     categorías la fija la CONFIGURACIÓN de cada entidad, no el diseño: hoy son
+     tres, mañana ocho, y apilados se comen la pantalla antes de que se vea un
+     solo registro. La regla del handoff es directa — si la cantidad de una
+     fila depende de la configuración, esa fila no existe en la pantalla: es
+     una lista dentro de un panel. */
+  const { ref: refAncho, angosto } = useAnchoAngosto<HTMLDivElement>();
+  const [panelAbierto, setPanelAbierto] = useState(false);
+
+  // Cuántos filtros están recortando el universo ahora mismo. El estado activo
+  // cuenta como uno: es el filtro que más recorta y el que más se olvida.
+  const activos =
+    selects.filter((s) => s.value && s.value !== '' && s.value !== 'todos').length +
+    (activeStatus && activeStatus !== 'todos' ? 1 : 0);
+
+  if (angosto === true) {
+    return (
+      <div className="av2-filterbar av2-filterbar--compacta" ref={refAncho}>
+        <button
+          type="button"
+          className="av2-filtros-boton"
+          onClick={() => setPanelAbierto((v) => !v)}
+          aria-expanded={panelAbierto}
+        >
+          Filtros
+          {activos > 0 && <span className="av2-filtros-badge">{activos}</span>}
+        </button>
+        {filterSummary && <span className="av2-filtros-resumen">{filterSummary}</span>}
+        {panelAbierto && (
+          <div className="av2-filtros-panel">
+            {selects.map((spec) => (
+              <Av2Select key={spec.id} spec={spec} />
+            ))}
+            {period && <PeriodControl value={period} onChange={onPeriodChange} />}
+            {hayTabs && (
+              <div className="av2-filtros-estados">
+                {statusTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`av2-filtros-estado${tab.id === activeStatus ? ' av2-filtros-estado--activo' : ''}`}
+                    onClick={() => {
+                      onStatusChange?.(tab.id);
+                      setPanelAbierto(false);
+                    }}
+                    disabled={(tab.count ?? 0) === 0}
+                  >
+                    <span>{tab.label}</span>
+                    <b>{(tab.count ?? 0).toLocaleString('es-AR')}</b>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="av2-filterbar" ref={refAncho}>
       {selects.map((spec) => (
         <Av2Select key={spec.id} spec={spec} />
       ))}
