@@ -118,3 +118,6 @@ docs/clientes/**/_*.txt
 # Lo que si se versiona es el resultado, scripts/datos/catalogo_latam.json.
 backend/scripts/datos/geonames/*.zip
 backend/scripts/datos/geonames/*.txt
+# GeoJSON de limites administrativos (geoBoundaries). Tampoco se versionan:
+# entre 3 y 164 MB por pais. Lo que queda es el contorno recortado, en la base.
+backend/scripts/datos/contornos/

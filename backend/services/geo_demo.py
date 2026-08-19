@@ -191,6 +191,34 @@ def areas_infona(nombre_municipio: str, cod_dpto: Optional[str] = None) -> list[
     return out
 
 
+async def area_del_catalogo(nombre_municipio: str, pais: str) -> list[dict]:
+    """El contorno oficial del municipio, si el batch ya lo dejo en el catalogo.
+
+    Es la mejor fuente para un municipio SIN division interna, que son casi
+    todos: sortear dentro de su limite real en vez de un circulo evita plantar
+    reclamos en el municipio vecino. Lo carga
+    `scripts/batch/contornos_municipios.py` desde geoBoundaries.
+
+    Devuelve vacio si ese municipio todavia no tiene contorno --- el llamador cae
+    al circulo, que sigue funcionando.
+    """
+    from core.database import AsyncSessionLocal
+    from sqlalchemy import text
+
+    async with AsyncSessionLocal() as db:
+        fila = (await db.execute(text(
+            "SELECT nombre, poligono FROM municipios_catalogo "
+            "WHERE pais = :p AND nombre = :n AND poligono IS NOT NULL LIMIT 1"),
+            {"p": pais, "n": nombre_municipio})).first()
+    if not fila:
+        return []
+    try:
+        anillo = json.loads(fila[1])
+    except (ValueError, TypeError):
+        return []
+    return [{"nombre": fila[0], "anillo": anillo}] if len(anillo) >= 3 else []
+
+
 def areas_desde_zonas(zonas: Iterable[dict]) -> list[dict]:
     """Areas a partir de las zonas ya cargadas en la base del municipio.
 

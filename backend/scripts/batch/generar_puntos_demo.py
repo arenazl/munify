@@ -38,8 +38,9 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
+from _comun import contorno_catalogo  # noqa: E402
 from services import geo_demo  # noqa: E402
 
 
@@ -84,6 +85,9 @@ async def main(a: argparse.Namespace) -> int:
     if not areas and (a.pais or "").upper() == "PY":
         areas = geo_demo.areas_infona(a.nombre, cod_dpto=a.dpto)
         fuente_area = "INFONA (division oficial de Paraguay)"
+    if not areas:
+        areas = await contorno_catalogo(a.nombre, a.pais or "")
+        fuente_area = "limite oficial del municipio (geoBoundaries)"
     if not areas and nucleo:
         areas = [{"nombre": a.nombre,
                   "anillo": geo_demo.circulo(nucleo[0], nucleo[1], radio_km=a.radio)}]
