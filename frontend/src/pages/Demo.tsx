@@ -9,6 +9,7 @@ import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { BanderaPais, type CodigoPais } from '../components/ui/BanderaPais';
+import './Demo.css';
 
 interface Municipio {
   id: number;
@@ -99,7 +100,7 @@ export default function Demo() {
     return (
       <>
         {nombre.slice(0, i)}
-        <span className="font-bold text-blue-600">{nombre.slice(i, i + q.length)}</span>
+        <span style={{ fontWeight: 700, color: 'var(--pl-green-700)' }}>{nombre.slice(i, i + q.length)}</span>
         {nombre.slice(i + q.length)}
       </>
     );
@@ -210,17 +211,8 @@ export default function Demo() {
   const showSearch = municipios.length >= SEARCH_THRESHOLD;
 
   return (
-    <div className="relative min-h-screen bg-slate-50 flex flex-col overflow-hidden">
-      {/* Mesh gradient de fondo — blobs blurreados que dan profundidad sin ruido. */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-32 w-[480px] h-[480px] rounded-full bg-blue-300/40 blur-[120px]" />
-        <div className="absolute top-1/3 -right-40 w-[520px] h-[520px] rounded-full bg-cyan-200/50 blur-[130px]" />
-        <div className="absolute -bottom-40 left-1/3 w-[420px] h-[420px] rounded-full bg-violet-200/40 blur-[120px]" />
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-      </div>
-
-      {/* Wrapper relative para que todo lo de abajo quede sobre los blobs. */}
-      <div className="relative z-10 flex flex-col flex-1">
+    <div className="dm-fondo relative overflow-hidden">
+      <div className="dm-capa">
       {creando && (
         <DemoCreationProgress done={creandoDone} municipioNombre={nuevoNombre} />
       )}
@@ -241,51 +233,46 @@ export default function Demo() {
         loading={!!eliminando}
       />
 
-      <header className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-5">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <BrandMark size={36} variant="content" className="flex-shrink-0" />
-            <span className="text-lg sm:text-xl font-bold text-slate-800 truncate">{BRAND.name}</span>
+      <header className="dm-header">
+        <div className="dm-header-caja">
+          <div className="dm-marca">
+            <BrandMark size={32} variant="content" />
+            <span className="dm-marca-nombre">{BRAND.name}</span>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-          <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
-          <button
-            onClick={() => navigate('/login')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-slate-700 text-xs transition-colors flex-shrink-0"
-          >
-            <LogIn className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Ya tengo cuenta</span>
-            <span className="sm:hidden">Ingresar</span>
-          </button>
+          <div className="dm-header-acciones">
+            <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
+            <button onClick={() => navigate('/login')} className="dm-link-suave">
+              <LogIn className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Ya tengo cuenta</span>
+              <span className="sm:hidden">Ingresar</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-8">
-        <div className="w-full max-w-2xl">
-          <div className="text-center mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-800 mb-3 leading-tight">
-              Probá {BRAND.name} en tu municipio
-            </h1>
-            <p className="text-slate-500 text-base sm:text-lg">
-              Escribí el nombre y armamos una demo en 3 segundos
+      <main className="dm-main">
+        <div className="dm-col">
+          <div className="dm-titular">
+            <span className="dm-eyebrow">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Municipios reales de 6 países
+            </span>
+            <h1 className="dm-titulo">Probá {BRAND.name} en tu municipio</h1>
+            <p className="dm-bajada">
+              Elegí tu ciudad del catálogo oficial y armamos la demo con sus calles, sus barrios y su mapa.
             </p>
           </div>
 
           {/* OJO: sin overflow-hidden (recortaba el dropdown) y con z-40 para
               que el dropdown quede SOBRE la sección de municipios de abajo */}
-          <div className="mb-6 bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.12),0_2px_8px_-2px_rgba(15,23,42,0.06)] p-4 sm:p-6 relative z-40">
-            {/* Top stripe gradient — refuerza que es el CTA principal. */}
-            <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl bg-gradient-to-r from-blue-500 via-cyan-400 to-violet-400" />
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <Sparkles className="h-5 w-5 text-blue-500" />
-              <span className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">
-                Crear demo en vivo
-              </span>
+          <div className="dm-alta">
+            <div className="dm-alta-cab">
+              <Sparkles className="h-4 w-4" style={{ color: 'var(--pl-green)' }} />
+              <span className="dm-alta-titulo">Crear demo en vivo</span>
               {/* País del catálogo. Va acá arriba y no como combo: son pocos y
                   la bandera se reconoce de un golpe. Cambiarlo limpia lo
                   tipeado, porque las sugerencias son de otro país. */}
-              <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-1" role="group" aria-label="País del catálogo">
+              <div className="dm-paises" role="group" aria-label="País del catálogo">
                 {PAISES.map((p) => {
                   const activo = pais === p.cod;
                   return (
@@ -301,23 +288,17 @@ export default function Demo() {
                       }}
                       aria-pressed={activo}
                       title={p.nombre}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all ${
-                        activo
-                          ? 'border-blue-400 bg-blue-50 shadow-sm'
-                          : 'border-transparent opacity-50 hover:opacity-90 hover:bg-slate-50'
-                      }`}
+                      className={`dm-pais${activo ? ' dm-pais--activo' : ''}`}
                     >
                       <BanderaPais pais={p.cod} size={13} />
-                      <span className={`text-[11px] font-semibold ${activo ? 'text-blue-700' : 'text-slate-500'}`}>
-                        {p.cod}
-                      </span>
+                      <span className="dm-pais-cod">{p.cod}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 min-w-0 relative">
+            <div className="dm-fila">
+              <div className="dm-campo">
                 <input
                   type="text"
                   value={nuevoNombre}
@@ -340,34 +321,20 @@ export default function Demo() {
                   placeholder={`Ej: ${PLACEHOLDER_CITIES[placeholderIdx]}...`}
                   disabled={creando}
                   maxLength={MAX_NAME}
-                  className={`w-full px-4 py-3 pr-20 rounded-xl border-2 focus:outline-none text-slate-800 placeholder-slate-400 transition-colors disabled:opacity-50 ${
-                    nameValid
-                      ? 'border-green-400 focus:border-green-500'
-                      : 'border-slate-200 focus:border-blue-500'
-                  }`}
+                  className={`dm-input${nameValid ? ' dm-input--ok' : ''}`}
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
-                  {nameValid && <Check className="h-4 w-4 text-green-500" />}
-                  <span
-                    className={`text-[10px] font-medium tabular-nums ${
-                      trimmed.length === 0
-                        ? 'text-slate-300'
-                        : nameValid
-                          ? 'text-green-500'
-                          : 'text-slate-400'
-                    }`}
-                  >
-                    {nameValid && muniSel ? muniSel.provincia : `${trimmed.length}/${MAX_NAME}`}
-                  </span>
+                <div className={`dm-input-marca${nameValid ? ' dm-input-marca--ok' : ''}`}>
+                  {nameValid && <Check className="h-3.5 w-3.5" />}
+                  <span>{nameValid && muniSel ? muniSel.provincia : `${trimmed.length}/${MAX_NAME}`}</span>
                 </div>
                 {/* Dropdown del catálogo oficial (tabla local, dataset georef).
                     Teclado: flechas navegan, Enter elige, Esc cierra. */}
                 {showSug && sugerencias.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl border border-slate-200/80 shadow-[0_18px_50px_-12px_rgba(15,23,42,0.25)] z-50 max-h-72 overflow-y-auto overscroll-contain">
-                    <div className="px-4 pt-2.5 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="dm-sug">
+                    <div className="dm-sug-cab">
                       <ShieldCheck className="h-3 w-3" />
                       Catálogo oficial de municipios
-                      {buscando && <Loader2 className="h-3 w-3 animate-spin ml-auto" />}
+                      {buscando && <Loader2 className="h-3 w-3 animate-spin" style={{ marginLeft: 'auto' }} />}
                     </div>
                     {sugerencias.map((m, i) => (
                       <button
@@ -375,22 +342,16 @@ export default function Demo() {
                         onMouseDown={(e) => { e.preventDefault(); elegirMuni(m); }}
                         onMouseEnter={() => setHlIdx(i)}
                         ref={(el) => { if (i === hlIdx && el) el.scrollIntoView({ block: 'nearest' }); }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                          i === hlIdx ? 'bg-blue-50' : 'bg-transparent'
-                        }`}
+                        className={`dm-sug-item${i === hlIdx ? ' dm-sug-item--activo' : ''}`}
                       >
-                        <span className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors ${
-                          i === hlIdx ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : 'bg-slate-100'
-                        }`}>
-                          <MapPin className={`h-4 w-4 ${i === hlIdx ? 'text-white' : 'text-slate-400'}`} />
+                        <span className="dm-sug-pin">
+                          <MapPin className="h-4 w-4" />
                         </span>
                         <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-medium text-slate-800 truncate">
-                            {resaltar(m.nombre, trimmed)}
-                          </span>
-                          <span className="block text-[11px] text-slate-400">{m.provincia}</span>
+                          <span className="dm-sug-nombre">{resaltar(m.nombre, trimmed)}</span>
+                          <span className="dm-sug-prov">{m.provincia}</span>
                         </span>
-                        {i === hlIdx && <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />}
+                        {i === hlIdx && <ArrowRight className="h-4 w-4 shrink-0" style={{ color: 'var(--pl-green)' }} />}
                       </button>
                     ))}
                   </div>
@@ -399,7 +360,7 @@ export default function Demo() {
               <button
                 onClick={handleCrearDemo}
                 disabled={creando || !nameValid}
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                className="dm-boton"
               >
                 {creando ? (
                   <>
@@ -416,114 +377,63 @@ export default function Demo() {
             </div>
 
             {/* Social proof / garantía — antes era texto gris chiquito. */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                <CreditCard className="h-3.5 w-3.5 text-green-600" />
-                Sin tarjeta
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
-                Sin registro
-              </div>
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-                Admin + vecino listos
-              </div>
+            <div className="dm-garantias">
+              <span className="dm-garantia"><CreditCard className="h-3.5 w-3.5" /> Sin tarjeta</span>
+              <span className="dm-garantia"><ShieldCheck className="h-3.5 w-3.5" /> Sin registro</span>
+              <span className="dm-garantia"><Sparkles className="h-3.5 w-3.5" /> Admin + vecino listos</span>
             </div>
           </div>
 
           {municipios.length > 0 && (
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-xs text-slate-400 uppercase tracking-wider font-medium">
-                o entrá a uno existente
-              </span>
-              <div className="flex-1 h-px bg-slate-200" />
-            </div>
+            <div className="dm-separador"><span>o entrá a uno existente</span></div>
           )}
 
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
-              {error}
-            </div>
+            <div className="dm-error">{error}</div>
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            <div className="dm-cargando">
+              <Loader2 className="h-7 w-7 animate-spin" style={{ margin: '0 auto', color: 'var(--pl-green)' }} />
             </div>
           ) : (
             <>
               {showSearch && (
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <div className="dm-buscador-demos">
+                  <Search className="h-4 w-4" />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Buscar municipio..."
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-white/60 bg-white/70 backdrop-blur-md focus:border-blue-400 focus:bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/10 text-sm text-slate-800 placeholder-slate-400 transition-all"
                   />
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+              <div className="dm-grilla">
                 {filteredMunicipios.map((municipio) => {
                   const primaryColor = municipio.color_primario || '#0088cc';
                   const isEliminando = eliminando === municipio.codigo;
-                  const inicial = municipio.nombre.trim().charAt(0).toUpperCase();
                   return (
-                    <div
-                      key={municipio.id}
-                      className="relative group rounded-2xl border border-white/70 bg-white/75 backdrop-blur-md overflow-hidden transition-all duration-300 hover:bg-white hover:-translate-y-0.5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.12),0_1px_4px_-1px_rgba(15,23,42,0.04)] hover:shadow-[0_16px_40px_-12px_rgba(15,23,42,0.22),0_2px_8px_-2px_rgba(15,23,42,0.08)]"
-                    >
-                      {/* Inicial gigante de marca de agua. Se tiñe del color del muni en hover. */}
-                      <div
-                        aria-hidden="true"
-                        className="absolute -right-2 -bottom-6 text-[8rem] leading-none font-black select-none pointer-events-none transition-all duration-500 text-slate-100 group-hover:scale-105"
-                        style={{
-                          fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
-                        }}
-                      >
-                        <span className="block transition-colors duration-300 group-hover:hidden">
-                          {inicial}
-                        </span>
-                        <span
-                          className="hidden group-hover:block"
-                          style={{ color: `${primaryColor}25` }}
-                        >
-                          {inicial}
-                        </span>
-                      </div>
-
-                      {/* Top stripe del color del muni — sutil, refuerza identidad. */}
-                      <div
-                        className="absolute top-0 left-0 right-0 h-[2px] opacity-60 group-hover:opacity-100 transition-opacity"
-                        style={{
-                          background: `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}00 100%)`,
-                        }}
-                      />
+                    <div key={municipio.id} className="dm-muni">
+                      {/* La franja del color del municipio es lo ÚNICO que
+                          distingue una tarjeta de otra, y es informacion: su
+                          identidad. Antes habia ademas una inicial serif de 8rem
+                          de marca de agua, que a esta escala competia con el
+                          nombre real y no decia nada que el nombre no dijera. */}
+                      <span className="dm-muni-franja" style={{ background: primaryColor }} />
 
                       <button
                         onClick={() => handleSelectMunicipio(municipio)}
                         disabled={isEliminando}
-                        className="relative w-full text-left px-5 py-5 active:scale-[0.98] transition-transform disabled:opacity-50"
+                        className="dm-muni-btn"
                       >
-                        <h3 className="font-bold text-slate-900 text-base leading-tight truncate pr-8">
-                          {municipio.nombre}
-                        </h3>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-[0.15em] mt-1.5 font-semibold truncate">
-                          {municipio.codigo}
-                        </p>
-
-                        {/* Flecha que entra en hover, alineada con el código. */}
-                        <div
-                          className="flex items-center gap-1.5 mt-3 text-xs font-semibold opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
-                          style={{ color: primaryColor }}
-                        >
-                          <span>Entrar</span>
+                        <h3 className="dm-muni-nombre">{municipio.nombre}</h3>
+                        <p className="dm-muni-codigo">{municipio.codigo}</p>
+                        <span className="dm-muni-entrar" style={{ color: primaryColor }}>
+                          Entrar
                           <ArrowRight className="h-3.5 w-3.5" />
-                        </div>
+                        </span>
                       </button>
 
                       <button
@@ -534,7 +444,7 @@ export default function Demo() {
                         disabled={isEliminando}
                         // SIEMPRE visible (antes solo en hover: inaccesible en mobile).
                         // Las demos se administran desde esta UI pública a propósito.
-                        className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/70 hover:bg-red-50 text-slate-400 hover:text-red-600 border border-slate-200/60 hover:border-red-200 transition-all disabled:opacity-50"
+                        className="dm-muni-borrar"
                         title={`Eliminar demo ${municipio.nombre}`}
                         aria-label={`Eliminar demo ${municipio.nombre}`}
                       >
@@ -550,17 +460,15 @@ export default function Demo() {
               </div>
 
               {showSearch && filteredMunicipios.length === 0 && (
-                <p className="text-center text-sm text-slate-400 py-8">
-                  No hay municipios que coincidan con "{search}"
-                </p>
+                <p className="dm-vacio">No hay municipios que coincidan con "{search}"</p>
               )}
             </>
           )}
         </div>
       </main>
 
-      <footer className="flex-shrink-0 py-6 px-6">
-        <p className="text-center text-slate-400 text-sm">
+      <footer className="dm-pie">
+        <p>
           {BRAND.name} - Conectando al gobierno con las necesidades del vecino
         </p>
       </footer>

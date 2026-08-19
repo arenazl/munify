@@ -1,0 +1,597 @@
+/* ==========================================================================
+   Generador de demos — la puerta de Munify
+   ==========================================================================
+   La pantalla estaba escrita con colores fijos de Tailwind (blue-500, cyan-500,
+   violet-400, slate-*), así que era la única de la app que no acompañaba el
+   tema: elegías Marfil o Tabaco y acá seguía todo celeste. Ahora sale de los
+   mismos tokens `--pl-*` que el resto.
+
+   Y se fue el vocabulario visual que la fechaba: tres manchas de blur de medio
+   millar de píxeles, vidrio esmerilado sobre cada tarjeta y degradados de tres
+   colores. El lenguaje del canvas es lo contrario y envejece mejor: fondo
+   sólido, borde de 1px, un solo acento y la jerarquía puesta en la tipografía.
+   Los blur gigantes además no eran gratis — tres capas de 120px de radio se
+   recomponen en cada scroll. */
+
+.dm-fondo {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--pl-surface-2);
+  color: var(--pl-text);
+}
+
+/* Un solo lavado del acento arriba, en lugar de las tres manchas de color.
+   Se disuelve rápido: sugiere el color de marca sin teñir la pantalla. */
+.dm-fondo::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 380px;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--pl-green) 7%, transparent) 0%,
+    transparent 100%);
+}
+
+.dm-capa {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* --- Cabecera ------------------------------------------------------ */
+
+.dm-header {
+  flex-shrink: 0;
+  padding: 18px 24px;
+}
+
+.dm-header-caja {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dm-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dm-marca-nombre {
+  font-family: var(--pl-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dm-header-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dm-link-suave {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pl-text-3);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              background var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-link-suave:hover {
+  color: var(--pl-text);
+  background: var(--pl-surface-3);
+}
+
+/* --- Encabezado del contenido -------------------------------------- */
+
+.dm-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 24px 40px;
+}
+
+.dm-col {
+  width: 100%;
+  max-width: 720px;
+}
+
+.dm-titular {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.dm-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--pl-text-3);
+  margin-bottom: 12px;
+}
+
+.dm-titulo {
+  font-family: var(--pl-font-display);
+  font-size: clamp(28px, 5vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--pl-text);
+  margin: 0;
+  text-wrap: balance;
+}
+
+.dm-bajada {
+  margin: 12px 0 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+}
+
+/* --- La tarjeta del alta ------------------------------------------- */
+
+/* Sin overflow: el desplegable del buscador se sale de la caja a propósito. */
+.dm-alta {
+  position: relative;
+  z-index: 40;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--pl-shadow-md, 0 8px 24px -12px rgba(16, 20, 24, 0.18));
+  margin-bottom: 26px;
+}
+
+.dm-alta-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dm-alta-titulo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pl-text-2);
+}
+
+/* --- Banderas de país ---------------------------------------------- */
+
+.dm-paises {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+@media (min-width: 640px) {
+  .dm-paises { width: auto; margin-left: auto; }
+}
+
+.dm-pais {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  opacity: 0.5;
+  transition: opacity var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              background var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-pais:hover { opacity: 0.9; background: var(--pl-surface-3); }
+
+.dm-pais--activo,
+.dm-pais--activo:hover {
+  opacity: 1;
+  background: var(--pl-green-100);
+  border-color: var(--pl-green-200);
+}
+
+.dm-pais-cod {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pl-text-3);
+}
+.dm-pais--activo .dm-pais-cod { color: var(--pl-green-700); }
+
+/* --- Buscador + botón ---------------------------------------------- */
+
+.dm-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .dm-fila { flex-direction: row; }
+}
+
+.dm-campo {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.dm-input {
+  width: 100%;
+  /* 16px o más: abajo de eso, iOS hace zoom al enfocar y descuadra la pantalla. */
+  font-size: 16px;
+  padding: 13px 84px 13px 15px;
+  border-radius: 11px;
+  border: 1px solid var(--pl-border-strong);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  outline: none;
+  transition: border-color var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              box-shadow var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-input::placeholder { color: var(--pl-text-faint); }
+.dm-input:focus {
+  border-color: var(--pl-green);
+  box-shadow: 0 0 0 3px var(--pl-green-100);
+}
+.dm-input:disabled { opacity: 0.5; }
+
+/* Municipio elegido del catálogo: el borde confirma sin decir nada. */
+.dm-input--ok,
+.dm-input--ok:focus {
+  border-color: var(--pl-green);
+}
+
+.dm-input-marca {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-text-faint);
+  max-width: 62px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-input-marca--ok { color: var(--pl-green-700); }
+
+.dm-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 22px;
+  height: 48px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 11px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent, #fff);
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-boton:hover:not(:disabled) { filter: brightness(1.08); }
+.dm-boton:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* --- Desplegable del catálogo -------------------------------------- */
+
+.dm-sug {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  z-index: 50;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 12px;
+  box-shadow: var(--pl-shadow-lg, 0 18px 50px -12px rgba(16, 20, 24, 0.28));
+  max-height: 290px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dm-sug-cab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+}
+
+.dm-sug-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--pl-text);
+}
+.dm-sug-item--activo { background: var(--pl-green-050); }
+
+.dm-sug-pin {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: var(--pl-surface-3);
+  color: var(--pl-text-3);
+}
+.dm-sug-item--activo .dm-sug-pin {
+  background: var(--pl-green);
+  color: var(--pl-on-accent, #fff);
+}
+
+.dm-sug-nombre {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pl-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-sug-prov {
+  display: block;
+  font-size: 11.5px;
+  color: var(--pl-text-3);
+}
+
+/* --- Las tres garantías -------------------------------------------- */
+
+.dm-garantias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--pl-border);
+}
+
+.dm-garantia {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+}
+
+/* --- Separador ------------------------------------------------------ */
+
+.dm-separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.dm-separador::before,
+.dm-separador::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--pl-border);
+}
+.dm-separador span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+}
+
+/* --- Las demos que ya existen --------------------------------------- */
+
+.dm-grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* Sin vidrio esmerilado ni inicial gigante de fondo: la tarjeta es una tarjeta.
+   Lo único que la distingue de otra es la franja del color del municipio, que
+   es información —su identidad— y no decoración. */
+.dm-muni {
+  position: relative;
+  border: 1px solid var(--pl-border);
+  border-radius: 12px;
+  background: var(--pl-surface);
+  overflow: hidden;
+  transition: border-color var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              transform var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              box-shadow var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-muni:hover {
+  transform: translateY(-2px);
+  border-color: var(--pl-border-strong);
+  box-shadow: var(--pl-shadow-md, 0 10px 26px -14px rgba(16, 20, 24, 0.3));
+}
+
+.dm-muni-franja {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.dm-muni-btn {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  padding: 18px 16px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+.dm-muni-btn:disabled { opacity: 0.5; }
+
+.dm-muni-nombre {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--pl-text);
+  padding-right: 26px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-muni-codigo {
+  margin: 5px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-muni-entrar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              transform var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-muni:hover .dm-muni-entrar { opacity: 1; transform: none; }
+/* En touch no hay hover: si dependiera de él, la pista no aparecería nunca. */
+@media (hover: none) {
+  .dm-muni-entrar { opacity: 1; transform: none; }
+}
+
+/* Visible SIEMPRE, no sólo en hover: en un teléfono no habría forma de borrar. */
+.dm-muni-borrar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  color: var(--pl-text-faint);
+  cursor: pointer;
+  transition: color var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              background var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.dm-muni-borrar:hover {
+  color: var(--pl-red-700, #b4232a);
+  background: var(--pl-red-050, rgba(180, 35, 42, 0.08));
+}
+
+/* --- Estados y pie --------------------------------------------------- */
+
+.dm-buscador-demos {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.dm-buscador-demos svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pl-text-faint);
+  pointer-events: none;
+}
+
+.dm-buscador-demos input {
+  width: 100%;
+  font-size: 16px;
+  padding: 10px 14px 10px 36px;
+  border-radius: 10px;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  outline: none;
+}
+.dm-buscador-demos input:focus { border-color: var(--pl-green); }
+
+.dm-vacio,
+.dm-cargando {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--pl-text-3);
+  font-size: 13.5px;
+}
+
+.dm-error {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  text-align: center;
+  color: var(--pl-red-700, #b4232a);
+  background: var(--pl-red-050, rgba(180, 35, 42, 0.08));
+  border: 1px solid var(--pl-red-200, rgba(180, 35, 42, 0.2));
+}
+
+.dm-pie {
+  flex-shrink: 0;
+  padding: 22px 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--pl-text-faint);
+}
