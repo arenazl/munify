@@ -153,6 +153,35 @@ const HOST_TO_BRAND: Record<string, string> = {
   'paraguay-limpio.netlify.app': 'paraguay-limpio',
 };
 
+/**
+ * Rutas que son de MUNIFY y de nadie más, pase lo que pase.
+ *
+ * El generador de demos y la galería de estilos no pertenecen a ningún
+ * municipio: son la herramienta de Munify. Tienen que comportarse como la raíz
+ * —limpiar la marca recordada y volver a la del site— porque si no heredan la
+ * que quedó pegada en la pestaña.
+ *
+ * Ese era un bug real: entrabas a una ruta de Asunción, la marca se guardaba en
+ * `sessionStorage`, y a partir de ahí `/demo` resolvía como Paraguay Limpio.
+ * Como esa marca SÍ tiene `municipioCodigo`, la ruta redirigía al home del
+ * municipio y el generador de demos se volvía inalcanzable en esa pestaña,
+ * sin más forma de salir que cerrarla.
+ */
+const RUTAS_DE_MUNIFY = [
+  '/demo',          // el generador de demos
+  '/demos',         // la galería de estilos
+  '/reels',         // estudio de reels
+  '/voz',           // estudio de voz
+  '/presentacion',  // la presentación comercial
+  '/bienvenido',    // la landing
+];
+
+/** ¿El pathname es una de esas rutas (o algo colgando de ellas)? */
+function esRutaDeMunify(pathname: string): boolean {
+  const limpio = pathname.replace(/\/+$/, '').toLowerCase();
+  return RUTAS_DE_MUNIFY.some((r) => limpio === r || limpio.startsWith(`${r}/`));
+}
+
 /** Dónde se recuerda la marca elegida por URL, mientras dure la pestaña. */
 const CLAVE_MARCA_SESION = 'brand_id';
 /** Ídem, pero PERSISTENTE — sólo se lee con la PWA instalada (ver abajo). */
@@ -292,8 +321,11 @@ function resolveBrandId(): string {
     const byHost = HOST_TO_BRAND[window.location.hostname];
     if (byHost && BRANDS[byHost]) return byHost;
 
-    const enRaiz = window.location.pathname.replace(/\/+$/, '') === '';
-    if (enRaiz && !esAppInstalada()) {
+    // La raíz y las rutas propias de Munify se tratan igual: son la puerta de
+    // la herramienta, no la de un municipio.
+    const ruta = window.location.pathname;
+    const esGlobal = ruta.replace(/\/+$/, '') === '' || esRutaDeMunify(ruta);
+    if (esGlobal && !esAppInstalada()) {
       try {
         window.sessionStorage.removeItem(CLAVE_MARCA_SESION);
       } catch {
