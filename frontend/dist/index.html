@@ -6,8 +6,20 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Viewport de PWA (estándar de base-compartida/11-FIX-VIEWPORT-PWA.md).
+         `maximum-scale=1, user-scalable=no` mata el zoom al tocar un input y el
+         doble-tap; `viewport-fit=cover` habilita las safe-area insets — sin él,
+         los `env(safe-area-inset-*)` que ya usa el shell devuelven 0 y en iPhone
+         el header queda tapado por la status bar / Dynamic Island. -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#3b82f6" />
+
+    <!-- PWA en iOS: pantalla completa y barra de estado translúcida (necesario
+         para que el contenido pueda usar las safe areas). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- SEO básico -->
     <title>Munify - Sistema de Gestión Municipal | Reclamos y Trámites Online</title>
@@ -88,8 +100,8 @@
       "sameAs": []
     }
     </script>
-    <script type="module" crossorigin src="/assets/index-DROxpjus.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BRB6AtxF.css">
+    <script type="module" crossorigin src="/assets/index-D7WtKl9n.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BW8tP2X4.css">
   </head>
   <body>
     <div id="root"></div>
