@@ -77,6 +77,30 @@ cientos de MB que se rebajan con un comando. Lo que sí se versiona es el
 resultado ya recortado (`scripts/datos/catalogo_latam.json`) y los puntos por
 ciudad (`scripts/semillas/datos/puntos_*.json`).
 
+## Contornos: qué quedó cargado
+
+| país | con contorno | fuente | cómo se emparejó |
+|---|---|---|---|
+| Argentina | 2.082 / 2.082 | IGN — `infra.datos.gob.ar/georef` | **por id oficial**, sin heurística |
+| Uruguay | 19 / 19 | geoBoundaries ADM1 | geométrico |
+| Chile | 337 / 346 | Biblioteca del Congreso, ADM3 | geométrico |
+| Paraguay | 244 / 263 | DGEEC, ADM2 | geométrico |
+| Perú | **0** | — | ADM2 son provincias (196) y el catálogo son distritos (1.873) |
+| Bolivia | **0** | — | ADM3 agrupa 1,49 municipios del catálogo por área |
+
+Los dos que están en cero **no fallaron: los frenó una guarda**, y siguen usando
+el círculo aproximado, que en su caso miente menos que el contorno del vecino.
+
+- **Perú** necesita la división distrital del INEI; geoBoundaries no la publica.
+- **Bolivia** tiene un problema anterior: nuestro catálogo son 539 (GeoNames
+  mezcla cantones) contra 339 municipios oficiales. Lo correcto es rehacer el
+  catálogo boliviano desde los 339 de GeoBolivia — que ya está descargado — y
+  recién ahí los contornos salen 1:1.
+- **Argentina** es el caso a imitar: cuando el país publica sus municipios con
+  geometría y el catálogo salió de la misma fuente, el emparejamiento es por
+  identificador y no hay nada que adivinar. Por eso existe `FUENTES` en
+  `contornos_municipios.py`.
+
 ## Lo que todavía no está resuelto
 
 - **Precalentar a escala.** Son ~40 s por ciudad contra un servicio comunitario

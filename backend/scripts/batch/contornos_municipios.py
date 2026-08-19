@@ -66,12 +66,44 @@ import difflib
 from _comun import CONTORNOS, anillos, motor, norm, simplificar  # noqa: E402
 
 API = "https://www.geoboundaries.org/api/current/gbOpen/{iso3}/{nivel}/"
+
+# Cuando el pais publica SUS municipios con geometria, gana su fuente sobre
+# geoBoundaries: es la division vigente y no la del ultimo censo que alguien
+# consolido. En Argentina ademas cierra perfecto --- el catalogo salio del mismo
+# georef, asi que los ids son los mismos y no hay que emparejar nada.
+#
+# geoBoundaries no sirve para Argentina: su ADM2 son departamentos, que
+# contienen VARIOS municipios (probado: 383/2082 y el script aborto solo).
+FUENTES = {
+    "AR": {
+        "url": "https://infra.datos.gob.ar/georef/municipios.geojson",
+        "id": "id",
+        "nombre": "nombre",
+        "fuente": "IGN / georef (datos.gob.ar) --- 2.082 municipios",
+    },
+}
 UA = "Munify/1.0 (contornos municipales para demos; https://munify.com.ar)"
 # Los nombres del catalogo y los del shapefile se escriben distinto. Estas son
 # las mismas variantes que ya se usan para las coordenadas: se prueban formas
 # del MISMO nombre, no municipios parecidos.
 RUIDO = ("municipio de ", "distrito de ", "comuna de ", "partido de ",
          "departamento de ", "provincia de ", "ciudad de ", "villa de ")
+
+
+def bajar_url(url: str, destino_nombre: str, descripcion: str) -> list[dict]:
+    """Un GeoJSON de una fuente nacional. Se cachea igual que el de geoBoundaries."""
+    CONTORNOS.mkdir(parents=True, exist_ok=True)
+    destino = CONTORNOS / destino_nombre
+    if destino.exists():
+        print(f"  usando el archivo ya bajado ({destino.stat().st_size / 1048576:.1f} MB)")
+    else:
+        print(f"  fuente: {descripcion}")
+        print(f"  bajando {url.rsplit('/', 1)[-1]} ...")
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=900) as r:
+            destino.write_bytes(r.read())
+        print(f"  {destino.stat().st_size / 1048576:.1f} MB guardados")
+    return json.loads(destino.read_text(encoding="utf-8"))["features"]
 
 
 def bajar(iso3: str, nivel: str) -> list[dict]:
@@ -113,8 +145,17 @@ def claves(nombre: str) -> list[str]:
 
 
 async def main(a: argparse.Namespace) -> int:
-    print(f"{a.iso3} {a.nivel} (pais {a.pais} del catalogo)")
-    features = bajar(a.iso3, a.nivel)
+    propia = FUENTES.get(a.pais) if not a.forzar_geoboundaries else None
+    if propia:
+        print(f"{a.pais}: fuente nacional propia")
+        features = bajar_url(propia["url"], f"{a.pais}_municipios.geojson", propia["fuente"])
+        campo_id, campo_nombre = propia["id"], propia["nombre"]
+    else:
+        if not a.iso3:
+            sys.exit(f"Sin fuente propia para {a.pais}: hace falta --iso3 y --nivel.")
+        print(f"{a.iso3} {a.nivel} (pais {a.pais} del catalogo)")
+        features = bajar(a.iso3, a.nivel)
+        campo_id, campo_nombre = None, "shapeName"
     print(f"  {len(features)} areas en el archivo")
 
     # EL MATCH ES GEOMETRICO, NO POR NOMBRE.
@@ -128,17 +169,26 @@ async def main(a: argparse.Namespace) -> int:
     # El nombre queda solo como dato para el reporte, para poder auditar que lo
     # que se emparejo tiene sentido.
     areas = []
+    por_id: dict[str, dict] = {}
     for f in features:
+        props = f.get("properties") or {}
         for anillo in anillos(f.get("geometry") or {}):
             if len(anillo) < 3:
                 continue
             xs = [p[0] for p in anillo]
             ys = [p[1] for p in anillo]
-            areas.append({
-                "nombre": (f.get("properties") or {}).get("shapeName") or "?",
+            area = {
+                "nombre": props.get(campo_nombre) or "?",
                 "anillo": anillo,
                 "bbox": (min(xs), min(ys), max(xs), max(ys)),
-            })
+            }
+            areas.append(area)
+            # Si las dos fuentes comparten el identificador oficial, no hay nada
+            # que emparejar: es el mismo municipio y punto.
+            if campo_id and props.get(campo_id):
+                anterior = por_id.get(str(props[campo_id]))
+                if anterior is None or len(anillo) > len(anterior["anillo"]):
+                    por_id[str(props[campo_id])] = area
     # Sin el pre-filtro por rectangulo esto son millones de comparaciones: se
     # descarta de una casi todo antes de entrar al ray casting.
     print(f"  {len(areas)} anillos indexados")
@@ -153,11 +203,25 @@ async def main(a: argparse.Namespace) -> int:
 
     aciertos, sin_centro, sin_area, distinto_nombre = [], [], [], []
     sospechosos: list[str] = []
+    por_identificador = 0
+    # Cuantos municipios termino usando cada area ORIGINAL. Se cuenta con la
+    # identidad del area de la fuente, no con la del anillo simplificado ---
+    # simplificar devuelve una lista nueva cada vez, asi que contar sobre eso
+    # daba 1.00 siempre y la guarda no servia para nada.
+    usos: dict[int, int] = {}
     from _comun import dentro
     for mid, nombre, _prov, _alias, lat, lng in muni:
         if not lat or not lng or (float(lat) == 0 and float(lng) == 0):
             sin_centro.append(nombre)
             continue
+        # 1) por identificador oficial, cuando las dos fuentes usan el mismo
+        directo = por_id.get(str(mid))
+        if directo:
+            aciertos.append((mid, nombre, simplificar(directo["anillo"], a.puntos)))
+            usos[id(directo)] = usos.get(id(directo), 0) + 1
+            por_identificador += 1
+            continue
+        # 2) si no, por geometria: el area que contiene al centro del municipio
         punto = (float(lng), float(lat))
         contiene = [ar for ar in areas
                     if ar["bbox"][0] <= punto[0] <= ar["bbox"][2]
@@ -189,21 +253,20 @@ async def main(a: argparse.Namespace) -> int:
                 continue
             distinto_nombre.append(f"{nombre} -> {elegido['nombre']} ({parecido:.2f})")
         aciertos.append((mid, nombre, simplificar(elegido["anillo"], a.puntos)))
+        usos[id(elegido)] = usos.get(id(elegido), 0) + 1
 
     # GUARDA DE NIVEL: si muchos municipios caen en el MISMO contorno, el nivel
     # pedido no es el municipal --- pasa en Argentina, donde ADM2 son
     # departamentos y cada uno contiene varios municipios. Cargar eso seria peor
     # que no cargar nada: los reclamos de la demo irian a parar al pueblo de al
     # lado con apariencia de dato oficial.
-    usos: dict[int, int] = {}
-    for _mid, _n, anillo in aciertos:
-        usos[id(anillo)] = usos.get(id(anillo), 0) + 1
     compartidos = sorted(usos.values(), reverse=True)
     promedio = (sum(compartidos) / len(compartidos)) if compartidos else 0
 
     total = len(muni) or 1
     print(f"RESULTADO   {len(aciertos)}/{len(muni)} con contorno ({100 * len(aciertos) // total}%)")
     print(f"  municipios por contorno : {promedio:.2f} promedio, {compartidos[0] if compartidos else 0} el peor")
+    print(f"  por identificador oficial: {por_identificador}")
     print(f"  sin centro cargado      : {len(sin_centro)}")
     print(f"  el centro no cae en nada: {len(sin_area)}")
     print(f"  nombre distinto al area : {len(distinto_nombre)}  (normal: grafias distintas)")
@@ -215,13 +278,24 @@ async def main(a: argparse.Namespace) -> int:
         if lista:
             print(f"    {etiqueta}: {'; '.join(lista[:6])}{' ...' if len(lista) > 6 else ''}")
 
-    if a.dry_run:
-        print("\n--dry-run: no se escribio nada")
-        return 0
+    # Las dos guardas se evaluan TAMBIEN en dry-run: sirven justamente para
+    # decidir si un nivel administrativo es usable, y esa respuesta hay que
+    # tenerla antes de escribir, no despues.
     if len(aciertos) < total * a.minimo:
         print(f"\nABORTADO: menos del {a.minimo:.0%} matcheo. El nivel {a.nivel} "
               f"probablemente no es el municipal en {a.iso3}. No se carga nada.")
         return 1
+    if promedio > a.max_por_contorno:
+        print(f"\nABORTADO: {promedio:.2f} municipios comparten cada contorno (hasta "
+              f"{compartidos[0]}). El nivel pedido agrupa VARIOS municipios en una "
+              f"sola area,\nasi que a algunos les tocaria el limite del vecino. Con "
+              f"eso los reclamos de la demo caerian en otra ciudad, con apariencia\n"
+              f"de dato oficial: el circulo aproximado miente menos. No se escribe nada.")
+        return 1
+
+    if a.dry_run:
+        print("\n--dry-run: no se escribio nada")
+        return 0
 
     async with engine.begin() as conn:
         for i in range(0, len(aciertos), 200):
@@ -240,7 +314,10 @@ async def main(a: argparse.Namespace) -> int:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--pais", required=True, help="Codigo de 2 letras del catalogo (PY, AR...)")
-    ap.add_argument("--iso3", required=True, help="Codigo de 3 letras de geoBoundaries (PRY, ARG...)")
+    ap.add_argument("--iso3", help="Codigo de 3 letras de geoBoundaries (PRY, CHL...). "
+                                   "No hace falta si el pais tiene fuente propia en FUENTES.")
+    ap.add_argument("--forzar-geoboundaries", action="store_true",
+                    help="Ignora la fuente nacional y usa geoBoundaries igual")
     ap.add_argument("--nivel", default="ADM2", help="ADM1/ADM2/ADM3: cual es el municipal")
     ap.add_argument("--puntos", type=int, default=300, help="Vertices por contorno")
     ap.add_argument("--minimo", type=float, default=0.5,
