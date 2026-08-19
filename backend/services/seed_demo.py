@@ -7,12 +7,15 @@ zonas, barrios, empleados, cuadrillas, SLAs, reclamos de ejemplo (con
 coordenadas reales para el mapa) y una solicitud — además de las
 categorías que ya siembra `crear_categorias_default()`.
 """
+import re
+import unicodedata
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from core.security import get_password_hash
+from services import geo_demo
 from models.user import User
 from models.enums import RolUsuario, EstadoReclamo
 from models.municipio import Municipio
@@ -628,14 +631,52 @@ def _slug_palabra(texto: str) -> str:
     return limpio.lower().split()[0]
 
 
+def _sin_tildes(texto: str) -> str:
+    return unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+
+
+def _codigo_zona(nombre: str, municipio_id: int) -> str:
+    """Codigo corto y unico para una zona. `Zona.codigo` es VARCHAR(20)."""
+    base = re.sub(r"[^A-Z0-9]+", "", _sin_tildes(nombre).upper())[:10] or "Z"
+    return f"{base}-{municipio_id}"[:20]
+
+
 async def _seed_zonas(
     db: AsyncSession,
     municipio_id: int,
     codigo_muni: str,
     muni_lat: float,
     muni_lng: float,
+    geo: Optional[list[dict]] = None,
 ) -> dict[str, Zona]:
-    """Crea 6 zonas con coords offset sobre el centro del municipio."""
+    """Las zonas del municipio: las REALES si las hay, y si no las genericas.
+
+    Con puntos geolocalizados cacheados (ver `services/geo_demo.py`), las zonas
+    son los distritos de verdad de esa ciudad --- los 6 de Asuncion, por ejemplo ---
+    y su centro es el promedio de los puntos que cayeron adentro, no un offset.
+    Sin cache queda el reparto generico Centro/Norte/Sur, que al menos no miente
+    sobre ser oficial.
+    """
+    reales: dict[str, list[dict]] = {}
+    for punto in (geo or []):
+        if punto.get("zona_nombre"):
+            reales.setdefault(punto["zona_nombre"], []).append(punto)
+    if reales:
+        zonas = {}
+        for nombre, puntos in reales.items():
+            zona = Zona(
+                municipio_id=municipio_id,
+                nombre=nombre[:100],
+                codigo=_codigo_zona(nombre, municipio_id),
+                latitud_centro=sum(p["lat"] for p in puntos) / len(puntos),
+                longitud_centro=sum(p["lon"] for p in puntos) / len(puntos),
+                activo=True,
+            )
+            db.add(zona)
+            zonas[nombre] = zona
+        await db.flush()
+        return zonas
+
     zonas = {}
     for nombre, cod_zona, dlat, dlng in ZONAS_DEMO:
         # Sufijar con municipio_id (numérico, corto) para garantizar unicidad
@@ -659,8 +700,34 @@ async def _seed_barrios(
     municipio_id: int,
     muni_lat: float,
     muni_lng: float,
+    geo: Optional[list[dict]] = None,
 ) -> dict[str, Barrio]:
-    """Crea 12 barrios hardcoded alrededor del centro del municipio."""
+    """Los barrios del municipio: los que devolvio el geocoding, o los genericos.
+
+    Los reales vienen del reverse geocoding de cada punto (Tacumbu, Santa Ana,
+    Ita Enramada en Asuncion) y quedan marcados como validados: son de OSM, no
+    inventados aca.
+    """
+    reales: dict[str, dict] = {}
+    for punto in (geo or []):
+        if punto.get("barrio"):
+            reales.setdefault(punto["barrio"], punto)
+    if reales:
+        barrios = {}
+        for nombre, punto in reales.items():
+            barrio = Barrio(
+                municipio_id=municipio_id,
+                nombre=nombre[:100],
+                latitud=punto["lat"],
+                longitud=punto["lon"],
+                tipo="suburb",
+                validado=True,
+            )
+            db.add(barrio)
+            barrios[nombre] = barrio
+        await db.flush()
+        return barrios
+
     barrios = {}
     for nombre, dlat, dlng in BARRIOS_DEMO:
         barrio = Barrio(
@@ -837,6 +904,13 @@ async def seed_demo_completo(
     muni = await db.get(Municipio, municipio_id)
     muni_lat = muni.latitud if muni and muni.latitud else -34.603722
     muni_lng = muni.longitud if muni and muni.longitud else -58.381592
+
+    # Puntos con direccion REAL de esta ciudad, precalculados por el batch
+    # `scripts/generar_puntos_demo.py`. Si esta ciudad todavia no se precalento,
+    # la lista viene vacia y todo lo de abajo cae en el comportamiento de
+    # siempre: la demo se crea igual, solo que con direcciones genericas. Nunca
+    # se sale a buscarlos en vivo --- serian ~40 segundos dentro del alta.
+    geo = geo_demo.puntos_para_semilla(muni.nombre, 60) if muni else []
 
     # ------------------------------------------------------------------
     # 1. Habilitar dependencias del catálogo global
@@ -1038,41 +1112,22 @@ async def seed_demo_completo(
     _tel_suffix = str(_h % 100_000_000).zfill(8)
     _telefono_demo = f"+54 9 11 {_tel_suffix[:4]}-{_tel_suffix[4:]}"
 
-    # Dirección: reverse-geocode contra Nominatim con un offset determinístico
-    # al centro del muni (~500m-2km). Así cada vecino demo vive en una calle
-    # REAL de su muni, geocodeable en el mapa. Si Nominatim falla, queda None
-    # y el vecino la carga al crear su primer trámite (que tiene autocomplete).
+    # Direccion del vecino demo. Sale de los puntos ya geolocalizados de esta
+    # ciudad: una calle real, con la altura que devolvio el geocoding o sin
+    # altura si no la hay.
+    #
+    # OJO con lo que habia antes: se pedia el reverse a Nominatim EN VIVO dentro
+    # del alta (con lo que la demo dependia de un servicio externo para crearse)
+    # y a la calle real se le pegaba un numero de puerta sacado de un hash
+    # ---`100 + ((_h >> 31) % 4900)`---, o sea una altura inventada presentada como
+    # direccion real. Sin cache ahora queda la calle sola: preferible una
+    # direccion incompleta a una que parece precisa y no lo es.
     _direccion_demo: Optional[str] = None
-    try:
-        import httpx as _httpx
-        # Offset entre -0.01° y +0.01° (~1km) para no caer siempre en el mismo
-        # punto, pero sin salir del muni.
-        _dlat = ((((_h >> 37) % 2000) - 1000) / 100000.0)
-        _dlng = ((((_h >> 43) % 2000) - 1000) / 100000.0)
-        async with _httpx.AsyncClient(timeout=5.0) as _hc:
-            _r = await _hc.get(
-                "https://nominatim.openstreetmap.org/reverse",
-                params={
-                    "lat": muni_lat + _dlat,
-                    "lon": muni_lng + _dlng,
-                    "format": "json",
-                    "zoom": 18,  # street-level
-                    "addressdetails": 1,
-                },
-                headers={"User-Agent": "Munify/1.0 (demo seed)"},
-            )
-            if _r.status_code == 200:
-                _data = _r.json()
-                _addr = _data.get("address", {}) if isinstance(_data, dict) else {}
-                _road = _addr.get("road") or _addr.get("pedestrian") or _addr.get("street")
-                if _road:
-                    _num = 100 + ((_h >> 31) % 4900)
-                    _loc = _addr.get("suburb") or _addr.get("city_district") or _addr.get("city") or _addr.get("town") or _addr.get("village") or ""
-                    _direccion_demo = f"{_road} {_num}" + (f", {_loc}" if _loc else "")
-    except Exception:
-        # Nominatim caido o timeout — el vecino queda sin direccion,
-        # la completa al crear su primer tramite.
-        pass
+    if geo:
+        _p_vecino = geo[_h % len(geo)]
+        _direccion_demo = _p_vecino["direccion"]
+        if _p_vecino.get("barrio"):
+            _direccion_demo = f"{_direccion_demo}, {_p_vecino['barrio']}"
 
     vecino_demo = User(
         email=f"vecino@{codigo}.demo.com",
@@ -1232,8 +1287,8 @@ async def seed_demo_completo(
     # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)
     # ------------------------------------------------------------------
-    zonas = await _seed_zonas(db, municipio_id, codigo, muni_lat, muni_lng)
-    barrios = await _seed_barrios(db, municipio_id, muni_lat, muni_lng)
+    zonas = await _seed_zonas(db, municipio_id, codigo, muni_lat, muni_lng, geo)
+    barrios = await _seed_barrios(db, municipio_id, muni_lat, muni_lng, geo)
 
     # ------------------------------------------------------------------
     # 6. Empleados + Cuadrillas (personal operativo)
@@ -1289,8 +1344,17 @@ async def seed_demo_completo(
         if not cat:
             continue
         muni_dep = muni_deps.get(r_data["dependencia_codigo"])
-        zona = zonas.get(r_data["zona_nombre"])
-        barrio = barrios.get(r_data["barrio_nombre"])
+        # Con puntos reales, la ubicacion del reclamo sale del punto y no del
+        # offset: direccion de una calle que existe, y zona/barrio ya resueltos
+        # --- el distrito por el poligono donde cayo, el barrio por el geocoding ---
+        # asi que no hay que adivinarlos por nombre.
+        punto = geo[len(reclamos_creados_list) % len(geo)] if geo else None
+        if punto:
+            zona = zonas.get(punto.get("zona_nombre"))
+            barrio = barrios.get(punto.get("barrio"))
+        else:
+            zona = zonas.get(r_data["zona_nombre"])
+            barrio = barrios.get(r_data["barrio_nombre"])
 
         # Fallback random si el match por nombre no devolvió nada — evita
         # quedar con FKs en NULL que rompen las queries agrupadas.
@@ -1310,9 +1374,9 @@ async def seed_demo_completo(
             descripcion=r_data["descripcion"],
             estado=r_data["estado"],
             prioridad=3,
-            direccion=r_data["direccion"],
-            latitud=muni_lat + r_data["lat_offset"],
-            longitud=muni_lng + r_data["lng_offset"],
+            direccion=punto["direccion"] if punto else r_data["direccion"],
+            latitud=punto["lat"] if punto else muni_lat + r_data["lat_offset"],
+            longitud=punto["lon"] if punto else muni_lng + r_data["lng_offset"],
             categoria_id=cat.id,
             zona_id=zona.id if zona else None,
             barrio_id=barrio.id if barrio else None,

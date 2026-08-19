@@ -112,3 +112,9 @@ backend/scripts/_*.py
 
 # Dumps de planillas de clientes: datos personales (nombres, sueldos, situacion laboral)
 docs/clientes/**/_*.txt
+
+# Dumps de GeoNames para el batch del catalogo de municipios. NO se versionan:
+# son 6 MB que se rebajan con un comando (ver scripts/cargar_catalogo_latam.py).
+# Lo que si se versiona es el resultado, scripts/datos/catalogo_latam.json.
+backend/scripts/datos/geonames/*.zip
+backend/scripts/datos/geonames/*.txt

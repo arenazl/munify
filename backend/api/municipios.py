@@ -430,7 +430,11 @@ async def obtener_usuarios_dependencias(
 
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
-PAISES_CATALOGO = {"AR", "PY"}
+# Paises con catalogo de municipios cargado. Se llenan por batch
+# (`scripts/cargar_catalogo_latam.py`), nunca en vivo: el alta de una demo no
+# puede depender de un servicio externo. Agregar uno es cargar su nivel con
+# intendente/alcalde y sumar su bandera en `components/ui/BanderaPais.tsx`.
+PAISES_CATALOGO = {"AR", "PY", "CL", "UY", "PE", "BO"}
 
 
 @router.get("/catalogo")
@@ -443,7 +447,10 @@ async def buscar_municipios_catalogo(
 
     Sólo se puede crear una demo con un municipio REAL elegido de esta lista.
     Fuentes: Argentina, dataset georef de datos.gob.ar (2.082); Paraguay,
-    registro del INE + las intendencias creadas después del censo 2012 (263).
+    registro del INE + las intendencias creadas después del censo 2012 (263);
+    Chile, Uruguay, Perú y Bolivia, GeoNames (CC-BY) al nivel donde hay
+    intendente o alcalde —comuna, departamento, distrito y municipio
+    respectivamente—, que no es el mismo en los cuatro.
 
     Busca por nombre Y por ALIAS: un municipio se conoce por más de un nombre
     —el oficial de la ley y el que usa la gente— y quien crea la demo escribe

@@ -8,7 +8,7 @@ import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
-import { BanderaPais } from '../components/ui/BanderaPais';
+import { BanderaPais, type CodigoPais } from '../components/ui/BanderaPais';
 
 interface Municipio {
   id: number;
@@ -30,10 +30,17 @@ interface MuniArg {
   alias?: string[];
 }
 
-/** Países con catálogo cargado. El orden es el de las banderas. */
-const PAISES = [
-  { cod: 'AR' as const, nombre: 'Argentina' },
-  { cod: 'PY' as const, nombre: 'Paraguay' },
+/** Países con catálogo de municipios cargado, en el orden de las banderas.
+ *  Cada uno se llena por batch (`scripts/cargar_catalogo_latam.py`) al nivel
+ *  donde hay intendente o alcalde, que no es el mismo en todos: comuna en
+ *  Chile, departamento en Uruguay, distrito en Perú. */
+const PAISES: { cod: CodigoPais; nombre: string }[] = [
+  { cod: 'AR', nombre: 'Argentina' },
+  { cod: 'PY', nombre: 'Paraguay' },
+  { cod: 'UY', nombre: 'Uruguay' },
+  { cod: 'CL', nombre: 'Chile' },
+  { cod: 'PE', nombre: 'Perú' },
+  { cod: 'BO', nombre: 'Bolivia' },
 ];
 
 const PLACEHOLDER_CITIES = ['Pergamino', 'San Pedro', 'Salta', 'Tandil', 'Rosario', 'Bariloche'];
@@ -57,7 +64,7 @@ export default function Demo() {
   // municipio REAL elegido de la lista (basta de "Pepito Pepito").
   // País del catálogo. Argentina por defecto (es el que más se usa); cambiarlo
   // limpia la selección hecha, porque un municipio pertenece a un solo país.
-  const [pais, setPais] = useState<'AR' | 'PY'>('AR');
+  const [pais, setPais] = useState<CodigoPais>('AR');
   const [sugerencias, setSugerencias] = useState<MuniArg[]>([]);
   const [muniSel, setMuniSel] = useState<MuniArg | null>(null);
   const [showSug, setShowSug] = useState(false);
@@ -270,7 +277,7 @@ export default function Demo() {
           <div className="mb-6 bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.12),0_2px_8px_-2px_rgba(15,23,42,0.06)] p-4 sm:p-6 relative z-40">
             {/* Top stripe gradient — refuerza que es el CTA principal. */}
             <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl bg-gradient-to-r from-blue-500 via-cyan-400 to-violet-400" />
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-blue-500" />
               <span className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">
                 Crear demo en vivo
@@ -278,7 +285,7 @@ export default function Demo() {
               {/* País del catálogo. Va acá arriba y no como combo: son pocos y
                   la bandera se reconoce de un golpe. Cambiarlo limpia lo
                   tipeado, porque las sugerencias son de otro país. */}
-              <div className="ml-auto flex items-center gap-1" role="group" aria-label="País del catálogo">
+              <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-1" role="group" aria-label="País del catálogo">
                 {PAISES.map((p) => {
                   const activo = pais === p.cod;
                   return (

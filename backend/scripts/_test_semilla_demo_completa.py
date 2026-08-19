@@ -16,7 +16,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from sqlalchemy import text  # noqa: E402
 from core.database import AsyncSessionLocal, engine  # noqa: E402
 
-NOMBRE = "Baradero"
+# Se puede cambiar con DEMO_TEST_NOMBRE para probar contra una ciudad que
+# tenga puntos geolocalizados cacheados. OJO: el script BORRA el municipio al
+# final, asi que nunca apuntarlo a uno que exista de verdad en la base.
+NOMBRE = os.getenv("DEMO_TEST_NOMBRE", "Baradero")
 
 
 async def main():
@@ -193,6 +196,17 @@ async def main():
                 print(f"  {label}: {val}")
             except Exception as e:
                 print(f"  {label}: ERROR {str(e)[:70]}")
+
+        # DONDE quedaron los reclamos. Es lo unico que delata si la demo habla
+        # de la ciudad del cliente o de calles genericas: los counts de arriba
+        # dan igual en los dos casos.
+        print("\n  UBICACION DE LOS RECLAMOS (los 8 primeros)")
+        for d, z, b, la, lo in (await db.execute(text(
+                "SELECT r.direccion, z.nombre, b.nombre, r.latitud, r.longitud "
+                "FROM reclamos r LEFT JOIN zonas z ON z.id = r.zona_id "
+                "LEFT JOIN barrios b ON b.id = r.barrio_id "
+                "WHERE r.municipio_id = :m ORDER BY r.id LIMIT 8"), {"m": mid})).fetchall():
+            print(f"    {str(d)[:36]:36} | {str(z)[:18]:18} | {str(b)[:16]:16} | {la},{lo}")
 
         # --- borrado con el cascade del endpoint ---
         print("\n=== BORRADO ===")
