@@ -97,13 +97,16 @@ export default function Configuracion() {
      `themePresets` vía ThemeContext — mismo catálogo, misma persistencia que
      la luna/sol de la topbar. Nada de listas duplicadas acá. */
   const temasApariencia = useMemo<TemaItem[]>(() => {
-    const orden = [...presets].sort((a, b) => (a.modo === b.modo ? 0 : a.modo === 'oscuro' ? -1 : 1));
-    return orden.map((t) => {
+    // El panel los acomoda en matriz por (modo, temperatura), asi que acá no
+    // hace falta ordenarlos: cada tema sabe en qué casillero va.
+    return presets.map((t) => {
       const activa = t.id === currentPresetId;
       const claro = t.modo === 'claro';
       return {
         id: t.id,
         nombre: t.name,
+        modo: t.modo,
+        temperatura: t.temperatura,
         borde: activa ? theme.primary : 'var(--pl-border)',
         fondoCard: 'var(--pl-surface)',
         lienzo: t.base,

@@ -3,6 +3,10 @@ import React from 'react';
 export interface TemaItem {
   id: string;
   nombre: string;
+  /** Fila de la matriz: claro u oscuro. */
+  modo: 'claro' | 'oscuro';
+  /** Columna de la matriz: qué tan plano, tostado o azulado es ese gris. */
+  temperatura: 'neutro' | 'calido' | 'frio';
   borde: string;
   fondoCard: string;
   lienzo: string;
@@ -35,6 +39,19 @@ export interface BarraItem {
   tick: number;
 }
 
+/** Los dos ejes del selector. El orden es el de la lectura: primero se decide
+ *  claro u oscuro (la pregunta grande) y despues la temperatura. */
+const FILAS: { modo: TemaItem['modo']; label: string; ayuda: string }[] = [
+  { modo: 'oscuro', label: 'Oscuro', ayuda: 'Turnos noche, salas de guardia' },
+  { modo: 'claro', label: 'Claro', ayuda: 'Mostrador, oficinas con luz' },
+];
+
+const COLUMNAS: { id: TemaItem['temperatura']; label: string }[] = [
+  { id: 'neutro', label: 'Neutro' },
+  { id: 'calido', label: 'Cálido' },
+  { id: 'frio', label: 'Frío' },
+];
+
 interface PanelAparienciaProps {
   veloMarca: string;
   acento: string;
@@ -48,10 +65,12 @@ interface PanelAparienciaProps {
 }
 
 export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas: rawTemas, acentos: rawAcentos, barras: rawBarras, onTemaSelect, onAcentoSelect, onBarraSelect }: PanelAparienciaProps) {
-  const temas = rawTemas?.length ? rawTemas : [
-    { id: 't1', nombre: 'Claro puro', borde: 'var(--pl-border)', fondoCard: 'var(--pl-surface)', lienzo: 'var(--pl-surface-2)', barra: 'var(--pl-surface)', linea: 'var(--pl-border)', peso: 400, color: 'var(--pl-text)', tick: 1 },
-    { id: 't2', nombre: 'Gris moderno', borde: 'var(--pl-border-strong)', fondoCard: 'var(--pl-surface)', lienzo: 'var(--pl-surface-3)', barra: 'var(--pl-surface-3)', linea: 'var(--pl-border-strong)', peso: 500, color: 'var(--pl-text)', tick: 0 },
-    { id: 't3', nombre: 'Oscuro', borde: 'rgba(255,255,255,0.1)', fondoCard: 'var(--pl-surface-2)', lienzo: 'var(--pl-text)', barra: 'var(--pl-surface-2)', linea: 'rgba(255,255,255,0.15)', peso: 300, color: 'var(--pl-surface)', tick: 0 }
+  // Placeholders de cuando el panel se mira suelto, sin el motor de temas
+  // detrás. Ocupan una columna de la matriz; los otros casilleros quedan vacíos
+  // a propósito, que es exactamente lo que se ve sin datos.
+  const temas: TemaItem[] = rawTemas?.length ? rawTemas : [
+    { id: 't1', nombre: 'Claro', modo: 'claro', temperatura: 'neutro', borde: 'var(--pl-border)', fondoCard: 'var(--pl-surface)', lienzo: 'var(--pl-surface-2)', barra: 'var(--pl-surface)', linea: 'var(--pl-border)', peso: 400, color: 'var(--pl-text)', tick: 1 },
+    { id: 't3', nombre: 'Oscuro', modo: 'oscuro', temperatura: 'neutro', borde: 'rgba(255,255,255,0.1)', fondoCard: 'var(--pl-surface-2)', lienzo: 'var(--pl-text)', barra: 'var(--pl-surface-2)', linea: 'rgba(255,255,255,0.15)', peso: 300, color: 'var(--pl-surface)', tick: 0 },
   ];
 
   const acentos = rawAcentos?.length ? rawAcentos : [
@@ -64,6 +83,36 @@ export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas
     { id: 'b1', nombre: 'Moderna', borde: 'var(--pl-border)', fondoCard: 'var(--pl-surface)', lienzo: 'var(--pl-surface)', textoAlto: 'var(--pl-text)', textoBajo: 'var(--pl-text-muted)', peso: 400, color: 'var(--pl-text)', tick: 1 },
     { id: 'b2', nombre: 'Plana', borde: 'transparent', fondoCard: 'var(--pl-surface-2)', lienzo: 'var(--pl-surface-2)', textoAlto: 'var(--pl-text)', textoBajo: 'var(--pl-text-muted)', peso: 400, color: 'var(--pl-text)', tick: 0 }
   ];
+  /** Una muestra del tema. Los colores son valores de cada tema (runtime), por
+   *  eso van inline; la caja y la grilla salen de `Configuracion.css`. */
+  const renderTema = (t: TemaItem) => (
+    <button
+      key={t.id}
+      type="button"
+      className="ap-tema"
+      onClick={() => onTemaSelect(t.id)}
+      title={t.nombre}
+      aria-pressed={t.tick === 1}
+      style={{ borderColor: t.borde, background: t.fondoCard }}
+    >
+      <span className="ap-tema-muestra" style={{ background: t.lienzo }}>
+        <span className="ap-tema-barra" style={{ background: t.barra }}></span>
+        <span className="ap-tema-lineas">
+          <span className="ap-tema-linea ap-tema-linea--acento" style={{ background: acento }}></span>
+          <span className="ap-tema-linea" style={{ background: t.linea, width: '92%' }}></span>
+          <span className="ap-tema-linea" style={{ background: t.linea, width: '64%' }}></span>
+        </span>
+      </span>
+      <span className="ap-tema-pie">
+        <span className="ap-tema-nombre" style={{ fontWeight: t.peso, color: t.color }}>{t.nombre}</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.8"
+             strokeLinecap="round" strokeLinejoin="round" style={{ opacity: t.tick }} aria-hidden="true">
+          <path d="m4 12 5 5L20 6" />
+        </svg>
+      </span>
+    </button>
+  );
+
   return (
     <div className="entrar-panel" style={{ marginTop: '16px' }}>
       <div style={{ background: 'var(--pl-surface)', border: '1px solid var(--pl-border)', borderRadius: '12px', padding: '18px 20px', minWidth: 0 }}>
@@ -126,32 +175,28 @@ export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas
 
       <div style={{ background: 'var(--pl-surface)', border: '1px solid var(--pl-border)', borderRadius: '12px', padding: '18px 20px', marginTop: '12px', minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: 'var(--pl-text-faint)' }}>TEMA DEL PANEL</span>
-        <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--pl-text-muted)', marginTop: '5px' }}>El acento se aplica sobre cualquier tema.</span>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '9px', marginTop: '11px' }}>
-          {temas.map(t => (
-            <span 
-              key={t.id}
-              onClick={() => onTemaSelect(t.id)} 
-              title={t.nombre} 
-              style={{ display: 'flex', flexDirection: 'column', gap: '7px', padding: '7px', border: `1px solid ${t.borde}`, borderRadius: '11px', background: t.fondoCard, cursor: 'pointer', minWidth: 0 }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--pl-green-200)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.borde; }}
-            >
-              <span style={{ display: 'flex', height: '62px', borderRadius: '7px', overflow: 'hidden', background: t.lienzo }}>
-                <span style={{ width: '30%', height: '100%', background: t.barra }}></span>
-                <span style={{ flex: 1, minWidth: 0, padding: '7px 6px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ display: 'block', height: '4px', width: '76%', borderRadius: '999px', background: acento }}></span>
-                  <span style={{ display: 'block', height: '3px', width: '92%', borderRadius: '999px', background: t.linea }}></span>
-                  <span style={{ display: 'block', height: '3px', width: '64%', borderRadius: '999px', background: t.linea }}></span>
-                </span>
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 2px 1px' }}>
-                <span style={{ fontSize: '12px', fontWeight: t.peso, color: t.color, minWidth: 0 }}>{t.nombre}</span>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={acento} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto', flex: '0 0 13px', opacity: t.tick }}>
-                  <path d="m4 12 5 5L20 6" />
-                </svg>
-              </span>
-            </span>
+        <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--pl-text-muted)', marginTop: '5px' }}>Dos preguntas: ¿claro u oscuro?, ¿neutro, cálido o frío? El acento se aplica sobre cualquiera.</span>
+        {/* MATRIZ, no lista. Antes eran seis muestras en fila y había que
+            comparar dos casi iguales para descubrir en qué se diferenciaban
+            —"gris, negro y azul los veo muy similares"—. Puestos en grilla, la
+            posición explica el tema: la fila dice claro u oscuro y la columna
+            si ese gris es plano, tostado o azulado. */}
+        <div className="ap-matriz">
+          <span aria-hidden="true"></span>
+          {COLUMNAS.map(c => (
+            <span key={c.id} className="ap-matriz-col">{c.label}</span>
+          ))}
+          {FILAS.map(f => (
+            <React.Fragment key={f.modo}>
+              <span className="ap-matriz-fila">{f.label}</span>
+              {COLUMNAS.map(c => {
+                const t = temas.find(x => x.modo === f.modo && x.temperatura === c.id);
+                // Un casillero vacío sería un hueco en la grilla y se leería
+                // como que falta cargar algo: se reserva el lugar.
+                if (!t) return <span key={c.id} aria-hidden="true"></span>;
+                return renderTema(t);
+              })}
+            </React.Fragment>
           ))}
         </div>
 

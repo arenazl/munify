@@ -197,11 +197,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Arrancan en el tema activo (si es de ese modo) o en el default del modo.
   const [ultimoClaro, setUltimoClaro] = useState<string>(
     () => localStorage.getItem(userScopedKey(user?.id, 'themePresetClaro'))
-      || (getBgTheme(inicialApariencia.bgId).modo === 'claro' ? inicialApariencia.bgId : 'blanco'),
+      || (getBgTheme(inicialApariencia.bgId).modo === 'claro' ? inicialApariencia.bgId : 'nieve'),
   );
   const [ultimoOscuro, setUltimoOscuro] = useState<string>(
     () => localStorage.getItem(userScopedKey(user?.id, 'themePresetOscuro'))
-      || (getBgTheme(inicialApariencia.bgId).modo === 'oscuro' ? inicialApariencia.bgId : 'gris'),
+      || (getBgTheme(inicialApariencia.bgId).modo === 'oscuro' ? inicialApariencia.bgId : 'grafito'),
   );
   // null = seguir el acento recomendado del tema; un id = elección del usuario.
   const [accentOverride, setAccentOverride] = useState<string | null>(inicialApariencia.accentId);

@@ -65,11 +65,20 @@ export interface ThemeColors {
   cardAccentBg?: string;
 }
 
+/** Cuánto tira el gris del tema hacia un lado. Es el segundo eje del selector:
+ *  el primero es claro/oscuro y este dice si ese claro (u oscuro) es plano,
+ *  tostado o azulado. Con los dos ejes, elegir tema son dos preguntas cortas en
+ *  vez de comparar seis muestras casi iguales. */
+export type Temperatura = 'neutro' | 'calido' | 'frio';
+
 /** Un tema de fondo: lo único declarado a mano es `base` + `modo`. */
 export interface BgTheme {
   id: string;
   name: string;
   modo: ThemeMode;
+  /** Su columna en la matriz del selector. Dos temas nunca comparten
+   *  (modo, temperatura): si comparten, uno de los dos sobra. */
+  temperatura: Temperatura;
   /** Color base del fondo. TODO el resto de las superficies sale de acá. */
   base: string;
   /** ID del acento que se aplica al elegir este tema, mientras el usuario no
@@ -199,33 +208,47 @@ const accentWash = (card: string, primary: string): string =>
   `linear-gradient(160deg, ${mixColors(card, primary, 0.07)} 0%, ${card} 60%)`;
 
 // ============================================================
-// EJE 1 — TEMAS DE FONDO (3 claros + 3 oscuros)
-// Los `base` son los de los mejores temas de la colección anterior; lo que se
-// fue es la paleta de 4 colores con el acento adentro.
+// EJE 1 — TEMAS DE FONDO: una MATRIZ, no una lista
+//
+// Siguen siendo seis, pero ya no se eligen de un listado plano donde había que
+// adivinar la diferencia entre Marfil y Ámbar. Son dos preguntas:
+//
+//                 neutro      cálido      frío
+//     oscuro      Grafito     Tabaco      Marino
+//     claro       Nieve       Marfil      Hielo
+//
+// Cada casillero se puede nombrar y ninguno se solapa con el de al lado, que
+// era el problema real: el dueño marcó el 2026-08-13 que "gris, negro y azul
+// los veo muy similares" --- tres neutros oscuros compitiendo entre sí.
+//
+// QUE CAMBIO Y POR QUE
+//   - Se va el NEGRO PURO (#0a0a0a): sobre negro las tarjetas no se despegan y
+//     la sombra directamente no existe. El neutro oscuro arranca un paso
+//     adentro, en #1b2027.
+//   - Se va el BLANCO PURO: sin blanco roto hay que ponerle borde a todo. El
+//     neutro claro es #fafaf9, y así las tarjetas blancas se despegan solas.
+//   - MARFIL y ÁMBAR eran el mismo tema a un paso de distancia: se funden en
+//     un solo cálido claro.
+//   - Aparece HIELO, el claro frío. Era el hueco real de la grilla: existía el
+//     oscuro frío (Marino) y no su equivalente claro.
 // ============================================================
 
 export const bgThemes: BgTheme[] = [
-  // ---- CLAROS ----
-  { id: 'blanco', name: 'Blanco', modo: 'claro', base: '#f7f8fa', acentoRecomendado: 'indigo',
-    acentos: ['indigo', 'celeste', 'verde', 'negro'] },
-  { id: 'marfil', name: 'Marfil', modo: 'claro', base: '#faf8f3', acentoRecomendado: 'olivo',
-    acentos: ['olivo', 'ambar', 'verde', 'negro'] },
-  // Ámbar apagado: cálido como el marfil pero un punto más gris, para que a
-  // pantalla completa no se lea amarillo.
-  { id: 'ambar', name: 'Ámbar', modo: 'claro', base: '#f5f2ea', acentoRecomendado: 'ambar',
-    acentos: ['ambar', 'olivo', 'verde', 'negro'] },
-
   // ---- OSCUROS ----
-  /* Los tres oscuros tienen que distinguirse DE UN VISTAZO (feedback del
-     dueño 2026-08-13: "gris, negro y azul los veo muy similares"):
-     negro = negro casi puro · gris = carbón claramente más claro y neutro ·
-     azul = azul marino con matiz visible, de la familia del acento azul. */
-  { id: 'negro', name: 'Negro', modo: 'oscuro', base: '#0a0a0a', acentoRecomendado: 'blanco',
-    acentos: ['blanco', 'ambar', 'turquesa', 'celeste'] },
-  { id: 'gris', name: 'Gris', modo: 'oscuro', base: '#26282d', acentoRecomendado: 'celeste',
-    acentos: ['celeste', 'turquesa', 'ambar', 'blanco'] },
-  { id: 'azul', name: 'Azul', modo: 'oscuro', base: '#101d36', acentoRecomendado: 'indigo',
-    acentos: ['indigo', 'turquesa', 'celeste', 'blanco'] },
+  { id: 'grafito', name: 'Grafito', modo: 'oscuro', temperatura: 'neutro', base: '#1b2027',
+    acentoRecomendado: 'azul', acentos: ['azul', 'celeste', 'turquesa', 'blanco'] },
+  { id: 'tabaco', name: 'Tabaco', modo: 'oscuro', temperatura: 'calido', base: '#241f1b',
+    acentoRecomendado: 'naranja', acentos: ['naranja', 'ambar', 'olivo', 'blanco'] },
+  { id: 'marino', name: 'Marino', modo: 'oscuro', temperatura: 'frio', base: '#18202f',
+    acentoRecomendado: 'indigo', acentos: ['indigo', 'celeste', 'turquesa', 'blanco'] },
+
+  // ---- CLAROS ----
+  { id: 'nieve', name: 'Nieve', modo: 'claro', temperatura: 'neutro', base: '#fafaf9',
+    acentoRecomendado: 'azul', acentos: ['azul', 'indigo', 'verde', 'negro'] },
+  { id: 'marfil', name: 'Marfil', modo: 'claro', temperatura: 'calido', base: '#f7f4ee',
+    acentoRecomendado: 'naranja', acentos: ['naranja', 'ambar', 'olivo', 'negro'] },
+  { id: 'hielo', name: 'Hielo', modo: 'claro', temperatura: 'frio', base: '#f3f6fa',
+    acentoRecomendado: 'celeste', acentos: ['celeste', 'azul', 'turquesa', 'negro'] },
 ];
 
 /**
@@ -235,9 +258,17 @@ export const bgThemes: BgTheme[] = [
  * app con el tema por defecto y pensarían que se les borró la preferencia.
  */
 export const ALIAS_TEMAS: Record<string, string> = {
-  niebla: 'blanco',
-  carbon: 'gris',
-  midnight: 'azul',
+  // Nombres de dos generaciones atrás
+  niebla: 'nieve',
+  carbon: 'grafito',
+  midnight: 'marino',
+  // La lista plana anterior. Los tres neutros oscuros caen todos en Grafito
+  // --- eran el mismo tema con distinto brillo --- y Ámbar se funde con Marfil.
+  blanco: 'nieve',
+  gris: 'grafito',
+  negro: 'grafito',
+  azul: 'marino',
+  ambar: 'marfil',
 };
 
 // ============================================================
@@ -277,7 +308,7 @@ export const sidebarModes: SidebarModeOption[] = [
 // Configuración por defecto — tema oscuro estilo VS Code, sin acento elegido
 // (usa el `acentoRecomendado` del tema) y sidebar siguiendo al tema.
 export const defaultThemeConfig = {
-  presetId: 'gris',
+  presetId: 'grafito',
   sidebarMode: 'organico' as SidebarMode,
 };
 
@@ -287,8 +318,15 @@ export const defaultThemeConfig = {
 
 /** Tema de fondo por id. TOLERANTE: un id desconocido cae al default. */
 export function getBgTheme(id: string | null | undefined): BgTheme {
+  // El alias se aplica ACÁ, que es el único punto por donde pasa la resolución
+  // de un tema guardado. `ALIAS_TEMAS` existía pero no lo llamaba nadie: era
+  // una tabla muerta, así que un usuario con un nombre viejo guardado ya venía
+  // cayendo al tema por defecto en silencio. Con la matriz eso se agravaba
+  // —`gris`, `negro`, `azul`, `blanco` y `ambar` dejaron de existir como ids—
+  // y todos ellos habrían perdido su preferencia de golpe.
+  const resuelto = (id && ALIAS_TEMAS[id]) || id;
   return (
-    bgThemes.find((t) => t.id === id) ||
+    bgThemes.find((t) => t.id === resuelto) ||
     bgThemes.find((t) => t.id === defaultThemeConfig.presetId) ||
     bgThemes[0]
   );

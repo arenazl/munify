@@ -406,3 +406,118 @@
 .entrar-panel {
   animation: entrarPanel 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
+
+
+/* ==========================================================================
+   Apariencia — la matriz de temas
+   ==========================================================================
+   Seis temas puestos en grilla en vez de en fila. La posición hace la mitad del
+   trabajo: la fila dice claro u oscuro, la columna si ese gris es plano,
+   tostado o azulado. Antes eran seis muestras seguidas y había que abrir dos
+   para descubrir en qué se diferenciaban.
+
+   Las columnas se estrechan pero la matriz NO se rompe en pantallas chicas: si
+   colapsara a una lista volvería a ser lo mismo que se quiso arreglar. La
+   columna de etiquetas se achica y los nombres siguen entrando. */
+.ap-matriz {
+  display: grid;
+  grid-template-columns: 74px repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.ap-matriz-col,
+.ap-matriz-fila {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+}
+
+.ap-matriz-fila {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--pl-text-2);
+}
+
+.ap-tema {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  cursor: pointer;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  transition: border-color var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.ap-tema:hover {
+  border-color: var(--pl-green-200);
+}
+
+.ap-tema-muestra {
+  display: flex;
+  height: 62px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+/* El rail ocupa el 30% de la muestra, la misma proporción que en la app: es lo
+   que hace reconocible la miniatura de un vistazo. */
+.ap-tema-barra {
+  width: 30%;
+  height: 100%;
+}
+
+.ap-tema-lineas {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ap-tema-linea {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+}
+.ap-tema-linea--acento {
+  height: 4px;
+  width: 76%;
+}
+
+.ap-tema-pie {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px 1px;
+}
+
+.ap-tema-nombre {
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-tema-pie svg {
+  margin-left: auto;
+  flex: 0 0 13px;
+}
+
+@media (max-width: 560px) {
+  .ap-matriz {
+    grid-template-columns: 46px repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .ap-tema-muestra { height: 48px; }
+  .ap-matriz-col { font-size: 9px; letter-spacing: 0.06em; }
+  .ap-matriz-fila { font-size: 10.5px; }
+}
