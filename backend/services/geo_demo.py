@@ -343,13 +343,36 @@ async def nucleo_urbano(nombre_municipio: str, pais: str = "") -> Optional[tuple
         async with httpx.AsyncClient(timeout=15.0,
                                      headers={"User-Agent": UA, "Accept-Language": "es"}) as cli:
             r = await cli.get("https://nominatim.openstreetmap.org/search",
-                              params={"q": consulta, "format": "json", "limit": 1})
+                              params={"q": consulta, "format": "json", "limit": 5})
             r.raise_for_status()
             datos = r.json()
         await asyncio.sleep(PAUSA_SEG)
-        return (float(datos[0]["lat"]), float(datos[0]["lon"])) if datos else None
     except Exception:  # noqa: BLE001 -- sin nucleo se sortea uniforme, que igual anda
         return None
+
+    # CUIDADO CON LO QUE DEVUELVE LA BUSQUEDA. Preguntar "Valparaiso, Chile" trae
+    # la REGION de Valparaiso, que incluye Isla de Pascua y por lo tanto tiene su
+    # centro en medio del Pacifico; sortear alrededor de ese punto dio 2
+    # direcciones de 60 gastando 470 llamadas. "Tarija, Bolivia" devuelve el
+    # departamento. Por eso se piden varios resultados y se descarta lo que
+    # abarca medio pais: un municipio no mide 165 km de lado.
+    def es_ciudad(d: dict) -> bool:
+        caja = d.get("boundingbox") or []
+        if len(caja) == 4:
+            try:
+                if (abs(float(caja[1]) - float(caja[0])) > 1.5
+                        or abs(float(caja[3]) - float(caja[2])) > 1.5):
+                    return False
+            except (TypeError, ValueError):
+                return False
+        return True
+
+    # Primero un lugar poblado; si no hay, cualquier cosa que no sea una region.
+    for filtro in (lambda d: d.get("class") == "place" and es_ciudad(d), es_ciudad):
+        for d in datos:
+            if filtro(d):
+                return (float(d["lat"]), float(d["lon"]))
+    return None
 
 
 # ==========================================================================
