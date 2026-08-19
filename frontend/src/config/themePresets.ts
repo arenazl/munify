@@ -236,19 +236,19 @@ const accentWash = (card: string, primary: string): string =>
 export const bgThemes: BgTheme[] = [
   // ---- OSCUROS ----
   { id: 'grafito', name: 'Grafito', modo: 'oscuro', temperatura: 'neutro', base: '#1b2027',
-    acentoRecomendado: 'azul', acentos: ['azul', 'celeste', 'turquesa', 'blanco'] },
+    acentoRecomendado: 'azul', acentos: ['azul', 'turquesa', 'violeta', 'gris'] },
   { id: 'tabaco', name: 'Tabaco', modo: 'oscuro', temperatura: 'calido', base: '#241f1b',
-    acentoRecomendado: 'naranja', acentos: ['naranja', 'ambar', 'olivo', 'blanco'] },
+    acentoRecomendado: 'terracota', acentos: ['terracota', 'dorado', 'vino', 'gris'] },
   { id: 'marino', name: 'Marino', modo: 'oscuro', temperatura: 'frio', base: '#18202f',
-    acentoRecomendado: 'indigo', acentos: ['indigo', 'celeste', 'turquesa', 'blanco'] },
+    acentoRecomendado: 'azul', acentos: ['azul', 'violeta', 'turquesa', 'gris'] },
 
   // ---- CLAROS ----
   { id: 'nieve', name: 'Nieve', modo: 'claro', temperatura: 'neutro', base: '#fafaf9',
-    acentoRecomendado: 'azul', acentos: ['azul', 'indigo', 'verde', 'negro'] },
+    acentoRecomendado: 'azul', acentos: ['azul', 'violeta', 'verde', 'gris'] },
   { id: 'marfil', name: 'Marfil', modo: 'claro', temperatura: 'calido', base: '#f7f4ee',
-    acentoRecomendado: 'naranja', acentos: ['naranja', 'ambar', 'olivo', 'negro'] },
+    acentoRecomendado: 'terracota', acentos: ['terracota', 'dorado', 'vino', 'gris'] },
   { id: 'hielo', name: 'Hielo', modo: 'claro', temperatura: 'frio', base: '#f3f6fa',
-    acentoRecomendado: 'celeste', acentos: ['celeste', 'azul', 'turquesa', 'negro'] },
+    acentoRecomendado: 'turquesa', acentos: ['turquesa', 'azul', 'verde', 'gris'] },
 ];
 
 /**
@@ -272,35 +272,66 @@ export const ALIAS_TEMAS: Record<string, string> = {
 };
 
 // ============================================================
-// EJE 2 — ACENTOS (transversales: cualquiera sobre cualquier fondo)
-// Son los acentos que ya usaban los presets viejos, ahora como eje propio.
+// EJE 2 — ACENTOS: una paleta CERRADA de ocho
+// ============================================================
+// Ocho, no un selector libre de color. Es la recomendación explícita del canvas
+// ("Munify - Rail y topbar", 6b) y la razón es concreta: cada acento tiene que
+// funcionar sobre el rail oscuro Y sobre blanco, y con color libre alguien
+// elige un amarillo con el que la píldora activa deja de leerse. Estos ocho
+// están probados contra las dos superficies.
+//
+// El contraste del texto sobre el acento ya no se fija a mano en ningún lado
+// (ver `contrastar()` en lib/colorUtils): se calcula. Las dos cosas van juntas
+// --- paleta acotada y tinta por contraste --- y es lo que el canvas pide.
 // ============================================================
 
 export const accents: AccentOption[] = [
-  { id: 'verde', name: 'Verde', color: '#1b7a3d' },
-  { id: 'esmeralda', name: 'Esmeralda', color: '#059669' },
-  { id: 'turquesa', name: 'Turquesa', color: '#14b8a6' },
-  { id: 'celeste', name: 'Celeste', color: '#0369a1' },
-  { id: 'azul', name: 'Azul', color: '#2563eb' },
-  { id: 'indigo', name: 'Índigo', color: '#4f46e5' },
-  { id: 'violeta', name: 'Violeta', color: '#7c3aed' },
-  { id: 'rosa', name: 'Rosa', color: '#db2777' },
-  { id: 'rojo', name: 'Rojo', color: '#dc2626' },
-  { id: 'naranja', name: 'Naranja', color: '#ea580c' },
-  { id: 'ambar', name: 'Ámbar', color: '#f59e0b' },
-  { id: 'olivo', name: 'Olivo', color: '#65a30d' },
-  // Se resuelve por MODO: blanco sobre oscuro, negro sobre claro.
-  { id: 'neutro', name: 'Neutro', color: { oscuro: '#fafafa', claro: '#171717' } },
+  { id: 'azul', name: 'Azul', color: '#4b87f5' },
+  { id: 'verde', name: 'Verde', color: '#2fb37e' },
+  { id: 'terracota', name: 'Terracota', color: '#d96a3f' },
+  { id: 'vino', name: 'Vino', color: '#b4515e' },
+  { id: 'violeta', name: 'Violeta', color: '#7c6ce0' },
+  { id: 'turquesa', name: 'Turquesa', color: '#0fa3b1' },
+  { id: 'dorado', name: 'Dorado', color: '#c79a2b' },
+  { id: 'gris', name: 'Gris', color: '#6b7480' },
 ];
 
+/**
+ * Acentos viejos → los ocho de ahora.
+ *
+ * Trece se volvieron ocho, y no por prolijidad: cada acento tiene que verse
+ * contra el rail oscuro Y contra blanco, y varios de los que había no pasaban
+ * esa doble prueba. Los que se van no desaparecen sin más — caen en el vecino
+ * más cercano de la paleta nueva, así que nadie pierde su color, sólo lo ve un
+ * poco más calibrado.
+ */
+export const ALIAS_ACENTOS: Record<string, string> = {
+  esmeralda: 'verde',
+  olivo: 'verde',
+  celeste: 'azul',
+  indigo: 'violeta',
+  rosa: 'vino',
+  rojo: 'vino',
+  naranja: 'terracota',
+  ambar: 'dorado',
+  blanco: 'gris',
+  negro: 'gris',
+  neutro: 'gris',
+};
 // ============================================================
 // EJE 3 — FONDO DE LA BARRA LATERAL
 // ============================================================
 
 export const sidebarModes: SidebarModeOption[] = [
-  // Los tres son el MISMO acento lavado sobre la base, en tres intensidades
-  // (ver sidebarColor). Ninguno es un color propio.
-  { id: 'tinte', name: 'Tinte', description: 'Se nota el acento en la barra' },
+  // Dos, no tres. Los dos son el MISMO acento lavado sobre la base, en dos
+  // intensidades (ver sidebarColor); ninguno es un color propio.
+  //
+  // SE FUE "TINTE", el que teñía la barra con el acento al 6%. No es cuestión
+  // de gusto: el canvas lo probó contra la paleta entera y lo descartó ---"con
+  // el amarillo y el lima este no sirve"---, mientras que los otros dos aguantan
+  // cualquier acento. Dejar los tres significaba que el municipio podía elegir
+  // la combinación que no se lee, y el trabajo del selector es justamente que
+  // no pueda.
   { id: 'organico', name: 'Orgánico', description: 'El acento se insinúa' },
   { id: 'claro', name: 'Claro', description: 'Apenas separada del fondo' },
 ];
@@ -357,7 +388,8 @@ export function getBgTheme(id: string | null | undefined): BgTheme {
 
 /** Color final de un acento para un modo dado (resuelve el Neutro). */
 export function resolveAccentColor(accentId: string | null | undefined, modo: ThemeMode): string {
-  const acento = accents.find((a) => a.id === accentId) || accents[0];
+  const id = (accentId && ALIAS_ACENTOS[accentId]) || accentId;
+  const acento = accents.find((a) => a.id === id) || accents[0];
   return typeof acento.color === 'string' ? acento.color : acento.color[modo];
 }
 
@@ -457,9 +489,15 @@ export function resolveSavedPreset(id: string | null | undefined): LegacySelecti
   return { bgId: defaultThemeConfig.presetId, accentId: null };
 }
 
-/** Acento guardado → id válido, o null (= seguir la recomendación del tema). */
+/** Acento guardado → id válido, o null (= seguir la recomendación del tema).
+ *
+ *  Pasa por `ALIAS_ACENTOS` igual que los temas por `ALIAS_TEMAS`: la paleta se
+ *  cerró de trece a ocho, y sin esto todos los que tenían Rojo, Índigo, Rosa,
+ *  Naranja, Ámbar, Olivo, Celeste o Esmeralda guardado perderían su color de
+ *  golpe. Cada uno cae en el vecino más cercano de la paleta nueva. */
 export function resolveSavedAccent(id: string | null | undefined): string | null {
-  return id && accents.some((a) => a.id === id) ? id : null;
+  const resuelto = (id && ALIAS_ACENTOS[id]) || id;
+  return resuelto && accents.some((a) => a.id === resuelto) ? resuelto : null;
 }
 
 /**
@@ -469,9 +507,12 @@ export function resolveSavedAccent(id: string | null | undefined): string | null
 export function resolveSidebarMode(value: string | null | undefined): SidebarMode {
   switch (value) {
     case 'organico':
-    case 'tinte':
     case 'claro':
       return value;
+    // El modo que se descartó por no aguantar toda la paleta: quien lo tenga
+    // guardado pasa al vecino más cercano, que es el mismo lavado más suave.
+    case 'tinte':
+      return 'organico';
     case 'clasico':
       return 'claro';
     case 'vintage':

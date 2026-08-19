@@ -55,7 +55,8 @@ const COLUMNAS: { id: TemaItem['temperatura']; label: string }[] = [
 interface PanelAparienciaProps {
   veloMarca: string;
   acento: string;
-  nombreAcento: string;
+  /** @deprecated El nombre del acento ahora se muestra debajo de cada muestra. */
+  nombreAcento?: string;
   temas: TemaItem[];
   acentos: AcentoItem[];
   barras: BarraItem[];
@@ -64,7 +65,7 @@ interface PanelAparienciaProps {
   onBarraSelect: (id: string) => void;
 }
 
-export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas: rawTemas, acentos: rawAcentos, barras: rawBarras, onTemaSelect, onAcentoSelect, onBarraSelect }: PanelAparienciaProps) {
+export default function PanelApariencia({ veloMarca, acento, temas: rawTemas, acentos: rawAcentos, barras: rawBarras, onTemaSelect, onAcentoSelect, onBarraSelect }: PanelAparienciaProps) {
   // Placeholders de cuando el panel se mira suelto, sin el motor de temas
   // detrás. Ocupan una columna de la matriz; los otros casilleros quedan vacíos
   // a propósito, que es exactamente lo que se ve sin datos.
@@ -203,21 +204,32 @@ export default function PanelApariencia({ veloMarca, acento, nombreAcento, temas
         <span style={{ display: 'block', height: '1px', background: 'var(--pl-border)', margin: '18px 0' }}></span>
 
         <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em', color: 'var(--pl-text-faint)' }}>COLOR DE ACENTO</span>
-        <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--pl-text-muted)', marginTop: '5px' }}>Pinta botones, estados activos y detalles en toda la app.</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+        <span style={{ display: 'block', fontSize: '11.5px', color: 'var(--pl-text-muted)', marginTop: '5px' }}>
+          Ocho, probados contra la barra oscura y contra blanco. No hay selector libre: con
+          color a elección alguien elige uno con el que el texto deja de leerse.
+        </span>
+        {/* Cuadrados de 30px con radio 8, como el canvas. Cada uno con su
+            nombre: un círculo de color suelto obliga a pasar el mouse por
+            encima para saber cuál es. */}
+        <div className="ap-acentos">
           {acentos.map(a => (
-            <span 
+            <button
               key={a.id}
-              onClick={() => onAcentoSelect(a.id)} 
-              title={a.nombre} 
-              style={{ display: 'grid', placeItems: 'center', width: '34px', height: '34px', borderRadius: '999px', background: a.hex, cursor: 'pointer', boxShadow: `0 0 0 ${a.anillo} var(--pl-surface), 0 0 0 ${a.borde} ${a.hex}` }}
+              type="button"
+              className={`ap-acento${a.tick === 1 ? ' ap-acento--activo' : ''}`}
+              onClick={() => onAcentoSelect(a.id)}
+              title={a.nombre}
+              aria-pressed={a.tick === 1}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--pl-on-accent)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: a.tick }}>
-                <path d="m4 12 5 5L20 6" />
-              </svg>
-            </span>
+              <span className="ap-acento-muestra" style={{ background: a.hex }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--pl-on-accent)"
+                     strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: a.tick }}>
+                  <path d="m4 12 5 5L20 6" />
+                </svg>
+              </span>
+              <span className="ap-acento-nombre">{a.nombre}</span>
+            </button>
           ))}
-          <span style={{ fontSize: '11.5px', fontWeight: 600, color: acento, marginLeft: '4px', whiteSpace: 'nowrap' }}>{nombreAcento}</span>
         </div>
 
         <span style={{ display: 'block', height: '1px', background: 'var(--pl-border)', margin: '18px 0' }}></span>

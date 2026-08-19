@@ -521,3 +521,52 @@
   .ap-matriz-col { font-size: 9px; letter-spacing: 0.06em; }
   .ap-matriz-fila { font-size: 10.5px; }
 }
+
+
+/* --- Acentos: la paleta cerrada ------------------------------------
+   Ocho cuadrados con su nombre debajo. Antes eran círculos sueltos y había que
+   pasar el mouse por cada uno para saber cuál era; el nombre al lado del color
+   evita esa adivinanza y de paso deja claro que la lista TERMINA ahí --- no es
+   una muestra de un selector más grande. */
+.ap-acentos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ap-acento {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              border-color var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.ap-acento:hover { background: var(--pl-surface-2); }
+.ap-acento--activo {
+  border-color: var(--pl-border-strong);
+  background: var(--pl-surface-2);
+}
+
+.ap-acento-muestra {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.ap-acento-nombre {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-text-2);
+  white-space: nowrap;
+}
+.ap-acento--activo .ap-acento-nombre { color: var(--pl-text); }
