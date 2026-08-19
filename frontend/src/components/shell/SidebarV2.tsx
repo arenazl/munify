@@ -36,6 +36,7 @@ import { useVecinoBadges } from '../../hooks/useVecinoBadges';
 import { useNavBadges, type NavBadges } from './useNavBadges';
 import { ICONO_CATEGORIA } from '../../config/navigation';
 import { BrandMark } from '../../brands/BrandMark';
+import { logoDelMunicipio } from '../../brands';
 import { BRAND } from '../../brands';
 
 /** Item de navegación tal como sale de config/navigation.ts (post-filter). */
@@ -396,7 +397,27 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
   };
 
   const [nombreBase, nombreAcento] = partirNombreMarca();
-  const subtitulo = user?.municipio_id && municipioActual ? municipioActual.nombre : undefined;
+
+  // QUIEN MANDA EN LA CABECERA ES EL MUNICIPIO, NO LA MARCA.
+  //
+  // El intendente entra a ver SU municipalidad: arriba de todo tiene que estar
+  // su escudo y su nombre, no el de la herramienta. Antes el nombre grande era
+  // el de la marca y el municipio quedaba de bajada chiquita, que es la lectura
+  // al reves --- Munify es el proveedor, el dueno de la pantalla es el tenant.
+  //
+  // Sin municipio (un super admin parado afuera de cualquier tenant) no hay
+  // nada que representar, y ahi si vuelve la marca.
+  const esTenant = Boolean(user?.municipio_id && municipioActual);
+  const logoTenant = esTenant ? logoDelMunicipio(municipioActual?.logo_url) : null;
+  // "Municipalidad de San Pedro" -> "San Pedro": el prefijo se repite en la
+  // bajada y en un sidebar de 13rem cada palabra cuenta.
+  const nombreTenant = (municipioActual?.nombre || '').replace(/^Municipalidad de /i, '');
+  const subtitulo = esTenant ? 'Municipalidad' : undefined;
+
+  /** El escudo del municipio si lo tiene; si no, la marca. Nunca un hueco. */
+  const marca = (tamano: number) => (logoTenant
+    ? <img src={logoTenant} alt="" className="sv2-logo-img" width={tamano} height={tamano} />
+    : <BrandMark size={tamano} variant="sidebar" />);
 
   // Botón ÚNICO de colapso, anclado al borde a la altura del logo. Antes eran
   // dos (uno en el header para cerrar, otro al pie para abrir): el control
@@ -420,8 +441,9 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
     const grupoFly = flyActivo ? grupos.find((g) => g.id === flyActivo.id) ?? null : null;
     return (
       <aside className="sv2 sv2--colapsado" ref={asideRef}>
-        <Link to="/gestion" className="sv2-logo sv2-logo--tile" title={BRAND.name}>
-          <BrandMark size={26} variant="sidebar" />
+        <Link to="/gestion" className="sv2-logo sv2-logo--tile"
+              title={esTenant ? nombreTenant : BRAND.name}>
+          {marca(30)}
         </Link>
         <nav className="sv2-cnav" aria-label="Navegación principal">
           {sueltos.map((item) => {
@@ -518,18 +540,23 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
   return (
     <aside className="sv2" ref={asideRef}>
       <div className="sv2-marca">
-        <Link to="/gestion" className="sv2-logo" title={BRAND.name}>
-          <BrandMark size={26} variant="sidebar" />
+        <Link to="/gestion" className="sv2-logo sv2-logo--grande"
+              title={esTenant ? nombreTenant : BRAND.name}>
+          {marca(44)}
         </Link>
         <div className="sv2-marca-textos">
           {/* BRAND.nameFont es un valor runtime de marca: inline permitido. El
               color del tramo acentuado NO: sale de `--pl-green` (el acento vivo
               del tema) via `.sv2-nombre-acento`, para que acompañe al acento que
               el usuario elige en Apariencia en vez de quedarse en el de marca. */}
-          <span className="sv2-nombre" style={{ fontFamily: BRAND.nameFont }}>
-            {nombreBase}
-            {nombreAcento !== '' && <span className="sv2-nombre-acento">{nombreAcento}</span>}
-          </span>
+          {esTenant ? (
+            <span className="sv2-nombre" title={nombreTenant}>{nombreTenant}</span>
+          ) : (
+            <span className="sv2-nombre" style={{ fontFamily: BRAND.nameFont }}>
+              {nombreBase}
+              {nombreAcento !== '' && <span className="sv2-nombre-acento">{nombreAcento}</span>}
+            </span>
+          )}
           {subtitulo && <span className="sv2-subtitulo">{subtitulo}</span>}
         </div>
       </div>

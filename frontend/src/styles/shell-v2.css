@@ -77,6 +77,25 @@
   margin-bottom: 12px;
 }
 
+/* Cabecera de tenant: el escudo del municipio manda, asi que ocupa el doble.
+   La caja crece pero el header no se desarma --- el bloque de textos que tiene al
+   lado son dos lineas y ya medía casi lo mismo. */
+.sv2-logo--grande {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+
+/* El escudo es de cada municipio y viene con la forma que venga: se encaja
+   entero en su caja (`contain`) en vez de recortarlo. Un escudo cortado por la
+   mitad se lee como un error de la app, no como el logo del cliente. */
+.sv2-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .sv2-marca-textos {
   display: flex;
   flex-direction: column;
@@ -88,6 +107,7 @@
   font-family: var(--pl-font-display);
   font-weight: 700;
   font-size: var(--pl-fs-card-title);
+  line-height: 1.15;
   letter-spacing: var(--pl-tracking-display);
   color: var(--pl-text);
   white-space: nowrap;
