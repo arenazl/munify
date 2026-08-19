@@ -44,3 +44,44 @@ export function alpha(hex: string, a: number): string {
   const [r, g, b] = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
+
+/**
+ * Relación de contraste WCAG entre dos colores (1 = iguales, 21 = negro/blanco).
+ *
+ * Usa la luminancia RELATIVA de la norma —con la corrección gamma—, que no es
+ * lo mismo que `luminance()` de acá arriba: esa es el promedio ponderado rápido
+ * que sirve para decidir "claro u oscuro", y da otro número.
+ */
+export function contraste(a: string, b: string): number {
+  const rel = (hex: string): number => {
+    const canal = (v: number) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    };
+    const [r, g, bb] = hexToRgb(hex);
+    return 0.2126 * canal(r) + 0.7152 * canal(g) + 0.0722 * canal(bb);
+  };
+  const [l1, l2] = [rel(a), rel(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+/**
+ * Empuja `color` hasta que se LEE sobre `fondo`.
+ *
+ * Existe porque "el acento un 14% más oscuro" no es una garantía: con un azul
+ * alcanza y con un amarillo no —un amarillo oscurecido sigue siendo amarillo
+ * claro—, y ahí el texto sobre el tinte del acento queda ilegible. Esto no
+ * cambia el TONO, sólo lo oscurece (o aclara, en tema oscuro) lo necesario.
+ *
+ * Si ni al máximo llega al objetivo, devuelve el extremo: un gris muy oscuro o
+ * uno muy claro. Preferimos perder el color antes que perder la lectura.
+ */
+export function contrastar(color: string, fondo: string, sobreClaro: boolean,
+                           objetivo = 4.5): string {
+  let actual = color;
+  for (let paso = 0; paso <= 20; paso++) {
+    if (contraste(actual, fondo) >= objetivo) return actual;
+    actual = sobreClaro ? darken(color, paso * 5) : lighten(color, paso * 5);
+  }
+  return sobreClaro ? '#1a1a1a' : '#f5f5f5';
+}

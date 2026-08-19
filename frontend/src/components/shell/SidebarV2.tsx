@@ -37,6 +37,11 @@ import { useNavBadges, type NavBadges } from './useNavBadges';
 import { ICONO_CATEGORIA } from '../../config/navigation';
 import { BrandMark } from '../../brands/BrandMark';
 import { logoDelMunicipio } from '../../brands';
+
+// La inyecta el build (vite.config -> define.__APP_VERSION__). En dev no
+// existe, y ahí la firma va sin número en vez de decir "undefined".
+declare const __APP_VERSION__: string | undefined;
+const VERSION_APP = typeof __APP_VERSION__ === 'string' ? `v${__APP_VERSION__}` : '';
 import { BRAND } from '../../brands';
 
 /** Item de navegación tal como sale de config/navigation.ts (post-filter). */
@@ -414,6 +419,27 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
   const nombreTenant = (municipioActual?.nombre || '').replace(/^Municipalidad de /i, '');
   const subtitulo = esTenant ? 'Municipalidad' : undefined;
 
+  // LA FIRMA VA AL PIE, Y ESO ES TODO EL PUNTO.
+  //
+  // Arriba manda el municipio; Munify firma abajo, en gris, como el proveedor
+  // que es. Es la jerarquía que pide el canvas ("la intendencia arriba, Munify
+  // al pie") y la que corresponde a una app white-label: el intendente entra a
+  // ver su municipalidad, no nuestra marca.
+  //
+  // En un shell que YA es de otra marca (Paraguay Limpio) no se firma dos
+  // veces: ahí la marca del shell ya está arriba y esto sobraría.
+  const firmaMunify = esTenant && !BRAND.municipioCodigo ? (
+    <div className="sv2-firma" title={`Munify ${VERSION_APP}`}>
+      <BrandMark size={16} variant="sidebar" />
+      {!colapsado && (
+        <>
+          <span className="sv2-firma-nombre">Munify</span>
+          <span className="sv2-firma-version">{VERSION_APP}</span>
+        </>
+      )}
+    </div>
+  ) : null;
+
   /** El escudo del municipio si lo tiene; si no, la marca. Nunca un hueco. */
   const marca = (tamano: number) => (logoTenant
     ? <img src={logoTenant} alt="" className="sv2-logo-img" width={tamano} height={tamano} />
@@ -531,6 +557,7 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
           </div>
         )}
 
+        {firmaMunify}
         {botonToggle}
       </aside>
     );
@@ -680,6 +707,7 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
           <span className="sv2-item-label">Ayuda y soporte</span>
         </span>
       </div>
+      {firmaMunify}
     </aside>
   );
 }

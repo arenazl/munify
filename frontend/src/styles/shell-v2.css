@@ -1276,3 +1276,39 @@
     transition: none;
   }
 }
+
+
+/* --- Firma del proveedor, al pie -----------------------------------
+   La contraparte de que la cabecera sea del municipio: arriba manda el tenant
+   y Munify firma abajo, apagado. Tiene que LEERSE como firma y no como un item
+   de navegación --- por eso va sin fondo, sin hover y en el gris más bajo del
+   rail. Si compitiera con los items volvería a ser marca nuestra en la casa
+   del cliente, que es justo lo que el canvas viene a corregir. */
+.sv2-firma {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--pl-border);
+  opacity: 0.55;
+  user-select: none;
+}
+
+.sv2-firma-nombre {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pl-text-3);
+}
+
+.sv2-firma-version {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--pl-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Colapsado: sólo el escudo, centrado en el rail angosto. */
+.sv2--colapsado .sv2-firma {
+  justify-content: center;
+  padding: 12px 0 14px;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { PORTADA_FALLBACK } from '../config/themePresets';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ClipboardList, TrendingUp, MapPin, Users, FileCheck,
@@ -926,7 +927,7 @@ export default function Dashboard() {
         sub={selectedDepNombre
           ? `Vista de la dependencia ${selectedDepNombre}.`
           : 'Todas las dependencias en un solo tablero.'}
-        fotoUrl={muniTablero?.imagen_portada || null}
+        fotoUrl={muniTablero?.imagen_portada || PORTADA_FALLBACK}
         fotoOpacity={muniTablero?.tema_config?.portadaOpacity}
         kpis={heroKpis}
         acciones={heroAcciones}

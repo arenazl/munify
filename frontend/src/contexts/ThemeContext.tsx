@@ -19,7 +19,7 @@ import {
 } from '../config/themePresets';
 import { DEFAULT_FONT_ID } from '../config/fontPresets';
 import { applyFontFamily } from '../lib/fontLoader';
-import { mix, lighten, darken, alpha, isLight } from '../lib/colorUtils';
+import { mix, lighten, darken, alpha, isLight, contrastar } from '../lib/colorUtils';
 import { BRAND } from '../brands';
 
 // Selección por defecto de la MARCA activa: sólo si la marca declara
@@ -312,7 +312,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     set('--pl-green', p);
     set('--pl-green-600', theme.primaryHover);
-    set('--pl-green-700', claro ? darken(p, 14) : lighten(p, 30)); // texto sobre acento suave
+    // Texto del acento sobre su propio tinte (el label del item activo del
+    // rail, los chips). NO puede ser "el acento un 14% más oscuro": con un
+    // amarillo o un lima eso sigue siendo amarillo claro y el label queda
+    // ilegible sobre `--pl-green-100`. Es la advertencia explícita del canvas
+    // ("con color libre alguien elige un amarillo y el texto queda ilegible") y
+    // la misma regla de tinta por contraste que ya rige en el resto del kit.
+    // Se empuja hasta alcanzar el contraste, sea cual sea el acento.
+    set('--pl-green-700', contrastar(p, mix(theme.card, p, 0.16), claro));
     // Ink del acento: texto sobre superficies blancas DENTRO del banner brand
     // (botón sólido del hero). No depende de claro/oscuro: el banner es oscuro siempre.
     set('--pl-accent-ink', darken(p, 32));

@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 import { reclamosApi, configuracionApi, publicoApi, vecinoApi, api } from '../lib/api';
 import { logoDelMunicipio } from '../brands';
+import { PORTADA_FALLBACK } from '../config/themePresets';
 import type { Recomendacion } from '../lib/api';
 
 const REC_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -221,10 +222,16 @@ export default function DashboardVecino() {
   const municipioLogo = logoDelMunicipio(
     municipioActual?.logo_url || localStorage.getItem('municipio_logo_url'),
   );
-  // Portada del municipio si la tiene. Antes acá iba una foto de banco de
-  // imágenes fija —una ciudad cualquiera, no la del vecino— y sin portada
-  // propia el banner cae al gradiente del acento, que al menos es la marca.
-  const municipioPortada = (municipioActual as { imagen_portada?: string })?.imagen_portada || null;
+  // Portada del municipio, y si no cargó la suya, la nuestra.
+  //
+  // Hubo una vuelta en la que sin portada propia el banner caía a un gradiente
+  // plano, con el argumento de que la foto de stock era "una ciudad cualquiera,
+  // no la del vecino". El argumento es cierto pero la conclusión estaba mal: el
+  // resultado era que la calidad de la primera pantalla dependía de si el
+  // municipio se había acordado de subir una imagen. Que no la haya subido es
+  // algo que cubrimos nosotros, no una licencia para mostrar menos.
+  const municipioPortada = (municipioActual as { imagen_portada?: string })?.imagen_portada
+    || PORTADA_FALLBACK;
 
   /** Los números del vecino, cortos para que entren en una fila en el celular. */
   const kpisVecino: HeroStripKpi[] = [

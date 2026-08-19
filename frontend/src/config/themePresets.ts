@@ -305,12 +305,35 @@ export const sidebarModes: SidebarModeOption[] = [
   { id: 'claro', name: 'Claro', description: 'Apenas separada del fondo' },
 ];
 
-// Configuración por defecto — tema oscuro estilo VS Code, sin acento elegido
-// (usa el `acentoRecomendado` del tema) y sidebar siguiendo al tema.
+// ============================================================
+// EL ESTILO DE ARRANQUE — uno solo, igual para todos los municipios
+// ============================================================
+// Un municipio que todavía no eligió nada NO tiene que verse distinto de otro
+// que tampoco eligió: la app arranca igual en los dos y a partir de ahí cada
+// uno la personaliza si quiere. Sin un default único, "no elegir" se convertía
+// en una decisión estética por omisión, y dos demos seguidas se veían distintas
+// sin que nadie hubiera tocado nada.
+//
+// Grafito + azul es el par del canvas ("Munify - Rail y topbar", 6a).
 export const defaultThemeConfig = {
   presetId: 'grafito',
+  accentId: 'azul',
   sidebarMode: 'organico' as SidebarMode,
 };
+
+/**
+ * La foto del banner cuando el municipio no subió la suya.
+ *
+ * NO es un adorno opcional: sin ella el hero queda un rectángulo de color
+ * plano, y eso baja la calidad de la app entera en la primera pantalla que ve
+ * un intendente. Que el municipio no haya cargado su foto es un dato que
+ * nosotros tenemos que cubrir, no un permiso para mostrar menos.
+ *
+ * Va servida desde `public/` y no desde un CDN de terceros: el banner es lo
+ * primero que se pinta, y depender de una red ajena para eso es cambiar un
+ * hueco por otro peor —el que aparece a veces—.
+ */
+export const PORTADA_FALLBACK = '/banner-fallback.jpg';
 
 // ============================================================
 // Resolución + derivación
