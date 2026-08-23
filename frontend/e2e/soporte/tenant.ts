@@ -34,6 +34,21 @@ export interface CasoTramite {
   conTurno: boolean;
 }
 
+/** Bloque del circuito de CAMPO (OT + inventario + cierre jerárquico). */
+export interface BloqueCampo {
+  /** rol del picker que opera en campo (debe existir en login.personas). */
+  operario: string;
+  /** nombre visible del operario en el select "Responsable" de la OT. */
+  operarioNombre: string;
+  /** rol del picker que gestiona las OT y cierra los reclamos. */
+  supervisor: string;
+  /** categorías de inventario REALES del tenant, una de cada naturaleza. */
+  categoriaActivo: string;
+  categoriaConsumible: string;
+  /** tres reclamos del circuito: A (simple), B y C (parcial en una misma OT). */
+  reclamos: CasoReclamo[];
+}
+
 export interface Tenant {
   id: string;
   nombre: string;
@@ -53,6 +68,8 @@ export interface Tenant {
   };
   reclamos: CasoReclamo[];
   tramites: CasoTramite[];
+  /** opcional: tenants sin el bloque se saltean campo.spec.ts. */
+  campo?: BloqueCampo;
 }
 
 export const TENANT_ID = process.env.E2E_TENANT || 'paraguay';
@@ -148,4 +165,62 @@ export async function contextoDe(browser: Browser, rol: string): Promise<{ ctx: 
   const ctx = await contextoNuevo(browser, { storageState: rutaStorageState(rol) });
   const page = await ctx.newPage();
   return { ctx, page };
+}
+
+/**
+ * El vecino paga su solicitud MÁS RECIENTE si está pendiente de pago
+ * (trámites con cobro AL INICIO). Camina el checkout del provider MOCK:
+ * elegir medio → confirmar → comprobante. Si no hay botón de pago, no-op —
+ * los tenants sin trámites con costo pasan de largo.
+ */
+export async function vecinoPagaSiCorresponde(page: Page, tramite?: string): Promise<boolean> {
+  await page.goto('/gestion/mis-tramites');
+  await cerrarAvisos(page);
+  // El botón de pago vive DENTRO del sheet de la solicitud: se abre la más
+  // reciente (la lista ordena desc; con `tramite` se acota por buscador).
+  if (tramite) {
+    const buscador = page.getByPlaceholder(/Buscar en mis trámites/i);
+    if (await buscador.isVisible().catch(() => false)) {
+      await buscador.fill(tramite);
+      await page.waitForTimeout(1_200);
+    }
+  }
+  const tarjeta = page.getByText(/^Solicitud: /).first();
+  if (!(await tarjeta.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false))) {
+    return false;
+  }
+  await tarjeta.click();
+  // Se paga SOLO si el pago es REQUISITO (cobro al inicio: banner "Esperando
+  // tu pago"). En los trámites con cobro al final el botón también existe
+  // (pago voluntario anticipado) pero el circuito NO paga en la puerta.
+  const urgente = page.getByText('Esperando tu pago').first();
+  if (!(await urgente.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false))) {
+    await page.keyboard.press('Escape');
+    return false;
+  }
+  await page.getByRole('button', { name: /Pagar trámite/i }).first().click();
+  // Redirección dura al checkout público del mock (/pago/checkout/{sesion}).
+  await page.waitForURL(/\/pago\/checkout\//, { timeout: 30_000 });
+
+  // Medio SIN formulario extra: "Dinero en cuenta" confirma directo. Si el
+  // muni filtra medios y no está, se cae al primero disponible y se completa
+  // el panel que aparezca.
+  const medioDirecto = page.getByRole('button', { name: /Dinero en cuenta/i }).first();
+  if (await medioDirecto.waitFor({ state: 'visible', timeout: 15_000 }).then(() => true).catch(() => false)) {
+    await medioDirecto.click();
+  } else {
+    await page.getByRole('button', { name: /Tarjeta|Rapipago|Pago Fácil|Débito/i }).first().click();
+  }
+  const continuar = page.getByRole('button', { name: /^Continuar$|Continuar/ }).first();
+  if (await continuar.isVisible().catch(() => false)) await continuar.click();
+
+  // Paneles especializados (tarjeta/cupón): botón "Pagar $..." o "Simular pago".
+  const pagarPanel = page.getByRole('button', { name: /^Pagar |Simular pago/i }).first();
+  if (await pagarPanel.waitFor({ state: 'visible', timeout: 5_000 }).then(() => true).catch(() => false)) {
+    await pagarPanel.click();
+  }
+
+  // Éxito REAL: la pantalla de comprobante del checkout.
+  await page.getByText(/comprobante/i).first().waitFor({ state: 'visible', timeout: 30_000 });
+  return true;
 }

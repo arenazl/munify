@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { cargarTenant, cerrarAvisos, contextoDe, marcaDeCorrida, type CasoTramite } from './soporte/tenant';
+import { cargarTenant, cerrarAvisos, contextoDe, marcaDeCorrida, vecinoPagaSiCorresponde, type CasoTramite } from './soporte/tenant';
 
 /**
  * Circuito COMPLETO de trámites, punta a punta y data-driven:
@@ -90,9 +90,12 @@ for (const caso of tenant.tramites) {
   const vecinoRol = caso.caso % 2 === 0 ? 'vecino-2' : 'vecino';
 
   test(`tramite ${id} ${caso.tramite}${caso.conTurno ? ' + turno' : ''}`, async ({ browser }) => {
-    // 1) El vecino crea la solicitud (y reserva turno si aplica).
+    // 1) El vecino crea la solicitud, PAGA si el trámite cobra al inicio
+    //    (la solicitud nace PENDIENTE_PAGO y nadie puede trabajarla hasta que
+    //    el dinero entra — checkout del provider mock), y reserva turno si aplica.
     const { ctx: ctxVecino, page: vecino } = await contextoDe(browser, vecinoRol);
     await vecinoCreaSolicitud(vecino, caso, id);
+    await vecinoPagaSiCorresponde(vecino, caso.tramite);
     if (caso.conTurno) await vecinoReservaTurno(vecino, caso);
     await ctxVecino.close();
 

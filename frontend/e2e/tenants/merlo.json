@@ -1,0 +1,92 @@
+{
+  "id": "merlo",
+  "nombre": "Merlo",
+  "rutaMarca": "/merlo",
+  "password": "1680",
+  "usuarios": {
+    "admin": "admin@merlo.demo.com",
+    "vecinos": ["vecino@merlo.demo.com"],
+    "supervisores": {
+      "SERVICIOS_PUBLICOS": "supervisor-servicios-publicos@merlo.demo.com",
+      "OBRAS_PUBLICAS": "supervisor-obras-publicas@merlo.demo.com",
+      "TRANSITO_VIAL": "supervisor-transito-vial@merlo.demo.com",
+      "ZOONOSIS": "supervisor-zoonosis@merlo.demo.com",
+      "HABILITACIONES": "supervisor-habilitaciones@merlo.demo.com",
+      "RENTAS": "supervisor-rentas@merlo.demo.com"
+    }
+  },
+  "login": {
+    "tipo": "picker",
+    "personas": {
+      "admin": "Admin Demo",
+      "vecino": "Lucas Sánchez",
+      "vecino-2": "Lucas Sánchez",
+      "campo": "Juan Pérez",
+      "sup-SERVICIOS_PUBLICOS": "Supervisor Secretaría de Servicios Públicos y Ambiente",
+      "sup-OBRAS_PUBLICAS": "Supervisor Secretaría de Obras Públicas",
+      "sup-TRANSITO_VIAL": "Supervisor Dirección de Tránsito y Seguridad Vial",
+      "sup-ZOONOSIS": "Supervisor Dirección de Zoonosis y Salud Animal",
+      "sup-HABILITACIONES": "Supervisor Dirección de Habilitaciones Comerciales"
+    },
+    "nombres": {
+      "vecino": "Lucas Sánchez",
+      "vecino-2": "Lucas Sánchez"
+    }
+  },
+  "reclamos": [
+    { "caso": 1, "categoria": "Alumbrado público", "dep": "SERVICIOS_PUBLICOS", "direccion": "Belén 2281", "detalle": "Columna sin luz hace tres noches, la cuadra queda completamente a oscuras.", "circuito": "resolver" },
+    { "caso": 2, "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS", "direccion": "Caaguazú 522", "detalle": "Bache profundo en la mano hacia la avenida, ya rompió dos llantas.", "circuito": "resolver" },
+    { "caso": 3, "categoria": "Recolección de residuos", "dep": "SERVICIOS_PUBLICOS", "direccion": "General Mosconi 555", "detalle": "Hace cuatro días que el camión no pasa y las bolsas se acumulan en la esquina.", "circuito": "resolver" },
+    { "caso": 4, "categoria": "Arbolado y espacios verdes", "dep": "SERVICIOS_PUBLICOS", "direccion": "Arredondo 1015", "detalle": "Rama gruesa quebrada sobre la vereda a punto de caer sobre la parada.", "circuito": "ot" },
+    { "caso": 5, "categoria": "Tránsito y señalización", "dep": "TRANSITO_VIAL", "direccion": "Saavedra Lamas 940", "detalle": "El semáforo del cruce quedó titilando en amarillo desde la tormenta.", "circuito": "resolver" },
+    { "caso": 6, "categoria": "Animales sueltos", "dep": "ZOONOSIS", "direccion": "Francisco Miranda 233", "detalle": "Jauría de cinco perros sueltos en la puerta de la escuela a la mañana.", "circuito": "resolver" },
+    { "caso": 7, "categoria": "Agua y cloacas", "dep": "SERVICIOS_PUBLICOS", "direccion": "Pedro Benoit 310", "detalle": "Pérdida de agua constante que corre por la cuneta desde el fin de semana.", "circuito": "ot" },
+    { "caso": 8, "categoria": "Higiene urbana", "dep": "SERVICIOS_PUBLICOS", "direccion": "Aristóbulo del Valle 780", "detalle": "Microbasural creciendo en el terreno lindero a la plaza.", "circuito": "resolver" },
+    { "caso": 9, "categoria": "Plagas y control", "dep": "ZOONOSIS", "direccion": "Ancaste 122", "detalle": "Ratas en el zanjón que cruzan a los patios; hay chicos en la cuadra.", "circuito": "resolver" },
+    { "caso": 10, "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS", "direccion": "Avenida Echeverry 1550", "detalle": "Hundimiento del pavimento junto a la boca de tormenta.", "circuito": "ot" },
+    { "caso": 11, "categoria": "Ruidos y convivencia", "dep": "SEGURIDAD", "direccion": "Albarellos 620", "detalle": "Taller que trabaja con amoladora hasta pasada la medianoche.", "circuito": "resolver" },
+    { "caso": 12, "categoria": "Alumbrado público", "dep": "SERVICIOS_PUBLICOS", "direccion": "Arenales 415", "detalle": "Tres luminarias seguidas apagadas frente al club de barrio.", "circuito": "resolver" },
+    { "caso": 13, "categoria": "Arbolado y espacios verdes", "dep": "SERVICIOS_PUBLICOS", "direccion": "Martin Gil 233", "detalle": "Raíces del plátano levantaron la vereda y una vecina ya se cayó.", "circuito": "ot" },
+    { "caso": 14, "categoria": "Recolección de residuos", "dep": "SERVICIOS_PUBLICOS", "direccion": "Pieres 840", "detalle": "Contenedor desbordado que nadie vacía desde la semana pasada.", "circuito": "resolver" },
+    { "caso": 15, "categoria": "Agua y cloacas", "dep": "SERVICIOS_PUBLICOS", "direccion": "Pedro Nolasco Flores 512", "detalle": "Olor a cloaca fuerte y líquido que rebalsa por la rejilla de la esquina.", "circuito": "ot" },
+    { "caso": 16, "categoria": "Tránsito y señalización", "dep": "TRANSITO_VIAL", "direccion": "Colodrero 315", "detalle": "Falta el cartel de PARE que voló con el temporal; el cruce quedó ciego.", "circuito": "resolver" },
+    { "caso": 17, "categoria": "Higiene urbana", "dep": "SERVICIOS_PUBLICOS", "direccion": "Achala 130", "detalle": "Pastizal de un metro en el predio municipal de la esquina.", "circuito": "resolver" },
+    { "caso": 18, "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS", "direccion": "Padre Moraga 745", "detalle": "Cordón roto que junta agua podrida cada vez que llueve.", "circuito": "ot" },
+    { "caso": 19, "categoria": "Animales sueltos", "dep": "ZOONOSIS", "direccion": "25 de Mayo 1120", "detalle": "Caballo atado en la plaza que quedó suelto y camina entre los autos.", "circuito": "resolver" },
+    { "caso": 20, "categoria": "Alumbrado público", "dep": "SERVICIOS_PUBLICOS", "direccion": "Federico Lacroze 233", "detalle": "Cable de la luminaria colgando a la altura de una persona.", "circuito": "ot" }
+  ],
+  "tramites": [
+    { "caso": 1, "tramite": "Licencia de conducir - Primera vez", "conTurno": true },
+    { "caso": 2, "tramite": "Certificado de libre deuda municipal", "conTurno": false },
+    { "caso": 3, "tramite": "Renovación de licencia de conducir", "conTurno": true },
+    { "caso": 4, "tramite": "Habilitación comercial", "conTurno": true },
+    { "caso": 5, "tramite": "Permiso de obra menor", "conTurno": true },
+    { "caso": 6, "tramite": "Plan de pago de tasas", "conTurno": true },
+    { "caso": 7, "tramite": "Renovación de habilitación comercial", "conTurno": true },
+    { "caso": 8, "tramite": "Certificado de libre deuda municipal", "conTurno": false },
+    { "caso": 9, "tramite": "Licencia de conducir - Primera vez", "conTurno": true },
+    { "caso": 10, "tramite": "Plan de pago de tasas", "conTurno": false },
+    { "caso": 11, "tramite": "Permiso de obra menor", "conTurno": true },
+    { "caso": 12, "tramite": "Renovación de licencia de conducir", "conTurno": true },
+    { "caso": 13, "tramite": "Habilitación comercial", "conTurno": false },
+    { "caso": 14, "tramite": "Certificado de libre deuda municipal", "conTurno": false },
+    { "caso": 15, "tramite": "Renovación de habilitación comercial", "conTurno": true },
+    { "caso": 16, "tramite": "Licencia de conducir - Primera vez", "conTurno": true },
+    { "caso": 17, "tramite": "Plan de pago de tasas", "conTurno": true },
+    { "caso": 18, "tramite": "Permiso de obra menor", "conTurno": false },
+    { "caso": 19, "tramite": "Renovación de licencia de conducir", "conTurno": true },
+    { "caso": 20, "tramite": "Habilitación comercial", "conTurno": true }
+  ],
+  "campo": {
+    "operario": "campo",
+    "operarioNombre": "Juan Pérez",
+    "supervisor": "sup-OBRAS_PUBLICAS",
+    "categoriaActivo": "Vehículos",
+    "categoriaConsumible": "Materiales",
+    "reclamos": [
+      { "caso": 31, "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS", "direccion": "Juan C. Andersen 412", "detalle": "Bache doble frente al corralón; entra un auto entero.", "circuito": "ot" },
+      { "caso": 32, "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS", "direccion": "Nicolás de Arredondo 918", "detalle": "Vereda hundida junto al desagüe pluvial.", "circuito": "ot" },
+      { "caso": 33, "categoria": "Bacheo y calles", "dep": "OBRAS_PUBLICAS", "direccion": "Lautaro 275", "detalle": "Pozo en la senda peatonal a mitad de cuadra.", "circuito": "ot" }
+    ]
+  }
+}
