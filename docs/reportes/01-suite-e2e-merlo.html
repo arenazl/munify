@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suite E2E Merlo — 59/59</title>
+<style>
+:root{
+  --bg:#0f1419; --panel:#1a2027; --panel2:#222b34; --line:#2d3742;
+  --text:#e6edf3; --muted:#8b97a3; --accent:#4f9cf9; --accent2:#7c5cff;
+  --green:#3fb950; --amber:#d29922; --red:#f85149; --teal:#39c5bb;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.55;padding:32px 20px;max-width:1080px;margin:0 auto;font-size:15px}
+h1{font-size:26px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px}
+h2{font-size:19px;font-weight:650;margin:0 0 14px;display:flex;align-items:center;gap:10px}
+h2 .num{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none}
+.sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:20px}
+.grid{display:grid;gap:14px}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:720px){.g3,.g2,.g4{grid-template-columns:1fr}}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.card .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.card .val{font-size:28px;font-weight:700;margin-top:6px;letter-spacing:-.5px}
+.card .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.red{color:var(--red)}.green{color:var(--green)}.amber{color:var(--amber)}.accent{color:var(--accent)}.teal{color:var(--teal)}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-green{background:rgba(63,185,80,.15);color:var(--green)}
+.b-red{background:rgba(248,81,73,.15);color:var(--red)}
+.b-amber{background:rgba(210,153,34,.15);color:var(--amber)}
+.b-accent{background:rgba(79,156,249,.15);color:var(--accent)}
+.b-purple{background:rgba(124,92,255,.15);color:var(--accent2)}
+.callout{border-left:3px solid var(--amber);background:rgba(210,153,34,.07);padding:12px 16px;border-radius:0 8px 8px 0;font-size:13.5px;margin-top:14px}
+.callout.green{border-left-color:var(--green);background:rgba(63,185,80,.07)}
+.callout.red{border-left-color:var(--red);background:rgba(248,81,73,.07)}
+code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px;color:var(--teal)}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;padding-top:18px;border-top:1px solid var(--line)}
+.bar{height:8px;border-radius:5px;background:var(--panel2);overflow:hidden;margin-top:8px}
+.bar>div{height:100%;border-radius:5px;background:var(--green)}
+.icon{width:16px;height:16px;vertical-align:-3px;margin-right:6px}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;margin-top:10px}
+.flow .step{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px}
+.flow .arr{color:var(--muted)}
+@media print{body{background:#fff;color:#111;max-width:none}section{break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<h1>Suite E2E — universo completo sobre la demo Merlo (QA)</h1>
+<p class="sub">Corrida final <code>E2E_RUN_ID=final</code> · 2026-08-23 · ambiente real
+<code>munify-qa.netlify.app</code> + Cloud Run <code>munify-api-qa</code> + DB <code>sugerenciasmun-qa</code> ·
+fuente: <code>frontend/e2e/.full-run-merlo.log</code> y verificaciones directas contra la DB de QA</p>
+
+<!-- 1. RESUMEN EJECUTIVO -->
+<section>
+  <h2><span class="num">1</span>Resumen ejecutivo</h2>
+  <div class="grid g4">
+    <div class="card"><div class="label">Corrida final</div><div class="val green">59 / 59</div><div class="hint">0 fallos · 23,1 min · medido</div></div>
+    <div class="card"><div class="label">Actores ejercitados</div><div class="val accent">4</div><div class="hint">vecino · supervisor · operario · admin</div></div>
+    <div class="card"><div class="label">Hallazgos de la app</div><div class="val amber">6</div><div class="hint">2 serios de plata · detalle en §5</div></div>
+    <div class="card"><div class="label">Costo por re-corrida</div><div class="val teal">0 tokens</div><div class="hint">un comando · ~23 min de máquina</div></div>
+  </div>
+  <div class="callout green" style="margin-top:16px">
+    <strong>El circuito entero del municipio quedó probado de punta a punta, con browser real, contra QA desplegado.</strong>
+    La suite es determinística (matriz fija, sin IA, sin randoms), agnóstica de tenant (otro municipio = otro JSON)
+    y de costo agéntico cero en cada corrida futura. El método quedó portable en
+    <code>base-compartida/19-SUITE-E2E-AGNOSTICA.md</code>.
+  </div>
+</section>
+
+<!-- 2. HITO CERO -->
+<section>
+  <h2><span class="num">2</span>Hito cero — la empresa nueva</h2>
+  <p style="font-size:13.5px">La campaña arrancó creando una empresa desde el generador real de demos
+  (<code>POST /municipios/crear-demo</code>), como pidió el dueño: la creación misma es parte de lo probado.</p>
+  <table>
+    <tr><th>Qué</th><th>Valor</th><th>Verificación</th></tr>
+    <tr><td>Municipio</td><td><strong>Merlo (Buenos Aires)</strong> · muni <code>153</code> · código <code>merlo</code></td><td><span class="badge b-green">API pública QA</span></td></tr>
+    <tr><td>Acceso</td><td><code>munify-qa.netlify.app/merlo</code> — botonera pública, <strong>PIN 1680</strong> al tocar un perfil</td><td><span class="badge b-green">browser real 9/9</span></td></tr>
+    <tr><td>Protección</td><td>El PIN es la password real de los 13 usuarios demo; <code>demo123</code> rebota con 401; el DELETE de la demo también exige PIN</td><td><span class="badge b-green">curl login OK/401</span></td></tr>
+    <tr><td>Locaciones</td><td>60 direcciones reales de Merlo (Nominatim reverse; ej. "Belén 2281", "Avenida Domingo Sica")</td><td><span class="badge b-green">DB QA</span></td></tr>
+    <tr><td>Semilla</td><td>13 reclamos · 14 solicitudes · 10 OT · 15 ítems de inventario · 24 turnos · 12 dependencias · 13 trámites (cobro al inicio Y al final) · tesorería</td><td><span class="badge b-green">conteo en DB QA</span></td></tr>
+  </table>
+</section>
+
+<!-- 3. LA MATRIZ -->
+<section>
+  <h2><span class="num">3</span>La matriz — 59 pruebas, 5 capas</h2>
+  <table>
+    <tr><th>Capa</th><th>Casos</th><th>Qué prueba</th><th>Resultado</th></tr>
+    <tr><td>Login con PIN (setup)</td><td>9</td><td>Un login por rol vía el picker: admin, 5 supervisores, 2 vecinos, operario — cada uno atraviesa el modal de PIN</td><td><span class="badge b-green">9/9</span></td></tr>
+    <tr><td>Campo (4 actores)</td><td>8</td><td>Alta de recursos → OT con reserva de camión + tornillos planeados, asignada al operario → exclusividad del activo → el operario completa con consumo REAL (100&rarr;80, no descuenta lo planeado) → el SUPERVISOR finaliza el reclamo (la cuadrilla no cierra) → cierre PARCIAL (OT con 2 reclamos, uno queda abierto) → cancelar libera y NO descuenta → negativo de permisos</td><td><span class="badge b-green">8/8</span></td></tr>
+    <tr><td>Cobros</td><td>2</td><td>Cobro al inicio: la solicitud nace pendiente de pago, el vecino paga por el checkout y el cobro llega a la pantalla Cobros del admin. Cobro al final: entra sin pedir plata en la puerta</td><td><span class="badge b-green">2/2</span></td></tr>
+    <tr><td>Reclamos</td><td>20</td><td>Wizard del vecino (categoría manual, dirección real) → gestor (admin en impares, supervisor del área en pares) → variantes: asignación simple, orden de trabajo con cascada, huérfano → el vecino ve el cierre</td><td><span class="badge b-green">20/20</span></td></tr>
+    <tr><td>Trámites + pago</td><td>20</td><td>Solicitud → <strong>paga si cobra al inicio</strong> (checkout mock) → turno para ESA solicitud → verificación de documentos obligatorios → <strong>paga al final si corresponde</strong> (el backend bloquea con 400 el cierre impago) → finalizar → el vecino ve el cierre</td><td><span class="badge b-green">20/20</span></td></tr>
+  </table>
+  <div class="bar"><div style="width:100%"></div></div>
+  <p class="hint" style="color:var(--muted);font-size:12px;margin-top:6px">59 de 59 en 23,1 minutos (log de la corrida, medido). Un solo worker, sin retries: el orden es parte de lo probado.</p>
+</section>
+
+<!-- 4. CRONICA -->
+<section>
+  <h2><span class="num">4</span>Cómo se llegó al verde — veedor + fixer</h2>
+  <div class="flow">
+    <span class="step">Corrida m1: 39 verdes, trámites 0/6</span><span class="arr">&rarr;</span>
+    <span class="step">Veedor corta la corrida (4 min/fallo condenado) y triangula contra la DB</span><span class="arr">&rarr;</span>
+    <span class="step">Fixer (Opus) diagnostica y arregla SOLO tests</span><span class="arr">&rarr;</span>
+    <span class="step">Trámites 20/20</span><span class="arr">&rarr;</span>
+    <span class="step">Veedor verifica con corrida propia</span><span class="arr">&rarr;</span>
+    <span class="step"><strong class="green">Final 59/59</strong></span>
+  </div>
+  <table style="margin-top:14px">
+    <tr><th>Causa raíz (bugs del TEST, no de la app)</th><th>Fix</th></tr>
+    <tr><td>El botón "Verificado sin archivo" DESAPARECE al verificar: iterar por índice pedía un elemento inexistente y el click sin timeout colgaba el caso 240 s</td><td>Se clickea siempre el primero; la señal real es que la cuenta baje</td></tr>
+    <tr><td>El checkout tiene 5 formas según el medio de pago; el helper solo conocía el selector — en adhesión a débito (medio único, sin selector) esperaba un botón que no existe</td><td><code>caminarCheckoutMock()</code> cubre las 5 formas (CBU + TyC incluidos)</td></tr>
+    <tr><td>El cobro AL FINAL nunca se había ejercitado: el backend rechaza con 400 el cierre de un trámite impago</td><td>Paso de pago del vecino entre "en curso" y "finalizar"</td></tr>
+  </table>
+  <div class="callout" style="margin-top:14px">
+    <strong>Fe de erratas del veedor:</strong> en el análisis previo se reportó que "nada impide finalizar una
+    solicitud impaga" (G10). Era INCORRECTO: el gate existe en el backend (<code>api/tramites.py:1151</code>)
+    y de hecho fue lo que hizo fallar los casos de cobro al final. Lo que sí falta es del lado visual (§5, hallazgo 4).
+  </div>
+</section>
+
+<!-- 5. HALLAZGOS DE LA APP -->
+<section>
+  <h2><span class="num">5</span>Hallazgos de la APP (sin tocar — decisión del dueño)</h2>
+  <p style="font-size:13.5px;margin-bottom:10px">Los dejó el circuito real; ninguno sale con tests de endpoints. Orden sugerido de ataque: 1 &rarr; 2 &rarr; 4 &rarr; 3 &rarr; 6 &rarr; 5.</p>
+  <table>
+    <tr><th>#</th><th>Hallazgo</th><th>Dónde</th><th>Severidad</th></tr>
+    <tr><td>1</td><td><strong>Override de testing vivo en PRODUCCIÓN:</strong> todo cupón de WhatsApp del Mostrador cobra $1 en lugar del costo real, en todos los municipios. Verificado en <code>origin/master</code> (no es hipótesis)</td><td><code>backend/api/pagos.py:299</code></td><td><span class="badge b-red">plata / prod</span></td></tr>
+    <tr><td>2</td><td><strong>Doble cobro posible:</strong> <code>crear_sesion_tramite</code> no valida sesión ya aprobada, y el front pinta "Pagar trámite" mientras la request de estado está en vuelo (y un catch silencioso lo deja para siempre si falla). Evidencia: solicitud con "Intentos: 2" en la corrida</td><td><code>backend/api/pagos.py</code> ~222 · <code>MisTramites.tsx:946</code></td><td><span class="badge b-red">plata (con MP real)</span></td></tr>
+    <tr><td>3</td><td><strong>Acción fantasma:</strong> al verificar el último documento la solicitud avanza sola a "en curso", pero el sheet no se refresca: el operador aprieta "Poner en Curso" sobre algo ya en curso y el front le canta éxito igual</td><td><code>GestionTramites.tsx:1944</code></td><td><span class="badge b-amber">UX gestor</span></td></tr>
+    <tr><td>4</td><td><strong>"Finalizar" habilitado sobre un trámite que el propio panel dice impago:</strong> el backend contesta 400 y el operador se come un toast de error — el botón debería estar deshabilitado</td><td><code>GestionTramites.tsx:2427</code></td><td><span class="badge b-amber">UX gestor</span></td></tr>
+    <tr><td>5</td><td>El <code>Sheet</code> (side panel de toda la app) no cierra con Escape</td><td><code>components/ui/Sheet.tsx</code></td><td><span class="badge b-accent">UX global</span></td></tr>
+    <tr><td>6</td><td>Semántica rara en la demo: "Renovación de licencia" configurada como débito automático <em>mensual</em> — para un trámite de pago único, en una demo comercial se lee mal</td><td><code>services/seed_demo.py</code></td><td><span class="badge b-accent">demo</span></td></tr>
+  </table>
+</section>
+
+<!-- 6. LO CONSTRUIDO -->
+<section>
+  <h2><span class="num">6</span>Lo construido en la jornada (commits en <code>qa</code>)</h2>
+  <table>
+    <tr><th>Commit</th><th>Qué</th></tr>
+    <tr><td><code>20486a9</code></td><td>Demos protegidas por PIN (el PIN es la password real; modal en la botonera; DELETE con PIN)</td></tr>
+    <tr><td><code>fa885b2</code></td><td>Fixes que destraban Mercado Pago REAL: el webhook resuelve la sesión por <code>external_reference</code>, back_urls absolutas, camino único de aprobación (deuda Y solicitud) y gate del endpoint público <code>/confirmar</code></td></tr>
+    <tr><td><code>6342877</code></td><td>Cache de 60 locaciones reales de Merlo + login E2E con PIN</td></tr>
+    <tr><td><code>329ac85</code></td><td>Tenant Merlo + <code>campo.spec</code> (4 actores) + <code>pagos.spec</code></td></tr>
+    <tr><td><code>86de043</code></td><td>Fix de trámites del fixer (verificado independientemente): 20/20</td></tr>
+    <tr><td><code>e2db58c</code></td><td>Docs de la suite + método portable en <code>base-compartida/19-SUITE-E2E-AGNOSTICA.md</code></td></tr>
+  </table>
+  <p style="font-size:12.5px;color:var(--muted);margin-top:8px">Además, en el ambiente QA: migraciones de proveedores de pago + webhooks + <code>demo_protegido</code> ejecutadas en <code>sugerenciasmun-qa</code>, y <code>WEBHOOK_BASE_URL</code> + <code>FERNET_KEY</code> configuradas en el servicio Cloud Run <code>munify-api-qa</code>.</p>
+</section>
+
+<!-- 7. PROXIMOS PASOS -->
+<section>
+  <h2><span class="num">7</span>Próximas capas</h2>
+  <table>
+    <tr><th>Capa</th><th>Qué falta</th><th>Quién</th></tr>
+    <tr><td>Smoke MP real</td><td>El dueño carga sus credenciales en <code>/gestion/proveedores-pago</code> de Merlo (URL directa, PIN 1680) y se prueba un pago real con el webhook firmado — los fixes ya están deployados en QA</td><td><span class="badge b-purple">dueño + veedor</span></td></tr>
+    <tr><td>Decisiones sobre §5</td><td>Priorizar los 6 hallazgos (los dos rojos tocan plata)</td><td><span class="badge b-purple">dueño</span></td></tr>
+    <tr><td>Tasas del padrón</td><td>La semilla ya genera partidas y deudas; nadie las ejercita end-to-end aún</td><td><span class="badge b-accent">suite</span></td></tr>
+    <tr><td>Modo veedor / cupón agnóstico</td><td>Hoy no existe en la app (solo el caso CENAT hardcodeado): decidir si se generaliza y después se testea</td><td><span class="badge b-accent">producto</span></td></tr>
+  </table>
+</section>
+
+<footer>Reporte generado el 2026-08-23 · Munify · corrida <code>final</code> contra QA · datos medidos en el ambiente real (log de Playwright + DB de QA + código de <code>origin/master</code>)</footer>
+
+</body>
+</html>
