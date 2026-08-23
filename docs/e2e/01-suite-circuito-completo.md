@@ -1,10 +1,37 @@
 # Suite E2E de circuito completo (Playwright)
 
 Suite de browser real que recorre los circuitos de negocio de punta a punta,
-**agnóstica de tenant**: los specs no conocen ningún dato de Asunción — todo lo
-específico del municipio vive en un fixture JSON.
+**agnóstica de tenant**: los specs no conocen ningún dato del municipio — todo
+lo específico vive en un fixture JSON por tenant.
 
-## Qué cubre
+> **Método general (portable a otras apps):** `base-compartida/19-SUITE-E2E-AGNOSTICA.md`
+> — principios, estructura, patrón veedor+fixer y las trampas ya pagadas.
+
+## Tenants
+
+- **`paraguay`** (Asunción, muni 146): el original. Corre local o contra QA.
+- **`merlo`** (Merlo BA, muni **153** en QA): demo creada por `/crear-demo` con
+  **PIN 1680** (demo protegida: el PIN es la password real de sus usuarios) y
+  locaciones reales (cache `puntos_merlo.json`). Corre **contra QA**:
+  `E2E_TENANT=merlo E2E_BASE_URL=https://munify-qa.netlify.app`.
+
+## Los cuatro specs (capas)
+
+- **`reclamos.spec.ts`** — 20 casos (asignación simple / OT / huérfano).
+- **`tramites.spec.ts`** — 20 casos, ahora con el COBRO integrado: paga al
+  inicio si la solicitud nace PENDIENTE_PAGO (checkout mock), paga al final
+  antes de cerrar (el backend bloquea con 400 un cierre impago), turno para
+  ESA solicitud (por su SOL-), verificación de documentos por conteo que baja.
+- **`campo.spec.ts`** — 8 casos, los 4 actores: admin alta recursos → supervisor
+  arma la OT (reserva activo + planea consumo + asigna al operario) →
+  exclusividad del activo → el operario completa con CONSUMO REAL (100→80,
+  descuenta lo real, libera el activo) → el supervisor finaliza el reclamo
+  (cierre jerárquico) → cierre PARCIAL (OT con 2 reclamos, se finaliza uno) →
+  cancelación (libera y NO descuenta) → negativo de permisos del operario.
+- **`pagos.spec.ts`** — cobro al inicio hasta la pantalla Cobros del admin;
+  cobro al final no exige pago en la puerta.
+
+## Qué cubre (detalle histórico del tenant paraguay)
 
 - **Logins** (9 roles del picker demo): admin, 5 supervisores de secretaría,
   2 vecinos, operario de campo.
