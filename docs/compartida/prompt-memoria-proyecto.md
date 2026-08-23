@@ -50,9 +50,9 @@ Por cada afirmacion sobre infraestructura, deploy o servicios externos,
 - ¿nombra un servicio o proveedor? Confirma que siga en uso
 - ¿nombra una URL o un endpoint? Pegale y fijate que responda
 
-Caso real: el `CLAUDE.md` de munify decia que el front deploya via GitHub Actions.
-El repo no tiene ni un workflow — Netlify usa su integracion nativa. El dato era
-verosimil, estaba escrito con seguridad, y era falso.
+Caso real: el `CLAUDE.md` de uno de mis proyectos afirmaba que el front deploya
+via GitHub Actions. El repo no tiene un solo workflow: Netlify usa su integracion
+nativa de git. El dato era verosimil, estaba escrito con seguridad, y era falso.
 
 Todo lo que no puedas verificar, marcalo `(sin verificar)` en el archivo. Preferible
 una duda explicita que una certeza falsa.
