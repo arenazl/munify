@@ -51,6 +51,9 @@ class MunicipioPublic(BaseModel):
     # True = demo de venta (aparece en /demo, expone accesos rápidos).
     # False = cliente productivo (oculto de /demo, sin accesos rápidos).
     es_demo: bool = True
+    # True = demo con PIN: la botonera se ve, pero el quick-login pide la
+    # clave numérica (que es la password real de los usuarios demo del muni).
+    demo_protegido: bool = False
 
     class Config:
         from_attributes = True
@@ -551,6 +554,10 @@ class MunicipioDemoCreate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     provincia: Optional[str] = None
+    # PIN numérico opcional (4-8 dígitos). Si viene, la demo nace PROTEGIDA:
+    # los usuarios demo se crean con el PIN como password (en vez de demo123)
+    # y el frontend pide la clave al tocar un perfil de la botonera.
+    demo_pin: Optional[str] = None
 
 
 class MunicipioDemoResponse(BaseModel):
@@ -670,6 +677,15 @@ async def crear_municipio_demo(
             detail="El nombre del municipio debe tener al menos 3 caracteres",
         )
 
+    # PIN opcional de demo protegida (ver MunicipioDemoCreate.demo_pin).
+    import re as _re
+    demo_pin = (data.demo_pin or "").strip() or None
+    if demo_pin and not _re.fullmatch(r"\d{4,8}", demo_pin):
+        raise HTTPException(
+            status_code=400,
+            detail="El PIN debe ser numérico, de 4 a 8 dígitos",
+        )
+
     # Normalizar código. Si ya existe, sufijar con -2, -3... hasta encontrar
     # uno libre. Así el prospecto puede tipear "Pergamino" dos veces y se
     # crean demos separados sin choque.
@@ -726,6 +742,7 @@ async def crear_municipio_demo(
         zoom_mapa_default=13,
         activo=True,
         abm_en_sidebar=False,
+        demo_protegido=bool(demo_pin),
     )
     db.add(municipio)
     await db.flush()
@@ -739,7 +756,8 @@ async def crear_municipio_demo(
     # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
     # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
     # la coherencia dependencia↔categoría con asignaciones random.
-    seed_info = await seed_demo_completo(db, municipio.id, codigo)
+    seed_info = await seed_demo_completo(db, municipio.id, codigo,
+                                         password=demo_pin or "demo123")
 
     await db.commit()
 
@@ -915,12 +933,15 @@ async def eliminar_municipio(
 @router.delete("/demo/{codigo}")
 async def eliminar_municipio_demo(
     codigo: str,
+    pin: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Elimina un municipio demo (hard delete con cascade).
     Endpoint PÚBLICO — solo borra munis que tengan usuarios @demo.com.
     No permite borrar municipios "reales" (producción).
+    Si la demo está protegida por PIN, exige `?pin=` y lo valida contra la
+    password del admin demo (que ES el PIN — ver crear-demo).
     """
     from sqlalchemy import func as sqla_func
     query = select(Municipio).where(
@@ -951,6 +972,24 @@ async def eliminar_municipio_demo(
             status_code=403,
             detail="Solo se pueden eliminar municipios de demo",
         )
+
+    # Demo protegida: sin el PIN correcto no se borra. Se valida contra el
+    # hash del admin demo porque el PIN es su password (no se guarda aparte).
+    if municipio.demo_protegido:
+        from core.security import verify_password
+        admin_q = await db.execute(
+            select(User).where(
+                User.municipio_id == municipio.id,
+                User.email.like("admin@%"),
+                User.activo == True,  # noqa: E712
+            )
+        )
+        admin_demo = admin_q.scalars().first()
+        if not pin or not admin_demo or not verify_password(pin, admin_demo.password_hash):
+            raise HTTPException(
+                status_code=403,
+                detail="Esta demo está protegida: hace falta el PIN para eliminarla",
+            )
 
     muni_id = municipio.id
     await db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))

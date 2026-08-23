@@ -9,6 +9,7 @@ import { API_URL } from '../lib/api';
 import { fetchJsonRetry } from '../lib/fetchRetry';
 import { BRAND, marcaDeMunicipio } from '../brands';
 import { BrandMark } from '../brands/BrandMark';
+import DemoPinGate from '../components/DemoPinGate';
 import { mix } from '../lib/colorUtils';
 
 export default function Login() {
@@ -64,6 +65,13 @@ export default function Login() {
   const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
   const [municipioCodigo, setMunicipioCodigo] = useState<string | null>(null);
   const [municipioColor, setMunicipioColor] = useState(BRAND.primary);
+
+  // Demo PROTEGIDA por PIN: la botonera se ve igual, pero al tocar un perfil
+  // se pregunta la clave numérica y se usa como password real del quick-login
+  // (el gate verdadero lo hace /auth/login contra el hash del usuario).
+  const [demoProtegido, setDemoProtegido] = useState(false);
+  const [pinGateEmail, setPinGateEmail] = useState<string | null>(null);
+  const [pinError, setPinError] = useState('');
 
   // Cargar datos del municipio al montar
   useEffect(() => {
@@ -137,22 +145,60 @@ export default function Login() {
   };
 
   const quickLogin = async (userEmail: string, userPassword: string) => {
+    // Demo protegida: la password real es el PIN del muni. Si aún no lo
+    // tenemos en esta sesión, se abre el modal y el login sigue desde ahí.
+    let passReal = userPassword;
+    if (demoProtegido) {
+      const pinGuardado = sessionStorage.getItem(`demo_pin_${municipioCodigo}`);
+      if (!pinGuardado) {
+        setPinError('');
+        setPinGateEmail(userEmail);
+        return;
+      }
+      passReal = pinGuardado;
+    }
     setEmail(userEmail);
-    setPassword(userPassword);
+    setPassword(passReal);
     setError('');
     setLoading(true);
 
     try {
-      await login(userEmail, userPassword);
+      await login(userEmail, passReal);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || 'Error al iniciar sesión');
+      if (demoProtegido) {
+        // PIN vencido o mal tipeado: se descarta y se vuelve a preguntar.
+        sessionStorage.removeItem(`demo_pin_${municipioCodigo}`);
+        setPinError('PIN incorrecto. Probá de nuevo.');
+        setPinGateEmail(userEmail);
+      } else {
+        const error = err as { response?: { data?: { detail?: string } } };
+        setError(error.response?.data?.detail || 'Error al iniciar sesión');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // El modal queda abierto mientras se valida: si el PIN está mal, el catch
+  // de quickLogin lo repregunta con error; si está bien, navigate desmonta.
+  const confirmarPin = (pin: string) => {
+    if (!pinGateEmail) return;
+    sessionStorage.setItem(`demo_pin_${municipioCodigo}`, pin);
+    void quickLogin(pinGateEmail, '');
+  };
+
+  const pinGate = (
+    <DemoPinGate
+      abierto={pinGateEmail !== null}
+      nombreMunicipio={municipioNombre || ''}
+      cargando={loading}
+      error={pinError}
+      onSubmit={confirmarPin}
+      onClose={() => { setPinGateEmail(null); setPinError(''); }}
+    />
+  );
 
   // Configuración visual por rol
   // Los perfiles de demo se distinguen por ICONO y etiqueta, no por un color
@@ -217,8 +263,21 @@ export default function Login() {
         }
       };
 
+      // Ficha pública del muni: trae demo_protegido (si el quick-login debe
+      // pedir PIN en vez de usar demo123).
+      const loadProteccion = async () => {
+        try {
+          const muni = await fetchJsonRetry<{ demo_protegido?: boolean }>(
+            `${API_URL}/municipios/public/${municipioCodigo}`);
+          setDemoProtegido(Boolean(muni.demo_protegido));
+        } catch (error) {
+          console.error('Error al cargar la ficha del municipio:', error);
+        }
+      };
+
       loadDemoUsers();
       loadDependenciaUsers();
+      loadProteccion();
     }
   }, [municipioCodigo]);
 
@@ -476,6 +535,7 @@ export default function Login() {
             </p>
           </div>
         </div>
+        {pinGate}
       </div>
     );
   }
@@ -768,6 +828,7 @@ export default function Login() {
           </div>
         </main>
       </div>
+      {pinGate}
     </div>
   );
 }

@@ -75,6 +75,13 @@ class Municipio(Base):
     # Los munis creados por el endpoint demo arrancan en True (default).
     es_demo = Column(Boolean, default=True, nullable=False)
 
+    # Demo PROTEGIDA por PIN: la botonera de perfiles se muestra igual, pero
+    # el quick-login pide una clave numérica. El PIN no se guarda acá: ES la
+    # password real de los usuarios demo del muni (el gate lo hace /auth/login
+    # contra el hash, no la UI). Este flag solo le dice al frontend que
+    # pregunte en vez de usar demo123.
+    demo_protegido = Column(Boolean, default=False, nullable=False, server_default="0")
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

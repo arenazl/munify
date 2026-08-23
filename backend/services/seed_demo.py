@@ -887,6 +887,7 @@ async def seed_demo_completo(
     db: AsyncSession,
     municipio_id: int,
     codigo: str,
+    password: str = "demo123",
 ) -> dict:
     """
     Arma toda la estructura de datos para que un municipio demo sea
@@ -898,7 +899,9 @@ async def seed_demo_completo(
 
     Retorna un dict con info del seed para la response del endpoint.
     """
-    hash_demo = get_password_hash("demo123")
+    # Demo protegida por PIN: el alta puede pasar otra password (el PIN) y
+    # todos los usuarios demo del muni nacen con ella en vez de demo123.
+    hash_demo = get_password_hash(password)
 
     # Cargar municipio para usar sus coords como centro de zonas/barrios/reclamos
     muni = await db.get(Municipio, municipio_id)

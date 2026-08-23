@@ -6,6 +6,7 @@ import { getDefaultRouteForUser } from '../config/navigation';
 import api from '../lib/api';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
+import DemoPinGate from '../components/DemoPinGate';
 
 /**
  * Pantalla "demo lista" — landing ultra-minimalista a la que redirige
@@ -52,6 +53,12 @@ export default function DemoReady() {
   const [error, setError] = useState('');
   const [quickLoading, setQuickLoading] = useState(false);
 
+  // Demo PROTEGIDA por PIN: los botones se ven, pero el quick-login pide la
+  // clave numérica y la usa como password real (misma mecánica que Login).
+  const [demoProtegido, setDemoProtegido] = useState(false);
+  const [pinGateEmail, setPinGateEmail] = useState<string | null>(null);
+  const [pinError, setPinError] = useState('');
+
   useEffect(() => {
     if (!codigo) {
       setError('No se recibió el código del municipio');
@@ -62,6 +69,8 @@ export default function DemoReady() {
       try {
         const res = await api.get(`/municipios/public/${codigo}/demo-users`);
         setUsers(res.data);
+        const ficha = await api.get(`/municipios/public/${codigo}`);
+        setDemoProtegido(Boolean(ficha.data?.demo_protegido));
       } catch (err) {
         console.error(err);
         setError('No pudimos cargar los usuarios de demo de ese municipio');
@@ -79,17 +88,41 @@ export default function DemoReady() {
 
   const handleQuickLoginByEmail = async (email: string | undefined) => {
     if (!email) return;
+    // Demo protegida: la password real es el PIN. Sin PIN en esta sesión,
+    // se abre el modal y el login sigue desde confirmarPin.
+    let pass = 'demo123';
+    if (demoProtegido) {
+      const pinGuardado = sessionStorage.getItem(`demo_pin_${codigo}`);
+      if (!pinGuardado) {
+        setPinError('');
+        setPinGateEmail(email);
+        return;
+      }
+      pass = pinGuardado;
+    }
     setQuickLoading(true);
     setError('');
     try {
-      await login(email, 'demo123');
+      await login(email, pass);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e.response?.data?.detail || 'Error ingresando con la cuenta de demo');
+      if (demoProtegido) {
+        sessionStorage.removeItem(`demo_pin_${codigo}`);
+        setPinError('PIN incorrecto. Probá de nuevo.');
+        setPinGateEmail(email);
+      } else {
+        const e = err as { response?: { data?: { detail?: string } } };
+        setError(e.response?.data?.detail || 'Error ingresando con la cuenta de demo');
+      }
       setQuickLoading(false);
     }
+  };
+
+  const confirmarPin = (pin: string) => {
+    if (!pinGateEmail) return;
+    sessionStorage.setItem(`demo_pin_${codigo}`, pin);
+    void handleQuickLoginByEmail(pinGateEmail);
   };
 
   return (
@@ -293,6 +326,14 @@ export default function DemoReady() {
           {BRAND.name} — Demo en vivo
         </p>
       </footer>
+      <DemoPinGate
+        abierto={pinGateEmail !== null}
+        nombreMunicipio={municipioNombre}
+        cargando={quickLoading}
+        error={pinError}
+        onSubmit={confirmarPin}
+        onClose={() => { setPinGateEmail(null); setPinError(''); }}
+      />
     </div>
   );
 }
