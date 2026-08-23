@@ -101,6 +101,18 @@ export async function loginPersonaUI(page: Page, tenant: Tenant, rol: string): P
   const boton = page.getByRole('button', { name: persona });
   await boton.waitFor({ state: 'visible', timeout: 30_000 });
   await boton.click();
+  // Demo PROTEGIDA: al tocar el perfil aparece el modal de PIN. La clave es
+  // la `password` del fixture (el PIN ES la password de los usuarios demo).
+  // En tenants sin PIN el modal no existe y se sigue directo a /gestion.
+  const modalPin = page.getByRole('dialog', { name: 'Demo protegida' });
+  const pidioPin = await Promise.race([
+    modalPin.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false),
+    page.waitForURL((url) => url.pathname.startsWith('/gestion'), { timeout: 30_000 }).then(() => false).catch(() => false),
+  ]);
+  if (pidioPin) {
+    await modalPin.getByPlaceholder('PIN numérico').fill(tenant.password);
+    await modalPin.getByRole('button', { name: 'Entrar' }).click();
+  }
   await page.waitForURL((url) => url.pathname.startsWith('/gestion'), { timeout: 30_000 });
   // El token queda en localStorage: esperamos que esté para que el
   // storageState guardado sirva.

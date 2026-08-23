@@ -45,6 +45,9 @@ function PinDialog({ nombreMunicipio, cargando, error, onSubmit, onClose }: Omit
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Demo protegida"
         className="w-full max-w-xs rounded-2xl bg-slate-800 border border-slate-700 p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
