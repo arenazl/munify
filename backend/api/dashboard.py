@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from datetime import datetime, timedelta
 from typing import List, Optional
 from pydantic import BaseModel
@@ -1200,6 +1200,12 @@ async def get_recurrentes(
         Reclamo.direccion != None,
         Reclamo.direccion != '',
         func.date(Reclamo.created_at) >= fecha_inicio,
+        # Solo ubicaciones PRECISAS: un foco armado con coordenadas por IP o
+        # centroide sería una esquina caliente falsa. NULL = legacy preciso.
+        or_(
+            Reclamo.ubicacion_origen.is_(None),
+            Reclamo.ubicacion_origen.notin_(("ip", "municipio")),
+        ),
     ]
     if dependencia_id:
         sub_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)

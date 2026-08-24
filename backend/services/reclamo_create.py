@@ -53,6 +53,7 @@ async def create_reclamo(
     actor_user: User,
     canal_ingreso: str,
     es_ventanilla_asistida: bool,
+    client_ip: str | None = None,
 ) -> Reclamo:
     """Crea el reclamo y devuelve la instancia persistida (con `id`).
 
@@ -76,16 +77,39 @@ async def create_reclamo(
         canal=canal_ingreso,
     )
 
+    # Ubicación INVISIBLE (regla del dueño): todo reclamo nace con
+    # coordenadas sin frenarle el flujo al vecino. Si el front no las trajo
+    # (sugerencia elegida o GPS silencioso), se resuelven acá — geocodificar
+    # lo tipeado → IP aproximada → centroide — y el ORIGEN queda guardado
+    # para que la analítica fina excluya los aproximados. Best-effort total.
+    try:
+        from models.municipio import Municipio
+        from services.ubicacion_reclamo import resolver_ubicacion
+        muni = await db.get(Municipio, municipio_id)
+        lat, lng, origen = await resolver_ubicacion(
+            municipio=muni,
+            direccion=data.direccion,
+            latitud=data.latitud,
+            longitud=data.longitud,
+            origen_declarado=data.ubicacion_origen,
+            client_ip=client_ip,
+        )
+        reclamo.latitud, reclamo.longitud, reclamo.ubicacion_origen = lat, lng, origen
+        logger.info("[UBICACION] %r -> (%s, %s) origen=%s", data.direccion, lat, lng, origen)
+    except Exception as e:
+        logger.warning("[UBICACION] Error resolviendo ubicación: %s", e)
+
     # Detectar barrio automáticamente desde la dirección. Best-effort: una falla
-    # NO impide crear el reclamo.
+    # NO impide crear el reclamo. Usa las coordenadas YA resueltas (no las del
+    # payload): un reclamo geocodificado también encuentra su barrio.
     try:
         from services.barrio_detector import detectar_barrio
         barrio_id = await detectar_barrio(
             db=db,
             municipio_id=municipio_id,
             direccion=data.direccion,
-            latitud=data.latitud,
-            longitud=data.longitud,
+            latitud=reclamo.latitud,
+            longitud=reclamo.longitud,
         )
         if barrio_id:
             reclamo.barrio_id = barrio_id

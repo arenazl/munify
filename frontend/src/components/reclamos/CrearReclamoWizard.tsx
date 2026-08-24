@@ -144,6 +144,22 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   const dniSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dniUltimoBuscado = useRef<string>('');
 
+  // ============ Ubicación invisible ============
+  // Regla del dueño: todo reclamo con coordenadas, SIN frenar el flujo. Al
+  // abrir el wizard se pide la geolocalización en silencio: si el permiso ya
+  // está dado no se nota nada; si el vecino la niega, acá no pasa nada — el
+  // backend resuelve solo (geocodifica lo tipeado o aproxima por IP). Estas
+  // coords se usan únicamente cuando NO se eligió sugerencia del autocomplete.
+  const gpsRef = useRef<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!open || !('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { gpsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
+      () => { /* denegado o sin señal: la cadena sigue server-side */ },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  }, [open]);
+
   // ============ Cargar datos al abrir ============
 
   useEffect(() => {
@@ -430,12 +446,23 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
 
     setSaving(true);
     try {
+      // Cadena silenciosa de ubicación: sugerencia elegida (precisa, apunta
+      // al problema) → GPS del dispositivo (donde está el vecino) → nada, y
+      // el backend termina la cadena (geocodifica lo tipeado / IP). El
+      // origen viaja para que la analítica sepa cuánto vale cada punto.
+      // OJO modo empleado: la ventanilla carga a nombre de un tercero — el
+      // GPS del mostrador NO es la ubicación del problema, no se manda.
+      const gps = !isEmpleado ? gpsRef.current : null;
+      const ubicacion = form.latitud != null && form.longitud != null
+        ? { latitud: form.latitud, longitud: form.longitud, ubicacion_origen: 'direccion' }
+        : gps
+          ? { latitud: gps.lat, longitud: gps.lng, ubicacion_origen: 'gps' }
+          : {};
       const payload: Record<string, unknown> = {
         titulo: form.titulo.trim(),
         descripcion: form.descripcion.trim(),
         direccion: form.direccion.trim(),
-        latitud: form.latitud ?? undefined,
-        longitud: form.longitud ?? undefined,
+        ...ubicacion,
         referencia: form.referencia.trim() || undefined,
         categoria_id: form.categoria_id,
         prioridad: 3,

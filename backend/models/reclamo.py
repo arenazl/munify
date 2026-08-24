@@ -31,6 +31,11 @@ class Reclamo(Base):
     direccion = Column(String(255), nullable=False)
     latitud = Column(Float, nullable=True)
     longitud = Column(Float, nullable=True)
+    # De dónde salió la coordenada: direccion | gps | geocodificada | ip |
+    # municipio. Los dos últimos son APROXIMADOS y la analítica fina
+    # (heatmap, focos) los excluye. NULL = legacy (previo a la regla, se
+    # trata como preciso). Ver services/ubicacion_reclamo.py.
+    ubicacion_origen = Column(String(15), nullable=True)
     referencia = Column(String(255), nullable=True)  # "Frente a la plaza", etc.
 
     # Categoría del reclamo (per-municipio)

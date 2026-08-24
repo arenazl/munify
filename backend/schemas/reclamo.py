@@ -9,6 +9,10 @@ class ReclamoCreate(BaseModel):
     direccion: str
     latitud: Optional[float] = None
     longitud: Optional[float] = None
+    # 'direccion' (sugerencia verificada) o 'gps' (geolocalización silenciosa
+    # del dispositivo). Si las coords no vienen, el backend resuelve solo
+    # (geocodificada/ip/municipio) — ver services/ubicacion_reclamo.py.
+    ubicacion_origen: Optional[str] = None
     referencia: Optional[str] = None
     categoria_id: int
     zona_id: Optional[int] = None

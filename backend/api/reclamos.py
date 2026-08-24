@@ -1682,6 +1682,7 @@ async def get_reclamo_historial(
 @router.post("", response_model=ReclamoResponse)
 async def create_reclamo(
     data: ReclamoCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1781,6 +1782,14 @@ async def create_reclamo(
     # de dependencia, historial coherente, POI, gamificación y notificaciones)
     # vive en el service. El endpoint ya resolvió QUIÉN es el creador (auth).
     from services.reclamo_create import create_reclamo as crear_reclamo_service
+    # IP real del vecino para la ubicación aproximada de último recurso.
+    # El front llega proxied por Netlify: primero su header, después el
+    # primer hop de X-Forwarded-For, y recién ahí la conexión directa.
+    client_ip = (
+        request.headers.get("x-nf-client-connection-ip")
+        or (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else None)
+    ) or None
     reclamo = await crear_reclamo_service(
         db,
         data=data,
@@ -1788,6 +1797,7 @@ async def create_reclamo(
         actor_user=current_user,
         canal_ingreso=canal_ingreso,
         es_ventanilla_asistida=es_ventanilla_asistida,
+        client_ip=client_ip,
     )
 
     # Recargar con relaciones para serializar + inyectar prioridad efectiva (OT) y POI.

@@ -7,7 +7,7 @@ Endpoints de analytics avanzados para el Dashboard.
 """
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import select, func, and_, case, or_
 from datetime import datetime, timedelta
 from typing import List, Optional
 from math import radians, cos, sin, asin, sqrt
@@ -79,7 +79,13 @@ async def get_heatmap_data(
             and_(
                 Reclamo.latitud.isnot(None),
                 Reclamo.longitud.isnot(None),
-                Reclamo.municipio_id == municipio_id
+                Reclamo.municipio_id == municipio_id,
+                # Solo ubicaciones PRECISAS: las aproximadas (ip/municipio)
+                # pintarían esquinas calientes falsas. NULL = legacy preciso.
+                or_(
+                    Reclamo.ubicacion_origen.is_(None),
+                    Reclamo.ubicacion_origen.notin_(("ip", "municipio")),
+                ),
             )
         )
         if con_fecha:
