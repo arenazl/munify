@@ -9,7 +9,7 @@ categorías que ya siembra `crear_categorias_default()`.
 """
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
@@ -408,6 +408,26 @@ SLA_CONFIGS_DEMO = [
 # reclamo insignia que más se muestra en las demos.
 # (titulo, descripcion, categoria_nombre, estado, direccion,
 #  dep_codigo, zona_nombre, barrio_nombre, lat_offset, lng_offset, historial)
+def _punto_con_focos(i: int) -> int:
+    """Regla del dueño: toda demo nace con RECURRENCIA real. Los primeros
+    reclamos se apilan en dos esquinas (3 + 2) para que el mapa de focos
+    ("Dónde se repiten los reclamos" agrupa por dirección, mínimo 2) tenga
+    recorrido desde el día uno; el resto se dispersa en puntos propios."""
+    if i < 3:
+        return 0
+    if i < 5:
+        return 1
+    return i - 3
+
+
+def _fecha_historica(i: int) -> datetime:
+    """Regla del dueño: sin componente histórico no es una demo funcional.
+    Reparte los reclamos ~3 meses hacia atrás de forma DETERMINÍSTICA (día
+    3, 10, 17... por índice, sin randoms) para que la tendencia mensual del
+    dashboard tenga movimiento y comparación reales."""
+    return datetime.utcnow() - timedelta(days=3 + i * 7, hours=(i * 5) % 12)
+
+
 RECLAMOS_DEMO = [
     # --- Servicios Públicos (4 — alumbrado x3 + residuos x1) ---
     {
@@ -1351,7 +1371,8 @@ async def seed_demo_completo(
         # offset: direccion de una calle que existe, y zona/barrio ya resueltos
         # --- el distrito por el poligono donde cayo, el barrio por el geocoding ---
         # asi que no hay que adivinarlos por nombre.
-        punto = geo[len(reclamos_creados_list) % len(geo)] if geo else None
+        idx_reclamo = len(reclamos_creados_list)
+        punto = geo[_punto_con_focos(idx_reclamo) % len(geo)] if geo else None
         if punto:
             zona = zonas.get(punto.get("zona_nombre"))
             barrio = barrios.get(punto.get("barrio"))
@@ -1371,11 +1392,19 @@ async def seed_demo_completo(
         # Mezcla de canales para que el demo muestre la omnicanalidad
         _canal_demo = ["app", "whatsapp", "ventanilla_asistida"][len(reclamos_creados_list) % 3]
 
+        # Historia retrodatada + resolución coherente (posterior a la creación)
+        # para los cerrados: la tendencia mensual y los focos "desde hace X
+        # días" nacen con datos reales, no con todo apilado en hoy.
+        _creado = _fecha_historica(idx_reclamo)
+        _cerrado = r_data["estado"] in (EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO)
+
         reclamo = Reclamo(
             municipio_id=municipio_id,
             titulo=r_data["titulo"],
             descripcion=r_data["descripcion"],
             estado=r_data["estado"],
+            created_at=_creado,
+            fecha_resolucion=(_creado + timedelta(days=2 + idx_reclamo % 4)) if _cerrado else None,
             prioridad=3,
             direccion=punto["direccion"] if punto else r_data["direccion"],
             latitud=punto["lat"] if punto else muni_lat + r_data["lat_offset"],
