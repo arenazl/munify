@@ -1008,6 +1008,9 @@ async def eliminar_municipio_demo(
         "DELETE hs FROM historial_solicitudes hs JOIN solicitudes s ON hs.solicitud_id = s.id WHERE s.municipio_id = :mid",
         "DELETE td FROM tramite_documentos_requeridos td JOIN tramites t ON td.tramite_id = t.id WHERE t.municipio_id = :mid",
         "DELETE sv FROM sla_violaciones sv JOIN reclamos r ON sv.reclamo_id = r.id WHERE r.municipio_id = :mid",
+        # Calificaciones del vecino (cuelgan del reclamo; el seed demo ya las
+        # crea sobre los reclamos cerrados)
+        "DELETE ca FROM calificaciones ca JOIN reclamos r ON ca.reclamo_id = r.id WHERE r.municipio_id = :mid",
         # Intermedias de empleados (via JOIN con empleados.municipio_id)
         "DELETE ec FROM empleado_cuadrillas ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
         "DELETE ec FROM empleado_categorias ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
@@ -1019,6 +1022,8 @@ async def eliminar_municipio_demo(
         "DELETE cc FROM cuadrilla_categorias cc JOIN cuadrillas c ON cc.cuadrilla_id = c.id WHERE c.municipio_id = :mid",
         # Ordenes de trabajo (pivot N:M con reclamos)
         "DELETE otr FROM orden_trabajo_reclamos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
+        # Recursos de OT (cuelgan de la OT y del item de inventario)
+        "DELETE otr FROM orden_trabajo_recursos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
         # Mapeo tramite → dependencia (cuelga de municipio_dependencias)
         "DELETE mdt FROM municipio_dependencia_tramites mdt JOIN municipio_dependencias md ON mdt.municipio_dependencia_id = md.id WHERE md.municipio_id = :mid",
         # Tasas: deudas/pagos cuelgan de partidas
@@ -1046,12 +1051,15 @@ async def eliminar_municipio_demo(
         # Turnero + campo (2026-07)
         "turnos", "ordenes_trabajo", "municipio_modulos",
         "agenda_configs", "agenda_excepciones",
+        # Inventario demo (seed_inventario) — quedaban huerfanos al borrar
+        "inventario_items", "inventario_categorias",
         # Tasas demo
         "tasas_partidas",
         # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)
         "tesoreria_movimientos_caja", "tesoreria_pagos_programados",
         "tesoreria_premios", "tesoreria_cajas", "tesoreria_parajes",
         "tesoreria_conceptos", "tesoreria_tipos_concepto", "tesoreria_tipos_empleado",
+        "tesoreria_conceptos_liquidacion", "proyectos",
         "gasto_proyectos", "gastos", "contactos", "ordenes_pago",
         "salesbot_configs", "configuraciones",
     ]

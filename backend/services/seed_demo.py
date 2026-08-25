@@ -428,6 +428,111 @@ def _fecha_historica(i: int) -> datetime:
     return datetime.utcnow() - timedelta(days=3 + i * 7, hours=(i * 5) % 12)
 
 
+# ============================================================
+# Historia de TRÁMITES y TURNOS (misma regla que _fecha_historica)
+# ============================================================
+# Regla del dueño: "los demos tienen que parecer apps en funcionamiento".
+# Una solicitud que nace y se cierra en el mismo segundo delata la semilla
+# (el KPI de tiempo de resolución da 0 y la bandeja no tiene pasado), igual
+# que un turno vencido que sigue en "reservado". Todo lo de abajo se deriva
+# del ÍNDICE — determinístico, sin randoms, reproducible entre demos.
+
+# Días que tarda cada FAMILIA de trámite, de mínimo a máximo. Las claves se
+# buscan dentro del nombre normalizado, así el mapeo sobrevive a que se
+# sumen trámites nuevos al catálogo (el que no matchea cae al default).
+DURACION_TRAMITE_DIAS = [
+    (("habilitacion",), (12, 20)),   # inspección de rubro + verificación
+    (("obra",), (5, 10)),            # visado de planos
+    (("licencia",), (1, 3)),         # psicofísico y entrega
+    (("libre deuda",), (0, 0)),      # se emite en el mostrador, mismo día
+    (("plan de pago",), (1, 2)),
+]
+DURACION_TRAMITE_DEFAULT = (2, 5)
+
+
+def _hora_mostrador(i: int) -> tuple:
+    """Hora de atención al público (08 a 13). Que todas las solicitudes de
+    la demo tengan la misma hora — o peor, medianoche — es lo primero que
+    se nota al abrir la bandeja ordenada por fecha."""
+    return 8 + (i * 5) % 6, (i * 17) % 60
+
+
+def _duracion_tramite_dias(nombre: str, i: int) -> int:
+    """Días que tarda ESE tipo de trámite en resolverse. Dos solicitudes del
+    mismo trámite no tardan igual, pero una habilitación comercial siempre
+    tarda más que un libre deuda: el ranking por tipo se sostiene."""
+    nom = _sin_tildes(nombre or "").lower()
+    lo, hi = DURACION_TRAMITE_DEFAULT
+    for claves, rango in DURACION_TRAMITE_DIAS:
+        if any(c in nom for c in claves):
+            lo, hi = rango
+            break
+    return lo + (i % (hi - lo + 1))
+
+
+def _fecha_solicitud(i: int, estado) -> datetime:
+    """created_at de una solicitud, esparcido ~90 días hacia atrás.
+    Las CERRADAS son viejas (25-89 días) para que su resolución también
+    caiga en el pasado; las pospuestas quedan en el medio (son las que
+    "vienen arrastrándose"); las abiertas son recientes (0-12 días) — una
+    bandeja con trabajo activo de esta semana, no un archivo muerto."""
+    if estado in (EstadoSolicitud.FINALIZADO, EstadoSolicitud.RECHAZADO):
+        dias = 25 + (i * 7) % 65
+    elif estado == EstadoSolicitud.POSPUESTO:
+        dias = 18 + (i * 11) % 40
+    else:
+        dias = (i * 5) % 13
+    hh, mm = _hora_mostrador(i)
+    fecha = (datetime.utcnow() - timedelta(days=dias)).replace(
+        hour=hh, minute=mm, second=0, microsecond=0)
+    # Nunca futura: con dias=0 la hora de mostrador puede caer más tarde que
+    # el momento real de la creación de la demo.
+    return min(fecha, datetime.utcnow() - timedelta(hours=1))
+
+
+def _fecha_resolucion_solicitud(creado: datetime, nombre_tramite: str, i: int) -> datetime:
+    """Cierre = creación + la duración del TIPO de trámite. Nunca futura y
+    nunca igual a la creación (el libre deuda cierra el mismo día, pero unas
+    horas después: es un mostrador, no un batch)."""
+    dias = _duracion_tramite_dias(nombre_tramite, i)
+    resol = (creado + timedelta(days=dias)).replace(
+        hour=9 + (i * 3) % 5, minute=(i * 23) % 60, second=0, microsecond=0)
+    if resol <= creado:
+        resol = creado + timedelta(hours=1 + i % 3)
+    return min(resol, datetime.utcnow() - timedelta(hours=1))
+
+
+# Mix de una agenda REAL: la mayoría de los turnos se cumple, algunos faltan
+# y alguno se cancela. 8 cumplidos / 2 ausentes / 1 cancelado por cada 11,
+# repartidos por índice (no al azar) para que los KPIs de la agenda den
+# siempre lo mismo en todas las demos.
+_CICLO_TURNO_PASADO = (
+    "cumplido", "cumplido", "ausente", "cumplido", "cumplido", "cancelado",
+    "cumplido", "cumplido", "ausente", "cumplido", "cumplido",
+)
+
+
+def _estado_turno_pasado(i: int) -> str:
+    """Estado con el que se cierra un turno cuya fecha ya pasó. NINGÚN turno
+    vencido puede quedar en 'reservado' — es el síntoma más visible de que
+    la data es sintética."""
+    return _CICLO_TURNO_PASADO[i % len(_CICLO_TURNO_PASADO)]
+
+
+# Devoluciones de vecinos sobre reclamos cerrados. Cortas y con matices
+# (no todas elogiosas), como las de una app en uso.
+COMENTARIOS_CALIFICACION = [
+    "Vinieron al otro día y lo dejaron impecable.",
+    "Tardaron un poco pero lo resolvieron bien.",
+    "Muy buen trato de la cuadrilla, muy amables.",
+    "Se solucionó, aunque nadie avisó cuándo iban a venir.",
+    "Rápido y prolijo, se nota el trabajo.",
+    "Lo arreglaron, pero hubo que insistir por teléfono.",
+    "Quedó bien resuelto, gracias por el seguimiento.",
+    "Conforme con el resultado, ojalá siempre sea así.",
+]
+
+
 RECLAMOS_DEMO = [
     # --- Servicios Públicos (4 — alumbrado x3 + residuos x1) ---
     {
@@ -465,7 +570,7 @@ RECLAMOS_DEMO = [
         "titulo": "Poste de luz caído tras la tormenta",
         "descripcion": "Un poste de alumbrado quedó caído sobre la vereda después de la tormenta de anoche. Riesgo para los peatones.",
         "categoria_nombre": "Alumbrado público",
-        "estado": EstadoReclamo.RECIBIDO,
+        "estado": EstadoReclamo.FINALIZADO,
         "direccion": "Sarmiento y Los Álamos",
         "dependencia_codigo": "SERVICIOS_PUBLICOS",
         "zona_nombre": "Oeste",
@@ -474,6 +579,8 @@ RECLAMOS_DEMO = [
         "lng_offset": -0.017,
         "historial": [
             {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Cuadrilla de Alumbrado despachada por riesgo eléctrico."},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO, "comentario": "Se retiró el poste caído y se repuso la luminaria."},
         ],
     },
     {
@@ -513,7 +620,7 @@ RECLAMOS_DEMO = [
         "titulo": "Vereda hundida por raíces",
         "descripcion": "Las raíces de un árbol levantaron las baldosas de la vereda, varios vecinos ya tropezaron.",
         "categoria_nombre": "Bacheo y calles",
-        "estado": EstadoReclamo.RECIBIDO,
+        "estado": EstadoReclamo.FINALIZADO,
         "direccion": "Güemes al 250",
         "dependencia_codigo": "OBRAS_PUBLICAS",
         "zona_nombre": "Este",
@@ -522,6 +629,8 @@ RECLAMOS_DEMO = [
         "lng_offset": -0.011,
         "historial": [
             {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Se programó la reconstrucción del tramo con Obras Públicas."},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO, "comentario": "Vereda reconstruida y raíz podada por espacios verdes."},
         ],
     },
     {
@@ -560,7 +669,7 @@ RECLAMOS_DEMO = [
         "titulo": "Falta de señalización en cruce escolar",
         "descripcion": "El cruce peatonal frente a la escuela no tiene demarcación horizontal ni cartel de reductor de velocidad.",
         "categoria_nombre": "Tránsito y señalización",
-        "estado": EstadoReclamo.RECIBIDO,
+        "estado": EstadoReclamo.FINALIZADO,
         "direccion": "La Estación y Belgrano",
         "dependencia_codigo": "TRANSITO_VIAL",
         "zona_nombre": "Centro",
@@ -569,6 +678,8 @@ RECLAMOS_DEMO = [
         "lng_offset": -0.004,
         "historial": [
             {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Se pidió la demarcación al área de señalamiento vial."},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO, "comentario": "Senda peatonal demarcada y cartel de reductor colocado."},
         ],
     },
     {
@@ -607,7 +718,7 @@ RECLAMOS_DEMO = [
         "titulo": "Enjambre de avispas en plaza del barrio",
         "descripcion": "Hay un panal de avispas en un árbol de la plaza del barrio, varios vecinos ya fueron picados.",
         "categoria_nombre": "Plagas y control",
-        "estado": EstadoReclamo.RECIBIDO,
+        "estado": EstadoReclamo.FINALIZADO,
         "direccion": "Plaza de Los Álamos",
         "dependencia_codigo": "ZOONOSIS",
         "zona_nombre": "Oeste",
@@ -616,6 +727,8 @@ RECLAMOS_DEMO = [
         "lng_offset": -0.014,
         "historial": [
             {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Se despachó el equipo de control de plagas."},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO, "comentario": "Panal removido; se recomendó no acercarse por 48 horas."},
         ],
     },
     {
@@ -1423,7 +1536,17 @@ async def seed_demo_completo(
     await db.flush()  # UN solo flush para obtener los ids de los 4 reclamos
 
     for reclamo, hist_list in zip(reclamos_creados_list, historiales_data):
-        for h_data in hist_list:
+        # El historial se reparte ENTRE la creación y el cierre del reclamo.
+        # Si todos los pasos quedan con la hora del seed, la línea de tiempo
+        # del detalle muestra un reclamo de hace 2 meses resuelto "hoy" —
+        # el mismo síntoma que la solicitud que nace y muere en el mismo
+        # segundo. El primer paso siempre es la creación.
+        _ini = reclamo.created_at or datetime.utcnow()
+        _fin = reclamo.fecha_resolucion or min(
+            _ini + timedelta(days=2), datetime.utcnow())
+        _pasos = max(len(hist_list) - 1, 1)
+        for h_idx, h_data in enumerate(hist_list):
+            _cuando = _ini if h_idx == 0 else _ini + (_fin - _ini) * h_idx / _pasos
             db.add(HistorialReclamo(
                 reclamo_id=reclamo.id,
                 usuario_id=vecino_demo.id,
@@ -1431,9 +1554,15 @@ async def seed_demo_completo(
                 estado_anterior=h_data.get("estado_anterior"),
                 estado_nuevo=h_data.get("estado_nuevo"),
                 comentario=h_data.get("comentario"),
+                created_at=_cuando,
             ))
     reclamos_creados = len(reclamos_creados_list)
     await db.flush()
+
+    # 8.bis. Calificaciones: parte de los reclamos cerrados ya viene con la
+    # devolución del vecino, así la pantalla de calidad de atención nace con
+    # datos en vez de "todavía no hay calificaciones".
+    calificaciones_creadas = await _seed_calificaciones(db, reclamos_creados_list)
 
     # 9. Solicitudes de ejemplo: 2 por trámite OPERATIVO (estados variados) —
     # los trámites `solo_catalogo` no generan solicitudes (regla 3).
@@ -1453,14 +1582,18 @@ async def seed_demo_completo(
         "Solicitud iniciada por ventanilla",
         "Necesito resolver esto antes de fin de mes",
     ]
+    # Una ventanilla que funciona CIERRA la mayor parte de lo que recibe: con
+    # 2 finalizados cada 8 el KPI de tiempo de resolución se calculaba sobre 3
+    # expedientes y el promedio no significaba nada. Ahora ~1 de cada 3 está
+    # cerrado, con su duración por tipo de trámite.
     _ESTADOS_CICLO = [
-        EstadoSolicitud.RECIBIDO,
-        EstadoSolicitud.EN_CURSO,
         EstadoSolicitud.RECIBIDO,
         EstadoSolicitud.FINALIZADO,
         EstadoSolicitud.EN_CURSO,
-        EstadoSolicitud.POSPUESTO,
+        EstadoSolicitud.FINALIZADO,
         EstadoSolicitud.RECIBIDO,
+        EstadoSolicitud.POSPUESTO,
+        EstadoSolicitud.EN_CURSO,
         EstadoSolicitud.FINALIZADO,
     ]
 
@@ -1493,6 +1626,19 @@ async def seed_demo_completo(
                 import random as _random
                 dep_id_sol = _random.choice(list(muni_deps.values())).id
 
+            # Historia del expediente: nace repartida ~90 días hacia atrás y
+            # cierra tantos días después como tarde ESE tipo de trámite (una
+            # habilitación comercial no se resuelve como un libre deuda).
+            _creado_sol = _fecha_solicitud(sol_idx, estado)
+            _cerrada = estado in (EstadoSolicitud.FINALIZADO, EstadoSolicitud.RECHAZADO)
+            _resol_sol = _fecha_resolucion_solicitud(
+                _creado_sol, tramite.nombre, sol_idx) if _cerrada else None
+            # Paso intermedio (en curso / pospuesto / cierre): entre la
+            # creación y hoy, nunca en el futuro.
+            _cambio_sol = _resol_sol or min(
+                _creado_sol + timedelta(days=1 + sol_idx % 3),
+                datetime.utcnow() - timedelta(hours=1))
+
             numero = f"SOL-{_year}-{(_sol_offset + sol_idx + 1):05d}"
             sol = Solicitud(
                 municipio_id=municipio_id,
@@ -1510,6 +1656,8 @@ async def seed_demo_completo(
                 direccion_solicitante=_direccion_demo if es_del_vecino else None,
                 municipio_dependencia_id=dep_id_sol,
                 prioridad=2 + (sol_idx % 3),
+                created_at=_creado_sol,
+                fecha_resolucion=_resol_sol,
             )
             db.add(sol)
             await db.flush()
@@ -1520,6 +1668,7 @@ async def seed_demo_completo(
                 estado_nuevo=EstadoSolicitud.RECIBIDO,
                 accion="Solicitud creada",
                 comentario="Solicitud generada automáticamente en la demo.",
+                created_at=_creado_sol,
             ))
             if estado != EstadoSolicitud.RECIBIDO:
                 db.add(HistorialSolicitud(
@@ -1529,6 +1678,7 @@ async def seed_demo_completo(
                     estado_nuevo=estado,
                     accion=f"Cambio a {estado.value}",
                     comentario="Avance del trámite (demo).",
+                    created_at=_cambio_sol,
                 ))
             solicitudes_creadas += 1
     await db.flush()
@@ -1567,10 +1717,63 @@ async def seed_demo_completo(
         "cuadrillas": len(cuadrillas),
         "sla_configs": sla_count,
         "reclamos": reclamos_creados,
+        "calificaciones": calificaciones_creadas,
         "solicitudes": solicitudes_creadas,
         "ordenes_trabajo": ots_creadas,
         "inventario_items": inv_res["items"],
     }
+
+
+# ============================================================
+# Calificaciones demo (la devolución del vecino sobre lo cerrado)
+# ============================================================
+
+async def _seed_calificaciones(db: AsyncSession, reclamos: list) -> int:
+    """Califica la MITAD (determinística) de los reclamos cerrados.
+
+    Que califiquen todos es tan falso como que no califique nadie: en la
+    realidad contesta una parte. Se toma uno sí y uno no sobre los cerrados,
+    con puntuaciones 3-5 y alguna 2 (un municipio con 5,0 perfecto no le
+    cree nadie), sub-puntajes coherentes con la nota general y 1 de cada 3
+    sin comentario. La fecha es 1-5 días DESPUÉS de la resolución — el
+    vecino contesta cuando ya vio el trabajo hecho.
+    """
+    from models.calificacion import Calificacion
+
+    ahora = datetime.utcnow()
+    cerrados = [r for r in reclamos
+                if r.estado in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)]
+    creadas = 0
+    for k, rec in enumerate(cerrados):
+        if k % 2:  # uno sí, uno no
+            continue
+        # `n` es el número de calificación (no de reclamo): así las primeras
+        # tres ya cubren un 5, un 3 y un 4. Con el ciclo sobre `k` un demo
+        # chico daba 5-5-4 y un promedio de 4,7 que no le cree nadie.
+        n = k // 2
+        puntuacion = (5, 3, 4, 5, 2, 4, 5, 3)[n % 8]
+        base = rec.fecha_resolucion or rec.created_at or ahora
+        cuando = base + timedelta(days=1 + (n % 5), hours=(n * 7) % 10)
+        if cuando >= ahora:
+            cuando = ahora - timedelta(hours=6)
+        db.add(Calificacion(
+            reclamo_id=rec.id,
+            usuario_id=rec.creador_id,
+            puntuacion=puntuacion,
+            # El que puntúa alto suele quejarse igual de la demora, y al
+            # revés: los sub-puntajes se mueven alrededor de la nota, no la
+            # repiten.
+            tiempo_respuesta=max(1, min(5, puntuacion - (1 if n % 3 == 0 else 0))),
+            calidad_trabajo=max(1, min(5, puntuacion + (1 if n % 4 == 0 else 0))),
+            atencion=max(1, min(5, puntuacion + (1 if puntuacion < 5 else 0))),
+            comentario=None if n % 3 == 2 else COMENTARIOS_CALIFICACION[
+                n % len(COMENTARIOS_CALIFICACION)],
+            tags="rapido,amable" if puntuacion >= 4 else "demoro",
+            created_at=cuando,
+        ))
+        creadas += 1
+    await db.flush()
+    return creadas
 
 
 # ============================================================
@@ -1838,13 +2041,14 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
 
         hoy = date.today()
         nombre_vec = f"{vecino.nombre} {vecino.apellido or ''}".strip()
-        # (delta_dias, hora, minuto, estado, recordatorio)
-        # delta 0 = HOY: la Agenda del día muestra actividad apenas entran
-        # (uno ya atendido a la mañana + dos reservados para más tarde).
+        # (delta_dias, hora, minuto, estado, recordatorio). delta 0 = HOY.
         TURNOS = [
-            # Hoy: la Agenda del día muestra actividad apenas entran
-            # (uno ya atendido a la mañana + dos reservados para más tarde).
-            (0, 8, 30, "cumplido", True),
+            # Hoy: la Agenda del día muestra actividad apenas entran. El de
+            # las 8:30 nace "reservado" a propósito — el guardarraíl de abajo
+            # lo cierra si esa hora ya pasó. Al revés (nacer "cumplido") la
+            # demo creada a las 7 de la mañana muestra un turno atendido en
+            # el futuro, que es la misma mentira al espejo.
+            (0, 8, 30, "reservado", True),
             (0, 11, 30, "reservado", True),
             (0, 12, 0, "reservado", True),
             # Próximos días hábiles (semana actual y siguiente)
@@ -1861,24 +2065,26 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
             (9, 10, 0, "reservado", False),
             (10, 9, 0, "reservado", False),
             (12, 10, 30, "reservado", False),
-            # Pasados recientes — cumplidos/ausentes/cancelado con recordatorio
-            (-2, 9, 0, "cumplido", True),
-            (-3, 9, 30, "cumplido", True),
-            (-4, 10, 0, "cumplido", True),
-            (-5, 11, 0, "ausente", True),
-            (-6, 11, 30, "cancelado", False),
-            # Resto del mes hacia atrás — completa la vista calendario
-            (-8, 9, 0, "cumplido", True),
-            (-9, 10, 0, "cumplido", True),
-            (-11, 9, 30, "ausente", True),
-            (-12, 11, 0, "cumplido", True),
         ]
+        # Historia del turnero: ~2 meses hacia atrás, un turno cada 3 días
+        # hábiles, con el mix de una agenda real (8 cumplidos / 2 ausentes /
+        # 1 cancelado por cada 11 — ver _estado_turno_pasado). Sin esta cola
+        # la agenda arranca sin pasado y las estadísticas de asistencia no
+        # tienen de dónde salir.
+        for k in range(22):
+            TURNOS.append((-(2 + k * 3), 8 + (k * 2) % 5, (0, 30)[k % 2],
+                           _estado_turno_pasado(k), True))
         for j, (delta, hh, mm, estado, recordado) in enumerate(TURNOS):
             t = con_turno[j % len(con_turno)]
             dep_id = dep_de.get(t.id)
             if not dep_id:
                 continue
             fh = datetime.combine(_dia_habil(hoy, delta), datetime.min.time()).replace(hour=hh, minute=mm)
+            # Guardarraíl: un turno cuya hora YA pasó no puede quedar
+            # "reservado" — pasa con los de hoy cuando la demo se crea a la
+            # tarde. Se cierra con el mismo mix determinístico.
+            if fh < datetime.now() and estado == "reservado":
+                estado = _estado_turno_pasado(j)
             db.add(Turno(
                 motivo_tipo="tramite",
                 tramite_id=t.id,
@@ -1896,6 +2102,23 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
             ))
             counts["turnos"] += 1
         await db.flush()
+
+    # Turnos que ENVEJECIERON: una demo creada hace semanas queda con turnos
+    # "reservados" de fecha vencida — el síntoma más visible de que la data
+    # es sintética. Re-correr la semilla del turnero sobre ese muni los
+    # cierra con el mismo mix determinístico (por id, así el resultado es
+    # reproducible). En un muni recién creado esto no encuentra nada.
+    vencidos = (await db.execute(
+        select(Turno).where(
+            Turno.municipio_id == municipio_id,
+            Turno.estado == "reservado",
+            Turno.fecha_hora < datetime.now(),
+        )
+    )).scalars().all()
+    for t_viejo in vencidos:
+        t_viejo.estado = _estado_turno_pasado(t_viejo.id)
+    counts["vencidos_cerrados"] = len(vencidos)
+    await db.flush()
 
     # NOTA: antes había un "balanceo" acá que le inyectaba 2 reclamos
     # sintéticos a CUALQUIER dependencia con <2 reclamos — incluidas las 6
