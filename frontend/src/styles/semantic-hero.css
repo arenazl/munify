@@ -297,8 +297,16 @@
   will-change: transform;
 }
 
+/* SIN `backwards` a propósito (bug real en QA, 2026-08-25): con fill-mode
+   backwards cada ficha queda en su 0% (opacity 0) mientras espera su delay,
+   y si el navegador cancela o pausa la cascada a mitad de camino —tab en
+   background, throttling, re-layout— los caracteres restantes quedan
+   INVISIBLES para siempre ("Quedan 13 por at…"). Sin fill, la ficha es
+   visible por defecto y sólo desaparece durante su PROPIO giro: el efecto
+   pasa de "revelado" a "vuelta de ficha sobre texto visible" (más parecido
+   al tablero real) y el peor caso degrada a texto legible, nunca a blanco. */
 .sh-slide--activo .sh-ficha {
-  animation: shFicha 340ms cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+  animation: shFicha 340ms cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 
 @keyframes shFicha {
