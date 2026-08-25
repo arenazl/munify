@@ -2225,6 +2225,11 @@ export const gastosApi = {
     concepto?: string;
   }) => api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
   reportes: () => api.get('/tesoreria/gastos/stats/reportes'),
+  /** Serie DIARIA y contigua de gasto (los días sin movimiento vienen en 0).
+   *  La consume el tablero financiero del Dashboard: la curva, el promedio
+   *  por día y el día más caro salen de acá, no de traerse los gastos. */
+  serie: (dias = 90) =>
+    api.get<{ fecha: string; monto: number }[]>('/tesoreria/gastos/serie', { params: { dias } }),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

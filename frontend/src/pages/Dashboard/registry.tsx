@@ -16,10 +16,35 @@ import { ColaReclamos } from './secciones/ColaReclamos';
 import { MapaTendencia } from './secciones/MapaTendencia';
 import { AnaliticaReclamos } from './secciones/AnaliticaReclamos';
 import { VozVecino } from './secciones/VozVecino';
+import { HeroFinanciero } from './secciones/HeroFinanciero';
+import { ColasPagos } from './secciones/ColasPagos';
+import { TendenciaGastos } from './secciones/TendenciaGastos';
+import { FinanzasResumen } from './secciones/FinanzasResumen';
 import type { SeccionProps } from './tipos';
 
 /** Hooks de datos que una sección necesita montados. */
-export type DominioDatos = 'reclamos' | 'tramites';
+export type DominioDatos = 'reclamos' | 'tramites' | 'finanzas';
+
+/**
+ * El módulo que enciende cada dominio de datos.
+ *
+ * Los dos primeros se llaman igual que su módulo; 'finanzas' no, porque el
+ * dominio agrupa lo que cuelga de tesorería (la agenda de pagos, la nómina,
+ * la contaduría) y el módulo que lo habilita es `tesoreria`. El mapa existe
+ * para que esa diferencia se declare UNA vez y no aparezca como un
+ * `d === 'finanzas' ? 'tesoreria' : d` regado por el orquestador.
+ */
+export const MODULO_DE_DOMINIO: Record<DominioDatos, string> = {
+  reclamos: 'reclamos',
+  tramites: 'tramites',
+  finanzas: 'tesoreria',
+};
+
+export const DOMINIOS: DominioDatos[] = ['reclamos', 'tramites', 'finanzas'];
+
+/** ¿El módulo que enciende este dominio está activo en el muni? */
+export const dominioActivo = (esActivo: (m: string) => boolean, d: DominioDatos): boolean =>
+  esActivo(MODULO_DE_DOMINIO[d]);
 
 export interface SeccionDashboard {
   id: string;
@@ -29,16 +54,31 @@ export interface SeccionDashboard {
   dominios: DominioDatos[];
   /** 'full' = fila propia; 'media' = dos consecutivas visibles comparten fila. */
   layout: 'full' | 'media';
-  /** Pares completa/resumen del mismo dominio (F3): completa ⇔ su dominio está
-   *  solo; resumen ⇔ convive con otros. Sin declarar = siempre. */
+  /**
+   * Pares completa/resumen del mismo dominio: la COMPLETA se muestra cuando su
+   * dominio está solo en la pantalla, y la RESUMEN cuando convive con otros.
+   * `variante` es documentación (qué mitad del par es cada una); lo que decide
+   * es `soloSiDominioSolo`.
+   */
   variante?: 'completa' | 'resumen';
+  /**
+   * - `true`  → visible SÓLO si su dominio está solo (ningún otro dominio del
+   *             muni está activo). Es la mitad COMPLETA del par.
+   * - `false` → visible SÓLO si CONVIVE con otro dominio. Es la RESUMEN.
+   * - sin declarar → visible siempre (sujeto a `requiere`).
+   */
   soloSiDominioSolo?: boolean;
   Componente: React.FC<SeccionProps>;
 }
 
 /**
  * ORDEN FIJO de la pantalla:
- * cinta de conteos → cola → mapa/tendencia → analítica → voz.
+ * cinta de conteos → cola → mapa/tendencia → analítica → voz → FINANZAS.
+ *
+ * El bloque financiero va DESPUÉS de lo operativo: en un muni full (Merlo)
+ * primero se resuelve la calle y el mostrador, y la plata cierra. En un muni
+ * sólo-financiero (San Pedro Norte) las secciones de reclamos no existen, así
+ * que finanzas queda arriba sin que nadie lo programe.
  * (El orden dinámico por actividad es F2b; hasta entonces manda este array.)
  */
 export const SECCIONES: SeccionDashboard[] = [
@@ -85,14 +125,69 @@ export const SECCIONES: SeccionDashboard[] = [
     layout: 'full',
     Componente: VozVecino,
   },
+
+  // ---------------------------------------------------------- FINANZAS
+  // Par completa/resumen: las tres primeras son la versión completa (el muni
+  // sólo-financiero), la última es el resumen de tres preguntas (cuando la
+  // plata convive con reclamos/trámites).
+  {
+    id: 'hero-financiero',
+    requiere: ['tesoreria'],
+    dominios: ['finanzas'],
+    layout: 'full',
+    variante: 'completa',
+    soloSiDominioSolo: true,
+    Componente: HeroFinanciero,
+  },
+  {
+    id: 'colas-pagos',
+    requiere: ['tesoreria'],
+    dominios: ['finanzas'],
+    layout: 'full',
+    variante: 'completa',
+    soloSiDominioSolo: true,
+    Componente: ColasPagos,
+  },
+  {
+    id: 'tendencia-gastos',
+    requiere: ['tesoreria'],
+    dominios: ['finanzas'],
+    layout: 'full',
+    variante: 'completa',
+    soloSiDominioSolo: true,
+    Componente: TendenciaGastos,
+  },
+  {
+    id: 'finanzas-resumen',
+    requiere: ['tesoreria'],
+    dominios: ['finanzas'],
+    layout: 'full',
+    variante: 'resumen',
+    soloSiDominioSolo: false,
+    Componente: FinanzasResumen,
+  },
 ];
 
-/** Las secciones cuyos módulos están TODOS activos, en el orden del registro. */
+/**
+ * Las secciones cuyos módulos están TODOS activos, en el orden del registro,
+ * ya resuelto el par completa/resumen.
+ *
+ * "Su dominio está SOLO" = ningún otro dominio del muni está encendido. Se
+ * mide contra los MÓDULOS, no contra las secciones candidatas: la cinta de
+ * conteos declara reclamos y trámites y es visible siempre, así que contar
+ * dominios de secciones diría que en San Pedro Norte conviven tres.
+ */
 export function seccionesVisibles(
   esActivo: (modulo: string) => boolean,
   secciones: SeccionDashboard[] = SECCIONES,
 ): SeccionDashboard[] {
-  return secciones.filter((s) => s.requiere.every(esActivo));
+  const presentes = DOMINIOS.filter((d) => dominioActivo(esActivo, d));
+  return secciones.filter((s) => {
+    if (!s.requiere.every(esActivo)) return false;
+    if (s.soloSiDominioSolo === undefined) return true;
+    const solo = presentes.every((d) => s.dominios.includes(d));
+    return s.soloSiDominioSolo ? solo : !solo;
+  });
 }
 
 /** Los dominios que hay que montar para las secciones dadas. */

@@ -38,6 +38,18 @@ export interface KpiCardV2Props {
   unidad?: string;
   /** Número en color deshabilitado (cero / sin dato). */
   atenuado?: boolean;
+  /**
+   * Veredicto del NÚMERO — lo tiñe (verde / ámbar / rojo).
+   *
+   * `delta` sólo sirve cuando hay una COMPARACIÓN contra un período previo:
+   * lleva flecha, y ponerle una a un número que no cambió contra nada es
+   * mentir sobre el dato. Hay KPIs que se juzgan solos ("108 pagos vencidos"
+   * es malo sin necesidad de comparar con nada) y ésos usan esto.
+   *
+   * Sin veredicto el número va en tinta normal: un dato sin juicio de valor.
+   * `atenuado` gana, porque un KPI sin dato no se califica.
+   */
+  veredicto?: KpiVeredicto;
   /** Serie REAL de evolución; con menos de 2 puntos se muestra la línea plana. */
   serie?: number[];
   /** Color runtime de la serie (la página lo lee de los tokens --pl-*). */
@@ -46,7 +58,7 @@ export interface KpiCardV2Props {
   sub?: string;
 }
 
-export function KpiCardV2({ eyebrow, icono: Icono, valor, unidad, atenuado, serie, serieColor, delta, sub }: KpiCardV2Props) {
+export function KpiCardV2({ eyebrow, icono: Icono, valor, unidad, atenuado, veredicto, serie, serieColor, delta, sub }: KpiCardV2Props) {
   const puntos = serie && serie.length >= 2 ? serie.map((v, i) => ({ i, v })) : null;
   const ultimo = puntos ? puntos.length - 1 : -1;
 
@@ -57,9 +69,11 @@ export function KpiCardV2({ eyebrow, icono: Icono, valor, unidad, atenuado, seri
     return <circle key={`p-${index}`} cx={cx} cy={cy} r={2.6} fill={serieColor} stroke="none" />;
   };
 
-  const numero = (
-    <span className={`dv2-kpi-valor${atenuado ? ' dv2-kpi-valor--atenuado' : ''}`}>{valor}</span>
-  );
+  // El atenuado manda sobre el veredicto: un KPI sin dato no se califica.
+  const tinte = atenuado
+    ? ' dv2-kpi-valor--atenuado'
+    : veredicto ? ` dv2-kpi-valor--${veredicto}` : '';
+  const numero = <span className={`dv2-kpi-valor${tinte}`}>{valor}</span>;
 
   return (
     <div className="dv2-card dv2-kpi-card">

@@ -33,8 +33,12 @@ import { BRAND } from '../../brands';
 import { useModulosActivos } from './datos/useModulosActivos';
 import { useDatosReclamos } from './datos/useDatosReclamos';
 import { useDatosTramites } from './datos/useDatosTramites';
-import { dominiosDeSecciones, seccionesVisibles, type DominioDatos } from './registry';
+import { useDatosFinanzas } from './datos/useDatosFinanzas';
+import { dominioActivo, dominiosDeSecciones, seccionesVisibles, type DominioDatos } from './registry';
 import { construirFrasesHero, contarAbiertos } from './armadores';
+import {
+  construirResumenFinanciero, construirStripFinanciero, fraseFinanzas,
+} from './armadoresFinanzas';
 import type { DashboardCtx, DatosDashboard } from './tipos';
 
 export default function Dashboard() {
@@ -173,19 +177,23 @@ export default function Dashboard() {
   const visibles = useMemo(() => seccionesVisibles(esActivo), [esActivo]);
   const dominios = useMemo(() => {
     const pedidos = dominiosDeSecciones(visibles);
-    // El hero también habla de reclamos y trámites (strip + frases), así que
-    // sus dominios se piden aunque ninguna sección los declare.
+    // El hero también habla de los tres dominios (strip + frases), así que se
+    // piden aunque ninguna sección los declare.
     pedidos.add('reclamos');
     pedidos.add('tramites');
+    pedidos.add('finanzas');
     // Un dominio se monta sólo si su módulo está ACTIVO. El filtro no es
     // cosmético: la cinta de conteos es visible siempre y declara los dos
     // dominios (arma un tramo por cada uno prendido); sin este filtro, un muni
     // sin reclamos —San Pedro Norte— volvería a disparar sus diez requests.
-    return new Set<DominioDatos>([...pedidos].filter((d) => esActivo(d)));
+    return new Set<DominioDatos>([...pedidos].filter((d) => dominioActivo(esActivo, d)));
   }, [visibles, esActivo]);
 
   const reclamosOn = dominios.has('reclamos');
   const tramitesOn = dominios.has('tramites');
+  const finanzasOn = dominios.has('finanzas');
+  /** El muni es sólo-financiero: el hero le habla de plata, no de la calle. */
+  const soloFinanzas = finanzasOn && !reclamosOn && !tramitesOn;
 
   // Hasta que no sabemos módulos Y dependencia no se fetchea nada.
   const listo = modulos.resuelto && dependenciasLoaded;
@@ -200,6 +208,15 @@ export default function Dashboard() {
   const datosTramites = useDatosTramites({
     enabled: listo && tramitesOn,
     depId,
+    refreshKey,
+  });
+  // Finanzas NO se filtra por dependencia: las cajas, la agenda de pagos y la
+  // conciliación son del municipio, no de una secretaría. Filtrarlas por la
+  // dependencia elegida arriba mostraría el mismo número con otro rótulo.
+  const datosFinanzas = useDatosFinanzas({
+    enabled: listo && finanzasOn,
+    contaduriaActiva: esActivo('contaduria'),
+    sueldosActivo: esActivo('sueldos'),
     refreshKey,
   });
 
@@ -225,10 +242,24 @@ export default function Dashboard() {
   // frase). Un dominio apagado nunca tiene datos, así que su frase no existe.
   const { stats, metricasAccion, coberturaResumen, califStats } = datosReclamos;
   const tramitesStats = datosTramites.stats;
-  const heroFrases = useMemo(
-    () => construirFrasesHero({ stats, metricasAccion, coberturaResumen, califStats, tramitesStats }),
-    [stats, metricasAccion, coberturaResumen, califStats, tramitesStats],
+
+  // Derivados financieros: los calcula UNA vez el orquestador y los usan el
+  // strip del banner y la frase del carrusel. Las secciones arman los suyos
+  // (son bobas y no comparten estado con la página).
+  const resumenFin = useMemo(
+    () => (finanzasOn ? construirResumenFinanciero(datosFinanzas) : null),
+    [finanzasOn, datosFinanzas],
   );
+
+  const heroFrases = useMemo(() => {
+    const frases = construirFrasesHero({
+      stats, metricasAccion, coberturaResumen, califStats, tramitesStats,
+    });
+    // La plata cierra el carrusel: con reclamos activos va al final, y en un
+    // muni sólo-financiero es la única frase que hay.
+    const financiera = resumenFin ? fraseFinanzas(resumenFin, datosFinanzas) : null;
+    return financiera ? [...frases, financiera] : frases;
+  }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats, resumenFin, datosFinanzas]);
 
   // ====================================================================
   // GATE DE PÁGINA. Sólo módulos + dependencias (nunca un dato de dominio) y,
@@ -236,7 +267,9 @@ export default function Dashboard() {
   // el tablero parpadearía vacío antes de tener sus números.
   // ====================================================================
   const cargandoDominios =
-    (reclamosOn && datosReclamos.cargando) || (tramitesOn && datosTramites.cargando);
+    (reclamosOn && datosReclamos.cargando)
+    || (tramitesOn && datosTramites.cargando)
+    || (finanzasOn && datosFinanzas.cargando);
 
   if (!listo || cargandoDominios) {
     return (
@@ -267,22 +300,27 @@ export default function Dashboard() {
   const tramitesActivos = contarAbiertos(tramitesStats);
   const enRiesgoSla = metricasAccion?.vencidos ?? null;
 
-  const heroKpis: HeroStripKpi[] = [
-    // La etiqueta corta es la que se ve en celular, donde los cuatro entran en
-    // una sola fila: se abrevia, no se corta con puntos suspensivos.
-    ...(reclamosOn
-      ? [{ etiqueta: 'Reclamos abiertos', etiquetaCorta: 'Abiertos', valor: reclamosAbiertos }]
-      : []),
-    ...(tramitesOn
-      ? [{ etiqueta: 'Trámites activos', etiquetaCorta: 'Trámites', valor: tramitesActivos }]
-      : []),
-    ...(reclamosOn
-      ? [
-          { etiqueta: 'Resolución promedio', etiquetaCorta: 'Resolución', valor: stats ? `${stats.tiempo_promedio_dias} d` : '—' },
-          { etiqueta: 'En riesgo de SLA', etiquetaCorta: 'Riesgo SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 },
-        ]
-      : []),
-  ];
+  // Con reclamos y trámites apagados el strip cambia de idioma entero: no
+  // tiene sentido dejar cuatro casillas vacías —o peor, en cero— a un muni que
+  // sólo maneja plata. Ahí los cuatro números son financieros.
+  const heroKpis: HeroStripKpi[] = soloFinanzas && resumenFin
+    ? construirStripFinanciero(resumenFin)
+    : [
+        // La etiqueta corta es la que se ve en celular, donde los cuatro entran en
+        // una sola fila: se abrevia, no se corta con puntos suspensivos.
+        ...(reclamosOn
+          ? [{ etiqueta: 'Reclamos abiertos', etiquetaCorta: 'Abiertos', valor: reclamosAbiertos }]
+          : []),
+        ...(tramitesOn
+          ? [{ etiqueta: 'Trámites activos', etiquetaCorta: 'Trámites', valor: tramitesActivos }]
+          : []),
+        ...(reclamosOn
+          ? [
+              { etiqueta: 'Resolución promedio', etiquetaCorta: 'Resolución', valor: stats ? `${stats.tiempo_promedio_dias} d` : '—' },
+              { etiqueta: 'En riesgo de SLA', etiquetaCorta: 'Riesgo SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 },
+            ]
+          : []),
+      ];
 
   const heroAcciones = (user?.rol === 'admin' || user?.rol === 'supervisor')
     ? {
@@ -294,13 +332,18 @@ export default function Dashboard() {
       }
     : null;
 
-  const datos: DatosDashboard = { reclamos: datosReclamos, tramites: datosTramites };
+  const datos: DatosDashboard = {
+    reclamos: datosReclamos,
+    tramites: datosTramites,
+    finanzas: datosFinanzas,
+  };
   const ctx: DashboardCtx = {
     depId,
     municipio: muniTablero,
     municipioNombre,
     dependenciaNombre: selectedDepNombre,
     refreshKey,
+    esActivo,
   };
 
   return (

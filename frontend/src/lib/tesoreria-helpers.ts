@@ -5,7 +5,7 @@
 // el estado base del gasto. Los colores quedan en UN solo lugar para que
 // el side modal del mapa y la home compartan el lenguaje visual.
 
-import type { EstadoGastoCuota, Gasto, GastoCuota } from '../types';
+import type { EstadoGastoCuota, Gasto, GastoCuota, PagoProgramado } from '../types';
 
 // Estado agregado a nivel CONTACTO ----------------------------------------
 export type EstadoContactoAgregado = 'al_dia' | 'en_mora' | 'sin_gastos';
@@ -136,4 +136,126 @@ export function formatFechaAR(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = parseFechaLocal(iso);
   return isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString('es-AR');
+}
+
+/**
+ * Días entre hoy y una fecha ISO. Negativo = ya pasó, 0 = hoy.
+ *
+ * Las dos puntas se normalizan a medianoche LOCAL: sin eso, "vence hoy a las
+ * 23" y "hoy a las 8" darían días distintos según la hora en que se mire la
+ * pantalla.
+ */
+export function diasDesdeHoy(fechaIso: string | null | undefined): number {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const d = parseFechaLocal(fechaIso);
+  if (isNaN(d.getTime())) return 0;
+  d.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - hoy.getTime()) / 86400000);
+}
+
+// ---------------------------------------------------------------- montos
+
+/**
+ * Monto en pesos, es-AR, sin centavos: "$27.237.565".
+ *
+ * Para el número exacto (un total que se va a comparar con el sistema).
+ */
+export function fmtMontoPesos(v: string | number | null | undefined): string {
+  const n = typeof v === 'string' ? parseFloat(v) : (v ?? 0);
+  return `$${(Number.isFinite(n) ? n : 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+}
+
+/**
+ * Monto COMPACTO para titulares: "$4,2M" de los millones para arriba,
+ * "$610.000" abajo.
+ *
+ * Un municipio del interior maneja cifras de ocho dígitos, y "$48.745.716"
+ * como número grande de un KPI no se lee de un vistazo: se cuenta con el
+ * dedo. Los millones van con UN decimal — más precisión en un titular es
+ * ruido, y menos convierte 1,9 en 2.
+ */
+export function fmtMontoCompacto(v: string | number | null | undefined): string {
+  const raw = typeof v === 'string' ? parseFloat(v) : (v ?? 0);
+  const n = Number.isFinite(raw) ? raw : 0;
+  if (Math.abs(n) >= 1_000_000) {
+    return `$${(n / 1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 1 })}M`;
+  }
+  return fmtMontoPesos(n);
+}
+
+// ------------------------------------------------------- cola de la agenda
+
+/**
+ * La agenda de pagos partida en las franjas con las que se trabaja.
+ *
+ * Vive acá y no en la pantalla porque la usan DOS consumidores: la pantalla
+ * de Pagos programados (sus tabs y su hero) y el tablero financiero. Que cada
+ * uno cuente "los vencidos" con su propio `for` es cómo se llega a dos
+ * números distintos para la misma pregunta.
+ */
+export interface ColaPagos {
+  /** proximo_pago < hoy. */
+  vencidos: PagoProgramado[];
+  montoVencido: number;
+  /** Antigüedad del vencido más viejo, en días. 0 si no hay vencidos. */
+  diasDelMasViejo: number;
+  /** hoy <= proximo_pago <= hoy + 7. */
+  estaSemana: PagoProgramado[];
+  montoSemana: number;
+  /** hoy <= proximo_pago <= hoy + 15 (incluye a los de esta semana). */
+  quincena: PagoProgramado[];
+  montoQuincena: number;
+  /** La primera fecha de la quincena; null si la quincena está vacía. */
+  primeraFechaQuincena: string | null;
+  /** Cuántos caen después de los 7 días. */
+  masAdelante: number;
+  /** Todo lo programado, vencido o no. */
+  comprometido: number;
+}
+
+export function clasificarPagos(pagos: PagoProgramado[]): ColaPagos {
+  const vencidos: PagoProgramado[] = [];
+  const estaSemana: PagoProgramado[] = [];
+  const quincena: PagoProgramado[] = [];
+  let montoVencido = 0;
+  let montoSemana = 0;
+  let montoQuincena = 0;
+  let masAdelante = 0;
+  let comprometido = 0;
+  let diasDelMasViejo = 0;
+
+  for (const p of pagos) {
+    const d = diasDesdeHoy(p.proximo_pago);
+    const m = parseFloat(p.monto_pesos || '0') || 0;
+    comprometido += m;
+    if (d < 0) {
+      vencidos.push(p);
+      montoVencido += m;
+      if (-d > diasDelMasViejo) diasDelMasViejo = -d;
+      continue;
+    }
+    if (d <= 7) {
+      estaSemana.push(p);
+      montoSemana += m;
+    } else {
+      masAdelante++;
+    }
+    if (d <= 15) {
+      quincena.push(p);
+      montoQuincena += m;
+    }
+  }
+
+  const primeraFechaQuincena = quincena.reduce<string | null>(
+    (min, p) => (!min || p.proximo_pago < min ? p.proximo_pago : min),
+    null,
+  );
+
+  return {
+    vencidos, montoVencido, diasDelMasViejo,
+    estaSemana, montoSemana,
+    quincena, montoQuincena, primeraFechaQuincena,
+    masAdelante, comprometido,
+  };
 }

@@ -431,6 +431,11 @@
   font-variant-numeric: tabular-nums;
 }
 .dv2-kpi-valor--atenuado { color: var(--pl-text-disabled); }
+/* Veredicto del número: hay KPIs que se juzgan solos ("108 pagos vencidos"),
+   sin comparación contra un período previo que justifique la flecha del delta. */
+.dv2-kpi-valor--bueno { color: var(--pl-green-700); }
+.dv2-kpi-valor--advertencia { color: var(--pl-amber-700); }
+.dv2-kpi-valor--malo { color: var(--pl-red-700); }
 
 .dv2-kpi-valor-bloque { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dv2-kpi-unidad { font-size: 12px; font-weight: 600; color: var(--pl-text-3); }
@@ -480,6 +485,14 @@
   gap: 12px;
   align-items: stretch;
 }
+/* Cinco KPIs (el estándar del hero semántico). No es `repeat(5, 1fr)` fijo:
+   en 5 columnas cada tarjeta baja de 200px y el número display se parte, así
+   que la fila decide sola cuántas entran — el auto-fit hace 5 / 3 / 2 / 1
+   según el ancho REAL del contenedor, sin media queries.
+   Va con las DOS clases a propósito: el media query de 1100px fuerza dos
+   columnas para `.dv2-grid-kpi`, y con una sola clase (misma especificidad,
+   más abajo en el archivo) le ganaría al auto-fit. */
+.dv2-grid-kpi.dv2-grid-kpi--5 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .dv2-grid-cola {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -43,6 +43,7 @@ import {
   contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS_SINGULAR,
 } from '../lib/contactoIcons';
 import { agendaPagosApi, contactosApi, cajasApi, conceptosLiquidacionApi } from '../lib/api';
+import { clasificarPagos, diasDesdeHoy } from '../lib/tesoreria-helpers';
 import type {
   Caja, Contacto, ConceptoLiquidacion, FrecuenciaPago, PagoEjecutadoHistorial, PagoProgramado,
 } from '../types';
@@ -126,11 +127,10 @@ function fmtFecha(fecha: string | null | undefined): string {
   return fecha ? parseLocalDate(fecha).toLocaleDateString('es-AR') : '';
 }
 
-function diasDesdeHoy(fecha: string): number {
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const d = parseLocalDate(fecha); d.setHours(0, 0, 0, 0);
-  return Math.round((d.getTime() - hoy.getTime()) / 86400000);
-}
+// `diasDesdeHoy` y la partición de la agenda (vencidos / esta semana /
+// quincena) viven en lib/tesoreria-helpers: las comparte con el tablero
+// financiero del Dashboard. Que cada pantalla las contara con su propio `for`
+// es cómo se llega a dos números distintos para la misma pregunta.
 
 function fmtMoney(v: string | number): string {
   const n = typeof v === 'string' ? parseFloat(v) : v;
@@ -335,23 +335,21 @@ export default function PagosProgramados() {
     }).sort((a, b) => a.proximo_pago.localeCompare(b.proximo_pago));
   }, [pagos, search, contactoFiltro, cajaFiltro, frecuenciaFiltro, conceptoFiltro, estadoFiltro]);
 
-  const stats = useMemo(() => {
-    let pendientes7 = 0, monto7 = 0, masAdelante = 0;
-    let vencidos = 0, montoVencido = 0, comprometido = 0;
-    for (const p of pagos) {
-      const d = diasDesdeHoy(p.proximo_pago);
-      const m = parseFloat(p.monto_pesos || '0');
-      comprometido += m;
-      if (d < 0) { vencidos++; montoVencido += m; }
-      else if (d <= 7) { pendientes7++; monto7 += m; }
-      else masAdelante++;
-    }
-    return { pendientes7, monto7, masAdelante, vencidos, montoVencido, comprometido };
-  }, [pagos]);
+  /** La agenda partida en franjas. Mismo helper que usa el tablero financiero
+   *  del Dashboard: un solo lugar donde se decide qué es "vencido". */
+  const cola = useMemo(() => clasificarPagos(pagos), [pagos]);
+
+  const stats = useMemo(() => ({
+    pendientes7: cola.estaSemana.length,
+    monto7: cola.montoSemana,
+    masAdelante: cola.masAdelante,
+    vencidos: cola.vencidos.length,
+    montoVencido: cola.montoVencido,
+    comprometido: cola.comprometido,
+  }), [cola]);
 
   /** Los vencidos: alimentan el veredicto y la acción "marcarlos". */
-  const vencidos = useMemo(
-    () => pagos.filter(p => diasDesdeHoy(p.proximo_pago) < 0), [pagos]);
+  const vencidos = cola.vencidos;
 
   /** Concepto dominante entre los vencidos + el día que más concentra. Sólo se
    *  afirma si de verdad domina (>= 50%); si no, el veredicto no lo menciona

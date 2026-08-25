@@ -380,6 +380,54 @@ async def list_gastos(
     return [_gasto_to_response(g) for g in gastos]
 
 
+# Declarado ANTES de /{gasto_id} para que "serie" no caiga en esa ruta.
+@router.get("/serie")
+async def serie_gastos(
+    request: Request,
+    dias: int = Query(90, ge=7, le=365, description="Ventana hacia atras, en dias"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serie DIARIA de gasto: [{fecha: 'YYYY-MM-DD', monto: float}].
+
+    Un solo GROUP BY por fecha. El tablero financiero necesita la curva, el
+    promedio por dia y el dia mas caro: traerse los 7.781 gastos del muni para
+    sumarlos en el navegador no es una opcion.
+
+    La serie es CONTIGUA: los dias sin gasto van con monto 0. Sin eso, el
+    "promedio por dia" del consumidor se calcularia sobre los dias que tienen
+    movimiento (42 de 90 en San Pedro Norte) y saldria inflado el doble.
+
+    El ultimo dia de la serie es hoy, o la ultima fecha con gasto si hay
+    gastos con fecha futura (el modelo los admite) — asi el mes en curso no
+    pierde filas cargadas por adelantado.
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    hoy = date.today()
+    desde = hoy - timedelta(days=dias)
+
+    rows = (await db.execute(
+        select(Gasto.fecha, func.coalesce(func.sum(Gasto.monto_pesos), 0))
+        .where(
+            Gasto.municipio_id == municipio_id,
+            Gasto.activo == True,  # noqa: E712
+            Gasto.fecha >= desde,
+        )
+        .group_by(Gasto.fecha)
+        .order_by(Gasto.fecha)
+    )).all()
+
+    por_fecha = {f: float(m or 0) for f, m in rows}
+    hasta = max([hoy, *por_fecha.keys()]) if por_fecha else hoy
+    salida = []
+    cursor = desde
+    while cursor <= hasta:
+        salida.append({"fecha": cursor.isoformat(), "monto": por_fecha.get(cursor, 0.0)})
+        cursor += timedelta(days=1)
+    return salida
+
+
 @router.post("", response_model=GastoResponse, status_code=201)
 async def create_gasto(
     payload: GastoCreate,

@@ -7,7 +7,7 @@
  * pasa a cada sección; el contrato de sección (`SeccionDashboard`) vive en
  * `registry.tsx`, que es donde tiene que estar la condición de visibilidad.
  */
-import type { DashboardStats } from '../../types';
+import type { Caja, DashboardStats, PagoProgramado } from '../../types';
 import type { Municipio } from '../../contexts/AuthContext';
 
 // ---------------------------------------------------------------- analytics
@@ -160,10 +160,63 @@ export interface DatosTramites {
   cargando: boolean;
 }
 
+// ------------------------------------------------------------- finanzas
+
+/** Un día de la serie de gasto (GET /tesoreria/gastos/serie). La serie es
+ *  CONTIGUA: los días sin gasto llegan con monto 0, así el promedio por día
+ *  se calcula sobre días de calendario y no sobre "días con movimiento". */
+export interface PuntoSerieGasto {
+  /** 'YYYY-MM-DD' */
+  fecha: string;
+  monto: number;
+}
+
+/** Conteo + monto de una pila (OPs esperando firma, movimientos sin conciliar).
+ *  null cuando el módulo que la produce está apagado: "null" y "cero" NO son
+ *  lo mismo y el copy los dice distinto. */
+export interface PilaFinanciera {
+  cantidad: number;
+  monto: number;
+}
+
+/** La nómina programada (GET /tesoreria/agenda/reportes). */
+export interface NominaResumen {
+  /** Contactos tipo empleado activos. */
+  empleados: number;
+  /** Suma de los pagos programados activos. */
+  masa: number;
+  /** Cuántos pagos programados activos la componen. */
+  pagos: number;
+}
+
+/**
+ * Todo lo que produce `useDatosFinanzas`.
+ *
+ * Los agregados del mes NO viven acá: salen de `serie` (que ya trae el día a
+ * día) en los armadores. Un endpoint menos y un número menos que puede
+ * contradecir al gráfico que tiene al lado.
+ */
+export interface DatosFinanzas {
+  /** Cajas ACTIVAS con su saldo calculado (incluye las tipo tarjeta, que el
+   *  armador separa: el "saldo" de una tarjeta es crédito, no plata). */
+  cajas: Caja[];
+  /** Pagos programados ACTIVOS de la agenda. */
+  pagos: PagoProgramado[];
+  serie: PuntoSerieGasto[];
+  /** OPs en estado pendiente. null = módulo contaduría apagado. */
+  opPendientes: PilaFinanciera | null;
+  /** Movimientos de caja sin conciliar. null = no se pidió (contaduría ON). */
+  conciliacion: PilaFinanciera | null;
+  /** null = módulo sueldos apagado. */
+  nomina: NominaResumen | null;
+  cargando: boolean;
+}
+
 /** Lo que recibe CADA sección: los hooks de todos los dominios montados. */
 export interface DatosDashboard {
   reclamos: DatosReclamos;
   tramites: DatosTramites;
+  finanzas: DatosFinanzas;
 }
 
 /** Contexto de la pantalla — lo transversal, no los datos. */
@@ -177,6 +230,15 @@ export interface DashboardCtx {
   /** Nombre de la dependencia filtrada; null = vista consolidada. */
   dependenciaNombre: string | null;
   refreshKey: number;
+  /**
+   * Estado efectivo de un módulo del muni (semántica `moduloEfectivo`).
+   *
+   * Las secciones lo usan SÓLO para elegir de su POOL —la 5.ª tarjeta
+   * financiera es "OP por autorizar" o "conciliación pendiente" según
+   * contaduría—, nunca para esconderse: si una sección entera depende de un
+   * módulo, eso se declara en `requiere` del registry y se resuelve una vez.
+   */
+  esActivo: (modulo: string) => boolean;
 }
 
 /** Props de toda sección del dashboard. */
