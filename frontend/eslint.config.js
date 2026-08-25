@@ -90,6 +90,21 @@ export default defineConfig([
           ],
         },
       ],
+      // Guardián de la tinta sobre acento (regla del dueño, 2026-08-25): la
+      // pareja "background del tema + color blanco hardcodeado" en un style
+      // inline es EXACTAMENTE como nacen los botones oscuros con texto oscuro
+      // cuando el tema cambia. La barrida del 2026-08-25 dejó esto en cero;
+      // este gate evita que rebrote. La tinta sobre el acento sale SIEMPRE de
+      // la fuente única por luminancia: var(--pl-on-accent) (o .pl-acento).
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "JSXAttribute[name.name='style'] ObjectExpression:has(Property[key.name=/^background(Color)?$/] > MemberExpression[object.name='theme'][property.name='primary']) > Property[key.name='color'] > Literal[value=/^(#fff|#ffffff|white)$/i]",
+          message:
+            'Tinta hardcodeada sobre fondo del tema: usá color: "var(--pl-on-accent)" (fuente única por luminancia) o la clase .pl-acento de pl-tokens.css. Con acento claro, el blanco fijo se vuelve ilegible.',
+        },
+      ],
     },
   },
   {
