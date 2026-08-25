@@ -264,8 +264,12 @@ async def obtener_usuarios_demo(
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
     # Cliente productivo (cerrojo): no exponer cuentas demo. El login queda
-    # solo con email + contraseña.
-    if not municipio.es_demo:
+    # solo con email + contraseña. EXCEPCIÓN: un muni con demo_protegido
+    # (acceso directo con PIN, ej. el clon de un tenant productivo en QA)
+    # muestra la botonera aunque no sea demo — igual acá abajo SOLO matchean
+    # cuentas con emails patrón demo, nunca los usuarios reales, y el click
+    # exige el PIN.
+    if not municipio.es_demo and not municipio.demo_protegido:
         return []
 
     # Buscar usuarios de prueba con tres patrones:
@@ -377,7 +381,9 @@ async def obtener_usuarios_dependencias(
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
     # Cliente productivo (cerrojo): no exponer accesos rápidos por dependencia.
-    if not municipio.es_demo:
+    # Misma excepción que demo-users: demo_protegido muestra la botonera
+    # (solo emails patrón demo) con el click gateado por PIN.
+    if not municipio.es_demo and not municipio.demo_protegido:
         return []
 
     # Buscar usuarios con municipio_dependencia_id asignado
