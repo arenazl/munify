@@ -35,7 +35,22 @@ import {
   cargarCatalogoReal,
   type DatosFormularioMuni
 } from './data/datosRealesConfig';
-import { dashboardApi, inventarioApi } from '../../lib/api';
+import { dashboardApi, inventarioApi, modulosApi } from '../../lib/api';
+import { MODULOS } from '../../lib/enums/modulos';
+
+// Grupos de Configuración gateados por los MÓDULOS del municipio: el
+// destilde de módulos tiene que valer también acá. Antes el árbol salía
+// entero del mock y un muni sólo-tesorería (San Pedro Norte) veía
+// Inventario, Reclamos y Trámites igual. Un grupo sin entrada acá es
+// transversal y se muestra siempre.
+const MODULOS_DEL_GRUPO: Record<string, string[]> = {
+  reclamos: ['reclamos'],
+  tramites: ['tramites'],
+  inventario: ['inventario', 'ordenes_trabajo'],
+  tesoreria: ['tesoreria', 'sueldos', 'contaduria'],
+  personal: ['sueldos', 'ordenes_trabajo', 'reclamos'],
+  integraciones: ['pagos'],
+};
 
 export default function Configuracion() {
   const {
@@ -45,19 +60,54 @@ export default function Configuracion() {
     presets, accents, sidebarOptions,
   } = useTheme();
   const { isSuperAdmin } = useSuperAdmin();
+
+  // Filas de municipio_modulos del muni actual. null = todavía sin respuesta
+  // (o falló): se muestra el árbol completo, como antes, para no parpadear.
+  const [modulosMuni, setModulosMuni] = useState<Map<string, boolean> | null>(null);
+  useEffect(() => {
+    modulosApi.list()
+      .then((r) => setModulosMuni(new Map(
+        ((r.data || []) as Array<{ modulo: string; activo: boolean }>)
+          .map((m) => [m.modulo, m.activo]),
+      )))
+      .catch(() => setModulosMuni(null));
+  }, []);
+
   /* El grupo Super Admin (auditoría, suscripciones, config del sidebar) es
      cross-tenant: un admin municipal no tiene nada que hacer ahí y verlo
-     invita a tocarlo. Super admin = admin SIN municipio_id. */
-  const arbol = useMemo(
-    () => MockData.arbol().filter((g: any) => g.id !== 'super' || isSuperAdmin),
-    [isSuperAdmin],
-  );
+     invita a tocarlo. Super admin = admin SIN municipio_id. Los grupos de
+     módulo respetan el destilde del muni (MODULOS_DEL_GRUPO): fila explícita
+     mata semántica; sin fila, opt-out = activo y opt-in (o desconocido,
+     ej. 'inventario' que no está en el catálogo del front) = oculto. */
+  const arbol = useMemo(() => {
+    const grupos = MockData.arbol().filter((g: { id: string }) => g.id !== 'super' || isSuperAdmin);
+    if (!modulosMuni || isSuperAdmin) return grupos;
+    const activo = (key: string): boolean => {
+      if (modulosMuni.has(key)) return !!modulosMuni.get(key);
+      const def = MODULOS.find((m) => m.key === key);
+      return def ? !def.optIn : false;
+    };
+    return grupos.filter((g: { id: string }) => {
+      const keys = MODULOS_DEL_GRUPO[g.id];
+      return !keys || keys.some(activo);
+    });
+  }, [isSuperAdmin, modulosMuni]);
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   const urlPadre = searchParams.get('tab');
   const urlHijo = searchParams.get('sub');
 
   const [padreActivo, setPadreActivo] = useState(urlPadre || arbol[0].id);
+
+  // Si el grupo activo desapareció al aplicar el destilde de módulos (ej.
+  // entró por URL a un módulo apagado), caer al primero visible.
+  useEffect(() => {
+    if (arbol.length && !arbol.some((g: { id: string }) => g.id === padreActivo)) {
+      setPadreActivo(arbol[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arbol]);
   const [hijosActivos, setHijosActivos] = useState<Record<string, string>>({
     general: 'muni',
     municipio: 'dependencias',
