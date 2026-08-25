@@ -33,7 +33,7 @@ import { BRAND } from '../../brands';
 import { useModulosActivos } from './datos/useModulosActivos';
 import { useDatosReclamos } from './datos/useDatosReclamos';
 import { useDatosTramites } from './datos/useDatosTramites';
-import { dominiosDeSecciones, seccionesVisibles } from './registry';
+import { dominiosDeSecciones, seccionesVisibles, type DominioDatos } from './registry';
 import { construirFrasesHero, contarAbiertos } from './armadores';
 import type { DashboardCtx, DatosDashboard } from './tipos';
 
@@ -172,12 +172,16 @@ export default function Dashboard() {
   const esActivo = modulos.esActivo;
   const visibles = useMemo(() => seccionesVisibles(esActivo), [esActivo]);
   const dominios = useMemo(() => {
-    const set = dominiosDeSecciones(visibles);
+    const pedidos = dominiosDeSecciones(visibles);
     // El hero también habla de reclamos y trámites (strip + frases), así que
-    // sus dominios se montan aunque ninguna sección los pida.
-    if (esActivo('reclamos')) set.add('reclamos');
-    if (esActivo('tramites')) set.add('tramites');
-    return set;
+    // sus dominios se piden aunque ninguna sección los declare.
+    pedidos.add('reclamos');
+    pedidos.add('tramites');
+    // Un dominio se monta sólo si su módulo está ACTIVO. El filtro no es
+    // cosmético: la cinta de conteos es visible siempre y declara los dos
+    // dominios (arma un tramo por cada uno prendido); sin este filtro, un muni
+    // sin reclamos —San Pedro Norte— volvería a disparar sus diez requests.
+    return new Set<DominioDatos>([...pedidos].filter((d) => esActivo(d)));
   }, [visibles, esActivo]);
 
   const reclamosOn = dominios.has('reclamos');

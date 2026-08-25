@@ -1,6 +1,5 @@
 import { setupAutoUpdate } from './lib/autoUpdate'
 import { toast } from 'sonner'
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -47,6 +46,8 @@ import './styles/rating-summary.css'
 import './styles/modern-select-v2.css'
 // dashboard v2 (agente de la página Dashboard) — hero banner + strip + cards v2
 import './styles/dashboard-v2.css'
+// bloque del dashboard: la cinta de conteos (reemplaza las filas de KpiCardV2)
+import './styles/cinta-conteos.css'
 import './styles/shell-v2.css'
 
 // Aplica la marca activa (VITE_BRAND) al documento antes del render:

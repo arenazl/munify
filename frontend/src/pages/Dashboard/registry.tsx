@@ -11,8 +11,7 @@
  * declara acá con su `requiere` y sus `dominios`, y listo.
  */
 import type React from 'react';
-import { KpisReclamos } from './secciones/KpisReclamos';
-import { KpisTramites } from './secciones/KpisTramites';
+import { CintaConteos } from './secciones/CintaConteos';
 import { ColaReclamos } from './secciones/ColaReclamos';
 import { MapaTendencia } from './secciones/MapaTendencia';
 import { AnaliticaReclamos } from './secciones/AnaliticaReclamos';
@@ -38,24 +37,25 @@ export interface SeccionDashboard {
 }
 
 /**
- * ORDEN FIJO de la pantalla. Es el orden del monolito, tal cual:
- * KPIs reclamos → KPIs trámites → cola → mapa/tendencia → analítica → voz.
- * (El orden dinámico por actividad es F2; hasta entonces manda este array.)
+ * ORDEN FIJO de la pantalla:
+ * cinta de conteos → cola → mapa/tendencia → analítica → voz.
+ * (El orden dinámico por actividad es F2b; hasta entonces manda este array.)
  */
 export const SECCIONES: SeccionDashboard[] = [
   {
-    id: 'kpis-reclamos',
-    requiere: ['reclamos'],
-    dominios: ['reclamos'],
+    id: 'cinta-conteos',
+    // Sin `requiere`: la cinta es de la PANTALLA, no de un módulo. Pide los
+    // dos dominios y arma un tramo por cada uno que tenga datos — con el
+    // módulo apagado ese `stats` es null y su tramo no existe. Sin ningún
+    // tramo el componente no dibuja nada.
+    //
+    // Ojo al tocar esto: el orquestador monta un dominio sólo si su módulo
+    // está activo. Sin ese filtro, esta sección (que siempre es visible)
+    // haría fetchear reclamos y trámites a un muni que no los tiene.
+    requiere: [],
+    dominios: ['reclamos', 'tramites'],
     layout: 'full',
-    Componente: KpisReclamos,
-  },
-  {
-    id: 'kpis-tramites',
-    requiere: ['tramites'],
-    dominios: ['tramites'],
-    layout: 'full',
-    Componente: KpisTramites,
+    Componente: CintaConteos,
   },
   {
     id: 'cola-reclamos',

@@ -3,17 +3,20 @@
  * no en el JSX de las secciones (las piezas del kit son BOBAS: el padre
  * declara qué decir y con qué veredicto).
  *
- * Salió del monolito `pages/Dashboard.tsx` sin cambiar una coma del copy:
- *  - `buildKpisPeriodo`: las dos filas de KpiCardV2 (reclamos / trámites).
+ *  - `buildCintaTramos`: la cinta de conteos (un tramo por dominio activo).
  *  - `construirFrasesHero`: las frases del SemanticHero.
- * TODO sale de datos reales del backend; los deltas se calculan contra los
- * períodos previos y, si falta la base de comparación, se degrada a un
- * subtexto informativo. JAMÁS se inventan series ni porcentajes.
+ *
+ * TODO sale de datos reales del backend. JAMÁS se inventan series ni
+ * porcentajes.
+ *
+ * REGLA DEL CERO (principio 3 del diseño, no negociable): un cero no se
+ * enuncia NUNCA. O el copy pivotea a lo que sí hubo ("Hoy todavía no entró
+ * ninguno nuevo") o el segmento —o la frase entera, si se quedó sin datos—
+ * se OMITE. Toda rama nueva de este archivo se escribe ya con las tres
+ * variantes gramaticales resueltas: cero, uno y muchos.
  */
-import { Inbox, CalendarDays, Clock, type LucideIcon } from 'lucide-react';
 import type { DashboardStats } from '../../types';
-import type { KpiCardV2Props } from '../../components/dashboard/KpiCardV2';
-import { seg, type HeroFrase } from '../../lib/semanticHero';
+import { seg, type HeroFrase, type HeroSegmento } from '../../lib/semanticHero';
 import {
   resolverUmbrales,
   veredictoMasEsPeor,
@@ -36,127 +39,122 @@ export const contarAbiertos = (s: DashboardStats | null): number =>
 
 export const fmtDias = (v: number) => v.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 
-/** % de variación redondeado; null si no hay base de comparación. */
-const pctDelta = (actual: number, prev: number): number | null =>
-  prev > 0 ? Math.round(((actual - prev) / prev) * 100) : null;
+/**
+ * ¿Hay al menos un cierre con DURACIÓN MEDIDA?
+ *
+ * `tiempo_promedio_dias` viene de un AVG(DATEDIFF(...)) que el backend
+ * degrada a 0 cuando no hay filas, así que un 0 puede significar dos cosas
+ * opuestas: "cerró todo el mismo día" o "no cerró nada / los cierres no
+ * tienen fecha de resolución". Contar estados cerrados NO alcanza — San
+ * Pedro Norte tiene solicitudes en 'finalizado' con `fecha_resolucion` en
+ * NULL, o sea cerradas pero sin duración.
+ *
+ * El único testigo confiable es `tiempo_resolucion_30d`, que el backend
+ * devuelve null (no 0) cuando no pudo promediar nada. Con eso, decir
+ * "resolvés en el día" deja de ser una suposición.
+ */
+const hayResolucionMedida = (s: DashboardStats): boolean =>
+  s.tiempo_promedio_dias > 0 || (s.tendencias?.tiempo_resolucion_30d ?? null) !== null;
 
-/** Suma la serie diaria en bloques semanales (de más viejo a más nuevo). */
-const seriePorSemana = (diaria: number[]): number[] => {
-  const semanas: number[] = [];
-  for (let i = diaria.length; i > 0; i -= 7) {
-    semanas.unshift(diaria.slice(Math.max(0, i - 7), i).reduce((a, b) => a + b, 0));
-  }
-  return semanas;
-};
+// ------------------------------------------------------- cinta de conteos
 
-export const buildKpisPeriodo = (opts: {
-  stats: DashboardStats;
-  etiquetaTotal: string;
-  /** Icono del total — lo único que cambia entre reclamos y trámites. */
-  iconoTotal: LucideIcon;
-  /** Serie diaria real de ingresos (ej: tendencia 30 días de reclamos). */
-  serieDiaria?: number[];
-  color: string;
-  colorNeutro: string;
-  msgSinCierres: string;
-}): KpiCardV2Props[] => {
+/** Un conteo de la cinta: prosa + número. El número va aparte porque se pinta
+ *  distinto (texto fuerte, cifras de ancho fijo). Sin `valor` el segmento es
+ *  pura prosa ("resolvés en el día"). */
+export interface CintaSegmento {
+  id: string;
+  /** Texto ANTES del número (ej. "resolvés en"). */
+  pre?: string;
+  /** El número, ya formateado en es-AR. */
+  valor?: string;
+  /** Texto DESPUÉS del número (ej. "en total", "días"). */
+  post?: string;
+}
+
+/** Un tramo = un dominio de la cinta (reclamos, trámites, …). */
+export interface CintaTramo {
+  id: string;
+  /** Lo que dice el chip del dominio. */
+  etiqueta: string;
+  tono: 'accent' | 'blue';
+  segmentos: CintaSegmento[];
+  accion: { label: string; to: string };
+}
+
+/**
+ * Los conteos crudos de UN dominio, con la regla del cero aplicada segmento
+ * por segmento: lo que vale 0 no se dibuja.
+ *
+ * Devuelve null cuando el dominio no tiene datos (módulo apagado → `stats`
+ * null; nunca cargó nada → total 0). Un dominio en cero no tiene tramo: el
+ * chip solo, seguido de nada, no informa — molesta.
+ */
+const tramoDeConteos = (opts: {
+  id: string;
+  etiqueta: string;
+  tono: 'accent' | 'blue';
+  stats: DashboardStats | null;
+  to: string;
+}): CintaTramo | null => {
   const s = opts.stats;
-  const t = s.tendencias;
-  const diaria = opts.serieDiaria && opts.serieDiaria.length >= 2 ? opts.serieDiaria : null;
-  const colorear = (card: KpiCardV2Props): KpiCardV2Props => ({
-    ...card,
-    serieColor: card.atenuado ? opts.colorNeutro : opts.color,
-  });
+  if (!s || s.total <= 0) return null;
 
-  const pctMes = t ? pctDelta(t.creados_30d, t.creados_30d_prev) : null;
-  const total: KpiCardV2Props = {
-    eyebrow: opts.etiquetaTotal,
-    icono: opts.iconoTotal,
-    valor: s.total,
-    atenuado: s.total === 0,
-    serie: diaria ?? (t ? [t.creados_30d_prev, t.creados_30d] : undefined),
-    delta: pctMes != null && pctMes !== 0
-      ? {
-          texto: `${Math.abs(pctMes)}%`,
-          direccion: pctMes > 0 ? 'sube' : 'baja',
-          veredicto: pctMes > 0 ? 'advertencia' : 'bueno',
-        }
-      : null,
-    sub: pctMes != null
-      ? (pctMes === 0
-          ? 'igual que el mes pasado'
-          : pctMes > 0 ? 'más que el mes pasado' : 'menos que el mes pasado')
-      : t ? `${t.creados_30d} en los últimos 30 días` : undefined,
+  const segmentos: CintaSegmento[] = [
+    { id: 'total', valor: s.total.toLocaleString('es-AR'), post: 'en total' },
+  ];
+  if (s.hoy > 0) segmentos.push({ id: 'hoy', valor: s.hoy.toLocaleString('es-AR'), post: 'hoy' });
+  if (s.semana > 0) {
+    segmentos.push({ id: 'semana', valor: s.semana.toLocaleString('es-AR'), post: 'esta semana' });
+  }
+
+  // Resolución promedio. Sin cierres medidos el segmento no existe: nada de
+  // "resolvés en 0 días" ni de suponer el día cuando el 0 sólo significa que
+  // no hay dato.
+  if (hayResolucionMedida(s)) {
+    const dias = s.tiempo_promedio_dias;
+    segmentos.push(
+      dias < 1
+        ? { id: 'resolucion', post: 'resolvés en el día' }
+        : {
+            id: 'resolucion',
+            pre: 'resolvés en',
+            valor: fmtDias(dias),
+            post: dias === 1 ? 'día' : 'días',
+          },
+    );
+  }
+
+  return {
+    id: opts.id,
+    etiqueta: opts.etiqueta,
+    tono: opts.tono,
+    segmentos,
+    accion: { label: 'Ver todos', to: opts.to },
   };
-
-  const nuevosHoy: KpiCardV2Props = {
-    eyebrow: 'Nuevos hoy',
-    icono: Inbox,
-    valor: s.hoy,
-    atenuado: s.hoy === 0,
-    serie: diaria ? diaria.slice(-7) : (t ? [t.ayer, s.hoy] : undefined),
-    sub: t ? (t.ayer === 1 ? 'Ayer entró 1' : `Ayer entraron ${t.ayer}`) : undefined,
-  };
-
-  const pctSemana = t ? pctDelta(s.semana, t.semana_pasada) : null;
-  const estaSemana: KpiCardV2Props = {
-    eyebrow: 'Esta semana',
-    icono: CalendarDays,
-    valor: s.semana,
-    atenuado: s.semana === 0,
-    serie: diaria ? seriePorSemana(diaria) : (t ? [t.semana_pasada, s.semana] : undefined),
-    delta: pctSemana != null && pctSemana !== 0
-      ? {
-          texto: `${Math.abs(pctSemana)}%`,
-          direccion: pctSemana > 0 ? 'sube' : 'baja',
-          veredicto: pctSemana > 0 ? 'advertencia' : 'bueno',
-        }
-      : null,
-    sub: pctSemana != null
-      ? (pctSemana === 0 ? 'igual que la semana anterior' : 'vs. semana anterior')
-      : t ? `Semana pasada: ${t.semana_pasada}` : undefined,
-  };
-
-  const t30 = t?.tiempo_resolucion_30d ?? null;
-  const t30prev = t?.tiempo_resolucion_30d_prev ?? null;
-  const diffDias = t30 != null && t30prev != null ? t30prev - t30 : null; // >0 = más rápido
-  // Serie semanal real de tiempo de resolución. Las semanas sin cierres vienen
-  // null: se descartan en vez de dibujarlas como 0 (un 0 se leería como
-  // "resolvimos todo en el día"). Con menos de 3 puntos no hay tendencia que
-  // mostrar y se deja sin serie.
-  const serieResolucionCruda = (t?.serie_resolucion_semanal ?? []).filter(
-    (v): v is number => typeof v === 'number',
-  );
-  const serieResolucion = serieResolucionCruda.length >= 3 ? serieResolucionCruda : null;
-  const resolucion: KpiCardV2Props = {
-    eyebrow: 'Resolución promedio',
-    icono: Clock,
-    valor: t30 != null ? fmtDias(t30) : '—',
-    unidad: t30 != null ? 'días' : undefined,
-    atenuado: t30 == null,
-    // Serie REAL semana a semana. Antes eran dos puntos (mes actual vs. mes
-    // previo): una recta entre dos valores, que parecía un gráfico sin mostrar
-    // ninguna tendencia. Si el backend todavía no la manda, se cae al par de
-    // siempre; jamás se inventa la serie.
-    serie: serieResolucion ?? (t30 != null && t30prev != null ? [t30prev, t30] : undefined),
-    delta: diffDias != null && Math.abs(diffDias) >= 0.1
-      ? {
-          texto: `${fmtDias(Math.abs(diffDias))} d`,
-          direccion: diffDias > 0 ? 'baja' : 'sube',
-          veredicto: diffDias > 0 ? 'bueno' : 'malo',
-        }
-      : null,
-    sub: t30 == null
-      ? opts.msgSinCierres
-      : diffDias == null
-        ? 'sin base del mes anterior'
-        : Math.abs(diffDias) >= 0.1
-          ? (diffDias > 0 ? 'más rápido que el mes pasado' : 'más lento que el mes pasado')
-          : 'igual que el mes pasado',
-  };
-
-  return [total, nuevosHoy, estaSemana, resolucion].map(colorear);
 };
+
+/** La cinta completa: un tramo por dominio con datos, en orden canónico. */
+export function buildCintaTramos(opts: {
+  reclamos: DashboardStats | null;
+  tramites: DashboardStats | null;
+}): CintaTramo[] {
+  return [
+    tramoDeConteos({
+      id: 'reclamos',
+      etiqueta: 'Reclamos',
+      tono: 'accent',
+      stats: opts.reclamos,
+      to: '/gestion/reclamos',
+    }),
+    tramoDeConteos({
+      id: 'tramites',
+      etiqueta: 'Trámites',
+      tono: 'blue',
+      stats: opts.tramites,
+      to: '/gestion/tramites',
+    }),
+  ].filter((t): t is CintaTramo => t !== null);
+}
 
 /**
  * Frases del hero semántico — solo con datos YA cargados (sin datos, sin
@@ -182,7 +180,11 @@ export function construirFrasesHero(opts: {
   // cero no se enuncia así) y encima midiendo lo que menos importa. Un
   // tablero de gestión habla de lo que tiene para resolver, no del reloj: el
   // universo está SIEMPRE, el día puede estar vacío sin que eso sea noticia.
-  if (stats && metricasAccion) {
+  //
+  // La puntuación va PEGADA al principio del segmento siguiente (". Quedan ",
+  // "; ") y nunca sola: los segmentos con veredicto son fichas inline-block y,
+  // al partir el renglón en mobile, un "." suelto abría la línea siguiente.
+  if (stats && metricasAccion && stats.total > 0) {
     const esperando = metricasAccion.esperando_visto_bueno ?? 0;
     const abiertos = contarAbiertos(stats);
     const enCurso = stats.por_estado?.en_curso ?? 0;
@@ -190,35 +192,69 @@ export function construirFrasesHero(opts: {
     // si el backend cuenta algún estado que no está en el mapa.
     const porAtender = Math.max(abiertos - enCurso, 0);
     const cerrados = Math.max(stats.total - abiertos, 0);
-    const tasa = stats.total > 0 ? Math.round((cerrados / stats.total) * 100) : 0;
-    frases.push({
-      segmentos: [
-        seg('Tenemos '),
-        seg(`${stats.total} ${stats.total === 1 ? 'reclamo' : 'reclamos'}`),
-        seg(' y resolvimos el '),
-        seg(`${tasa}%`, veredictoTasa(tasa, u.tasaResolucion)),
+    const tasa = Math.round((cerrados / stats.total) * 100);
+
+    const segmentos: HeroSegmento[] = [
+      seg('Tenemos '),
+      seg(`${stats.total} ${stats.total === 1 ? 'reclamo' : 'reclamos'}`),
+    ];
+    // Sin un solo cierre, "resolvimos el 0%" es el cero enunciado de manual:
+    // se dice lo que pasó, no el número que no hubo.
+    if (cerrados > 0) {
+      segmentos.push(seg(' y resolvimos el '), seg(`${tasa}%`, veredictoTasa(tasa, u.tasaResolucion)));
+    } else {
+      segmentos.push(seg(' y todavía no cerramos ninguno'));
+    }
+
+    // Lo que queda abierto. Cada mitad se enuncia sólo si existe, y si no
+    // existe ninguna la cláusula entera se va (no hay "Quedan 0 por atender
+    // y 0 en proceso").
+    const hayAbiertos = porAtender > 0 || enCurso > 0;
+    if (porAtender > 0 && enCurso > 0) {
+      segmentos.push(
         seg('. Quedan '),
         seg(`${porAtender} por atender`, veredictoMasEsPeor(porAtender, u.sinAsignar)),
         seg(' y '),
         seg(`${enCurso} en proceso`),
-        seg('; '),
-        // Cola real del supervisor: cuanto más alta, peor (un 0 sí es bueno).
+      );
+    } else if (porAtender > 0) {
+      segmentos.push(
+        seg(porAtender === 1 ? '. Queda ' : '. Quedan '),
+        seg(`${porAtender} por atender`, veredictoMasEsPeor(porAtender, u.sinAsignar)),
+      );
+    } else if (enCurso > 0) {
+      segmentos.push(seg('. Hay '), seg(`${enCurso} en proceso`));
+    }
+
+    // Cola real del supervisor: cuanto más alta, peor. En 0 el segmento NO se
+    // dice — que la cola esté vacía es buena noticia, pero se cuenta callándola
+    // ("0 esperan tu visto bueno" era el cero enunciado que reportó el dueño).
+    // Se engancha con punto y coma si hubo cláusula previa; si no, abre oración.
+    if (esperando > 0) {
+      segmentos.push(
+        seg(hayAbiertos ? '; ' : '. '),
         seg(
           `${esperando} ${esperando === 1 ? 'espera' : 'esperan'} tu visto bueno`,
           veredictoMasEsPeor(esperando, u.sinAsignar),
         ),
-        // El punto pegado al segmento previo y la coda con el espacio
-        // adelante: al partir el renglón en mobile, si no, el "." quedaba
-        // solo abriendo la línea siguiente.
-        seg('. '),
-        // El día, dicho como se dice: sin ingresos no se enuncia un cero.
-        seg(
-          stats.hoy > 0
-            ? `Hoy entraron ${stats.hoy} ${stats.hoy === 1 ? 'nuevo' : 'nuevos'}.`
-            : 'Hoy todavía no entró ninguno nuevo.',
-          stats.hoy > 0 ? 'bueno' : undefined,
-        ),
-      ],
+      );
+    }
+
+    // El día, dicho como se dice: sin ingresos no se enuncia un cero.
+    segmentos.push(
+      seg('. '),
+      seg(
+        stats.hoy === 0
+          ? 'Hoy todavía no entró ninguno nuevo.'
+          : stats.hoy === 1
+            ? 'Hoy entró 1 nuevo.'
+            : `Hoy entraron ${stats.hoy} nuevos.`,
+        stats.hoy > 0 ? 'bueno' : undefined,
+      ),
+    );
+
+    frases.push({
+      segmentos,
       acciones: [
         { label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true },
         ...(esperando > 0
@@ -229,25 +265,47 @@ export function construirFrasesHero(opts: {
   }
 
   // (b) El día en trámites: mismo formato que reclamos, otro módulo.
+  // Sin ingresos hoy Y sin nada en curso no hay frase: antes decía "En
+  // trámites entraron 0 gestiones hoy, con 0 en curso sobre el mostrador",
+  // que es la regla del cero rota dos veces en el mismo renglón.
   if (tramitesStats) {
     const abiertos = contarAbiertos(tramitesStats);
-    frases.push({
-      segmentos: [
-        seg('En trámites entraron '),
-        seg(
-          `${tramitesStats.hoy} ${tramitesStats.hoy === 1 ? 'gestión' : 'gestiones'} hoy`,
-          tramitesStats.hoy > 0 ? 'bueno' : undefined,
-        ),
-        seg(', con '),
-        seg(`${abiertos} en curso`, veredictoMasEsPeor(abiertos, u.sinAsignar)),
-        seg(' sobre el mostrador.'),
-      ],
-      acciones: [{ label: 'Ver trámites', to: '/gestion/tramites', primaria: true }],
-    });
+    const hoy = tramitesStats.hoy;
+    if (hoy > 0 || abiertos > 0) {
+      const segmentos: HeroSegmento[] = [];
+      if (hoy > 0) {
+        segmentos.push(
+          seg(hoy === 1 ? 'En trámites entró ' : 'En trámites entraron '),
+          seg(`${hoy} ${hoy === 1 ? 'gestión' : 'gestiones'} hoy`, 'bueno'),
+        );
+        if (abiertos > 0) {
+          segmentos.push(
+            seg(', con '),
+            seg(`${abiertos} en curso`, veredictoMasEsPeor(abiertos, u.sinAsignar)),
+            seg(' sobre el mostrador.'),
+          );
+        } else {
+          segmentos.push(seg('.'));
+        }
+      } else {
+        segmentos.push(
+          seg('En trámites no entró ninguna gestión hoy; hay '),
+          seg(`${abiertos} en curso`, veredictoMasEsPeor(abiertos, u.sinAsignar)),
+          seg(' sobre el mostrador.'),
+        );
+      }
+      frases.push({
+        segmentos,
+        acciones: [{ label: 'Ver trámites', to: '/gestion/tramites', primaria: true }],
+      });
+    }
   }
 
-  // (b) Salud de la gestión: tasa de resolución global + tiempo promedio
-  if (stats && coberturaResumen) {
+  // (c) Salud de la gestión: tasa de resolución global + tiempo promedio.
+  // Con tasa 0 (nada cerrado todavía) no hay salud que describir: la frase no
+  // existe en vez de anunciar "Resolvés el 0% de los reclamos".
+  if (stats && coberturaResumen && coberturaResumen.tasa_resolucion_global > 0) {
+    const dias = stats.tiempo_promedio_dias;
     frases.push({
       segmentos: [
         seg('Resolvés el '),
@@ -255,12 +313,29 @@ export function construirFrasesHero(opts: {
           `${coberturaResumen.tasa_resolucion_global}%`,
           veredictoTasa(coberturaResumen.tasa_resolucion_global, u.tasaResolucion),
         ),
-        seg(' de los reclamos, con un promedio de '),
-        seg(
-          `${stats.tiempo_promedio_dias} días`,
-          veredictoMenosEsMejor(stats.tiempo_promedio_dias, u.tiempoResolucionDias),
-        ),
-        seg(' por caso.'),
+        // El promedio se dice sólo si está MEDIDO. Venía como "0 días" (el
+        // backend promedia DATEDIFF, que en el mismo día da 0) y sin cierres
+        // fechados ese 0 ni siquiera es un promedio: ahí la frase se corta
+        // en el porcentaje, que es dato duro.
+        ...(!hayResolucionMedida(stats)
+          ? [seg(' de los reclamos.')]
+          : dias >= 1
+            ? [
+                seg(' de los reclamos, con un promedio de '),
+                seg(
+                  `${fmtDias(dias)} ${dias === 1 ? 'día' : 'días'}`,
+                  veredictoMenosEsMejor(dias, u.tiempoResolucionDias),
+                ),
+                seg(' por caso.'),
+              ]
+            : [
+                // "menos de un día" y no "casi todo se cierra en el día": el
+                // promedio no dice cómo se reparten los casos, y no vamos a
+                // inferir una distribución de una media.
+                seg(' de los reclamos, con un promedio de '),
+                seg('menos de un día', 'bueno'),
+                seg(' por caso.'),
+              ]),
       ],
       acciones: [{ label: 'Ver SLA', to: '/gestion/sla' }],
     });

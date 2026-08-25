@@ -5,7 +5,10 @@
  * hex fijos).
  *
  * Salió del monolito `pages/Dashboard.tsx` para que lo compartan las secciones
- * que pintan series (KpisReclamos / KpisTramites).
+ * que pintan series. Hoy no lo consume ninguna (las filas de KpiCardV2 que lo
+ * usaban las reemplazó la cinta de conteos, que es CSS puro sobre tokens):
+ * queda como el único lugar donde leer los matices del tema para recharts,
+ * que es lo que va a necesitar la tendencia de gastos (F3).
  */
 import { useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
