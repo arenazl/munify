@@ -2,7 +2,7 @@
   "id": "merlo",
   "nombre": "Merlo",
   "rutaMarca": "/merlo",
-  "password": "1680",
+  "password": "demo123",
   "usuarios": {
     "admin": "admin@merlo.demo.com",
     "vecinos": ["vecino@merlo.demo.com"],
@@ -18,15 +18,15 @@
   "login": {
     "tipo": "picker",
     "personas": {
-      "admin": "Admin Demo",
-      "vecino": "Lucas Sánchez",
-      "vecino-2": "Lucas Sánchez",
+      "admin": "Administrador",
+      "vecino": "Lucas",
+      "vecino-2": "Lucas",
       "campo": "Juan Pérez",
-      "sup-SERVICIOS_PUBLICOS": "Supervisor Secretaría de Servicios Públicos y Ambiente",
-      "sup-OBRAS_PUBLICAS": "Supervisor Secretaría de Obras Públicas",
-      "sup-TRANSITO_VIAL": "Supervisor Dirección de Tránsito y Seguridad Vial",
-      "sup-ZOONOSIS": "Supervisor Dirección de Zoonosis y Salud Animal",
-      "sup-HABILITACIONES": "Supervisor Dirección de Habilitaciones Comerciales"
+      "sup-SERVICIOS_PUBLICOS": "Secretaría de Servicios Públicos y Ambiente",
+      "sup-OBRAS_PUBLICAS": "Secretaría de Obras Públicas",
+      "sup-TRANSITO_VIAL": "Dirección de Tránsito y Seguridad Vial",
+      "sup-ZOONOSIS": "Dirección de Zoonosis y Salud Animal",
+      "sup-HABILITACIONES": "Dirección de Habilitaciones Comerciales"
     },
     "nombres": {
       "vecino": "Lucas Sánchez",
