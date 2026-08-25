@@ -186,9 +186,10 @@ export default function Dashboard() {
   // nómina en la 3.ª cola, conciliación en la 3.ª pregunta del resumen).
   // Silenciarlo ACÁ alcanza: todo lo demás (hooks, secciones, ctx) pregunta
   // por esta función. Cuando contaduría recupere su lugar, se borra el set.
+  const esActivoModulo = modulos.esActivo;
   const esActivo = useCallback(
-    (m: string) => !SILENCIADOS_EN_DASHBOARD.has(m) && modulos.esActivo(m),
-    [modulos.esActivo],
+    (m: string) => !SILENCIADOS_EN_DASHBOARD.has(m) && esActivoModulo(m),
+    [esActivoModulo],
   );
 
   // La actividad (historia + últimos 30 días por dominio) viaja en un GET más
