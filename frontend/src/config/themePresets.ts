@@ -1,3 +1,5 @@
+import { contraste } from '../lib/colorUtils';
+
 /**
  * Sistema de Temas — Munify
  *
@@ -157,14 +159,21 @@ const TINTA_OSCURA = '#1e293b';
 const TINTA_CLARA = '#ffffff';
 
 /**
- * Texto sobre una superficie de color (el acento): REGLA ÚNICA por luminancia
- * (decisión del dueño 2026-08-13): acento oscuro → tinta clara, acento claro →
- * tinta oscura. Es la MISMA vara que `--pl-on-accent`, así todo el kit elige
- * la tinta igual (antes convivían dos fórmulas y el mismo acento daba texto
- * blanco en un control y negro en otro).
+ * Texto sobre una superficie de color (el acento): REGLA ÚNICA (dueño
+ * 2026-08-13): acento oscuro → tinta clara, acento claro → tinta oscura.
+ * Es la MISMA vara que `--pl-on-accent` — todo el kit elige la tinta igual.
+ *
+ * CÓMO se decide (corregido 2026-08-25): tinta BLANCA salvo que el blanco no
+ * alcance 3:1 (el mínimo WCAG para componentes UI) sobre ese acento — ahí
+ * tinta oscura. La decisión usa `contraste()` (luminancia relativa de la
+ * norma, CON corrección gamma). Antes decidía `luminanciaDe() > 0.5`, el
+ * promedio rápido SIN gamma, que clasifica un azul medio (#4a90e2) como
+ * "claro" → tinta oscura → botón azul con texto azul (bug real en QA).
+ * Con la norma: azules/rojos/verdes plenos → blanco; amarillo, lima, ámbar
+ * y pasteles → tinta oscura. Exactamente la regla que el dueño pidió.
  */
 const tintaSobre = (fondo: string): string =>
-  isLightColor(fondo) ? TINTA_OSCURA : TINTA_CLARA;
+  contraste(TINTA_CLARA, fondo) >= 3 ? TINTA_CLARA : TINTA_OSCURA;
 
 /**
  * Deriva los 13 campos de `ThemeColors` a partir de tres colores.
