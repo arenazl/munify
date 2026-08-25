@@ -757,7 +757,7 @@ export default function ReclamoDetalle() {
                                       onClick={() => handleResendWhatsApp(log)}
                                       disabled={resendingId === log.id}
                                       className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                                      style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+                                      style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                                       title="Reintentar envío"
                                     >
                                       <RefreshCw className={`h-3 w-3 ${resendingId === log.id ? 'animate-spin' : ''}`} />

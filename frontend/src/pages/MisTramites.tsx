@@ -282,7 +282,7 @@ export default function MisTramites() {
                 className="w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
                 style={{
                   background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                  color: '#ffffff',
+                  color: 'var(--pl-on-accent)',
                 }}
               >
                 {consultando ? (
@@ -369,7 +369,7 @@ export default function MisTramites() {
           <button
             onClick={() => navigate('/gestion/tramites-config')}
             className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
-            style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+            style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
           >
             <Plus className="h-4 w-4 mr-2" />
             Configurar trámites
@@ -393,7 +393,7 @@ export default function MisTramites() {
         <button
           onClick={goToNuevoTramite}
           className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
-          style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+          style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
         >
           <Plus className="h-4 w-4 mr-2" />
           Iniciar mi primer trámite
@@ -1010,7 +1010,7 @@ export default function MisTramites() {
                     className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                     style={{
                       background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
-                      color: '#ffffff',
+                      color: 'var(--pl-on-accent)',
                       boxShadow: `0 8px 24px ${theme.primary}40`,
                     }}
                   >

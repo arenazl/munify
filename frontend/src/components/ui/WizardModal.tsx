@@ -429,7 +429,7 @@ export function WizardModal({
                       borderRadius: '50%',
                       border: `2px solid ${isCompleted || isCurrent ? theme.primary : theme.border}`,
                       backgroundColor: isCompleted || isCurrent ? theme.primary : theme.backgroundSecondary,
-                      color: isCompleted || isCurrent ? 'white' : theme.textSecondary,
+                      color: isCompleted || isCurrent ? 'var(--pl-on-accent)' : theme.textSecondary,
                       cursor: index <= currentStep ? 'pointer' : 'default',
                       display: 'flex',
                       alignItems: 'center',

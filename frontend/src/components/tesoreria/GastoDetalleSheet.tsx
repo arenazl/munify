@@ -716,7 +716,7 @@ export function GastoDetalleSheet({
                     className="flex-1 px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5"
                     style={{
                       backgroundColor: active ? theme.primary : theme.backgroundSecondary,
-                      color: active ? '#fff' : theme.text,
+                      color: active ? 'var(--pl-on-accent)' : theme.text,
                       border: `1px solid ${active ? theme.primary : theme.border}`,
                     }}
                   >

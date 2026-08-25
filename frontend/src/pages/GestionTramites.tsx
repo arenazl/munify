@@ -1976,7 +1976,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
                         style={{
                           background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                          color: '#ffffff',
+                          color: 'var(--pl-on-accent)',
                         }}
                       >
                         {loadingSugerencia ? (
@@ -2200,7 +2200,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                             background: empleadoSeleccionado
                               ? `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`
                               : theme.backgroundSecondary,
-                            color: empleadoSeleccionado ? '#ffffff' : theme.textSecondary,
+                            color: empleadoSeleccionado ? 'var(--pl-on-accent)' : theme.textSecondary,
                           }}
                         >
                           {asignando ? (
@@ -2243,7 +2243,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     <div className="flex items-center gap-2 mb-3 p-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
-                        style={{ backgroundColor: theme.primary, color: '#fff' }}
+                        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                       >
                         {resp.nombre?.[0]}{resp.apellido?.[0]}
                       </div>
@@ -2295,7 +2295,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                       background: responsableId
                         ? `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`
                         : theme.card,
-                      color: responsableId ? '#ffffff' : theme.textSecondary,
+                      color: responsableId ? 'var(--pl-on-accent)' : theme.textSecondary,
                       border: responsableId ? 'none' : `1px solid ${theme.border}`,
                     }}
                   >

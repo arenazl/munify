@@ -362,7 +362,7 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
               {highlight && (
                 <span
                   className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-1"
-                  style={{ backgroundColor: theme.primary, color: '#fff' }}
+                  style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                 >
                   <CheckCircle2 className="h-2.5 w-2.5" />
                   Mantener

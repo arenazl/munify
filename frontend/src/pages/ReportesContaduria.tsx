@@ -116,7 +116,7 @@ export default function ReportesContaduria() {
             <button
               onClick={() => descargarTransparencia('json')}
               className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
-              style={{ backgroundColor: theme.primary, color: '#fff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               <Download className="h-3.5 w-3.5" />
               JSON

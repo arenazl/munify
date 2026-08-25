@@ -224,7 +224,7 @@ export default function MapaPuntosPanel({
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
                       backgroundColor: count > 0 ? theme.primary : `${theme.textSecondary}15`,
-                      color: count > 0 ? '#fff' : theme.textSecondary,
+                      color: count > 0 ? 'var(--pl-on-accent)' : theme.textSecondary,
                     }}
                     title={
                       count > 0

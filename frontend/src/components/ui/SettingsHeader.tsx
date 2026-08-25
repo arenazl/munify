@@ -99,7 +99,7 @@ export default function SettingsHeader({
                 background: saveDisabled
                   ? theme.backgroundSecondary
                   : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                color: saveDisabled ? theme.textSecondary : '#ffffff',
+                color: saveDisabled ? theme.textSecondary : 'var(--pl-on-accent)',
               }}
             >
               {saving ? (

@@ -634,7 +634,7 @@ export default function Gamificacion() {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
                 style={{
                   backgroundColor: periodo === id ? theme.primary : theme.backgroundSecondary,
-                  color: periodo === id ? '#fff' : theme.text,
+                  color: periodo === id ? 'var(--pl-on-accent)' : theme.text,
                 }}
               >
                 <Icon className="h-4 w-4" />
@@ -726,7 +726,7 @@ export default function Gamificacion() {
                     {entry.user_id === user?.id && (
                       <span
                         className="ml-2 text-xs px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: theme.primary, color: '#fff' }}
+                        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                       >
                         Vos
                       </span>
@@ -864,7 +864,7 @@ export default function Gamificacion() {
                       className="w-full mt-4 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
                         backgroundColor: puedesCanjear ? theme.primary : theme.background,
-                        color: puedesCanjear ? '#fff' : theme.textSecondary,
+                        color: puedesCanjear ? 'var(--pl-on-accent)' : theme.textSecondary,
                       }}
                     >
                       {puedesCanjear ? 'Canjear Premio' : `Necesitás ${(recompensa.puntos_requeridos - (perfil?.puntos.puntos_totales || 0)).toLocaleString()} pts más`}

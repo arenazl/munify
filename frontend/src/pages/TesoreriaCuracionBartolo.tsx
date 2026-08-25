@@ -222,7 +222,7 @@ export default function TesoreriaCuracionBartolo() {
             className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all whitespace-nowrap"
             style={{
               backgroundColor: conceptoFiltro === nombre ? theme.primary : `${theme.primary}20`,
-              color: conceptoFiltro === nombre ? '#fff' : theme.primary,
+              color: conceptoFiltro === nombre ? 'var(--pl-on-accent)' : theme.primary,
             }}
           >
             {nombre.replace('Pago de ', '').replace('Contratación de ', '').replace('Compra de ', '')} · {count}

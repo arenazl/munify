@@ -68,7 +68,7 @@ export default function MobileEstadisticas() {
           <button
             onClick={() => navigate('/app')}
             className="mt-4 px-4 py-2 rounded-lg"
-            style={{ backgroundColor: theme.primary, color: '#fff' }}
+            style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
           >
             Volver
           </button>

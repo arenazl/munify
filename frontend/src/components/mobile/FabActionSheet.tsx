@@ -151,7 +151,7 @@ export function FabActionSheet({ open, onClose }: Props) {
                   height: 44,
                   borderRadius: 12,
                   backgroundColor: theme.primary,
-                  color: 'white',
+                  color: 'var(--pl-on-accent)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

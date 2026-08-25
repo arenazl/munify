@@ -216,7 +216,7 @@ export function DateRangePicker({
     .rdp-themed .rdp-day.rdp-range_start > .rdp-day_button,
     .rdp-themed .rdp-day.rdp-range_end > .rdp-day_button {
       background-color: ${theme.primary};
-      color: #ffffff;
+      color: var(--pl-on-accent);
       border: 1px solid ${theme.primary};
       font-weight: 600;
     }
@@ -228,7 +228,7 @@ export function DateRangePicker({
     }
     .rdp-themed .rdp-day.rdp-selected:not(.rdp-range_start):not(.rdp-range_end):not(.rdp-range_middle) > .rdp-day_button {
       background-color: ${theme.primary};
-      color: #ffffff;
+      color: var(--pl-on-accent);
       border: 1px solid ${theme.primary};
       font-weight: 600;
     }
@@ -319,7 +319,7 @@ export function DateRangePicker({
                   className="px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-200 hover:scale-105 active:scale-95"
                   style={{
                     backgroundColor: active ? theme.primary : theme.backgroundSecondary,
-                    color: active ? '#fff' : theme.text,
+                    color: active ? 'var(--pl-on-accent)' : theme.text,
                     border: `1px solid ${active ? theme.primary : theme.border}`,
                   }}
                 >

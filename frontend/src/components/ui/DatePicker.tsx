@@ -92,7 +92,7 @@ export function DatePicker({
   const rdpThemedCss = `
     .rdp-themed .rdp-day.rdp-selected > .rdp-day_button {
       background-color: ${theme.primary};
-      color: #ffffff;
+      color: var(--pl-on-accent);
       border: 1px solid ${theme.primary};
       font-weight: 600;
     }

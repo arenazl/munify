@@ -517,7 +517,7 @@ export default function TesoreriaMapa() {
             className="px-2.5 py-1 rounded-md text-xs font-medium"
             style={{
               backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
-              color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
+              color: tipoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
               border: `1px solid ${theme.border}`,
             }}
           >
@@ -774,7 +774,7 @@ export default function TesoreriaMapa() {
                             className="text-[10px] font-semibold px-2 py-1 rounded-md transition-all hover:scale-105"
                             style={{
                               backgroundColor: isPending ? theme.primary : `${theme.primary}20`,
-                              color: isPending ? '#fff' : theme.primary,
+                              color: isPending ? 'var(--pl-on-accent)' : theme.primary,
                               border: `1px solid ${theme.primary}40`,
                             }}
                             title={isPending ? 'Cancelar' : 'Click en el mapa para fijar ubicación'}
@@ -872,7 +872,7 @@ export default function TesoreriaMapa() {
             {pendingGeoId != null && (
               <div
                 className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] px-3 py-2 rounded-lg shadow-lg flex items-center gap-2"
-                style={{ backgroundColor: theme.primary, color: '#fff', border: `2px solid ${theme.primary}` }}
+                style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)', border: `2px solid ${theme.primary}` }}
               >
                 <MapPin className="h-4 w-4" />
                 <span className="text-xs font-semibold">
@@ -943,7 +943,7 @@ export default function TesoreriaMapa() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95"
                 style={{
                   background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                  color: '#fff',
+                  color: 'var(--pl-on-accent)',
                   boxShadow: `0 4px 14px ${theme.primary}40`,
                 }}
               >

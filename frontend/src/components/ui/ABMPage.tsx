@@ -678,7 +678,7 @@ export function ABMPage({
               className="sm:hidden p-2 rounded-lg transition-all active:scale-95 flex-shrink-0"
               style={{
                 backgroundColor: theme.primary,
-                color: '#ffffff',
+                color: 'var(--pl-on-accent)',
               }}
             >
               <Plus className="h-5 w-5" />
@@ -694,7 +694,7 @@ export function ABMPage({
               <button
                 onClick={() => setViewMode('cards')}
                 className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'cards' ? 'text-white' : ''}`}
-                style={{ color: viewMode === 'cards' ? '#ffffff' : theme.textSecondary }}
+                style={{ color: viewMode === 'cards' ? 'var(--pl-on-accent)' : theme.textSecondary }}
                 title="Vista tarjetas"
               >
                 {viewMode === 'cards' && (
@@ -711,7 +711,7 @@ export function ABMPage({
                 <button
                   onClick={() => setViewMode('table')}
                   className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'table' ? 'text-white' : ''}`}
-                  style={{ color: viewMode === 'table' ? '#ffffff' : theme.textSecondary }}
+                  style={{ color: viewMode === 'table' ? 'var(--pl-on-accent)' : theme.textSecondary }}
                   title="Vista tabla"
                 >
                   {viewMode === 'table' && (
@@ -1262,7 +1262,7 @@ export function ABMSheetFooter({ onCancel, onSave, saving = false, saveLabel = '
         onClick={onSave}
         disabled={saving}
         className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
-        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
       >
         {/* Shimmer effect */}
         <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -2357,7 +2357,7 @@ function ViewToggleHint({ hasGuided, hasTable }: { hasGuided: boolean; hasTable:
       <button
         onClick={dismiss}
         className="text-xs px-2 py-1 rounded font-semibold hover:bg-opacity-80 transition-colors flex-shrink-0"
-        style={{ backgroundColor: theme.primary, color: '#fff' }}
+        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
       >
         Entendido
       </button>

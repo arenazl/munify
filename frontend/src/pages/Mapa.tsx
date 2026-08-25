@@ -4142,7 +4142,7 @@ export default function Mapa() {
             {/* Hint flotante para crear */}
             <div
               className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] px-4 py-2 rounded-full text-xs font-medium shadow-lg pointer-events-none flex items-center gap-1.5"
-              style={{ backgroundColor: theme.primary, color: '#fff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               <MapPin size={12} /> Click en el mapa para crear un punto · arrastrá para mover
             </div>

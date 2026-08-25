@@ -333,7 +333,7 @@ export default function MobileMisReclamos() {
             className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all"
             style={{
               backgroundColor: filter === f.key ? theme.primary : theme.card,
-              color: filter === f.key ? '#fff' : theme.text,
+              color: filter === f.key ? 'var(--pl-on-accent)' : theme.text,
               border: filter === f.key ? 'none' : `1px solid ${theme.border}`,
             }}
           >

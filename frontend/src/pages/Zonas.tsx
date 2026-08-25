@@ -457,7 +457,7 @@ export default function Zonas() {
               onClick={handleSubmit}
               disabled={saving}
               className="px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-              style={{ backgroundColor: theme.primary, color: '#fff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Guardar

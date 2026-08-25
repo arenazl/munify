@@ -167,7 +167,7 @@ export function ReclamosSimilares({
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm"
                     style={{
                       backgroundColor: theme.primary,
-                      color: '#ffffff',
+                      color: 'var(--pl-on-accent)',
                     }}
                   >
                     <Eye className="h-4 w-4" />
@@ -227,7 +227,7 @@ export function ReclamosSimilares({
             className="flex-1 px-4 py-3 rounded-lg font-medium transition-colors"
             style={{
               backgroundColor: theme.primary,
-              color: '#ffffff',
+              color: 'var(--pl-on-accent)',
             }}
           >
             Crear de todos modos

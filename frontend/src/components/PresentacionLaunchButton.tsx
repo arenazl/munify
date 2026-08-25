@@ -29,7 +29,7 @@ export default function PresentacionLaunchButton({ label = `Conocé ${BRAND.name
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '10px 18px', borderRadius: 999, fontWeight: 800, fontSize: 14,
-          color: '#fff', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+          color: 'var(--pl-on-accent)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
           background: `linear-gradient(135deg, ${accent}, ${accent2})`,
           boxShadow: `0 8px 22px ${accent}55`,
           ...style,

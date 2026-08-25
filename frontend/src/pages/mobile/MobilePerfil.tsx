@@ -106,7 +106,7 @@ export default function MobilePerfil() {
             className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold"
             style={{
               background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}aa)`,
-              color: '#fff',
+              color: 'var(--pl-on-accent)',
             }}
           >
             {user.nombre.charAt(0).toUpperCase()}

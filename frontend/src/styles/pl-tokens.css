@@ -92,7 +92,10 @@
   border-color: var(--pl-green);
   color: var(--pl-on-accent);
 }
-.pl-acento:hover { background: var(--pl-green-700); }
+/* Sin :hover a propósito (hallazgo de la barrida 2026-08-25): un hover
+   incondicional acá le cambiaría el comportamiento a badges sin hover y a
+   botones disabled, y --pl-green-700 es un token de TEXTO, no de fondo.
+   El hover es del consumidor; esta clase garantiza el PAR, nada más. */
 .pl-acento :where(svg, span, strong, small) { color: inherit; }
 
 /* ============================================================

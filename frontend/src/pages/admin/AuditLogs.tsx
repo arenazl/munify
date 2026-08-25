@@ -357,7 +357,7 @@ export default function AuditLogs() {
             <button
               onClick={() => setView('list')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
-              style={{ backgroundColor: view === 'list' ? theme.primary : theme.card, color: view === 'list' ? '#fff' : theme.text }}
+              style={{ backgroundColor: view === 'list' ? theme.primary : theme.card, color: view === 'list' ? 'var(--pl-on-accent)' : theme.text }}
             >
               <ListIcon className="h-3.5 w-3.5" />
               Lista
@@ -365,7 +365,7 @@ export default function AuditLogs() {
             <button
               onClick={() => setView('grouped')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
-              style={{ backgroundColor: view === 'grouped' ? theme.primary : theme.card, color: view === 'grouped' ? '#fff' : theme.text }}
+              style={{ backgroundColor: view === 'grouped' ? theme.primary : theme.card, color: view === 'grouped' ? 'var(--pl-on-accent)' : theme.text }}
             >
               <Layers className="h-3.5 w-3.5" />
               Agrupado

@@ -533,7 +533,7 @@ export default function MisReclamos() {
                 className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-all hover:opacity-90 active:scale-95"
                 style={{
                   backgroundColor: theme.primary,
-                  color: '#ffffff'
+                  color: 'var(--pl-on-accent)'
                 }}
               >
                 <Star className="h-5 w-5" />
@@ -728,7 +728,7 @@ export default function MisReclamos() {
           className="w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             backgroundColor: theme.primary,
-            color: 'white',
+            color: 'var(--pl-on-accent)',
           }}
         >
           {enviandoCalificacion ? (
@@ -763,7 +763,7 @@ export default function MisReclamos() {
       <button
         onClick={goToNuevoReclamo}
         className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
-        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
       >
         <Plus className="h-4 w-4 mr-2" />
         Crear mi primer reclamo
@@ -813,7 +813,7 @@ export default function MisReclamos() {
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
                 backgroundColor: !filtroCategoria ? theme.primary : theme.backgroundSecondary,
-                color: !filtroCategoria ? '#ffffff' : theme.textSecondary,
+                color: !filtroCategoria ? 'var(--pl-on-accent)' : theme.textSecondary,
                 border: `1px solid ${!filtroCategoria ? theme.primary : theme.border}`,
               }}
             >

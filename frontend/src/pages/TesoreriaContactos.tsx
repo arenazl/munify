@@ -238,7 +238,7 @@ export default function TesoreriaContactos() {
         className="px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5"
         style={{
           backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
-          color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
+          color: tipoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
           border: `1px solid ${tipoFiltro === '' ? theme.primary : theme.border}`,
           height: 32,
         }}
@@ -308,7 +308,7 @@ export default function TesoreriaContactos() {
       className="inline-flex items-center gap-2 px-4 h-[34px] rounded-lg text-[12px] font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
       style={{
         background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover || theme.primary})`,
-        color: '#fff',
+        color: 'var(--pl-on-accent)',
         border: `1px solid ${theme.primary}`,
       }}
       title="Detectar y fusionar contactos duplicados (mismo nombre, distinto tipo)"
@@ -374,7 +374,7 @@ export default function TesoreriaContactos() {
             className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
             style={{
               backgroundColor: ubicacionModo === 'direccion' ? theme.primary : 'transparent',
-              color: ubicacionModo === 'direccion' ? '#fff' : theme.textSecondary,
+              color: ubicacionModo === 'direccion' ? 'var(--pl-on-accent)' : theme.textSecondary,
             }}
           >
             Dirección exacta
@@ -385,7 +385,7 @@ export default function TesoreriaContactos() {
             className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
             style={{
               backgroundColor: ubicacionModo === 'paraje' ? theme.primary : 'transparent',
-              color: ubicacionModo === 'paraje' ? '#fff' : theme.textSecondary,
+              color: ubicacionModo === 'paraje' ? 'var(--pl-on-accent)' : theme.textSecondary,
             }}
           >
             Paraje

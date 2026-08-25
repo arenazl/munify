@@ -184,7 +184,7 @@ export function CrearOPWizard({ open, onClose, onSuccess }: Props) {
                 className="px-4 py-3 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-95"
                 style={{
                   backgroundColor: active ? theme.primary : theme.card,
-                  color: active ? '#fff' : theme.text,
+                  color: active ? 'var(--pl-on-accent)' : theme.text,
                   border: `1.5px solid ${active ? theme.primary : theme.border}`,
                 }}
               >

@@ -93,7 +93,7 @@ export function DocumentReviewModal({ open, onClose, solicitudId, items, onChang
           <button
             onClick={onClose}
             className="mt-4 px-4 py-2 rounded-lg text-sm font-medium"
-            style={{ backgroundColor: theme.primary, color: '#fff' }}
+            style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
           >
             Cerrar
           </button>

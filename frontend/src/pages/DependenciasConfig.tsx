@@ -855,7 +855,7 @@ export default function DependenciasConfig() {
                 }`}
                 style={{
                   backgroundColor: mainTab === tab.key ? theme.primary : theme.backgroundSecondary,
-                  color: mainTab === tab.key ? '#fff' : theme.text,
+                  color: mainTab === tab.key ? 'var(--pl-on-accent)' : theme.text,
                   border: `1px solid ${mainTab === tab.key ? theme.primary : theme.border}`,
                 }}
               >
@@ -943,7 +943,7 @@ export default function DependenciasConfig() {
                 <button
                   onClick={abrirAiSecretarias}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 active:scale-95"
-                  style={{ backgroundColor: theme.primary, color: '#fff' }}
+                  style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                 >
                   <Sparkles className="h-4 w-4" />
                   Sugerir Secretarías

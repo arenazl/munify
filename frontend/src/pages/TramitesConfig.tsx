@@ -272,7 +272,7 @@ export default function TramitesConfig() {
               className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0"
               style={{
                 backgroundColor: filtroCategoria === null ? theme.primary : theme.backgroundSecondary,
-                color: filtroCategoria === null ? '#fff' : theme.text,
+                color: filtroCategoria === null ? 'var(--pl-on-accent)' : theme.text,
               }}
             >
               Todas

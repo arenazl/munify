@@ -161,7 +161,7 @@ export default function TesoreriaProyectos() {
         className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
         style={{
           backgroundColor: estadoFiltro === '' ? theme.primary : 'transparent',
-          color: estadoFiltro === '' ? '#fff' : theme.textSecondary,
+          color: estadoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
           border: `1px solid ${estadoFiltro === '' ? theme.primary : theme.border}`,
         }}
       >

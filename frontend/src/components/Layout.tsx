@@ -661,7 +661,7 @@ export default function Layout() {
                         className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                         style={{
                           backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.primary,
-                          color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                          color: pushSubscribed ? theme.textSecondary : 'var(--pl-on-accent)',
                           opacity: pushSubscribed ? 0.5 : 1
                         }}
                       >
@@ -762,7 +762,7 @@ export default function Layout() {
                 className="flex items-center py-2.5 rounded-lg text-xs font-medium active:scale-[0.98] group relative overflow-hidden"
                 style={{
                   backgroundColor: isActive ? theme.primary : 'transparent',
-                  color: isActive ? '#ffffff' : theme.sidebarTextSecondary,
+                  color: isActive ? 'var(--pl-on-accent)' : theme.sidebarTextSecondary,
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   paddingLeft: isCollapsed ? '0' : '16px',
                   paddingRight: isCollapsed ? '0' : '12px',
@@ -786,7 +786,7 @@ export default function Layout() {
                 {/* Barra lateral animada */}
                 <div
                   className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full transition-all duration-200 ${isActive ? 'h-6 opacity-100' : 'h-0 opacity-0 group-hover:h-4 group-hover:opacity-100'}`}
-                  style={{ backgroundColor: isActive ? '#ffffff' : theme.primary }}
+                  style={{ backgroundColor: isActive ? 'var(--pl-on-accent)' : theme.primary }}
                 />
                 <Icon
                   className="h-5 w-5 flex-shrink-0"
@@ -1614,7 +1614,7 @@ export default function Layout() {
               onClick={handleSaveProfile}
               disabled={savingProfile}
               className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
               <span className="relative">{savingProfile ? 'Guardando...' : 'Guardar'}</span>
@@ -1804,7 +1804,7 @@ export default function Layout() {
               onClick={handleValidateEmail}
               disabled={!emailValidationCode || emailValidationCode.length < 6}
               className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               Validar
             </button>
@@ -1966,7 +1966,7 @@ export default function Layout() {
                     className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
                     style={{
                       backgroundColor: pushSubscribed ? theme.border : theme.primary,
-                      color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                      color: pushSubscribed ? theme.textSecondary : 'var(--pl-on-accent)',
                       opacity: pushSubscribed ? 0.6 : 1
                     }}
                   >
