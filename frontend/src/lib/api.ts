@@ -627,6 +627,10 @@ export const dashboardApi = {
     api.get('/dashboard/stats', { params: depParam(dependenciaId) }),
   getTramitesStats: (dependenciaId?: number) =>
     api.get('/dashboard/tramites-stats', { params: depParam(dependenciaId) }),
+  /** El circuito de trámites en un request: cuellos (quién tiene la pelota),
+   *  presentismo del turnero y tiempos por tipo de trámite. */
+  getTramitesCircuito: (dependenciaId?: number) =>
+    api.get('/dashboard/tramites-circuito', { params: depParam(dependenciaId) }),
   getMisStats: () => api.get('/dashboard/mis-stats'),
   getEmpleadoStats: () => api.get('/dashboard/empleado-stats'),
   getPorCategoria: (dependenciaId?: number) =>

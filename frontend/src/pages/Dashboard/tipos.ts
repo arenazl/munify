@@ -7,8 +7,34 @@
  * pasa a cada sección; el contrato de sección (`SeccionDashboard`) vive en
  * `registry.tsx`, que es donde tiene que estar la condición de visibilidad.
  */
+import type { LucideIcon } from 'lucide-react';
 import type { Caja, DashboardStats, PagoProgramado } from '../../types';
 import type { Municipio } from '../../contexts/AuthContext';
+
+// ------------------------------------------------------- pregunta semántica
+
+/**
+ * Una PREGUNTA del tablero, ya resuelta por un armador: la pregunta, su
+ * respuesta, el veredicto y el porqué en prosa. Es exactamente lo que come
+ * `KpiSemantico`, que es una pieza boba y no calcula nada.
+ *
+ * Vive acá porque la usan los armadores de TODOS los dominios (finanzas,
+ * trámites, y los que vengan). Tenerla una vez es lo que evita que el
+ * armador de trámites tenga que importar el de finanzas para reusar su
+ * forma — o, peor, que la copie.
+ */
+export interface PreguntaSemantica {
+  id: string;
+  pregunta: string;
+  icono: LucideIcon;
+  tono: 'bueno' | 'malo' | 'advertencia' | 'info' | 'neutro';
+  valor: string;
+  unidad?: string;
+  /** Partes de la explicación: el texto plano y lo que va en negrita. */
+  detalle: { texto: string; fuerte?: boolean }[];
+  pie?: string;
+  accion: { label: string; to: string };
+}
 
 // ------------------------------------------------------------- dominios
 
@@ -191,8 +217,98 @@ export interface DatosReclamos {
   refrescando: boolean;
 }
 
+// ---------------------------------------------------- circuito de trámites
+
+/**
+ * Las solicitudes ABIERTAS repartidas por quién tiene la pelota
+ * (`GET /dashboard/tramites-circuito`).
+ *
+ * La distinción vecino/municipio es la información nueva del bloque: una
+ * cola de 30 no dice lo mismo si 24 duermen en una dependencia que si 24
+ * esperan que alguien pague. El backend clasifica por estado real y devuelve
+ * el desglose crudo para que el copy pueda nombrar el motivo.
+ */
+export interface CuellosTramites {
+  abiertas: number;
+  esperando_vecino: number;
+  esperando_municipio: number;
+  /** { estado: cantidad } de lo que espera al vecino (pendiente de pago…). */
+  por_estado_vecino: Record<string, number>;
+  /** Ídem del lado del municipio (recibido, en curso, pospuesto…). */
+  por_estado_municipio: Record<string, number>;
+  /** Antigüedad de la abierta más vieja. null si no hay ninguna abierta. */
+  dias_mas_vieja: number | null;
+  top_dependencia: { nombre: string; cantidad: number } | null;
+  /** Cuántas dependencias tienen alguna abierta. Con una sola, "la que más
+   *  concentra" no informa nada y el copy nombra el trámite en su lugar. */
+  dependencias_con_abiertas: number;
+  top_tramite: { nombre: string; cantidad: number } | null;
+  tramites_con_abiertas: number;
+}
+
+/**
+ * El presentismo del turnero. La ventana son los turnos YA OCURRIDOS de los
+ * últimos `dias`; los que todavía no llegaron van en `proximos` y no ensucian
+ * el porcentaje.
+ *
+ * `sin_marcar` son los que pasaron y siguen en 'reservado': NO son ausentes,
+ * son turnos que nadie registró. Tenerlos aparte es lo que evita contar como
+ * falta lo que sólo es un mostrador que no carga el resultado.
+ */
+export interface TurnosCircuito {
+  dias: number;
+  /** Turnos ya ocurridos en la ventana (presentados + ausentes + cancelados + sin marcar). */
+  total: number;
+  presentados: number;
+  ausentes: number;
+  cancelados: number;
+  sin_marcar: number;
+  /** Agendados de acá a `dias` días. */
+  proximos: number;
+  /** La hora del día con más ausencias, si hubo alguna. */
+  franja_ausencias: { hora: number; cantidad: number } | null;
+}
+
+export interface TipoTramiteCircuito {
+  tramite_id: number;
+  nombre: string;
+  solicitudes: number;
+  /** Cierres con fecha real de resolución (los únicos que se pueden medir). */
+  cerradas: number;
+  /** Promedio de duración en MINUTOS. null = ningún cierre medible; 0 = los
+   *  cierres existen y fueron instantáneos. No es lo mismo y se dice distinto. */
+  minutos_promedio: number | null;
+}
+
+export interface TiposCircuito {
+  dias: number;
+  /** Solicitudes de la ventana (la suma de `items`). */
+  total: number;
+  /** Tipos con movimiento, del más pedido al menos. */
+  items: TipoTramiteCircuito[];
+  /** El de mayor promedio, sólo si promedia MÁS de cero y sale de al menos
+   *  dos cierres. null cuando todo cierra en el acto: ahí no hay un trámite
+   *  que duela más y afirmarlo sería inventarlo. */
+  mas_lento: TipoTramiteCircuito | null;
+  /** El promedio de los OTROS tipos comparables, con la misma vara que eligió
+   *  a `mas_lento`. Es contra esto que se dice "tarda X contra Y del resto";
+   *  null cuando no hay otro tipo con tiempo fiable y no hay comparación. */
+  promedio_resto_minutos: number | null;
+}
+
+/** La respuesta completa de `GET /dashboard/tramites-circuito`. */
+export interface TramitesCircuito {
+  cuellos: CuellosTramites;
+  turnos: TurnosCircuito;
+  tipos: TiposCircuito;
+}
+
 export interface DatosTramites {
   stats: DashboardStats | null;
+  /** null = módulo apagado, todavía no llegó, o el GET falló. En los tres
+   *  casos la sección del circuito no dibuja nada — jamás un tablero roto
+   *  por un endpoint caído. */
+  circuito: TramitesCircuito | null;
   cargando: boolean;
 }
 

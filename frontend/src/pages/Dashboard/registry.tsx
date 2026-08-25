@@ -16,6 +16,7 @@ import { ColaReclamos } from './secciones/ColaReclamos';
 import { MapaTendencia } from './secciones/MapaTendencia';
 import { AnaliticaReclamos } from './secciones/AnaliticaReclamos';
 import { VozVecino } from './secciones/VozVecino';
+import { CircuitoTramites } from './secciones/CircuitoTramites';
 import { HeroFinanciero } from './secciones/HeroFinanciero';
 import { ColasPagos } from './secciones/ColasPagos';
 import { TendenciaGastos } from './secciones/TendenciaGastos';
@@ -161,6 +162,23 @@ export const SECCIONES: SeccionDashboard[] = [
     dominios: ['reclamos'],
     layout: 'full',
     Componente: VozVecino,
+  },
+
+  // ---------------------------------------------------------- TRÁMITES
+  // El bloque del mostrador: tres preguntas (dónde se traban, si se cumplen
+  // los turnos, qué tipo tarda más). Es la única sección del dominio, así
+  // que el orden dentro del bloque no está en disputa; dónde cae el BLOQUE
+  // lo decide la actividad de 30 días (en Merlo, arriba de finanzas).
+  //
+  // La cinta de conteos sigue hablando de trámites por su cuenta: es de la
+  // pantalla, va fija pegada al hero, y cuenta lo crudo (total / hoy / esta
+  // semana). Acá empieza lo que la cinta no puede decir.
+  {
+    id: 'circuito-tramites',
+    requiere: ['tramites'],
+    dominios: ['tramites'],
+    layout: 'full',
+    Componente: CircuitoTramites,
   },
 
   // ---------------------------------------------------------- FINANZAS

@@ -1259,6 +1259,362 @@ async def get_actividad(
     }
 
 
+# =====================================================
+# CIRCUITO DE TRÁMITES (WO-F4 — "el barro" del mostrador)
+# =====================================================
+
+# El circuito de una solicitud, leído por QUIÉN tiene la pelota. Los valores
+# van en minúscula porque acá se normaliza con .lower(): el enum tiene los
+# estados nuevos en minúscula ('recibido', 'pendiente_pago'…) y los legacy en
+# MAYÚSCULA ('EN_REVISION', 'REQUIERE_DOCUMENTACION'…), y ambos conviven en la
+# misma columna.
+#
+# CERRADOS: 'finalizado' es el cierre canónico, 'rechazado' también cierra
+# (mal, pero cierra) y 'aprobado' es el finalizado legacy.
+_SOLICITUD_CERRADOS = {"finalizado", "rechazado", "aprobado"}
+
+# ESPERAN AL VECINO: la solicitud está viva pero el municipio NO puede
+# moverla — depende de que el vecino pague o entregue papeles.
+#   - pendiente_pago: el trámite tiene costo y el pago no entró
+#     (models/tramite.py: "Esperando pago del vecino").
+#   - requiere_documentacion: legacy, la ventanilla pidió un papel que falta.
+# TODO lo demás que esté abierto espera al MUNICIPIO. Es a propósito el
+# criterio conservador (patrón resiliente): un estado nuevo que nadie mapeó
+# cae del lado del municipio, porque el tablero no puede desligar al muni de
+# algo que no sabe clasificar. Al revés —contarlo como del vecino— escondería
+# trabajo propio.
+_SOLICITUD_ESPERAN_VECINO = {"pendiente_pago", "requiere_documentacion"}
+
+# Turnos: el modelo declara 'reservado | cumplido | cancelado | ausente'
+# (models/turno.py) y la API de turnero valida exactamente ese set
+# (api/turnos_tramite.py, PATCH de estado). 'reservado' NO es un resultado:
+# es el estado inicial, así que un turno que ya pasó y sigue 'reservado' es
+# un turno que NADIE marcó — ni cumplido ni ausente.
+_TURNO_PRESENTADO = "cumplido"
+_TURNO_AUSENTE = "ausente"
+_TURNO_CANCELADO = "cancelado"
+_TURNO_SIN_MARCAR = "reservado"
+
+# Cierres mínimos para que un tipo de trámite pueda ser "el que más tarda".
+# Con uno solo el promedio es el caso, no la tendencia.
+_MIN_CIERRES_PARA_RANKING = 2
+
+
+def _estado_valor(estado) -> str:
+    """El estado como string, venga como enum o como texto crudo."""
+    return estado.value if hasattr(estado, "value") else str(estado)
+
+
+@router.get("/tramites-circuito")
+async def get_tramites_circuito(
+    request: Request,
+    dependencia_id: Optional[int] = None,
+    dias_turnos: int = 30,
+    dias_tipos: int = 90,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"])),
+):
+    """El CIRCUITO de trámites en un solo request: dónde se traban, si se
+    cumplen los turnos y qué tipo de trámite tarda más.
+
+    Contesta las tres preguntas del tablero (WO-F4). Son ocho agregaciones
+    (COUNT/AVG con GROUP BY, sin traer una sola fila de detalle), así que
+    entran en un request y no en tres.
+
+    **cuellos** — de las solicitudes ABIERTAS (todo lo que no sea finalizado,
+    rechazado o aprobado), cuántas dependen del municipio y cuántas están
+    frenadas esperando al vecino. Es la distinción que el tablero no hacía:
+    una cola de 30 no dice lo mismo si 25 duermen en una dependencia que si
+    25 esperan que alguien pague. Se acompaña de la dependencia (y del tipo)
+    que más concentra y de la antigüedad de la más vieja, que es la única
+    vara honesta para darle veredicto a una cola.
+
+    **turnos** — la ventana son los turnos YA OCURRIDOS de los últimos
+    `dias_turnos` (`fecha_hora` entre hace N días y ahora); los futuros van
+    aparte en `proximos`. Mezclarlos hundiría el presentismo con turnos que
+    todavía no llegaron. Los que pasaron y siguen en 'reservado' NO son
+    ausentes: son turnos que nadie marcó, y van en su propio contador —
+    inventarles un resultado sería la mentira más fácil de este endpoint.
+
+    **tipos** — por tipo de trámite en `dias_tipos`: cuántas solicitudes
+    entraron y cuánto tardaron las que CERRARON con fecha real. El promedio
+    va en MINUTOS y es `null` cuando el tipo no tiene ningún cierre medible
+    (mismo criterio que `tendencias.tiempo_resolucion_30d`: sin filas, null,
+    nunca un 0 que se lea como "se resuelve al instante"). `mas_lento` sale
+    sólo si algún tipo promedia MÁS de cero: si todos cierran en el acto no
+    hay un trámite que duela más, y decir que lo hay sería inventarlo.
+
+    Ojo con la hora: `turnos.fecha_hora` es un DateTime sin zona (la hora de
+    atención del mostrador) y el corte "ya ocurrido" se hace con la hora del
+    proceso, que en Cloud Run es UTC. En Argentina eso corre el corte hasta
+    3 horas — a las 07:00 UTC un turno de hoy 05:00 local ya cuenta como
+    ocurrido. Con horarios de atención de 8 a 13 no cambia ningún número,
+    pero queda dicho. Mismo criterio que `/turnos-tramite/stats`.
+    """
+    from models.tramite import Solicitud, EstadoSolicitud, Tramite
+    from models.turno import Turno
+    from models.municipio_dependencia import MunicipioDependencia
+    from models.dependencia import Dependencia
+    from sqlalchemy import and_, case, text
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+    if not municipio_id and current_user.municipio_id:
+        municipio_id = current_user.municipio_id
+
+    # Acotado como en /tendencia: un `dias` gigante no rompe (son agregados)
+    # pero tampoco significa nada.
+    dias_turnos = max(1, min(dias_turnos, 365))
+    dias_tipos = max(1, min(dias_tipos, 365))
+
+    vacio = {
+        "cuellos": {
+            "abiertas": 0, "esperando_vecino": 0, "esperando_municipio": 0,
+            "por_estado_vecino": {}, "por_estado_municipio": {},
+            "dias_mas_vieja": None,
+            "top_dependencia": None, "dependencias_con_abiertas": 0,
+            "top_tramite": None, "tramites_con_abiertas": 0,
+        },
+        "turnos": {
+            "dias": dias_turnos, "total": 0, "presentados": 0, "ausentes": 0,
+            "cancelados": 0, "sin_marcar": 0, "proximos": 0,
+            "franja_ausencias": None,
+        },
+        "tipos": {
+            "dias": dias_tipos, "total": 0, "items": [],
+            "mas_lento": None, "promedio_resto_minutos": None,
+        },
+    }
+    if not municipio_id:
+        return vacio
+
+    ahora = datetime.utcnow()
+    base_sol = [Solicitud.municipio_id == municipio_id]
+    if dependencia_id:
+        base_sol.append(Solicitud.municipio_dependencia_id == dependencia_id)
+
+    # ------------------------------------------------------------ cuellos
+    # (1) Reparto por estado de TODO el universo; la clasificación
+    # abierto/cerrado y vecino/municipio se hace en Python contra los sets de
+    # arriba, así un estado nuevo no rompe la query ni desaparece del conteo.
+    filas_estado = (await db.execute(
+        select(Solicitud.estado, func.count(Solicitud.id))
+        .where(*base_sol)
+        .group_by(Solicitud.estado)
+    )).all()
+
+    por_estado_vecino: dict[str, int] = {}
+    por_estado_municipio: dict[str, int] = {}
+    for estado, n in filas_estado:
+        clave = _estado_valor(estado)
+        norm = clave.lower()
+        if norm in _SOLICITUD_CERRADOS:
+            continue
+        destino = (
+            por_estado_vecino if norm in _SOLICITUD_ESPERAN_VECINO
+            else por_estado_municipio
+        )
+        destino[clave] = destino.get(clave, 0) + int(n)
+
+    esperando_vecino = sum(por_estado_vecino.values())
+    esperando_municipio = sum(por_estado_municipio.values())
+    abiertas = esperando_vecino + esperando_municipio
+
+    # Filtro SQL de "abierta" para las dos agrupaciones que siguen. Los
+    # miembros del enum son los que la columna guarda; el resto de los
+    # estados quedan del lado abierto por descarte, igual que arriba.
+    abiertas_sql = [
+        Solicitud.estado.notin_([
+            EstadoSolicitud.FINALIZADO,
+            EstadoSolicitud.RECHAZADO,
+            EstadoSolicitud.APROBADO,
+        ]),
+    ]
+
+    # (2) Qué dependencia concentra las abiertas. Se traen TODAS las que
+    # tienen alguna (son las dependencias del muni: decenas como mucho) para
+    # saber además cuántas hay — con una sola, "la que más concentra" no
+    # informa nada y el front dice el trámite en su lugar.
+    filas_dep = (await db.execute(
+        select(Dependencia.nombre, func.count(Solicitud.id).label("n"))
+        .select_from(Solicitud)
+        .join(MunicipioDependencia,
+              MunicipioDependencia.id == Solicitud.municipio_dependencia_id)
+        .join(Dependencia, Dependencia.id == MunicipioDependencia.dependencia_id)
+        .where(*base_sol, *abiertas_sql)
+        .group_by(Dependencia.id, Dependencia.nombre)
+        .order_by(func.count(Solicitud.id).desc())
+    )).all()
+
+    # (3) Ídem por tipo de trámite.
+    filas_tramite_abiertas = (await db.execute(
+        select(Tramite.nombre, func.count(Solicitud.id).label("n"))
+        .select_from(Solicitud)
+        .join(Tramite, Tramite.id == Solicitud.tramite_id)
+        .where(*base_sol, *abiertas_sql)
+        .group_by(Tramite.id, Tramite.nombre)
+        .order_by(func.count(Solicitud.id).desc())
+    )).all()
+
+    # (4) La más vieja que sigue abierta. Es la vara del veredicto: una cola
+    # de 30 con nada de más de dos días no es el mismo problema que una de 30
+    # con algo esperando desde hace un mes.
+    mas_vieja = (await db.execute(
+        select(func.min(Solicitud.created_at)).where(*base_sol, *abiertas_sql)
+    )).scalar()
+    dias_mas_vieja = (ahora - mas_vieja).days if mas_vieja else None
+
+    # ------------------------------------------------------------- turnos
+    desde_turnos = ahora - timedelta(days=dias_turnos)
+    base_turnos = [Turno.municipio_id == municipio_id]
+    if dependencia_id:
+        base_turnos.append(Turno.municipio_dependencia_id == dependencia_id)
+    ventana_ocurridos = [Turno.fecha_hora >= desde_turnos, Turno.fecha_hora <= ahora]
+
+    filas_turnos = (await db.execute(
+        select(Turno.estado, func.count(Turno.id))
+        .where(*base_turnos, *ventana_ocurridos)
+        .group_by(Turno.estado)
+    )).all()
+    turnos_por_estado = {_estado_valor(e): int(n) for e, n in filas_turnos}
+    turnos_total = sum(turnos_por_estado.values())
+
+    # Los próximos se acotan a la misma ventana hacia adelante: sin tope, un
+    # turno agendado a un año infla el número de "lo que se viene".
+    proximos = (await db.execute(
+        select(func.count(Turno.id)).where(
+            *base_turnos,
+            Turno.fecha_hora > ahora,
+            Turno.fecha_hora <= ahora + timedelta(days=dias_turnos),
+        )
+    )).scalar() or 0
+
+    # La franja con más ausencias. Sólo la HORA (no el día de semana): es la
+    # que sirve para mover ventanillas y sale de un GROUP BY sobre el índice
+    # (municipio_id, fecha_hora). El front decide si el número tiene entidad
+    # suficiente para enunciarlo — dos faltas no son una franja problemática.
+    fila_franja = (await db.execute(
+        select(func.hour(Turno.fecha_hora).label("h"), func.count(Turno.id))
+        .where(*base_turnos, *ventana_ocurridos, Turno.estado == _TURNO_AUSENTE)
+        .group_by(func.hour(Turno.fecha_hora))
+        .order_by(func.count(Turno.id).desc())
+        .limit(1)
+    )).first()
+
+    # -------------------------------------------------------------- tipos
+    desde_tipos = ahora.date() - timedelta(days=dias_tipos)
+    # Duración REAL del expediente, en minutos. En días (DATEDIFF, que es lo
+    # que usa el resto del archivo) todo lo que cierra dentro de la jornada
+    # da 0 y no se puede ordenar por "el que más tarda".
+    minutos_cierre = func.timestampdiff(
+        text("MINUTE"), Solicitud.created_at, Solicitud.fecha_resolucion,
+    )
+    # Mismo criterio de cierre MEDIBLE que /tramites-stats: finalizado (+ el
+    # legacy en mayúsculas) y con fecha de resolución cargada. Una solicitud
+    # 'finalizado' sin `fecha_resolucion` está cerrada pero no tiene duración
+    # — San Pedro Norte tiene de ésas — y no puede entrar en un promedio.
+    es_cierre_medible = and_(
+        or_(
+            Solicitud.estado == EstadoSolicitud.FINALIZADO,
+            Solicitud.estado == "FINALIZADO",
+        ),
+        Solicitud.fecha_resolucion.isnot(None),
+    )
+    filas_tipos = (await db.execute(
+        select(
+            Tramite.id,
+            Tramite.nombre,
+            func.count(Solicitud.id).label("n"),
+            func.sum(case((es_cierre_medible, 1), else_=0)).label("cerradas"),
+            func.avg(case((es_cierre_medible, minutos_cierre))).label("minutos"),
+        )
+        .select_from(Solicitud)
+        .join(Tramite, Tramite.id == Solicitud.tramite_id)
+        .where(*base_sol, func.date(Solicitud.created_at) >= desde_tipos)
+        .group_by(Tramite.id, Tramite.nombre)
+        .order_by(func.count(Solicitud.id).desc())
+    )).all()
+
+    items = [
+        {
+            "tramite_id": int(tid),
+            "nombre": nombre,
+            "solicitudes": int(n),
+            "cerradas": int(cerradas or 0),
+            # null (no 0) cuando no hay ningún cierre medible: el AVG viene
+            # NULL y así se devuelve. Un 0 acá se leería como "se resuelve al
+            # instante", que es lo contrario de "no sabemos".
+            "minutos_promedio": round(float(minutos), 1) if minutos is not None else None,
+        }
+        for tid, nombre, n, cerradas, minutos in filas_tipos
+    ]
+
+    # "El que más tarda" pide DOS cosas: que su promedio sea mayor que cero
+    # (si todo cierra en el acto no hay uno que duela más) y que salga de al
+    # menos dos cierres. Con un solo expediente medido eso no es un promedio,
+    # es una anécdota — y el tablero la publicaría como si fuera el ranking
+    # del municipio.
+    medibles = [
+        i for i in items
+        if (i["minutos_promedio"] or 0) > 0 and i["cerradas"] >= _MIN_CIERRES_PARA_RANKING
+    ]
+    mas_lento = max(medibles, key=lambda i: i["minutos_promedio"]) if medibles else None
+
+    # El "resto" contra el que se compara al más lento sale de la MISMA vara.
+    # Calcularlo del otro lado (con todos los tipos que tengan algún promedio)
+    # producía frases que se contradecían solas: un tipo con un único cierre de
+    # 24 h quedaba fuera del ranking por poco fiable pero entraba igual en el
+    # promedio, y la tarjeta terminaba diciendo "el más lento tarda 2,4 horas,
+    # contra 1 día del resto". null cuando no hay ningún otro tipo comparable:
+    # ahí no hay contra qué medirlo y no se afirma.
+    resto = [i for i in medibles if mas_lento is None or i["tramite_id"] != mas_lento["tramite_id"]]
+    promedio_resto = (
+        round(sum(i["minutos_promedio"] for i in resto) / len(resto), 1) if resto else None
+    )
+
+    return {
+        "cuellos": {
+            "abiertas": abiertas,
+            "esperando_vecino": esperando_vecino,
+            "esperando_municipio": esperando_municipio,
+            "por_estado_vecino": por_estado_vecino,
+            "por_estado_municipio": por_estado_municipio,
+            "dias_mas_vieja": dias_mas_vieja,
+            "top_dependencia": (
+                {"nombre": filas_dep[0][0], "cantidad": int(filas_dep[0][1])}
+                if filas_dep else None
+            ),
+            "dependencias_con_abiertas": len(filas_dep),
+            "top_tramite": (
+                {"nombre": filas_tramite_abiertas[0][0],
+                 "cantidad": int(filas_tramite_abiertas[0][1])}
+                if filas_tramite_abiertas else None
+            ),
+            "tramites_con_abiertas": len(filas_tramite_abiertas),
+        },
+        "turnos": {
+            "dias": dias_turnos,
+            "total": turnos_total,
+            "presentados": turnos_por_estado.get(_TURNO_PRESENTADO, 0),
+            "ausentes": turnos_por_estado.get(_TURNO_AUSENTE, 0),
+            "cancelados": turnos_por_estado.get(_TURNO_CANCELADO, 0),
+            # Pasaron y siguen 'reservado': nadie los marcó. No son ausentes.
+            "sin_marcar": turnos_por_estado.get(_TURNO_SIN_MARCAR, 0),
+            "proximos": int(proximos),
+            "franja_ausencias": (
+                {"hora": int(fila_franja[0]), "cantidad": int(fila_franja[1])}
+                if fila_franja and fila_franja[0] is not None else None
+            ),
+        },
+        "tipos": {
+            "dias": dias_tipos,
+            "total": sum(i["solicitudes"] for i in items),
+            "items": items,
+            "mas_lento": mas_lento,
+            "promedio_resto_minutos": promedio_resto,
+        },
+    }
+
+
 @router.get("/recurrentes")
 async def get_recurrentes(
     request: Request,
