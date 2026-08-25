@@ -52,12 +52,13 @@ const FRECUENCIA_COLORS: Record<FrecuenciaPago, string> = {
   bimestral: '#8b5cf6', trimestral: '#06b6d4', anual: '#10b981',
 };
 
-// Frecuencias que el usuario puede elegir al cargar/filtrar un pago. "quincenal"
-// queda EXCLUIDA: su cálculo real es "cada 14 días corridos" (no el 15 y el 30),
-// se desalinea del calendario y confunde. Se mantiene en LABELS/COLORS de arriba
-// para poder mostrar datos históricos si existieran, pero no como opción cargable.
+// "quincenal" volvió a lo cargable (decisión del dueño 2026-08-24): ahora es
+// quincena de CALENDARIO — dos vencimientos por mes, el día A y el A+14, con
+// A acotado a 1..14 para que el segundo día (<= 28) exista en TODOS los meses.
+// La exclusión anterior era por el cálculo viejo ("+14 días corridos"), que
+// se corría del calendario.
 const FRECUENCIAS_SELECCIONABLES: FrecuenciaPago[] =
-  (Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).filter((f) => f !== 'quincenal');
+  Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[];
 
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -944,6 +945,19 @@ export default function TesoreriaAgenda() {
                         { value: '6', label: 'Domingo' },
                       ]}
                     />
+                  </>
+                ) : form.frecuencia === 'quincenal' ? (
+                  <>
+                    <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Primer día del mes (1-14)</label>
+                    {/* Quincena de calendario: vence el día A y el A+14. Con A
+                        acotado a 1..14 el segundo día existe en todos los meses. */}
+                    <input type="number" min={1} max={14} value={Math.min(form.dia_del_mes, 14)}
+                      onChange={(e) => setForm(f => ({ ...f, dia_del_mes: Math.min(parseInt(e.target.value) || 1, 14) }))}
+                      className="w-full px-3 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+                    <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                      Se paga el {Math.min(form.dia_del_mes, 14)} y el {Math.min(form.dia_del_mes, 14) + 14} de cada mes
+                    </p>
                   </>
                 ) : (
                   <>

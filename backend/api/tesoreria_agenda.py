@@ -39,7 +39,21 @@ def _calcular_proximo_pago(actual: date, frecuencia: FrecuenciaPago, dia_del_mes
     if frecuencia == FrecuenciaPago.SEMANAL:
         return _add_dias(actual, 7)
     if frecuencia == FrecuenciaPago.QUINCENAL:
-        return _add_dias(actual, 14)
+        # Quincena de CALENDARIO (decision del dueño 2026-08-24): dos
+        # vencimientos fijos por mes, el dia A y el dia A+14. Con A acotado a
+        # 1..14 el segundo dia queda <= 28 y EXISTE en todos los meses — cero
+        # casos borde de febrero/meses cortos, sin clamp. Default 14 -> "se
+        # paga el 14 y el 28". Antes era "+14 dias corridos", que se corria
+        # del calendario y por eso estaba vetado en la UI.
+        dia_a = min(max(dia_del_mes, 1), 14)
+        dia_b = dia_a + 14
+        if actual.day < dia_a:
+            return actual.replace(day=dia_a)
+        if actual.day < dia_b:
+            return actual.replace(day=dia_b)
+        if actual.month == 12:
+            return date(actual.year + 1, 1, dia_a)
+        return date(actual.year, actual.month + 1, dia_a)
     if frecuencia == FrecuenciaPago.MENSUAL:
         meses = 1
     elif frecuencia == FrecuenciaPago.BIMESTRAL:
@@ -165,11 +179,14 @@ async def create_pago(
     if not c:
         raise HTTPException(422, "Contacto invalido para este municipio")
 
-    # Calcular proximo_pago inicial = primer dia_del_mes >= fecha_inicio
+    # Calcular proximo_pago inicial = primer vencimiento >= fecha_inicio.
+    # While y no if: con fecha_inicio a fin de mes, UN solo avance podia
+    # quedar igual en el pasado (ej. quincenal dia 14/28 con inicio el 29).
+    # Cada llamada avanza estricto, asi que el loop siempre termina.
     proximo = payload.fecha_inicio
     last_day = monthrange(proximo.year, proximo.month)[1]
     proximo = date(proximo.year, proximo.month, min(payload.dia_del_mes, last_day))
-    if proximo < payload.fecha_inicio:
+    while proximo < payload.fecha_inicio:
         proximo = _calcular_proximo_pago(proximo, payload.frecuencia, payload.dia_del_mes)
 
     pp = TesoreriaPagoProgramado(
@@ -351,7 +368,7 @@ async def update_pago(
         proximo = pp.fecha_inicio
         last_day = monthrange(proximo.year, proximo.month)[1]
         proximo = date(proximo.year, proximo.month, min(pp.dia_del_mes, last_day))
-        if proximo < pp.fecha_inicio:
+        while proximo < pp.fecha_inicio:
             proximo = _calcular_proximo_pago(proximo, pp.frecuencia, pp.dia_del_mes)
         pp.proximo_pago = proximo
 
