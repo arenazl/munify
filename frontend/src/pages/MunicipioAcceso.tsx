@@ -16,14 +16,17 @@ import Login from './Login';
  * Flujo:
  *   1. Lee `:codigo` de la URL.
  *   2. Trae el detalle público del municipio.
- *   3. Lo persiste (localStorage + IndexedDB) para que `/login` lo levante.
- *   4. Redirige a `/login`.
+ *   3. Lo persiste (localStorage + IndexedDB) para que el login lo levante.
+ *   4. `/merlo` redirige a `/merlo/login`; en `/merlo/login` el login se
+ *      renderiza EN EL LUGAR — el municipio nunca se cae de la URL.
  *   Si el código no existe -> vuelve a `/demo`.
  *
  * El código llega por la URL o, cuando la marca tiene ruta propia y el path no
  * lo nombra (`/py/asuncion`), por prop desde el router.
  */
-export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: string } = {}) {
+export default function MunicipioAcceso(
+  { codigo: codigoFijo, enLogin = false }: { codigo?: string; enLogin?: boolean } = {},
+) {
   const { codigo: codigoDeLaUrl } = useParams<{ codigo: string }>();
   const codigo = codigoFijo || codigoDeLaUrl;
   const navigate = useNavigate();
@@ -41,6 +44,9 @@ export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: strin
    * la URL, la marca viaja en el propio start_url.
    */
   const esRutaDeMarca = Boolean(codigoFijo);
+  // En la ruta de marca Y en `/<codigo>/login` el login se muestra acá mismo,
+  // con la URL intacta; sólo el acceso pelado `/<codigo>` navega (a su /login).
+  const quedaEnElLugar = esRutaDeMarca || enLogin;
   const [municipioListo, setMunicipioListo] = useState(false);
 
   useEffect(() => {
@@ -70,8 +76,8 @@ export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: strin
           localStorage.setItem('municipio_actual_id', String(data.id));
 
           if (!cancelled) {
-            if (esRutaDeMarca) setMunicipioListo(true);
-            else navigate('/login', { replace: true });
+            if (quedaEnElLugar) setMunicipioListo(true);
+            else navigate(`/${data.codigo}/login`, { replace: true });
           }
           return;
         } catch (e) {
@@ -92,7 +98,7 @@ export default function MunicipioAcceso({ codigo: codigoFijo }: { codigo?: strin
     return () => {
       cancelled = true;
     };
-  }, [codigo, navigate, esRutaDeMarca]);
+  }, [codigo, navigate, quedaEnElLugar]);
 
   // Municipio cargado y ruta de marca: el login se rinde ACÁ, con la URL
   // intacta (ver la nota de arriba sobre el start_url de la PWA en iOS).

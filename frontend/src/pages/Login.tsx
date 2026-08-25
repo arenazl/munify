@@ -296,13 +296,16 @@ export default function Login() {
   // auth (handleSubmit, quickLogin, Google) del login estándar. La marca elige
   // este layout por su config (BRAND.loginLayout), no por un flag white-label.
   if (BRAND.loginLayout === 'split') {
-    // Esta pantalla es la PORTADA DE LA MARCA, no la del municipio: el acento
-    // sale de `BRAND.primary` y no del color guardado en la ficha del muni.
-    // Importa cuando dos marcas comparten tenant — la demo Munify vive sobre el
-    // municipio de Paraguay Limpio, cuyo `color_primario` es verde, y sin esto
-    // se pintaba de verde una pantalla que es azul. Para Paraguay Limpio da el
-    // mismo color de siempre (su `primary` ES el verde de la ficha).
-    const accent = BRAND.primary;
+    // ¿De quién es esta portada? En una marca MONO-TENANT (Paraguay Limpio) es
+    // la portada de la MARCA: acento del brand, no de la ficha del muni (dos
+    // marcas pueden compartir tenant y el color de la ficha no manda). En
+    // Munify multi-tenant con municipio elegido es la portada del TENANT
+    // (pedido del dueño, 2026-08-25): el municipio en grande y su color como
+    // acento — al entrar por /merlo/login tiene que GRITAR Merlo.
+    const muniPropio = !BRAND.municipioCodigo && municipioNombre
+      ? municipioNombre.replace(/^Municipalidad de\s*/i, '')
+      : null;
+    const accent = (muniPropio && municipioColor) || BRAND.primary;
     // Fondos del hero TEÑIDOS con el acento sobre un casi-negro neutro. Antes
     // eran tres verdes fijos, que es justo lo que no puede tener un shell
     // white-label. Las proporciones están elegidas para reproducir los verdes
@@ -354,12 +357,20 @@ export default function Login() {
 
           {/* copy */}
           <div className="relative max-w-lg">
-            <div className="text-xs font-bold tracking-[0.25em] mb-4" style={{ color: accent }}>GESTIÓN MUNICIPAL</div>
+            <div className="text-xs font-bold tracking-[0.25em] mb-4" style={{ color: accent }}>
+              {muniPropio ? 'MUNICIPALIDAD DE' : 'GESTIÓN MUNICIPAL'}
+            </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.03]" style={{ fontFamily: BRAND.nameFont }}>
-              De tu reclamo<br />a la <span style={{ color: accent }}>solución.</span>
+              {muniPropio ? (
+                <>{muniPropio}<span style={{ color: accent }}>.</span></>
+              ) : (
+                <>De tu reclamo<br />a la <span style={{ color: accent }}>solución.</span></>
+              )}
             </h1>
             <p className="mt-6 text-base lg:text-lg text-white/70 leading-relaxed">
-              {BRAND.tagline || 'Reclamos, trámites y seguimiento en tiempo real, en una sola plataforma.'}
+              {muniPropio
+                ? 'De tu reclamo a la solución: reclamos, trámites y seguimiento en tiempo real.'
+                : (BRAND.tagline || 'Reclamos, trámites y seguimiento en tiempo real, en una sola plataforma.')}
             </p>
 
             <div className="grid grid-cols-2 gap-3 mt-8">
@@ -386,7 +397,9 @@ export default function Login() {
               <Sparkles className="h-6 w-6" style={{ color: accent }} />
             </div>
             <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
-            <p className="text-white/60 mt-1 mb-6">Elegí un perfil para entrar a la demo</p>
+            <p className="text-white/60 mt-1 mb-6">
+              {muniPropio ? `Elegí un perfil para entrar a ${muniPropio}` : 'Elegí un perfil para entrar a la demo'}
+            </p>
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/25 text-red-300 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>

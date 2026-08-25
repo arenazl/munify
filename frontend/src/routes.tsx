@@ -461,9 +461,14 @@ export const router = createBrowserRouter([
     element: <MunicipioAcceso codigo={codigo} />,
   })),
 
-  // Acceso directo por código de municipio: /<codigo> -> login del muni.
-  // Va al final: las rutas estáticas de arriba tienen prioridad de match.
+  // Acceso directo por código de municipio: /<codigo> redirige a
+  // /<codigo>/login. Va al final: las rutas estáticas tienen prioridad.
   { path: '/:codigo', element: <MunicipioAcceso /> },
+
+  // El login del tenant CON el municipio en la URL (/merlo/login): el muni no
+  // puede desaparecer de la barra al pasar del acceso al login (pedido del
+  // dueño, 2026-08-25). El login se renderiza en el lugar, sin navegar.
+  { path: '/:codigo/login', element: <MunicipioAcceso enLogin /> },
 
   // Links historicos: /reclamos/:id -> /gestion/reclamos/:id (sanea push/WhatsApp viejos)
   { path: '/reclamos/:id', element: <ReclamoLegacyRedirect /> },
