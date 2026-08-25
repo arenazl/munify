@@ -74,6 +74,28 @@
 }
 
 /* ============================================================
+   [SUPERFICIE DE ACENTO] — .pl-acento, LA clase del par fondo+tinta.
+
+   Regla única del dueño (2026-08-13, reafirmada 2026-08-25): NADIE pinta
+   el acento a mano. Esta clase entrega el fondo Y su tinta JUNTOS: la
+   tinta sale de la luminancia del acento (--pl-on-accent, una sola
+   fuente en ThemeContext) y es imposible quedarse con media pareja —
+   que es exactamente como nacen los botones oscuros con texto oscuro.
+
+   Sintaxis a propósito SIN !important y SIN :not: la clase pesa lo que
+   pesa una clase, y los hijos heredan vía :where() (especificidad CERO,
+   cualquier estilo propio les gana sin pelear). Si un elemento necesita
+   el acento y esta clase no le alcanza, el fix es mejorar ESTA clase,
+   no hardcodear un color al lado. */
+.pl-acento {
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  color: var(--pl-on-accent);
+}
+.pl-acento:hover { background: var(--pl-green-700); }
+.pl-acento :where(svg, span, strong, small) { color: inherit; }
+
+/* ============================================================
    [LAVADO DE ACENTO] — el patrón de fondo del kit.
 
    Una diagonal que NACE en el borde izquierdo (donde vive la
