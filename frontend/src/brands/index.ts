@@ -86,7 +86,11 @@ const BRANDS: Record<string, Brand> = {
     logoSrc: null,
     primary: '#3b82f6',
     accent: '#22c55e',
-    nameAccentIndex: 4, // "Muni" + "fy" en verde (espejo del logo azul+check verde)
+    // Sin nameAccentIndex a pedido del dueño (2026-08-24): el bicolor
+    // "Muni"+"fy" se retiró — el wordmark va plano, en un solo color.
+    // El layout split (hero + panel de acceso, el de Asunción) es EL login de
+    // la casa desde 2026-08-24: mismo componente, distinta config por marca.
+    loginLayout: 'split',
   },
   'paraguay-limpio': {
     id: 'paraguay-limpio',
@@ -119,7 +123,7 @@ const BRANDS: Record<string, Brand> = {
     logoSrc: null,        // logo Munify (BrandMark cae en MunifyLogo)
     primary: '#3b82f6',
     accent: '#22c55e',
-    nameAccentIndex: 4,   // "Muni" + "fy", igual que la marca madre
+    // Wordmark plano, igual que la marca madre (bicolor retirado 2026-08-24)
     municipioCodigo: 'asuncion',
     rutaAcceso: 'py/asuncion',
     loginLayout: 'split', // el hero de acceso de la demo, con identidad Munify
