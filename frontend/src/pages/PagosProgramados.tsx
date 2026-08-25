@@ -69,11 +69,13 @@ const FRECUENCIA_TOKEN: Record<FrecuenciaPago, string> = {
   bimestral: '--pl-data-2', trimestral: '--pl-data-3', anual: '--pl-green',
 };
 
-// "quincenal" queda EXCLUIDA de lo cargable: su cálculo real es "cada 14 días
-// corridos" (no el 15 y el 30), se desalinea del calendario y confunde. Sigue
-// en LABELS/TONO para poder mostrar datos históricos si existieran.
+// "quincenal" volvió a lo cargable (decisión del dueño 2026-08-24): ahora es
+// quincena de CALENDARIO — dos vencimientos por mes, el día A y el A+14, con
+// A acotado a 1..14 para que el segundo día (<= 28) exista en TODOS los meses.
+// La exclusión anterior era por el cálculo viejo ("+14 días corridos"), que
+// se corría del calendario.
 const FRECUENCIAS_SELECCIONABLES: FrecuenciaPago[] =
-  (Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).filter((f) => f !== 'quincenal');
+  Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[];
 
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
   .map((label, i) => ({ value: String(i), label }));
@@ -1127,6 +1129,19 @@ export default function PagosProgramados() {
                 <ModernSelect variant="v2" value={String(form.dia_semana ?? 4)}
                   onChange={(v) => setForm(f => ({ ...f, dia_semana: parseInt(v, 10) }))}
                   options={DIAS_SEMANA} />
+              </>
+            ) : form.frecuencia === 'quincenal' ? (
+              <>
+                <span className="av2-field-label">Primer día del mes (1-14)</span>
+                {/* Quincena de calendario: vence el día A y el A+14. Con A
+                    acotado a 1..14 el segundo día existe en todos los meses. */}
+                <input type="number" min={1} max={14}
+                  value={Math.min(form.dia_del_mes, 14)}
+                  aria-label="Primer día de la quincena" style={ESTILO_INPUT}
+                  onChange={(e) => setForm(f => ({ ...f, dia_del_mes: Math.min(parseInt(e.target.value, 10) || 1, 14) }))} />
+                <span className="av2-field-ayuda">
+                  Se paga el {Math.min(form.dia_del_mes, 14)} y el {Math.min(form.dia_del_mes, 14) + 14} de cada mes
+                </span>
               </>
             ) : (
               <>
