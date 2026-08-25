@@ -26,7 +26,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`clientes/`](clientes/) | Docs por cliente (`spn/` = San Pedro Norte: notas, reportes, planillas) |
 | [`design-sync/`](design-sync/) | **Los prototipos de Claude Design en HTML autoejecutable** (doble clic, sin servidor). Es la fuente contra la que se compara la app; no vive en el contexto de ningún agente. Regla global 22 |
 | [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas, y `paquetes/` con cada bajada del canvas fechada (la de número más alto es la vigente) |
-| [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`) — se crea al primer uso |
+| [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`). Último: `2026-08-25_dashboard-modular-por-modulos.md` — pasamanos para que Fable diseñe el dashboard module-aware y derive a Opus |
 | [`historico/`](historico/) | Docs superados, archivados por fecha (`YYYY-MM-DD-titulo.md`) |
 | [`antigravity/`](antigravity/) | Archivo histórico de Antigravity (herramienta dada de baja): scripts de extracción del prototipo de Configuración + capturas. El código que produjo NO está acá, sigue vivo en `frontend/src/` |
 | [`legacy/`](legacy/) | Archivo histórico pre-criterio (congelado; no mover, no borrar) |
