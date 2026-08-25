@@ -19,6 +19,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
 | [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
+| [`dashboard/`](dashboard/) | **Dashboard modular por módulos**: diseño cerrado (registry + hooks por dominio, cinta, regla del cero, orden por actividad) + WOs F1-F4 |
 | [`e2e/`](e2e/) | **Suite Playwright de circuito completo** (agnóstica de tenant): qué cubre, cómo correrla y cómo llevarla a otro municipio |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |
 | [`marketing/`](marketing/) | Brochure comercial |
@@ -50,6 +51,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
 | **Promover a prod la Tarjeta de crédito como caja (qué necesita Infra)** | [`handoffs/2026-07-23_promocion-tarjeta-credito.md`](handoffs/2026-07-23_promocion-tarjeta-credito.md) — sin migración; único paso manual = crear la caja con `codigo=TARJETA` |
 | **Retomar en frío el 2026-07-06 (Reclamos COMPLETO en qa + bloqueo de ambiente + regla "nunca DB directo")** | [`handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md`](handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md) |
+| **Retomar el dashboard modular (diseño cerrado + WOs F1-F4)** | [`dashboard/01-diseno-dashboard-modular.md`](dashboard/01-diseno-dashboard-modular.md) — reemplaza como vigente al pasamanos `handoffs/2026-08-25` |
 | Entender el estado del universo Reclamos (análisis + decisiones abiertas) | [`reclamos/01-analisis-funcional.md`](reclamos/01-analisis-funcional.md) |
 | Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
 | Ver las inconsistencias de UX/interacción del circuito (49 hallazgos) | [`reclamos/09-analisis-ux-circuito.md`](reclamos/09-analisis-ux-circuito.md) — insumo transversal repartido entre fases |
