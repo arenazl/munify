@@ -41,7 +41,10 @@ interface HeroBannerV2Props {
   acciones?: {
     conoceLabel: string;
     onConoce: () => void;
-    onPulso: () => void;
+    /** "Pulso del día" (modo televisor). Sin handler el botón no se dibuja:
+     *  el modo televisor es reclamos-céntrico y un muni sin ese módulo no
+     *  tiene qué mostrar ahí. */
+    onPulso?: () => void;
   } | null;
 }
 
@@ -82,15 +85,17 @@ export function HeroBannerV2({ eyebrow, titulo, sub, fotoUrl, fotoOpacity, kpis,
               <Sparkles className="dv2-hero-btn-icono" aria-hidden="true" />
               {acciones.conoceLabel}
             </button>
-            <button
-              type="button"
-              className="dv2-hero-btn dv2-hero-btn--outline"
-              onClick={acciones.onPulso}
-              title="Modo televisor — slides en pantalla completa"
-            >
-              <span className="dv2-pulse-dot" aria-hidden="true" />
-              Pulso del día
-            </button>
+            {acciones.onPulso && (
+              <button
+                type="button"
+                className="dv2-hero-btn dv2-hero-btn--outline"
+                onClick={acciones.onPulso}
+                title="Modo televisor — slides en pantalla completa"
+              >
+                <span className="dv2-pulse-dot" aria-hidden="true" />
+                Pulso del día
+              </button>
+            )}
           </div>
         )}
       </div>
