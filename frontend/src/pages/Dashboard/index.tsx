@@ -31,15 +31,22 @@ import { HeroBannerV2, type HeroStripKpi } from '../../components/dashboard/Hero
 import { PullToRefresh } from '../../components/ui/PullToRefresh';
 import { BRAND } from '../../brands';
 import { useModulosActivos } from './datos/useModulosActivos';
+import { useActividad } from './datos/useActividad';
 import { useDatosReclamos } from './datos/useDatosReclamos';
 import { useDatosTramites } from './datos/useDatosTramites';
 import { useDatosFinanzas } from './datos/useDatosFinanzas';
-import { dominioActivo, dominiosDeSecciones, seccionesVisibles, type DominioDatos } from './registry';
-import { construirFrasesHero, contarAbiertos } from './armadores';
+import {
+  dominioActivo, dominioConHistoria, dominiosDeSecciones, ordenarPorActividad,
+  prioridadDominios, seccionesVisibles,
+} from './registry';
+import { construirFrasesHero, contarAbiertos, type FraseDominio } from './armadores';
 import {
   construirResumenFinanciero, construirStripFinanciero, fraseFinanzas,
 } from './armadoresFinanzas';
-import type { DashboardCtx, DatosDashboard } from './tipos';
+import type { DashboardCtx, DatosDashboard, DominioDatos } from './tipos';
+
+/** Módulos que el DASHBOARD ignora aunque estén activos (decisión del dueño). */
+const SILENCIADOS_EN_DASHBOARD = new Set(['contaduria']);
 
 export default function Dashboard() {
   const { municipioActual, municipios, user } = useAuth();
@@ -173,8 +180,29 @@ export default function Dashboard() {
   // Módulos del muni → qué secciones existen → qué dominios se montan.
   // ====================================================================
   const modulos = useModulosActivos(municipioActual?.id);
-  const esActivo = modulos.esActivo;
-  const visibles = useMemo(() => seccionesVisibles(esActivo), [esActivo]);
+  // Contaduría FUERA del dashboard por ahora (dueño, 2026-08-25): el módulo
+  // sigue vivo en sus pantallas, pero el tablero no le dedica contenido — las
+  // piezas caen a su variante sin contaduría (conciliación en el 5.º KPI,
+  // nómina en la 3.ª cola, conciliación en la 3.ª pregunta del resumen).
+  // Silenciarlo ACÁ alcanza: todo lo demás (hooks, secciones, ctx) pregunta
+  // por esta función. Cuando contaduría recupere su lugar, se borra el set.
+  const esActivo = useCallback(
+    (m: string) => !SILENCIADOS_EN_DASHBOARD.has(m) && modulos.esActivo(m),
+    [modulos.esActivo],
+  );
+
+  // La actividad (historia + últimos 30 días por dominio) viaja en un GET más
+  // del arranque, en paralelo con los módulos: NO es un efecto encadenado y no
+  // se vuelve a pedir al cambiar de dependencia ni con el pull-to-refresh.
+  // Decide DOS cosas y las decide una sola vez: qué dominios tienen historia
+  // (los que no, ni se muestran ni se fetchean) y en qué orden van los bloques.
+  const actividad = useActividad(municipioActual?.id);
+  const prioridad = useMemo(() => prioridadDominios(actividad.datos), [actividad.datos]);
+
+  const visibles = useMemo(
+    () => ordenarPorActividad(seccionesVisibles(esActivo, actividad.datos), prioridad),
+    [esActivo, actividad.datos, prioridad],
+  );
   const dominios = useMemo(() => {
     const pedidos = dominiosDeSecciones(visibles);
     // El hero también habla de los tres dominios (strip + frases), así que se
@@ -182,18 +210,21 @@ export default function Dashboard() {
     pedidos.add('reclamos');
     pedidos.add('tramites');
     pedidos.add('finanzas');
-    // Un dominio se monta sólo si su módulo está ACTIVO. El filtro no es
-    // cosmético: la cinta de conteos es visible siempre y declara los dos
-    // dominios (arma un tramo por cada uno prendido); sin este filtro, un muni
-    // sin reclamos —San Pedro Norte— volvería a disparar sus diez requests.
-    return new Set<DominioDatos>([...pedidos].filter((d) => dominioActivo(esActivo, d)));
-  }, [visibles, esActivo]);
+    // Un dominio se monta sólo si su módulo está ACTIVO y además TIENE
+    // HISTORIA. El filtro no es cosmético: la cinta de conteos es visible
+    // siempre y declara los dos dominios (arma un tramo por cada uno
+    // prendido); sin este filtro, un muni sin reclamos —San Pedro Norte—
+    // volvería a disparar sus diez requests. La historia es el mismo criterio
+    // que usa `seccionesVisibles`: un módulo prendido que nunca se usó
+    // (total = 0) es un prototipo y no vale ni un request.
+    return new Set<DominioDatos>([...pedidos].filter(
+      (d) => dominioActivo(esActivo, d) && dominioConHistoria(actividad.datos, d),
+    ));
+  }, [visibles, esActivo, actividad.datos]);
 
   const reclamosOn = dominios.has('reclamos');
   const tramitesOn = dominios.has('tramites');
   const finanzasOn = dominios.has('finanzas');
-  /** El muni es sólo-financiero: el hero le habla de plata, no de la calle. */
-  const soloFinanzas = finanzasOn && !reclamosOn && !tramitesOn;
 
   // Hasta que no sabemos módulos Y dependencia no se fetchea nada.
   const listo = modulos.resuelto && dependenciasLoaded;
@@ -252,14 +283,17 @@ export default function Dashboard() {
   );
 
   const heroFrases = useMemo(() => {
-    const frases = construirFrasesHero({
+    const frases: FraseDominio[] = construirFrasesHero({
       stats, metricasAccion, coberturaResumen, califStats, tramitesStats,
     });
-    // La plata cierra el carrusel: con reclamos activos va al final, y en un
-    // muni sólo-financiero es la única frase que hay.
     const financiera = resumenFin ? fraseFinanzas(resumenFin, datosFinanzas) : null;
-    return financiera ? [...frases, financiera] : frases;
-  }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats, resumenFin, datosFinanzas]);
+    if (financiera) frases.push({ dominio: 'finanzas', frase: financiera });
+    // El carrusel abre con el dominio MÁS ACTIVO (misma prioridad que ordena
+    // los bloques). Dentro de un dominio, el orden lo sigue decidiendo el
+    // armador. Antes la plata cerraba siempre; ahora un muni que vive de la
+    // tesorería la escucha primero.
+    return prioridad.flatMap((d) => frases.filter((f) => f.dominio === d).map((f) => f.frase));
+  }, [stats, metricasAccion, coberturaResumen, califStats, tramitesStats, resumenFin, datosFinanzas, prioridad]);
 
   // ====================================================================
   // GATE DE PÁGINA. Sólo módulos + dependencias (nunca un dato de dominio) y,
@@ -300,27 +334,46 @@ export default function Dashboard() {
   const tramitesActivos = contarAbiertos(tramitesStats);
   const enRiesgoSla = metricasAccion?.vencidos ?? null;
 
-  // Con reclamos y trámites apagados el strip cambia de idioma entero: no
-  // tiene sentido dejar cuatro casillas vacías —o peor, en cero— a un muni que
-  // sólo maneja plata. Ahí los cuatro números son financieros.
-  const heroKpis: HeroStripKpi[] = soloFinanzas && resumenFin
-    ? construirStripFinanciero(resumenFin)
-    : [
-        // La etiqueta corta es la que se ve en celular, donde los cuatro entran en
-        // una sola fila: se abrevia, no se corta con puntos suspensivos.
-        ...(reclamosOn
-          ? [{ etiqueta: 'Reclamos abiertos', etiquetaCorta: 'Abiertos', valor: reclamosAbiertos }]
-          : []),
-        ...(tramitesOn
-          ? [{ etiqueta: 'Trámites activos', etiquetaCorta: 'Trámites', valor: tramitesActivos }]
-          : []),
-        ...(reclamosOn
-          ? [
-              { etiqueta: 'Resolución promedio', etiquetaCorta: 'Resolución', valor: stats ? `${stats.tiempo_promedio_dias} d` : '—' },
-              { etiqueta: 'En riesgo de SLA', etiquetaCorta: 'Riesgo SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 },
-            ]
-          : []),
-      ];
+  // El POOL del strip se reparte por ACTIVIDAD: cada casilla pertenece a un
+  // dominio y los cuatro lugares se llenan recorriendo los dominios de más a
+  // menos movidos. Un dominio apagado —o sin historia— no aporta candidatos,
+  // así que nunca queda una casilla en cero ("Reclamos abiertos 0" a un muni
+  // que no tiene reclamos era ruido, no dato). Con reclamos y trámites
+  // apagados sobran los cuatro lugares para la plata, que es exactamente el
+  // strip financiero del muni sólo-tesorería.
+  //
+  // El ORDEN de dibujo es el canónico (el de esta lista), no el de la
+  // prioridad: la actividad decide QUÉ entra, no dónde se para cada número —
+  // si no, el strip se reacomodaría entre un muni y otro sin motivo visual.
+  // La etiqueta corta es la que se ve en celular, donde los cuatro entran en
+  // una sola fila: se abrevia, no se corta con puntos suspensivos.
+  const candidatosStrip: { dominio: DominioDatos; kpi: HeroStripKpi }[] = [
+    ...(reclamosOn
+      ? [{ dominio: 'reclamos' as const, kpi: { etiqueta: 'Reclamos abiertos', etiquetaCorta: 'Abiertos', valor: reclamosAbiertos } }]
+      : []),
+    ...(tramitesOn
+      ? [{ dominio: 'tramites' as const, kpi: { etiqueta: 'Trámites activos', etiquetaCorta: 'Trámites', valor: tramitesActivos } }]
+      : []),
+    ...(reclamosOn
+      ? [
+          { dominio: 'reclamos' as const, kpi: { etiqueta: 'Resolución promedio', etiquetaCorta: 'Resolución', valor: stats ? `${stats.tiempo_promedio_dias} d` : '—' } },
+          { dominio: 'reclamos' as const, kpi: { etiqueta: 'En riesgo de SLA', etiquetaCorta: 'Riesgo SLA', valor: enRiesgoSla ?? '—', amber: (enRiesgoSla ?? 0) > 0 } },
+        ]
+      : []),
+    ...(finanzasOn && resumenFin
+      ? construirStripFinanciero(resumenFin).map((kpi) => ({ dominio: 'finanzas' as const, kpi }))
+      : []),
+  ];
+  const SLOTS_STRIP = 4;
+  const elegidos = new Set<number>();
+  prioridad.forEach((d) => {
+    candidatosStrip.forEach((c, i) => {
+      if (elegidos.size < SLOTS_STRIP && c.dominio === d) elegidos.add(i);
+    });
+  });
+  const heroKpis: HeroStripKpi[] = candidatosStrip
+    .filter((_, i) => elegidos.has(i))
+    .map((c) => c.kpi);
 
   const heroAcciones = (user?.rol === 'admin' || user?.rol === 'supervisor')
     ? {

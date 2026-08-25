@@ -23,7 +23,14 @@ import {
   veredictoTasa,
   veredictoMenosEsMejor,
 } from '../../lib/veredictos';
-import type { CalifEstadisticas, CoberturaResumen, MetricasAccion } from './tipos';
+import type { CalifEstadisticas, CoberturaResumen, DominioDatos, MetricasAccion } from './tipos';
+
+/** Una frase del carrusel con el dominio del que habla. El orquestador las
+ *  ordena por actividad: la frase del dominio más movido abre el carrusel. */
+export interface FraseDominio {
+  dominio: DominioDatos;
+  frase: HeroFrase;
+}
 
 // Estados que NO cuentan como "abiertos" para el strip del hero.
 // Patrón resiliente: cualquier estado desconocido cuenta como abierto.
@@ -167,10 +174,10 @@ export function construirFrasesHero(opts: {
   coberturaResumen: CoberturaResumen | null;
   califStats: CalifEstadisticas | null;
   tramitesStats: DashboardStats | null;
-}): HeroFrase[] {
+}): FraseDominio[] {
   const { stats, metricasAccion, coberturaResumen, califStats, tramitesStats } = opts;
   const u = resolverUmbrales();
-  const frases: HeroFrase[] = [];
+  const frases: FraseDominio[] = [];
 
   // (a) El estado del UNIVERSO de reclamos: cuántos son, cuántos resolvimos y
   // qué queda. El día es la coda, no el titular.
@@ -254,13 +261,16 @@ export function construirFrasesHero(opts: {
     );
 
     frases.push({
-      segmentos,
-      acciones: [
-        { label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true },
-        ...(esperando > 0
-          ? [{ label: `Cerrar los ${esperando}`, to: '/gestion/reclamos?estado=pendiente_confirmacion' }]
-          : []),
-      ],
+      dominio: 'reclamos',
+      frase: {
+        segmentos,
+        acciones: [
+          { label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true },
+          ...(esperando > 0
+            ? [{ label: `Cerrar los ${esperando}`, to: '/gestion/reclamos?estado=pendiente_confirmacion' }]
+            : []),
+        ],
+      },
     });
   }
 
@@ -295,8 +305,11 @@ export function construirFrasesHero(opts: {
         );
       }
       frases.push({
-        segmentos,
-        acciones: [{ label: 'Ver trámites', to: '/gestion/tramites', primaria: true }],
+        dominio: 'tramites',
+        frase: {
+          segmentos,
+          acciones: [{ label: 'Ver trámites', to: '/gestion/tramites', primaria: true }],
+        },
       });
     }
   }
@@ -307,6 +320,8 @@ export function construirFrasesHero(opts: {
   if (stats && coberturaResumen && coberturaResumen.tasa_resolucion_global > 0) {
     const dias = stats.tiempo_promedio_dias;
     frases.push({
+      dominio: 'reclamos',
+      frase: {
       segmentos: [
         seg('Resolvés el '),
         seg(
@@ -338,6 +353,7 @@ export function construirFrasesHero(opts: {
               ]),
       ],
       acciones: [{ label: 'Ver SLA', to: '/gestion/sla' }],
+      },
     });
   }
 
@@ -347,6 +363,8 @@ export function construirFrasesHero(opts: {
   if (califStats && califStats.total_calificaciones > 0) {
     const nota = califStats.promedio_general;
     frases.push({
+      dominio: 'reclamos',
+      frase: {
       segmentos: [
         seg('Los vecinos califican la gestión con '),
         seg(`${nota.toFixed(1)} de 5`, veredictoTasa((nota / 5) * 100, u.tasaResolucion)),
@@ -355,6 +373,7 @@ export function construirFrasesHero(opts: {
         ),
       ],
       acciones: [{ label: 'Ver la voz del vecino', to: '/gestion/calificaciones', primaria: true }],
+      },
     });
   }
 

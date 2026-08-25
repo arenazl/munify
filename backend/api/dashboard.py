@@ -1179,6 +1179,86 @@ async def get_metricas_detalle(
     }
 
 
+@router.get("/actividad")
+async def get_actividad(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Cuánta HISTORIA y cuánta ACTIVIDAD reciente tiene cada dominio del tablero.
+
+    Un solo request al arrancar el dashboard, seis COUNT() sin joins. Con esto
+    el tablero decide dos cosas de una vez:
+
+    - **Visibilidad por historia**: `total = 0` es un "módulo prototipo" — está
+      prendido pero nunca se usó. Sus secciones no se muestran NI se fetchean.
+      (El módulo apagado ya lo mata antes, aunque tenga datos viejos.)
+    - **Orden de los bloques**: `ultimos30` ordena los dominios de mayor a menor
+      actividad. Un muni que vive de la tesorería ve la plata arriba; uno que
+      vive de la calle, los reclamos.
+
+    Qué cuenta cada dominio (y por qué):
+
+    - `reclamos`  → tabla `reclamos`, por `created_at`.
+    - `tramites`  → tabla `solicitudes`. El dominio del tablero son las
+      GESTIONES de los vecinos, no el catálogo `tramites` (que son los tipos de
+      trámite que ofrece el muni y no miden actividad). Mismo criterio que
+      `/dashboard/tramites-stats`.
+    - `finanzas`  → `gastos` + `tesoreria_pagos_programados`, ambos sólo los
+      ACTIVOS (`activo = 1`): un gasto dado de baja no es historia del módulo.
+      Los últimos 30 días se miden con `gastos.fecha` (la fecha económica, que
+      es la indexada y la que usa `/tesoreria/gastos/serie`) y con
+      `created_at` de los pagos programados. Ojo: un pago programado que se
+      EJECUTA genera un `Gasto` con `pago_programado_id`, así que su ejecución
+      ya está contada del lado de gastos — contarla otra vez acá duplicaría.
+      Lo que suma la agenda por su cuenta es haberse dado de alta.
+
+    Sin dependencia_id a propósito: la actividad ordena la PANTALLA, no informa
+    de una secretaría. Filtrarla por el combo de arriba haría bailar el orden
+    de los bloques cada vez que el admin cambia de dependencia.
+    """
+    from models.tramite import Solicitud
+    from models.gasto import Gasto
+    from models.tesoreria_extra import TesoreriaPagoProgramado
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+    desde = datetime.utcnow().date() - timedelta(days=30)
+
+    async def _count(modelo, *extra) -> int:
+        return (await db.execute(
+            select(func.count(modelo.id))
+            .where(modelo.municipio_id == municipio_id, *extra)
+        )).scalar() or 0
+
+    gastos_total = await _count(Gasto, Gasto.activo == True)  # noqa: E712
+    gastos_30 = await _count(
+        Gasto, Gasto.activo == True, Gasto.fecha >= desde,  # noqa: E712
+    )
+    pagos_total = await _count(
+        TesoreriaPagoProgramado, TesoreriaPagoProgramado.activo == True,  # noqa: E712
+    )
+    pagos_30 = await _count(
+        TesoreriaPagoProgramado,
+        TesoreriaPagoProgramado.activo == True,  # noqa: E712
+        func.date(TesoreriaPagoProgramado.created_at) >= desde,
+    )
+
+    return {
+        "reclamos": {
+            "total": await _count(Reclamo),
+            "ultimos30": await _count(Reclamo, func.date(Reclamo.created_at) >= desde),
+        },
+        "tramites": {
+            "total": await _count(Solicitud),
+            "ultimos30": await _count(Solicitud, func.date(Solicitud.created_at) >= desde),
+        },
+        "finanzas": {
+            "total": gastos_total + pagos_total,
+            "ultimos30": gastos_30 + pagos_30,
+        },
+    }
+
+
 @router.get("/recurrentes")
 async def get_recurrentes(
     request: Request,

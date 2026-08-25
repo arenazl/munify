@@ -35,7 +35,7 @@ export function HeroFinanciero({ datos, ctx }: SeccionProps) {
     <>
       <SectionTitleV2
         icon={PiggyBank}
-        label="Finanzas"
+        label="Tesorería"
         action={{ label: 'Ver los gastos', to: '/gestion/tesoreria' }}
       />
       <div className="dv2-grid-kpi dv2-grid-kpi--5">

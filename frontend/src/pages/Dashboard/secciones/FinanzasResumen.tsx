@@ -34,7 +34,7 @@ export function FinanzasResumen({ datos, ctx }: SeccionProps) {
     <>
       <SectionTitleV2
         icon={PiggyBank}
-        label="Finanzas"
+        label="Tesorería"
         action={{ label: 'Ver los gastos', to: '/gestion/tesoreria' }}
       />
       <div className="kse-fila-3">

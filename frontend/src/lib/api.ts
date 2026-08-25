@@ -648,6 +648,9 @@ export const dashboardApi = {
   getConteoEstados: (dependencia_id?: number) =>
     api.get('/dashboard/conteo-estados', { params: dependencia_id ? { dependencia_id } : {} }),
   getConteoDependencias: () => api.get('/dashboard/conteo-dependencias'),
+  /** Historia (total) y actividad de 30 días por dominio. Ordena la pantalla
+   *  del tablero, así que NO se filtra por dependencia. */
+  getActividad: () => api.get('/dashboard/actividad'),
 };
 
 // Notificaciones

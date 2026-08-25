@@ -10,6 +10,42 @@
 import type { Caja, DashboardStats, PagoProgramado } from '../../types';
 import type { Municipio } from '../../contexts/AuthContext';
 
+// ------------------------------------------------------------- dominios
+
+/**
+ * Los tres dominios de datos del tablero: qué hook hay que montar, qué módulo
+ * lo enciende y en qué orden se muestran cuando la actividad empata.
+ *
+ * Vive acá (y no en `registry.tsx`) para que los armadores de copy puedan
+ * etiquetar sus frases sin importar el registro de secciones, que arrastra
+ * componentes.
+ */
+export type DominioDatos = 'reclamos' | 'tramites' | 'finanzas';
+
+/** ORDEN CANÓNICO. Es el desempate del orden dinámico y el orden en que se
+ *  dibuja el strip del hero. */
+export const DOMINIOS: DominioDatos[] = ['reclamos', 'tramites', 'finanzas'];
+
+/** Lo que devuelve `GET /dashboard/actividad` para UN dominio. */
+export interface ActividadDominio {
+  /** Historia completa. 0 = "módulo prototipo": prendido pero nunca usado. */
+  total: number;
+  /** Casos de los últimos 30 días. Es lo que ordena los bloques. */
+  ultimos30: number;
+}
+
+/** La respuesta completa del endpoint. */
+export type MapaActividad = Record<DominioDatos, ActividadDominio>;
+
+/** Lo que expone `useActividad`. */
+export interface Actividad {
+  /** null = todavía no llegó, o falló. En ambos casos el tablero cae al orden
+   *  canónico y NO esconde nada (fail-open). */
+  datos: MapaActividad | null;
+  /** true cuando ya se sabe (con dato o con error). */
+  resuelto: boolean;
+}
+
 // ---------------------------------------------------------------- analytics
 
 export interface HeatmapPoint {

@@ -20,10 +20,13 @@ import { HeroFinanciero } from './secciones/HeroFinanciero';
 import { ColasPagos } from './secciones/ColasPagos';
 import { TendenciaGastos } from './secciones/TendenciaGastos';
 import { FinanzasResumen } from './secciones/FinanzasResumen';
-import type { SeccionProps } from './tipos';
+import { DOMINIOS, type DominioDatos, type MapaActividad, type SeccionProps } from './tipos';
 
-/** Hooks de datos que una sección necesita montados. */
-export type DominioDatos = 'reclamos' | 'tramites' | 'finanzas';
+// El dominio de datos (y su orden canónico, `DOMINIOS`) viven en `tipos.ts`:
+// los armadores de copy también etiquetan por dominio y no pueden importar
+// este archivo, que arrastra todos los componentes de sección. NO se
+// re-exportan desde acá: un re-export en un módulo con componentes rompe el
+// fast refresh (regla react-refresh/only-export-components).
 
 /**
  * El módulo que enciende cada dominio de datos.
@@ -40,11 +43,37 @@ export const MODULO_DE_DOMINIO: Record<DominioDatos, string> = {
   finanzas: 'tesoreria',
 };
 
-export const DOMINIOS: DominioDatos[] = ['reclamos', 'tramites', 'finanzas'];
-
 /** ¿El módulo que enciende este dominio está activo en el muni? */
 export const dominioActivo = (esActivo: (m: string) => boolean, d: DominioDatos): boolean =>
   esActivo(MODULO_DE_DOMINIO[d]);
+
+/**
+ * ¿El dominio tiene HISTORIA? (principio 1.4: visible = módulo activo Y con
+ * historia). `total = 0` es un módulo prototipo: está prendido pero nunca se
+ * usó, así que sus secciones no se muestran ni se fetchean.
+ *
+ * Sin actividad (todavía no llegó, o el fetch falló) devuelve true: el orden y
+ * la visibilidad por datos son una MEJORA, no un requisito — jamás una
+ * pantalla vacía por un GET caído.
+ */
+export const dominioConHistoria = (actividad: MapaActividad | null, d: DominioDatos): boolean =>
+  actividad ? actividad[d].total > 0 : true;
+
+/**
+ * Los dominios ordenados por actividad de 30 días, desc. Empate → orden
+ * canónico. Sin actividad, orden canónico a secas.
+ *
+ * Este MISMO array prioriza tres cosas, para que la pantalla hable con una
+ * sola voz: el orden de los bloques de secciones, el pool del strip del hero y
+ * el orden de las frases del carrusel.
+ */
+export function prioridadDominios(actividad: MapaActividad | null): DominioDatos[] {
+  if (!actividad) return [...DOMINIOS];
+  return [...DOMINIOS].sort((a, b) => {
+    const dif = actividad[b].ultimos30 - actividad[a].ultimos30;
+    return dif !== 0 ? dif : DOMINIOS.indexOf(a) - DOMINIOS.indexOf(b);
+  });
+}
 
 export interface SeccionDashboard {
   id: string;
@@ -68,6 +97,12 @@ export interface SeccionDashboard {
    * - sin declarar → visible siempre (sujeto a `requiere`).
    */
   soloSiDominioSolo?: boolean;
+  /**
+   * `true` → la sección NO entra en el orden dinámico: queda arriba, fija, en
+   * el orden del registro. Es la cinta de conteos, que es de la PANTALLA (va
+   * pegada al hero) y no de un dominio.
+   */
+  fija?: boolean;
   Componente: React.FC<SeccionProps>;
 }
 
@@ -95,6 +130,8 @@ export const SECCIONES: SeccionDashboard[] = [
     requiere: [],
     dominios: ['reclamos', 'tramites'],
     layout: 'full',
+    // Va pegada al hero, arriba de todo: no la mueve el orden por actividad.
+    fija: true,
     Componente: CintaConteos,
   },
   {
@@ -179,15 +216,50 @@ export const SECCIONES: SeccionDashboard[] = [
  */
 export function seccionesVisibles(
   esActivo: (modulo: string) => boolean,
+  actividad: MapaActividad | null = null,
   secciones: SeccionDashboard[] = SECCIONES,
 ): SeccionDashboard[] {
-  const presentes = DOMINIOS.filter((d) => dominioActivo(esActivo, d));
+  const presentes = DOMINIOS.filter(
+    (d) => dominioActivo(esActivo, d) && dominioConHistoria(actividad, d),
+  );
   return secciones.filter((s) => {
     if (!s.requiere.every(esActivo)) return false;
+    // Historia: alcanza con que UNO de sus dominios la tenga. Todas las
+    // secciones declaran un único dominio menos la cinta, que declara dos y
+    // arma un tramo por cada uno con datos — gatearla contra el primero la
+    // mataría en un muni que sólo usa trámites.
+    if (!s.dominios.some((d) => dominioConHistoria(actividad, d))) return false;
     if (s.soloSiDominioSolo === undefined) return true;
     const solo = presentes.every((d) => s.dominios.includes(d));
     return s.soloSiDominioSolo ? solo : !solo;
   });
+}
+
+/**
+ * El ORDEN de la pantalla: las fijas arriba (la cinta), y después las
+ * secciones agrupadas en BLOQUES por su dominio principal, con los bloques
+ * ordenados por actividad.
+ *
+ * Dentro de un bloque manda el orden del registro: la cola antes que el mapa,
+ * el mapa antes que la analítica. Lo que se mueve es el bloque ENTERO — un
+ * muni que vive de la tesorería ve la plata arriba, uno que vive de la calle
+ * ve los reclamos, y en ningún caso se intercalan secciones de dominios
+ * distintos.
+ *
+ * Se llama UNA vez (useMemo sobre la actividad ya resuelta): la pantalla no
+ * baila mientras el usuario la mira.
+ */
+export function ordenarPorActividad(
+  visibles: SeccionDashboard[],
+  prioridad: DominioDatos[],
+): SeccionDashboard[] {
+  const fijas = visibles.filter((s) => s.fija);
+  const moviles = visibles.filter((s) => !s.fija);
+  const bloques = prioridad.flatMap((d) => moviles.filter((s) => s.dominios[0] === d));
+  // Una sección cuyo dominio principal no esté en la prioridad no se pierde:
+  // cierra la pantalla en el orden del registro.
+  const sobrantes = moviles.filter((s) => !bloques.includes(s));
+  return [...fijas, ...bloques, ...sobrantes];
 }
 
 /** Los dominios que hay que montar para las secciones dadas. */
