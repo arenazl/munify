@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from core.security import get_password_hash
-from services import geo_demo
+from services import geo_ciudad
 from models.user import User
 from models.enums import RolUsuario, EstadoReclamo
 from models.municipio import Municipio
@@ -333,34 +333,28 @@ TRAMITES_CATALOGO_EXTRA = [
 ]
 
 # ============================================================
-# Zonas (offsets sobre el centro del muni, ~2km de radio)
+# Zonas y barrios: SALEN DE LA CIUDAD, no de una lista
 # ============================================================
-ZONAS_DEMO = [
-    ("Centro",    "Z-CENTRO",    0.000,  0.000),
-    ("Norte",     "Z-NORTE",    -0.020,  0.000),
-    ("Sur",       "Z-SUR",       0.020,  0.000),
-    ("Este",      "Z-ESTE",      0.000,  0.020),
-    ("Oeste",     "Z-OESTE",     0.000, -0.020),
-    ("Periferia", "Z-PERIFERIA", 0.025,  0.025),
-]
+# Aca vivian ZONAS_DEMO ("Centro / Norte / Sur / Este / Oeste / Periferia") y
+# BARRIOS_DEMO ("Villa Norte", "Los Alamos", "Periferia Sur"): offsets fijos
+# sobre el centro del municipio. Estan BORRADAS y no vuelven.
+#
+# El dueño creo la demo de Lujan y vio "Centro / Norte / Sur" donde tenian que
+# decir Ameghino, Open Door, Jauregui, Lezica y Torrezuri. Son puntos cardinales
+# inventados presentados como los barrios de la ciudad del cliente --- justo lo
+# que la regla 11 prohibe, y justo lo que esta demo tiene que vender.
+#
+# Ahora la geografia sale de `services/geo_ciudad.py`: poligono real del
+# municipio (tabla `municipios_catalogo`) + UNA consulta a Overpass cacheada. Si
+# OSM no tiene barrios para esa ciudad, las zonas toman el nombre de sus calles
+# principales REALES; si no tiene ni eso, el municipio queda SIN zonas y el alta
+# lo informa. Nunca mas un nombre inventado.
 
-# ============================================================
-# Barrios (offsets sobre el centro, sin Nominatim)
-# ============================================================
-BARRIOS_DEMO = [
-    ("Centro",         0.000,  0.000),
-    ("Villa Norte",   -0.015,  0.002),
-    ("San Martín",    -0.010, -0.008),
-    ("Belgrano",       0.012,  0.005),
-    ("Güemes",         0.008, -0.012),
-    ("Sarmiento",     -0.005,  0.015),
-    ("Rivadavia",      0.003,  0.018),
-    ("Los Álamos",    -0.012, -0.015),
-    ("Las Lomas",      0.018,  0.010),
-    ("Parque",        -0.008,  0.010),
-    ("La Estación",    0.005, -0.005),
-    ("Periferia Sur",  0.022,  0.020),
-]
+# Cuantos puntos geolocalizados se le piden a la ciudad. Es un PARAMETRO, no un
+# numero atado al volumen de reclamos: cuando la semilla suba de 13 a 50 casos
+# alcanza con subir esto, y aunque quede corto no rompe nada --- el consumidor
+# recorre la lista con modulo, solo se repiten calles.
+PUNTOS_GEO = 80
 
 # ============================================================
 # Empleados demo
@@ -777,49 +771,30 @@ def _codigo_zona(nombre: str, municipio_id: int) -> str:
 async def _seed_zonas(
     db: AsyncSession,
     municipio_id: int,
-    codigo_muni: str,
-    muni_lat: float,
-    muni_lng: float,
-    geo: Optional[list[dict]] = None,
+    zonas_reales: list[dict],
 ) -> dict[str, Zona]:
-    """Las zonas del municipio: las REALES si las hay, y si no las genericas.
+    """Las zonas del municipio: las localidades REALES de esa ciudad, o ninguna.
 
-    Con puntos geolocalizados cacheados (ver `services/geo_demo.py`), las zonas
-    son los distritos de verdad de esa ciudad --- los 6 de Asuncion, por ejemplo ---
-    y su centro es el promedio de los puntos que cayeron adentro, no un offset.
-    Sin cache queda el reparto generico Centro/Norte/Sur, que al menos no miente
-    sobre ser oficial.
+    `zonas_reales` viene de `geo_ciudad` y son places de OpenStreetMap dentro
+    del poligono oficial del municipio: en Lujan, Olivera / Open Door / Torres /
+    Carlos Keen / Jauregui / Lezica y Torrezuri --- las localidades del partido,
+    con su coordenada real.
+
+    Si la lista viene vacia el municipio queda SIN zonas, a proposito. Antes
+    caia a Centro/Norte/Sur/Este/Periferia y eso es peor que no tener nada: una
+    zona vacia se nota y se corrige, un nombre inventado se toma por bueno.
     """
-    reales: dict[str, list[dict]] = {}
-    for punto in (geo or []):
-        if punto.get("zona_nombre"):
-            reales.setdefault(punto["zona_nombre"], []).append(punto)
-    if reales:
-        zonas = {}
-        for nombre, puntos in reales.items():
-            zona = Zona(
-                municipio_id=municipio_id,
-                nombre=nombre[:100],
-                codigo=_codigo_zona(nombre, municipio_id),
-                latitud_centro=sum(p["lat"] for p in puntos) / len(puntos),
-                longitud_centro=sum(p["lon"] for p in puntos) / len(puntos),
-                activo=True,
-            )
-            db.add(zona)
-            zonas[nombre] = zona
-        await db.flush()
-        return zonas
-
-    zonas = {}
-    for nombre, cod_zona, dlat, dlng in ZONAS_DEMO:
-        # Sufijar con municipio_id (numérico, corto) para garantizar unicidad
-        # global sin superar los 20 chars del VARCHAR(20) de Zona.codigo.
+    zonas: dict[str, Zona] = {}
+    for z in zonas_reales:
+        nombre = (z.get("nombre") or "").strip()
+        if not nombre or nombre in zonas:
+            continue
         zona = Zona(
             municipio_id=municipio_id,
-            nombre=nombre,
-            codigo=f"{cod_zona}-{municipio_id}",
-            latitud_centro=muni_lat + dlat,
-            longitud_centro=muni_lng + dlng,
+            nombre=nombre[:100],
+            codigo=_codigo_zona(nombre, municipio_id),
+            latitud_centro=z.get("lat"),
+            longitud_centro=z.get("lon"),
             activo=True,
         )
         db.add(zona)
@@ -831,50 +806,51 @@ async def _seed_zonas(
 async def _seed_barrios(
     db: AsyncSession,
     municipio_id: int,
-    muni_lat: float,
-    muni_lng: float,
-    geo: Optional[list[dict]] = None,
+    barrios_reales: list[dict],
 ) -> dict[str, Barrio]:
-    """Los barrios del municipio: los que devolvio el geocoding, o los genericos.
+    """Los barrios REALES del municipio, o ninguno.
 
-    Los reales vienen del reverse geocoding de cada punto (Tacumbu, Santa Ana,
-    Ita Enramada en Asuncion) y quedan marcados como validados: son de OSM, no
-    inventados aca.
+    Salen de OSM (`place=suburb|neighbourhood|quarter`) y por eso nacen
+    `validado=True`: la coordenada es la que tiene mapeada OpenStreetMap, no una
+    que calculamos nosotros.
     """
-    reales: dict[str, dict] = {}
-    for punto in (geo or []):
-        if punto.get("barrio"):
-            reales.setdefault(punto["barrio"], punto)
-    if reales:
-        barrios = {}
-        for nombre, punto in reales.items():
-            barrio = Barrio(
-                municipio_id=municipio_id,
-                nombre=nombre[:100],
-                latitud=punto["lat"],
-                longitud=punto["lon"],
-                tipo="suburb",
-                validado=True,
-            )
-            db.add(barrio)
-            barrios[nombre] = barrio
-        await db.flush()
-        return barrios
-
-    barrios = {}
-    for nombre, dlat, dlng in BARRIOS_DEMO:
+    barrios: dict[str, Barrio] = {}
+    for b in barrios_reales:
+        nombre = (b.get("nombre") or "").strip()
+        if not nombre or nombre in barrios:
+            continue
         barrio = Barrio(
             municipio_id=municipio_id,
-            nombre=nombre,
-            latitud=muni_lat + dlat,
-            longitud=muni_lng + dlng,
-            tipo="suburb",
-            validado=False,
+            nombre=nombre[:100],
+            latitud=b.get("lat"),
+            longitud=b.get("lon"),
+            tipo=b.get("tipo") or "suburb",
+            validado=True,
         )
         db.add(barrio)
         barrios[nombre] = barrio
     await db.flush()
     return barrios
+
+
+def _zona_para(zonas: dict[str, Zona], zona_nombre: Optional[str],
+               idx: int) -> Optional[Zona]:
+    """La zona de un empleado o cuadrilla, ahora que las zonas son REALES.
+
+    `EMPLEADOS_DEMO`/`CUADRILLAS_DEMO` traen nombres de zona genéricos ("Sur",
+    "Norte") que eran los de la lista vieja. Con las zonas de la ciudad de
+    verdad ese match no da nunca, y sin esto los 7 empleados quedaban con
+    `zona_id` NULL — el reparto por zona del tablero mostraba todo vacío.
+
+    Se reparten por POSICIÓN sobre las zonas reales: determinístico, y cada
+    operario queda a cargo de una localidad que existe.
+    """
+    if zona_nombre and zona_nombre in zonas:
+        return zonas[zona_nombre]
+    if not zona_nombre:
+        return None  # los administrativos no tienen zona a propósito
+    pool = list(zonas.values())
+    return pool[idx % len(pool)] if pool else None
 
 
 async def _seed_empleados(
@@ -885,9 +861,10 @@ async def _seed_empleados(
 ) -> list[Empleado]:
     """Crea 7 empleados con categoría principal, zona y telefono."""
     empleados = []
-    for nombre, apellido, telefono, tipo, especialidad, cat_nombre, zona_nombre in EMPLEADOS_DEMO:
+    for _i, (nombre, apellido, telefono, tipo, especialidad, cat_nombre,
+             zona_nombre) in enumerate(EMPLEADOS_DEMO):
         cat = cats_reclamo.get(cat_nombre) if cat_nombre else None
-        zona = zonas.get(zona_nombre) if zona_nombre else None
+        zona = _zona_para(zonas, zona_nombre, _i)
         empleado = Empleado(
             municipio_id=municipio_id,
             nombre=nombre,
@@ -931,9 +908,10 @@ async def _seed_cuadrillas(
     """Crea 3 cuadrillas con líder + 1 miembro cada una."""
     cuadrillas = []
     from datetime import date
-    for nombre, desc, cat_nombre, zona_nombre, lider_idx, miembro_idx in CUADRILLAS_DEMO:
+    for _i, (nombre, desc, cat_nombre, zona_nombre, lider_idx,
+             miembro_idx) in enumerate(CUADRILLAS_DEMO):
         cat = cats_reclamo.get(cat_nombre)
-        zona = zonas.get(zona_nombre)
+        zona = _zona_para(zonas, zona_nombre, _i)
         cuadrilla = Cuadrilla(
             municipio_id=municipio_id,
             nombre=nombre,
@@ -1021,6 +999,7 @@ async def seed_demo_completo(
     municipio_id: int,
     codigo: str,
     password: str = "demo123",
+    log=None,
 ) -> dict:
     """
     Arma toda la estructura de datos para que un municipio demo sea
@@ -1030,8 +1009,13 @@ async def seed_demo_completo(
     `crear_categorias_default()` y que la sesión tiene un flush pendiente
     con el municipio ya insertado.
 
+    `log` es un `services.seed_log.SeedLog` opcional: si viene, cada etapa deja
+    su nombre, estado, counts y duracion para la consola del super admin.
+
     Retorna un dict con info del seed para la response del endpoint.
     """
+    from services.seed_log import SeedLog
+
     # Demo protegida por PIN: el alta puede pasar otra password (el PIN) y
     # todos los usuarios demo del muni nacen con ella en vez de demo123.
     hash_demo = get_password_hash(password)
@@ -1041,12 +1025,25 @@ async def seed_demo_completo(
     muni_lat = muni.latitud if muni and muni.latitud else -34.603722
     muni_lng = muni.longitud if muni and muni.longitud else -58.381592
 
-    # Puntos con direccion REAL de esta ciudad, precalculados por el batch
-    # `scripts/generar_puntos_demo.py`. Si esta ciudad todavia no se precalento,
-    # la lista viene vacia y todo lo de abajo cae en el comportamiento de
-    # siempre: la demo se crea igual, solo que con direcciones genericas. Nunca
-    # se sale a buscarlos en vivo --- serian ~40 segundos dentro del alta.
-    geo = geo_demo.puntos_para_semilla(muni.nombre, 60) if muni else []
+    # Sin log del llamador se arma uno propio y no se guarda: asi los pasos se
+    # escriben una sola vez y los scripts no necesitan saber que existe.
+    log = log or SeedLog(muni.nombre if muni else codigo, codigo=codigo)
+
+    # LA GEOGRAFIA DE ESTA CIUDAD, EN VIVO Y SIN CACHE PREVIO.
+    # Poligono oficial desde `municipios_catalogo` + UNA consulta a Overpass
+    # (cacheada en disco para la proxima demo de la misma ciudad). De ahi salen
+    # las zonas, los barrios y los puntos con direccion real. Si algo no esta
+    # disponible, `geografia` degrada y lo explica en `degradacion` --- nunca
+    # levanta y nunca inventa nombres.
+    geo_ctx = await geo_ciudad.geografia(
+        db,
+        nombre=muni.nombre if muni else codigo,
+        pais=(muni.pais if muni and muni.pais else "AR"),
+        cantidad_puntos=PUNTOS_GEO,
+        lat=muni_lat, lon=muni_lng,
+        log=log,
+    )
+    geo = geo_ctx["puntos"]
 
     # ------------------------------------------------------------------
     # 1. Habilitar dependencias del catálogo global
@@ -1070,6 +1067,8 @@ async def seed_demo_completo(
         db.add(muni_dep)
         muni_deps[dep_codigo] = muni_dep
     await db.flush()
+    log.hito("dependencias", dependencias=len(muni_deps),
+             nombres=list(muni_deps.keys()))
 
     # ------------------------------------------------------------------
     # 2. Mapear categorías de reclamo → dependencias
@@ -1096,6 +1095,7 @@ async def seed_demo_completo(
                 activo=True,
             ))
     await db.flush()
+    log.hito("categorias_reclamo", categorias=len(cats_reclamo))
 
     # ------------------------------------------------------------------
     # 3. Crear trámites con documentos requeridos
@@ -1171,6 +1171,8 @@ async def seed_demo_completo(
     tramites_operativos = [
         (t, d) for t, d in tramites_creados if not d.get("solo_catalogo")
     ]
+    log.hito("tramites", tramites=len(tramites_creados),
+             operativos=len(tramites_operativos))
 
     # ------------------------------------------------------------------
     # 4. Crear usuarios demo
@@ -1286,6 +1288,8 @@ async def seed_demo_completo(
     )
     db.add(vecino_demo)
     await db.flush()
+    log.hito("usuarios", admin=1, vecino=1, supervisores=len(supervisores_demo),
+             direccion_vecino=_direccion_demo)
 
     # ------------------------------------------------------------------
     # Tasas demo: partidas ABL + Patente + Multa + sus deudas
@@ -1419,18 +1423,36 @@ async def seed_demo_completo(
             ))
 
         await db.flush()
+    log.hito("tasas", tipos_de_tasa=len(tipos_map),
+             motivo=None if tipos_map else "catalogo global de tipos de tasa vacio",
+             estado="ok" if tipos_map else "degradado")
 
     # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)
     # ------------------------------------------------------------------
-    zonas = await _seed_zonas(db, municipio_id, codigo, muni_lat, muni_lng, geo)
-    barrios = await _seed_barrios(db, municipio_id, muni_lat, muni_lng, geo)
+    with log.paso("zonas") as _p:
+        zonas = await _seed_zonas(db, municipio_id, geo_ctx["zonas"])
+        if zonas:
+            _p.ok(zonas=len(zonas), nombres=list(zonas.keys()))
+        else:
+            _p.degradado(
+                "OSM no devolvio ninguna division para esta ciudad; el municipio "
+                "queda sin zonas (antes se inventaban Centro/Norte/Sur)")
+    with log.paso("barrios") as _p:
+        barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"])
+        if barrios:
+            _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15])
+        else:
+            _p.degradado("OSM no tiene barrios mapeados dentro del poligono")
 
     # ------------------------------------------------------------------
     # 6. Empleados + Cuadrillas (personal operativo)
     # ------------------------------------------------------------------
     empleados = await _seed_empleados(db, municipio_id, cats_reclamo, zonas)
     cuadrillas = await _seed_cuadrillas(db, municipio_id, empleados, cats_reclamo, zonas)
+    log.hito("empleados_cuadrillas", empleados=len(empleados),
+             cuadrillas=len(cuadrillas),
+             con_zona=sum(1 for e in empleados if e.zona_id))
 
     # Usuarios con rol EMPLEADO — sin esto no hay con qué entrar como el
     # operario de campo (ve "Mis Trabajos" y, si el módulo está activo, sus
@@ -1462,6 +1484,7 @@ async def seed_demo_completo(
     # 7. SLA configs
     # ------------------------------------------------------------------
     sla_count = await _seed_sla_configs(db, municipio_id, cats_reclamo)
+    log.hito("sla", sla_configs=sla_count)
 
     # ------------------------------------------------------------------
     # 8. Reclamos de ejemplo (con coords + zona + barrio)
@@ -1490,8 +1513,11 @@ async def seed_demo_completo(
             zona = zonas.get(punto.get("zona_nombre"))
             barrio = barrios.get(punto.get("barrio"))
         else:
-            zona = zonas.get(r_data["zona_nombre"])
-            barrio = barrios.get(r_data["barrio_nombre"])
+            # Sin geografia real no hay zona ni barrio que adjudicar: los
+            # nombres de `RECLAMOS_DEMO` son de la lista generica vieja y no
+            # existen mas. Quedan en None y el fallback de abajo los reparte
+            # entre las zonas reales, si las hay.
+            zona = barrio = None
 
         # Fallback random si el match por nombre no devolvió nada — evita
         # quedar con FKs en NULL que rompen las queries agrupadas.
@@ -1519,9 +1545,15 @@ async def seed_demo_completo(
             created_at=_creado,
             fecha_resolucion=(_creado + timedelta(days=2 + idx_reclamo % 4)) if _cerrado else None,
             prioridad=3,
-            direccion=punto["direccion"] if punto else r_data["direccion"],
-            latitud=punto["lat"] if punto else muni_lat + r_data["lat_offset"],
-            longitud=punto["lon"] if punto else muni_lng + r_data["lng_offset"],
+            # SIN PUNTO REAL NO SE INVENTA UNA DIRECCION (regla 11). Antes caia
+            # a "Calle Guemes al 400" con un offset sobre el centro del muni:
+            # una calle que no existe y una chinche donde no paso nada. Ahora
+            # queda el nombre del municipio (que es cierto) y SIN coordenada,
+            # asi el mapa no muestra un pin falso. `direccion` es NOT NULL.
+            direccion=punto["direccion"] if punto else (
+                muni.nombre if muni else codigo),
+            latitud=punto["lat"] if punto else None,
+            longitud=punto["lon"] if punto else None,
             categoria_id=cat.id,
             zona_id=zona.id if zona else None,
             barrio_id=barrio.id if barrio else None,
@@ -1558,11 +1590,22 @@ async def seed_demo_completo(
             ))
     reclamos_creados = len(reclamos_creados_list)
     await db.flush()
+    _con_coord = sum(1 for r in reclamos_creados_list if r.latitud is not None)
+    log.hito("reclamos", reclamos=reclamos_creados,
+             con_coordenada_real=_con_coord,
+             con_zona=sum(1 for r in reclamos_creados_list if r.zona_id),
+             con_barrio=sum(1 for r in reclamos_creados_list if r.barrio_id),
+             direcciones=[r.direccion for r in reclamos_creados_list[:10]],
+             estado="ok" if _con_coord == reclamos_creados else "degradado",
+             motivo=None if _con_coord == reclamos_creados else
+             f"{reclamos_creados - _con_coord} reclamos sin coordenada: no habia "
+             f"geografia real para esta ciudad (no se inventa una direccion)")
 
     # 8.bis. Calificaciones: parte de los reclamos cerrados ya viene con la
     # devolución del vecino, así la pantalla de calidad de atención nace con
     # datos en vez de "todavía no hay calificaciones".
     calificaciones_creadas = await _seed_calificaciones(db, reclamos_creados_list)
+    log.hito("calificaciones", calificaciones=calificaciones_creadas)
 
     # 9. Solicitudes de ejemplo: 2 por trámite OPERATIVO (estados variados) —
     # los trámites `solo_catalogo` no generan solicitudes (regla 3).
@@ -1682,6 +1725,7 @@ async def seed_demo_completo(
                 ))
             solicitudes_creadas += 1
     await db.flush()
+    log.hito("solicitudes", solicitudes=solicitudes_creadas)
 
     # ------------------------------------------------------------------
     # 10. Órdenes de trabajo (el circuito de campo formal sobre los reclamos)
@@ -1691,8 +1735,11 @@ async def seed_demo_completo(
     )
 
     # Inventario demo (activos + consumibles) — se cruza con las OT.
+    log.hito("ordenes_trabajo", ordenes_trabajo=ots_creadas)
+
     from services.inventario_seed import seed_inventario
     inv_res = await seed_inventario(db, municipio_id, incluir_demo=True)
+    log.hito("inventario", items=inv_res["items"])
 
     # La OT ya no tiene catálogo propio de "tipos de trabajo": clasifica con las
     # categorías de reclamo del muni (sembradas en categorias_seed), así que acá
@@ -1702,9 +1749,11 @@ async def seed_demo_completo(
     # circuito completo (campo + inventario + sueldos + contaduría). El seed
     # corre una sola vez por muni nuevo, no hace falta chequear duplicados.
     from models.municipio_modulo import MunicipioModulo
-    for _mod in ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria'):
+    _modulos = ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria')
+    for _mod in _modulos:
         db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()
+    log.hito("modulos", modulos=list(_modulos))
 
     return {
         "dependencias": len(muni_deps),
@@ -1721,6 +1770,16 @@ async def seed_demo_completo(
         "solicitudes": solicitudes_creadas,
         "ordenes_trabajo": ots_creadas,
         "inventario_items": inv_res["items"],
+        # La demo tiene que poder DECIR si hablo de la ciudad del cliente o si
+        # se quedo corta. Sin esto una demo sin geografia se ve igual de bien en
+        # la respuesta del alta y el problema aparece recien en pantalla.
+        "geografia": {
+            "fuente_poligono": geo_ctx.get("fuente_poligono"),
+            "degradacion": geo_ctx.get("degradacion"),
+            "zonas_reales": [z["nombre"] for z in geo_ctx.get("zonas") or []],
+            "barrios_reales": [b["nombre"] for b in geo_ctx.get("barrios") or []],
+            "puntos": len(geo),
+        },
     }
 
 

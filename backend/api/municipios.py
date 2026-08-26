@@ -560,6 +560,11 @@ class MunicipioDemoCreate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     provincia: Optional[str] = None
+    # País del catálogo (ISO-3166 alpha-2). Decide dónde se busca el POLÍGONO
+    # oficial del municipio en `municipios_catalogo` y, con él, los barrios y
+    # calles reales de la ciudad (ver services/geo_ciudad.py). Sin esto, una
+    # demo de Encarnación buscaba su contorno entre los municipios argentinos.
+    pais: Optional[str] = "AR"
     # PIN numérico opcional (4-8 dígitos). Si viene, la demo nace PROTEGIDA:
     # los usuarios demo se crean con el PIN como password (en vez de demo123)
     # y el frontend pide la clave al tocar un perfil de la botonera.
@@ -675,6 +680,16 @@ async def crear_municipio_demo(
     """
     from services.categorias_default import crear_categorias_default
     from services.seed_demo import seed_demo_completo
+    from services.seed_log import SeedLog
+
+    def _counts(d) -> dict:
+        """Counts de un sub-seed, sin las claves reservadas del log.
+
+        `hito(nombre, motivo, estado, **detalle)`: si un sub-seed devolviera un
+        count llamado `estado`, pisaria el estado del paso y el log mentiria.
+        """
+        return {k: v for k, v in (d or {}).items()
+                if k not in ("estado", "motivo", "nombre")}
 
     nombre_limpio = (data.nombre or "").strip()
     if len(nombre_limpio) < 3:
@@ -706,6 +721,13 @@ async def crear_municipio_demo(
             break
         suffix += 1
         codigo = f"{base_codigo}-{suffix}"
+
+    # BITACORA DE LA CREACION. Se abre ACA, antes de tocar la base, porque el
+    # caso que hay que poder mirar es justamente el alta que se rompe a mitad:
+    # el log se escribe en su propia sesion (ver services/seed_log.py) y queda
+    # aunque la transaccion del alta se revierta.
+    log = SeedLog(nombre_limpio, codigo=codigo, pais=(data.pais or "AR"),
+                  provincia=data.provincia, origen="endpoint")
 
     # 1. Coordenadas del municipio. Si el autocomplete oficial ya las trajo
     # (tabla municipios_argentina), se usan directo. Si no, fallback al
@@ -740,6 +762,7 @@ async def crear_municipio_demo(
     municipio = Municipio(
         nombre=nombre_limpio,
         codigo=codigo,
+        pais=(data.pais or "AR").upper(),
         latitud=lat,
         longitud=lng,
         radio_km=10.0,
@@ -762,10 +785,18 @@ async def crear_municipio_demo(
     # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
     # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
     # la coherencia dependencia↔categoría con asignaciones random.
-    seed_info = await seed_demo_completo(db, municipio.id, codigo,
-                                         password=demo_pin or "demo123")
-
-    await db.commit()
+    #
+    # Va envuelto para que el log quede grabado TAMBIÉN si revienta acá: es el
+    # caso que hay que poder mirar desde la consola del super admin.
+    try:
+        seed_info = await seed_demo_completo(db, municipio.id, codigo,
+                                             password=demo_pin or "demo123",
+                                             log=log)
+        await db.commit()
+    except Exception as e:
+        log.error(e)
+        await log.guardar(municipio_id=municipio.id)
+        raise
 
     # 4. Turnero (best-effort): agenda, horarios y turnos de ejemplo sobre
     # los trámites ya creados en el paso 3.
@@ -774,17 +805,22 @@ async def crear_municipio_demo(
         turnero_counts = await seed_turnero_demo(db, municipio.id)
         print(f"[CREAR DEMO] Turnero seed: {turnero_counts}")
         await db.commit()
+        log.hito("turnero", **_counts(turnero_counts))
     except Exception as e:
         print(f"[CREAR DEMO] Seed de turnero fallo (best-effort): {e}")
         await db.rollback()
+        log.hito("turnero", estado="fallo", motivo=f"{type(e).__name__}: {str(e)[:300]}")
 
     # 5. Seed de tasas (best-effort): partidas + deudas ficticias para el demo
     # del Boton de Pago GIRE. Requiere seed_tipos_tasa.py ya corrido (global).
     try:
         from scripts.seed_tasas_completo import seed_para_municipio as seed_tasas
         await seed_tasas(municipio.id, limpiar=False)
+        log.hito("tasas_completo")
     except Exception as e:
         print(f"[CREAR DEMO] Seed de tasas fallo (best-effort): {e}")
+        log.hito("tasas_completo", estado="fallo",
+                 motivo=f"{type(e).__name__}: {str(e)[:300]}")
 
     # 6. Seed Tesoreria (best-effort): activa el modulo + carga catalogos
     # (15 tipos concepto, 300 conceptos, 10 tipos empleado), 5 cajas/fondos
@@ -801,10 +837,17 @@ async def crear_municipio_demo(
             t_counts = await seed_tesoreria_demo(db, municipio.id, admin_user.id)
             print(f"[CREAR DEMO] Tesoreria seed: {t_counts}")
             await db.commit()
+            log.hito("tesoreria", **_counts(t_counts))
+        else:
+            log.hito("tesoreria", estado="degradado",
+                     motivo="no se encontro el admin del muni recien creado")
     except Exception as e:
         print(f"[CREAR DEMO] Seed de Tesoreria fallo (best-effort): {e}")
         await db.rollback()
+        log.hito("tesoreria", estado="fallo",
+                 motivo=f"{type(e).__name__}: {str(e)[:300]}")
 
+    await log.guardar(municipio_id=municipio.id)
     await db.refresh(municipio)
 
     return MunicipioDemoResponse(

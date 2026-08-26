@@ -49,6 +49,7 @@ from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
 from .audit_log import AuditLog
+from .demo_seed_log import DemoSeedLog
 from .captura_movil_sesion import (
     CapturaMovilSesion,
     EstadoCapturaMovil,
@@ -136,6 +137,7 @@ __all__ = [
     "EmailValidation",
     # Audit logs
     "AuditLog",
+    "DemoSeedLog",
     # Captura móvil (handoff PC ↔ celular)
     "CapturaMovilSesion",
     "EstadoCapturaMovil",
