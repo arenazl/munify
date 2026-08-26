@@ -167,15 +167,24 @@ export default function Demo() {
       return;
     }
     if (!muniSel || muniSel.nombre !== nombre) {
-      setError('Elegí tu municipio de la lista (catálogo oficial de Argentina)');
+      // El copy nombra el país ELEGIDO en la botonera: el catálogo dejó de ser
+      // mono-país y decir "Argentina" con la bandera de Paraguay puesta hacía
+      // pensar que la búsqueda estaba rota.
+      const paisNombre = PAISES.find((p) => p.cod === pais)?.nombre || pais;
+      setError(`Elegí tu municipio de la lista (catálogo oficial de ${paisNombre}). Sin una ciudad del catálogo la demo queda sin barrios ni calles reales.`);
       return;
     }
     setCreando(true);
     setCreandoDone(false);
     setError('');
     try {
+      // El `pais` viaja SIEMPRE: es lo que decide dónde se busca el polígono
+      // oficial de la ciudad y, con él, sus barrios y calles reales. Se manda
+      // el del municipio elegido (no el de la botonera) porque es el dato que
+      // acompaña a lat/lng/provincia de esa misma fila del catálogo.
       const res = await municipiosApi.crearDemo(nombre, {
         lat: muniSel.lat, lng: muniSel.lng, provincia: muniSel.provincia,
+        pais: muniSel.pais || pais,
       });
       const muni = res.data;
       saveMunicipioToStorage({

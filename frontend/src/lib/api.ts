@@ -726,7 +726,12 @@ export const municipiosApi = {
   // Endpoint público para crear municipio de demo desde la landing comercial.
   // Arma todo el seed mínimo (categorías + dep General + 2 users demo) y
   // devuelve la URL de redirección a la landing del muni nuevo.
-  crearDemo: (nombre: string, geo?: { lat: number; lng: number; provincia?: string }) =>
+  // `pais` NO es opcional de hecho: decide en qué país se busca el POLÍGONO
+  // oficial de la ciudad (`municipios_catalogo`) y, con él, los barrios y
+  // calles reales (services/geo_ciudad.py). Sin mandarlo, el backend asume
+  // "AR" y una demo de Asunción o Valparaíso busca su contorno entre los
+  // municipios argentinos → se queda sin geografía.
+  crearDemo: (nombre: string, geo?: { lat: number; lng: number; provincia?: string; pais?: string }) =>
     api.post<{
       id: number;
       nombre: string;
@@ -775,6 +780,70 @@ export const auditApi = {
   setDebugMode: (enabled: boolean) =>
     api.put<{ enabled: boolean }>('/admin/settings/debug_mode', { enabled }),
   consolaResumen: () => api.get<ConsolaResumen>('/admin/consola/resumen'),
+};
+
+/* ============================================================
+ * Bitácora de la SEMILLA de demos (solo super admin).
+ * Contrato: backend/api/admin_seed_logs.py. El listado NO trae `pasos`
+ * (una demo grande son ~20 pasos con sus counts); el detalle sí.
+ * ============================================================ */
+
+/** Una etapa del pipeline de la semilla. `detalle` es libre: cada paso guarda
+ *  lo que produjo (counts, y cuando aplica los NOMBRES reales). */
+export interface SeedLogPaso {
+  nombre: string;
+  estado: 'ok' | 'degradado' | 'fallo' | string;
+  duracion_ms: number;
+  /** Por qué degradó o falló. Obligatorio del lado del backend para degradar. */
+  motivo?: string;
+  detalle?: Record<string, unknown>;
+}
+
+/** Lo que se lee SIN abrir el detalle (services/seed_log.py → resumen()). */
+export interface SeedLogResumen {
+  pasos_total: number;
+  pasos_ok: number;
+  pasos_degradados: number;
+  pasos_fallidos: number;
+  /** Los nombres REALES: es lo único que delata si la demo habla de la ciudad
+   *  del cliente o de zonas genéricas. */
+  zonas: string[];
+  barrios: string[];
+  calles_ejemplo: string[];
+  degradaciones: { paso: string; motivo?: string | null }[];
+}
+
+export interface SeedLogItem {
+  id: number;
+  created_at: string | null;
+  /** Nullable a propósito: el log sobrevive al borrado de la demo. */
+  municipio_id: number | null;
+  municipio_nombre: string;
+  codigo: string | null;
+  pais: string | null;
+  provincia: string | null;
+  /** 'endpoint' (pantalla /demo) o 'script'. */
+  origen: string;
+  estado: 'ok' | 'degradado' | 'fallo' | string;
+  duracion_ms: number;
+  resumen: SeedLogResumen | null;
+  error_message: string | null;
+}
+
+export interface SeedLogDetalle extends SeedLogItem {
+  pasos: SeedLogPaso[] | null;
+}
+
+export const seedLogsApi = {
+  list: (params: {
+    estado?: string;
+    municipio_id?: number;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) =>
+    api.get<{ total: number; items: SeedLogItem[] }>('/admin/seed-logs', { params }),
+  detail: (id: number) => api.get<SeedLogDetalle>(`/admin/seed-logs/${id}`),
 };
 
 // Proveedores de pago (GIRE, MercadoPago, MODO)

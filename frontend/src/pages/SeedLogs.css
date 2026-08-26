@@ -1,0 +1,207 @@
+/**
+ * SeedLogs.css — la piel del paso a paso de la semilla.
+ *
+ * Todo lo que es LISTA (hero, filtros, tabla, drawer) lo pone el kit abmv2:
+ * acá viven sólo las piezas del CUERPO del detalle, que es contenido de la
+ * página y no un control del kit — la historia de qué hizo la semilla.
+ *
+ * Regla del kit: cero hex. Todo sale de tokens `--pl-*`, y el color por
+ * estado sale de `--pl-tono` declarado en la MISMA regla (nunca heredado de
+ * :root, ver la nota de [LAVADO POR TONO] en pl-tokens.css).
+ */
+
+/* ---- Celda "qué pasó" de la tabla: dos renglones, no elipsis a la mitad ---- */
+.sl-que {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.35;
+  color: var(--pl-text-2);
+}
+.sl-que-motivo { color: var(--pl-text-muted); }
+
+/* ============================================================
+ * El paso a paso (cuerpo del SideModal)
+ * ============================================================ */
+
+.sl-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pl-space-2);
+}
+
+.sl-paso {
+  --pl-tono: var(--pl-green);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-tono);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface-2);
+  padding: 10px 12px;
+}
+.sl-paso--degradado { --pl-tono: var(--pl-amber); }
+.sl-paso--fallo     { --pl-tono: var(--pl-red); }
+
+.sl-paso-cab {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pl-space-2);
+}
+.sl-paso-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-text);
+  overflow-wrap: anywhere;
+}
+.sl-paso-estado {
+  flex: 0 0 auto;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-tono);
+}
+.sl-paso-dur {
+  flex: 0 0 auto;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El motivo de una degradación es LA información del panel: no se apaga. */
+.sl-paso-motivo {
+  margin: 6px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.4;
+  color: var(--pl-tono);
+  overflow-wrap: anywhere;
+}
+
+.sl-paso-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 9px;
+}
+/* Un paso sin datos abajo: el encabezado se centra en su propia altura. Lo
+   declara el padre con la clase, no un selector que lo deduzca. */
+.sl-paso-cab--solo { align-items: center; }
+
+/* ---- Counts: pares etiqueta / valor ---- */
+.sl-pares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+.sl-par {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+.sl-par-label {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.sl-par-valor {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Nombres reales: chips, que es como se leen de un vistazo ---- */
+.sl-lista { min-width: 0; }
+.sl-lista-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.sl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.sl-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--pl-radius-pill);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-3);
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-text-2);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* El chip que cuenta cuántos quedaron afuera: mismo alto, sin borde. */
+.sl-chip--resto {
+  border-color: transparent;
+  background: transparent;
+  color: var(--pl-text-muted);
+  font-weight: 500;
+}
+
+/* ---- Caída a texto crudo: sólo para lo que no tiene forma conocida ---- */
+.sl-crudo {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--pl-radius-sm);
+  background: var(--pl-surface-3);
+  border: 1px solid var(--pl-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--pl-fs-micro);
+  line-height: 1.45;
+  color: var(--pl-text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* ---- El error que tumbó el alta ---- */
+.sl-error {
+  --pl-tono: var(--pl-red);
+  border: 1px solid var(--pl-red-100);
+  border-left: 3px solid var(--pl-tono);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-red-100);
+  padding: 10px 12px;
+}
+.sl-error-txt {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--pl-fs-micro);
+  line-height: 1.5;
+  color: var(--pl-red-700);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Ficha de la ciudad (primera sección del detalle) ---- */
+.sl-ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sl-nota {
+  margin: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}

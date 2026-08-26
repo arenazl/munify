@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History,
+  History, Sprout,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -475,6 +475,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isSuperAdmin,
       categoria: 'Super Admin',
       description: 'Activar/desactivar módulos por municipio (feature flags)'
+    },
+    {
+      // Regla 10 del CLAUDE.md: una sola palabra. "Semilla" es como se llama
+      // el generador de demos en todo el código; "Logs de seeding" no entra.
+      name: 'Semilla',
+      href: '/gestion/admin/seed-logs',
+      icon: Sprout,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Paso a paso de lo que hizo la semilla en cada demo creada'
     },
     {
       name: 'Auditoría',

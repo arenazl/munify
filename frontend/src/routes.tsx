@@ -77,6 +77,7 @@ import GestionAusencias from './pages/GestionAusencias';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import AuditLogs from './pages/admin/AuditLogs';
+import SeedLogs from './pages/SeedLogs';
 import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
 import Demo from './pages/Demo';
@@ -344,6 +345,13 @@ export const router = createBrowserRouter([
       {
         path: 'admin/audit-logs',
         element: <ProtectedRoute roles={['admin']}><AuditLogs /></ProtectedRoute>
+      },
+      {
+        // Bitácora de la semilla de demos. Mismo gate que el resto del área de
+        // super admin: rol admin + `isSuperAdmin` en el sidebar; el backend
+        // vuelve a exigir admin SIN municipio_id (require_super_admin).
+        path: 'admin/seed-logs',
+        element: <ProtectedRoute roles={['admin']}><SeedLogs /></ProtectedRoute>
       },
       {
         path: 'admin/suscripciones',
