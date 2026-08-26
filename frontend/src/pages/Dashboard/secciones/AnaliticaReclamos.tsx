@@ -65,7 +65,11 @@ export function AnaliticaReclamos({ datos }: SeccionProps) {
 
   return (
     <>
-      <SectionTitleV2 icon={TrendingUp} label="Analítica" />
+      {/* El título habla en MÓDULOS, no en abstracciones (dueño, 2026-08-25):
+          estas cinco preguntas son de RECLAMOS —barrios, categorías, tiempos
+          de resolución—, así que el rótulo lo dice. "Analítica" no le decía a
+          nadie de qué módulo estaba hablando. */}
+      <SectionTitleV2 icon={TrendingUp} label="Reclamos" />
 
       {cargandoAnalytics ? (
         <div className="kse-fila-3">

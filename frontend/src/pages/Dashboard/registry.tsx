@@ -61,19 +61,45 @@ export const dominioConHistoria = (actividad: MapaActividad | null, d: DominioDa
   actividad ? actividad[d].total > 0 : true;
 
 /**
- * Los dominios ordenados por actividad de 30 días, desc. Empate → orden
- * canónico. Sin actividad, orden canónico a secas.
+ * Cuántas veces más movimiento tiene que tener un dominio para ADELANTAR a
+ * otro en la pantalla. Con menos que esto los números se consideran "parejos"
+ * y manda el orden canónico (reclamos → trámites → tesorería).
+ */
+const FACTOR_EVIDENTE = 3;
+
+/**
+ * Los dominios en el orden de la pantalla. Regla del dueño (2026-08-25):
+ *
+ * - Se mide el MOVIMIENTO GENERAL (`total`, la historia completa), no los
+ *   últimos 30 días: las demos son estáticas y una ventana corta ordenaría
+ *   por el azar de la semilla, no por el peso real de cada módulo.
+ * - El default es el orden canónico (reclamos → trámites → tesorería) y sólo
+ *   se altera cuando los números son MUY evidentes: un dominio adelanta a
+ *   otro únicamente si lo supera por `FACTOR_EVIDENTE`. En la práctica,
+ *   tesorería abre el tablero sólo en el muni que vive de la tesorería
+ *   (San Pedro Norte); en un muni operativo jamás va primera.
  *
  * Este MISMO array prioriza tres cosas, para que la pantalla hable con una
  * sola voz: el orden de los bloques de secciones, el pool del strip del hero y
  * el orden de las frases del carrusel.
  */
 export function prioridadDominios(actividad: MapaActividad | null): DominioDatos[] {
-  if (!actividad) return [...DOMINIOS];
-  return [...DOMINIOS].sort((a, b) => {
-    const dif = actividad[b].ultimos30 - actividad[a].ultimos30;
-    return dif !== 0 ? dif : DOMINIOS.indexOf(a) - DOMINIOS.indexOf(b);
-  });
+  const orden = [...DOMINIOS];
+  if (!actividad) return orden;
+  // Burbuja con umbral, no un sort: el comparador "sólo si es muy evidente"
+  // no es transitivo y un Array.sort con eso da resultados dependientes del
+  // motor. Con tres dominios, dos pasadas deterministas alcanzan.
+  for (let pasada = 0; pasada < orden.length - 1; pasada++) {
+    for (let i = 0; i < orden.length - 1 - pasada; i++) {
+      const a = orden[i];
+      const b = orden[i + 1];
+      if (actividad[b].total > actividad[a].total * FACTOR_EVIDENTE) {
+        orden[i] = b;
+        orden[i + 1] = a;
+      }
+    }
+  }
+  return orden;
 }
 
 export interface SeccionDashboard {
@@ -104,6 +130,12 @@ export interface SeccionDashboard {
    * pegada al hero) y no de un dominio.
    */
   fija?: boolean;
+  /**
+   * `true` → la sección cierra la pantalla SIEMPRE, después de todos los
+   * bloques, sin importar la actividad de su dominio. Es la Voz del Vecino:
+   * el dueño la quiere dockeada al fondo como remate del tablero.
+   */
+  alFondo?: boolean;
   Componente: React.FC<SeccionProps>;
 }
 
@@ -161,6 +193,9 @@ export const SECCIONES: SeccionDashboard[] = [
     requiere: ['reclamos'],
     dominios: ['reclamos'],
     layout: 'full',
+    // Cierra la pantalla SIEMPRE (dueño, 2026-08-25): es el remate del
+    // tablero, no compite con los bloques operativos ni con la plata.
+    alFondo: true,
     Componente: VozVecino,
   },
 
@@ -272,12 +307,14 @@ export function ordenarPorActividad(
   prioridad: DominioDatos[],
 ): SeccionDashboard[] {
   const fijas = visibles.filter((s) => s.fija);
-  const moviles = visibles.filter((s) => !s.fija);
+  const fondo = visibles.filter((s) => s.alFondo && !s.fija);
+  const moviles = visibles.filter((s) => !s.fija && !s.alFondo);
   const bloques = prioridad.flatMap((d) => moviles.filter((s) => s.dominios[0] === d));
   // Una sección cuyo dominio principal no esté en la prioridad no se pierde:
-  // cierra la pantalla en el orden del registro.
+  // entra después de los bloques, en el orden del registro.
   const sobrantes = moviles.filter((s) => !bloques.includes(s));
-  return [...fijas, ...bloques, ...sobrantes];
+  // Las de fondo (la Voz del Vecino) rematan la pantalla SIEMPRE.
+  return [...fijas, ...bloques, ...sobrantes, ...fondo];
 }
 
 /** Los dominios que hay que montar para las secciones dadas. */

@@ -1079,7 +1079,11 @@
    sus 420px, una sola cuando no. Sin media query: lo decide el contenedor,
    así el bloque sirve igual dentro de una pantalla angosta. */
 .dv2-grid-2--mapa {
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  /* `min(420px, 100%)`: el minimo de columna JAMAS supera el contenedor. Con
+     `minmax(420px, ...)` a secas, en un telefono (~390px) la columna media
+     420px, desbordaba el viewport y la tarjeta del mapa salia cortada (ademas
+     de habilitar movimiento horizontal de toda la pagina). */
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   /* Las dos tarjetas terminan a la MISMA altura. Con `start` cada una tomaba
      su alto natural y quedaban desparejas, que es lo que se nota primero en
      una fila de dos. La que sobra estira su contenido, no deja hueco. */

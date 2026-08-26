@@ -21,6 +21,16 @@
   margin-top: 12px;
   align-items: stretch;
 }
+/* Una sola tarjeta ocupando la fila: el estado sin datos de un bloque que
+   igual tiene que estar (la voz del vecino sin calificaciones). No se estira
+   a todo el ancho —una tarjeta de 1.400px es una pared de vacío—, se queda
+   en la medida de dos columnas. */
+.kse-fila-1 {
+  display: grid;
+  grid-template-columns: minmax(280px, 720px);
+  gap: 12px;
+  align-items: stretch;
+}
 
 /* Las cinco tarjetas miden lo MISMO, estén en la fila de tres o en la de dos.
    Sin este piso, la fila de abajo queda más baja que la de arriba —el texto
