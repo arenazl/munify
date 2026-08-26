@@ -1,17 +1,37 @@
 /**
- * El NÚCLEO PURO de `TendenciaMeses` (components/dashboard): agrupar la serie
- * diaria por mes y decir qué pasó en cada uno.
+ * El NÚCLEO PURO de `TendenciaMeses` (components/dashboard): recortar la serie
+ * diaria al período que REALMENTE tiene historia y decir qué pasó en él.
  *
  * Separado del componente por dos razones, la misma que ya separó
  * `lib/semanticHero.ts`:
  *  1. La regla de fast-refresh (un archivo de componentes exporta SÓLO
  *     componentes) — el lint corta si se exporta una función desde el .tsx.
  *  2. Acá vive el COPY del bloque, que es lo que hay que poder revisar sin
- *     montar React: el veredicto de un mes se verifica contra los números
+ *     montar React: el veredicto de un período se verifica contra los números
  *     reales del municipio, no mirando la pantalla.
  *
  * Nada de esto sabe de reclamos ni de gastos: recibe una serie de puntos y
  * el modo con el que hay que leerla.
+ *
+ * LA VENTANA LA DECIDEN LOS DATOS, NO EL CALENDARIO
+ * ------------------------------------------------
+ * Antes el bloque tomaba los últimos tres meses calendario estuvieran vacíos o
+ * no, y un municipio con datos sólo en julio abría en "Junio · 0 entraron" con
+ * los cuatro números en cero y la línea pegada al piso. Eso no es una
+ * tendencia: es un mes que no existió, enunciado como si fuera un resultado.
+ *
+ * Ahora la escala es elástica:
+ *  - Los períodos vacíos de los EXTREMOS se recortan siempre (no son historia,
+ *    son el largo de la ventana que pidió el front).
+ *  - Un mes vacío INTERMEDIO se conserva: entre dos meses con datos, el hueco
+ *    es información real —la actividad se cortó y volvió— y sacarlo haría que
+ *    mayo y agosto se lean como consecutivos. Eso sí: no se enuncia con un
+ *    cero (ni en el rótulo ni en mini-KPIs; ver `kpisDelPeriodo`).
+ *  - Con DOS o más meses con movimiento se recorren los meses, como siempre.
+ *  - Con UNO solo se pasa a VENTANA DE DÍAS: una sola vista, del primer día
+ *    con movimiento hasta HOY, con piso de 15 días. El eje termina siempre en
+ *    el presente aunque los últimos días estén en cero — esa ausencia es real
+ *    y se ve en la curva, pero no se dice "0".
  */
 
 export interface PuntoTendencia {
@@ -27,10 +47,12 @@ export interface PuntoTendencia {
 /** Qué mide la serie: un FLUJO de casos o un MONTO de dinero. */
 export type ModoTendencia = 'flujo' | 'monto';
 
-export interface Mes {
+/** Un tramo del recorrido: un mes calendario o la ventana de días. */
+export interface Periodo {
   clave: string;
+  /** 'Julio' o 'Últimos 15 días'. */
   label: string;
-  /** "jul" — para el eje y el día más cargado, que se leen sueltos. */
+  /** "jul" — vacío en la ventana de días, que cruza meses. */
   abrev: string;
   dias: PuntoTendencia[];
   entraron: number;
@@ -38,21 +60,42 @@ export interface Mes {
   /** Qué proporción de lo que entró se logró cerrar, 0..1 */
   tasa: number;
   porDia: number;
-  pico: { dia: number; cantidad: number } | null;
+  /** Cuántos de sus días tuvieron algún movimiento. */
+  diasConMovimiento: number;
+  /** El día más cargado, con su mes: en una ventana no todos son del mismo. */
+  pico: { dia: number; abrev: string; cantidad: number } | null;
+}
+
+/** Cómo se está leyendo la serie: mes a mes, o una sola ventana de días. */
+export type ModoRecorrido = 'meses' | 'ventana';
+
+export interface Recorrido {
+  modo: ModoRecorrido;
+  /** Los meses del recorrido, o la única ventana. Nunca vacío. */
+  periodos: Periodo[];
 }
 
 /**
- * La lectura del mes, en castellano y con su consecuencia.
+ * La lectura del período, en castellano y con su consecuencia.
  *
  * No describe la curva: dice qué pasó. Es la línea que un intendente puede
  * repetir en una reunión sin mirar el gráfico.
  */
 export interface VeredictoMes {
-  /** Las dos o tres palabras que califican el mes. Van en color. */
+  /** Las dos o tres palabras que califican el período. Van en color. */
   etiqueta: string;
   /** El dato que respalda la etiqueta. Va en gris. */
   resto: string;
   tono: 'bueno' | 'malo' | 'neutro';
+}
+
+/** Un mini-KPI del strip. La pieza sólo lo dibuja. */
+export interface KpiTendencia {
+  etiqueta: string;
+  valor: string;
+  /** El segundo dato, más chico ("· 14"). */
+  nota?: string;
+  tono?: 'bueno' | 'malo' | 'neutro';
 }
 
 /**
@@ -65,6 +108,20 @@ export interface VeredictoMes {
  * pasado. Hasta llegar a este umbral se muestran los meses completos.
  */
 export const DIAS_PARA_CONTAR_EL_MES = 10;
+
+/**
+ * Piso de la ventana de días: con menos, la curva es un palito.
+ * Si el municipio tiene tres días de historia igual se muestran quince —los
+ * doce vacíos de atrás son parte de la lectura ("recién arranca").
+ */
+export const PISO_VENTANA_DIAS = 15;
+
+/**
+ * Techo de la ventana: dos meses. Más que eso ya no es "los últimos días" y
+ * conviene el recorrido por meses. Nunca recorta un día CON movimiento: si
+ * todo lo que hay quedó afuera del techo, manda el dato (ver `ventanaDeDias`).
+ */
+export const TECHO_VENTANA_DIAS = 62;
 
 export const NOMBRE_MES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -80,8 +137,44 @@ export const ABREV_MES = [
 export const nf = (n: number, dec = 0) =>
   n.toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 
+/** La abreviatura del mes al que pertenece un 'YYYY-MM-DD'. */
+export const abrevDeFecha = (fecha: string) => ABREV_MES[Number(fecha.slice(5, 7)) - 1] ?? '';
+
+/** ¿Ese día pasó algo? Vale para los dos modos: en 'monto' no hay resueltos. */
+const conMovimiento = (p: PuntoTendencia) => (p.cantidad || 0) > 0 || (p.resueltos || 0) > 0;
+
+/** ¿Hubo algo en el período? Un mes en cero no es un mes: es un hueco. */
+export const periodoConMovimiento = (p: Periodo) => p.entraron > 0 || p.resueltos > 0;
+
+const picoDe = (dias: PuntoTendencia[]) =>
+  dias.reduce<{ dia: number; abrev: string; cantidad: number } | null>((may, d) => {
+    const n = d.cantidad || 0;
+    if (!may || n > may.cantidad) {
+      return { dia: Number(d.fecha.slice(8, 10)), abrev: abrevDeFecha(d.fecha), cantidad: n };
+    }
+    return may;
+  }, null);
+
+/** Los agregados que comparten el mes y la ventana. */
+function armarPeriodo(clave: string, label: string, abrev: string, dias: PuntoTendencia[]): Periodo {
+  const entraron = dias.reduce((s, d) => s + (d.cantidad || 0), 0);
+  const resueltos = dias.reduce((s, d) => s + (d.resueltos || 0), 0);
+  return {
+    clave,
+    label,
+    abrev,
+    dias,
+    entraron,
+    resueltos,
+    tasa: entraron > 0 ? resueltos / entraron : 0,
+    porDia: dias.length > 0 ? entraron / dias.length : 0,
+    diasConMovimiento: dias.filter(conMovimiento).length,
+    pico: picoDe(dias),
+  };
+}
+
 /** Agrupa la serie diaria por mes calendario, del más viejo al más nuevo. */
-export function agruparPorMes(datos: PuntoTendencia[]): Mes[] {
+export function agruparPorMes(datos: PuntoTendencia[]): Periodo[] {
   const mapa = new Map<string, PuntoTendencia[]>();
   for (const p of datos) {
     const clave = (p.fecha || '').slice(0, 7); // YYYY-MM
@@ -94,47 +187,78 @@ export function agruparPorMes(datos: PuntoTendencia[]): Mes[] {
   return [...mapa.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([clave, dias]) => {
-      const entraron = dias.reduce((s, d) => s + (d.cantidad || 0), 0);
-      const resueltos = dias.reduce((s, d) => s + (d.resueltos || 0), 0);
       const mes = Number(clave.slice(5, 7)) - 1;
-      const pico = dias.reduce<{ dia: number; cantidad: number } | null>((may, d) => {
-        const n = d.cantidad || 0;
-        if (!may || n > may.cantidad) return { dia: Number(d.fecha.slice(8, 10)), cantidad: n };
-        return may;
-      }, null);
-      return {
-        clave,
-        label: NOMBRE_MES[mes] ?? clave,
-        abrev: ABREV_MES[mes] ?? '',
-        dias,
-        entraron,
-        resueltos,
-        tasa: entraron > 0 ? resueltos / entraron : 0,
-        porDia: dias.length > 0 ? entraron / dias.length : 0,
-        pico,
-      };
+      return armarPeriodo(clave, NOMBRE_MES[mes] ?? clave, ABREV_MES[mes] ?? '', dias);
     });
 }
 
+/** Saca los períodos SIN movimiento de las dos puntas. Los del medio quedan. */
+function recortarExtremos(periodos: Periodo[]): Periodo[] {
+  let ini = 0;
+  let fin = periodos.length - 1;
+  while (ini <= fin && !periodoConMovimiento(periodos[ini])) ini++;
+  while (fin >= ini && !periodoConMovimiento(periodos[fin])) fin--;
+  return periodos.slice(ini, fin + 1);
+}
+
 /**
- * Los meses que el bloque recorre: los últimos `meses` de la serie, sin el
- * mes en curso cuando recién arranca (ver DIAS_PARA_CONTAR_EL_MES).
+ * La ventana de días: del primer día con movimiento hasta HOY (el último día
+ * de la serie, que el backend rellena siempre hasta la fecha).
+ *
+ * El piso la estira hacia atrás cuando la historia es cortita; el techo la
+ * acota cuando es larga, PERO nunca deja afuera un día con movimiento: entre
+ * respetar el techo y esconder el único dato que hay, gana el dato.
  */
-export function mesesDelRecorrido(datos: PuntoTendencia[], meses: number): Mes[] {
-  const grupos = agruparPorMes(datos);
+export function ventanaDeDias(datos: PuntoTendencia[]): Periodo | null {
+  if (datos.length === 0) return null;
+  const orden = [...datos].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const primerMov = orden.findIndex(conMovimiento);
+  if (primerMov < 0) return null;
+
+  // Piso: al menos PISO_VENTANA_DIAS de eje, sin salirse de la serie.
+  const porPiso = Math.max(0, orden.length - PISO_VENTANA_DIAS);
+  let desde = Math.min(primerMov, porPiso);
+
+  // Techo: se aplica sólo si adentro sigue quedando movimiento.
+  if (orden.length - desde > TECHO_VENTANA_DIAS) {
+    const candidato = orden.length - TECHO_VENTANA_DIAS;
+    if (orden.slice(candidato).some(conMovimiento)) desde = candidato;
+  }
+
+  const dias = orden.slice(desde);
+  return armarPeriodo(
+    `ventana-${dias[0].fecha}`,
+    `Últimos ${nf(dias.length)} días`,
+    '',
+    dias,
+  );
+}
+
+/**
+ * Qué recorre el bloque: los meses con historia, o una sola ventana de días.
+ * `null` cuando no hubo NADA — ahí el bloque no se dibuja (jamás un panel de
+ * ceros).
+ */
+export function recorridoDeTendencia(datos: PuntoTendencia[], meses: number): Recorrido | null {
+  let lista = recortarExtremos(agruparPorMes(datos));
+  if (lista.length === 0) return null;
 
   // "Hoy" se toma del último día de la serie, no del reloj del navegador:
   // así la decisión sale de los mismos datos que se están mostrando.
   const ultima = datos.reduce((may, p) => (p.fecha > may ? p.fecha : may), '');
-  const ultimo = grupos[grupos.length - 1];
-  const enCurso = ultimo && ultimo.clave === ultima.slice(0, 7);
+  const ultimo = lista[lista.length - 1];
+  const enCurso = ultimo.clave === ultima.slice(0, 7);
   const arranca = Number(ultima.slice(8, 10)) < DIAS_PARA_CONTAR_EL_MES;
 
   // Se descarta sólo si quedan al menos dos meses para comparar: antes que
   // mostrar un mes suelto, es preferible dejar el parcial.
-  if (enCurso && arranca && grupos.length > 2) grupos.pop();
+  if (enCurso && arranca && lista.length > 2) lista = recortarExtremos(lista.slice(0, -1));
 
-  return grupos.slice(-meses);
+  const conHistoria = lista.filter(periodoConMovimiento).length;
+  if (conHistoria >= 2) return { modo: 'meses', periodos: lista.slice(-meses) };
+
+  const ventana = ventanaDeDias(datos);
+  return ventana ? { modo: 'ventana', periodos: [ventana] } : null;
 }
 
 /** Puntos de una polilínea SVG, normalizados al alto del lienzo. */
@@ -151,12 +275,18 @@ export function puntosDeLinea(valores: number[], max: number, ancho: number, alt
 }
 
 /** El veredicto en modo 'flujo': la BRECHA entre lo que entró y lo que cerró. */
-export function veredictoDelMes(m: Mes, previo: Mes | null): VeredictoMes {
+export function veredictoDelMes(m: Periodo, previo: Periodo | null): VeredictoMes {
   const pct = Math.round(m.tasa * 100);
   const deCada10 = Math.round(m.tasa * 10);
 
   if (m.entraron === 0) {
-    return { etiqueta: 'Sin movimiento', resto: 'no entraron reclamos en el período.', tono: 'neutro' };
+    // Un mes vacío INTERMEDIO del recorrido. No se enuncia el cero: se dice
+    // qué no pasó, y los mini-KPIs de ese mes ni se dibujan.
+    return {
+      etiqueta: `Sin movimiento en ${m.label.toLowerCase()}:`,
+      resto: 'no entró ni se cerró ningún reclamo.',
+      tono: 'neutro',
+    };
   }
   if (m.tasa >= 1) {
     return {
@@ -213,8 +343,8 @@ export function veredictoDelMes(m: Mes, previo: Mes | null): VeredictoMes {
  * que este bloque existe para evitar.
  */
 export function veredictoDelMesMonto(
-  m: Mes,
-  previo: Mes | null,
+  m: Periodo,
+  previo: Periodo | null,
   enCurso: boolean,
   fmt: (n: number) => string,
 ): VeredictoMes {
@@ -268,4 +398,167 @@ export function veredictoDelMesMonto(
     resto: contra,
     tono: 'neutro',
   };
+}
+
+/**
+ * El veredicto de la VENTANA DE DÍAS: el municipio no tiene meses que
+ * comparar, así que la frase no compara — interpreta lo que hubo.
+ *
+ * Regla del cero: acá es donde más fácil se cuela ("se cerraron 0"). Ninguna
+ * rama enuncia un cero: cuando no hubo cierres la frase pivotea a lo que sí
+ * pasó ("todavía no se cerró ninguno") y el mini-KPI correspondiente ni
+ * aparece.
+ */
+export function veredictoDeVentana(
+  v: Periodo,
+  modo: ModoTendencia,
+  fmt: (n: number) => string,
+): VeredictoMes {
+  const dias = v.dias.length;
+  const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
+
+  if (modo === 'monto') {
+    return {
+      etiqueta: `Se gastaron ${fmt(v.entraron)} en ${dias} días:`,
+      resto: `${fmt(v.porDia)} por día — hubo movimiento en ${v.diasConMovimiento} de esos días.`,
+      tono: 'neutro',
+    };
+  }
+
+  // Sólo cierres: entró nada, pero se descargó la cola vieja. Es una buena
+  // noticia y no se la puede contar como "0 ingresados".
+  if (v.entraron === 0) {
+    return {
+      etiqueta: `Se cerraron ${nf(v.resueltos)} ${plural(v.resueltos, 'reclamo', 'reclamos')}:`,
+      resto: `no entró ninguno nuevo en ${dias} días — la cola bajó.`,
+      tono: 'bueno',
+    };
+  }
+
+  const entrados = `${nf(v.entraron)} ${plural(v.entraron, 'reclamo', 'reclamos')}`;
+
+  if (v.resueltos === 0) {
+    // Si todo entró en la última semana, todavía no hubo tiempo de cerrarlo:
+    // marcarlo en rojo sería un reproche inventado.
+    const reciente = v.diasConMovimiento > 0
+      && dias - v.dias.findIndex(conMovimiento) <= 7;
+    return {
+      etiqueta: `Entraron ${entrados}:`,
+      resto: reciente
+        ? 'recién arranca el circuito, todavía no se cerró ninguno.'
+        : `todavía no se cerró ninguno — ${nf(v.porDia, 1)} por día.`,
+      tono: reciente ? 'neutro' : 'malo',
+    };
+  }
+
+  const deCada10 = Math.round(v.tasa * 10);
+  if (v.tasa >= 1) {
+    return {
+      etiqueta: `Entraron ${entrados} y se cerraron ${nf(v.resueltos)}:`,
+      resto: 'se cerró todo lo que entró y algo de la cola vieja.',
+      tono: 'bueno',
+    };
+  }
+  return {
+    etiqueta: `Entraron ${entrados} y se cerraron ${nf(v.resueltos)}:`,
+    resto: `${deCada10} de cada 10, a ${nf(v.porDia, 1)} por día.`,
+    tono: v.tasa >= 0.75 ? 'bueno' : 'malo',
+  };
+}
+
+interface OpcionesKpis {
+  periodo: Periodo;
+  previo: Periodo | null;
+  modo: ModoTendencia;
+  recorrido: ModoRecorrido;
+  tono: VeredictoMes['tono'];
+  fmt: (n: number) => string;
+}
+
+/**
+ * Los cuatro (o menos) números que respaldan la frase.
+ *
+ * REGLA DEL CERO: un KPI que sólo puede decir "0" no se dibuja. Un mes vacío
+ * intermedio devuelve la lista VACÍA —queda la frase y la curva plana, que ya
+ * cuentan que no pasó nada— en lugar del panel de ceros con "1 jun · 0" que
+ * es lo que motivó todo este cambio.
+ */
+export function kpisDelPeriodo({ periodo, previo, modo, recorrido, tono, fmt }: OpcionesKpis): KpiTendencia[] {
+  const m = periodo;
+  if (!periodoConMovimiento(m)) return [];
+
+  const pico = m.pico && m.pico.cantidad > 0 ? m.pico : null;
+
+  if (modo === 'monto') {
+    const kpis: KpiTendencia[] = [
+      { etiqueta: 'Total gastado', valor: fmt(m.entraron) },
+      { etiqueta: 'Promedio por día', valor: fmt(m.porDia) },
+    ];
+    if (recorrido === 'meses') {
+      // Sin mes previo no hay variación: una raya, no un 0%.
+      const delta = previo && previo.entraron > 0
+        ? Math.round(((m.entraron - previo.entraron) / previo.entraron) * 100)
+        : null;
+      kpis.push({
+        etiqueta: 'Vs. mes anterior',
+        valor: delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta}%`,
+        tono,
+      });
+    } else {
+      kpis.push({
+        etiqueta: 'Días con gasto',
+        valor: `${nf(m.diasConMovimiento)} de ${nf(m.dias.length)}`,
+      });
+    }
+    kpis.push({
+      etiqueta: 'Día más caro',
+      valor: pico ? `${pico.dia} ${pico.abrev}` : '—',
+      nota: pico ? `· ${fmt(pico.cantidad)}` : undefined,
+    });
+    return kpis;
+  }
+
+  // --- flujo ---
+  if (recorrido === 'meses') {
+    // Los cuatro de siempre: el recorrido por meses no cambió.
+    return [
+      { etiqueta: 'Ingresados', valor: nf(m.entraron) },
+      { etiqueta: 'Resueltos', valor: nf(m.resueltos), tono: 'bueno' },
+      { etiqueta: 'Tasa de cierre', valor: `${Math.round(m.tasa * 100)}%`, tono },
+      {
+        etiqueta: 'Día más cargado',
+        valor: m.pico ? `${m.pico.dia} ${m.pico.abrev}` : '—',
+        nota: m.pico ? `· ${nf(m.pico.cantidad)}` : undefined,
+      },
+    ];
+  }
+
+  const kpis: KpiTendencia[] = [];
+  if (m.entraron > 0) kpis.push({ etiqueta: 'Ingresados', valor: nf(m.entraron) });
+  if (m.resueltos > 0) kpis.push({ etiqueta: 'Resueltos', valor: nf(m.resueltos), tono: 'bueno' });
+  if (m.entraron > 0 && m.resueltos > 0) {
+    kpis.push({ etiqueta: 'Tasa de cierre', valor: `${Math.round(m.tasa * 100)}%`, tono });
+  } else if (m.entraron > 0) {
+    // Sin cierres, la tasa sería un 0% enunciado: en su lugar, el ritmo.
+    kpis.push({ etiqueta: 'Promedio por día', valor: nf(m.porDia, 1) });
+  } else {
+    // Sólo hubo cierres: el ritmo de ingreso sería otro cero, así que el
+    // segundo número dice en cuántos días se descargó la cola.
+    kpis.push({ etiqueta: 'Días con cierres', valor: `${nf(m.diasConMovimiento)} de ${nf(m.dias.length)}` });
+  }
+  // "1 jun · 0" no es un día más cargado: si no hubo ninguno, no hay KPI.
+  if (pico) {
+    kpis.push({
+      etiqueta: 'Día más cargado',
+      valor: `${pico.dia} ${pico.abrev}`,
+      nota: `· ${nf(pico.cantidad)}`,
+    });
+  }
+  return kpis;
+}
+
+/** El rótulo de un tramo del recorrido. Un mes sin movimiento no dice "0". */
+export function rotuloDelPeriodo(m: Periodo, modo: ModoTendencia, fmt: (n: number) => string): string {
+  if (!periodoConMovimiento(m)) return `${m.label} · sin movimiento`;
+  return `${m.label} · ${modo === 'monto' ? fmt(m.entraron) : `${nf(m.entraron)} entraron`}`;
 }

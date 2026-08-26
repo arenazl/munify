@@ -6,8 +6,9 @@
  * hay componente nuevo — la pieza del kit se generalizó por props, que es lo
  * que se pedía: mismos gráficos, otros datos.
  *
- * La pieza se calla sola cuando no hay dos meses que comparar (devuelve
- * null), así que un muni recién cargado no ve un gráfico de un mes suelto.
+ * La pieza se calla sola cuando no hay NADA cargado (devuelve null) y cambia
+ * de escala cuando hay un solo mes con gasto: ahí muestra la ventana de días
+ * hasta hoy en vez de un carrusel de un mes suelto.
  */
 import { useMemo } from 'react';
 import { TendenciaMeses } from '../../../components/dashboard/TendenciaMeses';

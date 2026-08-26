@@ -6,7 +6,8 @@
  *
  * Las dos piezas van FUERA de cualquier loader de la página: cada una ya
  * resuelve su propia espera —FocosRotativos recibe `loading`, y
- * TendenciaMeses no dibuja nada mientras no haya dos meses que comparar—.
+ * TendenciaMeses no dibuja nada mientras no haya un solo día con movimiento
+ * (con un mes de historia cambia de escala y muestra la ventana de días)—.
  * Mezclarlas en un ternario ajeno fue lo que dejó la tendencia colgada del
  * esqueleto de carga, visible sólo mientras cargaba.
  *

@@ -113,9 +113,12 @@
 .tm-veredicto--bueno strong { color: var(--pl-green-700); }
 .tm-veredicto--malo strong { color: var(--pl-red-700); }
 
+/* Las columnas las declara el padre (`--tm-kpis`): un período sin cierres
+   muestra tres números, no cuatro con dos ceros. Fallback en 4, el caso
+   completo. */
 .tm-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--tm-kpis, 4), minmax(0, 1fr));
   gap: 12px;
   margin: 16px 0 4px;
   padding: 14px 0;
@@ -238,10 +241,12 @@
   to { transform: scaleX(var(--tm-hasta, 1)); }
 }
 
-/* Los rótulos, alineados con los tramos de la barra de arriba. */
+/* Los rótulos, alineados con los tramos de la barra de arriba. Cuántos son lo
+   dice el padre (`--tm-tramos`): con dos meses de historia son dos, y tres
+   columnas fijas dejaban un hueco. */
 .tm-meses {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--tm-tramos, 3), minmax(0, 1fr));
   gap: 10px;
   margin-top: 8px;
 }
