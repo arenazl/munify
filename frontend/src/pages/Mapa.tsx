@@ -3660,6 +3660,9 @@ export default function Mapa() {
           style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
         >
           <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
           className={claseBasemap(isDarkTheme)}
             center={getMapCenter()}
             zoom={13}
@@ -4087,6 +4090,9 @@ export default function Mapa() {
               style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
             >
               <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
           className={claseBasemap(isDarkTheme)}
                 center={getPoiCenter()}
                 zoom={13}

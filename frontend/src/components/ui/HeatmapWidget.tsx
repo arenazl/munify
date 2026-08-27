@@ -592,6 +592,9 @@ export default function HeatmapWidget({
       style={{ height: '100%', width: '100%' }}
     >
       <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
           className={claseBasemap(isDarkTheme)}
         center={mapCenter}
         zoom={isFullscreen ? 14 : 13}

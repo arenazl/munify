@@ -95,6 +95,9 @@ export function PolygonDrawer({
 
       <div className="rounded-xl overflow-hidden" style={{ height, border: '1px solid currentColor' }}>
         <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
           center={centro}
           zoom={zoom}
           style={{ width: '100%', height: '100%' }}

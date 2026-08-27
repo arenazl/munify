@@ -831,7 +831,10 @@ export default function TesoreriaMapa() {
                 filter: none;
               }
             `}</style>
-            <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+            <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1} center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
               <TileLayer
                 key={tileProvider}
                 attribution={tile.attribution}
@@ -1026,6 +1029,9 @@ export default function TesoreriaMapa() {
                 style={{ height: 140, border: `1px solid ${theme.border}` }}
               >
                 <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
                   center={[selected.latitud, selected.longitud]}
                   zoom={16}
                   style={{ width: '100%', height: '100%' }}

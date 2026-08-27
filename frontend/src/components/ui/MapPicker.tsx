@@ -192,6 +192,9 @@ export function MapPicker({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
@@ -277,6 +280,9 @@ export function MapView({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
