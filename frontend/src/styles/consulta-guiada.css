@@ -169,7 +169,10 @@
   font-family: var(--pl-font-display);
   font-size: var(--pl-fs-body);
   font-weight: 500;
-  line-height: 2.2;
+  /* 2.35 y no 2.2: los combos embebidos miden ~32px con bordes y con 2.2 la
+     caja de línea quedaba más baja — al primer zoom del navegador los
+     renglones se PISABAN entre sí (reporte del dueño, 2026-08-27). */
+  line-height: 2.35;
   letter-spacing: var(--pl-tracking-display);
   color: var(--pl-text-3);
   text-wrap: pretty;
@@ -193,7 +196,10 @@
 
 .cg-combo .ms2-trigger {
   width: auto;
-  min-width: var(--cg-combo-min, 118px);
+  /* El mínimo NUNCA puede superar el ancho disponible: un min-width fijo le
+     gana al max-width y el combo desbordaba la card apenas se achicaba el
+     ancho útil (zoom del navegador, tablet). */
+  min-width: min(var(--cg-combo-min, 118px), 100%);
   max-width: 100%;
   min-height: 30px;
   padding: 3px 8px 3px 11px;
@@ -210,7 +216,14 @@
   background: var(--pl-green-100);
   border-color: var(--pl-green-200);
 }
-.cg-combo .ms2-valor { color: inherit; font-weight: 600; }
+.cg-combo .ms2-valor {
+  color: inherit;
+  font-weight: 600;
+  /* Sin lugar, el valor se corta con puntos — el combo jamás empuja la frase. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cg-combo .ms2-placeholder { color: var(--pl-green-700); }
 .cg-combo .ms2-chevron { color: color-mix(in srgb, var(--pl-green-700) 60%, transparent); }
 
@@ -223,14 +236,17 @@
    preguntas): verde clarito + texto verde. Antes era un círculo verde sólido
    que el propio dueño leyó como "aplicar filtros" — un primario oscuro ahí
    promete otra cosa (feedback 2026-08-13). */
+/* Del MISMO tamaño que los combos y las píldoras (30px): medía 38px y se
+   comía la frase (pedido del dueño, 2026-08-27). El label se queda — el play
+   pelado ya se probó y se leía como "aplicar filtros". */
 .cg-continuacion {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   vertical-align: middle;
-  margin-left: 12px;
-  height: 38px;
-  padding: 0 16px;
+  margin-left: 10px;
+  height: 30px;
+  padding: 0 12px;
   font-family: var(--pl-font-sans);
   font-size: var(--pl-fs-body);
   font-weight: 600;
@@ -267,9 +283,9 @@
   transform: none;
 }
 .cg-continuacion-icono {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
 }
 
 /* --- herramientas del costado (no filtran: hacen algo) --- */
@@ -345,7 +361,7 @@
    Un botón con label largo ("Ver la evolución") metido dentro de la frase
    competía con ella y en tablet se le encimaba. El play se explica solo. */
 .cg-continuacion--icono {
-  width: 38px;
+  width: 30px;
   padding: 0;
   border-radius: var(--pl-radius-pill);
   justify-content: center;
