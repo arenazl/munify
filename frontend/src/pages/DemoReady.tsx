@@ -54,7 +54,10 @@ export default function DemoReady() {
   const [users, setUsers] = useState<DemoUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [quickLoading, setQuickLoading] = useState(false);
+  // QUIÉN está entrando (su email), no "si alguien entra": con un booleano
+  // global el spinner se prendía en TODAS las tarjetas al tocar una (doble
+  // loading que reportó el dueño, 2026-08-28).
+  const [entrando, setEntrando] = useState<string | null>(null);
 
   // Demo PROTEGIDA por PIN: los botones se ven, pero el quick-login pide la
   // clave numérica y la usa como password real (misma mecánica que Login).
@@ -103,7 +106,7 @@ export default function DemoReady() {
       }
       pass = pinGuardado;
     }
-    setQuickLoading(true);
+    setEntrando(email);
     setError('');
     try {
       await login(email, pass);
@@ -118,7 +121,7 @@ export default function DemoReady() {
         const e = err as { response?: { data?: { detail?: string } } };
         setError(e.response?.data?.detail || 'Error ingresando con la cuenta de demo');
       }
-      setQuickLoading(false);
+      setEntrando(null);
     }
   };
 
@@ -174,7 +177,7 @@ export default function DemoReady() {
               <div className="dr-duo">
                 <button
                   onClick={() => handleQuickLoginByEmail(adminUser?.email)}
-                  disabled={quickLoading || !adminUser}
+                  disabled={entrando !== null || !adminUser}
                   className="dr-rol dr-rol--ink"
                 >
                   <span className="dr-rol-ico">
@@ -187,7 +190,7 @@ export default function DemoReady() {
                   {adminUser && (
                     <span className="dr-rol-mail">{adminUser.email}</span>
                   )}
-                  {quickLoading && (
+                  {entrando === adminUser?.email && (
                     <span className="dr-rol-velo">
                       <Loader2 className="h-6 w-6 animate-spin" />
                     </span>
@@ -196,7 +199,7 @@ export default function DemoReady() {
 
                 <button
                   onClick={() => handleQuickLoginByEmail(vecinoUser?.email)}
-                  disabled={quickLoading || !vecinoUser}
+                  disabled={entrando !== null || !vecinoUser}
                   className="dr-rol"
                 >
                   <span className="dr-rol-ico">
@@ -209,7 +212,7 @@ export default function DemoReady() {
                   {vecinoUser && (
                     <span className="dr-rol-mail">{vecinoUser.email}</span>
                   )}
-                  {quickLoading && (
+                  {entrando === vecinoUser?.email && (
                     <span className="dr-rol-velo">
                       <Loader2 className="h-6 w-6 animate-spin" />
                     </span>
@@ -230,7 +233,7 @@ export default function DemoReady() {
                       <button
                         key={sup.email}
                         onClick={() => handleQuickLoginByEmail(sup.email)}
-                        disabled={quickLoading}
+                        disabled={entrando !== null}
                         className="dr-mini"
                       >
                         <span className="dr-mini-ico">
@@ -261,7 +264,7 @@ export default function DemoReady() {
                       <button
                         key={emp.email}
                         onClick={() => handleQuickLoginByEmail(emp.email)}
-                        disabled={quickLoading}
+                        disabled={entrando !== null}
                         className="dr-mini"
                       >
                         <span className="dr-mini-ico">
@@ -293,7 +296,7 @@ export default function DemoReady() {
       <DemoPinGate
         abierto={pinGateEmail !== null}
         nombreMunicipio={municipioNombre}
-        cargando={quickLoading}
+        cargando={entrando !== null}
         error={pinError}
         onSubmit={confirmarPin}
         onClose={() => { setPinGateEmail(null); setPinError(''); }}

@@ -715,9 +715,11 @@ function abrir(id){
 }
 
 /* ============================================================
-   ASISTENTE (Groq). La key la pone el usuario y vive en SU
-   navegador: /calls es publica, una key en el codigo quedaria
-   a la vista de cualquiera.
+   ASISTENTE. La key de la IA vive en el SERVIDOR de Munify
+   (endpoint /api/public/calls/ia, con rate limit): antes habia
+   que pegar una key de Groq POR NAVEGADOR y el dueño lo marco
+   como friccion inaceptable (2026-08-28). La pagina le pega a
+   /api same-origin, como cualquier app.
 
    Lo que la IA SI puede: preparar el pitch para ESE municipio,
    contestar una objecion, redactar el mail de seguimiento — con
@@ -725,13 +727,9 @@ function abrir(id){
    (quien es el intendente hoy). No tiene busqueda web y los
    inventaria; esos datos salen del relevamiento aparte.
    ============================================================ */
-const KEY_IA = 'munify_llamados_groq', KEY_IA_MODELO = 'munify_llamados_groq_modelo';
-const GROQ = 'https://api.groq.com/openai/v1';
+const IA_URL = '/api/public/calls/ia';
 let iaChat = [];          // {rol, txt} de la conversacion abierta
 let iaCargando = false;
-
-function iaKey(){ try { return localStorage.getItem(KEY_IA) || ''; } catch(e){ return ''; } }
-function iaModelo(){ try { return localStorage.getItem(KEY_IA_MODELO) || 'openai/gpt-oss-120b'; } catch(e){ return 'openai/gpt-oss-120b'; } }
 
 function iaContexto(c){
   const f = FUNC[c.id] || {}, inv = INVEST[c.id] || {}, r = db[c.id] || {}, sp = SPEECH[c.pais] || {};
@@ -784,80 +782,33 @@ function iaPintar(c){
 
 async function iaPreguntar(c, texto){
   if (!texto || iaCargando) return;
-  if (!iaKey()){ iaConfig(true); return; }
   iaChat.push({rol:'yo', txt:texto});
   iaCargando = true; iaPintar(c);
   try {
+    // El historial que viaja se recorta a lo ultimo: el contexto pesado (la
+    // ficha) va una sola vez en el system y el endpoint tiene tope de tamaño.
     const mensajes = [{role:'system', content: IA_SISTEMA + '\n\nFICHA DEL MUNICIPIO:\n' + iaContexto(c)}]
-      .concat(iaChat.map(m => ({role: m.rol === 'yo' ? 'user' : 'assistant', content: m.txt})));
-    const res = await fetch(GROQ + '/chat/completions', {
+      .concat(iaChat.slice(-12).map(m => ({role: m.rol === 'yo' ? 'user' : 'assistant', content: m.txt})));
+    const res = await fetch(IA_URL, {
       method:'POST',
-      headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + iaKey()},
-      body: JSON.stringify({model: iaModelo(), messages: mensajes, temperature: 0.6, max_tokens: 700}),
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mensajes}),
     });
-    const j = await res.json();
-    if (!res.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + res.status));
-    const txt = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || '').trim();
-    iaChat.push({rol:'ia', txt: txt || 'Vino una respuesta vacia. Proba de nuevo o cambia de modelo.'});
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.detail || ('HTTP ' + res.status));
+    const txt = String(j.respuesta || '').trim();
+    iaChat.push({rol:'ia', txt: txt || 'Vino una respuesta vacia. Proba de nuevo.'});
   } catch(err){
-    iaChat.push({rol:'err', txt: 'No pude preguntarle a la IA: ' + err.message
-      + (String(err.message).match(/401|key/i) ? ' — revisa la API key en Configurar.' : '')});
+    iaChat.push({rol:'err', txt: 'No pude preguntarle a la IA: ' + err.message});
   }
   iaCargando = false; iaPintar(c);
-}
-
-function iaConfig(abrir){
-  const el = document.getElementById('iaCfg'); if (!el) return;
-  const mostrar = abrir === undefined ? el.style.display === 'none' : abrir;
-  el.style.display = mostrar ? 'grid' : 'none';
-  if (!mostrar) return;
-  el.innerHTML =
-      '<div class="ayuda">La key queda guardada <b>solo en este navegador</b>, no viaja a ningun lado. '
-    + 'Se saca gratis en <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>.</div>'
-    + '<input id="iaKeyInp" type="password" placeholder="gsk_..." value="' + esc(iaKey()) + '" autocomplete="off">'
-    + '<select id="iaModeloSel"><option value="' + esc(iaModelo()) + '">' + esc(iaModelo()) + '</option></select>'
-    + '<div style="display:flex;gap:7px"><button class="btn p sm" id="iaGuardar">Guardar</button>'
-    + '<button class="btn sm" id="iaModelos">Traer mis modelos</button>'
-    + (iaKey() ? '<button class="btn sm" id="iaBorrar" style="margin-left:auto">Borrar key</button>' : '') + '</div>'
-    + '<div class="ayuda" id="iaCfgMsg"></div>';
-  document.getElementById('iaGuardar').onclick = () => {
-    try {
-      localStorage.setItem(KEY_IA, document.getElementById('iaKeyInp').value.trim());
-      localStorage.setItem(KEY_IA_MODELO, document.getElementById('iaModeloSel').value);
-    } catch(e){}
-    document.getElementById('iaCfgMsg').textContent = 'Listo, guardado.';
-    setTimeout(() => iaConfig(false), 700);
-  };
-  document.getElementById('iaModelos').onclick = async () => {
-    const msg = document.getElementById('iaCfgMsg');
-    const k = document.getElementById('iaKeyInp').value.trim();
-    if (!k){ msg.textContent = 'Primero pega la key.'; return; }
-    msg.textContent = 'Buscando los modelos de tu cuenta...';
-    try {
-      const res = await fetch(GROQ + '/models', {headers:{'Authorization':'Bearer ' + k}});
-      const j = await res.json();
-      if (!res.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + res.status));
-      const ids = (j.data || []).map(m => m.id)
-        .filter(id => !/whisper|guard|tts|prompt/i.test(id)).sort();
-      const sel = document.getElementById('iaModeloSel');
-      sel.innerHTML = ids.map(id => '<option value="' + esc(id) + '"'
-        + (id === iaModelo() ? ' selected' : '') + '>' + esc(id) + '</option>').join('');
-      msg.textContent = ids.length + ' modelos disponibles. Elegi uno y guarda.';
-    } catch(err){ msg.textContent = 'No pude traerlos: ' + err.message; }
-  };
-  const bb = document.getElementById('iaBorrar');
-  if (bb) bb.onclick = () => {
-    try { localStorage.removeItem(KEY_IA); } catch(e){}
-    iaConfig(true);
-  };
 }
 
 function iaMontar(c){
   iaChat = []; iaCargando = false;
   const cont = document.getElementById('iaBox'); if (!cont) return;
   cont.innerHTML =
-      '<div class="ia-head">Asistente <span class="cfg" id="iaCfgBtn">' + (iaKey() ? 'Configurar' : 'Poner mi API key') + '</span></div>'
-    + '<div class="ia-cfg" id="iaCfg" style="display:none"></div>'
+      '<div class="ia-head">Asistente</div>'
     + '<div class="ia-msgs" id="iaMsgs"></div>'
     + '<div class="ia-sug" id="iaSug">' + IA_SUGERENCIAS.map((s, i) =>
         '<button data-i="' + i + '">' + esc(s) + '</button>').join('') + '</div>'
@@ -866,14 +817,12 @@ function iaMontar(c){
     + '<div class="ia-nota">Responde con la ficha de arriba como contexto. No conoce datos actuales del municipio '
     + '(quien es el intendente hoy, obras, cifras): eso sale del relevamiento, no de la IA.</div>';
   iaPintar(c);
-  document.getElementById('iaCfgBtn').onclick = () => iaConfig();
   document.getElementById('iaSug').querySelectorAll('button').forEach(b =>
     b.onclick = () => iaPreguntar(c, IA_SUGERENCIAS[b.dataset.i]));
   const inp = document.getElementById('iaInp');
   const mandar = () => { const t = inp.value.trim(); inp.value = ''; iaPreguntar(c, t); };
   document.getElementById('iaEnviar').onclick = mandar;
   inp.onkeydown = e => { if (e.key === 'Enter') mandar(); };
-  if (!iaKey()) iaConfig(true);
 }
 
 function pintarHist(){
@@ -966,12 +915,6 @@ document.getElementById('fileImport').onchange = e => {
     aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'oscuro' : 'claro');
   document.getElementById('tipsBox').innerHTML = TIPS.map(x =>
     '<div class="box tip"><b>' + esc(x.titulo) + '</b>' + esc(x.texto) + '</div>').join('');
-  try {
-    const p = new URLSearchParams(location.search);
-    if (p.get('k')){ localStorage.setItem(KEY_IA, p.get('k').trim());
-      history.replaceState(null, '', location.pathname); }
-    if (p.get('m')) localStorage.setItem(KEY_IA_MODELO, p.get('m').trim());
-  } catch(e){}
   try { paisHoy = localStorage.getItem(KEY_PAIS) || ''; } catch(e){}
   let v = null; try { v = localStorage.getItem(KEY_VISTA); } catch(e){}
   /* En el telefono la vista Hoy se plegaba sola: se deja abierto lo urgente
