@@ -772,6 +772,14 @@ async def crear_municipio_demo(
         activo=True,
         abm_en_sidebar=False,
         demo_protegido=bool(demo_pin),
+        # Las demos NUEVAS abren en tema CLARO (decisión del dueño,
+        # 2026-08-27): la demo se muestra en oficinas con luz y el claro
+        # "papel" es la identidad de la marca — el dark queda a un click
+        # (la luna) como efecto del vendedor. 'marfil' es el claro cálido
+        # del set de fondos; el usuario que elige otro tema pisa esto
+        # (prioridad: localStorage > tema_config > default global). Las
+        # demos existentes no se tocan.
+        tema_config={"presetId": "marfil"},
     )
     db.add(municipio)
     await db.flush()
