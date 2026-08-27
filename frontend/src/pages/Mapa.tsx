@@ -101,8 +101,7 @@ import {
   Hotspot,
   BBox,
 } from '../lib/mapaUtils';
-import MapaStats from '../components/mapa/MapaStats';
-import MapaArtefactosProto from '../components/mapa/MapaArtefactosProto';
+import MapaArtefactos from '../components/mapa/MapaArtefactos';
 import MapaTimelapseBanda, {
   type VelocidadTimelapse,
   type ComparacionVentana,
@@ -4069,27 +4068,13 @@ export default function Mapa() {
         </div>
       </section>
 
-      {/* PROTOTIPO TEMPORAL (se borra al elegir): tres layouts candidatos para
-             reemplazar el donut y el sparkline de MapaStats. Datos de muestra
-             rotulados; el switch 1/2/3 es la prueba del dueño. */}
-      <MapaArtefactosProto />
-
-      {/* === Sección de análisis debajo del mapa. El ranking NO es fijo:
-             cambia con la pregunta (mismo componente, otro contenido y otro
-             encabezado) y va acompañado de los paneles de estado y
-             tendencia. === */}
-      <MapaStats
-        reclamos={reclamosFiltrados}
-        statusColors={ESTADO_COLORS_LISTA}
-        statusLabels={estadoLabels}
-        ranking={ranking.items}
-        rankingId={ID_RANKING}
-        rankingTitulo={ranking.titulo}
-        rankingCaption={ranking.caption}
-        rankingIcono={ranking.icono}
-        rankingTono={ranking.tono}
-        rankingVacio={ranking.vacio}
-      />
+      {/* === Los artefactos de la lente (reemplazan al ranking + donut +
+             sparkline viejos, decisión del dueño 2026-08-27): tres cards
+             semánticas de dos caras — pregunta ↔ listado — que siguen a la
+             pregunta activa y al recorte de filtros. === */}
+      <div id={ID_RANKING}>
+        <MapaArtefactos pregunta={pregunta} ranking={ranking} reclamos={reclamosFiltrados} />
+      </div>
         </>
       )}
 
