@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1720">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Llamados">
+<title>Llamados Munify</title>
+<style>
+:root{
+ --bg:#0f1720; --bg2:#141e2a; --card:#1a2635; --card2:#213040; --line:#2b3b4e; --line2:#3a4c62;
+ --ink:#e8eef6; --ink2:#9db0c6; --ink3:#6d829c;
+ --acc:#3d8bfd; --acc2:#2f6fd0;
+ --ok:#35c07f; --warn:#e2a33c; --bad:#e06c6c; --purple:#9a7bdc;
+ --r:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;overflow-x:hidden;overscroll-behavior:none}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+input,textarea,select,button{font-family:inherit;font-size:16px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 14px 92px}
+
+header.top{position:sticky;top:0;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:blur(8px);
+ border-bottom:1px solid var(--line);padding-top:max(env(safe-area-inset-top),8px)}
+.top-in{max-width:1180px;margin:0 auto;padding:0 14px 10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.2px;font-size:17px}
+.brand i{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),var(--purple));
+ display:grid;place-items:center;font-style:normal;font-size:13px;color:#fff;font-weight:800}
+.spacer{flex:1}
+.kpis{display:flex;gap:7px;flex-wrap:wrap}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.kpi b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:13.5px}
+.kpi.ok b{color:var(--ok)} .kpi.warn b{color:var(--warn)} .kpi.pu b{color:var(--purple)}
+
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:13px 0 4px}
+.chip{border:1px solid var(--line2);background:var(--card);color:var(--ink2);border-radius:999px;
+ padding:6px 13px;font-size:13px;cursor:pointer;transition:.12s;white-space:nowrap}
+.chip:hover{border-color:var(--acc);color:var(--ink)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.chip .n{opacity:.7;font-size:11.5px;margin-left:4px}
+.buscar{flex:1;min-width:190px;position:relative}
+.buscar input{width:100%;background:var(--card);border:1px solid var(--line2);border-radius:999px;
+ padding:9px 15px 9px 15px;color:var(--ink);outline:none}
+.buscar input:focus{border-color:var(--acc)}
+
+.lista{display:grid;gap:9px;margin-top:11px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;
+ display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;cursor:pointer;transition:.12s}
+.row:hover{border-color:var(--line2);background:var(--card2)}
+.row.sel{border-color:var(--acc)}
+.row.done{opacity:.6}
+.est{width:8px;height:38px;border-radius:5px;background:var(--line2);flex:none}
+.est.contactado{background:var(--ok)} .est.no-atiende{background:var(--warn)}
+.est.rellamar{background:var(--purple)} .est.descartado{background:var(--bad)}
+.info{min-width:0}
+.info h3{margin:0 0 2px;font-size:15.5px;font-weight:700;letter-spacing:-.15px;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:12.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta b{color:var(--ink2);font-weight:600}
+.tel-btn{display:inline-flex;align-items:center;gap:7px;background:var(--acc);color:#fff;text-decoration:none;
+ border-radius:9px;padding:9px 14px;font-weight:700;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tel-btn:hover{background:var(--acc2)}
+.tel-btn.hecho{background:var(--card2);color:var(--ink2);border:1px solid var(--line2)}
+.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--line2);
+ color:var(--ink3);margin-left:6px;vertical-align:middle}
+.badge.n{border-color:var(--purple);color:var(--purple)}
+
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;opacity:0;pointer-events:none;transition:.18s}
+.ov.on{opacity:1;pointer-events:auto}
+.panel{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--bg2);z-index:61;
+ border-left:1px solid var(--line);transform:translateX(102%);transition:transform .22s cubic-bezier(.4,0,.2,1);
+ display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+.panel.on{transform:none}
+.p-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+.p-head h2{margin:0 0 3px;font-size:19px;letter-spacing:-.3px}
+.p-head .meta{font-size:13px;white-space:normal}
+.x{background:var(--card);border:1px solid var(--line2);color:var(--ink2);border-radius:9px;width:32px;height:32px;
+ cursor:pointer;flex:none;font-size:18px;line-height:1}
+.p-body{flex:1;overflow-y:auto;padding:14px 16px 34px;-webkit-overflow-scrolling:touch}
+.sec{margin-bottom:18px}
+.sec>label{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);
+ margin-bottom:7px;font-weight:700}
+.box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;
+ font-size:14px;color:var(--ink2);line-height:1.6}
+.box.script{border-left:3px solid var(--acc);color:var(--ink)}
+.box.perfil{border-left:3px solid var(--purple)}
+.p-tel{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.p-tel a.tel-btn{flex:1;justify-content:center;font-size:16.5px;padding:13px}
+.btn{border:1px solid var(--line2);background:var(--card);color:var(--ink2);border-radius:9px;padding:9px 13px;
+ cursor:pointer;font-size:13.5px;font-weight:600;transition:.12s}
+.btn:hover{border-color:var(--acc);color:var(--ink)}
+.btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.sm{padding:6px 11px;font-size:12.5px}
+.estados{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:7px}
+.eb{border:1px solid var(--line2);background:var(--card);color:var(--ink2);border-radius:9px;padding:10px 8px;
+ cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:.12s}
+.eb:hover{border-color:var(--ink3)}
+.eb.on[data-e=contactado]{background:var(--ok);border-color:var(--ok);color:#04240f}
+.eb.on[data-e=no-atiende]{background:var(--warn);border-color:var(--warn);color:#1a1200}
+.eb.on[data-e=rellamar]{background:var(--purple);border-color:var(--purple);color:#fff}
+.eb.on[data-e=descartado]{background:var(--bad);border-color:var(--bad);color:#fff}
+textarea,input.f{width:100%;background:var(--card);border:1px solid var(--line2);border-radius:10px;
+ padding:11px 12px;color:var(--ink);outline:none;resize:vertical;line-height:1.55}
+textarea:focus,input.f:focus{border-color:var(--acc)}
+.fila2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.hist{display:grid;gap:7px}
+.h-it{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13.5px;color:var(--ink2)}
+.h-it time{color:var(--ink3);font-size:11.5px;display:block;margin-bottom:3px}
+.h-it .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--line2)}
+.vacio{color:var(--ink3);font-size:13.5px;padding:14px 2px;line-height:1.6;text-align:center}
+.tips{display:grid;gap:8px}
+.tip b{color:var(--ink);display:block;margin-bottom:3px}
+footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);border-top:1px solid var(--line);
+ padding:9px 14px calc(9px + env(safe-area-inset-bottom));z-index:30}
+.foot-in{max-width:1180px;margin:0 auto;width:100%;display:flex;gap:11px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink3)}
+.progress{flex:1;min-width:100px;height:6px;background:var(--card2);border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),var(--acc));border-radius:999px;transition:width .3s}
+@media(max-width:640px){
+ .row{grid-template-columns:auto 1fr;gap:10px}
+ .row .tel-btn{grid-column:2;justify-self:start;margin-top:7px}
+ .kpis{width:100%;overflow-x:auto}
+ .fila2{grid-template-columns:1fr}
+ .top-in{gap:9px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="brand"><i>M</i> Llamados</div>
+  <div class="spacer"></div>
+  <div class="kpis" id="kpis"></div>
+</div></header>
+
+<div class="wrap">
+  <div class="filtros" id="fPais"></div>
+  <div class="filtros" style="padding-top:0">
+    <div id="fEstado" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    <div class="buscar"><input id="q" type="search" placeholder="Buscar municipio, provincia o telefono..." autocomplete="off"></div>
+  </div>
+  <div class="lista" id="lista"></div>
+  <div class="vacio" id="vacio" style="display:none"></div>
+</div>
+
+<footer class="pie"><div class="foot-in">
+  <span id="pieTxt"></span>
+  <div class="progress"><i id="pieBar" style="width:0%"></i></div>
+  <button class="btn sm" id="btnExport">Bajar copia</button>
+  <button class="btn sm" id="btnImport">Restaurar</button>
+  <input type="file" id="fileImport" accept="application/json" style="display:none">
+</div></footer>
+
+<div class="ov" id="ov"></div>
+<aside class="panel" id="panel" aria-hidden="true">
+  <div class="p-head">
+    <div style="flex:1;min-width:0">
+      <h2 id="pTitulo"></h2>
+      <div class="meta" id="pMeta"></div>
+    </div>
+    <button class="x" id="pClose" aria-label="Cerrar">&times;</button>
+  </div>
+  <div class="p-body" id="pBody"></div>
+</aside>
+
+<script>
+const DATOS = {"contactos":[{"pais":"Argentina","region":"Córdoba","localidad":"Alta Gracia","habitantes":"~55.000","perfil":"Fuerte perfil turístico e histórico. Zona descentralizada con mucha circulación vehicular, ideal para reportes viales.","telefono":"03547 42-9480","lote":"Municipios medianos","id":"argentina-alta-gracia-0"},{"pais":"Argentina","region":"Córdoba","localidad":"Jesús María","habitantes":"~35.000","perfil":"Polo comercial del norte cordobés ligado a eventos masivos. Necesitan orden operativo rápido en temporada.","telefono":"03525 44-3700","lote":"Municipios medianos","id":"argentina-jes-s-mar-a-1"},{"pais":"Argentina","region":"Córdoba","localidad":"Río Tercero","habitantes":"~55.000","perfil":"Corazón industrial y petroquímico. Gestión muy técnica y receptiva a la despapelización.","telefono":"03571 42-3010","lote":"Municipios medianos","id":"argentina-r-o-tercero-2"},{"pais":"Argentina","region":"Córdoba","localidad":"Bell Ville","habitantes":"~35.000","perfil":"Cabecera de departamento ordenada, perfil agroindustrial clásico que valora tiempos de respuesta.","telefono":"03537 42-1331","lote":"Municipios medianos","id":"argentina-bell-ville-3"},{"pais":"Argentina","region":"Córdoba","localidad":"Marcos Juárez","habitantes":"~30.000","perfil":"Zona núcleo productiva. Municipio con recursos tecnológicos propios pero ávido de mostrar innovación.","telefono":"03472 45-3000","lote":"Municipios medianos","id":"argentina-marcos-ju-rez-4"},{"pais":"Argentina","region":"Córdoba","localidad":"Corral de Bustos","habitantes":"~17.000","perfil":"Escala mediana justa donde el ejecutivo atiende temas de gestión real sin rosca partidaria pesada.","telefono":"03468 42-1250","lote":"Municipios medianos","id":"argentina-corral-de-bustos-5"},{"pais":"Argentina","region":"Córdoba","localidad":"Santa Rosa de Calamuchita","habitantes":"~18.000","perfil":"Villa turística top. Explotan con los servicios públicos en verano; les urge app de control dinámico.","telefono":"03546 42-9220","lote":"Municipios medianos","id":"argentina-santa-rosa-de-calamuchita-6"},{"pais":"Argentina","region":"Córdoba","localidad":"Villa Allende","habitantes":"~38.000","perfil":"Crecimiento residencial acelerado en Sierras Chicas; alta demanda de ordenamiento en servicios urbanos.","telefono":"03543 43-8250","lote":"Municipios medianos","id":"argentina-villa-allende-7"},{"pais":"Argentina","region":"Santa Fe","localidad":"Rafaela","habitantes":"~100.000","perfil":"Polo tecnológico e industrial de avanzada. Muy abiertos a herramientas de gestión digital y modernización.","telefono":"03492 50-6000","lote":"Municipios medianos","id":"argentina-rafaela-8"},{"pais":"Argentina","region":"Santa Fe","localidad":"Venado Tuerto","habitantes":"~80.000","perfil":"Centro de la zona núcleo sur. Gestión metódica, alta exigencia de eficiencia en bacheo y alumbrado.","telefono":"03462 43-6300","lote":"Municipios medianos","id":"argentina-venado-tuerto-9"},{"pais":"Argentina","region":"Santa Fe","localidad":"Reconquista","habitantes":"~80.000","perfil":"Capital del norte santafesino. Gran extensión territorial con necesidad de descentralizar reclamos zonales.","telefono":"03482 42-0013","lote":"Municipios medianos","id":"argentina-reconquista-10"},{"pais":"Argentina","region":"Santa Fe","localidad":"Casilda","habitantes":"~38.000","perfil":"Perfil comercial y agroexportador sólido. Administración municipal tradicional buscando digitalizarse.","telefono":"03464 42-2050","lote":"Municipios medianos","id":"argentina-casilda-11"},{"pais":"Argentina","region":"Santa Fe","localidad":"Cañada de Gómez","habitantes":"~36.000","perfil":"Corredor industrial de la ruta 9. Municipios con presupuesto propio y equipos técnicos eficientes.","telefono":"03471 42-2025","lote":"Municipios medianos","id":"argentina-ca-ada-de-g-mez-12"},{"pais":"Argentina","region":"Santa Fe","localidad":"Esperanza","habitantes":"~45.000","perfil":"Primera colonia organizada del país. Alta valoración de la prolijidad institucional y orden urbano.","telefono":"03496 42-0009","lote":"Municipios medianos","id":"argentina-esperanza-13"},{"pais":"Argentina","region":"Santa Fe","localidad":"San Lorenzo","habitantes":"~50.000","perfil":"Polo portuario e histórico sobre el Paraná. Gran movimiento industrial y tránsito pesado diario.","telefono":"03476 42-1111","lote":"Municipios medianos","id":"argentina-san-lorenzo-14"},{"pais":"Argentina","region":"Entre Ríos","localidad":"Gualeguaychú","habitantes":"~90.000","perfil":"Fuerte perfil turístico y comercial. Requieren control estricto de servicios y espacios públicos.","telefono":"03442 42-3300","lote":"Municipios medianos","id":"argentina-gualeguaych-15"},{"pais":"Argentina","region":"Entre Ríos","localidad":"Concepción del Uruguay","habitantes":"~85.000","perfil":"Ciudad universitaria e histórica. Buena predisposición para proyectos de innovación ciudadana.","telefono":"03442 42-5101","lote":"Municipios medianos","id":"argentina-concepci-n-del-uruguay-16"},{"pais":"Argentina","region":"Entre Ríos","localidad":"Villaguay","habitantes":"~50.000","perfil":"Corazón geográfico de la provincia. Municipio de escala intermedia muy enfocado en gestión comunal.","telefono":"03455 42-1121","lote":"Municipios medianos","id":"argentina-villaguay-17"},{"pais":"Argentina","region":"Entre Ríos","localidad":"Chajarí","habitantes":"~45.000","perfil":"Polo citrícola y productivo muy dinámico. Intendencias con perfil ágil y moderno.","telefono":"03456 42-1400","lote":"Municipios medianos","id":"argentina-chajar-18"},{"pais":"Argentina","region":"Entre Ríos","localidad":"Victoria","habitantes":"~38.000","perfil":"Conexión directa por puente a Rosario, turismo masivo de fin de semana que exige respuestas rápidas.","telefono":"03436 42-2225","lote":"Municipios medianos","id":"argentina-victoria-19"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Tandil","habitantes":"~120.000","perfil":"Referente nacional en gestión inteligente y gobierno abierto. Excelente terreno para mostrar Munify.","telefono":"0249 443-2000","lote":"Municipios medianos","id":"argentina-tandil-20"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Olavarría","habitantes":"~115.000","perfil":"Polo minero, cementero y agropecuario. Estructura municipal grande pero abierta a optimización.","telefono":"02284 44-0400","lote":"Municipios medianos","id":"argentina-olavarr-a-21"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Pergamino","habitantes":"~105.000","perfil":"Corazón de la zona núcleo norte bonaerense. Perfil técnico alto en secretarías de Obras Públicas.","telefono":"02477 40-8000","lote":"Municipios medianos","id":"argentina-pergamino-22"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Necochea","habitantes":"~95.000","perfil":"Distrito portuario y balneario masivo. Estacionalidad marcada que satura los servicios municipales.","telefono":"02262 42-2121","lote":"Municipios medianos","id":"argentina-necochea-23"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Junín","habitantes":"~95.000","perfil":"Hub logístico y tecnológico del noroeste bonaerense. Muy receptivos a software de gestión local.","telefono":"0236 440-7900","lote":"Municipios medianos","id":"argentina-jun-n-24"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Tres Arroyos","habitantes":"~60.000","perfil":"Comuna agroindustrial ordenada, administración equilibrada y muy receptiva a propuestas directas.","telefono":"02983 43-1555","lote":"Municipios medianos","id":"argentina-tres-arroyos-25"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Azul","habitantes":"~65.000","perfil":"Cabecera regional centro. Necesidad imperiosa de modernizar canales de interacción con el vecino.","telefono":"02281 42-5500","lote":"Municipios medianos","id":"argentina-azul-26"},{"pais":"Argentina","region":"Buenos Aires","localidad":"Chivilcoy","habitantes":"~67.000","perfil":"Partido pujante con fuerte actividad comercial y industrial intermedia. Excelente escala de trabajo.","telefono":"02346 42-3011","lote":"Municipios medianos","id":"argentina-chivilcoy-27"},{"pais":"Argentina","region":"Mendoza","localidad":"San Rafael","habitantes":"~210.000","perfil":"Segundo departamento en importancia. Polo turístico y agrícola vitivinícola con gran extensión territorial y alta demanda de servicios viales.","telefono":"0260 442-8200","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-san-rafael-28"},{"pais":"Argentina","region":"Mendoza","localidad":"Godoy Cruz","habitantes":"~190.000","perfil":"Pionero en modernización y gestión municipal inteligente en Cuyo. Muy receptivos a herramientas de innovación digital y participación.","telefono":"0261 413-3000","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-godoy-cruz-29"},{"pais":"Argentina","region":"Mendoza","localidad":"San Martín","habitantes":"~120.000","perfil":"Corazón de la zona Este mendocina. Municipio pujante con fuerte perfil agroindustrial y administrativo ordenado.","telefono":"0263 442-0050","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-san-mart-n-30"},{"pais":"Argentina","region":"Mendoza","localidad":"Luján de Cuyo","habitantes":"~140.000","perfil":"Tierra de malbec y polo residencial en expansión hacia la cordillera. Exigen agilidad en control de obras y servicios.","telefono":"0261 498-9900","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-luj-n-de-cuyo-31"},{"pais":"Argentina","region":"Mendoza","localidad":"General Alvear","habitantes":"~50.000","perfil":"Escala media ideal del sur mendocino. Comunidades integradas con trato directo con secretarías técnicas.","telefono":"02625 42-2111","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-general-alvear-32"},{"pais":"Argentina","region":"San Juan","localidad":"Rawson","habitantes":"~125.000","perfil":"Departamento de gran densidad poblacional colindante a la capital; con urgencia de optimizar canales de reclamos vecinales.","telefono":"0264 428-1100","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-rawson-33"},{"pais":"Argentina","region":"San Juan","localidad":"Rivadavia","habitantes":"~90.000","perfil":"Perfil residencial y universitario en crecimiento. Equipos municipales abiertos a la incorporación de software de gestión.","telefono":"0264 433-1111","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-rivadavia-34"},{"pais":"Argentina","region":"San Juan","localidad":"Chimbas","habitantes":"~90.000","perfil":"Zona industrial y fabril activa. Necesidad operativa de control dinámico de bacheo y alumbrado público.","telefono":"0264 431-1000","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-chimbas-35"},{"pais":"Argentina","region":"San Juan","localidad":"Santa Lucía","habitantes":"~50.000","perfil":"Comuna urbana-residencial ordenada, escala intermedia justa para implementar tableros de control municipales.","telefono":"0264 425-1025","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-santa-luc-a-36"},{"pais":"Argentina","region":"San Luis","localidad":"Villa Mercedes","habitantes":"~130.000","perfil":"Segundo distrito y motor industrial puntano. Estructura técnica moderna con fuerte impulso a la digitalización.","telefono":"02657 42-1000","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-villa-mercedes-37"},{"pais":"Argentina","region":"San Luis","localidad":"Merlo","habitantes":"~25.000","perfil":"Villa turística internacional de las Sierras de los Comechingones. Alta rotación poblacional estacional que requiere control de servicios.","telefono":"02656 47-6620","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-merlo-38"},{"pais":"Argentina","region":"San Luis","localidad":"Justo Daract","habitantes":"~20.000","perfil":"Nodo ferroviario y logístico histórico. Municipio mediano con gestión cercana y abierta a propuestas tecnológicas.","telefono":"02657 43-2100","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-justo-daract-39"},{"pais":"Argentina","region":"La Pampa","localidad":"General Pico","habitantes":"~65.000","perfil":"Capital económica del norte pampeano. Polo agroindustrial pujante, prolijo y con estándares altos de gestión.","telefono":"02302 43-4250","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-general-pico-40"},{"pais":"Argentina","region":"La Pampa","localidad":"Toay","habitantes":"~15.000","perfil":"Cercana a la capital, perfil residencial en auge. Escala chica-mediana muy manejable para presentaciones directas.","telefono":"02954 38-1999","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-toay-41"},{"pais":"Argentina","region":"La Pampa","localidad":"General Acha","habitantes":"~16.000","perfil":"Punto estratégico de rutas en el centro-sur provincial. Intendencia enfocada en servicios esenciales al vecino.","telefono":"02952 43-2005","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-general-acha-42"},{"pais":"Argentina","region":"Neuquén","localidad":"San Martín de los Andes","habitantes":"~35.000","perfil":"Centro turístico cordillerano de elite. Exigencia extrema en calidad de servicios públicos y reportes ambientales.","telefono":"02972 42-7350","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-san-mart-n-de-los-andes-43"},{"pais":"Argentina","region":"Neuquén","localidad":"Cutral Có","habitantes":"~40.000","perfil":"Polo hidrocarburífero histórico. Presupuesto propio y constantes inversiones en infraestructura urbana.","telefono":"0299 496-1215","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-cutral-c-44"},{"pais":"Argentina","region":"Neuquén","localidad":"Plottier","habitantes":"~45.000","perfil":"Crecimiento demográfico explosivo en el conurbano neuquino. Urgencia total de sistemas modernos de gestión.","telefono":"0299 493-6100","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-plottier-45"},{"pais":"Argentina","region":"Neuquén","localidad":"Zapala","habitantes":"~35.000","perfil":"Centro geográfico y logístico de la provincia. Perfil industrial minero con tradición institucional.","telefono":"02942 43-1555","lote":"Cuyo / Pampeana / Patagonia","id":"argentina-zapala-46"},{"pais":"Argentina","region":"Río Negro","localidad":"General Roca","habitantes":"~95.000","perfil":"Polo frutícola y comercial del Alto Valle. Gestión municipal muy estructurada, con áreas técnicas abiertas a la digitalización.","telefono":"0298 443-1400","lote":"Patagonia austral","id":"argentina-general-roca-47"},{"pais":"Argentina","region":"Río Negro","localidad":"Cipolletti","habitantes":"~90.000","perfil":"Ciudad de pujante crecimiento urbano pegada a Neuquén. Alta demanda de eficiencia en servicios viales y alumbrado.","telefono":"0299 479-3150","lote":"Patagonia austral","id":"argentina-cipolletti-48"},{"pais":"Argentina","region":"Río Negro","localidad":"Bariloche","habitantes":"~135.000","perfil":"Motor turístico internacional de la Patagonia. Escala más grande pero con necesidad crítica de control de reclamos urbanos y ambientales.","telefono":"0294 442-3171","lote":"Patagonia austral","id":"argentina-bariloche-49"},{"pais":"Argentina","region":"Río Negro","localidad":"Villa Regina","habitantes":"~35.000","perfil":"Escala mediana ideal en el Valle. Municipio ordenado con trato directo en secretarías de gobierno.","telefono":"0298 446-1011","lote":"Patagonia austral","id":"argentina-villa-regina-50"},{"pais":"Argentina","region":"Chubut","localidad":"Puerto Madryn","habitantes":"~100.000","perfil":"Polo turístico internacional (península Valdés) y industrial pesquero. Alta exigencia de calidad en atención al vecino.","telefono":"0280 445-2101","lote":"Patagonia austral","id":"argentina-puerto-madryn-51"},{"pais":"Argentina","region":"Chubut","localidad":"Comodoro Rivadavia","habitantes":"~185.000","perfil":"Capital petrolera de la Patagonia. Presupuesto fuerte, estructura compleja pero con necesidades claras de descentralización de reclamos.","telefono":"0297 406-2000","lote":"Patagonia austral","id":"argentina-comodoro-rivadavia-52"},{"pais":"Argentina","region":"Chubut","localidad":"Trelew","habitantes":"~105.000","perfil":"Centro logístico y comercial del Valle Inferior. Municipio con tradición administrativa en busca de innovación.","telefono":"0280 442-0111","lote":"Patagonia austral","id":"argentina-trelew-53"},{"pais":"Argentina","region":"Chubut","localidad":"Esquel","habitantes":"~38.000","perfil":"Cabecera de la cordillera chubutense. Comuna mediana muy prolija, receptiva a herramientas de gestión participativa.","telefono":"02945 45-1930","lote":"Patagonia austral","id":"argentina-esquel-54"},{"pais":"Argentina","region":"Santa Cruz","localidad":"Caleta Olivia","habitantes":"~70.000","perfil":"Segundo núcleo poblacional y petrolero del norte santacruceño. Alta demanda de soluciones operativas en servicios públicos.","telefono":"0297 485-1100","lote":"Patagonia austral","id":"argentina-caleta-olivia-55"},{"pais":"Argentina","region":"Santa Cruz","localidad":"Pico Truncado","habitantes":"~25.000","perfil":"Escala intermedia justa en zona norte. Intendencia con perfil operativo directo y contacto ágil con secretarías.","telefono":"0297 499-2015","lote":"Patagonia austral","id":"argentina-pico-truncado-56"},{"pais":"Argentina","region":"Santa Cruz","localidad":"El Calafate","habitantes":"~25.000","perfil":"Villa turística mundial de los glaciares. Presupuesto dinámico y constante necesidad de optimizar la infraestructura urbana.","telefono":"02902 49-1110","lote":"Patagonia austral","id":"argentina-el-calafate-57"},{"pais":"Argentina","region":"Tierra del Fuego","localidad":"Río Grande","habitantes":"~100.000","perfil":"Polo industrial electrónico y metalúrgico. Municipio con alta digitalización interna y apertura a software de gestión.","telefono":"02964 43-3000","lote":"Patagonia austral","id":"argentina-r-o-grande-58"},{"pais":"Argentina","region":"Tierra del Fuego","localidad":"Ushuaia","habitantes":"~85.000","perfil":"Fin del mundo, perfil turístico global masivo. Gran movimiento de servicios públicos y exigencia institucional.","telefono":"02901 42-1420","lote":"Patagonia austral","id":"argentina-ushuaia-59"},{"pais":"Argentina","region":"Corrientes","localidad":"Goya","habitantes":"~90.000","perfil":"Segundo distrito provincial. Polo tabacalero, comercial e industrial sobre el río Paraná; intendencia con peso político y administrativo propio.","telefono":"03777 42-1600","lote":"NEA","id":"argentina-goya-60"},{"pais":"Argentina","region":"Corrientes","localidad":"Paso de los Libres","habitantes":"~45.000","perfil":"Paso fronterizo internacional clave con Brasil (Uruguaiana). Alto tránsito comercial y aduanero que exige control operativo.","telefono":"03772 42-1300","lote":"NEA","id":"argentina-paso-de-los-libres-61"},{"pais":"Argentina","region":"Corrientes","localidad":"Curuzú Cuatiá","habitantes":"~42.000","perfil":"Corazón ganadero y agrícola del sur correntino. Municipio ordenado con estructuras técnicas muy estables.","telefono":"03774 42-2250","lote":"NEA","id":"argentina-curuz-cuati-62"},{"pais":"Argentina","region":"Corrientes","localidad":"Mercedes","habitantes":"~40.000","perfil":"Centro de peregrinación y polo agropecuario. Escala ideal para implementaciones de reportes ciudadanos y gestión municipal.","telefono":"03773 42-1020","lote":"NEA","id":"argentina-mercedes-63"},{"pais":"Argentina","region":"Misiones","localidad":"Oberá","habitantes":"~80.000","perfil":"Capital de la zona centro y de las Colectividades. Perfil comercial e industrial pujante con alta valoración de la gestión digital.","telefono":"03755 42-1301","lote":"NEA","id":"argentina-ober-64"},{"pais":"Argentina","region":"Misiones","localidad":"Eldorado","habitantes":"~75.000","perfil":"Polo foresto-industrial y comercial del Alto Paraná. Estructura municipal amplia y muy receptiva a optimización de servicios.","telefono":"03751 42-1111","lote":"NEA","id":"argentina-eldorado-65"},{"pais":"Argentina","region":"Misiones","localidad":"Puerto Iguazú","habitantes":"~55.000","perfil":"Destino turístico mundial por las Cataratas. Presupuesto y movimiento diario intensos que demandan control urbano estricto.","telefono":"03757 42-0120","lote":"NEA","id":"argentina-puerto-iguaz-66"},{"pais":"Argentina","region":"Misiones","localidad":"Leandro N. Alem","habitantes":"~40.000","perfil":"Ciudad de la Fiesta Nacional de la Navidad, perfil productivo y cooperativo muy sólido. Comuna sumamente ordenada.","telefono":"03754 42-0050","lote":"NEA","id":"argentina-leandro-n-alem-67"},{"pais":"Argentina","region":"Chaco","localidad":"Presidencia Roque Sáenz Peña","habitantes":"~110.000","perfil":"La 'Termal', segundo centro chaqueño y nodo agroindustrial. Gestión moderna con fuerte impulso a la descentralización.","telefono":"0364 442-2100","lote":"NEA","id":"argentina-presidencia-roque-s-enz-pe-a-68"},{"pais":"Argentina","region":"Chaco","localidad":"Villa Ángela","habitantes":"~50.000","perfil":"Polo agrícola e industrial del sudoeste provincial. Escala mediana justa para establecer canales directos de reclamos.","telefono":"03735 42-1105","lote":"NEA","id":"argentina-villa-ngela-69"},{"pais":"Argentina","region":"Chaco","localidad":"General José de San Martín","habitantes":"~35.000","perfil":"Cabecera de la zona norte chaqueña. Intendencia activa con trato directo y vocación de innovación tecnológica.","telefono":"03725 42-0140","lote":"NEA","id":"argentina-general-jos-de-san-mart-n-70"},{"pais":"Argentina","region":"Formosa","localidad":"Clorinda","habitantes":"~60.000","perfil":"Segunda ciudad y centro comercial fronterizo con Paraguay. Alto dinamismo comercial y urbano que requiere control logístico.","telefono":"03718 42-1200","lote":"NEA","id":"argentina-clorinda-71"},{"pais":"Argentina","region":"Formosa","localidad":"Pirané","habitantes":"~25.000","perfil":"Centro agropecuario y ferroviario clave en el centro formoseño. Municipio mediano con gestión cercana al vecino.","telefono":"0370 446-0010","lote":"NEA","id":"argentina-piran-72"},{"pais":"Argentina","region":"Tucumán","localidad":"Concepción","habitantes":"~55.000","perfil":"La 'Perla del Sur' tucumano. Polo comercial, azucarero y de servicios muy activo, con escala justa de gestión municipal.","telefono":"03865 42-1200","lote":"NOA","id":"argentina-concepci-n-73"},{"pais":"Argentina","region":"Tucumán","localidad":"Tafí Viejo","habitantes":"~80.000","perfil":"Ciudad histórico-ferroviaria en gran expansión residencial metropolitana; alta demanda de ordenamiento urbano.","telefono":"0381 461-4400","lote":"NOA","id":"argentina-taf-viejo-74"},{"pais":"Argentina","region":"Tucumán","localidad":"Yerba Buena","habitantes":"~85.000","perfil":"Municipio residencial de alto poder adquisitivo y gran exigencia en servicios públicos, pavimentación y seguridad.","telefono":"0381 425-5000","lote":"NOA","id":"argentina-yerba-buena-75"},{"pais":"Argentina","region":"Tucumán","localidad":"Banda del Río Salí","habitantes":"~110.000","perfil":"Polo industrial fabril del este metropolitano; estructura grande pero con gran necesidad de control operativo.","telefono":"0381 426-1100","lote":"NOA","id":"argentina-banda-del-r-o-sal-76"},{"pais":"Argentina","region":"Salta","localidad":"San Ramón de la Nueva Orán","habitantes":"~85.000","perfil":"Polo comercial y agroindustrial del norte salteño. Intendencias con alta movilidad y trato directo con secretarías.","telefono":"03878 42-1011","lote":"NOA","id":"argentina-san-ram-n-de-la-nueva-or-n-77"},{"pais":"Argentina","region":"Salta","localidad":"Tartagal","habitantes":"~80.000","perfil":"Centro hidrocarburífero y comercial de frontera. Gran extensión urbana con desafíos constantes en servicios.","telefono":"03873 42-1050","lote":"NOA","id":"argentina-tartagal-78"},{"pais":"Argentina","region":"Salta","localidad":"Metán","habitantes":"~35.000","perfil":"Nudo de rutas nacionales y polo agropecuario del sur salteño. Escala mediana prolija y muy receptiva.","telefono":"03876 42-1230","lote":"NOA","id":"argentina-met-n-79"},{"pais":"Argentina","region":"Salta","localidad":"Cafayate","habitantes":"~16.000","perfil":"Corazón de los Valles Calchaquíes y polo vitivinícola mundial. Turismo top que exige control y prolijidad.","telefono":"03868 42-1110","lote":"NOA","id":"argentina-cafayate-80"},{"pais":"Argentina","region":"Jujuy","localidad":"San Pedro de Jujuy","habitantes":"~75.000","perfil":"Segundo centro económico y azucarero de la provincia. Dinámica comercial intensa y necesidad de gestión ágil.","telefono":"03888 42-0120","lote":"NOA","id":"argentina-san-pedro-de-jujuy-81"},{"pais":"Argentina","region":"Jujuy","localidad":"Palpalá","habitantes":"~55.000","perfil":"Ciudad siderúrgica e industrial por excelencia. Estructura técnica muy vinculada al trabajo fabril y municipal.","telefono":"0388 429-1100","lote":"NOA","id":"argentina-palpal-82"},{"pais":"Argentina","region":"Jujuy","localidad":"Libertador General San Martín","habitantes":"~50.000","perfil":"Polo agroindustrial (Ledesma). Escala mediana ideal con un entorno urbano muy concentrado y activo.","telefono":"03886 42-1005","lote":"NOA","id":"argentina-libertador-general-san-mart-n-83"},{"pais":"Argentina","region":"Jujuy","localidad":"Humahuaca","habitantes":"~15.000","perfil":"Hito turístico internacional de la Quebrada. Requiere gestión dinámica de espacios públicos y servicios.","telefono":"03887 42-1022","lote":"NOA","id":"argentina-humahuaca-84"},{"pais":"Argentina","region":"Catamarca","localidad":"Andalgalá","habitantes":"~20.000","perfil":"Histórico polo minero y agrícola del oeste catamarqueño. Municipio mediano con gestión muy personalizada.","telefono":"03835 42-2010","lote":"NOA","id":"argentina-andalgal-85"},{"pais":"Argentina","region":"Catamarca","localidad":"Tinogasta","habitantes":"~15.000","perfil":"Ruta del Vino de altura y turismo cordillerano. Intendencia enfocada en optimizar la experiencia local y visitante.","telefono":"03837 42-1120","lote":"NOA","id":"argentina-tinogasta-86"},{"pais":"Argentina","region":"Catamarca","localidad":"Valle Viejo","habitantes":"~35.000","perfil":"Área metropolitana de la capital en fuerte crecimiento residencial y comercial. Perfil ideal para Munify.","telefono":"0383 444-1234","lote":"NOA","id":"argentina-valle-viejo-87"},{"pais":"Argentina","region":"Santiago del Estero","localidad":"La Banda","habitantes":"~140.000","perfil":"Segunda ciudad santiagueña, pegada a la capital. Estructura densa con fuerte necesidad de digitalizar reclamos.","telefono":"0385 427-1000","lote":"NOA","id":"argentina-la-banda-88"},{"pais":"Argentina","region":"Santiago del Estero","localidad":"Termas de Río Hondo","habitantes":"~35.000","perfil":"Principal centro termal y polo de eventos internacionales de automovilismo. Turismo masivo y exigente.","telefono":"03858 42-1025","lote":"NOA","id":"argentina-termas-de-r-o-hondo-89"},{"pais":"Argentina","region":"Santiago del Estero","localidad":"Añatuya","habitantes":"~25.000","perfil":"Cabecera del sudeste provincial, nodo ganadero y comercial. Gestión de escala mediana muy directa.","telefono":"03844 42-1111","lote":"NOA","id":"argentina-a-atuya-90"},{"pais":"Argentina","region":"La Rioja","localidad":"Chilecito","habitantes":"~55.000","perfil":"Segundo departamento provincial. Polo agroindustrial y vitivinícola al pie del Famatina; muy pujante.","telefono":"03825 42-2100","lote":"NOA","id":"argentina-chilecito-91"},{"pais":"Argentina","region":"La Rioja","localidad":"Aimogasta","habitantes":"~15.000","perfil":"Capital nacional de la aceituna. Economía regional muy sólida con intendencia de escala compacta.","telefono":"03827 42-0050","lote":"NOA","id":"argentina-aimogasta-92"},{"pais":"Paraguay","region":"Central","localidad":"San Lorenzo","habitantes":"~300.000","perfil":"Ciudad universitaria y gran polo comercial del área metropolitana. Alta densidad con urgencia de modernizar reclamos urbanos.","telefono":"+595 21 582-100","lote":"Paraguay lote 1","id":"paraguay-san-lorenzo-93"},{"pais":"Paraguay","region":"Central","localidad":"Luque","habitantes":"~280.000","perfil":"Ciudad de la música y vecina al aeropuerto internacional. Fuerte movimiento comercial y descentralización barrial necesaria.","telefono":"+595 21 642-050","lote":"Paraguay lote 1","id":"paraguay-luque-94"},{"pais":"Paraguay","region":"Central","localidad":"Lambaré","habitantes":"~150.000","perfil":"Zona residencial y comercial densa pegada a la capital. Estructura municipal urbana muy compacta y activa.","telefono":"+595 21 301-350","lote":"Paraguay lote 1","id":"paraguay-lambar-95"},{"pais":"Paraguay","region":"Central","localidad":"Fernando de la Mora","habitantes":"~180.000","perfil":"Eje comercial y de servicios clave del Gran Asunción. Municipio ordenado con alta exigencia en bacheo y tasas.","telefono":"+595 21 502-230","lote":"Paraguay lote 1","id":"paraguay-fernando-de-la-mora-96"},{"pais":"Paraguay","region":"Central","localidad":"Capiatá","habitantes":"~230.000","perfil":"Nudo de rutas troncales. Crecimiento demográfico acelerado que exige herramientas digitales de control vecinal.","telefono":"+595 294 220-300","lote":"Paraguay lote 1","id":"paraguay-capiat-97"},{"pais":"Paraguay","region":"Alto Paraná","localidad":"Presidente Franco","habitantes":"~110.000","perfil":"Zona metropolitana de la triple frontera. Polo comercial en expansión con fuerte necesidad de ordenamiento urbano.","telefono":"+595 61 550-111","lote":"Paraguay lote 1","id":"paraguay-presidente-franco-98"},{"pais":"Paraguay","region":"Alto Paraná","localidad":"Hernandarias","habitantes":"~85.000","perfil":"Capital de la energía (cerca de Itaipú). Municipio con recursos y perfil industrial/turístico muy pujante.","telefono":"+595 61 282-400","lote":"Paraguay lote 1","id":"paraguay-hernandarias-99"},{"pais":"Paraguay","region":"Alto Paraná","localidad":"Minga Guazú","habitantes":"~90.000","perfil":"Polo agroindustrial y logístico sobre la ruta PY02. Escala mediana en pleno despegue de servicios.","telefono":"+595 61 460-200","lote":"Paraguay lote 1","id":"paraguay-minga-guaz-100"},{"pais":"Paraguay","region":"Itapúa","localidad":"Encarnación","habitantes":"~130.000","perfil":"La 'Perla del Sur', polo turístico internacional y fronterizo con Posadas. Gestión modelo en modernización y orden.","telefono":"+595 71 204-800","lote":"Paraguay lote 1","id":"paraguay-encarnaci-n-101"},{"pais":"Paraguay","region":"Itapúa","localidad":"Hohenau","habitantes":"~16.000","perfil":"Corazón de las Colonias Unidas. Perfil cooperativo agroindustrial alemán/suizo ultra prolijo y eficiente.","telefono":"+595 775 232-225","lote":"Paraguay lote 1","id":"paraguay-hohenau-102"},{"pais":"Paraguay","region":"Caaguazú","localidad":"Coronel Oviedo","habitantes":"~120.000","perfil":"El cruce de caminos de Paraguay. Nodo comercial estratégico con intendencia de escala mediana ideal.","telefono":"+595 521 202-300","lote":"Paraguay lote 1","id":"paraguay-coronel-oviedo-103"},{"pais":"Paraguay","region":"Caaguazú","localidad":"Caaguazú","habitantes":"~125.000","perfil":"Polo maderero y agrícola muy activo. Estructura municipal con trato directo y vocación de servicio.","telefono":"+595 522 422-100","lote":"Paraguay lote 1","id":"paraguay-caaguaz-104"},{"pais":"Paraguay","region":"Guairá","localidad":"Villarrica","habitantes":"~70.000","perfil":"Histórica ciudad cultural y universitaria. Administración tradicional muy respetada con apertura a la innovación.","telefono":"+595 541 42-200","lote":"Paraguay lote 1","id":"paraguay-villarrica-105"},{"pais":"Paraguay","region":"Cordillera","localidad":"Caacupé","habitantes":"~70.000","perfil":"Capital espiritual del país y centro turístico de las sierras. Alta rotación estacional que exige control de servicios.","telefono":"+595 511 252-210","lote":"Paraguay lote 1","id":"paraguay-caacup-106"},{"pais":"Paraguay","region":"Concepción","localidad":"Concepción","habitantes":"~85.000","perfil":"Histórica capital del primer departamento y puerto sobre el río Paraguay. Nodo comercial del norte con fuerte influencia regional.","telefono":"+595 331 42-150","lote":"Paraguay lote 2","id":"paraguay-concepci-n-107"},{"pais":"Paraguay","region":"Concepción","localidad":"Horqueta","habitantes":"~60.000","perfil":"Zona agrícola y ganadera muy activa. Escala mediana ideal con trato directo en la administración municipal.","telefono":"+595 332 232-100","lote":"Paraguay lote 2","id":"paraguay-horqueta-108"},{"pais":"Paraguay","region":"Amambay","localidad":"Pedro Juan Caballero","habitantes":"~115.000","perfil":"Frontera seca caliente con Brasil. Polo comercial masivo de altísimo movimiento urbano que exige control y ordenamiento.","telefono":"+595 336 272-300","lote":"Paraguay lote 2","id":"paraguay-pedro-juan-caballero-109"},{"pais":"Paraguay","region":"San Pedro","localidad":"San Estanislao (Santaní)","habitantes":"~60.000","perfil":"El gran cruce de rutas del norte interior. Polo comercial dinámico que agrupa a distritos agrícolas pujantes.","telefono":"+595 342 222-140","lote":"Paraguay lote 2","id":"paraguay-san-estanislao-santan-110"},{"pais":"Paraguay","region":"San Pedro","localidad":"Guayaybí","habitantes":"~35.000","perfil":"Zona de alta producción frutihortícola sobre corredor central. Municipio de escala intermedia muy enfocado en gestión comunal.","telefono":"+595 432 250-100","lote":"Paraguay lote 2","id":"paraguay-guayayb-111"},{"pais":"Paraguay","region":"Canindeyú","localidad":"Salto del Guairá","habitantes":"~45.000","perfil":"Polo comercial fronterizo estratégico de fuerte expansión urbana y turística.","telefono":"+595 46 242-200","lote":"Paraguay lote 2","id":"paraguay-salto-del-guair-112"},{"pais":"Paraguay","region":"Canindeyú","localidad":"Curuguaty","habitantes":"~60.000","perfil":"Ciudad histórica y centro agropecuario regional en pleno crecimiento demográfico y de servicios.","telefono":"+595 48 210-150","lote":"Paraguay lote 2","id":"paraguay-curuguaty-113"},{"pais":"Paraguay","region":"Paraguarí","localidad":"Paraguarí","habitantes":"~25.000","perfil":"Capital departamental de cerros y turismo histórico cercano a Asunción; administración ordenada y tradicional.","telefono":"+595 531 432-110","lote":"Paraguay lote 2","id":"paraguay-paraguar-114"},{"pais":"Paraguay","region":"Paraguarí","localidad":"Carapeguá","habitantes":"~35.000","perfil":"Ciudad de la artesanía y el tejido. Municipio mediano con fuerte arraigo local y demanda de control urbano.","telefono":"+595 526 232-200","lote":"Paraguay lote 2","id":"paraguay-carapegu-115"},{"pais":"Paraguay","region":"Ñeembucú","localidad":"Pilar","habitantes":"~35.000","perfil":"Histórica 'Perla del Sur' sobre el río Paraguay. Perfil industrial textil tradicional y puerto con gran proyección.","telefono":"+595 786 232-400","lote":"Paraguay lote 2","id":"paraguay-pilar-116"},{"pais":"Perú","region":"Lima Provincias","localidad":"Huacho (Huaura)","habitantes":"~160.000","perfil":"Capital de Lima Provincias. Polo agrícola, comercial y administrativo del Norte Chico muy activo y cercano a la capital.","telefono":"+51 1 232-1110","lote":"Peru lote 1","id":"per-huacho-huaura-117"},{"pais":"Perú","region":"Lima Provincias","localidad":"Barranca","habitantes":"~70.000","perfil":"Puerto y centro comercial estratégico en la Panamericana Norte. Intendencia (Municipalidad Provincial) con trato directo.","telefono":"+51 1 235-5121","lote":"Peru lote 1","id":"per-barranca-118"},{"pais":"Perú","region":"Lima Provincias","localidad":"Cañete (San Vicente)","habitantes":"~110.000","perfil":"Sur Chico, polo agrícola y vitivinícola con gran expansión inmobiliaria y turística de fin de semana.","telefono":"+51 1 581-1122","lote":"Peru lote 1","id":"per-ca-ete-san-vicente-119"},{"pais":"Perú","region":"Ica","localidad":"Ica","habitantes":"~250.000","perfil":"Potencia agroexportadora y vitivinícola. Gestión municipal moderna y estructurada, con alta exigencia en servicios.","telefono":"+51 56 231-420","lote":"Peru lote 1","id":"per-ica-120"},{"pais":"Perú","region":"Ica","localidad":"Chincha Alta","habitantes":"~210.000","perfil":"Polo comercial y textil del sur chico. Alta densidad urbana con urgencia de sistemas dinámicos de reclamos.","telefono":"+51 56 261-210","lote":"Peru lote 1","id":"per-chincha-alta-121"},{"pais":"Perú","region":"Ica","localidad":"Pisco","habitantes":"~140.000","perfil":"Ciudad portuaria, industrial y turística. Presupuesto dinámico por canon y constante necesidad de ordenamiento urbano.","telefono":"+51 56 532-120","lote":"Peru lote 1","id":"per-pisco-122"},{"pais":"Perú","region":"Áncash","localidad":"Chimbote (Santa)","habitantes":"~380.000","perfil":"El puerto pesquero y siderúrgico más importante del país. Estructura municipal grande pero abierta a la optimización de áreas técnicas.","telefono":"+51 43 321-321","lote":"Peru lote 1","id":"per-chimbote-santa-123"},{"pais":"Perú","region":"Áncash","localidad":"Huaraz","habitantes":"~130.000","perfil":"Capital de la Cordillera Blanca, turismo de montaña internacional. Gestión muy enfocada en control urbano y servicios turísticos.","telefono":"+51 43 421-601","lote":"Peru lote 1","id":"per-huaraz-124"},{"pais":"Perú","region":"La Libertad","localidad":"Trujillo (Distritos)","habitantes":"~350.000 (Core)","perfil":"Capital de la marinera y segundo polo económico del país. Municipios distritales pujantes (como Víctor Larco o La Esperanza) ideales para Munify.","telefono":"+51 44 291-320","lote":"Peru lote 1","id":"per-trujillo-distritos-125"},{"pais":"Perú","region":"La Libertad","localidad":"Pacasmayo","habitantes":"~30.000","perfil":"Escala mediana ideal en la costa norte, puerto histórico con administración municipal muy cercana al vecino.","telefono":"+51 44 562-110","lote":"Peru lote 1","id":"per-pacasmayo-126"},{"pais":"Perú","region":"Lambayeque","localidad":"Chiclayo (Distritos)","habitantes":"~300.000","perfil":"Gran mercado comercial del norte peruano. Alta actividad comercial informal y urbana que requiere tableros de control.","telefono":"+51 74 232-231","lote":"Peru lote 1","id":"per-chiclayo-distritos-127"},{"pais":"Perú","region":"Lambayeque","localidad":"Lambayeque","habitantes":"~80.000","perfil":"Ciudad histórica y universitaria, escala mediana muy ordenada con fuerte valor patrimonial y turístico.","telefono":"+51 74 282-120","lote":"Peru lote 1","id":"per-lambayeque-128"},{"pais":"Perú","region":"Piura","localidad":"Sullana","habitantes":"~200.000","perfil":"La 'Perla del Chira', polo agrícola y comercial del norte peruano. Intendencia con gran movimiento operativo.","telefono":"+51 73 503-110","lote":"Peru lote 1","id":"per-sullana-129"},{"pais":"Perú","region":"Piura","localidad":"Talara","habitantes":"~140.000","perfil":"Ciudad petrolera e industrial por excelencia. Presupuesto propio y constante necesidad de modernización urbana.","telefono":"+51 73 382-211","lote":"Peru lote 1","id":"per-talara-130"},{"pais":"Perú","region":"Arequipa","localidad":"Arequipa (Distritos Cercanos)","habitantes":"~300.000 (Core)","perfil":"Segunda metrópoli del país. Distritos pujantes como Cerro Colorado o Cayma con alto presupuesto y exigencia digital.","telefono":"+51 54 212-000","lote":"Peru lote 2","id":"per-arequipa-distritos-cercanos-131"},{"pais":"Perú","region":"Arequipa","localidad":"Mollendo (Islay)","habitantes":"~50.000","perfil":"Puerto clave del sur peruano y balneario. Municipalidad provincial con escala intermedia muy manejable.","telefono":"+51 54 532-110","lote":"Peru lote 2","id":"per-mollendo-islay-132"},{"pais":"Perú","region":"Cusco","localidad":"Cusco (Distritos)","habitantes":"~120.000 (Core)","perfil":"Capital turística mundial. Gestión municipal con alta presión sobre el ordenamiento del centro histórico y servicios.","telefono":"+51 84 242-476","lote":"Peru lote 2","id":"per-cusco-distritos-133"},{"pais":"Perú","region":"Cusco","localidad":"Sicuani (Canchis)","habitantes":"~60.000","perfil":"Nudo vial y comercial del sur andino. Municipio provincial con fuerte arraigo e intercambio comercial diario.","telefono":"+51 84 351-120","lote":"Peru lote 2","id":"per-sicuani-canchis-134"},{"pais":"Perú","region":"Junín","localidad":"Huancayo","habitantes":"~380.000","perfil":"Corazón del centro andino peruano. Gran polo comercial y de servicios con intensa actividad administrativa.","telefono":"+51 64 600-400","lote":"Peru lote 2","id":"per-huancayo-135"},{"pais":"Perú","region":"Junín","localidad":"Tarma","habitantes":"~70.000","perfil":"La 'Perla de los Andes', turismo y agricultura de altura. Municipio provincial con trato cercano.","telefono":"+51 64 321-110","lote":"Peru lote 2","id":"per-tarma-136"},{"pais":"Perú","region":"Puno","localidad":"Juliaca (San Román)","habitantes":"~280.000","perfil":"El gigante comercial del altiplano. Movimiento comercial informal y formal masivo que requiere ordenamiento urgente.","telefono":"+51 51 321-150","lote":"Peru lote 2","id":"per-juliaca-san-rom-n-137"},{"pais":"Perú","region":"Puno","localidad":"Puno","habitantes":"~140.000","perfil":"Capital a orillas del Titicaca. Fuerte perfil turístico e institucional con demandas constantes de servicios.","telefono":"+51 51 351-240","lote":"Peru lote 2","id":"per-puno-138"},{"pais":"Perú","region":"Cajamarca","localidad":"Cajamarca","habitantes":"~220.000","perfil":"Polo histórico y minero del norte andino. Gestión municipal grande pero muy enfocada en modernización.","telefono":"+51 76 599-000","lote":"Peru lote 2","id":"per-cajamarca-139"},{"pais":"Perú","region":"Cajamarca","localidad":"Jaén","habitantes":"~130.000","perfil":"Capital cafetalera y comercial del nororiente. Crecimiento demográfico acelerado y gran dinamismo local.","telefono":"+51 76 431-210","lote":"Peru lote 2","id":"per-ja-n-140"},{"pais":"Perú","region":"Ayacucho","localidad":"Huamanga (Ayacucho)","habitantes":"~220.000","perfil":"Ciudad de las 33 iglesias y rica tradición artesanal. Fuerte movimiento turístico y universitario.","telefono":"+51 66 311-311","lote":"Peru lote 2","id":"per-huamanga-ayacucho-141"},{"pais":"Perú","region":"Loreto","localidad":"Yurimaguas (Alto Amazonas)","habitantes":"~70.000","perfil":"Puerto fluvial clave en la selva baja. Municipio provincial con desafíos logísticos y de servicios únicos.","telefono":"+51 65 352-120","lote":"Peru lote 2","id":"per-yurimaguas-alto-amazonas-142"},{"pais":"Uruguay","region":"Canelones","localidad":"Canelones / Ciudad de la Costa","habitantes":"~600.000","perfil":"Segundo departamento más poblado, metropolitano y de gran expansión comercial. Intendencia muy avanzada en gestión digital.","telefono":"+598 1828","lote":"Uruguay","id":"uruguay-canelones-ciudad-de-la-costa-143"},{"pais":"Uruguay","region":"Maldonado","localidad":"Maldonado / Punta del Este","habitantes":"~200.000","perfil":"Polo turístico internacional de elite. Presupuesto alto y máxima exigencia en calidad de servicios públicos y reportes urbanos.","telefono":"+598 4222 1921","lote":"Uruguay","id":"uruguay-maldonado-punta-del-este-144"},{"pais":"Uruguay","region":"Salto","localidad":"Salto","habitantes":"~130.000","perfil":"Capital del litoral norte, polo termal, universitario y comercial. Intendencia con estructura regional muy sólida.","telefono":"+598 4733 9880","lote":"Uruguay","id":"uruguay-salto-145"},{"pais":"Uruguay","region":"Paysandú","localidad":"Paysandú","habitantes":"~120.000","perfil":"Histórico polo industrial, portuario y comercial sobre el río Uruguay. Intendencia muy ordenada y tradicional.","telefono":"+598 4722 6220","lote":"Uruguay","id":"uruguay-paysand-146"},{"pais":"Uruguay","region":"Colonia","localidad":"Colonia del Sacramento","habitantes":"~130.000","perfil":"Destino patrimonial mundial y puerta de entrada rápida desde Buenos Aires. Perfil comercial e industrial pujante.","telefono":"+598 4522 2127","lote":"Uruguay","id":"uruguay-colonia-del-sacramento-147"},{"pais":"Uruguay","region":"San José","localidad":"San José de Mayo","habitantes":"~115.000","perfil":"Zona agrícola-ganadera clave muy cercana a la capital. Intendencia con gestión directa y metódica.","telefono":"+598 4342 9000","lote":"Uruguay","id":"uruguay-san-jos-de-mayo-148"},{"pais":"Uruguay","region":"Tacuarembó","localidad":"Tacuarembó","habitantes":"~90.000","perfil":"Corazón del norte uruguayo, gran extensión territorial y forestal. Intendencia con fuerte arraigo local.","telefono":"+598 4632 2607","lote":"Uruguay","id":"uruguay-tacuaremb-149"},{"pais":"Uruguay","region":"Rivera","localidad":"Rivera","habitantes":"~105.000","perfil":"Frontera seca dinámica con Brasil (Santana do Livramento). Polo comercial de 'free shops' de alto tráfico.","telefono":"+598 4622 3647","lote":"Uruguay","id":"uruguay-rivera-150"},{"pais":"Uruguay","region":"Soriano","localidad":"Mercedes","habitantes":"~85.000","perfil":"Eje agroexportador de la zona núcleo uruguaya. Comuna muy prolija, perfil técnico alto.","telefono":"+598 4532 2201","lote":"Uruguay","id":"uruguay-mercedes-151"},{"pais":"Uruguay","region":"Florida","localidad":"Florida","habitantes":"~70.000","perfil":"Centro geográfico y lechero del país. Escala mediana justa, muy receptiva a propuestas de modernización.","telefono":"+598 4352 2241","lote":"Uruguay","id":"uruguay-florida-152"},{"pais":"Uruguay","region":"Rocha","localidad":"Rocha","habitantes":"~70.000","perfil":"Costa oceánica y turismo estacional masivo. Desafíos enormes en gestión de servicios municipales de temporada.","telefono":"+598 4472 6162","lote":"Uruguay","id":"uruguay-rocha-153"}],"speeches":{"Argentina":{"titulo":"Argentina","pulso":"Es un gestor territorial muy expuesto al vecino de a pie. Le terroriza la queja viral en redes sociales y la burocracia de los grandes distritos. Le gusta sentirse \"moderno\" pero con los pies en el barro.","angulo":"Eficiencia de recursos y control operativo sin gastar fortuna en consultoras.","script":"¿Qué tal, buenos días? Te llamo de Munify. Estoy intentando comunicarme con el área de Modernización o con la Secretaría de Gobierno del intendente. Te hago re breve el motivo: nosotros venimos trabajando con comunas del interior (como San Pedro o municipios similares en la región) implementando una plataforma de gestión ciudadana que centraliza los reclamos de bacheo, luminarias y servicios en un solo tablero inteligente para el Ejecutivo. Hoy los municipios chicos están resolviendo la trazabilidad de los reclamos en menos de 48 horas sin que el vecino tenga que ir presencialmente a la municipalidad a hacer colas. ¿Con quién me sugerís que converse cinco minutos para dejarle un caso de éxito medido en su misma provincia?"},"Paraguay":{"titulo":"Paraguay","pulso":"Hay muchísimo orgullo por el crecimiento económico, el comercio y el desarrollo local. Valoran enormemente la prolijidad institucional, la transparencia administrativa frente a la Junta Municipal (concejales) y el orden de los tributos.","angulo":"Transparencia, recaudación ordenada y modernización al nivel de las grandes ciudades del Mercosur.","script":"¿Cómo le va, muy buenos días? Le hablo desde Argentina en representación de Munify. Estamos expandiendo nuestra plataforma de gestión y reporte ciudadano a municipios pujantes de Paraguay, enfocándonos en intendencias que están digitalizando la atención al contribuyente. Nuestra herramienta le permite al intendente tener tableros de control en tiempo real sobre el estado de los servicios urbanos y las cuadrillas en la calle, evitando la dispersión de reclamos por WhatsApp o llamadas sueltas. ¿Me podría derivar con el director de gabinete o secretaría general para enviarle un breve resumen de cómo estamos trabajando en ciudades de escala similar?"},"Perú":{"titulo":"Perú","pulso":"Las municipalidades manejan presupuestos por canon (minero, petrolero, aduanero) y están bajo la lupa fiscal permanente de la Contraloría General de la República. El alcalde sufre horrores la gestión documentaria ineficiente y la falta de indicadores de cumplimiento para rendir cuentas.","angulo":"Trazabilidad de obras, cumplimiento de metas institucionales (como los incentivos municipales del MEF) y ordenamiento frente a la Contraloría.","script":"Buenos días, estimado, le saludo de la empresa tecnológica Munify. Nos estamos comunicando con municipalidades provinciales y distritales que están optimizando sus indicadores de gestión y la atención ciudadana. Nosotros proveemos un sistema integral de trazabilidad de reportes urbanos y expedientes que le asegura al despacho de alcaldía métricas claras de resolución ante la Contraloría y los vecinos. ¿Con qué área de gerencia municipal o sistemas podría coordinar una demostración técnica de 10 minutos adaptada a la jurisdicción?"},"Uruguay":{"titulo":"Uruguay","pulso":"Es una administración extremadamente metódica, seria, de procesos muy formales. No les gusta la venta agresiva ni el \"vendehumo\". Van directo a los papeles, los antecedentes institucionales y la robustez técnica.","angulo":"Gobierno abierto, descentralización departamental y optimización de flujos de trabajo de las direcciones de obras y servicios.","script":"Buenos días, ¿cómo le va? Lo molesto brevemente desde Munify. Somos una compañía de desarrollo de software enfocada en plataformas de gobierno abierto y gestión de incidencias para administraciones públicas locales. Estamos vinculándonos con las Intendencias Departamentales del interior uruguayo para aportar tableros de control dinámicos que agilicen la respuesta de las direcciones territoriales. ¿Me indicaría cuál es el canal formal o la secretaría de intendencia para hacerle llegar nuestro dossier corporativo y un acceso de cortesía a nuestras estaciones de prueba?"}},"tips":[{"titulo":"La \"Patria Comtec\" o la empresa establecida","texto":"Como dijiste que sos de Argentina y estás establecido acá, úsalo a favor. En Paraguay, Perú y Uruguay hay un gran respeto por el desarrollo de software argentino (por la industria potente que hay). Decir \"somos una empresa tecnológica consolidada en Argentina\" te da chapa de estabilidad y soporte técnico real, no sos un pibe con una notebook desde su casa."},{"titulo":"El gancho de la demo express","texto":"Si el secretario te atiende y muestra un mínimo de interés, no te pongas a explicar código. Tirá la frase mágica: \"Mirá, te propongo algo: pásame por WhatsApp el nombre exacto de tu municipio, yo te armo una demo en 10 segundos con los datos reales de tu ejido urbano y te mando un video de un minuto mostrando cómo tus vecinos reportarían un bache en tu propia plaza principal. Si te gusta, lo charlamos\". Ahí los matas."},{"titulo":"Atacar al segundo de a bordo","texto":"Al intendente o alcalde es difícil pillarlo de entrada. Apunta siempre al Secretario de Gobierno, Gerente Municipal o Director de Modernización. Ese es el que sufre el día a día operativo y es el que le va a decir al intendente: \"Jefe, mire esta herramienta, nos va a solucionar el dolor de cabeza de los reclamos\"."}],"generado":"2026-08-26","fuente":"docs/regiones"};
+const CONTACTOS = DATOS.contactos || [];
+const SPEECH = DATOS.speeches || {};
+const TIPS = DATOS.tips || [];
+const KEY = 'munify_llamados_v1';
+const ESTADOS = [
+  {id:'',            lbl:'Sin llamar'},
+  {id:'contactado',  lbl:'Contactado'},
+  {id:'no-atiende',  lbl:'No atiende'},
+  {id:'rellamar',    lbl:'Volver a llamar'},
+  {id:'descartado',  lbl:'Descartado'},
+];
+const LBL = Object.fromEntries(ESTADOS.map(e => [e.id, e.lbl]));
+
+let db = cargar();
+let fPais = '', fEstado = '', q = '', selId = null;
+
+function cargar(){ try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; } }
+function guardar(){ try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){} pintarKpis(); pintarPie(); }
+function reg(id){ if(!db[id]) db[id] = {estado:'', notas:'', proximo:'', quien:'', hist:[]}; return db[id]; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function telHref(t){ return 'tel:' + String(t).replace(/[^\d+]/g,''); }
+function ahora(){ const d = new Date(); return d.toISOString(); }
+function fecha(iso){ try { const d = new Date(iso); return d.toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); } catch(e){ return iso; } }
+
+function filtrados(){
+  const t = q.trim().toLowerCase();
+  return CONTACTOS.filter(c => {
+    if (fPais && c.pais !== fPais) return false;
+    const e = (db[c.id]||{}).estado || '';
+    if (fEstado === 'pend' ? e !== '' : fEstado && e !== fEstado) return false;
+    if (!t) return true;
+    return (c.localidad + ' ' + c.region + ' ' + c.telefono + ' ' + c.pais).toLowerCase().includes(t);
+  });
+}
+
+function pintarFiltros(){
+  const paises = [...new Set(CONTACTOS.map(c => c.pais))];
+  const cont = document.getElementById('fPais');
+  cont.innerHTML = ['<button class="chip'+(fPais===''?' on':'')+'" data-p="">Todos<span class="n">'+CONTACTOS.length+'</span></button>']
+    .concat(paises.map(p => {
+      const n = CONTACTOS.filter(c => c.pais === p).length;
+      return '<button class="chip'+(fPais===p?' on':'')+'" data-p="'+esc(p)+'">'+esc(p)+'<span class="n">'+n+'</span></button>';
+    })).join('');
+  cont.querySelectorAll('.chip').forEach(b => b.onclick = () => { fPais = b.dataset.p; pintar(); });
+
+  const ce = document.getElementById('fEstado');
+  const opts = [{id:'',lbl:'Todos'},{id:'pend',lbl:'Sin llamar'}].concat(ESTADOS.filter(e => e.id));
+  ce.innerHTML = opts.map(o => {
+    let n;
+    if (o.id === '') n = CONTACTOS.length;
+    else if (o.id === 'pend') n = CONTACTOS.filter(c => !((db[c.id]||{}).estado)).length;
+    else n = CONTACTOS.filter(c => (db[c.id]||{}).estado === o.id).length;
+    return '<button class="chip'+(fEstado===o.id?' on':'')+'" data-e="'+o.id+'">'+o.lbl+'<span class="n">'+n+'</span></button>';
+  }).join('');
+  ce.querySelectorAll('.chip').forEach(b => b.onclick = () => { fEstado = b.dataset.e; pintar(); });
+}
+
+function pintarLista(){
+  const arr = filtrados();
+  const cont = document.getElementById('lista');
+  const vac = document.getElementById('vacio');
+  if (!arr.length){
+    cont.innerHTML = '';
+    vac.style.display = 'block';
+    vac.textContent = q ? 'Ningun municipio coincide con "' + q + '".' : 'No hay municipios en este filtro. Proba con otro estado o pais.';
+    return;
+  }
+  vac.style.display = 'none';
+  cont.innerHTML = arr.map(c => {
+    const r = db[c.id] || {};
+    const e = r.estado || '';
+    const nNotas = (r.hist||[]).length;
+    return '<div class="row'+(e?' done':'')+(selId===c.id?' sel':'')+'" data-id="'+c.id+'">'
+      + '<span class="est '+e+'"></span>'
+      + '<div class="info"><h3>'+esc(c.localidad)
+      + (e ? '<span class="badge">'+LBL[e]+'</span>' : '')
+      + (nNotas ? '<span class="badge n">'+nNotas+'</span>' : '')
+      + '</h3><div class="meta"><b>'+esc(c.region)+'</b> &middot; '+esc(c.pais)+' &middot; '+esc(c.habitantes)+'</div></div>'
+      + '<a class="tel-btn'+(e?' hecho':'')+'" href="'+telHref(c.telefono)+'" data-tel="'+c.id+'">'+esc(c.telefono)+'</a>'
+      + '</div>';
+  }).join('');
+  cont.querySelectorAll('.row').forEach(r => r.onclick = ev => {
+    if (ev.target.closest('a')) return;
+    abrir(r.dataset.id);
+  });
+  cont.querySelectorAll('a[data-tel]').forEach(a => a.onclick = () => {
+    const id = a.dataset.tel, r = reg(id);
+    r.hist.push({t: ahora(), tipo:'llamada', txt:'Llamada iniciada'});
+    if (!r.estado) r.estado = 'no-atiende';
+    guardar(); pintar(); setTimeout(() => abrir(id), 250);
+  });
+}
+
+function pintarKpis(){
+  const n = CONTACTOS.length;
+  const cont = CONTACTOS.filter(c => (db[c.id]||{}).estado === 'contactado').length;
+  const rell = CONTACTOS.filter(c => (db[c.id]||{}).estado === 'rellamar').length;
+  const pend = CONTACTOS.filter(c => !((db[c.id]||{}).estado)).length;
+  document.getElementById('kpis').innerHTML =
+      '<span class="kpi">Total <b>'+n+'</b></span>'
+    + '<span class="kpi ok">Contactados <b>'+cont+'</b></span>'
+    + '<span class="kpi pu">Rellamar <b>'+rell+'</b></span>'
+    + '<span class="kpi warn">Sin llamar <b>'+pend+'</b></span>';
+}
+
+function pintarPie(){
+  const n = CONTACTOS.length;
+  const hechos = CONTACTOS.filter(c => (db[c.id]||{}).estado).length;
+  const pct = n ? Math.round(hechos*100/n) : 0;
+  document.getElementById('pieBar').style.width = pct + '%';
+  document.getElementById('pieTxt').textContent = hechos + ' de ' + n + ' gestionados (' + pct + '%)';
+}
+
+function pintar(){ pintarFiltros(); pintarLista(); pintarKpis(); pintarPie(); }
+
+function abrir(id){
+  const c = CONTACTOS.find(x => x.id === id); if (!c) return;
+  selId = id;
+  const r = reg(id);
+  const sp = SPEECH[c.pais] || {};
+  document.getElementById('pTitulo').textContent = c.localidad;
+  document.getElementById('pMeta').innerHTML = '<b>'+esc(c.region)+'</b> &middot; '+esc(c.pais)+' &middot; '+esc(c.habitantes)+' hab. &middot; '+esc(c.lote);
+  document.getElementById('pBody').innerHTML =
+      '<div class="p-tel"><a class="tel-btn" href="'+telHref(c.telefono)+'" id="pLlamar">Llamar '+esc(c.telefono)+'</a>'
+    + '<button class="btn" id="pCopiar">Copiar</button></div>'
+    + '<div class="sec"><label>Como llega el municipio</label><div class="box perfil">'+esc(c.perfil)+'</div></div>'
+    + (sp.script ? '<div class="sec"><label>Speech para '+esc(c.pais)+'</label>'
+        + '<div class="box script">'+esc(sp.script)+'</div>'
+        + (sp.pulso ? '<div class="box" style="margin-top:7px"><b style="color:var(--ink)">El pulso:</b> '+esc(sp.pulso)+'</div>' : '')
+        + (sp.angulo ? '<div class="box" style="margin-top:7px"><b style="color:var(--ink)">Angulo de venta:</b> '+esc(sp.angulo)+'</div>' : '')
+        + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
+    + '<div class="sec"><label>Como termino la llamada</label><div class="estados" id="pEstados">'
+      + ESTADOS.filter(e => e.id).map(e => '<button class="eb'+(r.estado===e.id?' on':'')+'" data-e="'+e.id+'">'+e.lbl+'</button>').join('')
+      + '</div></div>'
+    + '<div class="sec"><label>Que me dijo</label>'
+      + '<textarea id="pNotas" rows="4" placeholder="Con quien hable, que area, que dijo, cuando conviene volver...">'+esc(r.notas)+'</textarea>'
+      + '<div class="fila2" style="margin-top:9px">'
+      + '<input class="f" id="pQuien" placeholder="Con quien hable" value="'+esc(r.quien)+'">'
+      + '<input class="f" id="pProximo" type="date" value="'+esc(r.proximo)+'">'
+      + '</div>'
+      + '<button class="btn p" id="pGuardar" style="margin-top:9px;width:100%">Guardar en el historial</button></div>'
+    + '<div class="sec"><label>Historial</label><div class="hist" id="pHist"></div></div>'
+    + (TIPS.length ? '<div class="sec"><label>Recordar siempre</label><div class="tips">'
+        + TIPS.map(t => '<div class="box tip"><b>'+esc(t.titulo)+'</b>'+esc(t.texto)+'</div>').join('') + '</div></div>' : '');
+
+  pintarHist();
+  document.getElementById('ov').classList.add('on');
+  document.getElementById('panel').classList.add('on');
+  document.getElementById('panel').setAttribute('aria-hidden','false');
+
+  document.getElementById('pLlamar').onclick = () => {
+    r.hist.push({t: ahora(), tipo:'llamada', txt:'Llamada iniciada'});
+    if (!r.estado) r.estado = 'no-atiende';
+    guardar(); pintarHist(); pintarLista();
+  };
+  document.getElementById('pCopiar').onclick = () => copiar(c.telefono, 'pCopiar', 'Copiar');
+  const bs = document.getElementById('pCopiarScript');
+  if (bs) bs.onclick = () => copiar(sp.script, 'pCopiarScript', 'Copiar speech');
+  document.querySelectorAll('#pEstados .eb').forEach(b => b.onclick = () => {
+    r.estado = (r.estado === b.dataset.e) ? '' : b.dataset.e;
+    r.hist.push({t: ahora(), tipo:'estado', txt: r.estado ? ('Marcado: ' + LBL[r.estado]) : 'Estado borrado'});
+    guardar(); abrir(id); pintarLista();
+  });
+  document.getElementById('pGuardar').onclick = () => {
+    const nt = document.getElementById('pNotas').value.trim();
+    r.notas = nt;
+    r.quien = document.getElementById('pQuien').value.trim();
+    r.proximo = document.getElementById('pProximo').value;
+    if (nt) r.hist.push({t: ahora(), tipo:'nota', txt: nt});
+    if (r.proximo) r.hist.push({t: ahora(), tipo:'agenda', txt:'Volver a llamar el ' + r.proximo});
+    document.getElementById('pNotas').value = '';
+    guardar(); pintarHist(); pintarLista();
+    const b = document.getElementById('pGuardar'); b.textContent = 'Guardado'; setTimeout(() => b.textContent = 'Guardar en el historial', 1200);
+  };
+}
+
+function pintarHist(){
+  const r = reg(selId);
+  const el = document.getElementById('pHist'); if (!el) return;
+  const h = (r.hist || []).slice().reverse();
+  if (!h.length){ el.innerHTML = '<div class="vacio">Todavia no hay movimientos. Cuando llames o anotes algo, queda aca.</div>'; return; }
+  const col = {llamada:'var(--acc)', estado:'var(--ok)', nota:'var(--purple)', agenda:'var(--warn)'};
+  el.innerHTML = h.map(x => '<div class="h-it"><time>'+fecha(x.t)+'</time>'
+    + '<span class="dot" style="background:'+(col[x.tipo]||'var(--line2)')+'"></span>'+esc(x.txt)+'</div>').join('');
+}
+
+function copiar(txt, btnId, orig){
+  const b = document.getElementById(btnId);
+  const fin = () => { if(b){ b.textContent = 'Copiado'; setTimeout(() => b.textContent = orig, 1200); } };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(fin).catch(fin);
+  else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select();
+         try { document.execCommand('copy'); } catch(e){} document.body.removeChild(t); fin(); }
+}
+
+function cerrar(){
+  selId = null;
+  document.getElementById('ov').classList.remove('on');
+  document.getElementById('panel').classList.remove('on');
+  document.getElementById('panel').setAttribute('aria-hidden','true');
+  pintarLista();
+}
+document.getElementById('ov').onclick = cerrar;
+document.getElementById('pClose').onclick = cerrar;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+document.getElementById('q').oninput = e => { q = e.target.value; pintarLista(); };
+
+document.getElementById('btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify(db, null, 1)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'llamados-munify-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+};
+document.getElementById('btnImport').onclick = () => document.getElementById('fileImport').click();
+document.getElementById('fileImport').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { try { db = JSON.parse(rd.result) || {}; guardar(); pintar(); } catch(err){ alert('El archivo no se pudo leer'); } };
+  rd.readAsText(f);
+};
+
+pintar();
+</script>
+</body></html>
