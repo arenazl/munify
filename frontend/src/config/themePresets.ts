@@ -1,5 +1,3 @@
-import { contraste } from '../lib/colorUtils';
-
 /**
  * Sistema de Temas — Munify
  *
@@ -163,17 +161,22 @@ const TINTA_CLARA = '#ffffff';
  * 2026-08-13): acento oscuro → tinta clara, acento claro → tinta oscura.
  * Es la MISMA vara que `--pl-on-accent` — todo el kit elige la tinta igual.
  *
- * CÓMO se decide (corregido 2026-08-25): tinta BLANCA salvo que el blanco no
- * alcance 3:1 (el mínimo WCAG para componentes UI) sobre ese acento — ahí
- * tinta oscura. La decisión usa `contraste()` (luminancia relativa de la
- * norma, CON corrección gamma). Antes decidía `luminanciaDe() > 0.5`, el
- * promedio rápido SIN gamma, que clasifica un azul medio (#4a90e2) como
- * "claro" → tinta oscura → botón azul con texto azul (bug real en QA).
- * Con la norma: azules/rojos/verdes plenos → blanco; amarillo, lima, ámbar
- * y pasteles → tinta oscura. Exactamente la regla que el dueño pidió.
+ * CÓMO se decide (tercera vara, 2026-08-27 — las dos anteriores fallaron en
+ * un color cada una):
+ *   1. `luminanciaDe() > 0.5`: el azul medio (#4a90e2, 0.52) y el verde
+ *      (#22c55e, 0.53) daban "claros" → botón azul con texto azul (bug QA).
+ *   2. WCAG `contraste(blanco) >= 3` (2026-08-25): salvó al azul (3.7:1)
+ *      pero el verde quedó en 2.1:1 → botón verde con tinta oscura (bug QA
+ *      del 27/8). La norma es matemática, no perceptual: sobre verdes medios
+ *      "gana" el negro aunque el ojo pida blanco.
+ *   3. AHORA: luminancia PERCEPTUAL (la misma `luminanciaDe`, coeficientes
+ *      YIQ) con el umbral donde el ojo lo pone: 0.59, entre el verde pleno
+ *      (0.53 → blanca) y la lima (0.63 → oscura). Azul 0.52, cian 0.52,
+ *      rojo 0.47 → blanca; lima 0.63, ámbar 0.65, amarillo 0.69 y los
+ *      pasteles → oscura. Margen de ±0.05 a cada lado del corte.
  */
 const tintaSobre = (fondo: string): string =>
-  contraste(TINTA_CLARA, fondo) >= 3 ? TINTA_CLARA : TINTA_OSCURA;
+  luminanciaDe(fondo) > 0.59 ? TINTA_OSCURA : TINTA_CLARA;
 
 /**
  * Deriva los 13 campos de `ThemeColors` a partir de tres colores.
