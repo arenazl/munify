@@ -164,6 +164,48 @@ header.top{position:sticky;top:0;z-index:40;background:rgba(15,23,32,.96);backdr
 .conteo{font-size:12px;color:var(--ink3);padding:1px 3px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .conteo b{color:var(--ink2);font-variant-numeric:tabular-nums;font-weight:700}
 .conteo .limpiar{margin-left:auto;color:var(--acc);cursor:pointer;font-weight:600}
+
+/* ---- Paginado de la lista: nada de 154 filas de corrido ---- */
+.mas{width:100%;margin-top:9px;border:1px dashed var(--line2);background:transparent;color:var(--ink2);
+ border-radius:10px;padding:11px;font-size:13.5px;font-weight:600;cursor:pointer}
+.mas:hover{border-color:var(--acc);color:var(--acc)}
+.mas span{color:var(--ink3);font-weight:400}
+
+/* ---- Tarjetas plegables (solo se pliegan en el telefono) ---- */
+.tarj details{margin:0}
+.tarj > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
+ font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.tarj > summary::-webkit-details-marker{display:none}
+.tarj > summary .flecha{margin-left:auto;width:7px;height:7px;border-right:2px solid var(--ink3);
+ border-bottom:2px solid var(--ink3);transform:rotate(45deg);transition:transform .15s}
+.tarj[open] > summary .flecha{transform:rotate(-135deg)}
+.tarj > summary .cuenta{background:var(--card2);border:1px solid var(--line);border-radius:999px;
+ padding:1px 8px;font-size:11px;letter-spacing:0;color:var(--ink2);font-weight:700}
+.tarj > summary + *{margin-top:10px}
+
+@media(max-width:1000px){
+  /* la barra de paises no envuelve: una linea que se desliza */
+  .paises{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;-webkit-overflow-scrolling:touch;
+   scrollbar-width:none}
+  .paises::-webkit-scrollbar{display:none}
+  .hoy-top{margin-top:11px}
+  .hoy-grid{gap:10px}
+  .big{padding:16px}
+  .big h2{font-size:25px}
+  .big .acciones{margin-top:11px}
+  .big a.bl,.big button.gh{padding:10px 13px;font-size:14px}
+  .tarj{padding:11px 12px}
+  .meta-dia{padding:11px 12px;margin-top:10px}
+  .meta-top .n{font-size:23px}
+  .meta-top .frase{margin-left:0;text-align:left;flex-basis:100%;font-size:12.5px}
+  /* filas mas bajas: entran mas municipios sin scrollear tanto */
+  .row{padding:9px 10px;gap:9px}
+  .est{height:28px}
+  .info h4{font-size:14px}
+  .tel-btn{padding:7px 11px;font-size:12.5px}
+  .controles{gap:6px;margin-bottom:9px}
+  .hist{max-height:none}
+}
 .lista{display:grid;gap:7px}
 .row{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 11px;
  display:grid;grid-template-columns:6px 1fr auto;gap:10px;align-items:center;cursor:pointer;transition:.12s}
@@ -284,12 +326,12 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
       <div>
         <div class="big" id="siguiente"></div>
         <div class="meta-dia" id="metaDia"></div>
-        <div class="tarj" style="margin-top:13px"><h3>Prometiste volver</h3><div id="agenda"></div></div>
+        <details class="tarj" style="margin-top:13px" open><summary>Prometiste volver<span class="cuenta" id="agendaCuenta"></span><span class="flecha"></span></summary><div id="agenda"></div></details>
       </div>
       <div>
-        <div class="tarj"><h3>Cómo venís</h3><div id="porPais"></div><div class="resumen" id="resumenHoy"></div></div>
-        <div class="tarj" style="margin-top:13px"><h3>Después de ese, seguís con</h3><div class="cola-hoy" id="colaHoy"></div></div>
-        <div class="tarj" style="margin-top:13px"><h3>Últimos movimientos</h3><div class="hist" id="ultimos"></div></div>
+        <details class="tarj" open><summary>Cómo venís<span class="flecha"></span></summary><div id="porPais"></div><div class="resumen" id="resumenHoy"></div></details>
+        <details class="tarj" style="margin-top:13px" open><summary>Después seguís con<span class="cuenta" id="colaHoyCuenta"></span><span class="flecha"></span></summary><div class="cola-hoy" id="colaHoy"></div></details>
+        <details class="tarj" style="margin-top:13px" open><summary>Últimos movimientos<span class="flecha"></span></summary><div class="hist" id="ultimos"></div></details>
       </div>
     </div>
   </div>
@@ -344,6 +386,7 @@ const COL = {llamada:'var(--acc)', estado:'var(--ok)', nota:'var(--purple)', age
 
 let db = cargar(), vista = 'hoy', fPais = '', fEstado = '', q = '', selId = null;
 let paisHoy = '';
+let tope = 25;   // cuantas filas se dibujan de una
 const KEY_META = 'munify_llamados_meta', KEY_PAIS = 'munify_llamados_paishoy';
 function metaDiaria(){ let n = 5; try { n = parseInt(localStorage.getItem(KEY_META) || '5', 10); } catch(e){}
   return isNaN(n) ? 5 : Math.max(1, Math.min(20, n)); }
@@ -434,6 +477,8 @@ function pintarMetaDia(){
 }
 function pintarColaHoy(){
   const cola = colaDelDia(metaDiaria() + 1).slice(1), el = document.getElementById('colaHoy');
+  const cc = document.getElementById('colaHoyCuenta');
+  if (cc) cc.textContent = cola.length || '';
   el.innerHTML = cola.length ? cola.map((c, i) => {
     const f = FUNC[c.id] || {}, r = db[c.id] || {};
     const motivo = (r.proximo && r.proximo <= hoyISO()) ? 'le prometiste volver' : (f.intendente || c.region);
@@ -478,6 +523,8 @@ function pintarHoy(){
         + '<div class="meta">' + esc(x.r.quien || x.c.region) + '</div></div>'
         + '<a class="tel-btn hecho" href="' + telHref(x.c.telefono) + '">' + esc(x.c.telefono) + '</a></div>').join('')
     : '<div class="vacio">Todavía no anotaste ninguna fecha para volver. Cuando te digan "llamame el martes", ponelo en la ficha y aparece acá.</div>';
+  const cuentaAg = document.getElementById('agendaCuenta');
+  if (cuentaAg) cuentaAg.textContent = ag.length || '';
   document.getElementById('agenda').innerHTML = html;
   document.getElementById('agenda2').innerHTML = html;
   document.querySelectorAll('[data-abrir]').forEach(el => el.onclick = ev => {
@@ -527,7 +574,7 @@ function pintarFiltros(){
   sp.innerHTML = '<option value="">Todos los países (' + CONTACTOS.length + ')</option>'
     + paises.map(p => '<option value="' + esc(p) + '"' + (fPais===p?' selected':'') + '>'
         + esc(p) + ' (' + CONTACTOS.filter(c => c.pais === p).length + ')</option>').join('');
-  sp.onchange = () => { fPais = sp.value; pintarFiltros(); pintarLista(); };
+  sp.onchange = () => { fPais = sp.value; tope = 25; pintarFiltros(); pintarLista(); };
 
   const se = document.getElementById('selEstado');
   const opts = [{id:'',lbl:'Cualquier estado'},{id:'pend',lbl:'Sin llamar'}].concat(ESTADOS);
@@ -538,7 +585,7 @@ function pintarFiltros(){
       : base.filter(c => (db[c.id]||{}).estado === o.id).length;
     return '<option value="' + o.id + '"' + (fEstado===o.id?' selected':'') + '>' + o.lbl + ' (' + n + ')</option>';
   }).join('');
-  se.onchange = () => { fEstado = se.value; pintarFiltros(); pintarLista(); };
+  se.onchange = () => { fEstado = se.value; tope = 25; pintarFiltros(); pintarLista(); };
 }
 function pintarConteo(n){
   const el = document.getElementById('conteo'); if (!el) return;
@@ -547,7 +594,7 @@ function pintarConteo(n){
     + (hayFiltro ? '<span class="limpiar" id="limpiar">Ver todos</span>' : '');
   const l = document.getElementById('limpiar');
   if (l) l.onclick = () => {
-    fPais = ''; fEstado = ''; q = '';
+    fPais = ''; fEstado = ''; q = ''; tope = 25;
     document.getElementById('q').value = '';
     pintarFiltros(); pintarLista();
   };
@@ -561,7 +608,8 @@ function pintarLista(){
   }
   vac.style.display = 'none';
   pintarConteo(arr.length);
-  cont.innerHTML = arr.map(c => {
+  const visibles = arr.slice(0, tope);
+  cont.innerHTML = visibles.map(c => {
     const r = db[c.id] || {}, e = r.estado || '', f = FUNC[c.id] || {}, n = (r.hist||[]).length;
     return '<div class="row' + (e?' done':'') + (selId===c.id?' sel':'') + '" data-id="' + c.id + '">'
       + '<span class="est ' + e + '"></span>'
@@ -573,6 +621,14 @@ function pintarLista(){
       + ' · ' + esc(c.habitantes) + '</div></div>'
       + '<a class="tel-btn' + (e?' hecho':'') + '" href="' + telHref(c.telefono) + '" data-tel="' + c.id + '">' + esc(c.telefono) + '</a></div>';
   }).join('');
+  if (arr.length > visibles.length){
+    const b = document.createElement('button');
+    b.className = 'mas';
+    const restan = arr.length - visibles.length;
+    b.innerHTML = 'Ver ' + Math.min(25, restan) + ' más <span>· quedan ' + restan + '</span>';
+    b.onclick = () => { tope += 25; pintarLista(); };
+    cont.appendChild(b);
+  }
   cont.querySelectorAll('.row').forEach(r => r.onclick = ev => { if (ev.target.closest('a')) return; abrir(r.dataset.id); });
   cont.querySelectorAll('a[data-tel]').forEach(a => a.onclick = () => { marcarLlamada(a.dataset.tel); setTimeout(() => abrir(a.dataset.tel), 200); });
 }
@@ -859,7 +915,7 @@ function irA(v){
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('#switch button').forEach(b => b.onclick = () => irA(b.dataset.v));
-document.getElementById('q').oninput = e => { q = e.target.value; pintarLista(); };
+document.getElementById('q').oninput = e => { q = e.target.value; tope = 25; pintarLista(); };
 document.getElementById('ov').onclick = cerrarFicha;
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') cerrarFicha();
@@ -909,6 +965,14 @@ document.getElementById('fileImport').onchange = e => {
   } catch(e){}
   try { paisHoy = localStorage.getItem(KEY_PAIS) || ''; } catch(e){}
   let v = null; try { v = localStorage.getItem(KEY_VISTA); } catch(e){}
+  /* En el telefono la vista Hoy se plegaba sola: se deja abierto lo urgente
+     (lo que prometiste devolver, si hay) y el resto se abre a pedido. */
+  if (window.matchMedia('(max-width: 1000px)').matches){
+    document.querySelectorAll('#vHoy details.tarj').forEach(d => {
+      const esAgenda = !!d.querySelector('#agenda');
+      d.open = esAgenda && agendados().length > 0;
+    });
+  }
   pintar();
   irA(v === 'ops' ? 'ops' : 'hoy');
 })();
