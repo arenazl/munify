@@ -48,6 +48,8 @@ import './styles/modern-select-v2.css'
 import './styles/dashboard-v2.css'
 // bloque del dashboard: la cinta de conteos (reemplaza las filas de KpiCardV2)
 import './styles/cinta-conteos.css'
+// mapa base neutro (filtro sobre los tiles de OSM, ver lib/basemaps.ts)
+import './styles/mapa-base.css'
 import './styles/shell-v2.css'
 
 // Aplica la marca activa (VITE_BRAND) al documento antes del render:

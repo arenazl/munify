@@ -67,7 +67,7 @@ const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attri
   // Stadia tambien pide key (desde 2023): en su lugar, el Canvas oscuro.
   stadia: {
     label: 'Oscuro',
-    url: BASEMAP.dark,
+    url: BASEMAP,
     attribution: BASEMAP_ATTR,
   },
   // Era el voyager de CARTO, que paso a exigir key y estampaba la marca de
@@ -75,7 +75,7 @@ const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attri
   // neutra para que los pines se lean.
   voyager: {
     label: 'Neutro',
-    url: BASEMAP.light,
+    url: BASEMAP,
     attribution: BASEMAP_ATTR,
   },
 };

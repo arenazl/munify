@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { X, Maximize2, ZoomIn, ZoomOut, Home } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { BASEMAP, BASEMAP_ATTR } from '../../lib/basemaps';
+import { BASEMAP, BASEMAP_ATTR, claseBasemap } from '../../lib/basemaps';
 
 // Declarar el tipo para leaflet.heat
 declare module 'leaflet' {
@@ -376,9 +376,9 @@ function getCategoryKey(categoria: string): string {
   return 'otros';
 }
 
-// El mapa base sale de lib/basemaps: CARTO paso a estampar "API KEY REQUIRED"
-// sobre el tile y eso se vio publicado en el dashboard.
-const TILE_URLS = { light: BASEMAP.light, dark: BASEMAP.dark };
+// Un solo tile server (OSM) para los dos temas: el gris y el modo oscuro
+// salen de un filtro CSS sobre la capa de tiles. Ver lib/basemaps.ts.
+const TILE_URLS = { light: BASEMAP, dark: BASEMAP };
 
 export default function HeatmapWidget({
   data,
@@ -592,6 +592,7 @@ export default function HeatmapWidget({
       style={{ height: '100%', width: '100%' }}
     >
       <MapContainer
+          className={claseBasemap(isDarkTheme)}
         center={mapCenter}
         zoom={isFullscreen ? 14 : 13}
         style={{ height: '100%', width: '100%' }}

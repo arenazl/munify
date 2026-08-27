@@ -114,7 +114,7 @@ type TimePreset = '7' | '30' | '90' | '365' | 'all';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { BASEMAP, BASEMAP_ATTR } from '../lib/basemaps';
+import { BASEMAP, BASEMAP_ATTR, claseBasemap } from '../lib/basemaps';
 
 // Tipo para leaflet.heat (no exporta tipos)
 declare module 'leaflet' {
@@ -146,8 +146,9 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Ver lib/basemaps: CARTO empezo a exigir key y estampaba la marca de agua.
-const TILE_URLS = { light: BASEMAP.light, dark: BASEMAP.dark };
+// Un solo tile server (OSM); el gris y el oscuro salen de un filtro CSS
+// sobre la capa de tiles. Ver lib/basemaps.ts.
+const TILE_URLS = { light: BASEMAP, dark: BASEMAP };
 
 /** Tres tramos de la rampa de densidad (matices de veredicto del theme). */
 interface RampaDensidad {
@@ -3659,6 +3660,7 @@ export default function Mapa() {
           style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
         >
           <MapContainer
+          className={claseBasemap(isDarkTheme)}
             center={getMapCenter()}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
@@ -4085,6 +4087,7 @@ export default function Mapa() {
               style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
             >
               <MapContainer
+          className={claseBasemap(isDarkTheme)}
                 center={getPoiCenter()}
                 zoom={13}
                 style={{ height: '100%', width: '100%' }}

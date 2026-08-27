@@ -1,0 +1,46 @@
+/* ============================================================
+   El mapa base, neutro — sin depender de un proveedor de tiles grises.
+
+   OpenStreetMap es la unica fuente que no pide key ni amenaza con
+   apagarse (CARTO empezo a estampar "API KEY REQUIRED" sobre el tile y
+   los raster clasicos de Esri estan marcados como "podrian desactivarse
+   sin aviso"). Lo que OSM no da es una version gris, y un mapa a todo
+   color le compite el color al mapa de calor.
+
+   Se resuelve del lado del navegador: se desatura LA CAPA DE TILES.
+   Solo esa. En Leaflet el basemap vive en `.leaflet-tile-pane` y los
+   datos en otros panes (`overlay` para el heatmap y los poligonos,
+   `marker` para los pines), asi que el filtro no toca lo que importa:
+   los colores del dato quedan enteros sobre un fondo apagado.
+   ============================================================ */
+
+.mapa-neutro .leaflet-tile-pane {
+  /* Gris casi total, apenas mas claro: las calles se leen, el color se va. */
+  filter: grayscale(0.92) brightness(1.04) contrast(0.94);
+}
+
+/* Modo oscuro: el MISMO tile invertido. El hue-rotate devuelve los azules
+   del agua a su lugar (sin el, un rio invertido sale naranja). */
+.mapa-neutro--oscuro .leaflet-tile-pane {
+  filter: grayscale(0.9) invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+}
+
+/* La atribucion sigue el tema del mapa, no el del tile. */
+.mapa-neutro .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.78);
+  color: #4a5568;
+  font-size: 10px;
+}
+.mapa-neutro--oscuro .leaflet-control-attribution {
+  background: rgba(14, 22, 33, 0.78);
+  color: #8fa0b5;
+}
+.mapa-neutro--oscuro .leaflet-control-attribution a { color: #7ba7d0; }
+
+/* Los controles de zoom, con la misma piel que el resto de la app. */
+.mapa-neutro--oscuro .leaflet-bar a {
+  background: #1a2635;
+  color: #e8eef6;
+  border-color: #2b3b4e;
+}
+.mapa-neutro--oscuro .leaflet-bar a:hover { background: #213040; }
