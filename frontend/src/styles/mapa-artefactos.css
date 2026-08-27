@@ -7,7 +7,7 @@
 @media (max-width: 900px) { .map-art { grid-template-columns: 1fr; } }
 
 .map-art .tj {
-  background: var(--pl-card, #fff); border: 1px solid var(--pl-border, #e5e7eb);
+  background: var(--pl-surface, #fff); border: 1px solid var(--pl-border, #e5e7eb);
   border-radius: var(--pl-radius-lg, 14px); padding: 16px 18px;
   display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 186px;
   animation: mapart-card .3s var(--pl-ease, ease) both;
