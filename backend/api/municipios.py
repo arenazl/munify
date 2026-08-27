@@ -788,6 +788,11 @@ async def crear_municipio_demo(
     #
     # Va envuelto para que el log quede grabado TAMBIÉN si revienta acá: es el
     # caso que hay que poder mirar desde la consola del super admin.
+    # El id se captura ANTES del try: si la semilla revienta, la sesión queda
+    # con rollback pendiente y `municipio.id` ya no se puede leer
+    # (PendingRollbackError) — la bitácora del alta fallido se perdía justo en
+    # el caso que tenía que cubrir (visto con San Salvador de Jujuy).
+    muni_id = municipio.id
     try:
         seed_info = await seed_demo_completo(db, municipio.id, codigo,
                                              password=demo_pin or "demo123",
@@ -795,7 +800,8 @@ async def crear_municipio_demo(
         await db.commit()
     except Exception as e:
         log.error(e)
-        await log.guardar(municipio_id=municipio.id)
+        await db.rollback()
+        await log.guardar(municipio_id=muni_id)
         raise
 
     # 4. Turnero (best-effort): agenda, horarios y turnos de ejemplo sobre

@@ -935,14 +935,26 @@ async def _seed_zonas(
     zona vacia se nota y se corrige, un nombre inventado se toma por bueno.
     """
     zonas: dict[str, Zona] = {}
+    codigos_usados: set[str] = set()
     for z in zonas_reales:
         nombre = (z.get("nombre") or "").strip()
         if not nombre or nombre in zonas:
             continue
+        # "Asentamiento San Antonio" y "Asentamiento B. Belgrano" truncan al
+        # mismo ASENTAMIEN-<muni> y `zonas.codigo` es UNIQUE: el alta de San
+        # Salvador de Jujuy moria en el INSERT con Duplicate entry. Ante
+        # colision, sufijo numerico deterministico sobre la misma base.
+        codigo = _codigo_zona(nombre, municipio_id)
+        seq = 1
+        while codigo in codigos_usados:
+            seq += 1
+            base = re.sub(r"[^A-Z0-9]+", "", _sin_tildes(nombre).upper())[:10] or "Z"
+            codigo = f"{base}{seq}-{municipio_id}"[:20]
+        codigos_usados.add(codigo)
         zona = Zona(
             municipio_id=municipio_id,
             nombre=nombre[:100],
-            codigo=_codigo_zona(nombre, municipio_id),
+            codigo=codigo,
             latitud_centro=z.get("lat"),
             longitud_centro=z.get("lon"),
             activo=True,
