@@ -802,7 +802,7 @@ async def crear_municipio_demo(
     # los trámites ya creados en el paso 3.
     try:
         from services.seed_demo import seed_turnero_demo
-        turnero_counts = await seed_turnero_demo(db, municipio.id)
+        turnero_counts = await seed_turnero_demo(db, municipio.id, log=log)
         print(f"[CREAR DEMO] Turnero seed: {turnero_counts}")
         await db.commit()
         log.hito("turnero", **_counts(turnero_counts))

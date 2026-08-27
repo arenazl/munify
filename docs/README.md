@@ -19,6 +19,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
 | [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
+| [`calls/`](calls/) | **Directorio de llamados** (`/calls`): cómo regenerar la app, agregar municipios y repasar los nombres de los intendentes |
 | [`dashboard/`](dashboard/) | **Dashboard modular por módulos**: diseño cerrado (registry + hooks por dominio, cinta, regla del cero, orden por actividad) + WOs F1-F4 |
 | [`e2e/`](e2e/) | **Suite Playwright de circuito completo** (agnóstica de tenant): qué cubre, cómo correrla y cómo llevarla a otro municipio |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |

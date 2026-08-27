@@ -19,9 +19,12 @@ import math
 import random
 from datetime import date, timedelta
 from decimal import Decimal
-from calendar import monthrange
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from services.seed_demo import (
+    OBJETIVO_GASTOS, OBJETIVO_PAGOS_PROGRAMADOS, VENTANA_DIAS,
+)
 
 from models import (
     Municipio, Contacto, Gasto, GastoCuota, User, MunicipioModulo,
@@ -441,12 +444,18 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
             .limit(20)
         )).scalars().all()
 
-    # 7. Gastos historicos: ~50 distribuidos en los ultimos 6 meses
+    # 7. Gastos historicos: OBJETIVO_GASTOS dentro de la MISMA ventana de 3
+    # meses que los reclamos y los tramites (antes se repartian en 6 meses, con
+    # lo que la mitad del dinero caia fuera del periodo que muestra la demo y
+    # los totales del tablero no cerraban con la actividad).
     has_gastos = (await db.execute(
         select(Gasto).where(Gasto.municipio_id == municipio_id).limit(1)
     )).scalar_one_or_none()
     if not has_gastos and contactos_creados:
-        random.seed(municipio_id)  # determinista por muni
+        # `random.Random` propio y NO `random.seed()` global: sembrar el modulo
+        # entero desde una funcion de servicio le cambia el random a todo el
+        # proceso (y a cualquier otra request que corra en paralelo).
+        rnd = random.Random(f"tesoreria:{municipio_id}")
         hoy = date.today()
         conceptos_mix = [
             "Sueldo mensual", "Honorarios abogado", "Honorarios contador",
@@ -455,19 +464,19 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
             "Mano de obra electricidad", "Subsidio club deportivo",
             "Publicidad radio FM local", "Aporte cooperadora escuela",
         ]
-        for i in range(50):
-            mes_atras = random.randint(0, 6)
-            anio = hoy.year if hoy.month - mes_atras > 0 else hoy.year - 1
-            mes = ((hoy.month - mes_atras - 1) % 12) + 1
-            last_day = monthrange(anio, mes)[1]
-            dia = random.randint(1, last_day)
-            fecha_g = date(anio, mes, dia)
-            contacto = random.choice(contactos_creados)
-            concepto = random.choice(conceptos_mix)
-            monto = Decimal(random.choice([50_000, 80_000, 120_000, 180_000, 250_000, 350_000, 500_000, 800_000]))
-            forma = random.choice([FormaPago.TRANSFERENCIA, FormaPago.EFECTIVO, FormaPago.CHEQUE])
+        gastos_nuevos = []
+        for i in range(OBJETIVO_GASTOS):
+            # Misma curva de densidad que los reclamos: mas movimiento en las
+            # semanas recientes, sin dejar semanas en blanco.
+            frac = (i + 0.5) / OBJETIVO_GASTOS
+            dias = int(round(VENTANA_DIAS * (frac ** 1.4)))
+            fecha_g = hoy - timedelta(days=min(dias, VENTANA_DIAS - 1))
+            contacto = rnd.choice(contactos_creados)
+            concepto = rnd.choice(conceptos_mix)
+            monto = Decimal(rnd.choice([50_000, 80_000, 120_000, 180_000, 250_000, 350_000, 500_000, 800_000]))
+            forma = rnd.choice([FormaPago.TRANSFERENCIA, FormaPago.EFECTIVO, FormaPago.CHEQUE])
 
-            g = Gasto(
+            gastos_nuevos.append((Gasto(
                 municipio_id=municipio_id,
                 creador_id=admin_user_id,
                 destino_tipo=DestinoGasto.CONTACTO,
@@ -479,15 +488,18 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
                 tipo_financiacion=TipoFinanciacion.CONTADO,
                 forma_pago=forma,
                 activo=True,
-            )
-            db.add(g)
-            await db.flush()
-            db.add(GastoCuota(
-                gasto_id=g.id, numero=1, monto=monto,
-                fecha_vencimiento=fecha_g, fecha_pago=fecha_g,
-                estado=EstadoGastoCuota.PAGADA, forma_pago=forma,
-            ))
+            ), monto, fecha_g, forma))
             counts["gastos"] += 1
+        # UN flush para los 44 (antes: un flush POR gasto, 44 round-trips a
+        # Aiven solo para conseguir los ids de las cuotas).
+        db.add_all([g for g, _m, _f, _fp in gastos_nuevos])
+        await db.flush()
+        db.add_all([
+            GastoCuota(gasto_id=g.id, numero=1, monto=monto,
+                       fecha_vencimiento=fecha_g, fecha_pago=fecha_g,
+                       estado=EstadoGastoCuota.PAGADA, forma_pago=forma)
+            for g, monto, fecha_g, forma in gastos_nuevos
+        ])
 
     # 8. Proyectos (3)
     has_proyectos = (await db.execute(
@@ -507,35 +519,48 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
             ))
             counts["proyectos"] += 1
 
-    # 9. Pagos programados (2)
+    # 9. Pagos programados: OBJETIVO_PAGOS_PROGRAMADOS.
+    # Con 2 la pantalla se veia vacia; con 25 habria mas reglas de pago que
+    # empleados tiene el municipio demo. 6 es una nomina chica creible: 5
+    # empleados con su sueldo/plus + un servicio que se paga todos los meses.
     has_pp = (await db.execute(
         select(TesoreriaPagoProgramado).where(TesoreriaPagoProgramado.municipio_id == municipio_id).limit(1)
     )).scalar_one_or_none()
     if not has_pp and contactos_creados:
-        empleados = [c for c in contactos_creados if c.tipo == TipoContacto.EMPLEADO][:2]
-        # Conceptos reales del catálogo recién sembrado (no texto libre) —
-        # variedad: uno paga el sueldo básico, el otro un plus de presentismo.
-        _conceptos_pp = [("Sueldo Básico", 500_000), ("Presentismo", 45_000)]
-        for idx, emp in enumerate(empleados):
-            concepto_nombre, monto = _conceptos_pp[idx % len(_conceptos_pp)]
-            hoy = date.today()
-            inicio = date(hoy.year, hoy.month, 1)
+        empleados = [c for c in contactos_creados if c.tipo == TipoContacto.EMPLEADO]
+        proveedores = [c for c in contactos_creados if c.tipo == TipoContacto.PROVEEDOR]
+        # Conceptos reales del catálogo recién sembrado (no texto libre).
+        _conceptos_pp = [
+            ("Sueldo Básico", 500_000, FrecuenciaPago.MENSUAL, 5),
+            ("Presentismo", 45_000, FrecuenciaPago.MENSUAL, 5),
+            ("Antigüedad", 80_000, FrecuenciaPago.MENSUAL, 5),
+            ("Bono por Zona", 60_000, FrecuenciaPago.MENSUAL, 10),
+            ("Sueldo Básico", 420_000, FrecuenciaPago.MENSUAL, 5),
+            ("Obra Social", 95_000, FrecuenciaPago.MENSUAL, 15),
+        ]
+        destinatarios = (empleados + proveedores) or contactos_creados
+        hoy = date.today()
+        for idx in range(min(OBJETIVO_PAGOS_PROGRAMADOS, len(_conceptos_pp))):
+            concepto_nombre, monto, frecuencia, dia_mes = _conceptos_pp[idx]
+            destino = destinatarios[idx % len(destinatarios)]
+            inicio = date(hoy.year, hoy.month, 1) - timedelta(days=VENTANA_DIAS)
             proximo_mes = hoy.month + 1 if hoy.month < 12 else 1
             proximo_anio = hoy.year if hoy.month < 12 else hoy.year + 1
             db.add(TesoreriaPagoProgramado(
-                municipio_id=municipio_id, contacto_id=emp.id,
+                municipio_id=municipio_id, contacto_id=destino.id,
                 caja_id=caja_tesoro_id,
                 concepto=concepto_nombre,
                 descripcion="[DEMO] Pago programado de prueba",
                 monto_pesos=Decimal(monto),
                 forma_pago="transferencia",
-                frecuencia=FrecuenciaPago.MENSUAL,
-                dia_del_mes=5,
+                frecuencia=frecuencia,
+                dia_del_mes=dia_mes,
                 fecha_inicio=inicio,
-                proximo_pago=date(proximo_anio, proximo_mes, 5),
+                proximo_pago=date(proximo_anio, proximo_mes, dia_mes),
                 activo=True,
             ))
             counts["pagos_programados"] += 1
+        counts["movimientos_de_plata"] = counts["gastos"] + counts["pagos_programados"]
 
     await db.flush()
     return counts
