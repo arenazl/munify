@@ -15,6 +15,22 @@
  --ok:#35c07f; --warn:#e2a33c; --bad:#e06c6c; --purple:#9a7bdc;
  --r:12px;
 }
+
+:root[data-tema="claro"]{
+ --bg:#f4f6f9; --bg2:#ffffff; --card:#ffffff; --card2:#eef2f7; --line:#dfe5ec; --line2:#c8d2de;
+ --ink:#16212e; --ink2:#4d5f75; --ink3:#7c8ca1;
+ --acc:#2f6fd0; --acc2:#245ab0;
+ --ok:#1e9e63; --warn:#b57611; --bad:#c94a4a; --purple:#7357bd;
+}
+:root[data-tema="claro"] header.top{background:rgba(244,246,249,.96)}
+:root[data-tema="claro"] footer.pie{background:rgba(244,246,249,.97)}
+:root[data-tema="claro"] .row,:root[data-tema="claro"] .box,:root[data-tema="claro"] .h-it{box-shadow:0 1px 2px rgba(20,34,51,.05)}
+:root[data-tema="claro"] .eb.on[data-e=contactado]{color:#fff}
+:root[data-tema="claro"] .eb.on[data-e=no-atiende]{color:#fff}
+.tema{background:var(--card);border:1px solid var(--line2);color:var(--ink2);border-radius:9px;width:34px;height:34px;
+ cursor:pointer;display:grid;place-items:center;flex:none;transition:.12s;padding:0}
+.tema:hover{border-color:var(--acc);color:var(--acc)}
+.tema svg{width:17px;height:17px;display:block}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;overflow-x:hidden;overscroll-behavior:none}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -129,6 +145,7 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
 <header class="top"><div class="top-in">
   <div class="brand"><i>M</i> Llamados</div>
   <div class="spacer"></div>
+  <button class="tema" id="btnTema" type="button" aria-label="Cambiar tema" title="Cambiar tema"></button>
   <div class="kpis" id="kpis"></div>
 </div></header>
 
@@ -384,6 +401,31 @@ document.getElementById('fileImport').onchange = e => {
   rd.onload = () => { try { db = JSON.parse(rd.result) || {}; guardar(); pintar(); } catch(err){ alert('El archivo no se pudo leer'); } };
   rd.readAsText(f);
 };
+
+/* ---- Tema: luna para el modo claro, sol para volver al oscuro ---- */
+const LUNA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+const SOL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+const KEY_TEMA = 'munify_llamados_tema';
+function aplicarTema(t){
+  document.documentElement.setAttribute('data-tema', t);
+  const b = document.getElementById('btnTema');
+  if (b){
+    b.innerHTML = t === 'claro' ? SOL : LUNA;
+    b.title = t === 'claro' ? 'Volver al modo oscuro' : 'Pasar al modo claro';
+    b.setAttribute('aria-label', b.title);
+  }
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.setAttribute('content', t === 'claro' ? '#f4f6f9' : '#0f1720');
+  try { localStorage.setItem(KEY_TEMA, t); } catch(e){}
+}
+(function initTema(){
+  let t = null;
+  try { t = localStorage.getItem(KEY_TEMA); } catch(e){}
+  if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'claro' : 'oscuro';
+  aplicarTema(t);
+  document.getElementById('btnTema').onclick = () =>
+    aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'oscuro' : 'claro');
+})();
 
 pintar();
 </script>
