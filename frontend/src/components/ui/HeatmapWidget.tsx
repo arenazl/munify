@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { X, Maximize2, ZoomIn, ZoomOut, Home } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { BASEMAP, BASEMAP_ATTR } from '../../lib/basemaps';
 
 // Declarar el tipo para leaflet.heat
 declare module 'leaflet' {
@@ -375,13 +376,9 @@ function getCategoryKey(categoria: string): string {
   return 'otros';
 }
 
-// URLs de tiles para tema claro y oscuro
-const TILE_URLS = {
-  // Voyager: claro con detalle (calles, nombres, color suave).
-  // dark_all: base negra con calles/labels visibles, ideal para realzar el heatmap.
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-};
+// El mapa base sale de lib/basemaps: CARTO paso a estampar "API KEY REQUIRED"
+// sobre el tile y eso se vio publicado en el dashboard.
+const TILE_URLS = { light: BASEMAP.light, dark: BASEMAP.dark };
 
 export default function HeatmapWidget({
   data,
@@ -603,7 +600,7 @@ export default function HeatmapWidget({
       >
         <TileLayer
           url={tileUrl}
-          attribution='&copy; OSM &copy; CARTO'
+          attribution={BASEMAP_ATTR}
         />
         <InvalidateOnResize />
         {/* Con encuadre CONTROLADO desde afuera el auto-fit no corre: pisaba

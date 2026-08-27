@@ -16,6 +16,7 @@ import { ABMPage } from '../components/ui/ABMPage';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import { contactosApi, gastosApi } from '../lib/api';
 import type { Contacto, Gasto, GastoCuota, TipoContacto } from '../types';
+import { BASEMAP, BASEMAP_ATTR } from '../lib/basemaps';
 import {
   estadoDeContacto, estadoDeGasto, gastoEnRango, recortarGastoARango,
   ESTADO_CONTACTO_LABEL, ESTADO_CONTACTO_COLOR,
@@ -63,15 +64,19 @@ const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attri
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
   },
+  // Stadia tambien pide key (desde 2023): en su lugar, el Canvas oscuro.
   stadia: {
-    label: 'Stadia',
-    url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; Stadia Maps &copy; OpenStreetMap',
+    label: 'Oscuro',
+    url: BASEMAP.dark,
+    attribution: BASEMAP_ATTR,
   },
+  // Era el voyager de CARTO, que paso a exigir key y estampaba la marca de
+  // agua sobre el mapa. El Canvas gris de Esri cumple el mismo papel: base
+  // neutra para que los pines se lean.
   voyager: {
-    label: 'Voyager',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OSM &copy; CARTO',
+    label: 'Neutro',
+    url: BASEMAP.light,
+    attribution: BASEMAP_ATTR,
   },
 };
 

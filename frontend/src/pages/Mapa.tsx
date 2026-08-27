@@ -114,6 +114,7 @@ type TimePreset = '7' | '30' | '90' | '365' | 'all';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { BASEMAP, BASEMAP_ATTR } from '../lib/basemaps';
 
 // Tipo para leaflet.heat (no exporta tipos)
 declare module 'leaflet' {
@@ -145,10 +146,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-const TILE_URLS = {
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-};
+// Ver lib/basemaps: CARTO empezo a exigir key y estampaba la marca de agua.
+const TILE_URLS = { light: BASEMAP.light, dark: BASEMAP.dark };
 
 /** Tres tramos de la rampa de densidad (matices de veredicto del theme). */
 interface RampaDensidad {
@@ -3664,7 +3663,7 @@ export default function Mapa() {
             zoom={13}
             style={{ height: '100%', width: '100%' }}
           >
-            <TileLayer attribution="&copy; OSM &copy; CARTO" url={tileUrl} />
+            <TileLayer attribution={BASEMAP_ATTR} url={tileUrl} />
 
             <FitBoundsToMarkers reclamos={reclamosFiltrados} signal={fitSignal} />
             <MapController target={mapTarget} />
@@ -4090,7 +4089,7 @@ export default function Mapa() {
                 zoom={13}
                 style={{ height: '100%', width: '100%' }}
               >
-                <TileLayer attribution="&copy; OSM &copy; CARTO" url={tileUrl} />
+                <TileLayer attribution={BASEMAP_ATTR} url={tileUrl} />
 
                 <FitBoundsToLatLngs points={poiPoints} signal={poiFitSignal} />
                 <MapController target={mapTarget} />
