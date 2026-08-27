@@ -10,7 +10,11 @@
   background: var(--pl-card, #fff); border: 1px solid var(--pl-border, #e5e7eb);
   border-radius: var(--pl-radius-lg, 14px); padding: 16px 18px;
   display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 186px;
+  animation: mapart-card .3s var(--pl-ease, ease) both;
 }
+.map-art .tj:nth-child(2) { animation-delay: .06s; }
+.map-art .tj:nth-child(3) { animation-delay: .12s; }
+@keyframes mapart-card { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .map-art .tj-preg {
   font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
   color: var(--pl-text-3, #94a3b8);
@@ -74,7 +78,10 @@
 
 /* tendencia: barras semanales con eje */
 .map-art .barras { display: flex; align-items: flex-end; gap: 5px; height: 64px; padding-top: 18px; }
-.map-art .barras .b { flex: 1; background: color-mix(in srgb, var(--pl-green, #16a34a) 30%, transparent); border-radius: 4px 4px 0 0; min-height: 3px; position: relative; }
+.map-art .barras .b { flex: 1; background: color-mix(in srgb, var(--pl-green, #16a34a) 30%, transparent); border-radius: 4px 4px 0 0; min-height: 3px; position: relative;
+  transform-origin: bottom; animation: mapart-barra .55s var(--pl-ease, ease) both; }
+@keyframes mapart-barra { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .map-art .tj, .map-art .barras .b { animation: none; } }
 .map-art .barras .b.hoy { background: var(--pl-green, #16a34a); }
 .map-art .barras .b.hoy::after {
   content: attr(data-v); position: absolute; top: -18px; left: 50%; transform: translateX(-50%);

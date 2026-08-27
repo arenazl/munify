@@ -19,7 +19,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Reclamo } from '../../types';
 import type { RankedListItem } from '../ui/RankedList';
+import { useCountUp } from '../../hooks/useCountUp';
 import '../../styles/mapa-artefactos.css';
+
+/** Número que cuenta desde 0 (pieza del kit). Sólo para valores numéricos. */
+function NumAnimado({ v }: { v: number }) {
+  return <>{useCountUp(v)}</>;
+}
 
 interface RankingLente {
   titulo: string;
@@ -148,7 +154,10 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
             det: (
               <>
                 {top.detalle ? <>{top.detalle} — </> : null}
-                <strong>{top.valor}{top.valorSub ? ` ${top.valorSub}` : ''}</strong>
+                <strong>
+                  {typeof top.valor === 'number' ? <NumAnimado v={top.valor} /> : top.valor}
+                  {top.valorSub ? ` ${top.valorSub}` : ''}
+                </strong>
                 {segundo && (
                   <>. Le sigue <strong>{segundo.titulo}</strong> con {segundo.valor}
                   {segundo.valorSub ? ` ${segundo.valorSub}` : ''}.</>
@@ -190,7 +199,7 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
             num: top[0],
             det: (
               <>
-                <strong>{top[1]} de {total}</strong> reclamos del recorte ({parte}%)
+                <strong><NumAnimado v={top[1]} /> de {total}</strong> reclamos del recorte ({parte}%)
                 {segundo && <>. Le sigue <strong>{segundo[0]}</strong> con {segundo[1]}.</>}
               </>
             ),
@@ -238,7 +247,7 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
       preg: '¿Cómo viene la entrada?',
       cara: totalVentana > 0
         ? {
-            num: <>{actual} <small>esta semana</small></>,
+            num: <><NumAnimado v={actual} /> <small>esta semana</small></>,
             det: (
               <>Venía de <strong>{previa}</strong> la semana anterior;{' '}
               <strong>{totalVentana}</strong> en las últimas {SEMANAS} semanas.</>
@@ -266,7 +275,10 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
                 key={i}
                 className={`b${i === SEMANAS - 1 ? ' hoy' : ''}`}
                 data-v={n}
-                style={{ height: `${Math.max((n / max) * 100, 4)}%` }}
+                style={{
+                  height: `${Math.max((n / max) * 100, 4)}%`,
+                  animationDelay: `${i * 35}ms`,
+                }}
               />
             ))}
           </div>
@@ -283,7 +295,9 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
   }, [tendencia]);
 
   return (
-    <div className="map-art">
+    /* key por lente: al cambiar el chip las cards REMONTAN — la entrada
+       escalonada y los counters vuelven a correr, como en el modo TV. */
+    <div className="map-art" key={pregunta}>
       <Tarjeta datos={cardLente} />
       <Tarjeta datos={cardCategorias} />
       <Tarjeta datos={cardTendencia} />
