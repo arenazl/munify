@@ -355,11 +355,19 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
 
     gruesas = [p for p in places if p["tipo"] in PLACES_ZONA]
     finas = [p for p in places if p["tipo"] in PLACES_BARRIO]
-    # Ciudad sin localidades alrededor: la unica division que existe son sus
-    # barrios, y entonces esos SON las zonas. No se inventa un nivel de mas.
-    if not gruesas:
-        gruesas = finas
-        finas = []
+    # Ciudad sin localidades alrededor: si el unico place "grueso" es la ciudad
+    # misma, una zona unica que abarca el 100% de los casos no divide nada
+    # (Villa Carlos Paz: un solo `town` y 59 barrios --- salia UNA zona con los
+    # 50 reclamos adentro). La division real son sus barrios, y esos pasan a
+    # ser las zonas; si tampoco hay barrios, se cae mas abajo a las calles
+    # principales. En un partido (Lujan, Merlo) hay varias localidades y este
+    # caso no toca nada.
+    if len(gruesas) <= 1:
+        if finas:
+            gruesas = finas
+            finas = []
+        else:
+            gruesas = []
 
     degradacion: Optional[str] = None
     if not gruesas and calles:
