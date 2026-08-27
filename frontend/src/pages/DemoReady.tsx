@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Shield, User, Sparkles, ArrowLeft, Building2, Wrench } from 'lucide-react';
+import { Loader2, Shield, User, ArrowLeft, Building2, Wrench } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import api from '../lib/api';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import DemoPinGate from '../components/DemoPinGate';
+// Misma hoja que el generador: es la pantalla siguiente del mismo embudo y
+// comparte sus tokens (`.dm-fondo`) para no desincronizar dos paletas.
+import './Demo.css';
 
 /**
  * Pantalla "demo lista" — landing ultra-minimalista a la que redirige
@@ -126,151 +129,119 @@ export default function DemoReady() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden flex flex-col">
-      {/* Glow de fondo */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500 rounded-full blur-3xl" />
-      </div>
-
-      {/* Header */}
-      <header className="relative z-10 flex-shrink-0 px-6 py-5">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <BrandMark size={36} variant="content" />
-            <span className="text-xl font-bold text-white">{BRAND.name}</span>
+    <div className="dm-fondo relative overflow-hidden">
+      <div className="dm-capa">
+      <header className="dm-header">
+        <div className="dm-header-caja">
+          <div className="dm-marca">
+            <BrandMark size={32} variant="content" />
+            <span className="dm-marca-nombre">{BRAND.name}</span>
           </div>
-          <button
-            onClick={() => navigate('/demo')}
-            className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white font-medium text-sm transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
+          <button onClick={() => navigate('/demo')} className="dm-link-suave">
+            <ArrowLeft className="h-3.5 w-3.5" />
             Crear otra demo
           </button>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-8">
-        <div className="w-full max-w-3xl">
+      <main className="dm-main dr-centro">
+        <div className="dm-shell dr-shell">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <Loader2 className="h-10 w-10 text-blue-400 animate-spin" />
-              <p className="text-slate-400">Preparando tu demo...</p>
+            <div className="dm-cargando">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <p>Preparando tu demo...</p>
             </div>
           ) : (
             <>
-              {/* Hero de celebración */}
-              <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                  <Sparkles className="h-4 w-4 text-emerald-400" />
-                  <span className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">
-                    Demo lista
-                  </span>
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-                  {municipioNombre || 'Tu demo'}
-                </h1>
-                <p className="text-slate-400 text-lg">
+              {/* Hero de entrega */}
+              <div className="dr-hero">
+                <span className="dm-eyebrow">
+                  <span className="dm-pulso" />
+                  Demo lista
+                </span>
+                <h1 className="dm-titulo">{municipioNombre || 'Tu demo'}</h1>
+                <p className="dm-bajada">
                   Elegí cómo querés entrar a probar la plataforma
                 </p>
               </div>
 
               {/* Error */}
               {error && (
-                <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm text-center">
-                  {error}
-                </div>
+                <div className="dm-error">{error}</div>
               )}
 
               {/* Admin + Vecino arriba (roles globales) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="dr-duo">
                 <button
                   onClick={() => handleQuickLoginByEmail(adminUser?.email)}
                   disabled={quickLoading || !adminUser}
-                  className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl"
+                  className="dr-rol dr-rol--ink"
                 >
-                  <div className="flex flex-col gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                      <Shield className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-bold text-white mb-1">Como Admin</h3>
-                      <p className="text-xs text-rose-100/90">
-                        Gestioná reclamos, trámites, dependencias y usuarios
-                      </p>
-                      {adminUser && (
-                        <p className="text-[10px] text-rose-100/70 font-mono mt-2 truncate">
-                          {adminUser.email}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <span className="dr-rol-ico">
+                    <Shield className="h-5 w-5" />
+                  </span>
+                  <h3 className="dr-rol-tit">Como Admin</h3>
+                  <p className="dr-rol-desc">
+                    Gestioná reclamos, trámites, dependencias y usuarios
+                  </p>
+                  {adminUser && (
+                    <span className="dr-rol-mail">{adminUser.email}</span>
+                  )}
                   {quickLoading && (
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 text-white animate-spin" />
-                    </div>
+                    <span className="dr-rol-velo">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </span>
                   )}
                 </button>
 
                 <button
                   onClick={() => handleQuickLoginByEmail(vecinoUser?.email)}
                   disabled={quickLoading || !vecinoUser}
-                  className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl"
+                  className="dr-rol"
                 >
-                  <div className="flex flex-col gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                      <User className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-bold text-white mb-1">Como Vecino</h3>
-                      <p className="text-xs text-blue-100/90">
-                        Cargá reclamos y trámites como ciudadano
-                      </p>
-                      {vecinoUser && (
-                        <p className="text-[10px] text-blue-100/70 font-mono mt-2 truncate">
-                          {vecinoUser.email}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <span className="dr-rol-ico">
+                    <User className="h-5 w-5" />
+                  </span>
+                  <h3 className="dr-rol-tit">Como Vecino</h3>
+                  <p className="dr-rol-desc">
+                    Cargá reclamos y trámites como ciudadano
+                  </p>
+                  {vecinoUser && (
+                    <span className="dr-rol-mail">{vecinoUser.email}</span>
+                  )}
                   {quickLoading && (
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 text-white animate-spin" />
-                    </div>
+                    <span className="dr-rol-velo">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </span>
                   )}
                 </button>
               </div>
 
               {/* Supervisores por dependencia */}
               {supervisorUsers.length > 0 && (
-                <div className="mt-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Building2 className="h-4 w-4 text-amber-400" />
-                    <span className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-                      Supervisores por dependencia
-                    </span>
-                    <span className="text-xs text-slate-500">({supervisorUsers.length})</span>
+                <div className="dr-grupo">
+                  <div className="dr-grupo-tit">
+                    <Building2 className="h-4 w-4" />
+                    Supervisores por dependencia
+                    <span className="dr-grupo-cuenta">({supervisorUsers.length})</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="dr-mini-grilla">
                     {supervisorUsers.map((sup) => (
                       <button
                         key={sup.email}
                         onClick={() => handleQuickLoginByEmail(sup.email)}
                         disabled={quickLoading}
-                        className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 p-3 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-lg hover:shadow-xl"
+                        className="dr-mini"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-                            <Building2 className="h-4 w-4 text-white" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-white truncate">
-                              {sup.dependencia_nombre || sup.apellido || 'Dependencia'}
-                            </p>
-                            <p className="text-[9px] text-amber-100/70 font-mono truncate">{sup.email}</p>
-                          </div>
-                        </div>
+                        <span className="dr-mini-ico">
+                          <Building2 className="h-4 w-4" />
+                        </span>
+                        <span className="dr-mini-txt">
+                          <span className="dr-mini-tit">
+                            {sup.dependencia_nombre || sup.apellido || 'Dependencia'}
+                          </span>
+                          <span className="dr-mini-mail">{sup.email}</span>
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -279,41 +250,35 @@ export default function DemoReady() {
 
               {/* Empleados de campo (circuito de mis-trabajos / órdenes de trabajo) */}
               {empleadoUsers.length > 0 && (
-                <div className="mt-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Wrench className="h-4 w-4 text-emerald-400" />
-                    <span className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
-                      Empleados de campo
-                    </span>
-                    <span className="text-xs text-slate-500">({empleadoUsers.length})</span>
+                <div className="dr-grupo">
+                  <div className="dr-grupo-tit">
+                    <Wrench className="h-4 w-4" />
+                    Empleados de campo
+                    <span className="dr-grupo-cuenta">({empleadoUsers.length})</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="dr-mini-grilla">
                     {empleadoUsers.map((emp) => (
                       <button
                         key={emp.email}
                         onClick={() => handleQuickLoginByEmail(emp.email)}
                         disabled={quickLoading}
-                        className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/90 to-teal-600/90 p-3 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-lg hover:shadow-xl"
+                        className="dr-mini"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-                            <Wrench className="h-4 w-4 text-white" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-white truncate">
-                              {emp.nombre_completo}
-                            </p>
-                            <p className="text-[9px] text-emerald-100/70 font-mono truncate">{emp.email}</p>
-                          </div>
-                        </div>
+                        <span className="dr-mini-ico">
+                          <Wrench className="h-4 w-4" />
+                        </span>
+                        <span className="dr-mini-txt">
+                          <span className="dr-mini-tit">{emp.nombre_completo}</span>
+                          <span className="dr-mini-mail">{emp.email}</span>
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              <p className="text-center text-slate-500 text-xs mt-8">
-                Todas las cuentas usan la contraseña <span className="font-mono text-slate-400">demo123</span> —
+              <p className="dr-nota">
+                Todas las cuentas usan la contraseña <code>demo123</code> —
                 podés cerrar sesión y probar otra cuando quieras.
               </p>
             </>
@@ -321,11 +286,10 @@ export default function DemoReady() {
         </div>
       </main>
 
-      <footer className="relative z-10 flex-shrink-0 py-6 px-6">
-        <p className="text-center text-slate-500 text-sm">
-          {BRAND.name} — Demo en vivo
-        </p>
+      <footer className="dm-pie">
+        <p>{BRAND.name} — Demo en vivo</p>
       </footer>
+      </div>
       <DemoPinGate
         abierto={pinGateEmail !== null}
         nombreMunicipio={municipioNombre}

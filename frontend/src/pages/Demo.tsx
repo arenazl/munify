@@ -100,7 +100,7 @@ export default function Demo() {
     return (
       <>
         {nombre.slice(0, i)}
-        <span style={{ fontWeight: 700, color: 'var(--pl-green-700)' }}>{nombre.slice(i, i + q.length)}</span>
+        <span className="dm-sug-match">{nombre.slice(i, i + q.length)}</span>
         {nombre.slice(i + q.length)}
       </>
     );
@@ -249,7 +249,19 @@ export default function Demo() {
             <span className="dm-marca-nombre">{BRAND.name}</span>
           </div>
           <div className="dm-header-acciones">
-            <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
+            {/* El botón trae el acento del tema de la app; acá se lo pisa con el
+                marino de la landing para no meter un segundo color de marca. */}
+            <PresentacionLaunchButton
+              label="Conocé Munify"
+              style={{
+                padding: '8px 15px',
+                fontSize: 13,
+                fontWeight: 600,
+                background: 'var(--dm-accent)',
+                color: 'var(--dm-on-accent)',
+                boxShadow: '0 8px 20px -10px rgba(19, 40, 94, 0.55)',
+              }}
+            />
             <button onClick={() => navigate('/login')} className="dm-link-suave">
               <LogIn className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Ya tengo cuenta</span>
@@ -260,219 +272,247 @@ export default function Demo() {
       </header>
 
       <main className="dm-main">
-        <div className="dm-col">
-          <div className="dm-titular">
-            <span className="dm-eyebrow">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Municipios reales de 6 países
-            </span>
-            <h1 className="dm-titulo">Probá {BRAND.name} en tu municipio</h1>
-            <p className="dm-bajada">
-              Elegí tu ciudad del catálogo oficial y armamos la demo con sus calles, sus barrios y su mapa.
-            </p>
-          </div>
-
-          {/* OJO: sin overflow-hidden (recortaba el dropdown) y con z-40 para
-              que el dropdown quede SOBRE la sección de municipios de abajo */}
-          <div className="dm-alta">
-            <div className="dm-alta-cab">
-              <Sparkles className="h-4 w-4" style={{ color: 'var(--pl-green)' }} />
-              <span className="dm-alta-titulo">Crear demo en vivo</span>
-              {/* País del catálogo. Va acá arriba y no como combo: son pocos y
-                  la bandera se reconoce de un golpe. Cambiarlo limpia lo
-                  tipeado, porque las sugerencias son de otro país. */}
-              <div className="dm-paises" role="group" aria-label="País del catálogo">
-                {PAISES.map((p) => {
-                  const activo = pais === p.cod;
-                  return (
-                    <button
-                      key={p.cod}
-                      type="button"
-                      onClick={() => {
-                        if (activo) return;
-                        setPais(p.cod);
-                        setMuniSel(null);
-                        setSugerencias([]);
-                        setShowSug(false);
-                      }}
-                      aria-pressed={activo}
-                      title={p.nombre}
-                      className={`dm-pais${activo ? ' dm-pais--activo' : ''}`}
-                    >
-                      <BanderaPais pais={p.cod} size={13} />
-                      <span className="dm-pais-cod">{p.cod}</span>
-                    </button>
-                  );
-                })}
+        <div className="dm-shell">
+          {/* Hero partido, como el de la landing: discurso a la izquierda y el
+              panel de la acción a la derecha. En mobile el orden lo invierte el
+              CSS (`.dm-hero-panel { order: 1 }`) — primero el formulario. */}
+          <div className="dm-hero">
+            <div className="dm-hero-texto">
+              <span className="dm-eyebrow">
+                <span className="dm-pulso" />
+                Catálogo oficial de municipios · 6 países
+              </span>
+              <h1 className="dm-titulo">
+                Probá <em>{BRAND.name}</em> en tu municipio
+              </h1>
+              <p className="dm-bajada">
+                Elegí tu ciudad del catálogo oficial y armamos la demo con sus calles, sus barrios y su mapa.
+              </p>
+              {/* Las tres garantías, ahora como las pills del hero de la landing. */}
+              <div className="dm-tags">
+                <span className="dm-tag dm-tag--accent"><CreditCard className="h-3.5 w-3.5" /> Sin tarjeta</span>
+                <span className="dm-tag"><ShieldCheck className="h-3.5 w-3.5" /> Sin registro</span>
+                <span className="dm-tag"><Sparkles className="h-3.5 w-3.5" /> Admin + vecino listos</span>
               </div>
             </div>
-            <div className="dm-fila">
-              <div className="dm-campo">
-                <input
-                  type="text"
-                  value={nuevoNombre}
-                  onChange={(e) => {
-                    const v = e.target.value.slice(0, MAX_NAME);
-                    setNuevoNombre(v);
-                    if (muniSel && muniSel.nombre !== v.trim()) setMuniSel(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (showSug && sugerencias.length > 0) {
-                      if (e.key === 'ArrowDown') { e.preventDefault(); setHlIdx((i) => (i + 1) % sugerencias.length); return; }
-                      if (e.key === 'ArrowUp') { e.preventDefault(); setHlIdx((i) => (i - 1 + sugerencias.length) % sugerencias.length); return; }
-                      if (e.key === 'Enter') { e.preventDefault(); elegirMuni(sugerencias[hlIdx] || sugerencias[0]); return; }
-                      if (e.key === 'Escape') { setShowSug(false); return; }
-                    }
-                    if (e.key === 'Enter' && !creando && nameValid) handleCrearDemo();
-                  }}
-                  onFocus={() => { if (sugerencias.length > 0 && !muniSel) setShowSug(true); }}
-                  onBlur={() => setTimeout(() => setShowSug(false), 180)}
-                  placeholder={`Ej: ${PLACEHOLDER_CITIES[placeholderIdx]}...`}
-                  disabled={creando}
-                  maxLength={MAX_NAME}
-                  className={`dm-input${nameValid ? ' dm-input--ok' : ''}`}
-                />
-                <div className={`dm-input-marca${nameValid ? ' dm-input-marca--ok' : ''}`}>
-                  {nameValid && <Check className="h-3.5 w-3.5" />}
-                  <span>{nameValid && muniSel ? muniSel.provincia : `${trimmed.length}/${MAX_NAME}`}</span>
+
+            <div className="dm-hero-panel">
+              {/* OJO: sin overflow-hidden (recortaba el dropdown) y con z-40 para
+                  que el dropdown quede SOBRE la sección de municipios de abajo */}
+              <div className="dm-alta">
+                {/* Barra de ventana del mockup de producto de la landing
+                    (`.app-mock__bar`): dice "esto es la app", sin fingir datos. */}
+                <div className="dm-alta-bar">
+                  <span className="dm-alta-punto" />
+                  <span className="dm-alta-punto" />
+                  <span className="dm-alta-punto" />
+                  <span className="dm-alta-titulo">{BRAND.name} · generador de demos</span>
                 </div>
-                {/* Dropdown del catálogo oficial (tabla local, dataset georef).
-                    Teclado: flechas navegan, Enter elige, Esc cierra. */}
-                {showSug && sugerencias.length > 0 && (
-                  <div className="dm-sug">
-                    <div className="dm-sug-cab">
-                      <ShieldCheck className="h-3 w-3" />
-                      Catálogo oficial de municipios
-                      {buscando && <Loader2 className="h-3 w-3 animate-spin" style={{ marginLeft: 'auto' }} />}
+                <div className="dm-alta-cuerpo">
+                <div className="dm-alta-cab">
+                  <span className="dm-alta-label">Crear demo en vivo</span>
+                  {/* País del catálogo. Va acá arriba y no como combo: son pocos y
+                      la bandera se reconoce de un golpe. Cambiarlo limpia lo
+                      tipeado, porque las sugerencias son de otro país. */}
+                  <div className="dm-paises" role="group" aria-label="País del catálogo">
+                    {PAISES.map((p) => {
+                      const activo = pais === p.cod;
+                      return (
+                        <button
+                          key={p.cod}
+                          type="button"
+                          onClick={() => {
+                            if (activo) return;
+                            setPais(p.cod);
+                            setMuniSel(null);
+                            setSugerencias([]);
+                            setShowSug(false);
+                          }}
+                          aria-pressed={activo}
+                          title={p.nombre}
+                          className={`dm-pais${activo ? ' dm-pais--activo' : ''}`}
+                        >
+                          <BanderaPais pais={p.cod} size={13} />
+                          <span className="dm-pais-cod">{p.cod}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="dm-fila">
+                  <div className="dm-campo">
+                    <input
+                      type="text"
+                      value={nuevoNombre}
+                      onChange={(e) => {
+                        const v = e.target.value.slice(0, MAX_NAME);
+                        setNuevoNombre(v);
+                        if (muniSel && muniSel.nombre !== v.trim()) setMuniSel(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (showSug && sugerencias.length > 0) {
+                          if (e.key === 'ArrowDown') { e.preventDefault(); setHlIdx((i) => (i + 1) % sugerencias.length); return; }
+                          if (e.key === 'ArrowUp') { e.preventDefault(); setHlIdx((i) => (i - 1 + sugerencias.length) % sugerencias.length); return; }
+                          if (e.key === 'Enter') { e.preventDefault(); elegirMuni(sugerencias[hlIdx] || sugerencias[0]); return; }
+                          if (e.key === 'Escape') { setShowSug(false); return; }
+                        }
+                        if (e.key === 'Enter' && !creando && nameValid) handleCrearDemo();
+                      }}
+                      onFocus={() => { if (sugerencias.length > 0 && !muniSel) setShowSug(true); }}
+                      onBlur={() => setTimeout(() => setShowSug(false), 180)}
+                      placeholder={`Ej: ${PLACEHOLDER_CITIES[placeholderIdx]}...`}
+                      disabled={creando}
+                      maxLength={MAX_NAME}
+                      className={`dm-input${nameValid ? ' dm-input--ok' : ''}`}
+                    />
+                    <div className={`dm-input-marca${nameValid ? ' dm-input-marca--ok' : ''}`}>
+                      {nameValid && <Check className="h-3.5 w-3.5" />}
+                      <span>{nameValid && muniSel ? muniSel.provincia : `${trimmed.length}/${MAX_NAME}`}</span>
                     </div>
-                    {sugerencias.map((m, i) => (
-                      <button
-                        key={m.id}
-                        onMouseDown={(e) => { e.preventDefault(); elegirMuni(m); }}
-                        onMouseEnter={() => setHlIdx(i)}
-                        ref={(el) => { if (i === hlIdx && el) el.scrollIntoView({ block: 'nearest' }); }}
-                        className={`dm-sug-item${i === hlIdx ? ' dm-sug-item--activo' : ''}`}
-                      >
-                        <span className="dm-sug-pin">
-                          <MapPin className="h-4 w-4" />
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className="dm-sug-nombre">{resaltar(m.nombre, trimmed)}</span>
-                          <span className="dm-sug-prov">{m.provincia}</span>
-                        </span>
-                        {i === hlIdx && <ArrowRight className="h-4 w-4 shrink-0" style={{ color: 'var(--pl-green)' }} />}
-                      </button>
-                    ))}
+                    {/* Dropdown del catálogo oficial (tabla local, dataset georef).
+                        Teclado: flechas navegan, Enter elige, Esc cierra. */}
+                    {showSug && sugerencias.length > 0 && (
+                      <div className="dm-sug">
+                        <div className="dm-sug-cab">
+                          <ShieldCheck className="h-3 w-3" />
+                          Catálogo oficial de municipios
+                          {buscando && <Loader2 className="h-3 w-3 animate-spin" style={{ marginLeft: 'auto' }} />}
+                        </div>
+                        {sugerencias.map((m, i) => (
+                          <button
+                            key={m.id}
+                            onMouseDown={(e) => { e.preventDefault(); elegirMuni(m); }}
+                            onMouseEnter={() => setHlIdx(i)}
+                            ref={(el) => { if (i === hlIdx && el) el.scrollIntoView({ block: 'nearest' }); }}
+                            className={`dm-sug-item${i === hlIdx ? ' dm-sug-item--activo' : ''}`}
+                          >
+                            <span className="dm-sug-pin">
+                              <MapPin className="h-4 w-4" />
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="dm-sug-nombre">{resaltar(m.nombre, trimmed)}</span>
+                              <span className="dm-sug-prov">{m.provincia}</span>
+                            </span>
+                            {i === hlIdx && <ArrowRight className="h-4 w-4 shrink-0 dm-sug-flecha" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleCrearDemo}
+                    disabled={creando || !nameValid}
+                    className="dm-boton"
+                  >
+                    {creando ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Creando...
+                      </>
+                    ) : (
+                      <>
+                        Probar ahora
+                        <ArrowRight className="h-5 w-5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* La razón del autocompletado, dicha una vez y donde se decide. */}
+                <p className="dm-nota">
+                  <ShieldCheck className="h-4 w-4" />
+                  Sólo municipios del catálogo oficial: es lo que hace que la demo salga con
+                  los barrios y las calles reales de tu ciudad.
+                </p>
+
+                {/* El error vive DENTRO del panel: es donde se origina (validación
+                    del alta) y donde el ojo ya está puesto. */}
+                {error && (
+                  <div className="dm-error">{error}</div>
+                )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="dm-listado">
+            {municipios.length > 0 && (
+              <div className="dm-separador"><span>o entrá a uno existente</span></div>
+            )}
+
+            {loading ? (
+              <div className="dm-cargando">
+                <Loader2 className="h-7 w-7 animate-spin" />
+              </div>
+            ) : (
+              <>
+                {showSearch && (
+                  <div className="dm-buscador-demos">
+                    <Search className="h-4 w-4" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar municipio..."
+                    />
                   </div>
                 )}
-              </div>
-              <button
-                onClick={handleCrearDemo}
-                disabled={creando || !nameValid}
-                className="dm-boton"
-              >
-                {creando ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  <>
-                    Probar ahora
-                    <ArrowRight className="h-5 w-5" />
-                  </>
-                )}
-              </button>
-            </div>
 
-            {/* Social proof / garantía — antes era texto gris chiquito. */}
-            <div className="dm-garantias">
-              <span className="dm-garantia"><CreditCard className="h-3.5 w-3.5" /> Sin tarjeta</span>
-              <span className="dm-garantia"><ShieldCheck className="h-3.5 w-3.5" /> Sin registro</span>
-              <span className="dm-garantia"><Sparkles className="h-3.5 w-3.5" /> Admin + vecino listos</span>
-            </div>
-          </div>
+                <div className="dm-grilla">
+                  {filteredMunicipios.map((municipio) => {
+                    const primaryColor = municipio.color_primario || '#0088cc';
+                    const isEliminando = eliminando === municipio.codigo;
+                    return (
+                      <div key={municipio.id} className="dm-muni">
+                        {/* La franja del color del municipio es lo ÚNICO que
+                            distingue una tarjeta de otra, y es informacion: su
+                            identidad. Antes habia ademas una inicial serif de 8rem
+                            de marca de agua, que a esta escala competia con el
+                            nombre real y no decia nada que el nombre no dijera. */}
+                        <span className="dm-muni-franja" style={{ background: primaryColor }} />
 
-          {municipios.length > 0 && (
-            <div className="dm-separador"><span>o entrá a uno existente</span></div>
-          )}
+                        <button
+                          onClick={() => handleSelectMunicipio(municipio)}
+                          disabled={isEliminando}
+                          className="dm-muni-btn"
+                        >
+                          <h3 className="dm-muni-nombre">{municipio.nombre}</h3>
+                          <p className="dm-muni-codigo">{municipio.codigo}</p>
+                          <span className="dm-muni-entrar" style={{ color: primaryColor }}>
+                            Entrar
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </span>
+                        </button>
 
-          {error && (
-            <div className="dm-error">{error}</div>
-          )}
-
-          {loading ? (
-            <div className="dm-cargando">
-              <Loader2 className="h-7 w-7 animate-spin" style={{ margin: '0 auto', color: 'var(--pl-green)' }} />
-            </div>
-          ) : (
-            <>
-              {showSearch && (
-                <div className="dm-buscador-demos">
-                  <Search className="h-4 w-4" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar municipio..."
-                  />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setToDelete(municipio);
+                          }}
+                          disabled={isEliminando}
+                          // SIEMPRE visible (antes solo en hover: inaccesible en mobile).
+                          // Las demos se administran desde esta UI pública a propósito.
+                          className="dm-muni-borrar"
+                          title={`Eliminar demo ${municipio.nombre}`}
+                          aria-label={`Eliminar demo ${municipio.nombre}`}
+                        >
+                          {isEliminando ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
 
-              <div className="dm-grilla">
-                {filteredMunicipios.map((municipio) => {
-                  const primaryColor = municipio.color_primario || '#0088cc';
-                  const isEliminando = eliminando === municipio.codigo;
-                  return (
-                    <div key={municipio.id} className="dm-muni">
-                      {/* La franja del color del municipio es lo ÚNICO que
-                          distingue una tarjeta de otra, y es informacion: su
-                          identidad. Antes habia ademas una inicial serif de 8rem
-                          de marca de agua, que a esta escala competia con el
-                          nombre real y no decia nada que el nombre no dijera. */}
-                      <span className="dm-muni-franja" style={{ background: primaryColor }} />
-
-                      <button
-                        onClick={() => handleSelectMunicipio(municipio)}
-                        disabled={isEliminando}
-                        className="dm-muni-btn"
-                      >
-                        <h3 className="dm-muni-nombre">{municipio.nombre}</h3>
-                        <p className="dm-muni-codigo">{municipio.codigo}</p>
-                        <span className="dm-muni-entrar" style={{ color: primaryColor }}>
-                          Entrar
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </span>
-                      </button>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setToDelete(municipio);
-                        }}
-                        disabled={isEliminando}
-                        // SIEMPRE visible (antes solo en hover: inaccesible en mobile).
-                        // Las demos se administran desde esta UI pública a propósito.
-                        className="dm-muni-borrar"
-                        title={`Eliminar demo ${municipio.nombre}`}
-                        aria-label={`Eliminar demo ${municipio.nombre}`}
-                      >
-                        {isEliminando ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {showSearch && filteredMunicipios.length === 0 && (
-                <p className="dm-vacio">No hay municipios que coincidan con "{search}"</p>
-              )}
-            </>
-          )}
+                {showSearch && filteredMunicipios.length === 0 && (
+                  <p className="dm-vacio">No hay municipios que coincidan con "{search}"</p>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </main>
 
