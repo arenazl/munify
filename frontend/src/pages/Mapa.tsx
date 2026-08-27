@@ -114,7 +114,7 @@ type TimePreset = '7' | '30' | '90' | '365' | 'all';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { BASEMAP, BASEMAP_ATTR, claseBasemap } from '../lib/basemaps';
+import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM, claseBasemap } from '../lib/basemaps';
 
 // Tipo para leaflet.heat (no exporta tipos)
 declare module 'leaflet' {
@@ -3662,6 +3662,7 @@ export default function Mapa() {
           <MapContainer
         wheelPxPerZoomLevel={180}
         wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
           className={claseBasemap(isDarkTheme)}
             center={getMapCenter()}
@@ -4092,6 +4093,7 @@ export default function Mapa() {
               <MapContainer
         wheelPxPerZoomLevel={180}
         wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
           className={claseBasemap(isDarkTheme)}
                 center={getPoiCenter()}

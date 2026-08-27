@@ -33,6 +33,17 @@
 /** El único tile server. `{s}` son los subdominios (a/b/c) que Leaflet rota. */
 export const BASEMAP = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
+/**
+ * Tope de zoom de TODOS los mapas de la app.
+ *
+ * OSM renderiza hasta z19, pero en ciudades poco mapeadas los últimos niveles
+ * son calles flotando en un fondo vacío: parece "sin datos" aunque el tile
+ * cargó. El zoom frena en el último nivel que siempre se ve completo. Va en el
+ * `<MapContainer maxZoom=...>`: Leaflet corta ahí la rueda, el doble click y
+ * los botones +/-.
+ */
+export const BASEMAP_MAX_ZOOM = 17;
+
 /** Atribución obligatoria de OSM. Va en el control del mapa. */
 export const BASEMAP_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 

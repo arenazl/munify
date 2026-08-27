@@ -16,7 +16,7 @@ import { ABMPage } from '../components/ui/ABMPage';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import { contactosApi, gastosApi } from '../lib/api';
 import type { Contacto, Gasto, GastoCuota, TipoContacto } from '../types';
-import { BASEMAP, BASEMAP_ATTR } from '../lib/basemaps';
+import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM } from '../lib/basemaps';
 import {
   estadoDeContacto, estadoDeGasto, gastoEnRango, recortarGastoARango,
   ESTADO_CONTACTO_LABEL, ESTADO_CONTACTO_COLOR,
@@ -834,12 +834,13 @@ export default function TesoreriaMapa() {
             <MapContainer
         wheelPxPerZoomLevel={180}
         wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1} center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
               <TileLayer
                 key={tileProvider}
                 attribution={tile.attribution}
                 url={tile.url}
-                maxZoom={19}
+                maxZoom={BASEMAP_MAX_ZOOM}
               />
               <MapController points={points} triggerFit={fitTrigger} onReady={(m) => { mapRef.current = m; }} />
               <MapClickCapture
@@ -1031,6 +1032,7 @@ export default function TesoreriaMapa() {
                 <MapContainer
         wheelPxPerZoomLevel={180}
         wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
                   center={[selected.latitud, selected.longitud]}
                   zoom={16}

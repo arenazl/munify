@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { X, Maximize2, ZoomIn, ZoomOut, Home } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { BASEMAP, BASEMAP_ATTR, claseBasemap } from '../../lib/basemaps';
+import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM, claseBasemap } from '../../lib/basemaps';
 
 // Declarar el tipo para leaflet.heat
 declare module 'leaflet' {
@@ -594,6 +594,7 @@ export default function HeatmapWidget({
       <MapContainer
         wheelPxPerZoomLevel={180}
         wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
           className={claseBasemap(isDarkTheme)}
         center={mapCenter}
