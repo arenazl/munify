@@ -237,17 +237,27 @@ Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 > "NO se levantan servers locales NUNCA": el user pasó a trabajar local porque le resulta
 > mucho más ágil.
 
-> ### REGLA DE ORO de secretos y variables (dueño, 2026-08-28)
+> ### REGLA DE ORO de secretos y variables (norma del ecosistema)
 >
-> **Los secretos/variables que corresponden a LA APP los carga la app misma**
-> (esta sesión): env vars del backend **QA** (`munify-api-qa` — matiza para QA
-> la prohibición de `gcloud run services update`), **GitHub Secrets** del repo
-> (`gh secret set -R arenazl/munify`) y variables de los proyectos del front
-> de QA. **Lo que la app NO hace jamás:** setear cualquier cosa en
-> **PRODUCCIÓN** ni **promover qa→prod** — eso es exclusivo de Infra.
-> Textual del dueño: "todo lo que son secretos que corresponden a tu
-> aplicación, los cargás vos; lo que no hacés es promover QA a producción o
-> setear cosas en producción".
+> Fuente completa: **`base-compartida/20-REPARTO-SECRETOS-Y-PLATAFORMA.md`**
+> (Lucas, 2026-08-27). Tres categorías:
+>
+> 1. **Secretos DE LA APLICACIÓN** (Gemini, Groq, Brevo, client IDs): **los
+>    carga la app, en QA Y en producción** — en prod vía
+>    `secretmanager.secretVersionAdder` sobre sus propios secrets (agregar
+>    versión no permite leer). Si falta una key de la app: se carga, no se pide.
+> 2. **Secretos de ACCESO A DATOS** (`DATABASE_URL`, `SECRET_KEY`): Infra,
+>    siempre.
+> 3. **Credenciales de CUENTA/PLATAFORMA** (token Cloudflare, SA de GCP):
+>    Infra, jamás se reparten — si un CD las necesita, se arma para que NO
+>    hagan falta.
+>
+> Sigue vedado SIEMPRE para la app: ejecutar contra la base de producción y
+> promover qa→prod. Y ninguna sesión autoriza por otra (regla 4 del doc).
+>
+> Nota de plataforma (mismo doc): **el front de QA vive en Cloudflare Pages**
+> (`app-qa.munify.com.ar`, CD por push vía Cloud Build de Infra); Netlify es
+> plataforma SALIENTE — prod sigue ahí hasta que Infra la migre.
 
 **VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero el deploy a
 Cloud Run lo dispara Infra por su cuenta (puede no ser instantáneo). Para saber qué está
