@@ -102,6 +102,7 @@ import {
   BBox,
 } from '../lib/mapaUtils';
 import MapaStats from '../components/mapa/MapaStats';
+import MapaArtefactosProto from '../components/mapa/MapaArtefactosProto';
 import MapaTimelapseBanda, {
   type VelocidadTimelapse,
   type ComparacionVentana,
@@ -4062,6 +4063,11 @@ export default function Mapa() {
           )}
         </div>
       </section>
+
+      {/* PROTOTIPO TEMPORAL (se borra al elegir): tres layouts candidatos para
+             reemplazar el donut y el sparkline de MapaStats. Datos de muestra
+             rotulados; el switch 1/2/3 es la prueba del dueño. */}
+      <MapaArtefactosProto />
 
       {/* === Sección de análisis debajo del mapa. El ranking NO es fijo:
              cambia con la pregunta (mismo componente, otro contenido y otro

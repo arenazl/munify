@@ -1,0 +1,81 @@
+/* PROTOTIPO TEMPORAL (MapaArtefactosProto): tres layouts candidatos para los
+   paneles de abajo del mapa. Se borra cuando el dueño elija la variante.
+   Regla de oro del dueño: SIMETRÍA SIEMPRE — todas las grillas estiran sus
+   celdas a la misma altura (grid + stretch), nada de aire muerto. */
+
+.map-proto { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+
+.map-proto-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.map-proto-tag {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--pl-amber-strong, #b45309);
+  background: color-mix(in srgb, var(--pl-amber-strong, #b45309) 12%, transparent);
+  border-radius: var(--pl-radius-pill, 999px); padding: 3px 10px;
+}
+.map-proto-seg { display: inline-flex; gap: 2px; background: color-mix(in srgb, var(--pl-text, #1f2937) 7%, transparent); border-radius: var(--pl-radius-pill, 999px); padding: 3px; }
+.map-proto-seg button {
+  border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 700;
+  padding: 4px 14px; border-radius: var(--pl-radius-pill, 999px);
+  background: transparent; color: var(--pl-text-2, #64748b);
+}
+.map-proto-seg button.act { background: var(--pl-card, #fff); color: var(--pl-text, #1f2937); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.map-proto-seg button:focus-visible { outline: 2px solid var(--pl-green, #16a34a); outline-offset: 1px; }
+
+/* ---------- piezas comunes ---------- */
+.map-proto .fila { display: grid; gap: 12px; align-items: stretch; }
+.map-proto .f3 { grid-template-columns: repeat(3, 1fr); }
+.map-proto .f2 { grid-template-columns: 1.4fr 1fr; }
+@media (max-width: 900px) { .map-proto .f3, .map-proto .f2 { grid-template-columns: 1fr; } }
+
+.map-proto .tj {
+  background: var(--pl-card, #fff); border: 1px solid var(--pl-border, #e5e7eb);
+  border-radius: var(--pl-radius-lg, 14px); padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.map-proto .tj-preg {
+  font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--pl-text-3, #94a3b8);
+}
+.map-proto .tj-num { font-size: 28px; font-weight: 800; line-height: 1.05; color: var(--pl-text, #1f2937); font-variant-numeric: tabular-nums; }
+.map-proto .tj-num small { font-size: 14px; font-weight: 700; color: var(--pl-text-2, #64748b); }
+.map-proto .tj-det { font-size: 13px; color: var(--pl-text-2, #64748b); margin: 0; }
+.map-proto .tj-det strong { color: var(--pl-text, #1f2937); }
+.map-proto .tj-pie { margin-top: auto; }
+
+.map-proto .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.map-proto .chip {
+  font-size: 11.5px; font-weight: 700; padding: 3px 10px; display: inline-flex;
+  align-items: center; gap: 6px; border-radius: var(--pl-radius-pill, 999px);
+}
+.map-proto .chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.map-proto .chip.ok    { color: var(--pl-green-700, #15803d); background: color-mix(in srgb, var(--pl-green, #16a34a) 14%, transparent); }
+.map-proto .chip.warn  { color: var(--pl-amber-strong, #b45309); background: color-mix(in srgb, var(--pl-amber-strong, #b45309) 14%, transparent); }
+.map-proto .chip.grave { color: var(--pl-red, #b91c1c); background: color-mix(in srgb, var(--pl-red, #b91c1c) 12%, transparent); }
+
+/* ---------- V2: bloques protagonista, SIEMPRE parejos ---------- */
+.map-proto .bloques {
+  display: grid; gap: 8px; flex: 1;
+  grid-template-columns: 1.6fr 1fr; grid-template-rows: 1fr 1fr; min-height: 168px;
+}
+.map-proto .bloque {
+  border-radius: var(--pl-radius-md, 12px); padding: 12px 14px; color: var(--pl-on-accent, #fff);
+  display: flex; flex-direction: column; justify-content: space-between; min-width: 0;
+}
+.map-proto .bloque .bt { font-size: 12px; font-weight: 800; line-height: 1.25; }
+.map-proto .bloque .bv { font-size: 24px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.map-proto .bloque .bs { font-size: 11.5px; opacity: .92; }
+.map-proto .bloque.g  { grid-row: span 2; background: var(--pl-red, #d9534f); }
+.map-proto .bloque.m  { background: var(--pl-amber-strong, #e8923f); }
+.map-proto .bloque.s  { background: var(--pl-amber, #e5b23b); }
+
+/* ---------- V3: rotador ---------- */
+.map-proto .rot { padding: 20px 24px; }
+.map-proto .rot .tj-num { font-size: 32px; }
+.map-proto .puntos { display: flex; gap: 5px; margin-top: 10px; }
+.map-proto .puntos button {
+  border: 0; padding: 0; cursor: pointer; width: 8px; height: 8px; border-radius: 4px;
+  background: color-mix(in srgb, var(--pl-text, #1f2937) 18%, transparent);
+  transition: width .25s var(--pl-ease, ease);
+}
+.map-proto .puntos button.act { width: 20px; background: var(--pl-amber-strong, #e5a23b); }
+@media (prefers-reduced-motion: reduce) { .map-proto .puntos button { transition: none; } }
