@@ -237,6 +237,18 @@ Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 > "NO se levantan servers locales NUNCA": el user pasó a trabajar local porque le resulta
 > mucho más ágil.
 
+> ### REGLA DE ORO de secretos y variables (dueño, 2026-08-28)
+>
+> **Los secretos/variables que corresponden a LA APP los carga la app misma**
+> (esta sesión): env vars del backend **QA** (`munify-api-qa` — matiza para QA
+> la prohibición de `gcloud run services update`), **GitHub Secrets** del repo
+> (`gh secret set -R arenazl/munify`) y variables de los proyectos del front
+> de QA. **Lo que la app NO hace jamás:** setear cualquier cosa en
+> **PRODUCCIÓN** ni **promover qa→prod** — eso es exclusivo de Infra.
+> Textual del dueño: "todo lo que son secretos que corresponden a tu
+> aplicación, los cargás vos; lo que no hacés es promover QA a producción o
+> setear cosas en producción".
+
 **VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero el deploy a
 Cloud Run lo dispara Infra por su cuenta (puede no ser instantáneo). Para saber qué está
 realmente vivo, consultar el OpenAPI del servicio:
