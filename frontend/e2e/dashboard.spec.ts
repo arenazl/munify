@@ -179,6 +179,13 @@ test.describe('tablero del admin (dashboard modular)', () => {
 
     test.skip(esperado.length < 2, 'Con un solo bloque no hay orden que verificar');
 
+    // Primero ESPERAR cada ancla (la Voz del Vecino monta tarde: su sección
+    // rinde null hasta que llega el fetch de calificaciones) y recién después
+    // leer el orden del DOM de una sola pasada.
+    for (const texto of esperado) {
+      await expect(titulo(page, texto).first()).toBeVisible({ timeout: 30_000 });
+    }
+
     // El orden REAL sale del DOM (columna única): títulos en orden de documento.
     const reales = (await page.locator(SEL_TITULOS).allInnerTexts()).map((s) => s.trim());
     const posiciones = esperado.map((texto) => ({
