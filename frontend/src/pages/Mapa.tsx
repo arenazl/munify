@@ -1094,7 +1094,10 @@ export default function Mapa() {
 
   const isDarkTheme = (() => {
     const hex = theme.background?.replace('#', '') || '';
-    if (hex.length !== 6) return true;
+    // Fondo ilegible => SIN filtro oscuro: un mapa colorido en tema oscuro es
+    // un detalle; un mapa negro en tema claro (lo que pasaba con el default
+    // en true) es un bug que el dueño ve al instante.
+    if (hex.length !== 6) return false;
     const n = parseInt(hex, 16);
     const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff)) / 255;
     return lum < 0.5;
@@ -3656,8 +3659,11 @@ export default function Mapa() {
       <div className={`av2-mapa${expandidoCss ? ' av2-mapa--expandido' : ''}`} ref={lienzoRef}>
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}
+        {/* El filtro claro/oscuro va en el WRAPPER, no en el MapContainer:
+            react-leaflet congela sus props tras el montaje y el cambio de
+            tema en vivo dejaba el mapa con el filtro viejo pegado. */}
         <div
-          className="av2-mapa-lienzo"
+          className={`av2-mapa-lienzo ${claseBasemap(isDarkTheme)}`}
           style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
         >
           <MapContainer
@@ -3665,7 +3671,6 @@ export default function Mapa() {
         wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
-          className={claseBasemap(isDarkTheme)}
             center={getMapCenter()}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
@@ -4093,7 +4098,7 @@ export default function Mapa() {
         <div className="flex flex-col lg:flex-row gap-4 mt-3">
           <div className="av2-mapa av2-mapa--pegado flex-1 min-w-0" ref={lienzoRef}>
             <div
-              className="av2-mapa-lienzo"
+              className={`av2-mapa-lienzo ${claseBasemap(isDarkTheme)}`}
               style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
             >
               <MapContainer
@@ -4101,7 +4106,6 @@ export default function Mapa() {
         wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
-          className={claseBasemap(isDarkTheme)}
                 center={getPoiCenter()}
                 zoom={13}
                 style={{ height: '100%', width: '100%' }}

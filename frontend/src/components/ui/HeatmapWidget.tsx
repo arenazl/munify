@@ -585,10 +585,13 @@ export default function HeatmapWidget({
     );
   }
 
-  // Renderizar mapa - la key con mapVersion fuerza unmount/remount completo
+  // Renderizar mapa - la key con mapVersion fuerza unmount/remount completo.
+  // El filtro claro/oscuro va en el WRAPPER: react-leaflet congela className
+  // tras el montaje y el cambio de tema en vivo dejaba el filtro viejo.
   const renderMap = (isFullscreen: boolean) => (
     <div
       key={`map-${mapVersion}-${isFullscreen ? 'full' : 'widget'}`}
+      className={claseBasemap(isDarkTheme)}
       style={{ height: '100%', width: '100%' }}
     >
       <MapContainer
@@ -596,7 +599,6 @@ export default function HeatmapWidget({
         wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
-          className={claseBasemap(isDarkTheme)}
         center={mapCenter}
         zoom={isFullscreen ? 14 : 13}
         style={{ height: '100%', width: '100%' }}
