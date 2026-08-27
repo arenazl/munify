@@ -25,16 +25,21 @@
 :root[data-tema="claro"] .row,:root[data-tema="claro"] .tarj,:root[data-tema="claro"] .ficha{box-shadow:0 1px 2px rgba(20,34,51,.05)}
 :root[data-tema="claro"] .eb.on[data-e=contactado],:root[data-tema="claro"] .eb.on[data-e=no-atiende]{color:#fff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;overflow-x:hidden;overscroll-behavior:none;width:100%;max-width:100%}
-/* touch-action pan-y: el dedo solo scrollea VERTICAL — mata el zigzagueo
-   horizontal del viewport (estandar base-compartida/11). Los carruseles
-   horizontales (paises, kpis) recuperan su gesto con pan-x local. */
-body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;touch-action:pan-y}
+/* APP-SHELL 100% FIJO (regla del dueño, 2026-08-28, estandar 11 de
+   base-compartida): html/body clavados al viewport y SIN scroll propio —
+   scrollea SOLO .app-scroll (y los paneles internos controlados). Es lo que
+   hace que la PWA no se "vaya a los costados" ni rebote como pagina web. */
+html,body{margin:0;padding:0;width:100%;height:100%;max-width:100%;overflow:hidden;
+ overscroll-behavior:none;position:fixed;inset:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ touch-action:pan-y;display:flex;flex-direction:column}
+.app-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+ -webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
 .paises,.kpis{touch-action:pan-x pan-y}
 input,textarea,select,button{font-family:inherit;font-size:16px}
 .wrap{max-width:1400px;margin:0 auto;padding:0 14px 92px}
 
-header.top{position:sticky;top:0;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:blur(8px);
+header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:blur(8px);
  border-bottom:1px solid var(--line);padding-top:max(env(safe-area-inset-top),8px)}
 .top-in{max-width:1400px;margin:0 auto;padding:0 14px 10px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.2px;font-size:17px}
@@ -104,7 +109,8 @@ header.top{position:sticky;top:0;z-index:40;background:rgba(15,23,32,.96);backdr
 .ia-head{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);
  font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700}
 .ia-head .cfg{margin-left:auto;color:var(--acc);cursor:pointer;font-size:11px;letter-spacing:0;text-transform:none;font-weight:600}
-.ia-msgs{display:grid;gap:8px;padding:12px 13px;max-height:320px;overflow-y:auto}
+.ia-msgs{display:grid;gap:8px;padding:12px 13px;max-height:320px;overflow-y:auto;overflow-x:hidden;
+ overscroll-behavior:contain;touch-action:pan-y}
 .ia-msg{font-size:13.5px;line-height:1.6;padding:10px 12px;border-radius:10px;white-space:pre-wrap}
 .ia-msg.yo{background:var(--acc-soft);border:1px solid var(--acc);color:var(--ink);margin-left:22px}
 .ia-msg.ia{background:var(--card);border:1px solid var(--line);color:var(--ink2);margin-right:22px}
@@ -244,7 +250,7 @@ header.top{position:sticky;top:0;z-index:40;background:rgba(15,23,32,.96);backdr
 .sec>label{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);
  margin-bottom:7px;font-weight:700}
 .box{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;
- font-size:13.5px;color:var(--ink2);line-height:1.6}
+ font-size:13.5px;color:var(--ink2);line-height:1.6;overflow-wrap:anywhere}
 .box+.box{margin-top:7px}
 .box.script{border-left:3px solid var(--acc);color:var(--ink)}
 .box.perfil{border-left:3px solid var(--purple)}
@@ -275,7 +281,8 @@ textarea,input.f{width:100%;background:var(--card2);border:1px solid var(--line2
  padding:11px 12px;color:var(--ink);outline:none;resize:vertical;line-height:1.55}
 textarea:focus,input.f:focus{border-color:var(--acc)}
 .fila2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.hist{display:grid;gap:6px;max-height:300px;overflow-y:auto}
+.hist{display:grid;gap:6px;max-height:300px;overflow-y:auto;overflow-x:hidden;
+ overscroll-behavior:contain;touch-action:pan-y}
 .h-it{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13px;color:var(--ink2)}
 .h-it time{color:var(--ink3);font-size:11.5px;display:block;margin-bottom:2px}
 .h-it .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
@@ -301,7 +308,11 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
  .ficha-col.on{transform:none}
  .ov.on{opacity:1;pointer-events:auto}
  .ficha{border:0;border-radius:0;height:100%;display:flex;flex-direction:column}
- .f-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:34px}
+ /* El scroller de la ficha SOLO va vertical: sin esto, un contenido apenas
+    mas ancho (una URL larga) habilitaba el arrastre lateral adentro del
+    panel aunque el body estuviera clavado (visto en iPhone, Godoy Cruz). */
+ .f-body{overflow-y:auto;overflow-x:hidden;flex:1;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;touch-action:pan-y;padding-bottom:34px}
  .hoy-grid{grid-template-columns:1fr}
  /* Los KPIs duplicaban el alto del header sticky en el telefono (dos pisos
     pegados arriba = media pantalla). El dato vive igual en "Como venis" y
@@ -325,7 +336,7 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
   <div class="kpis" id="kpis"></div>
 </div></header>
 
-<div class="wrap">
+<div class="app-scroll"><div class="wrap">
   <div id="vHoy">
     <div class="hoy-top">
       <span class="tit">Hoy</span>
@@ -367,7 +378,7 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
       </div>
     </div>
   </div>
-</div>
+</div></div>
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
