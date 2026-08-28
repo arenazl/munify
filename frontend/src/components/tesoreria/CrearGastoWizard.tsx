@@ -762,12 +762,16 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         options={FORMAS_PAGO.map(f => ({ value: f.value, label: f.label }))}
       />
 
-      {/* Acá vivía un SEGUNDO selector de tarjeta (sobre la tabla legado
-          `tarjetas_credito`, que era sólo una etiqueta). Convivía con el paso
-          "Tarjeta" —el que de verdad decide dónde se acumula la deuda— y el
-          resultado era que el wizard ofrecía una tarjeta arriba y dos pasos
-          después decía que no había ninguna (San Pedro Norte, 2026-08-28).
-          La tarjeta se elige UNA vez, en su paso. */}
+      {formaPago === 'tarjeta' && (
+        <ModernSelect
+          label="Tarjeta de crédito"
+          value={tarjetaId ? String(tarjetaId) : ''}
+          onChange={(v) => setTarjetaId(v ? parseInt(v, 10) : null)}
+          options={tarjetas.map(t => ({ value: String(t.id), label: `${t.denominacion} (${t.marca} ····${t.ultimos_4 || ''})` }))}
+          placeholder="Elegí una tarjeta..."
+          searchable
+        />
+      )}
 
       {/* Estado del pago: concretado | al_dia | pendiente */}
       <div>
