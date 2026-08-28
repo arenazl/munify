@@ -27,7 +27,6 @@ import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { PagarTarjetaModal } from '../components/tesoreria/PagarTarjetaModal';
 import { cajasApi } from '../lib/api';
 import type { Caja } from '../types';
-import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 /** Una caja con `codigo === 'TARJETA'`. El tipo es el `Caja` del dominio: el
  *  backend ya expone ahí es_tarjeta / limite / deuda_actual calculados. */
@@ -75,7 +74,6 @@ export default function TarjetasCredito() {
   const [tarjetas, setTarjetas] = useState<CajaTarjeta[]>([]);
   // El modal de pago necesita las cajas REALES (de donde sale la plata).
   const [todasLasCajas, setTodasLasCajas] = useState<CajaTarjeta[]>([]);
-  useReportarTotal(tarjetas.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
