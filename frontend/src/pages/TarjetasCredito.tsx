@@ -25,9 +25,8 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { PagarTarjetaModal } from '../components/tesoreria/PagarTarjetaModal';
-import { cajasApi } from '../lib/api';
+import { cajasApi, tarjetasApi } from '../lib/api';
 import type { Caja } from '../types';
-import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 /** Una caja con `codigo === 'TARJETA'`. El tipo es el `Caja` del dominio: el
  *  backend ya expone ahí es_tarjeta / limite / deuda_actual calculados. */
@@ -75,7 +74,6 @@ export default function TarjetasCredito() {
   const [tarjetas, setTarjetas] = useState<CajaTarjeta[]>([]);
   // El modal de pago necesita las cajas REALES (de donde sale la plata).
   const [todasLasCajas, setTodasLasCajas] = useState<CajaTarjeta[]>([]);
-  useReportarTotal(tarjetas.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -85,13 +83,71 @@ export default function TarjetasCredito() {
   const [confirmDel, setConfirmDel] = useState<CajaTarjeta | null>(null);
   const [pagando, setPagando] = useState<CajaTarjeta | null>(null);
 
-  const fetchData = async () => {
+  /** Tarjeta de la tabla legado (`tarjetas_credito`): sólo etiqueta, sin
+   *  contabilidad. Es lo que el cliente cargó antes de que la tarjeta pasara
+   *  a ser una caja. */
+  interface TarjetaLegado {
+    id: number; denominacion: string; marca: string; ultimos_4: string | null; activo: boolean;
+  }
+
+  /**
+   * MIGRACIÓN AUTOMÁTICA, una sola vez y sin pedirle nada al usuario.
+   *
+   * Al mover el ABM a las cajas-tarjeta me olvidé de traer los datos: el
+   * cliente de San Pedro Norte entró y vio la pantalla VACÍA, porque su
+   * "Visa ····9594" seguía viviendo en la tabla vieja. Para él no es otra
+   * tabla: es su tarjeta que desapareció. Así que cada tarjeta legado que no
+   * tenga su caja se crea acá, con el mismo nombre que él le puso.
+   *
+   * Es idempotente (compara por nombre normalizado) y silenciosa: si algo
+   * falla, la pantalla igual muestra lo que haya — nunca rompe por esto.
+   */
+  const migrarLegado = async (cajasTarjeta: CajaTarjeta[]): Promise<boolean> => {
+    try {
+      const res = await tarjetasApi.list();
+      const legado = ((res.data as TarjetaLegado[]) || []).filter(t => t.activo);
+      if (legado.length === 0) return false;
+
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const yaEstan = new Set(cajasTarjeta.map(c => norm(c.nombre)));
+      const faltan = legado.filter(t => !yaEstan.has(norm(armarNombre(t.denominacion, t.ultimos_4 || ''))));
+      if (faltan.length === 0) return false;
+
+      for (const t of faltan) {
+        await cajasApi.create({
+          nombre: armarNombre(t.denominacion, t.ultimos_4 || ''),
+          codigo: 'TARJETA',
+          color: MARCA_COLOR[t.marca] || null,
+          icono: 'CreditCard',
+          saldo_inicial: '0',      // límite desconocido: lo edita el cliente
+          activo: true,
+        });
+      }
+      toast.success(faltan.length === 1
+        ? 'Tu tarjeta quedó lista para usar'
+        : `${faltan.length} tarjetas quedaron listas para usar`);
+      return true;
+    } catch {
+      return false;   // sin migración la pantalla sigue funcionando igual
+    }
+  };
+
+  const fetchData = async (permitirMigrar = true) => {
     setLoading(true);
     try {
       const res = await cajasApi.list({ include_saldos: true });
       const todas = (res.data as CajaTarjeta[]) || [];
+      const tarjetasCaja = todas.filter(c => c.es_tarjeta);
+
+      // Sin ninguna tarjeta-caja puede ser que el muni tenga las suyas en la
+      // tabla vieja: se migran y se vuelve a pedir la lista ya completa.
+      if (permitirMigrar && tarjetasCaja.length === 0) {
+        const migro = await migrarLegado(tarjetasCaja);
+        if (migro) { await fetchData(false); return; }
+      }
+
       setTodasLasCajas(todas);
-      setTarjetas(todas.filter(c => c.es_tarjeta));
+      setTarjetas(tarjetasCaja);
     } catch {
       toast.error('Error cargando tarjetas');
     } finally {
