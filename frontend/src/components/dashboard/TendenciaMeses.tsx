@@ -95,11 +95,12 @@ export function TendenciaMeses({
   const esMonto = modo === 'monto';
   const fmt = formatoValor ?? ((n: number) => nf(n, n < 10 && !Number.isInteger(n) ? 1 : 0));
 
-  /** 'YYYY-MM' del último dato de la serie: el mes que todavía está corriendo. */
-  const claveUltima = useMemo(
-    () => datos.reduce((may, p) => (p.fecha > may ? p.fecha : may), '').slice(0, 7),
-    [datos],
-  );
+  /** 'YYYY-MM' de HOY (hora local): el mes que todavía está corriendo. No se
+   *  deriva del último dato — la serie puede traer fechas futuras (cuotas). */
+  const claveHoy = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
 
   const recorrido = useMemo(() => recorridoDeTendencia(datos, meses), [datos, meses]);
   const lista = useMemo(() => recorrido?.periodos ?? [], [recorrido]);
@@ -115,7 +116,10 @@ export function TendenciaMeses({
   const esVentana = recorrido.modo === 'ventana';
   const mes = lista[indice];
   const previo = indice > 0 ? lista[indice - 1] : null;
-  const enCurso = mes.clave === claveUltima;
+  const enCurso = mes.clave === claveHoy;
+  // ¿El recorrido cruza hacia adelante? Cambia el subtítulo: "últimos N
+  // meses" sería mentira si la mitad del recorrido todavía no pasó.
+  const hayFuturo = lista.some((p) => p.futuro);
   const veredicto = esVentana
     ? veredictoDeVentana(mes, modo, fmt)
     : esMonto
@@ -170,12 +174,17 @@ export function TendenciaMeses({
         <h3 className="tm-titulo">{titulo ?? 'Tendencia de reclamos'}</h3>
         <span className="tm-mes">{mes.label}</span>
         <span className="tm-sub">
-          {esVentana ? 'hasta hoy' : `de los últimos ${lista.length} meses`}
+          {esVentana
+            ? 'hasta hoy'
+            : hayFuturo
+              ? `de ${lista[0].label.toLowerCase()} a ${lista[lista.length - 1].label.toLowerCase()}`
+              : `de los últimos ${lista.length} meses`}
         </span>
 
         <div className="tm-controles">
           <span className="tm-leyenda">
-            <i className="tm-punto tm-punto--in" />{esMonto ? 'Gastado' : 'Ingresados'}
+            <i className="tm-punto tm-punto--in" />
+            {esMonto ? (mes.futuro ? 'Comprometido' : 'Gastado') : 'Ingresados'}
           </span>
           {hayResueltos && (
             <span className="tm-leyenda"><i className="tm-punto tm-punto--out" />Resueltos</span>
@@ -223,7 +232,14 @@ export function TendenciaMeses({
             {[14, 52, 90, 128, 166].map((y) => <path key={y} d={`M0 ${y}h${W}`} />)}
           </g>
           {area && <polygon className="tm-area" points={area} />}
-          {lineaIn && <polyline className="tm-linea tm-linea--in" points={lineaIn} />}
+          {/* Mes comprometido: línea punteada — es plata anotada, no ejecutada. */}
+          {lineaIn && (
+            <polyline
+              className="tm-linea tm-linea--in"
+              points={lineaIn}
+              strokeDasharray={mes.futuro ? '7 5' : undefined}
+            />
+          )}
           {hayResueltos && <polyline className="tm-linea tm-linea--out" points={puntosDeLinea(outs, max, W, H)} />}
         </svg>
       </div>

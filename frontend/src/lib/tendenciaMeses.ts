@@ -64,6 +64,10 @@ export interface Periodo {
   diasConMovimiento: number;
   /** El día más cargado, con su mes: en una ventana no todos son del mismo. */
   pico: { dia: number; abrev: string; cantidad: number } | null;
+  /** Mes FUTURO respecto de hoy: plata COMPROMETIDA (cuotas, pagos cargados
+   *  por adelantado), no ejecutada. Sólo lo enciende `recorridoDeTendencia`;
+   *  en series sin fechas futuras (reclamos) jamás aparece. */
+  futuro?: boolean;
 }
 
 /** Cómo se está leyendo la serie: mes a mes, o una sola ventana de días. */
@@ -108,6 +112,12 @@ export interface KpiTendencia {
  * pasado. Hasta llegar a este umbral se muestran los meses completos.
  */
 export const DIAS_PARA_CONTAR_EL_MES = 10;
+
+/**
+ * Tope de meses FUTUROS en el recorrido. La serie puede traer cuotas cargadas
+ * a un año; el recorrido muestra lo que viene sin volverse un almanaque.
+ */
+export const MESES_FUTUROS_MAX = 4;
 
 /**
  * Piso de la ventana de días: con menos, la curva es un palito.
@@ -239,25 +249,51 @@ export function ventanaDeDias(datos: PuntoTendencia[]): Periodo | null {
  * `null` cuando no hubo NADA — ahí el bloque no se dibuja (jamás un panel de
  * ceros).
  */
-export function recorridoDeTendencia(datos: PuntoTendencia[], meses: number): Recorrido | null {
-  let lista = recortarExtremos(agruparPorMes(datos));
+/** 'YYYY-MM-DD' de HOY en hora LOCAL. Nunca `toISOString()`: es UTC y de
+ *  noche (UTC-3) correría el día — el bug de fechas que ya pagamos una vez. */
+function fechaLocalISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function recorridoDeTendencia(
+  datos: PuntoTendencia[],
+  meses: number,
+  /** Inyectable para tests; en runtime es el HOY local del navegador. */
+  hoyISO?: string,
+): Recorrido | null {
+  const lista = recortarExtremos(agruparPorMes(datos));
   if (lista.length === 0) return null;
 
-  // "Hoy" se toma del último día de la serie, no del reloj del navegador:
-  // así la decisión sale de los mismos datos que se están mostrando.
-  const ultima = datos.reduce((may, p) => (p.fecha > may ? p.fecha : may), '');
-  const ultimo = lista[lista.length - 1];
-  const enCurso = ultimo.clave === ultima.slice(0, 7);
-  const arranca = Number(ultima.slice(8, 10)) < DIAS_PARA_CONTAR_EL_MES;
+  // "Hoy" es el del CALENDARIO, no el último día de la serie: la serie puede
+  // traer gastos con fecha futura (cuotas, pagos cargados por adelantado) y
+  // con ellos "la cola de la serie" dejó de significar "los últimos meses" —
+  // el recorrido mostraba oct/nov/dic como si fueran pasado y se salteaba el
+  // mes en curso (San Pedro Norte, 2026-08-28).
+  const hoy = hoyISO ?? fechaLocalISO();
+  const claveHoy = hoy.slice(0, 7);
+  const diaHoy = Number(hoy.slice(8, 10));
 
-  // Se descarta sólo si quedan al menos dos meses para comparar: antes que
-  // mostrar un mes suelto, es preferible dejar el parcial.
-  if (enCurso && arranca && lista.length > 2) lista = recortarExtremos(lista.slice(0, -1));
+  // Historia hasta hoy inclusive; lo que viene, marcado como FUTURO.
+  let pasados = lista.filter((p) => p.clave <= claveHoy);
+  const futuros = lista
+    .filter((p) => p.clave > claveHoy)
+    .slice(0, MESES_FUTUROS_MAX)
+    .map((p) => ({ ...p, futuro: true }));
 
-  const conHistoria = lista.filter(periodoConMovimiento).length;
-  if (conHistoria >= 2) return { modo: 'meses', periodos: lista.slice(-meses) };
+  // El mes en curso recién arrancado se descarta sólo si quedan al menos dos
+  // meses para comparar: antes que mostrar un mes suelto, queda el parcial.
+  const enCurso = pasados.length > 0 && pasados[pasados.length - 1].clave === claveHoy;
+  if (enCurso && diaHoy < DIAS_PARA_CONTAR_EL_MES && pasados.length > 2) {
+    pasados = recortarExtremos(pasados.slice(0, -1));
+  }
 
-  const ventana = ventanaDeDias(datos);
+  const periodos = [...pasados.slice(-meses), ...futuros];
+  const conHistoria = periodos.filter(periodoConMovimiento).length;
+  if (conHistoria >= 2) return { modo: 'meses', periodos };
+
+  // La ventana dice "hasta hoy": los días futuros no entran en ella.
+  const ventana = ventanaDeDias(datos.filter((p) => p.fecha <= hoy));
   return ventana ? { modo: 'ventana', periodos: [ventana] } : null;
 }
 
@@ -354,6 +390,24 @@ export function veredictoDelMesMonto(
     enCurso
       ? `En lo que va de ${m.label.toLowerCase()} ${resto}`
       : resto.charAt(0).toUpperCase() + resto.slice(1);
+
+  // Mes FUTURO: nada se "gastó" — es plata ya comprometida (cuotas, pagos
+  // cargados por adelantado). La frase no compara contra el pasado: son dos
+  // magnitudes distintas y el delta diría cualquier cosa.
+  if (m.futuro) {
+    if (m.entraron === 0) {
+      return {
+        etiqueta: `${m.label} viene libre:`,
+        resto: 'sin cuotas ni pagos cargados por adelantado.',
+        tono: 'neutro',
+      };
+    }
+    return {
+      etiqueta: `Ya hay ${fmt(m.entraron)} comprometidos:`,
+      resto: `cuotas y pagos cargados por adelantado para ${m.label.toLowerCase()}.`,
+      tono: 'neutro',
+    };
+  }
 
   if (m.entraron === 0) {
     return {
@@ -490,13 +544,17 @@ export function kpisDelPeriodo({ periodo, previo, modo, recorrido, tono, fmt }: 
   const pico = m.pico && m.pico.cantidad > 0 ? m.pico : null;
 
   if (modo === 'monto') {
+    const futuro = Boolean(m.futuro);
     const kpis: KpiTendencia[] = [
-      { etiqueta: 'Total gastado', valor: fmt(m.entraron) },
+      { etiqueta: futuro ? 'Total comprometido' : 'Total gastado', valor: fmt(m.entraron) },
       { etiqueta: 'Promedio por día', valor: fmt(m.porDia) },
     ];
     if (recorrido === 'meses') {
-      // Sin mes previo no hay variación: una raya, no un 0%.
-      const delta = previo && previo.entraron > 0
+      // Sin mes previo no hay variación: una raya, no un 0%. Y GASTADO contra
+      // COMPROMETIDO tampoco se compara: el delta sólo existe entre meses de
+      // la misma especie (real vs real, comprometido vs comprometido).
+      const comparable = previo && previo.entraron > 0 && Boolean(previo.futuro) === futuro;
+      const delta = comparable
         ? Math.round(((m.entraron - previo.entraron) / previo.entraron) * 100)
         : null;
       kpis.push({
@@ -511,7 +569,7 @@ export function kpisDelPeriodo({ periodo, previo, modo, recorrido, tono, fmt }: 
       });
     }
     kpis.push({
-      etiqueta: 'Día más caro',
+      etiqueta: futuro ? 'Día más cargado' : 'Día más caro',
       valor: pico ? `${pico.dia} ${pico.abrev}` : '—',
       nota: pico ? `· ${fmt(pico.cantidad)}` : undefined,
     });
