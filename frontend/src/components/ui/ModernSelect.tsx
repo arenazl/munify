@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { abreviarPalabras } from '../../lib/textAbbreviation';
+import { tintaLegible } from '../../lib/tintaLegible';
 
 /**
  * ModernSelect — Combo dropdown canónico de la app. REEMPLAZA `<select>` nativo.
@@ -100,6 +101,11 @@ export function ModernSelect({
   variant = 'clasico',
 }: ModernSelectProps) {
   const { theme } = useTheme();
+  // Colores de DATO (option.color) pasan SIEMPRE por tintaLegible contra la
+  // superficie donde se pintan: el matiz lo elige el dato, la legibilidad la
+  // garantiza el tema (la Visa azul marino se aclara sola en dark mode).
+  const tintaEn = (c: string | undefined, superficie: string) =>
+    c ? tintaLegible(c, superficie) : undefined;
   // Interruptor de la variante: con `v2` NO se aplica ningún estilo inline de
   // color — manda el CSS de clases (así el look sale íntegro de tokens --pl-*).
   const esV2 = variant === 'v2';
@@ -262,10 +268,10 @@ export function ModernSelect({
             <div
               className={esV2 ? 'ms2-icono' : 'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0'}
               style={esV2
-                ? (selectedOption.color ? { color: selectedOption.color } : undefined)
+                ? (selectedOption.color ? { color: tintaEn(selectedOption.color, theme.backgroundSecondary) } : undefined)
                 : {
                     backgroundColor: selectedOption.color ? `${selectedOption.color}20` : `${theme.primary}20`,
-                    color: selectedOption.color || theme.primary
+                    color: tintaEn(selectedOption.color, theme.backgroundSecondary) || theme.primary
                   }}
             >
               {selectedOption.icon}
@@ -273,8 +279,8 @@ export function ModernSelect({
           )}
           {esV2 ? (
             selectedOption ? (
-              // runtime: color de la opción (dato), si la trae
-              <span className="ms2-valor" style={selectedOption.color ? { color: selectedOption.color } : undefined}>
+              // runtime: color de la opción (dato), si la trae — legible sobre el tema
+              <span className="ms2-valor" style={selectedOption.color ? { color: tintaEn(selectedOption.color, theme.backgroundSecondary) } : undefined}>
                 {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
               </span>
             ) : (
@@ -285,7 +291,7 @@ export function ModernSelect({
               {selectedOption ? (
                 <span
                   className="block truncate font-medium leading-tight"
-                  style={{ color: selectedOption.color || theme.text }}
+                  style={{ color: tintaEn(selectedOption.color, theme.backgroundSecondary) || theme.text }}
                 >
                   {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
                 </span>
@@ -393,10 +399,10 @@ export function ModernSelect({
                       <div
                         className={esV2 ? 'ms2-opcion-icono' : 'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0'}
                         style={esV2
-                          ? (option.color ? { color: option.color } : undefined)
+                          ? (option.color ? { color: tintaEn(option.color, theme.card) } : undefined)
                           : {
                               backgroundColor: option.color ? `${option.color}20` : `${theme.primary}20`,
-                              color: option.color || theme.primary
+                              color: tintaEn(option.color, theme.card) || theme.primary
                             }}
                       >
                         {option.icon}
@@ -410,9 +416,9 @@ export function ModernSelect({
                               isSelected ? 'font-semibold' : option.emphasized ? 'font-bold' : 'font-medium'
                             }`}
                         style={esV2
-                          ? (option.color ? { color: option.color } : undefined)
+                          ? (option.color ? { color: tintaEn(option.color, theme.card) } : undefined)
                           : {
-                              color: option.color || theme.text,
+                              color: tintaEn(option.color, theme.card) || theme.text,
                               opacity: option.emphasized === false ? 0.45 : 1,
                             }}
                       >
