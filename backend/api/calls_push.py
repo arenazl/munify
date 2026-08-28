@@ -14,7 +14,7 @@ Los tres momentos (regla del dueño, 2026-08-28):
 Cumplida la meta, el dia se calla: una notificacion que no aporta entrena a
 ignorar las que si aportan.
 """
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import json
 import logging
@@ -151,6 +151,10 @@ def _enviar(sub: CallsPushSub, titulo: str, cuerpo: str) -> bool:
         return False
 
 
+# GET además de POST (hallazgo de Infra, 2026-08-28): un POST sin body se come
+# un 411 Length Required que no explica nada, y Cloud Scheduler manda body vacío
+# por defecto. Con GET, cualquier scheduler lo dispara sin ceremonia.
+@router.get("/push/cron")
 @router.post("/push/cron")
 async def cron(request: Request, momento: Optional[str] = None,
                db: AsyncSession = Depends(get_db)):
