@@ -42,7 +42,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;max-width:100%;overflow:hidd
 body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
  touch-action:pan-y;display:flex;flex-direction:column}
 .app-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
- -webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+ overscroll-behavior:contain;touch-action:pan-y}
 .paises,.kpis{touch-action:pan-x pan-y}
 input,textarea,select,button{font-family:inherit;font-size:16px}
 .wrap{max-width:1400px;margin:0 auto;padding:0 14px 92px}
@@ -416,7 +416,8 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
       </div>
     </div>
   </div>
-</div></div>
+</div>
+<div class="ov" id="ov"></div></div>
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
@@ -426,7 +427,6 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
   <button class="btn sm" id="btnImport">Restaurar</button>
   <input type="file" id="fileImport" accept="application/json" style="display:none">
 </div></footer>
-<div class="ov" id="ov"></div>
 
 <script>
 const DATOS = /*__DATOS__*/{};
