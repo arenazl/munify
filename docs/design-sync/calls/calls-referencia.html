@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Llamados">
 <title>Llamados Munify</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&display=swap">
 <style>
 :root{
  --bg:#0f1720; --bg2:#141e2a; --card:#1a2635; --card2:#213040; --line:#2b3b4e; --line2:#3a4c62;
@@ -14,6 +17,9 @@
  --acc:#3d8bfd; --acc2:#2f6fd0; --acc-soft:#1b2c45;
  --ok:#35c07f; --warn:#e2a33c; --bad:#e06c6c; --purple:#9a7bdc;
  --r:12px;
+ /* La display de los heroes semanticos de la app (--pl-font-display = Sora):
+    los titulos de seccion hablan el mismo idioma que el resto de Munify. */
+ --font-display:'Sora',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
 }
 :root[data-tema="claro"]{
  --bg:#f4f6f9; --bg2:#ffffff; --card:#ffffff; --card2:#eef2f7; --line:#dfe5ec; --line2:#c8d2de;
@@ -107,7 +113,8 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .ia-btn svg{width:15px;height:15px}
 .ia-wrap{margin-top:13px;border:1px solid var(--line);border-radius:var(--r);background:var(--card2);overflow:hidden}
 .ia-head{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);
- font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+ font:700 14px/1.25 var(--font-display);letter-spacing:-.2px;color:var(--ink)}
+.ia-head::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--purple);flex:none}
 .ia-msgs{display:grid;gap:8px;padding:12px 13px;max-height:320px;overflow-y:auto;overflow-x:hidden;
  overscroll-behavior:contain;touch-action:pan-y}
 .ia-msg{font-size:13.5px;line-height:1.6;padding:10px 12px;border-radius:10px;white-space:pre-wrap}
@@ -124,7 +131,9 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .ia-input input:focus{border-color:var(--purple)}
 .ia-nota{font-size:11.5px;color:var(--ink3);padding:0 13px 11px;line-height:1.5}
 .tarj{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
-.tarj h3{margin:0 0 10px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.tarj h3{margin:0 0 10px;display:flex;align-items:center;gap:8px;font:700 14px/1.25 var(--font-display);
+ letter-spacing:-.2px;color:var(--ink)}
+.tarj h3::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--acc);flex:none}
 .ag-it{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .ag-it:last-child{border-bottom:none}
 .ag-it:hover .ag-nom{color:var(--acc)}
@@ -178,7 +187,8 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 /* ---- Tarjetas plegables (solo se pliegan en el telefono) ---- */
 .tarj details{margin:0}
 .tarj > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
- font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+ font:700 14px/1.25 var(--font-display);letter-spacing:-.2px;color:var(--ink)}
+.tarj > summary::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--acc);flex:none}
 .tarj > summary::-webkit-details-marker{display:none}
 .tarj > summary .flecha{margin-left:auto;width:7px;height:7px;border-right:2px solid var(--ink3);
  border-bottom:2px solid var(--ink3);transform:rotate(45deg);transition:transform .15s}
@@ -241,11 +251,21 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .f-body{padding:14px 16px 18px}
 .sec{margin-bottom:16px}
 .sec:last-child{margin-bottom:0}
-.sec>label{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);
- margin-bottom:7px;font-weight:700}
-.box{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;
- font-size:13.5px;color:var(--ink2);line-height:1.6;overflow-wrap:anywhere}
-.box+.box{margin-top:7px}
+/* Titulos de seccion con IDENTIDAD (pedido del dueño, 2026-08-28): la Sora
+   de los heroes, chiquita y con su marca de acento — un golpe de vista y ya
+   sabes que viene, en lugar del microrotulo gris que hacia "panel panel". */
+.sec>label{display:flex;align-items:center;gap:8px;font:700 14.5px/1.25 var(--font-display);
+ letter-spacing:-.2px;color:var(--ink);margin-bottom:8px}
+.sec>label::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--acc);flex:none}
+/* Menos "panel panel panel" (dueño, 2026-08-28): el box PLANO deja de ser
+   tarjeta — texto con un hairline a la izquierda, respira. Los que cargan
+   SEMANTICA (script/perfil/dato/ojo) conservan su tarjeta tintada: son los
+   que tienen que saltar a la vista. */
+.box{background:transparent;border:0;border-left:2px solid var(--line);border-radius:0;
+ padding:2px 0 2px 13px;font-size:13.5px;color:var(--ink2);line-height:1.6;overflow-wrap:anywhere}
+.box+.box{margin-top:9px}
+.box.script,.box.perfil,.box.dato,.box.ojo{background:var(--card2);border:1px solid var(--line);
+ border-radius:10px;padding:11px 13px}
 .box.script{border-left:3px solid var(--acc);color:var(--ink)}
 .box.perfil{border-left:3px solid var(--purple)}
 .box.dato{border-left:3px solid var(--ok)}
