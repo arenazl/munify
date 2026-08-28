@@ -54,14 +54,27 @@ input,textarea,select,button{font-family:inherit;font-size:16px}
 
 header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:blur(8px);
  border-bottom:1px solid var(--line);padding-top:max(env(safe-area-inset-top),8px)}
-.top-in{max-width:1400px;margin:0 auto;padding:0 14px 10px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.2px;font-size:17px}
+/* BARRA DE APP: UNA SOLA FILA, SIEMPRE. `flex-wrap:wrap` aca es un bug, no una
+   defensa: cuando falta ancho, el ultimo control cae solo a un segundo piso y
+   se come el alto util de la pantalla (le paso al dueño en un iPhone 17 Pro,
+   2026-08-28). Lo correcto es que los controles se COMPRIMAN: el titulo cede
+   ancho (ellipsis), el resto conserva su tamaño y nada envuelve. */
+.top-in{max-width:1400px;margin:0 auto;padding:0 14px 10px;display:flex;align-items:center;
+ gap:10px;flex-wrap:nowrap;min-width:0}
+/* El unico que cede ancho: el isotipo nunca se achica, el texto se corta si
+   hace falta (y en pantallas muy angostas desaparece — ver la media query). */
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.2px;font-size:17px;
+ flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap}
+.brand .txt{overflow:hidden;text-overflow:ellipsis}
 /* El isotipo REAL de Munify (mismo SVG que favicon.svg de la app). Va sobre
    un cuadradito claro para que el marino se lea igual en tema oscuro. */
 .brand i{width:26px;height:26px;border-radius:7px;background:#fff;display:grid;place-items:center;
  font-style:normal;flex:none;box-shadow:0 0 0 1px rgba(17,42,108,.12)}
 .brand i svg{width:17px;height:17px;display:block}
-.spacer{flex:1}
+.spacer{flex:1 1 0;min-width:0}
+/* Los controles de la barra conservan su tamaño: son destinos de toque, no
+   texto. Achicarlos rompe el area minima de 34px. */
+.switch,.tema,.kpis{flex:0 0 auto}
 .switch{display:flex;background:var(--card);border:1px solid var(--line2);border-radius:999px;padding:3px;gap:2px}
 .switch button{border:0;background:transparent;color:var(--ink2);border-radius:999px;padding:6px 15px;
  cursor:pointer;font-size:13.5px;font-weight:600;transition:.12s}
@@ -201,8 +214,10 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .controles{display:grid;gap:7px;margin-bottom:10px}
 .dos{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .sel{position:relative}
-.sel select{width:100%;appearance:none;-webkit-appearance:none;background:var(--card);
- border:1px solid var(--line2);border-radius:9px;padding:8px 28px 8px 12px;color:var(--ink);
+/* padding-right 34: el chevron dibujado con :after ocupa lugar real. Con 28 el
+   texto le pasaba por debajo y se leia "Todos los países (154" cortado. */
+.sel select{width:100%;min-width:0;appearance:none;-webkit-appearance:none;background:var(--card);
+ border:1px solid var(--line2);border-radius:9px;padding:8px 34px 8px 12px;color:var(--ink);
  font-size:13.5px;font-weight:600;cursor:pointer;outline:none;text-overflow:ellipsis}
 .sel select:focus{border-color:var(--acc)}
 .sel:after{content:"";position:absolute;right:11px;top:50%;width:6px;height:6px;pointer-events:none;
@@ -390,6 +405,18 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
  .ficha{border:0;border-radius:0;height:100%;display:flex;flex-direction:column}
  .f-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:34px}
  .hoy-grid{grid-template-columns:1fr}
+ /* Telefono: el titulo cede su lugar al isotipo (la marca se sigue viendo) y
+    los controles quedan todos en la MISMA fila. */
+ .brand .txt{display:none}
+ .brand{gap:0}
+ /* El pie tambien es una sola linea: la barra de progreso se va (el % ya
+    esta en el texto) y los botones se achican. */
+ footer.pie{padding:7px 12px calc(7px + env(safe-area-inset-bottom))}
+ .foot-in{gap:8px;flex-wrap:nowrap;font-size:11.5px}
+ .foot-in .barra{display:none}
+ .foot-in .btn.sm{padding:5px 9px;font-size:12px;white-space:nowrap}
+ #pieTxt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
+ .vtag{display:none}
  /* Los KPIs duplicaban el alto del header sticky en el telefono (dos pisos
     pegados arriba = media pantalla). El dato vive igual en "Como venis" y
     en el pie: en mobile el header queda de UNA linea. */
@@ -402,7 +429,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 </style></head>
 <body>
 <header class="top"><div class="top-in">
-  <div class="brand"><i><svg viewBox="0 0 1446.79 1426" aria-hidden="true"><polygon fill="#112a6c" points="1271.65 371.24 1271.65 1069.5 635.82 1426 0 1069.5 0 356.5 635.82 0 1128.59 276.29 1000.48 381.26 636.9 177.4 160.18 444.69 160.18 979.27 636.9 1246.56 1113.62 979.27 1113.62 544.87 1271.65 371.24"/><polygon fill="#3f6ac8" points="1446.79 79.97 1225.77 330.78 1113.62 458.05 644.86 989.99 448.06 781.76 448.06 568.98 637.63 759.38 1052.94 410.67 1179.19 304.66 1446.79 79.97"/><polygon fill="#112a6c" points="404.64 517.83 404.64 1037.89 253.8 953.49 253.8 500.38 332.09 454.86 404.64 517.83"/><polygon fill="#112a6c" points="1020.14 650.78 1020.14 954.08 867.22 1039.31 868.09 818.95 1020.14 650.78"/></svg></i> Llamados</div>
+  <div class="brand"><i><svg viewBox="0 0 1446.79 1426" aria-hidden="true"><polygon fill="#112a6c" points="1271.65 371.24 1271.65 1069.5 635.82 1426 0 1069.5 0 356.5 635.82 0 1128.59 276.29 1000.48 381.26 636.9 177.4 160.18 444.69 160.18 979.27 636.9 1246.56 1113.62 979.27 1113.62 544.87 1271.65 371.24"/><polygon fill="#3f6ac8" points="1446.79 79.97 1225.77 330.78 1113.62 458.05 644.86 989.99 448.06 781.76 448.06 568.98 637.63 759.38 1052.94 410.67 1179.19 304.66 1446.79 79.97"/><polygon fill="#112a6c" points="404.64 517.83 404.64 1037.89 253.8 953.49 253.8 500.38 332.09 454.86 404.64 517.83"/><polygon fill="#112a6c" points="1020.14 650.78 1020.14 954.08 867.22 1039.31 868.09 818.95 1020.14 650.78"/></svg></i><span class="txt">Llamados</span></div>
   <div class="switch" id="switch">
     <button data-v="hoy" class="on">Hoy</button>
     <button data-v="ops">Trabajar</button>
@@ -460,7 +487,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 27/08 22:53 · 42b72f0</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 27/08 23:14 · a3dde96</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -719,16 +746,25 @@ function filtrados(){
     return (c.localidad + ' ' + c.region + ' ' + c.telefono + ' ' + c.pais + ' ' + (f.intendente||'')).toLowerCase().includes(t);
   });
 }
+/* Pantalla angosta = el label se ABREVIA, no se corta con puntos. Un control
+   que muestra "Todos los países (154" leyendo a medias es peor que uno que
+   dice "Todos (154)" entero. (Regla del kit; el dueño lo marco en un iPhone
+   17 Pro el 2026-08-28.) */
+const angosto = () => window.matchMedia('(max-width: 760px)').matches;
+
 function pintarFiltros(){
+  const corto = angosto();
   const paises = [...new Set(CONTACTOS.map(c => c.pais))];
   const sp = document.getElementById('selPais');
-  sp.innerHTML = '<option value="">Todos los países (' + CONTACTOS.length + ')</option>'
+  sp.innerHTML = '<option value="">' + (corto ? 'Todos' : 'Todos los países')
+    + ' (' + CONTACTOS.length + ')</option>'
     + paises.map(p => '<option value="' + esc(p) + '"' + (fPais===p?' selected':'') + '>'
         + esc(p) + ' (' + CONTACTOS.filter(c => c.pais === p).length + ')</option>').join('');
   sp.onchange = () => { fPais = sp.value; tope = 25; pintarFiltros(); pintarLista(); };
 
   const se = document.getElementById('selEstado');
-  const opts = [{id:'',lbl:'Cualquier estado'},{id:'pend',lbl:'Sin llamar'}].concat(ESTADOS);
+  const opts = [{id:'', lbl: corto ? 'Cualquiera' : 'Cualquier estado'},
+                {id:'pend', lbl:'Sin llamar'}].concat(ESTADOS);
   se.innerHTML = opts.map(o => {
     const base = fPais ? CONTACTOS.filter(c => c.pais === fPais) : CONTACTOS;
     const n = o.id === '' ? base.length
@@ -1202,6 +1238,15 @@ async function desactivarNotif(){
    ============================================================ */
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev =>
   document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+
+/* Al girar el telefono o cambiar de ventana, los labels se re-evaluan: lo que
+   se abrevia en angosto vuelve completo en ancho. Un control "responsivo" que
+   solo se adapta en la carga no es responsivo. */
+let _t = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_t);
+  _t = setTimeout(() => { if (vista === 'ops') pintarFiltros(); }, 180);
+});
 let ultimoTap = 0;
 document.addEventListener('touchend', (e) => {
   const ahora = Date.now();
