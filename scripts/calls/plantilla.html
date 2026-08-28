@@ -310,7 +310,16 @@ textarea:focus,input.f:focus{border-color:var(--acc)}
 .h-it .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
 .vacio{color:var(--ink3);font-size:13.5px;padding:20px 12px;line-height:1.6;text-align:center}
 .tip b{color:var(--ink);display:block;margin-bottom:3px}
-.tips{display:grid;gap:7px}
+/* "Recordar" como ROTADOR (dueño, 2026-08-28): eran tres parrafos apilados,
+   la parte mas larga y estatica de la columna. Un consejo por vez, rota cada
+   10 s, y el punto lo frena — mismo patron que el resto de la app. */
+.tips{display:block}
+.tips .tip{min-height:150px}
+.tip-pts{display:flex;gap:5px;margin-top:9px}
+.tip-pts button{border:0;padding:0;cursor:pointer;width:8px;height:8px;border-radius:4px;
+ background:var(--line2);transition:width .25s}
+.tip-pts button.act{width:20px;background:var(--warn)}
+@media(prefers-reduced-motion:reduce){.tip-pts button{transition:none}}
 
 footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);border-top:1px solid var(--line);
  padding:9px 14px calc(9px + env(safe-area-inset-bottom));z-index:30}
@@ -946,8 +955,20 @@ document.getElementById('fileImport').onchange = e => {
   aplicarTema(t);
   document.getElementById('btnTema').onclick = () =>
     aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'oscuro' : 'claro');
-  document.getElementById('tipsBox').innerHTML = TIPS.map(x =>
-    '<div class="box tip"><b>' + esc(x.titulo) + '</b>' + esc(x.texto) + '</div>').join('');
+  // "Recordar": un consejo por vez. Rota solo; tocar un punto lo frena.
+  let tipIdx = 0, tipManual = false;
+  const pintarTip = () => {
+    const caja = document.getElementById('tipsBox'); if (!caja || !TIPS.length) return;
+    const t = TIPS[tipIdx % TIPS.length];
+    caja.innerHTML = '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>'
+      + '<div class="tip-pts">' + TIPS.map((x, i) =>
+        '<button data-i="' + i + '"' + (i === tipIdx ? ' class="act"' : '')
+        + ' aria-label="Ver consejo ' + (i + 1) + '"></button>').join('') + '</div>';
+    caja.querySelectorAll('.tip-pts button').forEach(b =>
+      b.onclick = () => { tipIdx = +b.dataset.i; tipManual = true; pintarTip(); });
+  };
+  pintarTip();
+  setInterval(() => { if (!tipManual && TIPS.length > 1){ tipIdx = (tipIdx + 1) % TIPS.length; pintarTip(); } }, 10000);
   try { paisHoy = localStorage.getItem(KEY_PAIS) || ''; } catch(e){}
   let v = null; try { v = localStorage.getItem(KEY_VISTA); } catch(e){}
   /* En el telefono la vista Hoy se plegaba sola: se deja abierto lo urgente
