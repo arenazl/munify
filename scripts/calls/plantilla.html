@@ -114,7 +114,6 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .ia-wrap{margin-top:13px;border:1px solid var(--line);border-radius:var(--r);background:var(--card2);overflow:hidden}
 .ia-head{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--line);
  font:700 14px/1.25 var(--font-display);letter-spacing:-.2px;color:var(--ink)}
-.ia-head::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--purple);flex:none}
 .ia-msgs{display:grid;gap:8px;padding:12px 13px;max-height:320px;overflow-y:auto;overflow-x:hidden;
  overscroll-behavior:contain;touch-action:pan-y}
 .ia-msg{font-size:13.5px;line-height:1.6;padding:10px 12px;border-radius:10px;white-space:pre-wrap}
@@ -133,7 +132,6 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .tarj{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
 .tarj h3{margin:0 0 10px;display:flex;align-items:center;gap:8px;font:700 14px/1.25 var(--font-display);
  letter-spacing:-.2px;color:var(--ink)}
-.tarj h3::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--acc);flex:none}
 .ag-it{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .ag-it:last-child{border-bottom:none}
 .ag-it:hover .ag-nom{color:var(--acc)}
@@ -188,7 +186,6 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .tarj details{margin:0}
 .tarj > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
  font:700 14px/1.25 var(--font-display);letter-spacing:-.2px;color:var(--ink)}
-.tarj > summary::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--acc);flex:none}
 .tarj > summary::-webkit-details-marker{display:none}
 .tarj > summary .flecha{margin-left:auto;width:7px;height:7px;border-right:2px solid var(--ink3);
  border-bottom:2px solid var(--ink3);transform:rotate(45deg);transition:transform .15s}
@@ -262,7 +259,12 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
    sabes que viene, en lugar del microrotulo gris que hacia "panel panel". */
 .sec>label{display:flex;align-items:center;gap:8px;font:700 14.5px/1.25 var(--font-display);
  letter-spacing:-.2px;color:var(--ink);margin-bottom:8px}
-.sec>label::before{content:'';width:14px;height:4px;border-radius:2px;background:var(--acc);flex:none}
+/* El iconito diferenciador de cada seccion (pedido del dueño): un pantallazo
+   y ya sabes que informacion agrega el panel. SVG inline, color semantico. */
+.sic{width:15px;height:15px;flex:none;display:inline-flex}
+.sic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sic.a{color:var(--acc)} .sic.p{color:var(--purple)} .sic.o{color:var(--ok)}
+.sic.w{color:var(--warn)} .sic.n{color:var(--ink3)}
 /* Menos "panel panel panel" (dueño, 2026-08-28): el box PLANO deja de ser
    tarjeta — texto con un hairline a la izquierda, respira. Los que cargan
    SEMANTICA (script/perfil/dato/ojo) conservan su tarjeta tintada: son los
@@ -365,12 +367,12 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
       <div>
         <div class="big" id="siguiente"></div>
         <div class="meta-dia" id="metaDia"></div>
-        <details class="tarj" style="margin-top:13px" open><summary>Prometiste volver<span class="cuenta" id="agendaCuenta"></span><span class="flecha"></span></summary><div id="agenda"></div></details>
+        <details class="tarj" style="margin-top:13px" open><summary><i class="sic w"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></i>Prometiste volver<span class="cuenta" id="agendaCuenta"></span><span class="flecha"></span></summary><div id="agenda"></div></details>
       </div>
       <div>
-        <details class="tarj" open><summary>Cómo venís<span class="flecha"></span></summary><div id="porPais"></div><div class="resumen" id="resumenHoy"></div></details>
-        <details class="tarj" style="margin-top:13px" open><summary>Después seguís con<span class="cuenta" id="colaHoyCuenta"></span><span class="flecha"></span></summary><div class="cola-hoy" id="colaHoy"></div></details>
-        <details class="tarj" style="margin-top:13px" open><summary>Últimos movimientos<span class="flecha"></span></summary><div class="hist" id="ultimos"></div></details>
+        <details class="tarj" open><summary><i class="sic o"><svg viewBox="0 0 24 24"><path d="M5 20V9M12 20V4M19 20v-9"/></svg></i>Cómo venís<span class="flecha"></span></summary><div id="porPais"></div><div class="resumen" id="resumenHoy"></div></details>
+        <details class="tarj" style="margin-top:13px" open><summary><i class="sic a"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6M12.5 9.5 15 12l-2.5 2.5"/></svg></i>Después seguís con<span class="cuenta" id="colaHoyCuenta"></span><span class="flecha"></span></summary><div class="cola-hoy" id="colaHoy"></div></details>
+        <details class="tarj" style="margin-top:13px" open><summary><i class="sic n"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i>Últimos movimientos<span class="flecha"></span></summary><div class="hist" id="ultimos"></div></details>
       </div>
     </div>
   </div>
@@ -391,9 +393,9 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
       </div>
       <div class="ops-col ficha-col" id="fichaCol"><div class="ficha" id="ficha"></div></div>
       <div class="ops-col extra">
-        <div class="tarj"><h3>Lo que viene</h3><div id="agenda2"></div></div>
-        <div class="tarj" style="margin-top:13px"><h3>Avance</h3><div id="porPais2"></div></div>
-        <div class="tarj" style="margin-top:13px"><h3>Recordar</h3><div class="tips" id="tipsBox"></div></div>
+        <div class="tarj"><h3><i class="sic w"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></i>Lo que viene</h3><div id="agenda2"></div></div>
+        <div class="tarj" style="margin-top:13px"><h3><i class="sic o"><svg viewBox="0 0 24 24"><path d="M5 20V9M12 20V4M19 20v-9"/></svg></i>Avance</h3><div id="porPais2"></div></div>
+        <div class="tarj" style="margin-top:13px"><h3><i class="sic w"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4.2 10.3c.8.8 1.4 1.6 1.6 2.7h5.2c.2-1.1.8-1.9 1.6-2.7A6 6 0 0 0 12 3Z"/></svg></i>Recordar</h3><div class="tips" id="tipsBox"></div></div>
       </div>
     </div>
   </div>
@@ -684,7 +686,7 @@ function abrir(id){
     : '';
   const ojo = f.nota ? '<div class="box ojo" style="margin-bottom:13px"><b>Ojo:</b> ' + esc(f.nota) + '</div>' : '';
   const invest = (inv.estructura || inv.digital || inv.color || inv.web)
-    ? '<div class="sec"><label>Lo que averiguamos del municipio</label>'
+    ? '<div class="sec"><label><i class="sic a"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></i>Lo que averiguamos del municipio</label>'
       + (inv.estructura ? '<div class="box"><b>Áreas:</b> ' + esc(inv.estructura) + '</div>' : '')
       + (inv.digital ? '<div class="box"><b>Digitalización:</b> ' + esc(inv.digital) + '</div>' : '')
       + (inv.color ? '<div class="box dato"><b>Para romper el hielo:</b> ' + esc(inv.color) + '</div>' : '')
@@ -699,22 +701,22 @@ function abrir(id){
     + '<div class="p-tel"><a class="tel-btn" href="' + telHref(c.telefono) + '" id="pLlamar">Llamar ' + esc(c.telefono) + '</a>'
     + '<button class="btn" id="pCopiar">Copiar</button></div>'
     + quien + ojo
-    + '<div class="sec"><label>Cómo llega el municipio</label><div class="box perfil">' + esc(c.perfil) + '</div></div>'
+    + '<div class="sec"><label><i class="sic p"><svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></i>Cómo llega el municipio</label><div class="box perfil">' + esc(c.perfil) + '</div></div>'
     + invest
-    + (sp.script ? '<div class="sec"><label>Speech para ' + esc(c.pais) + '</label>'
+    + (sp.script ? '<div class="sec"><label><i class="sic a"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg></i>Speech para ' + esc(c.pais) + '</label>'
         + '<div class="box script">' + esc(sp.script) + '</div>'
         + (sp.angulo ? '<div class="box"><b>Ángulo:</b> ' + esc(sp.angulo) + '</div>' : '')
         + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
-    + '<div class="sec"><label>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
+    + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg></i>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
-    + '<div class="sec"><label>Qué me dijo</label>'
+    + '<div class="sec"><label><i class="sic w"><svg viewBox="0 0 24 24"><path d="M17 3l4 4L8 20H4v-4L17 3Z"/></svg></i>Qué me dijo</label>'
       + '<textarea id="pNotas" rows="3" placeholder="Con quién hablé, qué área, qué dijo...">' + esc(r.notas) + '</textarea>'
       + '<div class="fila2" style="margin-top:9px">'
       + '<input class="f" id="pQuien" placeholder="Con quién hablé" value="' + esc(r.quien) + '">'
       + '<input class="f" id="pProximo" type="date" value="' + esc(r.proximo) + '"></div>'
       + '<button class="btn p" id="pGuardar" style="margin-top:9px;width:100%">Guardar en el historial</button></div>'
-    + '<div class="sec"><label>Historial</label><div class="hist" id="pHist"></div></div>'
+    + '<div class="sec"><label><i class="sic n"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i>Historial</label><div class="hist" id="pHist"></div></div>'
     + '<div class="ia-wrap" id="iaBox"></div></div>';
 
   pintarHist(); iaMontar(c);
@@ -839,7 +841,7 @@ function iaMontar(c){
   iaChat = []; iaCargando = false;
   const cont = document.getElementById('iaBox'); if (!cont) return;
   cont.innerHTML =
-      '<div class="ia-head">Asistente</div>'
+      '<div class="ia-head"><i class="sic p"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/></svg></i>Asistente</div>'
     + '<div class="ia-msgs" id="iaMsgs"></div>'
     + '<div class="ia-sug" id="iaSug">' + IA_SUGERENCIAS.map((s, i) =>
         '<button data-i="' + i + '">' + esc(s) + '</button>').join('') + '</div>'
