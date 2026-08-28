@@ -41,11 +41,16 @@ html,body{margin:0;padding:0;width:100%;height:100%;max-width:100%;overflow:hidd
  overscroll-behavior:none;position:fixed;inset:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
  touch-action:pan-y;display:flex;flex-direction:column}
+/* iOS ignora `user-scalable=no` desde iOS 10: el zoom por pellizco y por
+   doble-tap se corta con touch-action + los eventos `gesture*` de Safari
+   (ver el bloque anti-zoom del script). Sin esto, una PWA se pellizca como
+   una pagina web cualquiera — que es justo lo que el dueño reporto. */
+button,a,input,select,textarea,.row,.cola-it,.ag-it,.eb,.chip,.pchip{touch-action:manipulation}
 .app-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
  overscroll-behavior:contain;touch-action:pan-y}
 .paises,.kpis{touch-action:pan-x pan-y}
 input,textarea,select,button{font-family:inherit;font-size:16px}
-.wrap{max-width:1400px;margin:0 auto;padding:0 14px 92px}
+.wrap{max-width:1400px;margin:0 auto;padding:0 14px 16px;width:100%}
 
 header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:blur(8px);
  border-bottom:1px solid var(--line);padding-top:max(env(safe-area-inset-top),8px)}
@@ -154,10 +159,34 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .resumen{font-size:13.5px;color:var(--ink2);line-height:1.6;border-top:1px solid var(--line);margin-top:11px;padding-top:11px}
 .resumen b{color:var(--ink)}
 
-.ops{display:grid;grid-template-columns:335px 1fr 285px;gap:13px;margin-top:14px;align-items:start}
-.ops-col{min-width:0}
-.lista-col{position:sticky;top:112px;max-height:calc(100vh - 132px);overflow-y:auto;padding-right:3px}
-.extra{position:sticky;top:112px}
+/* VISTA "TRABAJAR": tres columnas que ocupan el alto y scrollean CADA UNA.
+   Antes vivian de `position:sticky; top:112px` + `max-height:calc(100vh-132px)`,
+   que dependian de que el header estuviera EN EL FLUJO. Con el app-shell fijo
+   el header salio del flujo y esas reglas quedaron mintiendo: scrolleaba solo
+   la lista (que tenia overflow propio) y la ficha y la columna derecha
+   quedaban muertas (reporte del dueño, 2026-08-28). Ahora el alto lo pone el
+   shell y cada columna es su propio scroller. */
+.ops{display:grid;grid-template-columns:335px minmax(0,1fr) 285px;gap:13px;
+ margin-top:14px;align-items:stretch;min-height:0}
+/* Tablet en horizontal (y ventanas angostas de escritorio): la columna
+   auxiliar se va y quedan lista + ficha, que es lo que se trabaja. Antes
+   estas anchuras entraban a la fuerza y apretaban la ficha. */
+@media(min-width:1001px) and (max-width:1300px){
+  .ops{grid-template-columns:300px minmax(0,1fr)}
+  .extra{display:none}
+}
+.ops-col{min-width:0;min-height:0}
+.lista-col,.ficha-col,.extra{overflow-y:auto;overflow-x:hidden;
+ overscroll-behavior:contain;touch-action:pan-y}
+.lista-col{padding-right:3px}
+.extra{padding-right:3px}
+
+/* Modo pantalla-completa de la vista Trabajar: el contenedor deja de
+   scrollear y el alto baja por la cadena hasta las columnas. */
+body[data-vista="ops"] .app-scroll{overflow:hidden}
+body[data-vista="ops"] .wrap{height:100%;display:flex;flex-direction:column;padding-bottom:12px}
+body[data-vista="ops"] #vOps{flex:1;min-height:0;display:flex;flex-direction:column}
+body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .filtros{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:9px}
 .chip{border:1px solid var(--line2);background:var(--card);color:var(--ink2);border-radius:999px;
  padding:5px 12px;font-size:12.5px;cursor:pointer;transition:.12s;white-space:nowrap}
@@ -328,7 +357,11 @@ textarea:focus,input.f:focus{border-color:var(--acc)}
 .tip-pts button.act{width:20px;background:var(--warn)}
 @media(prefers-reduced-motion:reduce){.tip-pts button{transition:none}}
 
-footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);border-top:1px solid var(--line);
+/* El pie es parte del SHELL (fila del flex del body), ya no `position:fixed`:
+   asi no tapa el contenido ni obliga a un padding-bottom magico de 92px, y en
+   la vista Trabajar deja el alto justo para que las columnas terminen donde
+   empieza el pie. */
+footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--line);
  padding:9px 14px calc(9px + env(safe-area-inset-bottom));z-index:30}
 .foot-in{max-width:1400px;margin:0 auto;width:100%;display:flex;gap:11px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink3)}
 .foot-in .barra{max-width:250px}
@@ -340,9 +373,15 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
  width:32px;height:32px;cursor:pointer;font-size:18px;line-height:1;flex:none}
 @media(min-width:1001px){ .cerrar-ficha{display:none} }
 @media(max-width:1000px){
+ /* Telefono: una sola columna y el scroll vuelve al contenedor — la ficha
+    entra como panel deslizante y la columna auxiliar no se muestra. */
  .ops{grid-template-columns:1fr}
- .lista-col{position:static;max-height:none;overflow:visible}
+ .lista-col{overflow:visible;padding-right:0}
  .extra{display:none}
+ body[data-vista="ops"] .app-scroll{overflow-y:auto}
+ body[data-vista="ops"] .wrap,
+ body[data-vista="ops"] #vOps,
+ body[data-vista="ops"] .ops{height:auto;flex:none;display:block}
  .ficha-col{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);z-index:61;background:var(--bg2);
   border-left:1px solid var(--line);transform:translateX(102%);transition:transform .22s cubic-bezier(.4,0,.2,1);
   display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
@@ -1006,12 +1045,18 @@ function pintarPie(){
 function pintar(){ pintarKpis(); pintarPie(); pintarHoy(); if (vista === 'ops'){ pintarFiltros(); pintarLista(); } }
 function irA(v){
   vista = v;
+  // El CSS necesita saber en que vista estamos: "Trabajar" usa el modo
+  // pantalla-completa (cada columna scrollea sola) y "Hoy" el scroll normal.
+  document.body.dataset.vista = v;
   document.getElementById('vHoy').style.display = v === 'hoy' ? '' : 'none';
   document.getElementById('vOps').style.display = v === 'ops' ? '' : 'none';
   document.querySelectorAll('#switch button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   try { localStorage.setItem(KEY_VISTA, v); } catch(e){}
   if (v === 'ops'){ pintarFiltros(); pintarLista(); if (!selId) fichaVacia(); }
-  window.scrollTo(0, 0);
+  // El shell es fijo: quien scrollea es el contenedor, no la ventana.
+  const cont = document.querySelector('.app-scroll');
+  if (cont) cont.scrollTop = 0;
+  document.querySelectorAll('.ops-col').forEach(c => { c.scrollTop = 0; });
 }
 document.querySelectorAll('#switch button').forEach(b => b.onclick = () => irA(b.dataset.v));
 document.getElementById('q').oninput = e => { q = e.target.value; tope = 25; pintarLista(); };
@@ -1146,6 +1191,23 @@ async function desactivarNotif(){
   try { localStorage.removeItem(KEY_SUB); } catch(e){}
   pintarBtnNotif();
 }
+
+/* ============================================================
+   ANTI-ZOOM en iOS. Safari ignora `user-scalable=no` desde iOS 10, asi que
+   una PWA instalada se pellizca y se hace doble-tap como una pagina web
+   cualquiera (reporte del dueño, 2026-08-28). Los eventos `gesture*` son la
+   unica via que respeta: se cancelan los tres. El doble-tap se corta con el
+   `touch-action:manipulation` del CSS y, para lo que quede fuera, con el
+   guard de los 300 ms de abajo.
+   ============================================================ */
+['gesturestart', 'gesturechange', 'gestureend'].forEach(ev =>
+  document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
+let ultimoTap = 0;
+document.addEventListener('touchend', (e) => {
+  const ahora = Date.now();
+  if (ahora - ultimoTap < 300) e.preventDefault();   // segundo toque = zoom
+  ultimoTap = ahora;
+}, { passive: false });
 
 (function init(){
   let t = null; try { t = localStorage.getItem(KEY_TEMA); } catch(e){}
