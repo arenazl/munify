@@ -234,6 +234,8 @@ export default function Login() {
     maneja_reclamos: boolean;
     maneja_tramites: boolean;
   }>>([]);
+  // true cuando las dos listas de perfiles ya respondieron (con datos o vacías).
+  const [perfilesResueltos, setPerfilesResueltos] = useState(false);
 
   // API_URL importado desde lib/api.ts
 
@@ -275,8 +277,12 @@ export default function Login() {
         }
       };
 
-      loadDemoUsers();
-      loadDependenciaUsers();
+      // El form de credenciales del layout split espera a que las DOS listas
+      // resuelvan: sin esto, en un muni demo el form flashea un instante antes
+      // de que llegue la botonera. 4xx no reintenta, así que un cliente
+      // productivo resuelve en un solo round-trip.
+      void Promise.allSettled([loadDemoUsers(), loadDependenciaUsers()])
+        .then(() => setPerfilesResueltos(true));
       loadProteccion();
     }
   }, [municipioCodigo]);
@@ -306,6 +312,13 @@ export default function Login() {
       ? municipioNombre.replace(/^Municipalidad de\s*/i, '')
       : null;
     const accent = (muniPropio && municipioColor) || BRAND.primary;
+    // Cliente PRODUCTIVO (es_demo=false): el backend devuelve las listas de
+    // perfiles vacías, así que el panel no tiene botonera. Sin esto la
+    // pantalla decía "Elegí un perfil" sin NINGÚN perfil ni campo — San Pedro
+    // Norte quedaba sin forma de escribir sus credenciales (2026-08-28).
+    // `perfilesResueltos` evita el flash del form en munis demo mientras
+    // llegan los perfiles.
+    const sinPerfiles = perfilesResueltos && demoUsers.length === 0 && dependenciaUsers.length === 0;
     // Fondos del hero TEÑIDOS con el acento sobre un casi-negro neutro. Antes
     // eran tres verdes fijos, que es justo lo que no puede tener un shell
     // white-label. Las proporciones están elegidas para reproducir los verdes
@@ -398,7 +411,9 @@ export default function Login() {
             </div>
             <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
             <p className="text-white/60 mt-1 mb-6">
-              {muniPropio ? `Elegí un perfil para entrar a ${muniPropio}` : 'Elegí un perfil para entrar a la demo'}
+              {sinPerfiles
+                ? 'Ingresá con tu cuenta'
+                : muniPropio ? `Elegí un perfil para entrar a ${muniPropio}` : 'Elegí un perfil para entrar a la demo'}
             </p>
 
             {error && (
@@ -522,6 +537,65 @@ export default function Login() {
                 </div>
               );
             })()}
+
+            {/* Cliente productivo, sin botonera: el form de credenciales va acá
+                mismo, con los MISMOS handlers del login estándar. Es el acceso
+                real de San Pedro Norte — sin esto no puede entrar. */}
+            {sinPerfiles && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-white/30 focus:ring-2 outline-none transition-all ${
+                      touched.email && !emailValidation.isValid
+                        ? 'border-red-500/50 focus:border-red-500/50'
+                        : 'border-white/10 focus:border-white/30'
+                    }`}
+                    placeholder="tu@email.com"
+                  />
+                  {touched.email && !emailValidation.isValid && (
+                    <p className="mt-1 text-xs text-red-400">{emailValidation.error}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">Contraseña</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-white/30 focus:ring-2 outline-none transition-all ${
+                      touched.password && !passwordValidation.isValid
+                        ? 'border-red-500/50 focus:border-red-500/50'
+                        : 'border-white/10 focus:border-white/30'
+                    }`}
+                    placeholder="Tu contraseña"
+                  />
+                  {touched.password && !passwordValidation.isValid && (
+                    <p className="mt-1 text-xs text-red-400">{passwordValidation.error}</p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 font-extrabold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: fondoHero }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Ingresando...
+                    </>
+                  ) : (
+                    'Ingresar'
+                  )}
+                </button>
+              </form>
+            )}
 
             <div className="flex items-center gap-3 my-5">
               <div className="flex-1 h-px bg-white/10" />
