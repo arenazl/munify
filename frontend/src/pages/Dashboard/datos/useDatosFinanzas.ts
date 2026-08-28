@@ -52,6 +52,7 @@ export function useDatosFinanzas(opts: OpcionesDatosFinanzas): DatosFinanzas {
   const [cajas, setCajas] = useState<Caja[]>([]);
   const [pagos, setPagos] = useState<PagoProgramado[]>([]);
   const [serie, setSerie] = useState<PuntoSerieGasto[]>([]);
+  const [desdeOperativo, setDesdeOperativo] = useState<string | null>(null);
   const [opPendientes, setOpPendientes] = useState<PilaFinanciera | null>(null);
   const [conciliacion, setConciliacion] = useState<PilaFinanciera | null>(null);
   const [nomina, setNomina] = useState<NominaResumen | null>(null);
@@ -63,18 +64,22 @@ export function useDatosFinanzas(opts: OpcionesDatosFinanzas): DatosFinanzas {
 
     const fetchAll = async () => {
       // ---- Etapa 1: lo que SIEMPRE hace falta, en paralelo ----
-      const [cajasRes, pagosRes, serieRes] = await Promise.all([
+      const [cajasRes, pagosRes, serieRes, inicioRes] = await Promise.all([
         cajasApi.list({ activo: true, include_saldos: true })
           .catch((err) => { console.error('Error cargando cajas:', err); return { data: [] }; }),
         agendaPagosApi.list({ activo: true })
           .catch((err) => { console.error('Error cargando agenda de pagos:', err); return { data: [] }; }),
         gastosApi.serie(DIAS_SERIE_GASTO)
           .catch((err) => { console.error('Error cargando serie de gastos:', err); return { data: [] }; }),
+        // Sin esta señal la tendencia no se cae: usa su regla de densidad.
+        gastosApi.inicioOperativo()
+          .catch((err) => { console.error('Error cargando inicio operativo:', err); return { data: { desde: null } }; }),
       ]);
       if (cancel) return;
       setCajas((cajasRes.data || []) as Caja[]);
       setPagos((pagosRes.data || []) as PagoProgramado[]);
       setSerie((serieRes.data || []) as PuntoSerieGasto[]);
+      setDesdeOperativo(inicioRes.data?.desde ?? null);
       // La primera carga termina acá: el tablero ya puede dibujarse. Lo de
       // abajo llena la 5.ª tarjeta y la 3.ª cola, que toleran llegar después.
       setCargando(false);
@@ -141,6 +146,7 @@ export function useDatosFinanzas(opts: OpcionesDatosFinanzas): DatosFinanzas {
     cajas,
     pagos,
     serie,
+    desdeOperativo,
     opPendientes,
     conciliacion,
     nomina,
@@ -148,5 +154,5 @@ export function useDatosFinanzas(opts: OpcionesDatosFinanzas): DatosFinanzas {
     // para que, si el módulo se prende, la primera carga muestre el skeleton
     // en vez de un tablero vacío por un frame (mismo criterio que reclamos).
     cargando: enabled ? cargando : false,
-  }), [cajas, pagos, serie, opPendientes, conciliacion, nomina, enabled, cargando]);
+  }), [cajas, pagos, serie, desdeOperativo, opPendientes, conciliacion, nomina, enabled, cargando]);
 }

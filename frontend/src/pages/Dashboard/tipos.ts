@@ -355,6 +355,10 @@ export interface DatosFinanzas {
   /** Pagos programados ACTIVOS de la agenda. */
   pagos: PagoProgramado[];
   serie: PuntoSerieGasto[];
+  /** Primer día en que el muni cargó gastos A MANO ('YYYY-MM-DD'): la
+   *  tendencia arranca ahí y deja afuera las importaciones en ráfaga. null =
+   *  sin señal (la tendencia cae a su regla de densidad). */
+  desdeOperativo: string | null;
   /** OPs en estado pendiente. null = módulo contaduría apagado. */
   opPendientes: PilaFinanciera | null;
   /** Movimientos de caja sin conciliar. null = no se pidió (contaduría ON). */

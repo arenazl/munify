@@ -261,6 +261,9 @@ export function recorridoDeTendencia(
   meses: number,
   /** Inyectable para tests; en runtime es el HOY local del navegador. */
   hoyISO?: string,
+  /** Primer día de OPERACIÓN real ('YYYY-MM-DD', del backend): la historia
+   *  arranca en ese mes. Sin señal, decide la densidad (`inicioOperativo`). */
+  desdeISO?: string,
 ): Recorrido | null {
   // SIN FUTUROLOGÍA (dueño, 2026-08-28): la tendencia es la historia HASTA
   // HOY. La serie puede traer fechas futuras (cuotas, pagos cargados por
@@ -272,6 +275,18 @@ export function recorridoDeTendencia(
   const diaHoy = Number(hoy.slice(8, 10));
 
   let lista = recortarExtremos(agruparPorMes(datos.filter((p) => p.fecha <= hoy)));
+  if (lista.length === 0) return null;
+
+  // SÓLO LA OPERACIÓN REAL (dueño, 2026-08-28): lo importado en bloque no es
+  // tendencia — si quiere estadísticas de 2010 va a la pantalla de Gastos.
+  // Con señal del backend, el corte es el mes de esa fecha; sin señal, la
+  // densidad de días con movimiento lo detecta sola.
+  if (desdeISO) {
+    const claveDesde = desdeISO.slice(0, 7);
+    lista = recortarExtremos(lista.filter((p) => p.clave >= claveDesde));
+  } else {
+    lista = lista.slice(inicioOperativo(lista));
+  }
   if (lista.length === 0) return null;
 
   // El mes en curso recién arrancado se descarta sólo si quedan al menos dos
@@ -307,6 +322,33 @@ export function segmentosDelRecorrido(periodos: Periodo[]): Periodo[] {
     .map(([anio, dias]) => ({ ...armarPeriodo(anio, anio, '', dias), esAnio: true }));
 }
 
+/**
+ * HISTORIA OPERATIVA vs CARGA HISTÓRICA — la densidad decide.
+ *
+ * San Pedro Norte (2026-08-28): 8.251 gastos desde enero 2024, pero el muni
+ * usa el sistema desde MAYO 2026. Lo anterior entró en bloque (la migración:
+ * totales mensuales asentados en 1-2 fechas por mes, densidad 3-6%); desde
+ * mayo carga todos los días (23-28 días con movimiento por mes, 74-100%).
+ * Promediar las dos cosas da "$91M por mes en 32 meses": cierto y sin valor.
+ *
+ * Regla: se camina desde hoy hacia atrás mientras el mes sea DENSO (al menos
+ * `DIAS_DENSOS_MES` días con movimiento; proporcional en el mes en curso, que
+ * todavía no tiene todos sus días). Donde se corta la racha empieza la
+ * historia operativa. Con racha menor a dos meses no hay operación
+ * detectable y toda la serie se toma como historia (el default de siempre).
+ */
+export const DIAS_DENSOS_MES = 8;
+
+const esDenso = (p: Periodo) =>
+  p.diasConMovimiento >= Math.min(DIAS_DENSOS_MES, Math.max(1, Math.ceil(p.dias.length * 0.25)));
+
+/** Índice del primer mes de la historia operativa (0 = toda la serie). */
+export function inicioOperativo(periodos: Periodo[]): number {
+  let i = periodos.length;
+  while (i > 0 && esDenso(periodos[i - 1])) i--;
+  return periodos.length - i >= 2 ? i : 0;
+}
+
 /** "de enero 2024 a hoy" / "de junio a hoy" (mismo año: sin repetirlo). */
 export function rangoDelRecorrido(periodos: Periodo[], hoyISO?: string): string {
   if (periodos.length === 0) return '';
@@ -323,22 +365,54 @@ export function rangoDelRecorrido(periodos: Periodo[], hoyISO?: string): string 
  * El VEREDICTO del panorama: la lectura de TODA la historia en una frase.
  * Mismo contrato que los veredictos de período: interpreta, no describe.
  */
+/**
+ * Lo que el panorama compara: los meses COMPLETOS (el promedio) y el mes EN
+ * CURSO contra el anterior (el ritmo). Un promedio que incluye medio agosto
+ * miente para abajo; un "vs" entre dos meses completos dice cómo cerró el
+ * pasado, no cómo viene el presente.
+ */
+function lecturaDelPanorama(periodos: Periodo[], claveHoy?: string) {
+  const enCurso = claveHoy ? periodos.find((p) => p.clave === claveHoy) ?? null : null;
+  const completos = periodos.filter((p) => p !== enCurso);
+  const base = completos.length > 0 ? completos : periodos;
+  const totalBase = base.reduce((s, p) => s + p.entraron, 0);
+  const promedio = base.length > 0 ? totalBase / base.length : 0;
+  const idx = enCurso ? periodos.indexOf(enCurso) : -1;
+  const previo = idx > 0 ? periodos[idx - 1] : null;
+  const delta = enCurso && previo && previo.entraron > 0
+    ? (enCurso.entraron - previo.entraron) / previo.entraron
+    : null;
+  return { enCurso, completos, promedio, previo, delta };
+}
+
 export function veredictoDelPanorama(
   periodos: Periodo[],
   modo: ModoTendencia,
   fmt: (n: number) => string,
+  claveHoy?: string,
 ): VeredictoMes {
   const total = periodos.reduce((s, p) => s + p.entraron, 0);
   const resueltos = periodos.reduce((s, p) => s + p.resueltos, 0);
   const n = periodos.length;
 
   if (modo === 'monto') {
-    const promedio = n > 0 ? total / n : 0;
-    return {
-      etiqueta: `Venís gastando ${fmt(promedio)} por mes:`,
-      resto: `${fmt(total)} en ${nf(n)} meses.`,
-      tono: 'neutro',
-    };
+    const { enCurso, promedio, previo, delta } = lecturaDelPanorama(periodos, claveHoy);
+    const etiqueta = `Venís gastando ${fmt(promedio)} por mes:`;
+    if (enCurso && previo && delta !== null) {
+      const pct = Math.abs(Math.round(delta * 100));
+      const SALTO = 0.05;
+      const como = delta > SALTO
+        ? `va un ${pct}% arriba de ${previo.label.toLowerCase()}`
+        : delta < -SALTO
+          ? `va un ${pct}% abajo de ${previo.label.toLowerCase()}`
+          : `viene parejo con ${previo.label.toLowerCase()}`;
+      return {
+        etiqueta,
+        resto: `${enCurso.label.toLowerCase()} ${como} (${fmt(enCurso.entraron)} contra ${fmt(previo.entraron)}).`,
+        tono: 'neutro',
+      };
+    }
+    return { etiqueta, resto: `${fmt(total)} en ${nf(n)} meses.`, tono: 'neutro' };
   }
   const tasa = total > 0 ? resueltos / total : 0;
   const pct = Math.round(tasa * 100);
@@ -349,11 +423,17 @@ export function veredictoDelPanorama(
   };
 }
 
-/** Los mini-KPIs del panorama. Regla del cero intacta: sin datos, sin KPI. */
+/**
+ * Los mini-KPIs del panorama — DINÁMICOS con la ventana real y de
+ * RELEVANCIA: total del período operativo, promedio de los meses completos,
+ * el mes en curso contra el anterior, y el mes más caro. Regla del cero
+ * intacta: sin datos, sin KPI; sin mes previo, sin "vs".
+ */
 export function kpisDelPanorama(
   periodos: Periodo[],
   modo: ModoTendencia,
   fmt: (n: number) => string,
+  claveHoy?: string,
 ): KpiTendencia[] {
   const conMov = periodos.filter(periodoConMovimiento);
   if (conMov.length === 0) return [];
@@ -365,11 +445,25 @@ export function kpisDelPanorama(
   const labelMes = multiAnio ? `${caro.label} ${caro.clave.slice(0, 4)}` : caro.label;
 
   if (modo === 'monto') {
-    return [
-      { etiqueta: 'Total gastado', valor: fmt(total), nota: `· ${nf(n)} meses` },
-      { etiqueta: 'Promedio mensual', valor: fmt(n > 0 ? total / n : 0) },
-      { etiqueta: 'Mes más caro', valor: labelMes, nota: `· ${fmt(caro.entraron)}` },
+    const { enCurso, completos, promedio, previo, delta } = lecturaDelPanorama(periodos, claveHoy);
+    const kpis: KpiTendencia[] = [
+      { etiqueta: 'Total gastado', valor: fmt(total), nota: `· ${nf(n)} ${n === 1 ? 'mes' : 'meses'}` },
+      {
+        etiqueta: 'Promedio mensual',
+        valor: fmt(promedio),
+        nota: completos.length > 0 && completos.length < n ? `· ${nf(completos.length)} completos` : undefined,
+      },
     ];
+    if (enCurso && previo && delta !== null) {
+      const pct = Math.round(delta * 100);
+      kpis.push({
+        etiqueta: `${enCurso.label} vs ${previo.label.toLowerCase()}`,
+        valor: `${pct > 0 ? '+' : ''}${pct}%`,
+        nota: `· ${fmt(enCurso.entraron)}`,
+      });
+    }
+    kpis.push({ etiqueta: 'Mes más caro', valor: labelMes, nota: `· ${fmt(caro.entraron)}` });
+    return kpis;
   }
   const resueltos = periodos.reduce((s, p) => s + p.resueltos, 0);
   const kpis: KpiTendencia[] = [
@@ -381,6 +475,45 @@ export function kpisDelPanorama(
   }
   kpis.push({ etiqueta: 'Mes más cargado', valor: labelMes, nota: `· ${nf(caro.entraron)}` });
   return kpis;
+}
+
+/**
+ * GRANULARIDAD DEL TRAZO — se deriva del largo de la ventana, no se elige.
+ *
+ * 970 puntos diarios en 620px son un peine de picos, no una curva (y la
+ * historia cargada en bloque —la curación entró por fechas puntuales— lo
+ * empeora). A escala de años la unidad es el mes; a escala de meses, la
+ * semana; el día sólo cuando la ventana es corta.
+ */
+export type Granularidad = 'dia' | 'semana' | 'mes';
+
+export function granularidadPara(dias: number): Granularidad {
+  if (dias <= TECHO_VENTANA_DIAS) return 'dia';
+  if (dias <= 14 * 31) return 'semana';
+  return 'mes';
+}
+
+/**
+ * Re-muestrea la serie diaria a la granularidad dada: cada punto es la SUMA
+ * del tramo (entró / se cerró) y lleva la fecha del primer día del tramo. En
+ * 'dia' devuelve la serie tal cual.
+ */
+export function resamplear(dias: PuntoTendencia[], gran: Granularidad): PuntoTendencia[] {
+  if (gran === 'dia' || dias.length === 0) return dias;
+  const claveDe = (fecha: string, i: number) =>
+    gran === 'mes' ? fecha.slice(0, 7) : String(Math.floor(i / 7));
+  const tramos = new Map<string, PuntoTendencia>();
+  dias.forEach((d, i) => {
+    const k = claveDe(d.fecha, i);
+    const acc = tramos.get(k);
+    if (acc) {
+      acc.cantidad += d.cantidad || 0;
+      acc.resueltos = (acc.resueltos || 0) + (d.resueltos || 0);
+    } else {
+      tramos.set(k, { fecha: d.fecha, cantidad: d.cantidad || 0, resueltos: d.resueltos || 0 });
+    }
+  });
+  return [...tramos.values()];
 }
 
 /** Puntos de una polilínea SVG, normalizados al alto del lienzo. */

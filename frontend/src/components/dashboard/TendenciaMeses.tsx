@@ -33,11 +33,13 @@ import { useMemo, useState } from 'react';
 
 import {
   abrevDeFecha,
+  granularidadPara,
   kpisDelPanorama,
   kpisDelPeriodo,
   puntosDeLinea,
   rangoDelRecorrido,
   recorridoDeTendencia,
+  resamplear,
   rotuloDelPeriodo,
   segmentosDelRecorrido,
   veredictoDeVentana,
@@ -60,6 +62,10 @@ interface TendenciaMesesProps {
   datos: PuntoTendencia[];
   /** Tope de meses de historia. Default: 36 (tres años). */
   meses?: number;
+  /** Primer día de OPERACIÓN real ('YYYY-MM-DD'): la historia arranca en ese
+   *  mes y lo importado en bloque queda afuera. Sin señal, la densidad de
+   *  días con movimiento decide sola. */
+  desde?: string;
   className?: string;
   /** Qué mide la serie. Default 'flujo' — el uso histórico, intacto. */
   modo?: ModoTendencia;
@@ -75,6 +81,7 @@ interface TendenciaMesesProps {
 export function TendenciaMeses({
   datos,
   meses = 36,
+  desde,
   className,
   modo = 'flujo',
   titulo,
@@ -90,7 +97,10 @@ export function TendenciaMeses({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
-  const recorrido = useMemo(() => recorridoDeTendencia(datos, meses), [datos, meses]);
+  const recorrido = useMemo(
+    () => recorridoDeTendencia(datos, meses, undefined, desde),
+    [datos, meses, desde],
+  );
   const mesesLista = useMemo(() => recorrido?.periodos ?? [], [recorrido]);
   const segmentos = useMemo(() => segmentosDelRecorrido(mesesLista), [mesesLista]);
   const panoramaDias = useMemo(() => mesesLista.flatMap((p) => p.dias), [mesesLista]);
@@ -113,7 +123,7 @@ export function TendenciaMeses({
     && (vistaDetalle.clave === claveHoy || vistaDetalle.clave === claveHoy.slice(0, 4));
 
   const veredicto = enPanorama
-    ? veredictoDelPanorama(mesesLista, modo, fmt)
+    ? veredictoDelPanorama(mesesLista, modo, fmt, claveHoy)
     : esVentana
       ? veredictoDeVentana(vistaDetalle!, modo, fmt)
       : esMonto
@@ -121,7 +131,7 @@ export function TendenciaMeses({
         : veredictoDelMes(vistaDetalle!, previo);
 
   const kpis = enPanorama
-    ? kpisDelPanorama(mesesLista, modo, fmt)
+    ? kpisDelPanorama(mesesLista, modo, fmt, claveHoy)
     : kpisDelPeriodo({
         periodo: vistaDetalle!,
         previo,
@@ -137,23 +147,27 @@ export function TendenciaMeses({
   const W = 620;
   const H = 170;
   const diasVista = enPanorama ? panoramaDias : vistaDetalle!.dias;
-  const ins = diasVista.map((d) => d.cantidad || 0);
-  const outs = diasVista.map((d) => d.resueltos || 0);
+  // La granularidad del trazo se DERIVA del largo de la ventana: días, semanas
+  // o meses. 970 puntos diarios en 620px no son una curva, son un peine.
+  const gran = granularidadPara(diasVista.length);
+  const puntosVista = resamplear(diasVista, gran);
+  const ins = puntosVista.map((d) => d.cantidad || 0);
+  const outs = puntosVista.map((d) => d.resueltos || 0);
   const hayResueltos = outs.some((v) => v > 0);
   const max = Math.max(1, ...ins, ...outs);
   const lineaIn = puntosDeLinea(ins, max, W, H);
   const area = lineaIn ? `0,${H} ${lineaIn} ${W},${H}` : '';
 
-  // Eje: "1 jul" en ventanas cortas; con más de un año a la vista el día es
-  // ruido y manda "jul 2025".
-  const multiAnio = diasVista.length > 370
-    || (diasVista.length > 0 && diasVista[0].fecha.slice(0, 4) !== diasVista[diasVista.length - 1].fecha.slice(0, 4));
+  // Eje: "1 jul" por días o semanas; por meses el día es ruido y manda
+  // "jul 2025" (con más de un año a la vista, siempre con el año).
+  const multiAnio = diasVista.length > 0
+    && diasVista[0].fecha.slice(0, 4) !== diasVista[diasVista.length - 1].fecha.slice(0, 4);
   const ejes = [0, 1, 2, 3].map((i) => {
-    const d = diasVista[Math.round((i / 3) * (diasVista.length - 1))];
+    const d = puntosVista[Math.round((i / 3) * (puntosVista.length - 1))];
     if (!d) return '';
-    return multiAnio
-      ? `${abrevDeFecha(d.fecha)} ${d.fecha.slice(0, 4)}`
-      : `${Number(d.fecha.slice(8, 10))} ${abrevDeFecha(d.fecha)}`;
+    if (gran === 'mes') return `${abrevDeFecha(d.fecha)} ${d.fecha.slice(0, 4)}`;
+    const dia = `${Number(d.fecha.slice(8, 10))} ${abrevDeFecha(d.fecha)}`;
+    return multiAnio ? `${dia} ${d.fecha.slice(0, 4)}` : dia;
   });
 
   const chip = esVentana ? vistaDetalle!.label : enPanorama ? 'Panorama' : vistaDetalle!.label;

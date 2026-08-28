@@ -431,6 +431,55 @@ async def serie_gastos(
     return salida
 
 
+@router.get("/inicio-operativo")
+async def inicio_operativo(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Desde cuando el muni OPERA el sistema, separado de las importaciones.
+
+    San Pedro Norte (2026-08-28): 8.251 gastos con fecha desde enero 2024, pero
+    7.127 entraron el 15/05/2026 en un solo dia (la migracion de las planillas)
+    y desde el 16/05 el tesorero carga a mano todos los dias. Un promedio que
+    mezcle las dos cosas ("$91M por mes en 32 meses") es cierto y no sirve: la
+    tendencia del dashboard tiene que hablar de la operacion real, y el
+    historico se consulta en la pantalla de Gastos con filtros.
+
+    El modelo no guarda el origen de un gasto, pero la RAFAGA de created_at lo
+    delata de forma deterministica:
+      - importacion = un dia con al menos max(100, 10 x mediana diaria) filas
+        creadas, cuyas fechas contables abarcan mas de 60 dias (un lote
+        operativo -sueldos del mes- es grande pero de fechas del mismo mes);
+      - la operacion empieza el primer dia con filas fuera de esas rafagas.
+    Sin filas: desde=None (el front cae a su regla de densidad).
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    dia = func.date(Gasto.created_at).label("dia")
+    rows = (await db.execute(
+        select(dia, func.count().label("n"), func.min(Gasto.fecha), func.max(Gasto.fecha))
+        .where(Gasto.municipio_id == municipio_id)
+        .group_by(dia)
+        .order_by(dia)
+    )).all()
+    if not rows:
+        return {"desde": None, "importaciones": []}
+
+    conteos = sorted(n for _, n, _, _ in rows)
+    mediana = conteos[len(conteos) // 2]
+    umbral = max(100, 10 * mediana)
+    importaciones = [
+        {"dia": str(d), "filas": n, "fechas": [str(fmin), str(fmax)]}
+        for d, n, fmin, fmax in rows
+        if n >= umbral and fmin and fmax and (fmax - fmin).days > 60
+    ]
+    dias_import = {i["dia"] for i in importaciones}
+    operativos = [str(d) for d, _, _, _ in rows if str(d) not in dias_import]
+    return {"desde": operativos[0] if operativos else None, "importaciones": importaciones}
+
+
 @router.post("", response_model=GastoResponse, status_code=201)
 async def create_gasto(
     payload: GastoCreate,

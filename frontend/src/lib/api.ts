@@ -2306,6 +2306,12 @@ export const gastosApi = {
    *  por día y el día más caro salen de acá, no de traerse los gastos. */
   serie: (dias = 90) =>
     api.get<{ fecha: string; monto: number }[]>('/tesoreria/gastos/serie', { params: { dias } }),
+  /** Desde cuándo el muni carga gastos a mano (las importaciones en ráfaga
+   *  quedan afuera). `desde` null = sin señal. */
+  inicioOperativo: () =>
+    api.get<{ desde: string | null; importaciones: { dia: string; filas: number; fechas: string[] }[] }>(
+      '/tesoreria/gastos/inicio-operativo',
+    ),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

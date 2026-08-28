@@ -22,6 +22,7 @@ export function TendenciaGastos({ datos }: SeccionProps) {
   return (
     <TendenciaMeses
       datos={puntos}
+      desde={datos.finanzas.desdeOperativo ?? undefined}
       modo="monto"
       titulo="Tendencia de gastos"
       etiquetaAccesible="Tendencia de gastos"
