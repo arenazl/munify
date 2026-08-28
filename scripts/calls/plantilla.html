@@ -106,6 +106,7 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .cola-it .pos{font-size:12px;color:var(--ink3);font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
 .cola-it .nm{font-weight:650;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cola-it .sb{font-size:11.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cola-it .why{color:var(--acc);font-weight:600}
 
 .ia-btn{background:linear-gradient(135deg,var(--purple),var(--acc));color:#fff;border:0;border-radius:9px;
  padding:9px 14px;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
@@ -472,6 +473,56 @@ function colaDelDia(n){
   return n ? cola.slice(0, n) : cola;
 }
 function siguienteSugerido(){ return colaDelDia(1)[0] || null; }
+/* ============================================================
+   "Despues seguis con" INTELIGENTE (dueño, 2026-08-28): la cola se arma
+   alrededor del ANCLA (el sugerido de arriba, o el ultimo que trabajaste)
+   con criterios explicables — y cada item DICE por que sigue el:
+     · lo prometido ya vencido            (+50)  "le prometiste volver"
+     · lo que quedo a medio cerrar        (+34)  rellamar sin fecha
+     · no atendio (y hoy no lo llamaste)  (+26)  reintento
+     · misma zona que el ancla            (+18)  se aprovecha el envion
+     · tamaño similar al ancla            (+10)  misma problematica operativa
+   Desempate: poblacion. Todo sale de datos REALES de la ficha y de TU uso
+   (estados, notas, agenda): la cola cambia sola a medida que trabajas.
+   ============================================================ */
+function colaInteligente(n){
+  const hoy = hoyISO();
+  const ancla = siguienteSugerido();
+  const llamadosHoy = new Set();
+  CONTACTOS.forEach(c => ((db[c.id]||{}).hist || []).forEach(h => {
+    if (h.tipo === 'llamada' && h.t.slice(0,10) === hoy) llamadosHoy.add(c.id);
+  }));
+  const logAncla = ancla ? Math.log10(Math.max(poblacion(ancla), 1)) : null;
+  const puntuar = c => {
+    const r = db[c.id] || {};
+    let pts = 0, razon = '';
+    if (r.proximo && r.proximo <= hoy){ pts += 50; razon = 'le prometiste volver'; }
+    else if (r.estado === 'rellamar'){ pts += 34; razon = 'quedó a medio cerrar'; }
+    else if (r.estado === 'no-atiende' && !llamadosHoy.has(c.id)){ pts += 26; razon = 'no atendió, reintentá'; }
+    if (ancla && c.region && c.region === ancla.region){
+      pts += 18; if (!razon) razon = 'misma zona que ' + ancla.localidad;
+    }
+    if (logAncla != null && Math.abs(Math.log10(Math.max(poblacion(c), 1)) - logAncla) < 0.3){
+      pts += 10; if (!razon) razon = 'tamaño similar, misma problemática';
+    }
+    pts += Math.min(Math.log10(Math.max(poblacion(c), 1)), 8);
+    return {c, pts, razon};
+  };
+  const candidatos = CONTACTOS.filter(c => {
+    const r = db[c.id] || {};
+    if (c.id === (ancla && ancla.id)) return false;
+    if (r.estado === 'contactado' || r.estado === 'descartado') return false;
+    if (r.proximo && r.proximo > hoy) return false;   // agendado a futuro: vive en la agenda
+    if (llamadosHoy.has(c.id) && r.estado !== 'rellamar') return false;
+    return true;
+  });
+  const orden = arr => arr.map(puntuar).sort((a, b) => b.pts - a.pts);
+  const cola = [];
+  const push = x => { if (x && !cola.some(y => y.c.id === x.c.id)) cola.push(x); };
+  orden(delPais(candidatos)).forEach(push);
+  if (paisHoy) orden(candidatos).forEach(push);
+  return n ? cola.slice(0, n) : cola;
+}
 function llamadasDeHoy(){
   const hoy = hoyISO(), ids = new Set();
   CONTACTOS.forEach(c => ((db[c.id]||{}).hist || []).forEach(x => {
@@ -527,15 +578,17 @@ function pintarMetaDia(){
   };
 }
 function pintarColaHoy(){
-  const cola = colaDelDia(metaDiaria() + 1).slice(1), el = document.getElementById('colaHoy');
+  const cola = colaInteligente(metaDiaria()), el = document.getElementById('colaHoy');
   const cc = document.getElementById('colaHoyCuenta');
   if (cc) cc.textContent = cola.length || '';
-  el.innerHTML = cola.length ? cola.map((c, i) => {
-    const f = FUNC[c.id] || {}, r = db[c.id] || {};
-    const motivo = (r.proximo && r.proximo <= hoyISO()) ? 'le prometiste volver' : (f.intendente || c.region);
+  el.innerHTML = cola.length ? cola.map((x, i) => {
+    const c = x.c, f = FUNC[c.id] || {};
+    const sub = x.razon
+      ? '<span class="why">' + esc(x.razon) + '</span>' + (f.intendente ? ' · ' + esc(f.intendente) : '')
+      : esc(f.intendente || c.region);
     return '<div class="cola-it" data-abrir="' + c.id + '"><span class="pos">' + (i+2) + '</span>'
       + '<div style="min-width:0"><div class="nm">' + esc(c.localidad) + '</div>'
-      + '<div class="sb">' + esc(motivo) + '</div></div>'
+      + '<div class="sb">' + sub + '</div></div>'
       + '<a class="tel-btn hecho" href="' + telHref(c.telefono) + '">' + esc(c.telefono) + '</a></div>';
   }).join('') : '<div class="vacio">No queda nadie más en la cola' + (paisHoy ? ' de ' + esc(paisHoy) : '') + '.</div>';
 }
