@@ -243,7 +243,13 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .badge.n{border-color:var(--purple);color:var(--purple)}
 .badge.ojo{border-color:var(--warn);color:var(--warn)}
 
-.ficha{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ficha{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+ touch-action:pan-y}
+/* El cuerpo de la ficha SOLO va vertical, EN TODOS LOS ANCHOS (antes vivia
+   solo en la media query mobile y el desktop quedaba sin la regla): un
+   contenido apenas mas ancho (una URL larga) habilitaba el arrastre lateral
+   adentro del panel aunque el shell estuviera clavado. */
+.f-body{overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y}
 .f-head{padding:15px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
 .f-head>div{flex:1;min-width:0}
 .f-head h2{margin:0 0 3px;font-size:23px;letter-spacing:-.4px}
@@ -308,6 +314,9 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
  padding:9px 14px calc(9px + env(safe-area-inset-bottom));z-index:30}
 .foot-in{max-width:1400px;margin:0 auto;width:100%;display:flex;gap:11px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--ink3)}
 .foot-in .barra{max-width:250px}
+/* El sello de build: la respuesta instantanea a "¿se deployo?" sin abrir
+   la consola ni dudar del cache del dispositivo. */
+.vtag{font-size:10.5px;color:var(--ink3);opacity:.75;font-variant-numeric:tabular-nums;white-space:nowrap}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;opacity:0;pointer-events:none;transition:.18s}
 .cerrar-ficha{background:var(--card2);border:1px solid var(--line2);color:var(--ink2);border-radius:9px;
  width:32px;height:32px;cursor:pointer;font-size:18px;line-height:1;flex:none}
@@ -322,11 +331,7 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
  .ficha-col.on{transform:none}
  .ov.on{opacity:1;pointer-events:auto}
  .ficha{border:0;border-radius:0;height:100%;display:flex;flex-direction:column}
- /* El scroller de la ficha SOLO va vertical: sin esto, un contenido apenas
-    mas ancho (una URL larga) habilitaba el arrastre lateral adentro del
-    panel aunque el body estuviera clavado (visto en iPhone, Godoy Cruz). */
- .f-body{overflow-y:auto;overflow-x:hidden;flex:1;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain;touch-action:pan-y;padding-bottom:34px}
+ .f-body{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;padding-bottom:34px}
  .hoy-grid{grid-template-columns:1fr}
  /* Los KPIs duplicaban el alto del header sticky en el telefono (dos pisos
     pegados arriba = media pantalla). El dato vive igual en "Como venis" y
@@ -396,6 +401,7 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 27/08 21:19 · 42c8137</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>

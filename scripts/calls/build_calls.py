@@ -57,6 +57,21 @@ W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 norm = lambda s: re.sub(r"\s+", " ", str(s if s is not None else "")).strip()  # noqa: E731
 
 
+def _sello_build():
+    """Sello visible en el pie: fecha ART + hash corto de git. Es la respuesta
+    instantanea a la duda '¿se deployo o estoy viendo cache?'."""
+    import subprocess
+    from datetime import datetime, timedelta, timezone
+    art = timezone(timedelta(hours=-3))
+    fecha = datetime.now(art).strftime("%d/%m %H:%M")
+    try:
+        h = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                           capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        h = ""
+    return f"{fecha}{(' · ' + h) if h else ''}"
+
+
 def slug(pais: str, localidad: str) -> str:
     import unicodedata
     s = unicodedata.normalize("NFD", (pais + "-" + localidad).lower())
@@ -184,7 +199,8 @@ def main() -> int:
         print("ERROR: la plantilla no tiene el hueco /*__DATOS__*/{}")
         return 1
     io.open(SALIDA, "w", encoding="utf-8").write(
-        html.replace("/*__DATOS__*/{}", json.dumps(datos, ensure_ascii=False, separators=(",", ":"))))
+        html.replace("/*__DATOS__*/{}", json.dumps(datos, ensure_ascii=False, separators=(",", ":")))
+        .replace("/*__BUILD__*/dev", _sello_build()))
 
     print(f"\nOK -> {os.path.relpath(SALIDA, RAIZ)}  ({round(os.path.getsize(SALIDA)/1024, 1)} KB)")
     print(f"  municipios     {len(contactos)}  {dict(Counter(c['pais'] for c in contactos))}")
