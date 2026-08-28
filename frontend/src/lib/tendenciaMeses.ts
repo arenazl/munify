@@ -64,10 +64,8 @@ export interface Periodo {
   diasConMovimiento: number;
   /** El día más cargado, con su mes: en una ventana no todos son del mismo. */
   pico: { dia: number; abrev: string; cantidad: number } | null;
-  /** Mes FUTURO respecto de hoy: plata COMPROMETIDA (cuotas, pagos cargados
-   *  por adelantado), no ejecutada. Sólo lo enciende `recorridoDeTendencia`;
-   *  en series sin fechas futuras (reclamos) jamás aparece. */
-  futuro?: boolean;
+  /** Es un AÑO entero (la historia larga se segmenta por año, no por mes). */
+  esAnio?: boolean;
 }
 
 /** Cómo se está leyendo la serie: mes a mes, o una sola ventana de días. */
@@ -114,10 +112,12 @@ export interface KpiTendencia {
 export const DIAS_PARA_CONTAR_EL_MES = 10;
 
 /**
- * Tope de meses FUTUROS en el recorrido. La serie puede traer cuotas cargadas
- * a un año; el recorrido muestra lo que viene sin volverse un almanaque.
+ * Con más de esta cantidad de meses de historia, el recorrido se segmenta por
+ * AÑO: 32 chips de meses no son un índice, son ruido. San Pedro Norte (tres
+ * años de gastos) se lee 2024 · 2025 · 2026; un muni de cuatro meses, mes a
+ * mes.
  */
-export const MESES_FUTUROS_MAX = 4;
+export const MESES_PARA_SEGMENTAR_POR_ANIO = 14;
 
 /**
  * Piso de la ventana de días: con menos, la curva es un palito.
@@ -262,39 +262,125 @@ export function recorridoDeTendencia(
   /** Inyectable para tests; en runtime es el HOY local del navegador. */
   hoyISO?: string,
 ): Recorrido | null {
-  const lista = recortarExtremos(agruparPorMes(datos));
-  if (lista.length === 0) return null;
-
-  // "Hoy" es el del CALENDARIO, no el último día de la serie: la serie puede
-  // traer gastos con fecha futura (cuotas, pagos cargados por adelantado) y
-  // con ellos "la cola de la serie" dejó de significar "los últimos meses" —
-  // el recorrido mostraba oct/nov/dic como si fueran pasado y se salteaba el
-  // mes en curso (San Pedro Norte, 2026-08-28).
+  // SIN FUTUROLOGÍA (dueño, 2026-08-28): la tendencia es la historia HASTA
+  // HOY. La serie puede traer fechas futuras (cuotas, pagos cargados por
+  // adelantado) — acá se cortan: lo que viene lo cuenta la agenda de pagos,
+  // no este gráfico. "Hoy" es el del CALENDARIO, no el último día de la
+  // serie, que con futuras dejó de significar "el presente".
   const hoy = hoyISO ?? fechaLocalISO();
   const claveHoy = hoy.slice(0, 7);
   const diaHoy = Number(hoy.slice(8, 10));
 
-  // Historia hasta hoy inclusive; lo que viene, marcado como FUTURO.
-  let pasados = lista.filter((p) => p.clave <= claveHoy);
-  const futuros = lista
-    .filter((p) => p.clave > claveHoy)
-    .slice(0, MESES_FUTUROS_MAX)
-    .map((p) => ({ ...p, futuro: true }));
+  let lista = recortarExtremos(agruparPorMes(datos.filter((p) => p.fecha <= hoy)));
+  if (lista.length === 0) return null;
 
   // El mes en curso recién arrancado se descarta sólo si quedan al menos dos
   // meses para comparar: antes que mostrar un mes suelto, queda el parcial.
-  const enCurso = pasados.length > 0 && pasados[pasados.length - 1].clave === claveHoy;
-  if (enCurso && diaHoy < DIAS_PARA_CONTAR_EL_MES && pasados.length > 2) {
-    pasados = recortarExtremos(pasados.slice(0, -1));
+  const enCurso = lista[lista.length - 1].clave === claveHoy;
+  if (enCurso && diaHoy < DIAS_PARA_CONTAR_EL_MES && lista.length > 2) {
+    lista = recortarExtremos(lista.slice(0, -1));
   }
 
-  const periodos = [...pasados.slice(-meses), ...futuros];
+  const periodos = lista.slice(-meses);
   const conHistoria = periodos.filter(periodoConMovimiento).length;
   if (conHistoria >= 2) return { modo: 'meses', periodos };
 
-  // La ventana dice "hasta hoy": los días futuros no entran en ella.
   const ventana = ventanaDeDias(datos.filter((p) => p.fecha <= hoy));
   return ventana ? { modo: 'ventana', periodos: [ventana] } : null;
+}
+
+/**
+ * Los CHIPS del recorrido: los mismos meses si la historia es corta, o
+ * AGRUPADOS por año cuando es larga (más de `MESES_PARA_SEGMENTAR_POR_ANIO`).
+ * Un segmento-año es un `Periodo` común con `esAnio` — mismos agregados,
+ * misma maquinaria de veredictos y KPIs.
+ */
+export function segmentosDelRecorrido(periodos: Periodo[]): Periodo[] {
+  if (periodos.length <= MESES_PARA_SEGMENTAR_POR_ANIO) return periodos;
+  const porAnio = new Map<string, PuntoTendencia[]>();
+  for (const p of periodos) {
+    const anio = p.clave.slice(0, 4);
+    porAnio.set(anio, [...(porAnio.get(anio) ?? []), ...p.dias]);
+  }
+  return [...porAnio.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([anio, dias]) => ({ ...armarPeriodo(anio, anio, '', dias), esAnio: true }));
+}
+
+/** "de enero 2024 a hoy" / "de junio a hoy" (mismo año: sin repetirlo). */
+export function rangoDelRecorrido(periodos: Periodo[], hoyISO?: string): string {
+  if (periodos.length === 0) return '';
+  const primero = periodos[0];
+  const hoy = hoyISO ?? fechaLocalISO();
+  const multiAnio = primero.clave.slice(0, 4) !== hoy.slice(0, 4);
+  const desde = multiAnio
+    ? `${primero.label.toLowerCase()} ${primero.clave.slice(0, 4)}`
+    : primero.label.toLowerCase();
+  return `de ${desde} a hoy`;
+}
+
+/**
+ * El VEREDICTO del panorama: la lectura de TODA la historia en una frase.
+ * Mismo contrato que los veredictos de período: interpreta, no describe.
+ */
+export function veredictoDelPanorama(
+  periodos: Periodo[],
+  modo: ModoTendencia,
+  fmt: (n: number) => string,
+): VeredictoMes {
+  const total = periodos.reduce((s, p) => s + p.entraron, 0);
+  const resueltos = periodos.reduce((s, p) => s + p.resueltos, 0);
+  const n = periodos.length;
+
+  if (modo === 'monto') {
+    const promedio = n > 0 ? total / n : 0;
+    return {
+      etiqueta: `Venís gastando ${fmt(promedio)} por mes:`,
+      resto: `${fmt(total)} en ${nf(n)} meses.`,
+      tono: 'neutro',
+    };
+  }
+  const tasa = total > 0 ? resueltos / total : 0;
+  const pct = Math.round(tasa * 100);
+  return {
+    etiqueta: `Entraron ${nf(total)} y se cerró el ${pct}%:`,
+    resto: `${nf(resueltos)} resueltos en ${nf(n)} meses.`,
+    tono: tasa >= 0.75 ? 'bueno' : tasa >= 0.5 ? 'neutro' : 'malo',
+  };
+}
+
+/** Los mini-KPIs del panorama. Regla del cero intacta: sin datos, sin KPI. */
+export function kpisDelPanorama(
+  periodos: Periodo[],
+  modo: ModoTendencia,
+  fmt: (n: number) => string,
+): KpiTendencia[] {
+  const conMov = periodos.filter(periodoConMovimiento);
+  if (conMov.length === 0) return [];
+  const total = periodos.reduce((s, p) => s + p.entraron, 0);
+  const n = periodos.length;
+  const multiAnio = periodos.length > 0
+    && periodos[0].clave.slice(0, 4) !== periodos[periodos.length - 1].clave.slice(0, 4);
+  const caro = conMov.reduce((may, p) => (p.entraron > may.entraron ? p : may), conMov[0]);
+  const labelMes = multiAnio ? `${caro.label} ${caro.clave.slice(0, 4)}` : caro.label;
+
+  if (modo === 'monto') {
+    return [
+      { etiqueta: 'Total gastado', valor: fmt(total), nota: `· ${nf(n)} meses` },
+      { etiqueta: 'Promedio mensual', valor: fmt(n > 0 ? total / n : 0) },
+      { etiqueta: 'Mes más caro', valor: labelMes, nota: `· ${fmt(caro.entraron)}` },
+    ];
+  }
+  const resueltos = periodos.reduce((s, p) => s + p.resueltos, 0);
+  const kpis: KpiTendencia[] = [
+    { etiqueta: 'Ingresados', valor: nf(total), nota: `· ${nf(n)} meses` },
+  ];
+  if (resueltos > 0) {
+    kpis.push({ etiqueta: 'Resueltos', valor: nf(resueltos), tono: 'bueno' });
+    kpis.push({ etiqueta: 'Tasa de cierre', valor: `${Math.round((resueltos / Math.max(1, total)) * 100)}%` });
+  }
+  kpis.push({ etiqueta: 'Mes más cargado', valor: labelMes, nota: `· ${nf(caro.entraron)}` });
+  return kpis;
 }
 
 /** Puntos de una polilínea SVG, normalizados al alto del lienzo. */
@@ -390,24 +476,6 @@ export function veredictoDelMesMonto(
     enCurso
       ? `En lo que va de ${m.label.toLowerCase()} ${resto}`
       : resto.charAt(0).toUpperCase() + resto.slice(1);
-
-  // Mes FUTURO: nada se "gastó" — es plata ya comprometida (cuotas, pagos
-  // cargados por adelantado). La frase no compara contra el pasado: son dos
-  // magnitudes distintas y el delta diría cualquier cosa.
-  if (m.futuro) {
-    if (m.entraron === 0) {
-      return {
-        etiqueta: `${m.label} viene libre:`,
-        resto: 'sin cuotas ni pagos cargados por adelantado.',
-        tono: 'neutro',
-      };
-    }
-    return {
-      etiqueta: `Ya hay ${fmt(m.entraron)} comprometidos:`,
-      resto: `cuotas y pagos cargados por adelantado para ${m.label.toLowerCase()}.`,
-      tono: 'neutro',
-    };
-  }
 
   if (m.entraron === 0) {
     return {
@@ -544,21 +612,17 @@ export function kpisDelPeriodo({ periodo, previo, modo, recorrido, tono, fmt }: 
   const pico = m.pico && m.pico.cantidad > 0 ? m.pico : null;
 
   if (modo === 'monto') {
-    const futuro = Boolean(m.futuro);
     const kpis: KpiTendencia[] = [
-      { etiqueta: futuro ? 'Total comprometido' : 'Total gastado', valor: fmt(m.entraron) },
+      { etiqueta: 'Total gastado', valor: fmt(m.entraron) },
       { etiqueta: 'Promedio por día', valor: fmt(m.porDia) },
     ];
     if (recorrido === 'meses') {
-      // Sin mes previo no hay variación: una raya, no un 0%. Y GASTADO contra
-      // COMPROMETIDO tampoco se compara: el delta sólo existe entre meses de
-      // la misma especie (real vs real, comprometido vs comprometido).
-      const comparable = previo && previo.entraron > 0 && Boolean(previo.futuro) === futuro;
-      const delta = comparable
+      // Sin período previo no hay variación: una raya, no un 0%.
+      const delta = previo && previo.entraron > 0
         ? Math.round(((m.entraron - previo.entraron) / previo.entraron) * 100)
         : null;
       kpis.push({
-        etiqueta: 'Vs. mes anterior',
+        etiqueta: m.esAnio ? 'Vs. año anterior' : 'Vs. mes anterior',
         valor: delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta}%`,
         tono,
       });
@@ -569,7 +633,7 @@ export function kpisDelPeriodo({ periodo, previo, modo, recorrido, tono, fmt }: 
       });
     }
     kpis.push({
-      etiqueta: futuro ? 'Día más cargado' : 'Día más caro',
+      etiqueta: 'Día más caro',
       valor: pico ? `${pico.dia} ${pico.abrev}` : '—',
       nota: pico ? `· ${fmt(pico.cantidad)}` : undefined,
     });

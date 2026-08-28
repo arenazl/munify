@@ -1,75 +1,64 @@
 /**
- * TendenciaMeses — el recorrido del período que el municipio REALMENTE tiene,
- * como un reproductor.
+ * TendenciaMeses — la HISTORIA COMPLETA del municipio, en una curva.
  *
  * QUÉ PROBLEMA RESUELVE
- * Una serie de 30 días es una línea plana con algún pico: no cuenta nada. Lo
- * que se quiere saber es si el municipio viene GANANDO o PERDIENDO, y eso
- * sólo se ve comparando meses. Este bloque recorre los últimos, uno por vez, y
- * de cada uno dice lo mismo: cuánto entró, cuánto se cerró, qué proporción se
- * logró y qué día fue el peor.
+ * Un gráfico que se llama "Tendencia" promete una curva continua, no un
+ * carrusel de meses de a uno (dueño, 2026-08-28). El bloque abre con el
+ * PANORAMA: toda la historia disponible hasta hoy en una sola línea, con su
+ * frase-veredicto y los KPIs del período completo. Los tramos de abajo son el
+ * DRILL-DOWN: click en un mes (o un año) y se ve su detalle diario, con el
+ * veredicto y los KPIs de ese tramo. Nada rota solo: una tendencia se mira,
+ * no gira.
  *
- * La frase de arriba es lo que hace el trabajo: no describe el gráfico, lo
- * INTERPRETA ("se abría la brecha: entraban 2,4 por día y se cerraba menos de
- * la mitad"). El gráfico está para respaldarla, no al revés.
+ * ESCALA ELÁSTICA, DOS VECES
+ *  - La ventana la deciden los datos: se muestra toda la historia que haya
+ *    (un muni de 4 meses ve 4 meses; San Pedro Norte, tres años).
+ *  - Los tramos también: hasta ~14 meses de historia el índice es por MES;
+ *    más que eso, por AÑO (2024 · 2025 · 2026). Criterio en
+ *    `lib/tendenciaMeses.ts` (`MESES_PARA_SEGMENTAR_POR_ANIO`).
+ *  - Con UN solo mes con historia el bloque cambia a VENTANA DE DÍAS, una
+ *    sola vista sin tramos. Sin datos no se dibuja nada: jamás un panel de
+ *    ceros.
  *
- * El recorrido automático es lo que lo vuelve una pieza de demo: la pantalla
- * se cuenta sola, sin que nadie toque nada. Se pausa al pasar el mouse y con
- * `prefers-reduced-motion` no arranca — el hook del kit ya resuelve todo eso.
- *
- * ESCALA ELÁSTICA (la ventana la deciden los datos, no el calendario)
- * Los meses vacíos de las puntas no son períodos y se recortan; si después de
- * eso queda UN solo mes con historia, el bloque cambia de escala y muestra una
- * VENTANA DE DÍAS —del primer día con movimiento hasta hoy, piso de 15 días—
- * en una sola vista, sin carrusel. Un municipio con quince días de vida se lee
- * en quince días; uno con tres meses, mes a mes. Sin datos, no se dibuja nada:
- * jamás un panel de ceros. Todo el criterio vive en `lib/tendenciaMeses.ts`.
+ * SIN FUTUROLOGÍA: la serie puede traer fechas futuras (cuotas cargadas por
+ * adelantado) y este bloque las corta en HOY. Lo comprometido hacia adelante
+ * lo cuentan la agenda de pagos y la proyección, no la tendencia.
  *
  * DOS MODOS (la pieza es del KIT, no de reclamos):
- *  - `'flujo'` (default): dos series —lo que entró y lo que se cerró— y el
- *    veredicto habla de la BRECHA entre ambas. Es el uso histórico.
- *  - `'monto'`: UNA serie en dinero. El veredicto habla de cuánto se gastó
- *    contra el mes anterior (umbral del 5%, abajo de eso es ruido) y los
- *    mini-KPIs cambian a total / promedio por día / variación / día más caro.
- *    El mes EN CURSO no se califica en verde ni en rojo: se dice "en lo que
- *    va de", porque celebrar un mes a mitad de camino contra uno entero es
- *    exactamente la comparación que este bloque existe para evitar.
+ *  - `'flujo'` (default): dos series —entró / se cerró— y veredictos de brecha.
+ *  - `'monto'`: una serie en pesos, veredictos de gasto. El período EN CURSO
+ *    no se califica: se dice "en lo que va de".
  */
-import { useMemo } from 'react';
-import { Pause, Play, ChevronRight } from 'lucide-react';
-import { useCarruselAuto } from '../../lib/useCarruselAuto';
+import { useMemo, useState } from 'react';
 
 import {
   abrevDeFecha,
+  kpisDelPanorama,
   kpisDelPeriodo,
-  nf,
   puntosDeLinea,
+  rangoDelRecorrido,
   recorridoDeTendencia,
   rotuloDelPeriodo,
+  segmentosDelRecorrido,
   veredictoDeVentana,
   veredictoDelMes,
   veredictoDelMesMonto,
+  veredictoDelPanorama,
+  nf,
   type ModoTendencia,
   type PuntoTendencia,
 } from '../../lib/tendenciaMeses';
 
-// El nucleo puro del bloque (el recorte elastico de la ventana, los
-// veredictos, los mini-KPIs, la polilinea) vive en lib/tendenciaMeses.ts. Se
-// separo por la regla de fast-refresh —un archivo de componentes exporta SOLO
-// componentes— y porque ahi vive el COPY, que hay que poder verificar contra
-// los numeros reales del municipio sin montar React. Mismo criterio que
-// lib/semanticHero.ts.
+// El núcleo puro del bloque (el recorte de la ventana, la segmentación por
+// mes/año, los veredictos, los mini-KPIs, la polilínea) vive en
+// lib/tendenciaMeses.ts. Se separó por la regla de fast-refresh —un archivo
+// de componentes exporta SOLO componentes— y porque ahí vive el COPY, que se
+// verifica contra los números reales del municipio sin montar React.
 export type { ModoTendencia, PuntoTendencia };
-
-/** Cada cuanto pasa al mes siguiente. */
-// Cada mes se queda el DOBLE de tiempo que antes (6s -> 12s).
-// La frase que acompania al grafico hay que leerla, no alcanzar a verla: a
-// 6 segundos el panel cambiaba antes de que uno terminara de entenderlo.
-const INTERVALO_MS = 12000;
 
 interface TendenciaMesesProps {
   datos: PuntoTendencia[];
-  /** Cuántos meses recorrer, del más reciente hacia atrás. */
+  /** Tope de meses de historia. Default: 36 (tres años). */
   meses?: number;
   className?: string;
   /** Qué mide la serie. Default 'flujo' — el uso histórico, intacto. */
@@ -85,7 +74,7 @@ interface TendenciaMesesProps {
 
 export function TendenciaMeses({
   datos,
-  meses = 3,
+  meses = 36,
   className,
   modo = 'flujo',
   titulo,
@@ -95,113 +84,104 @@ export function TendenciaMeses({
   const esMonto = modo === 'monto';
   const fmt = formatoValor ?? ((n: number) => nf(n, n < 10 && !Number.isInteger(n) ? 1 : 0));
 
-  /** 'YYYY-MM' de HOY (hora local): el mes que todavía está corriendo. No se
-   *  deriva del último dato — la serie puede traer fechas futuras (cuotas). */
+  /** 'YYYY-MM' de HOY (hora local): el período que todavía está corriendo. */
   const claveHoy = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
   const recorrido = useMemo(() => recorridoDeTendencia(datos, meses), [datos, meses]);
-  const lista = useMemo(() => recorrido?.periodos ?? [], [recorrido]);
-  const { indice, ir, propsPausa, menosMovimiento, pausado, alternarPausa } = useCarruselAuto({
-    total: lista.length,
-    intervaloMs: INTERVALO_MS,
-  });
+  const mesesLista = useMemo(() => recorrido?.periodos ?? [], [recorrido]);
+  const segmentos = useMemo(() => segmentosDelRecorrido(mesesLista), [mesesLista]);
+  const panoramaDias = useMemo(() => mesesLista.flatMap((p) => p.dias), [mesesLista]);
 
-  // Sin un solo día con movimiento no hay nada que contar: antes que un panel
-  // de ceros, el bloque no se dibuja.
+  // El tramo elegido (clave de segmento) o null = panorama. Clave y no índice:
+  // si la serie se recarga, un índice viejo apuntaría a otro tramo.
+  const [seleccion, setSeleccion] = useState<string | null>(null);
+
   if (!recorrido) return null;
 
   const esVentana = recorrido.modo === 'ventana';
-  const mes = lista[indice];
-  const previo = indice > 0 ? lista[indice - 1] : null;
-  const enCurso = mes.clave === claveHoy;
-  // ¿El recorrido cruza hacia adelante? Cambia el subtítulo: "últimos N
-  // meses" sería mentira si la mitad del recorrido todavía no pasó.
-  const hayFuturo = lista.some((p) => p.futuro);
-  const veredicto = esVentana
-    ? veredictoDeVentana(mes, modo, fmt)
-    : esMonto
-      ? veredictoDelMesMonto(mes, previo, enCurso, fmt)
-      : veredictoDelMes(mes, previo);
+  const idxSeleccion = seleccion === null ? -1 : segmentos.findIndex((s) => s.clave === seleccion);
+  const vistaDetalle = esVentana
+    ? recorrido.periodos[0]
+    : idxSeleccion >= 0 ? segmentos[idxSeleccion] : null;
+  const enPanorama = !esVentana && vistaDetalle === null;
 
-  const kpis = kpisDelPeriodo({
-    periodo: mes,
-    previo,
-    modo,
-    recorrido: recorrido.modo,
-    tono: veredicto.tono,
-    fmt,
-  });
+  const previo = idxSeleccion > 0 ? segmentos[idxSeleccion - 1] : null;
+  const enCursoDetalle = vistaDetalle !== null
+    && (vistaDetalle.clave === claveHoy || vistaDetalle.clave === claveHoy.slice(0, 4));
 
-  // Con un solo tramo no hay recorrido: ni barra de progreso, ni rótulos, ni
-  // botón de play. La ventana de días es UNA vista.
-  const hayRecorrido = lista.length > 1;
+  const veredicto = enPanorama
+    ? veredictoDelPanorama(mesesLista, modo, fmt)
+    : esVentana
+      ? veredictoDeVentana(vistaDetalle!, modo, fmt)
+      : esMonto
+        ? veredictoDelMesMonto(vistaDetalle!, previo, enCursoDetalle, fmt)
+        : veredictoDelMes(vistaDetalle!, previo);
+
+  const kpis = enPanorama
+    ? kpisDelPanorama(mesesLista, modo, fmt)
+    : kpisDelPeriodo({
+        periodo: vistaDetalle!,
+        previo,
+        modo,
+        recorrido: recorrido.modo,
+        tono: veredicto.tono,
+        fmt,
+      });
+
+  // Los tramos sólo existen fuera de la ventana y con más de un segmento.
+  const hayRecorrido = !esVentana && segmentos.length > 1;
 
   const W = 620;
   const H = 170;
-  const ins = mes.dias.map((d) => d.cantidad || 0);
-  const outs = mes.dias.map((d) => d.resueltos || 0);
+  const diasVista = enPanorama ? panoramaDias : vistaDetalle!.dias;
+  const ins = diasVista.map((d) => d.cantidad || 0);
+  const outs = diasVista.map((d) => d.resueltos || 0);
   const hayResueltos = outs.some((v) => v > 0);
   const max = Math.max(1, ...ins, ...outs);
   const lineaIn = puntosDeLinea(ins, max, W, H);
   const area = lineaIn ? `0,${H} ${lineaIn} ${W},${H}` : '';
 
-  // "1 jul" y no "1": un número suelto no dice de qué mes es, y el eje puede
-  // cruzar meses (la ventana de días arranca en julio y termina en agosto).
+  // Eje: "1 jul" en ventanas cortas; con más de un año a la vista el día es
+  // ruido y manda "jul 2025".
+  const multiAnio = diasVista.length > 370
+    || (diasVista.length > 0 && diasVista[0].fecha.slice(0, 4) !== diasVista[diasVista.length - 1].fecha.slice(0, 4));
   const ejes = [0, 1, 2, 3].map((i) => {
-    const d = mes.dias[Math.round((i / 3) * (mes.dias.length - 1))];
-    return d ? `${Number(d.fecha.slice(8, 10))} ${abrevDeFecha(d.fecha)}` : '';
+    const d = diasVista[Math.round((i / 3) * (diasVista.length - 1))];
+    if (!d) return '';
+    return multiAnio
+      ? `${abrevDeFecha(d.fecha)} ${d.fecha.slice(0, 4)}`
+      : `${Number(d.fecha.slice(8, 10))} ${abrevDeFecha(d.fecha)}`;
   });
+
+  const chip = esVentana ? vistaDetalle!.label : enPanorama ? 'Panorama' : vistaDetalle!.label;
 
   return (
     <section
-      className={`tm ${className || ''}${pausado ? ' tm--pausado' : ''}`}
-      {...propsPausa}
+      className={`tm ${className || ''}`}
       style={{
-        // Duración runtime: la barra tarda EXACTAMENTE lo que el carrusel, de
-        // un solo número. Si mañana cambia el intervalo, la barra lo sigue
-        // sola. Las otras dos son el ancho de las grillas, que ya no son
-        // fijas: los KPIs y los tramos varían con lo que el municipio tenga.
-        ['--tm-paso' as string]: `${INTERVALO_MS}ms`,
+        // Anchos runtime de las grillas: los KPIs y los tramos varían con lo
+        // que el municipio tenga (los tramos suman el chip "Panorama").
         ['--tm-kpis' as string]: `${Math.max(1, kpis.length)}`,
-        ['--tm-tramos' as string]: `${Math.max(1, lista.length)}`,
+        ['--tm-tramos' as string]: `${Math.max(1, segmentos.length + 1)}`,
       }}
       aria-label={etiquetaAccesible ?? 'Tendencia de reclamos'}
     >
       <header className="tm-head">
         <h3 className="tm-titulo">{titulo ?? 'Tendencia de reclamos'}</h3>
-        <span className="tm-mes">{mes.label}</span>
+        <span className="tm-mes">{chip}</span>
         <span className="tm-sub">
-          {esVentana
-            ? 'hasta hoy'
-            : hayFuturo
-              ? `de ${lista[0].label.toLowerCase()} a ${lista[lista.length - 1].label.toLowerCase()}`
-              : `de los últimos ${lista.length} meses`}
+          {esVentana ? 'hasta hoy' : rangoDelRecorrido(mesesLista)}
         </span>
 
         <div className="tm-controles">
           <span className="tm-leyenda">
-            <i className="tm-punto tm-punto--in" />
-            {esMonto ? (mes.futuro ? 'Comprometido' : 'Gastado') : 'Ingresados'}
+            <i className="tm-punto tm-punto--in" />{esMonto ? 'Gastado' : 'Ingresados'}
           </span>
           {hayResueltos && (
             <span className="tm-leyenda"><i className="tm-punto tm-punto--out" />Resueltos</span>
-          )}
-          {/* El play/pausa refleja el estado REAL: si el visitante pidió menos
-              movimiento, el recorrido no arranca y el botón lo dice. */}
-          {hayRecorrido && (
-            <button
-              type="button"
-              className="tm-play"
-              onClick={menosMovimiento ? () => ir(indice + 1) : alternarPausa}
-              title={menosMovimiento ? 'Ver el mes siguiente' : pausado ? 'Retomar el recorrido' : 'Pausar el recorrido'}
-              aria-label={menosMovimiento ? 'Ver el mes siguiente' : pausado ? 'Retomar el recorrido' : 'Pausar el recorrido'}
-            >
-              {menosMovimiento ? <ChevronRight className="h-3 w-3" />
-                : pausado ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
-            </button>
           )}
         </div>
       </header>
@@ -232,57 +212,37 @@ export function TendenciaMeses({
             {[14, 52, 90, 128, 166].map((y) => <path key={y} d={`M0 ${y}h${W}`} />)}
           </g>
           {area && <polygon className="tm-area" points={area} />}
-          {/* Mes comprometido: línea punteada — es plata anotada, no ejecutada. */}
-          {lineaIn && (
-            <polyline
-              className="tm-linea tm-linea--in"
-              points={lineaIn}
-              strokeDasharray={mes.futuro ? '7 5' : undefined}
-            />
-          )}
+          {lineaIn && <polyline className="tm-linea tm-linea--in" points={lineaIn} />}
           {hayResueltos && <polyline className="tm-linea tm-linea--out" points={puntosDeLinea(outs, max, W, H)} />}
         </svg>
       </div>
       <div className="tm-eje">{ejes.map((e, i) => <span key={i}>{e}</span>)}</div>
 
-      {/* Los meses no son pastillas: son la línea de tiempo del recorrido.
-          Es UNA barra continua que va de punta a punta —del primer mes al
-          último—, no una barra por mes que se llena por turno: lo que se está
-          mostrando es un recorrido, y la barra tiene que leerse como ese
-          recorrido, no como cosas sueltas. Con un solo tramo no hay recorrido
-          y la barra desaparece. */}
+      {/* Los tramos son el ÍNDICE de la historia: el panorama abre, y cada
+          mes (o año, cuando la historia es larga) se visita con un click.
+          Nada avanza solo. */}
       {hayRecorrido && (
-        <>
-          <div
-            className="tm-progreso"
-            aria-hidden="true"
-            style={{
-              // De dónde a dónde avanza en este tramo. Con el índice adentro, el
-              // salto entre meses es continuo: el tramo nuevo arranca justo donde
-              // terminó el anterior, sin volver a cero.
-              ['--tm-desde' as string]: `${indice / lista.length}`,
-              ['--tm-hasta' as string]: `${(indice + 1) / lista.length}`,
-            }}
+        <div className="tm-meses">
+          <button
+            type="button"
+            className={`tm-mes-btn ${enPanorama ? 'tm-mes-btn--activo' : ''}`}
+            onClick={() => setSeleccion(null)}
+            aria-current={enPanorama}
           >
-            <span key={`prog-${indice}`} className="tm-progreso-avance" />
-          </div>
-
-          <div className="tm-meses">
-            {lista.map((m, i) => (
-              <button
-                key={m.clave}
-                type="button"
-                className={`tm-mes-btn ${i === indice ? 'tm-mes-btn--activo' : ''}${
-                  i < indice ? ' tm-mes-btn--visto' : ''
-                }`}
-                onClick={() => ir(i)}
-                aria-current={i === indice}
-              >
-                <span className="tm-mes-rotulo">{rotuloDelPeriodo(m, modo, fmt)}</span>
-              </button>
-            ))}
-          </div>
-        </>
+            <span className="tm-mes-rotulo">Panorama</span>
+          </button>
+          {segmentos.map((m) => (
+            <button
+              key={m.clave}
+              type="button"
+              className={`tm-mes-btn ${vistaDetalle?.clave === m.clave ? 'tm-mes-btn--activo' : ''}`}
+              onClick={() => setSeleccion(m.clave)}
+              aria-current={vistaDetalle?.clave === m.clave}
+            >
+              <span className="tm-mes-rotulo">{rotuloDelPeriodo(m, modo, fmt)}</span>
+            </button>
+          ))}
+        </div>
       )}
     </section>
   );

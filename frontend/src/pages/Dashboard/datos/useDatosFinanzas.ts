@@ -28,8 +28,10 @@ import { agendaPagosApi, cajasApi, conciliacionApi, gastosApi, ordenesPagoApi } 
 import type { Caja, PagoProgramado } from '../../../types';
 import type { DatosFinanzas, NominaResumen, PilaFinanciera, PuntoSerieGasto } from '../tipos';
 
-/** Días de serie de gasto que se piden. Ver comentario de cabecera. */
-export const DIAS_SERIE_GASTO = 120;
+/** Días de serie de gasto que se piden: TRES AÑOS. La tendencia muestra toda
+ *  la historia del muni (segmentada por año cuando es larga); 1095 puntos
+ *  diarios son ~40KB de payload y un solo GROUP BY indexado. */
+export const DIAS_SERIE_GASTO = 1095;
 
 export interface OpcionesDatosFinanzas {
   /** Módulo tesorería activo Y página lista (módulos + dependencias). */

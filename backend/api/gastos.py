@@ -384,7 +384,10 @@ async def list_gastos(
 @router.get("/serie")
 async def serie_gastos(
     request: Request,
-    dias: int = Query(90, ge=7, le=365, description="Ventana hacia atras, en dias"),
+    # Tope de 5 anios: la tendencia del dashboard pide 1095 (toda la historia,
+    # segmentada por anio en el front). El payload sigue siendo un punto por
+    # dia y el GROUP BY va sobre (municipio_id, fecha) indexado.
+    dias: int = Query(90, ge=7, le=1830, description="Ventana hacia atras, en dias"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
