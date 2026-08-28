@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Llamados">
 <title>Llamados Munify</title>
+<link rel="manifest" href="/calls/manifest.json">
+<link rel="apple-touch-icon" href="/calls/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&display=swap">
@@ -49,8 +51,11 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
  border-bottom:1px solid var(--line);padding-top:max(env(safe-area-inset-top),8px)}
 .top-in{max-width:1400px;margin:0 auto;padding:0 14px 10px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.2px;font-size:17px}
-.brand i{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),var(--purple));
- display:grid;place-items:center;font-style:normal;font-size:13px;color:#fff;font-weight:800}
+/* El isotipo REAL de Munify (mismo SVG que favicon.svg de la app). Va sobre
+   un cuadradito claro para que el marino se lea igual en tema oscuro. */
+.brand i{width:26px;height:26px;border-radius:7px;background:#fff;display:grid;place-items:center;
+ font-style:normal;flex:none;box-shadow:0 0 0 1px rgba(17,42,108,.12)}
+.brand i svg{width:17px;height:17px;display:block}
 .spacer{flex:1}
 .switch{display:flex;background:var(--card);border:1px solid var(--line2);border-radius:999px;padding:3px;gap:2px}
 .switch button{border:0;background:transparent;color:var(--ink2);border-radius:999px;padding:6px 15px;
@@ -60,6 +65,7 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .tema{background:var(--card);border:1px solid var(--line2);color:var(--ink2);border-radius:9px;width:34px;height:34px;
  cursor:pointer;display:grid;place-items:center;flex:none;transition:.12s;padding:0}
 .tema:hover{border-color:var(--acc);color:var(--acc)}
+.tema.on{border-color:var(--acc);color:var(--acc);background:var(--acc-soft)}
 .tema svg{width:17px;height:17px;display:block}
 .kpis{display:flex;gap:7px;flex-wrap:wrap}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
@@ -357,12 +363,13 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
 </style></head>
 <body>
 <header class="top"><div class="top-in">
-  <div class="brand"><i>M</i> Llamados</div>
+  <div class="brand"><i><svg viewBox="0 0 1446.79 1426" aria-hidden="true"><polygon fill="#112a6c" points="1271.65 371.24 1271.65 1069.5 635.82 1426 0 1069.5 0 356.5 635.82 0 1128.59 276.29 1000.48 381.26 636.9 177.4 160.18 444.69 160.18 979.27 636.9 1246.56 1113.62 979.27 1113.62 544.87 1271.65 371.24"/><polygon fill="#3f6ac8" points="1446.79 79.97 1225.77 330.78 1113.62 458.05 644.86 989.99 448.06 781.76 448.06 568.98 637.63 759.38 1052.94 410.67 1179.19 304.66 1446.79 79.97"/><polygon fill="#112a6c" points="404.64 517.83 404.64 1037.89 253.8 953.49 253.8 500.38 332.09 454.86 404.64 517.83"/><polygon fill="#112a6c" points="1020.14 650.78 1020.14 954.08 867.22 1039.31 868.09 818.95 1020.14 650.78"/></svg></i> Llamados</div>
   <div class="switch" id="switch">
     <button data-v="hoy" class="on">Hoy</button>
     <button data-v="ops">Trabajar</button>
   </div>
   <div class="spacer"></div>
+  <button class="tema" id="btnNotif" type="button" aria-label="Recordatorios" style="display:none"></button>
   <button class="tema" id="btnTema" type="button" aria-label="Cambiar tema"></button>
   <div class="kpis" id="kpis"></div>
 </div></header>
@@ -413,7 +420,7 @@ footer.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(15,23,32,.97);
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 27/08 21:40 · 7364569</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 27/08 21:54 · eeb6824</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -539,7 +546,7 @@ function marcarLlamada(id){
   const r = reg(id);
   r.hist.push({t:new Date().toISOString(), tipo:'llamada', txt:'Llamada iniciada'});
   if (!r.estado) r.estado = 'no-atiende';
-  guardar(); pintar();
+  guardar(); pintar(); reportarProgreso();
 }
 
 function pintarPaisesHoy(){
@@ -575,6 +582,7 @@ function pintarMetaDia(){
     const v = Math.max(1, Math.min(20, parseInt(inp.value, 10) || 5));
     try { localStorage.setItem(KEY_META, String(v)); } catch(e){}
     pintarMetaDia();
+    reportarProgreso();
   };
 }
 function pintarColaHoy(){
@@ -1040,6 +1048,105 @@ document.getElementById('fileImport').onchange = e => {
   rd.readAsText(f);
 };
 
+/* ============================================================
+   RECORDATORIOS (Web Push) — tres por dia: manana, mediodia y tarde.
+   El servidor los manda (endpoints /api/public/calls/push/*), asi llegan
+   con la PWA CERRADA — en iPhone es la unica via, y exige que la app este
+   instalada en la pantalla de inicio.
+
+   El progreso vive en el localStorage de este navegador, asi que se REPORTA
+   al servidor cada vez que cambia: sin eso el recordatorio de la tarde no
+   podria decir "te faltan 3".
+   ============================================================ */
+const KEY_SUB = 'munify_llamados_push_endpoint';
+const PUSH_URL = '/api/public/calls/push';
+const hayPush = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let swReg = null;
+
+function subGuardada(){ try { return localStorage.getItem(KEY_SUB) || ''; } catch(e){ return ''; } }
+function b64ToU8(b64){
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+function datosSub(sub){
+  const j = sub.toJSON();
+  return {endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+          user_agent: navigator.userAgent.slice(0, 400)};
+}
+function pintarBtnNotif(){
+  const b = document.getElementById('btnNotif'); if (!b) return;
+  if (!hayPush){ b.style.display = 'none'; return; }
+  const on = !!subGuardada() && Notification.permission === 'granted';
+  b.style.display = '';
+  b.classList.toggle('on', on);
+  b.title = on ? 'Recordatorios activados — tocá para desactivarlos'
+               : 'Activar los recordatorios del día';
+  b.innerHTML = on
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><path d="m3 3 18 18"/></svg>';
+}
+/* Lo que el servidor necesita para redactar el recordatorio: como viene el dia
+   y a quien le toca. Se manda solo si cambio algo (nada de spamear). */
+let ultimoReporte = '';
+async function reportarProgreso(){
+  const ep = subGuardada(); if (!ep) return;
+  const prox = siguienteSugerido();
+  const cuerpo = {endpoint: ep, hechas: llamadasDeHoy(), meta: metaDiaria(),
+                  proximo: prox ? prox.localidad : null};
+  const firma = JSON.stringify(cuerpo);
+  if (firma === ultimoReporte) return;
+  ultimoReporte = firma;
+  try {
+    await fetch(PUSH_URL + '/progreso', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: firma});
+  } catch(e){ /* sin red el recordatorio usa el ultimo progreso conocido */ }
+}
+async function activarNotif(){
+  if (!hayPush){ alert('Este navegador no soporta recordatorios.'); return; }
+  // iOS exige la app INSTALADA (pantalla de inicio) para permitir push.
+  const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (iOS && !instalada){
+    alert('En iPhone hay que instalar la app primero: tocá Compartir y después "Agregar a inicio". Desde ahí se activan los recordatorios.');
+    return;
+  }
+  try {
+    const permiso = await Notification.requestPermission();
+    if (permiso !== 'granted'){ alert('Sin permiso de notificaciones no puedo recordarte nada.'); return; }
+    swReg = swReg || await navigator.serviceWorker.register('/calls/sw.js', {scope:'/calls/'});
+    await navigator.serviceWorker.ready;
+    const r = await fetch(PUSH_URL + '/clave');
+    const {clave} = await r.json();
+    const sub = await swReg.pushManager.subscribe({
+      userVisibleOnly: true, applicationServerKey: b64ToU8(clave)});
+    const datos = datosSub(sub);
+    await fetch(PUSH_URL + '/suscribir', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(datos)});
+    try { localStorage.setItem(KEY_SUB, datos.endpoint); } catch(e){}
+    pintarBtnNotif();
+    ultimoReporte = ''; await reportarProgreso();
+    // Una de prueba al toque: activar no puede ser un acto de fe hasta mañana.
+    await fetch(PUSH_URL + '/probar', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(datos)});
+  } catch(err){
+    alert('No pude activar los recordatorios: ' + (err && err.message ? err.message : err));
+  }
+}
+async function desactivarNotif(){
+  try {
+    const reg = swReg || await navigator.serviceWorker.getRegistration('/calls/');
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (sub){
+      await fetch(PUSH_URL + '/baja', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(datosSub(sub))});
+      await sub.unsubscribe();
+    }
+  } catch(e){ /* igual se olvida local */ }
+  try { localStorage.removeItem(KEY_SUB); } catch(e){}
+  pintarBtnNotif();
+}
+
 (function init(){
   let t = null; try { t = localStorage.getItem(KEY_TEMA); } catch(e){}
   if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'claro' : 'oscuro';
@@ -1047,6 +1154,15 @@ document.getElementById('fileImport').onchange = e => {
   document.getElementById('btnTema').onclick = () =>
     aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'oscuro' : 'claro');
   pintarTip();
+  // Recordatorios: el SW se registra siempre (para que la PWA sea instalable);
+  // el permiso y la suscripcion solo con el boton.
+  if (hayPush){
+    navigator.serviceWorker.register('/calls/sw.js', {scope:'/calls/'})
+      .then(r => { swReg = r; }).catch(() => {});
+    const b = document.getElementById('btnNotif');
+    if (b) b.onclick = () => (subGuardada() ? desactivarNotif() : activarNotif());
+  }
+  pintarBtnNotif();
   try { paisHoy = localStorage.getItem(KEY_PAIS) || ''; } catch(e){}
   let v = null; try { v = localStorage.getItem(KEY_VISTA); } catch(e){}
   /* En el telefono la vista Hoy se plegaba sola: se deja abierto lo urgente

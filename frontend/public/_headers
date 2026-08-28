@@ -26,3 +26,14 @@
 
 /sw.js
   Cache-Control: no-store, max-age=0, must-revalidate
+
+# El SW y el manifest de /calls: mismo criterio no-store que los de la app
+# (un SW cacheado es un SW que no se actualiza nunca).
+/calls/sw.js
+  Cache-Control: no-store, max-age=0, must-revalidate
+
+/calls/manifest.json
+  Cache-Control: no-store, max-age=0, must-revalidate
+
+/calls/
+  Cache-Control: no-store, max-age=0, must-revalidate

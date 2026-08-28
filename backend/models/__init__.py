@@ -46,6 +46,7 @@ from .tramite_documento_requerido import TramiteDocumentoRequerido
 from .tramite_sugerido import TramiteSugerido
 from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
+from .calls_push import CallsPushSub
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
 from .audit_log import AuditLog
@@ -131,6 +132,7 @@ __all__ = [
     "DocumentoSolicitud",
     # Push Notifications
     "PushSubscription",
+    "CallsPushSub",
     # Consultas guardadas / BI
     "ConsultaGuardada",
     # Email validation
