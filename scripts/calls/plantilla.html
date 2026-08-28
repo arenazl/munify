@@ -684,9 +684,47 @@ function pintarLista(){
   cont.querySelectorAll('a[data-tel]').forEach(a => a.onclick = () => { marcarLlamada(a.dataset.tel); setTimeout(() => abrir(a.dataset.tel), 200); });
 }
 
+/* ============================================================
+   "Recordar" CONTEXTUAL (dueño, 2026-08-28): los consejos cambian con la
+   SELECCION. Con una ficha abierta, primero lo propio de ese municipio —
+   el "ojo" del intendente y lo que anotaste la ultima vez (datos reales,
+   nada inventado)— y despues los genericos, ordenados por pais: fuera de
+   Argentina, la carta de "empresa argentina establecida" abre; en
+   Argentina va al final. Un consejo por vez, rota cada 10 s.
+   ============================================================ */
+let tipIdx = 0, tipManual = false;
+
+function tipsPara(){
+  const c = selId != null ? CONTACTOS.find(x => x.id === selId) : null;
+  if (!c) return TIPS;
+  const f = FUNC[c.id] || {}, r = db[c.id] || {};
+  const propios = [];
+  if (f.nota) propios.push({titulo: 'Ojo con ' + c.localidad, texto: f.nota});
+  if (r.quien || r.notas) propios.push({titulo: 'La última vez',
+    texto: (r.quien ? 'Hablaste con ' + r.quien + '. ' : '') + (r.notas || '')});
+  const esAR = c.pais === 'Argentina';
+  const peso = t => /comtec|argentin/i.test(t.titulo + ' ' + t.texto) ? (esAR ? 1 : -1) : 0;
+  const genericos = TIPS.slice().sort((a, b) => peso(a) - peso(b));
+  return propios.concat(genericos);
+}
+
+function pintarTip(){
+  const caja = document.getElementById('tipsBox'); if (!caja) return;
+  const lista = tipsPara(); if (!lista.length) return;
+  const i = tipIdx % lista.length, t = lista[i];
+  caja.innerHTML = '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>'
+    + '<div class="tip-pts">' + lista.map((x, j) =>
+      '<button data-i="' + j + '"' + (j === i ? ' class="act"' : '')
+      + ' aria-label="Ver consejo ' + (j + 1) + '"></button>').join('') + '</div>';
+  caja.querySelectorAll('.tip-pts button').forEach(b =>
+    b.onclick = () => { tipIdx = +b.dataset.i; tipManual = true; pintarTip(); });
+}
+setInterval(() => { if (!tipManual && tipsPara().length > 1){ tipIdx += 1; pintarTip(); } }, 10000);
+
 function abrir(id){
   const c = CONTACTOS.find(x => x.id === id); if (!c) return;
   selId = id;
+  tipIdx = 0; tipManual = false; pintarTip();
   const r = reg(id), sp = SPEECH[c.pais] || {}, f = FUNC[c.id] || {}, inv = INVEST[c.id] || {};
   const quien = f.intendente
     ? '<div class="quien"><div class="k">Preguntá por</div><div class="nom">' + esc(f.intendente) + '</div>'
@@ -955,20 +993,7 @@ document.getElementById('fileImport').onchange = e => {
   aplicarTema(t);
   document.getElementById('btnTema').onclick = () =>
     aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'oscuro' : 'claro');
-  // "Recordar": un consejo por vez. Rota solo; tocar un punto lo frena.
-  let tipIdx = 0, tipManual = false;
-  const pintarTip = () => {
-    const caja = document.getElementById('tipsBox'); if (!caja || !TIPS.length) return;
-    const t = TIPS[tipIdx % TIPS.length];
-    caja.innerHTML = '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>'
-      + '<div class="tip-pts">' + TIPS.map((x, i) =>
-        '<button data-i="' + i + '"' + (i === tipIdx ? ' class="act"' : '')
-        + ' aria-label="Ver consejo ' + (i + 1) + '"></button>').join('') + '</div>';
-    caja.querySelectorAll('.tip-pts button').forEach(b =>
-      b.onclick = () => { tipIdx = +b.dataset.i; tipManual = true; pintarTip(); });
-  };
   pintarTip();
-  setInterval(() => { if (!tipManual && TIPS.length > 1){ tipIdx = (tipIdx + 1) % TIPS.length; pintarTip(); } }, 10000);
   try { paisHoy = localStorage.getItem(KEY_PAIS) || ''; } catch(e){}
   let v = null; try { v = localStorage.getItem(KEY_VISTA); } catch(e){}
   /* En el telefono la vista Hoy se plegaba sola: se deja abierto lo urgente
