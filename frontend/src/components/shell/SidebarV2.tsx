@@ -376,7 +376,14 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
     () => grupos.find((g) => g.items.some((it) => normalizarHref(it.href) === activo))?.id ?? null,
     [grupos, activo],
   );
-  const abiertoId = manual && manual.ruta === activo ? manual.id : grupoDeRutaActiva;
+  // Sin grupo de la ruta (ej. el dashboard, que vive en "Principal" y no es un
+  // grupo), abre el PRIMER grupo visible: los módulos apagados no aparecen y
+  // el orden del sidebar es del tenant, así que ese primero ES su módulo
+  // principal (San Pedro Norte aterriza con Tesorería desplegada; un muni
+  // operativo, con Reclamos). El plegado manual sigue mandando.
+  const abiertoId = manual && manual.ruta === activo
+    ? manual.id
+    : (grupoDeRutaActiva ?? grupos[0]?.id ?? null);
 
   // Al abrir un grupo se pliega el anterior; anclarCabecera evita que la
   // cabecera clickeada se mueva de lugar cuando el plegado ocurre arriba.
