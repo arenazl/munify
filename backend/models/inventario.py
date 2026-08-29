@@ -14,7 +14,7 @@ Módulo aditivo, opt-in por `municipio_modulos.modulo = 'inventario'`.
 Cruce con OT: ver `api/ordenes_trabajo.py` (reservar/consumir/liberar).
 """
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Text, Float, Enum,
+    Column, Integer, String, Boolean, Date, DateTime, Text, Float, Enum,
     ForeignKey, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -95,6 +95,18 @@ class InventarioItem(Base):
     ocupado_por_ot_id = Column(
         Integer, ForeignKey("ordenes_trabajo.id", ondelete="SET NULL"), nullable=True, index=True
     )
+
+    # --- Flota (modulo Recursos, Etapa 1) ---
+    # Un vehiculo del municipio es un ACTIVO comun con estos datos cargados;
+    # no hay tabla de vehiculos aparte. En un martillo quedan todos en NULL.
+    # El dominio va en `identificador`, que ya existia para eso.
+    marca_modelo = Column(String(120), nullable=True)
+    anio = Column(Integer, nullable=True)
+    km_actual = Column(Integer, nullable=True)
+    tipo_combustible = Column(String(20), nullable=True)   # nafta|gasoil|gnc|electrico
+    vencimiento_vtv = Column(Date, nullable=True)
+    vencimiento_seguro = Column(Date, nullable=True)
+    km_proximo_service = Column(Integer, nullable=True)
 
     activo = Column(Boolean, default=True, nullable=False)  # soft delete
 

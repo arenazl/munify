@@ -60,6 +60,7 @@ from .modulos import router as modulos_router
 from .contactos import router as contactos_router
 from .gastos import router as gastos_router
 from .proyectos import router as proyectos_router
+from .flota import router as flota_router
 from .cotizacion import router as cotizacion_router
 from .tesoreria_catalogo import router as tesoreria_catalogo_router
 from .tesoreria_conceptos import router as tesoreria_conceptos_router
@@ -144,6 +145,7 @@ api_router.include_router(modulos_router, prefix="/modulos", tags=["Modulos"])
 api_router.include_router(contactos_router, prefix="/tesoreria/contactos", tags=["Tesoreria - Contactos"])
 api_router.include_router(gastos_router, prefix="/tesoreria/gastos", tags=["Tesoreria - Gastos"])
 api_router.include_router(proyectos_router, prefix="/tesoreria/proyectos", tags=["Tesoreria - Proyectos"])
+api_router.include_router(flota_router, prefix="/flota", tags=["Recursos - Flota"])
 api_router.include_router(cotizacion_router, prefix="/cotizacion", tags=["Cotizacion USD"])
 api_router.include_router(tesoreria_catalogo_router, prefix="/tesoreria", tags=["Tesoreria - Catalogos"])
 api_router.include_router(tesoreria_conceptos_router, prefix="/tesoreria", tags=["Tesoreria - Conceptos ABM"])
