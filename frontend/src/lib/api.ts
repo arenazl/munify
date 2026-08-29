@@ -2560,6 +2560,12 @@ export const proyectosApi = {
   update: (id: number, data: Record<string, unknown>) =>
     api.put(`/tesoreria/proyectos/${id}`, data),
   delete: (id: number) => api.delete(`/tesoreria/proyectos/${id}`),
+  /** Obras que el municipio decidió mostrarle al vecino. Público, sin token:
+   *  lo consume la home del vecino y el mapa. */
+  publicas: (municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.get('/tesoreria/proyectos/publicas', { params: { municipio_id: mId } });
+  },
 };
 
 export const tesoreriaCatalogoApi = {

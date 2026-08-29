@@ -12,7 +12,7 @@ Relacion N:M con gastos via tabla gasto_proyectos (monto_asignado en pesos).
 import enum
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Date, Text,
-    Numeric, Enum, ForeignKey, UniqueConstraint,
+    Numeric, Enum, Float, ForeignKey, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -49,6 +49,33 @@ class Proyecto(Base):
     )
 
     activo = Column(Boolean, default=True, nullable=False)
+
+    # --- Modulo Comunicacion, Etapa 2: OBRAS A LA VISTA (2026-08-29) ---
+    # El proyecto ya existia como contenedor de gastos (puertas adentro).
+    # Estos campos son lo que le falta para poder MOSTRARSELO al vecino.
+
+    # El municipio elige cual publica. Default False: publicar es un acto
+    # deliberado, no algo que pasa por cargar un proyecto en tesoreria.
+    publico = Column(Boolean, nullable=False, default=False, server_default="0")
+
+    # Como viene la obra, en criollo. Es distinto del `estado` contable
+    # (activo/pausado/finalizado): "en ejecucion" le habla al vecino.
+    estado_obra = Column(String(20), nullable=True)   # por_empezar | en_ejecucion | terminada
+
+    # 0..100. NULL = el municipio todavia no lo cargo, y entonces la tarjeta
+    # no muestra barra: un 0% inventado seria peor que no decir nada.
+    avance = Column(Integer, nullable=True)
+
+    foto_url = Column(String(500), nullable=True)
+
+    # Para que la obra caiga en el mapa que ya existe.
+    latitud = Column(Float, nullable=True)
+    longitud = Column(Float, nullable=True)
+
+    # La plata es harina de otro costal: se publica el AVANCE, no el gasto.
+    # Mostrar cuanto salio abre una discusion que el intendente tiene que
+    # poder elegir, asi que va apagado por defecto y aparte de `publico`.
+    mostrar_monto = Column(Boolean, nullable=False, default=False, server_default="0")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

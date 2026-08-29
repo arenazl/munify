@@ -506,16 +506,31 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
         select(Proyecto).where(Proyecto.municipio_id == municipio_id).limit(1)
     )).scalar_one_or_none()
     if not has_proyectos:
+        # Fotos REALES con licencia comercial (Openverse/Flickr), verificadas
+        # una por una: 200, JPEG y menos de 260 KB.
+        _FOTO_OBRA = {
+            "pavimento": "https://live.staticflickr.com/8533/15615541840_f94883830d_b.jpg",
+            "vereda": "https://live.staticflickr.com/4032/4712272185_d7065d7eff_b.jpg",
+            "luminaria": "https://live.staticflickr.com/3146/2616498325_5a145721aa_b.jpg",
+        }
+        # OBRAS A LA VISTA (Etapa 2): la demo publica dos de las tres, para
+        # que se vea que publicar es una DECISION del municipio y no algo
+        # automatico. El monto queda apagado en todas: se muestra el avance.
         proys = [
-            ("Repavimentacion Av. Principal", "[DEMO] Obra de pavimentacion en avenida principal", Decimal(12_000_000), EstadoProyecto.ACTIVO),
-            ("Departamento para el vecindario", "[DEMO] Construccion vivienda social", Decimal(8_500_000), EstadoProyecto.ACTIVO),
-            ("Plaza del Bicentenario", "[DEMO] Remodelacion plaza central", Decimal(3_800_000), EstadoProyecto.FINALIZADO),
+            ("Repavimentacion Av. Principal", "[DEMO] Obra de pavimentacion en avenida principal",
+             Decimal(12_000_000), EstadoProyecto.ACTIVO, True, "en_ejecucion", 60, _FOTO_OBRA["pavimento"]),
+            ("Departamento para el vecindario", "[DEMO] Construccion vivienda social",
+             Decimal(8_500_000), EstadoProyecto.ACTIVO, False, None, None, None),
+            ("Plaza del Bicentenario", "[DEMO] Remodelacion plaza central",
+             Decimal(3_800_000), EstadoProyecto.FINALIZADO, True, "terminada", 100, _FOTO_OBRA["vereda"]),
         ]
-        for nombre, desc, presup, estado in proys:
+        for nombre, desc, presup, estado, publico, est_obra, avance, foto in proys:
             db.add(Proyecto(
                 municipio_id=municipio_id, nombre=nombre, descripcion=desc,
                 presupuesto=presup, estado=estado, activo=True,
                 fecha_inicio=date.today() - timedelta(days=90),
+                publico=publico, estado_obra=est_obra, avance=avance,
+                foto_url=foto, mostrar_monto=False,
             ))
             counts["proyectos"] += 1
 

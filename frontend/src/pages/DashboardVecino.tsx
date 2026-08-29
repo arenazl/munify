@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin,
-  ChevronRight, Trophy, Map, Megaphone, Calendar, Newspaper,
-  ClipboardList, Sparkles, FileCheck, XCircle, TrendingUp,
+  ChevronRight, Trophy, Map, Megaphone, Calendar, Newspaper, Hammer,
+  FileCheck, TrendingUp,
   TrendingDown, Building2, Star, BarChart3, X, Users, Target,
   Zap, ArrowUpRight, ArrowDownRight, Activity,
   Search, PlusCircle, Upload, Loader, ShieldCheck, Info,
@@ -116,6 +116,120 @@ function mapNoticia(n: NoticiaApiResponse): NoticiaItem {
   };
 }
 
+/**
+ * TIRA DE PENDIENTES — lo que el vecino tiene para hacer, en UNA línea.
+ *
+ * Reemplaza a las cuatro tarjetas de "Recomendaciones para vos", que ocupaban
+ * el mejor lugar del panel para cosas que no son urgentes. Patrón tomado de la
+ * barra de proveedores de RepareYa: rótulo con punto a la izquierda, ítems
+ * compactos con su contexto, y el excedente detrás de "Ver N más" en vez de
+ * apilar. Se ve todo, pero pesa lo que tiene que pesar.
+ *
+ * En pantalla chica la tira NO envuelve: scrollea en horizontal. Una barra que
+ * se parte en tres filas deja de ser una barra.
+ */
+function TiraPendientes({
+  recomendaciones,
+  theme,
+  onIr,
+}: {
+  recomendaciones: Recomendacion[];
+  theme: ReturnType<typeof useTheme>['theme'];
+  onIr: (url: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const VISIBLES = 2;
+  const visibles = abierto ? recomendaciones : recomendaciones.slice(0, VISIBLES);
+  const restantes = recomendaciones.length - visibles.length;
+
+  return (
+    <div
+      className="rounded-2xl px-3 py-2.5 md:px-4"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Rótulo: dice cuántas cosas hay, no "recomendaciones". */}
+        <div className="flex items-center gap-2 flex-shrink-0 pl-1">
+          <span
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: theme.primary }}
+          />
+          <span
+            className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em] whitespace-nowrap"
+            style={{ color: theme.textSecondary }}
+          >
+            {recomendaciones.length === 1 ? 'Tenés 1 pendiente' : `Tenés ${recomendaciones.length} pendientes`}
+          </span>
+        </div>
+
+        {/* Los ítems. `min-w-0` + overflow-x: la barra nunca envuelve. */}
+        <div
+          className={`flex-1 min-w-0 flex items-center gap-2 ${abierto ? 'flex-wrap' : 'overflow-x-auto'}`}
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {visibles.map((rec, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => rec.accion_url && onIr(rec.accion_url)}
+              className="group flex items-center gap-2.5 rounded-xl pl-1.5 pr-2.5 py-1.5 flex-shrink-0 max-w-[19rem] transition-colors text-left"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+              title={rec.descripcion}
+            >
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${rec.color}1f` }}
+              >
+                <RecIcono nombre={rec.icono} color={rec.color} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold leading-tight truncate" style={{ color: theme.text }}>
+                  {rec.titulo}
+                </span>
+                <span className="block text-[11px] leading-tight truncate" style={{ color: theme.textSecondary }}>
+                  {rec.accion_label || rec.descripcion}
+                </span>
+              </span>
+              <ChevronRight
+                className="w-4 h-4 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
+                style={{ color: theme.textSecondary }}
+              />
+            </button>
+          ))}
+        </div>
+
+        {/* El excedente: se despliega en el lugar, no manda a otra pantalla. */}
+        {(restantes > 0 || abierto) && (
+          <button
+            type="button"
+            onClick={() => setAbierto((v) => !v)}
+            className="flex items-center gap-1 text-xs font-semibold flex-shrink-0 whitespace-nowrap pr-1"
+            style={{ color: theme.primary }}
+          >
+            {abierto ? 'Ver menos' : `Ver ${restantes} más`}
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${abierto ? 'rotate-90' : ''}`} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Obra que el municipio decidió mostrar (GET /tesoreria/proyectos/publicas).
+ *  Módulo Comunicación, Etapa 2: el proyecto ya vivía en Tesorería con sus
+ *  gastos; acá sale a la calle, con avance y foto en vez de plata. */
+interface ObraItem {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  estado_obra: string | null;
+  avance: number | null;
+  foto_url: string | null;
+  fecha_fin: string | null;
+  /** Sólo llega si el municipio prendió "mostrar monto". */
+  invertido: string | null;
+}
+
 /** 'YYYY-MM-DD' de hoy en hora LOCAL (nunca toISOString: es UTC y de noche
  *  adelanta un día, y un aviso vigente hasta hoy se leería vencido). */
 function hoyISO(): string {
@@ -161,11 +275,14 @@ export default function DashboardVecino() {
     rechazados: 0,
   });
   const [nombreMunicipio, setNombreMunicipio] = useState('');
-  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig | null>(null);
+  // La config se sigue trayendo, pero hoy nadie la lee: el único consumidor
+  // era el gate de los KPI cards, que se sacaron el 2026-08-29.
+  const [, setDashboardConfig] = useState<DashboardConfig | null>(null);
   const [estadisticasPublicas, setEstadisticasPublicas] = useState<EstadisticasPublicas | null>(null);
   const [modalEstadistica, setModalEstadistica] = useState<string | null>(null);
   const [recomendaciones, setRecomendaciones] = useState<Recomendacion[]>([]);
   const [noticias, setNoticias] = useState<NoticiaItem[]>([]);
+  const [obras, setObras] = useState<ObraItem[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -194,6 +311,17 @@ export default function DashboardVecino() {
           setNoticias(items.map(mapNoticia));
         } catch {
           setNoticias([]);
+        }
+
+        // Obras públicas. Si el muni no publicó ninguna, el bloque no se
+        // dibuja — mismo criterio que las novedades: nada de relleno.
+        try {
+          const obrasRes = await api.get('/tesoreria/proyectos/publicas', {
+            params: { municipio_id: user.municipio_id },
+          });
+          setObras((obrasRes.data as ObraItem[] | null) || []);
+        } catch {
+          setObras([]);
         }
       }
 
@@ -242,11 +370,7 @@ export default function DashboardVecino() {
     r => r.estado !== 'resuelto' && r.estado !== 'rechazado'
   ).length;
 
-  const isComponentVisible = (componentId: string): boolean => {
-    if (!dashboardConfig?.componentes) return true;
-    const comp = dashboardConfig.componentes.find(c => c.id === componentId);
-    return comp ? comp.visible : true;
-  };
+
 
   if (loading) {
     return (
@@ -354,53 +478,21 @@ export default function DashboardVecino() {
 
       <SemanticHero etiqueta="TUS RECLAMOS" frases={frasesVecino} />
 
-      {/* Recomendaciones inteligentes */}
+      {/* PENDIENTES — una tira, no cuatro tarjetas.
+          Antes esto ocupaba el mejor lugar del panel (el centro, arriba) para
+          decir cosas que no son urgentes: "subí un documento", "calificá tus
+          reclamos". Le dábamos espacio de titular a un pie de página.
+          Ahora es UNA línea: rótulo, los dos pendientes más importantes con su
+          contexto, y el resto detrás de "Ver N más". Pasa de un cuarto de
+          pantalla a una fila, sin ocultar nada. */}
       {recomendaciones.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold flex items-center gap-2 px-1" style={{ color: theme.text }}>
-            <Sparkles className="w-4 h-4" style={{ color: theme.primary }} />
-            Recomendaciones para vos
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {recomendaciones.map((rec, i) => (
-              <div
-                key={i}
-                className="group relative rounded-xl p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer overflow-hidden"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-                onClick={() => rec.accion_url && navigate(rec.accion_url)}
-              >
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  style={{ background: `linear-gradient(135deg, ${rec.color}10 0%, transparent 60%)` }}
-                />
-                <div className="relative flex items-start gap-3">
-                  <div
-                    className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: `${rec.color}15` }}
-                  >
-                    <RecIcono nombre={rec.icono} color={rec.color} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
-                      {rec.titulo}
-                    </h4>
-                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: theme.textSecondary }}>
-                      {rec.descripcion}
-                    </p>
-                    {rec.accion_label && (
-                      <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold"
-                            style={{ color: rec.color }}>
-                        {rec.accion_label}
-                        <ChevronRight className="w-3 h-3" />
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <TiraPendientes
+          recomendaciones={recomendaciones}
+          theme={theme}
+          onIr={(url) => navigate(url)}
+        />
       )}
+
 
       {/* Los cuatro KPI cards (total / pendientes / resueltos / rechazados)
           se sacaron el 2026-08-29: repetían exactamente lo que el hero ya
@@ -437,6 +529,28 @@ export default function DashboardVecino() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Obras a la vista (módulo Comunicación, Etapa 2). Sólo si el municipio
+          publicó alguna: si no publicó, el bloque no existe. */}
+      {obras.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+              <Hammer className="h-5 w-5" style={{ color: theme.primary }} />
+              Obras en tu ciudad
+            </h2>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>
+              {obras.length === 1 ? '1 obra' : `${obras.length} obras`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {obras.map((o) => (
+              <ObraCard key={o.id} obra={o} theme={theme} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -1245,6 +1359,105 @@ function QuickAccessCard({
 }
 
 // News Carousel Card - Carrusel horizontal con slide (todas las imágenes en fila)
+/** Cómo viene la obra, en el idioma del vecino. */
+const ESTADO_OBRA: Record<string, { label: string; tono: 'ok' | 'curso' | 'espera' }> = {
+  terminada: { label: 'Terminada', tono: 'ok' },
+  en_ejecucion: { label: 'En ejecución', tono: 'curso' },
+  por_empezar: { label: 'Por empezar', tono: 'espera' },
+};
+
+/**
+ * Una OBRA publicada. La diferencia con una novedad es el AVANCE: es lo que
+ * el vecino quiere saber ("¿en qué anda?"), y por eso la barra es el centro
+ * de la tarjeta. Sin avance cargado NO se dibuja barra — un 0% inventado
+ * diría que la obra está frenada, que es otra cosa.
+ */
+function ObraCard({
+  obra,
+  theme,
+}: {
+  obra: ObraItem;
+  theme: ReturnType<typeof useTheme>['theme'];
+}) {
+  const est = ESTADO_OBRA[obra.estado_obra || ''] ?? null;
+  const color =
+    est?.tono === 'ok' ? 'var(--pl-green)'
+    : est?.tono === 'curso' ? theme.primary
+    : 'var(--pl-amber)';
+  const avance = typeof obra.avance === 'number' ? Math.max(0, Math.min(100, obra.avance)) : null;
+
+  return (
+    <article
+      className="rounded-xl overflow-hidden group"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="relative h-32">
+        {obra.foto_url ? (
+          <img
+            src={obra.foto_url}
+            alt=""
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${theme.primary}25, ${theme.primary}08)` }}
+          >
+            <Hammer className="w-8 h-8" style={{ color: `${theme.primary}80` }} />
+          </div>
+        )}
+        <div
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent 60%)' }}
+        />
+        {est && (
+          <span
+            className="absolute top-2.5 left-2.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md"
+            style={{ backgroundColor: color, color: 'var(--pl-on-accent)' }}
+          >
+            {est.label}
+          </span>
+        )}
+      </div>
+
+      <div className="p-3">
+        <h4 className="font-semibold text-sm leading-tight line-clamp-1" style={{ color: theme.text }}>
+          {obra.nombre}
+        </h4>
+        {obra.descripcion && (
+          <p className="text-xs leading-snug line-clamp-2 mt-0.5" style={{ color: theme.textSecondary }}>
+            {obra.descripcion}
+          </p>
+        )}
+
+        {avance !== null && (
+          <div className="mt-2.5">
+            <div className="flex items-center justify-between text-[11px] mb-1">
+              <span style={{ color: theme.textSecondary }}>Avance</span>
+              <span className="font-bold" style={{ color }}>{avance}%</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: theme.backgroundSecondary }}>
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${avance}%`, backgroundColor: color }}
+              />
+            </div>
+          </div>
+        )}
+
+        {obra.invertido && (
+          <div className="mt-2 text-[11px]" style={{ color: theme.textSecondary }}>
+            Invertido: <span className="font-semibold" style={{ color: theme.text }}>
+              ${Number(obra.invertido).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+            </span>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
 /** Peso visual del aviso. El color sale de tokens del tema, nunca de un hex
  *  suelto: la misma tarjeta tiene que funcionar en los 12 fondos. */
 function estiloTipo(tipo: string, theme: ReturnType<typeof useTheme>['theme']) {

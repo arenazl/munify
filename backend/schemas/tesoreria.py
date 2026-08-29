@@ -7,7 +7,7 @@ Cubre:
 """
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import Literal, Optional, List
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
@@ -309,6 +309,10 @@ class CuotaProyeccionResponse(BaseModel):
 EstadoProyectoStr = EstadoProyecto
 
 
+# Como viene la obra, en el idioma del vecino (distinto del estado contable).
+EstadoObraStr = Literal["por_empezar", "en_ejecucion", "terminada"]
+
+
 class ProyectoBase(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=150)
     descripcion: Optional[str] = None
@@ -316,6 +320,15 @@ class ProyectoBase(BaseModel):
     fecha_inicio: Optional[date] = None
     fecha_fin: Optional[date] = None
     estado: EstadoProyectoStr = "activo"
+
+    # --- Obras a la vista (Etapa 2) ---
+    publico: bool = False
+    estado_obra: Optional[EstadoObraStr] = None
+    avance: Optional[int] = Field(None, ge=0, le=100)
+    foto_url: Optional[str] = Field(None, max_length=500)
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    mostrar_monto: bool = False
 
 
 class ProyectoCreate(ProyectoBase):
@@ -330,6 +343,13 @@ class ProyectoUpdate(BaseModel):
     fecha_fin: Optional[date] = None
     estado: Optional[EstadoProyectoStr] = None
     activo: Optional[bool] = None
+    publico: Optional[bool] = None
+    estado_obra: Optional[EstadoObraStr] = None
+    avance: Optional[int] = Field(None, ge=0, le=100)
+    foto_url: Optional[str] = Field(None, max_length=500)
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    mostrar_monto: Optional[bool] = None
 
 
 class ProyectoResumen(BaseModel):
@@ -337,6 +357,26 @@ class ProyectoResumen(BaseModel):
     total_imputado: Decimal
     cantidad_gastos: int
     porcentaje_presupuesto: Optional[float] = None  # null si no hay presupuesto
+
+
+class ObraPublica(BaseModel):
+    """La obra tal como la ve el VECINO. Es un schema aparte a propósito: el
+    de gestión lleva presupuesto e imputaciones, y eso no sale a la calle
+    salvo que el municipio prenda `mostrar_monto`."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nombre: str
+    descripcion: Optional[str] = None
+    estado_obra: Optional[str] = None
+    avance: Optional[int] = None
+    foto_url: Optional[str] = None
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+    # Sólo viaja si el municipio decidió mostrarlo; si no, va en null.
+    invertido: Optional[Decimal] = None
 
 
 class ProyectoResponse(ProyectoBase):
