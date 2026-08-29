@@ -161,7 +161,7 @@ async def create_noticia(
     db.add(noticia)
     await db.commit()
     await db.refresh(noticia)
-    return noticia
+    return _con_texto(noticia)
 
 
 @router.patch("/{noticia_id}", response_model=NoticiaResponse)
@@ -176,7 +176,7 @@ async def update_noticia(
         setattr(noticia, field, value)
     await db.commit()
     await db.refresh(noticia)
-    return noticia
+    return _con_texto(noticia)
 
 
 @router.delete("/{noticia_id}")
