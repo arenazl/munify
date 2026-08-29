@@ -2428,28 +2428,40 @@ async def seed_demo_completo(
 # vigencia apaga el aviso sola). Contenido municipal generico: ningun nombre
 # de persona ni dato que se pueda confundir con real.
 #
-# (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado)
+# Fotos REALES con licencia comercial (Openverse/Flickr), verificadas una por
+# una: responden 200, son JPEG y pesan menos de 350 KB. Nada de placeholders
+# genericos ni fotos sin relacion con el tema del aviso.
+FOTO = {
+    "agua": "https://live.staticflickr.com/1160/979654762_e69e4770e3_b.jpg",
+    "vacunacion": "https://live.staticflickr.com/3601/3610076880_b09b78550a_b.jpg",
+    "recoleccion": "https://live.staticflickr.com/7015/6469424599_0b0912bd92_b.jpg",
+    "poda": "https://live.staticflickr.com/5517/9517319399_c94037c6f4_b.jpg",
+    "obra": "https://live.staticflickr.com/8533/15615541840_f94883830d_b.jpg",
+    "feria": "https://live.staticflickr.com/8433/7590604662_cdd8eedc1c_b.jpg",
+}
+
+# (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto)
 #   creado_hace: dias hacia atras del created_at
 #   desde/hasta: dias respecto de HOY (None = sin fecha)
 AVISOS_DEMO = [
     ("Corte de agua en el centro",
      "Manana de 8 a 14 no va a haber agua por una reparacion en la red. Recomendamos juntar antes.",
-     "aviso", 1, 0, 1, True, True),
+     "aviso", 1, 0, 1, True, True, FOTO["agua"]),
     ("Cambia el cronograma de recoleccion",
      "Desde esta semana los residuos reciclables se retiran los martes y viernes por la manana.",
-     "aviso", 2, 0, 6, False, True),
+     "aviso", 2, 0, 6, False, True, FOTO["recoleccion"]),
     ("Vacunacion antirrabica gratuita",
      "Los sabados de 9 a 13 en la plaza central. Traer al animal con correa o en transportadora.",
-     "aviso", 0, 0, 10, False, False),
+     "aviso", 0, 0, 10, False, False, FOTO["vacunacion"]),
     ("Poda de arbolado",
      "La proxima semana empieza la poda programada. Los dias que toque cada sector se avisan por este medio.",
-     "aviso", 0, 3, 12, False, False),
+     "aviso", 0, 3, 12, False, False, FOTO["poda"]),
     ("Termino la obra de cordon cuneta",
      "Se completaron las diez cuadras previstas. La proxima etapa arranca el mes que viene.",
-     "noticia", 8, None, None, False, True),
+     "noticia", 8, None, None, False, True, FOTO["obra"]),
     ("Feria de emprendedores",
      "El fin de semana pasado la feria reunio a mas de treinta puestos de vecinos de la ciudad.",
-     "aviso", 12, -10, -3, False, True),
+     "aviso", 12, -10, -3, False, True, FOTO["feria"]),
 ]
 
 
@@ -2462,13 +2474,14 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
 
     hoy = datetime.utcnow().date()
     creados = 0
-    for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado) in AVISOS_DEMO:
+    for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto) in AVISOS_DEMO:
         created = (datetime.utcnow() - timedelta(days=creado_hace)).replace(
             hour=9 + (creados * 3) % 8, minute=(creados * 13) % 60, second=0, microsecond=0)
         db.add(Noticia(
             municipio_id=municipio_id,
             titulo=titulo,
             descripcion=texto,
+            imagen_url=foto,
             tipo=tipo,
             fecha_desde=(hoy + timedelta(days=desde)) if desde is not None else None,
             fecha_hasta=(hoy + timedelta(days=hasta)) if hasta is not None else None,
