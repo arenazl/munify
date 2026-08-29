@@ -2440,28 +2440,34 @@ FOTO = {
     "feria": "https://live.staticflickr.com/8433/7590604662_cdd8eedc1c_b.jpg",
 }
 
-# (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto)
+# (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto,
+#  recurrencia, dias, segmentada)
 #   creado_hace: dias hacia atras del created_at
 #   desde/hasta: dias respecto de HOY (None = sin fecha)
+# Los dos ultimos campos son el CRONOGRAMA: cada cuanto se repite y, en la
+# semanal, que dias (0 = lunes). Lo que ya se contaba en el texto ("los martes
+# y viernes") ahora tambien es un dato: asi el vecino lo ve como cronograma y
+# no como un aviso que vence. El ultimo campo marca la unica segmentada de la
+# demo, para que se vea que un aviso puede ir a un solo barrio.
 AVISOS_DEMO = [
     ("Corte de agua en el centro",
      "Manana de 8 a 14 no va a haber agua por una reparacion en la red. Recomendamos juntar antes.",
-     "aviso", 1, 0, 1, True, True, FOTO["agua"]),
+     "aviso", 1, 0, 1, True, True, FOTO["agua"], None, None, False),
     ("Cambia el cronograma de recoleccion",
      "Desde esta semana los residuos reciclables se retiran los martes y viernes por la manana.",
-     "aviso", 2, 0, 6, False, True, FOTO["recoleccion"]),
+     "aviso", 2, 0, None, False, True, FOTO["recoleccion"], "semanal", "1,4", False),
     ("Vacunacion antirrabica gratuita",
      "Los sabados de 9 a 13 en la plaza central. Traer al animal con correa o en transportadora.",
-     "aviso", 0, 0, 10, False, False, FOTO["vacunacion"]),
+     "aviso", 0, 0, 10, False, False, FOTO["vacunacion"], "semanal", "5", False),
     ("Poda de arbolado",
      "La proxima semana empieza la poda programada. Los dias que toque cada sector se avisan por este medio.",
-     "aviso", 0, 3, 12, False, False, FOTO["poda"]),
+     "aviso", 0, 3, 12, False, False, FOTO["poda"], None, None, True),
     ("Termino la obra de cordon cuneta",
      "Se completaron las diez cuadras previstas. La proxima etapa arranca el mes que viene.",
-     "noticia", 8, None, None, False, True, FOTO["obra"]),
+     "noticia", 8, None, None, False, True, FOTO["obra"], None, None, False),
     ("Feria de emprendedores",
      "El fin de semana pasado la feria reunio a mas de treinta puestos de vecinos de la ciudad.",
-     "aviso", 12, -10, -3, False, True, FOTO["feria"]),
+     "aviso", 12, -10, -3, False, True, FOTO["feria"], None, None, False),
 ]
 
 
@@ -2470,11 +2476,20 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
 
     `enviados_count` sale de los vecinos que la demo realmente creo: un numero
     inventado ahi seria un dato falso en pantalla."""
+    from models.barrio import Barrio
     from models.noticia import Noticia
+
+    # El barrio de la publicacion segmentada. Si la demo no llego a cargar
+    # barrios, esa publicacion sale para todo el municipio: mejor sin
+    # segmentar que apuntando a un barrio que no existe.
+    primer_barrio = (await db.execute(
+        select(Barrio.id).where(Barrio.municipio_id == municipio_id).order_by(Barrio.nombre).limit(1)
+    )).scalar_one_or_none()
 
     hoy = datetime.utcnow().date()
     creados = 0
-    for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto) in AVISOS_DEMO:
+    for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto,
+         recurrencia, dias, segmentada) in AVISOS_DEMO:
         created = (datetime.utcnow() - timedelta(days=creado_hace)).replace(
             hour=9 + (creados * 3) % 8, minute=(creados * 13) % 60, second=0, microsecond=0)
         db.add(Noticia(
@@ -2489,6 +2504,9 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
             activo=True,
             enviado_at=(created + timedelta(hours=2)) if avisado else None,
             enviados_count=vecinos if avisado else 0,
+            recurrencia=recurrencia,
+            dias_semana=dias,
+            barrio_id=primer_barrio if segmentada else None,
             created_at=created,
         ))
         creados += 1

@@ -65,6 +65,10 @@ Por eso la Etapa 1 manda **a todo el municipio**, que además cubre el caso
 más frecuente (corte de agua, cronograma, alerta). La segmentación fina entra
 en la Etapa 3, junto con el trabajo de darle barrio al vecino.
 
+> **Resuelto en la Etapa 3 (2026-08-29), y como estaba dicho:** el vecino
+> **declara** su barrio en su perfil. No se infiere de dónde reclamó — eso
+> seguiría siendo una inferencia mostrada como dato.
+
 ---
 
 ## 4. Las tres etapas
@@ -133,13 +137,48 @@ Esta etapa las publica: el vecino ve qué se está haciendo, dónde y cómo vien
 - Sin inventar plata: se muestra avance y fotos, no el gasto, salvo que el
   municipio lo prenda.
 
-### Etapa 3 · Cronogramas y segmentación — PENDIENTE
+### Etapa 3 · Cronogramas y segmentación — HECHA (2026-08-29, en qa)
 
-- Avisos **recurrentes** (recolección, poda, barrido) que se repiten solos, con
-  el mismo motor de recurrencia que ya usa la agenda de pagos.
-- **Barrio del vecino**: darle barrio a la ficha del vecino (declarado por él o
-  detectado con `barrio_detector.py` al cargar su dirección) y recién ahí
-  segmentar los avisos por barrio o zona.
+Migración: `backend/scripts/migrate_cronogramas.py` (cuatro columnas nullable).
+
+**El cronograma es UNA publicación, no una serie.** "La recolección pasa los
+martes y viernes" no son 104 avisos por año: es un aviso que dice cuándo se
+repite. Por eso `recurrencia` (`semanal` / `quincenal` / `mensual`) y
+`dias_semana` (`"1,4"` = martes y viernes, 0 = lunes) son campos de la
+noticia, y no hay generador de ocurrencias que llenar ni purgar.
+
+La frase la arma **el backend** (`cronograma_texto`, calculado, no una
+columna): las tres superficies del vecino leen la misma frase en vez de
+traducir `"1,4"` cada una a su manera. En el feed, lo que se repite muestra
+*cuándo vuelve a pasar* en lugar de una cuenta regresiva — lo recurrente no
+vence.
+
+**Segmentación por barrio.** `usuarios.barrio_id` (lo declara el vecino en su
+perfil, no se infiere de la dirección) y `noticias.barrio_id`:
+
+| Publicación | Quién la ve |
+|---|---|
+| sin barrio | todo el municipio |
+| con barrio | sólo los vecinos que declararon ese barrio |
+| — | el vecino sin barrio declarado ve únicamente las generales |
+
+`GET /noticias/publico` toma `vecino_id` para resolver el alcance; sin él
+(visitante sin sesión) devuelve sólo las generales. Mandarle a alguien el corte
+de agua de otro barrio es peor que no mandarle nada: deja de creerle al canal.
+
+**Verificado en QA** (2026-08-29): 20 casos por API (crear, editar, los tres
+alcances, el visitante, multi-tenant) y 16 sobre la pantalla real con
+Playwright — el ABM, el form, el perfil del vecino y el feed. Dos bugs
+salieron sólo de probar el front: `/auth/me` arma el `UserResponse` campo por
+campo y no incluía `barrio_id`, y guardar el barrio no refrescaba la sesión,
+así que al recargar volvía a "Todo el municipio".
+
+> **Deuda anotada:** los cuatro armados manuales de `UserResponse` en
+> `api/auth.py` obligan a acordarse de cuatro lugares por cada columna nueva.
+> `model_validate(user)` lo resolvería (el schema ya tiene `from_attributes`).
+
+Las demos nacen con dos cronogramas (recolección los martes y viernes,
+vacunación los sábados) y una publicación segmentada a un barrio.
 
 ---
 
