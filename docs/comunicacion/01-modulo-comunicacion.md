@@ -164,22 +164,49 @@ traducir `"1,4"` cada una a su manera. En el feed, lo que se repite muestra
 *cuándo vuelve a pasar* en lugar de una cuenta regresiva — lo recurrente no
 vence.
 
-**Segmentación por barrio.** `usuarios.barrio_id` (lo declara el vecino en su
-perfil, no se infiere de la dirección) y `noticias.barrio_id`:
+**Segmentación por ZONA.** `usuarios.zona_id` (lo declara el vecino en su
+perfil, no se infiere de la dirección) y la tabla puente `noticia_zonas`:
 
 | Publicación | Quién la ve |
 |---|---|
-| sin barrio | todo el municipio |
-| con barrio | sólo los vecinos que declararon ese barrio |
-| — | el vecino sin barrio declarado ve únicamente las generales |
+| sin zonas | todo el municipio |
+| con zonas | sólo los vecinos que declararon alguna de esas zonas |
+| — | el vecino sin zona declarada ve únicamente las generales |
 
 `GET /noticias/publico` toma `vecino_id` para resolver el alcance; sin él
 (visitante sin sesión) devuelve sólo las generales. Mandarle a alguien el corte
-de agua de otro barrio es peor que no mandarle nada: deja de creerle al canal.
+de agua de otra zona es peor que no mandarle nada: deja de creerle al canal.
+
+**Por qué ZONA y no barrio** (corrección del dueño, 2026-08-29, con los números
+que la decidieron — medidos sobre la base entera, no sobre un municipio, que
+fue el error de la primera vuelta):
+
+| | |
+|---|---|
+| Municipios con zonas cargadas | 80 (494 zonas) |
+| Barrios en toda la base | 963 |
+| Barrios **con zona asignada** | **0** |
+| Trelew, creado ese mismo día | 12 zonas, **0 barrios** |
+
+No se puede llegar del vecino a la zona pasando por su barrio, y los municipios
+nuevos nacen con zonas y sin barrios: *"con zonas estamos bien, barrios no todo
+el país está mapeado"*. La zona es la unidad que siempre está — y segmenta
+mejor que el sur/este/oeste que se usaba antes.
+
+**Y son VARIAS, no una.** Un corte de agua toca tres zonas; con una sola había
+que cargar la misma publicación tres veces y bajarla tres veces. Por eso la
+tabla puente. Migración: `backend/scripts/migrate_segmentacion_zonas.py`.
+
+**La foto se sube, no se pega.** El campo Imagen pedía una URL y el que carga
+esto es un empleado municipal que tiene la foto en el celular: en la práctica
+se habría publicado todo sin imagen. `POST /noticias/imagen` sube a Cloudinary
+en una carpeta por municipio (la cuenta es compartida entre tenants).
 
 **Verificado en QA** (2026-08-29): 20 casos por API (crear, editar, los tres
-alcances, el visitante, multi-tenant) y 16 sobre la pantalla real con
-Playwright — el ABM, el form, el perfil del vecino y el feed. Dos bugs
+alcances, el visitante, multi-tenant), 11 más para el caso de varias zonas
+(una publicación que llega a dos zonas es UNA, no una copia por zona) y 17
+sobre la pantalla real con Playwright — el ABM, el form, el perfil del vecino
+y el feed. Dos bugs
 salieron sólo de probar el front: `/auth/me` arma el `UserResponse` campo por
 campo y no incluía `barrio_id`, y guardar el barrio no refrescaba la sesión,
 así que al recargar volvía a "Todo el municipio".
