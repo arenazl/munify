@@ -2136,18 +2136,23 @@ export const calificacionesApi = {
 };
 
 // Noticias
+/** Avisos al vecino (módulo Comunicación). La tabla se llama `noticias`.
+ *
+ *  El municipio sale del token en TODO lo de gestión: antes viajaba como
+ *  query param y el cliente podía publicar en otro tenant. El único que lleva
+ *  `municipio_id` es el feed público, que se consulta sin sesión. */
 export const noticiasApi = {
-  getAll: (params?: { municipio_id?: number; solo_activas?: boolean; skip?: number; limit?: number }) => {
-    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
-    return api.get('/noticias', { params: { ...params, municipio_id: municipioId } });
-  },
-  getOne: (id: number) => api.get(`/noticias/${id}`),
-  create: (data: Record<string, unknown>, municipioId?: number) => {
+  publico: (municipioId?: number) => {
     const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.post('/noticias', data, { params: { municipio_id: mId } });
+    return api.get('/noticias/publico', { params: { municipio_id: mId } });
   },
-  update: (id: number, data: Record<string, unknown>) => api.put(`/noticias/${id}`, data),
+  getAll: () => api.get('/noticias'),
+  create: (data: Record<string, unknown>) => api.post('/noticias', data),
+  update: (id: number, data: Record<string, unknown>) => api.patch(`/noticias/${id}`, data),
   delete: (id: number) => api.delete(`/noticias/${id}`),
+  /** Push + campana a los vecinos del muni. Idempotente: si ya se avisó,
+   *  devuelve `ya_enviado` y no vuelve a mandar. */
+  enviar: (id: number) => api.post<{ enviados: number; ya_enviado: boolean }>(`/noticias/${id}/enviar`),
 };
 
 // Gestion de Empleados (cuadrillas, ausencias, horarios, metricas, capacitaciones)

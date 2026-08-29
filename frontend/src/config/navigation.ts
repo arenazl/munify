@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout,
+  History, Sprout, Megaphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -25,6 +25,7 @@ export const ICONO_CATEGORIA: Record<string, LucideIcon> = {
   'Sueldos': Banknote,
   'Contaduría': Receipt,
   'Campo': Hammer,
+  'Comunicación': Megaphone,
   'Mi Área': Layers,
   'Atención al vecino': Building2,
   'Configuración': Settings,
@@ -431,6 +432,17 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: false,
       categoria: 'Contaduría',
       description: 'OPs vencidas, próximas, top beneficiarios'
+    },
+    // === COMUNICACIÓN (módulo nuevo 2026-08-29, opt-in) ===
+    // Lo que el municipio le cuenta al vecino sin que el vecino pregunte.
+    // Ver docs/comunicacion/01-modulo-comunicacion.md
+    {
+      name: 'Avisos',
+      href: '/gestion/avisos',
+      icon: Megaphone,
+      show: isAdminOrSupervisor && modulosActivos.has('comunicacion'),
+      categoria: 'Comunicación',
+      description: 'Novedades y avisos al celular del vecino'
     },
     // === ABMs per-municipio ===
     // 'Categorías' (categorias-reclamo), 'Trámites' (categorias-tramite) y
