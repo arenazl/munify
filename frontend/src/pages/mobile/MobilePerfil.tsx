@@ -37,6 +37,14 @@ export default function MobilePerfil() {
   const [barrioId, setBarrioId] = useState<string>(user?.barrio_id ? String(user.barrio_id) : '');
   const [guardandoBarrio, setGuardandoBarrio] = useState(false);
 
+  // El user llega DESPUES del primer render (el contexto lo resuelve en un
+  // efecto), asi que el valor inicial del useState siempre se calcula con
+  // `user` en null: sin esto el selector mostraba "Todo el municipio" aunque
+  // el vecino ya tuviera su barrio guardado.
+  useEffect(() => {
+    setBarrioId(user?.barrio_id ? String(user.barrio_id) : '');
+  }, [user?.barrio_id]);
+
   useEffect(() => {
     if (!user?.municipio_id) return;
     municipiosApi.getBarrios(user.municipio_id)
