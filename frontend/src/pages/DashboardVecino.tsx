@@ -335,37 +335,6 @@ export default function DashboardVecino() {
   })();
 
 
-  // Stats cards data
-  const statsCards = [
-    {
-      title: 'Total Reclamos',
-      value: misEstadisticas.total,
-      icon: ClipboardList,
-      iconBg: `${theme.primary}20`,
-      iconColor: theme.primary,
-    },
-    {
-      title: 'Pendientes',
-      value: reclamosPendientes,
-      icon: Clock,
-      iconBg: '#f59e0b20',
-      iconColor: '#f59e0b',
-    },
-    {
-      title: 'Resueltos',
-      value: misEstadisticas.resueltos,
-      icon: CheckCircle,
-      iconBg: '#22c55e20',
-      iconColor: '#22c55e',
-    },
-    {
-      title: 'Rechazados',
-      value: misEstadisticas.rechazados,
-      icon: XCircle,
-      iconBg: '#ef444420',
-      iconColor: '#ef4444',
-    },
-  ];
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchData(); }}>
@@ -433,52 +402,11 @@ export default function DashboardVecino() {
         </div>
       )}
 
-      {/* Stats Cards - Estilo Glassmorphism */}
-      {isComponentVisible('stats') && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {statsCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.title}
-                className="group relative rounded-2xl p-4 md:p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer overflow-hidden"
-                style={{
-                  backgroundColor: theme.card,
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
-                />
-                <div
-                  className="absolute -top-16 -right-16 w-32 h-32 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"
-                  style={{ backgroundColor: card.iconColor }}
-                />
-                <div className="relative flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
-                      {card.title}
-                    </p>
-                    <p className="text-2xl md:text-3xl font-black mt-1 tracking-tight" style={{ color: theme.text }}>
-                      {card.value}
-                    </p>
-                  </div>
-                  <div
-                    className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
-                    style={{
-                      backgroundColor: card.iconBg,
-                      boxShadow: `0 4px 14px ${card.iconColor}25`
-                    }}
-                  >
-                    <Icon className="h-5 w-5 md:h-6 md:w-6" style={{ color: card.iconColor }} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Los cuatro KPI cards (total / pendientes / resueltos / rechazados)
+          se sacaron el 2026-08-29: repetían exactamente lo que el hero ya
+          dice arriba ('Tus reclamos · En curso · Resueltos'), y los
+          rechazados los cuenta la alerta roja, que además ofrece la acción
+          ('Ver el motivo'). Los KPIs viven en el hero, una sola vez. */}
 
       {/* News Feed - solo se muestra si el municipio cargó noticias reales */}
       {noticias.length > 0 && (
