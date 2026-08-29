@@ -29,7 +29,7 @@ import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { seg } from '../lib/semanticHero';
-import { cajasApi, flotaApi } from '../lib/api';
+import { cajasApi, contactosApi, flotaApi } from '../lib/api';
 import type { Caja } from '../types';
 
 interface Vehiculo {
@@ -58,6 +58,8 @@ type FormCarga = {
   importe: string;
   km: string;
   caja_id: number | null;
+  /** La estación de servicio. El gasto necesita un destino sí o sí. */
+  contacto_id: number | null;
   observaciones: string;
 };
 
@@ -67,7 +69,8 @@ const hoyISO = () => {
 };
 
 const FORM_VACIO: FormCarga = {
-  item_id: null, fecha: hoyISO(), litros: '', importe: '', km: '', caja_id: null, observaciones: '',
+  item_id: null, fecha: hoyISO(), litros: '', importe: '', km: '',
+  caja_id: null, contacto_id: null, observaciones: '',
 };
 
 const plata = (v: string | number | null | undefined) =>
@@ -101,6 +104,7 @@ export default function Flota() {
   const { theme } = useTheme();
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [proveedores, setProveedores] = useState<{ id: number; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [estadoTab, setEstadoTab] = useState('todos');
@@ -111,12 +115,14 @@ export default function Flota() {
   const cargar = async () => {
     setLoading(true);
     try {
-      const [vRes, cRes] = await Promise.all([
+      const [vRes, cRes, pRes] = await Promise.all([
         flotaApi.vehiculos(),
         cajasApi.list({ activo: true }).catch(() => ({ data: [] })),
+        contactosApi.list({ activo: true }).catch(() => ({ data: [] })),
       ]);
       setVehiculos((vRes.data as Vehiculo[]) || []);
       setCajas((cRes.data as Caja[]) || []);
+      setProveedores(((pRes.data as { id: number; nombre: string }[]) || []).slice(0, 200));
     } catch {
       toast.error('No se pudo cargar la flota');
     } finally {
@@ -257,6 +263,7 @@ export default function Flota() {
         importe: form.importe ? Number(form.importe) : null,
         km: form.km ? Number(form.km) : null,
         caja_id: form.caja_id,
+        contacto_id: form.contacto_id,
         observaciones: form.observaciones.trim() || null,
       });
       toast.success(form.caja_id && form.importe
@@ -419,6 +426,19 @@ export default function Flota() {
                 style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.text }}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+              Estación de servicio
+            </label>
+            <ModernSelect
+              options={proveedores.map((p) => ({ value: String(p.id), label: p.nombre }))}
+              value={form.contacto_id ? String(form.contacto_id) : ''}
+              onChange={(v) => setForm((f) => ({ ...f, contacto_id: v ? Number(v) : null }))}
+              placeholder="Sin especificar"
+              searchable
+            />
           </div>
 
           <div>

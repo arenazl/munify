@@ -22,7 +22,7 @@ from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import FlotaCarga, InventarioItem, RolUsuario, User
-from models.gasto import Gasto
+from models.gasto import DestinoGasto, Gasto
 
 router = APIRouter()
 
@@ -120,6 +120,11 @@ class CargaCreate(BaseModel):
     observaciones: Optional[str] = None
     # Si viene, la carga ademas se imputa como gasto y descuenta esa caja.
     caja_id: Optional[int] = None
+    # La estacion de servicio. El gasto SIEMPRE necesita un destino: con
+    # proveedor queda imputado a el, y sin proveedor a la dependencia que usa
+    # el vehiculo. Un gasto sin destino no se puede guardar (columna NOT NULL).
+    contacto_id: Optional[int] = None
+    dependencia_id: Optional[int] = None
 
 
 # ============================================================
@@ -241,6 +246,11 @@ async def registrar_carga(
         gasto = Gasto(
             municipio_id=municipio_id,
             creador_id=current_user.id,
+            # El destino es obligatorio en el modelo: con proveedor cargado va
+            # a el; si no, a la dependencia (la que opera el vehiculo).
+            destino_tipo=DestinoGasto.CONTACTO if data.contacto_id else DestinoGasto.DEPENDENCIA,
+            destino_contacto_id=data.contacto_id,
+            destino_dependencia_id=data.dependencia_id,
             concepto=f"Combustible {vehiculo.nombre}",
             descripcion=f"{data.litros} litros"
                         + (f" · {data.km} km" if data.km else ""),
