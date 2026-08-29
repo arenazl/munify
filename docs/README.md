@@ -18,6 +18,8 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
 | [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
 | [`financiero/`](financiero/) | **Qué hace hoy el módulo financiero** (Contaduría + Tesorería + Sueldos + dashboard): descripción funcional fiel, base para buscar mejoras |
+| [`comunicacion/`](comunicacion/) | **Módulo NUEVO** (a construir): avisos al vecino, obras a la vista, cronogramas. Tres etapas, spec de la primera |
+| [`recursos/`](recursos/) | **Módulo NUEVO** (a construir): flota y combustible, presentismo de cuadrillas, reservas. Tres etapas, consolidado con OT+Inventario |
 | [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
 | [`calls/`](calls/) | **Directorio de llamados** (`/calls`): `01` cómo regenerar la app y repasar los intendentes · `02` qué le falta y por dónde seguir |
