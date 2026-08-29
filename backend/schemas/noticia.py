@@ -3,16 +3,24 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-# aviso | noticia | alerta. Literal y no Enum de Python: el front manda el
-# string y no hay logica de negocio colgada del tipo, solo peso visual.
-TipoAviso = Literal["aviso", "noticia", "alerta"]
+# DONDE aparece la publicacion en la app del vecino. No es una etiqueta: es
+# el bloque del feed en el que sale. Los tres son lo mismo —imagen, titulo,
+# descripcion— y por eso viven en UNA tabla y se cargan en UNA pantalla.
+#   destacado -> el banner grande de arriba (rota si hay varios)
+#   novedad   -> las tarjetas del medio
+# Las OBRAS no estan aca: viven en Tesoreria como proyectos, con sus gastos
+# imputados, y se publican con un tilde en esa misma pantalla. Duplicarlas
+# como noticia seria tener la misma obra en dos lugares.
+# Se aceptan los valores viejos (aviso/noticia/alerta) para no romper lo ya
+# cargado: el front los trata como "novedad".
+TipoAviso = Literal["destacado", "novedad", "aviso", "noticia", "alerta"]
 
 
 class NoticiaBase(BaseModel):
     titulo: str
     descripcion: str
     imagen_url: Optional[str] = None
-    tipo: TipoAviso = "aviso"
+    tipo: TipoAviso = "novedad"
     fecha_desde: Optional[date] = None
     fecha_hasta: Optional[date] = None
     fijado: bool = False

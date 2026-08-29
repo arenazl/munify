@@ -27,8 +27,10 @@ class Noticia(Base):
 
     # --- Modulo Comunicacion, Etapa 1 (2026-08-29) ---
 
-    # aviso | noticia | alerta. Cambia el peso visual en el feed, no la tabla.
-    tipo = Column(String(20), nullable=False, default="aviso", server_default="aviso")
+    # DONDE sale en la app del vecino: destacado (el banner grande de arriba,
+    # que rota si hay varios) o novedad (las tarjetas del medio). Las OBRAS no
+    # estan aca: viven en Tesoreria como proyectos y se publican desde ahi.
+    tipo = Column(String(20), nullable=False, default="novedad", server_default="novedad")
 
     # Vigencia: el aviso del corte de agua se apaga SOLO. Ambas nullable =
     # sin vencimiento (una noticia comun vive hasta que la bajen).

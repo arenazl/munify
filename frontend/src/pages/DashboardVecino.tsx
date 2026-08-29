@@ -515,13 +515,21 @@ export default function DashboardVecino() {
             // en tira. Sin nada fijado manda la más reciente, que ya viene
             // primera del backend. No es decoración: el orden lo decide el
             // dato, no el azar de la grilla.
-            const [destacada, ...resto] = noticias;
+            // Destacado = lo que Comunicación mandó al banner (tipo
+            // 'destacado' o el `fijado` de antes). El resto va abajo.
+            const esDestacada = (n: NoticiaItem) => n.fijado || n.tipo === 'destacado';
+            const enBanner = noticias.filter(esDestacada);
+            const resto = noticias.filter((n) => !esDestacada(n));
+            // Sin nada destacado, la más reciente hace de banner: la fila de
+            // arriba no puede quedar vacía si hay novedades para mostrar.
+            const banner = enBanner.length > 0 ? enBanner : noticias.slice(0, 1);
+            const abajo = enBanner.length > 0 ? resto : noticias.slice(1);
             return (
               <div className="grid gap-4">
-                <NovedadDestacada noticia={destacada} theme={theme} />
-                {resto.length > 0 && (
+                <BannerNovedades noticias={banner} theme={theme} />
+                {abajo.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {resto.map((n) => (
+                    {abajo.map((n) => (
                       <NovedadCompacta key={n.id} noticia={n} theme={theme} />
                     ))}
                   </div>
@@ -1460,6 +1468,61 @@ function ChipNovedad({ texto, color, solido }: { texto: string; color: string; s
     >
       {texto}
     </span>
+  );
+}
+
+/**
+ * BANNER del feed: rota entre las novedades destacadas.
+ *
+ * Con una sola no rota ni dibuja puntos — no hay entre qué alternar, y unos
+ * puntos que no llevan a ningún lado son ruido. La rotación se frena al pasar
+ * el mouse y con `prefers-reduced-motion`.
+ */
+function BannerNovedades({
+  noticias,
+  theme,
+}: {
+  noticias: NoticiaItem[];
+  theme: ReturnType<typeof useTheme>['theme'];
+}) {
+  const [indice, setIndice] = useState(0);
+  const [pausado, setPausado] = useState(false);
+
+  useEffect(() => {
+    if (noticias.length < 2 || pausado) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t = setInterval(() => setIndice((i) => (i + 1) % noticias.length), 7000);
+    return () => clearInterval(t);
+  }, [noticias.length, pausado]);
+
+  const actual = noticias[Math.min(indice, noticias.length - 1)];
+  if (!actual) return null;
+
+  return (
+    <div
+      onMouseEnter={() => setPausado(true)}
+      onMouseLeave={() => setPausado(false)}
+      className="relative"
+    >
+      <NovedadDestacada noticia={actual} theme={theme} />
+      {noticias.length > 1 && (
+        <div className="absolute bottom-3 right-4 flex items-center gap-1.5">
+          {noticias.map((n, i) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => setIndice(i)}
+              aria-label={`Ver ${n.titulo}`}
+              className="h-1.5 rounded-full transition-all"
+              style={{
+                width: i === indice ? 18 : 6,
+                backgroundColor: i === indice ? '#fff' : 'rgba(255,255,255,0.5)',
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

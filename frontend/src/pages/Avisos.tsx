@@ -1,23 +1,29 @@
 /**
- * AVISOS — módulo Comunicación, Etapa 1.
+ * COMUNICACIÓN — todo lo que el municipio le muestra al vecino, en UNA pantalla.
  *
- * Lo que el municipio le cuenta al vecino sin que el vecino pregunte: un corte
- * de agua, una obra que arranca, una alerta por tormenta.
+ * El feed del vecino tiene tres bloques, y los tres son la misma cosa: una
+ * imagen, un título y una descripción. Por eso se cargan acá y no en tres
+ * pantallas distintas. Lo único que cambia es DÓNDE aparece cada publicación:
  *
- * El canal ya existía —la tabla `noticias` y las tres pantallas del vecino que
- * la muestran— pero estaba VACÍO en todos los municipios porque no había dónde
- * cargarlo. Esta pantalla es esa punta suelta.
+ *   Destacado → el banner grande de arriba (rota si hay varios)
+ *   Novedad   → las tarjetas del medio
+ *   Obra      → el bloque de obras, con su avance
  *
- * Dos cosas la separan de un ABM cualquiera:
+ * LAS OBRAS VIENEN PRECARGADAS. No se escriben acá: Tesorería las carga como
+ * proyectos —con sus gastos imputados— y aparecen en esta lista esperando
+ * decisión. **Comunicación decide cuáles publica y cuáles no.** Así el que
+ * comunica no entra al módulo de la plata, y la obra sigue siendo un solo
+ * registro en el sistema.
+ *
+ * Dos reglas más que se ven en la pantalla:
  *  - **La vigencia hace el estado.** El aviso del corte de agua se apaga solo
- *    el día que pasa: "Vigente / Programado / Vencido" se DEDUCE de las fechas,
- *    no es un campo que alguien tenga que acordarse de bajar.
- *  - **Avisar es irreversible.** El push le llega a todo el municipio y no se
- *    puede deshacer: el botón pide confirmación y, una vez enviado, queda como
- *    constancia ("Avisado a N vecinos") en vez de volver a estar disponible.
+ *    el día que pasa: se deduce de las fechas, no es un campo que alguien
+ *    tenga que acordarse de bajar.
+ *  - **Avisar es irreversible.** El push le llega a todo el municipio: pide
+ *    confirmación y después queda como constancia.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Megaphone, Pin, Send, Trash2, Pencil } from 'lucide-react';
+import { Hammer, Loader2, Megaphone, Pencil, Pin, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
@@ -28,47 +34,58 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { seg } from '../lib/semanticHero';
-import { noticiasApi } from '../lib/api';
+import { noticiasApi, proyectosApi } from '../lib/api';
 
-interface Aviso {
+/** Una publicación del feed. `origen` dice de qué tabla salió: las novedades
+ *  viven en `noticias`, las obras en `proyectos` (Tesorería). El resto de la
+ *  pantalla las trata igual. */
+interface Publicacion {
   id: number;
+  origen: 'noticia' | 'obra';
   titulo: string;
   descripcion: string;
   imagen_url: string | null;
-  tipo: 'aviso' | 'noticia' | 'alerta';
+  /** destacado | novedad | obra */
+  tipo: string;
   fecha_desde: string | null;
   fecha_hasta: string | null;
-  fijado: boolean;
   activo: boolean;
   enviado_at: string | null;
   enviados_count: number;
-  created_at: string;
+  avance: number | null;
+  estado_obra: string | null;
+  /** Sólo obras: si Comunicación ya decidió publicarla. */
+  publicada: boolean;
 }
 
 const TIPOS: SelectOption[] = [
-  { value: 'aviso', label: 'Aviso' },
-  { value: 'noticia', label: 'Noticia' },
-  { value: 'alerta', label: 'Alerta' },
+  { value: 'destacado', label: 'Destacado', description: 'El banner grande de arriba. Si hay varios, van rotando' },
+  { value: 'novedad', label: 'Novedad', description: 'Las tarjetas del medio del feed' },
+];
+
+const ESTADOS_OBRA: SelectOption[] = [
+  { value: 'por_empezar', label: 'Por empezar' },
+  { value: 'en_ejecucion', label: 'En ejecución' },
+  { value: 'terminada', label: 'Terminada' },
 ];
 
 type FormState = {
   titulo: string;
   descripcion: string;
-  tipo: 'aviso' | 'noticia' | 'alerta';
+  imagen_url: string;
+  tipo: string;
   fecha_desde: string;
   fecha_hasta: string;
-  fijado: boolean;
   activo: boolean;
+  avance: string;
+  estado_obra: string;
+  publicada: boolean;
 };
 
 const FORM_VACIO: FormState = {
-  titulo: '',
-  descripcion: '',
-  tipo: 'aviso',
-  fecha_desde: '',
-  fecha_hasta: '',
-  fijado: false,
-  activo: true,
+  titulo: '', descripcion: '', imagen_url: '', tipo: 'novedad',
+  fecha_desde: '', fecha_hasta: '', activo: true,
+  avance: '', estado_obra: 'en_ejecucion', publicada: false,
 };
 
 /** 'YYYY-MM-DD' de hoy en hora LOCAL. Nunca `toISOString()`: es UTC y de noche
@@ -78,29 +95,30 @@ const hoyISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-type Estado = 'vigente' | 'programado' | 'vencido' | 'bajado';
+type Estado = 'vigente' | 'programado' | 'vencido' | 'bajado' | 'sin-publicar';
 
-/** El estado NO es un campo: sale de la vigencia. */
-function estadoDe(a: Aviso): Estado {
-  const hoy = hoyISO();
-  if (!a.activo) return 'bajado';
-  if (a.fecha_hasta && a.fecha_hasta < hoy) return 'vencido';
-  if (a.fecha_desde && a.fecha_desde > hoy) return 'programado';
+function estadoDe(p: Publicacion): Estado {
+  if (p.origen === 'obra' && !p.publicada) return 'sin-publicar';
+  if (!p.activo) return 'bajado';
+  if (p.fecha_hasta && p.fecha_hasta < hoyISO()) return 'vencido';
+  if (p.fecha_desde && p.fecha_desde > hoyISO()) return 'programado';
   return 'vigente';
 }
 
 const ESTADO_LABEL: Record<Estado, string> = {
-  vigente: 'Vigente',
-  programado: 'Programado',
-  vencido: 'Vencido',
-  bajado: 'Bajado',
+  vigente: 'Publicado', programado: 'Programado', vencido: 'Vencido',
+  bajado: 'Bajado', 'sin-publicar': 'Sin publicar',
 };
 
 const ESTADO_TONE: Record<Estado, ChipTone> = {
-  vigente: 'green',
-  programado: 'amber',
-  vencido: 'gray',
-  bajado: 'gray',
+  vigente: 'green', programado: 'amber', vencido: 'gray',
+  bajado: 'gray', 'sin-publicar': 'blue',
+};
+
+const TIPO_LABEL: Record<string, string> = {
+  destacado: 'Banner', novedad: 'Novedad', obra: 'Obra',
+  // Lo cargado antes del cambio de nombres cae en Novedad.
+  aviso: 'Novedad', noticia: 'Novedad', alerta: 'Novedad',
 };
 
 const fmtFecha = (iso: string | null) => {
@@ -109,9 +127,12 @@ const fmtFecha = (iso: string | null) => {
   return `${Number(d)}/${Number(m)}/${a}`;
 };
 
-const vigenciaTexto = (a: Aviso) => {
-  const desde = fmtFecha(a.fecha_desde);
-  const hasta = fmtFecha(a.fecha_hasta);
+const detalleDe = (p: Publicacion) => {
+  if (p.origen === 'obra') {
+    return p.avance !== null ? `${p.avance}% de avance` : 'sin avance cargado';
+  }
+  const desde = fmtFecha(p.fecha_desde);
+  const hasta = fmtFecha(p.fecha_hasta);
   if (desde && hasta) return `Del ${desde} al ${hasta}`;
   if (hasta) return `Hasta el ${hasta}`;
   if (desde) return `Desde el ${desde}`;
@@ -120,177 +141,224 @@ const vigenciaTexto = (a: Aviso) => {
 
 export default function Avisos() {
   const { theme } = useTheme();
-  const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [items, setItems] = useState<Publicacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [estadoTab, setEstadoTab] = useState('todos');
+  const [tab, setTab] = useState('todos');
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editando, setEditando] = useState<Publicacion | null>(null);
   const [form, setForm] = useState<FormState>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
-  const [aBorrar, setABorrar] = useState<Aviso | null>(null);
-  const [aAvisar, setAAvisar] = useState<Aviso | null>(null);
+  const [aBorrar, setABorrar] = useState<Publicacion | null>(null);
+  const [aAvisar, setAAvisar] = useState<Publicacion | null>(null);
   const [enviando, setEnviando] = useState(false);
 
+  /** Las dos fuentes, unificadas: las novedades que se escriben acá y las
+   *  obras que Tesorería ya cargó, esperando decisión de publicarlas. */
   const cargar = async () => {
     setLoading(true);
     try {
-      const res = await noticiasApi.getAll();
-      setAvisos((res.data as Aviso[]) || []);
+      const [nRes, pRes] = await Promise.all([
+        noticiasApi.getAll(),
+        proyectosApi.list({ activo: true }).catch(() => ({ data: [] })),
+      ]);
+
+      const novedades: Publicacion[] = ((nRes.data as Record<string, unknown>[]) || []).map((n) => ({
+        id: n.id as number,
+        origen: 'noticia' as const,
+        titulo: n.titulo as string,
+        descripcion: (n.descripcion as string) || '',
+        imagen_url: (n.imagen_url as string) ?? null,
+        tipo: n.fijado ? 'destacado' : ((n.tipo as string) || 'novedad'),
+        fecha_desde: (n.fecha_desde as string) ?? null,
+        fecha_hasta: (n.fecha_hasta as string) ?? null,
+        activo: Boolean(n.activo),
+        enviado_at: (n.enviado_at as string) ?? null,
+        enviados_count: (n.enviados_count as number) ?? 0,
+        avance: null, estado_obra: null, publicada: true,
+      }));
+
+      const obras: Publicacion[] = ((pRes.data as Record<string, unknown>[]) || []).map((p) => ({
+        id: p.id as number,
+        origen: 'obra' as const,
+        titulo: p.nombre as string,
+        descripcion: (p.descripcion as string) || '',
+        imagen_url: (p.foto_url as string) ?? null,
+        tipo: 'obra',
+        fecha_desde: null, fecha_hasta: null,
+        activo: Boolean(p.activo),
+        enviado_at: null, enviados_count: 0,
+        avance: (p.avance as number) ?? null,
+        estado_obra: (p.estado_obra as string) ?? null,
+        publicada: Boolean(p.publico),
+      }));
+
+      setItems([...novedades, ...obras]);
     } catch {
-      toast.error('No se pudieron cargar los avisos');
+      toast.error('No se pudieron cargar las comunicaciones');
     } finally {
       setLoading(false);
     }
   };
   useEffect(() => { cargar(); }, []);
 
-  const vigentes = useMemo(() => avisos.filter((a) => estadoDe(a) === 'vigente'), [avisos]);
+  const destacados = useMemo(() => items.filter((i) => i.tipo === 'destacado'), [items]);
+  const novedades = useMemo(
+    () => items.filter((i) => i.origen === 'noticia' && i.tipo !== 'destacado'), [items]);
+  const obras = useMemo(() => items.filter((i) => i.origen === 'obra'), [items]);
+  const sinPublicar = useMemo(() => obras.filter((o) => !o.publicada), [obras]);
   const sinAvisar = useMemo(
-    () => avisos.filter((a) => !a.enviado_at && estadoDe(a) === 'vigente'),
-    [avisos],
-  );
-  const alcanzados = useMemo(
-    () => avisos.reduce((s, a) => s + (a.enviados_count || 0), 0),
-    [avisos],
+    () => items.filter((i) => i.origen === 'noticia' && !i.enviado_at && estadoDe(i) === 'vigente'),
+    [items],
   );
 
   const visibles = useMemo(() => {
     const s = search.trim().toLowerCase();
-    return avisos.filter((a) => {
-      if (estadoTab === 'vigentes' && estadoDe(a) !== 'vigente') return false;
-      if (estadoTab === 'sin-avisar' && (a.enviado_at || estadoDe(a) !== 'vigente')) return false;
-      if (estadoTab === 'terminados' && !['vencido', 'bajado'].includes(estadoDe(a))) return false;
+    return items.filter((i) => {
+      if (tab === 'destacados' && i.tipo !== 'destacado') return false;
+      if (tab === 'novedades' && !(i.origen === 'noticia' && i.tipo !== 'destacado')) return false;
+      if (tab === 'obras' && i.origen !== 'obra') return false;
+      if (tab === 'pendientes' && !(sinPublicar.includes(i) || sinAvisar.includes(i))) return false;
       if (!s) return true;
-      return a.titulo.toLowerCase().includes(s) || a.descripcion.toLowerCase().includes(s);
+      return i.titulo.toLowerCase().includes(s) || i.descripcion.toLowerCase().includes(s);
     });
-  }, [avisos, search, estadoTab]);
+  }, [items, search, tab, sinPublicar, sinAvisar]);
 
-  // El hero habla del canal, no de la tabla: lo que importa es si el vecino se
-  // está enterando. Sin avisos cargados, la frase lo dice sin enunciar ceros.
+  const pendientes = sinPublicar.length + sinAvisar.length;
+
   const heroFrases = useMemo(() => {
-    if (avisos.length === 0) {
-      return [{
-        segmentos: [
-          seg('Todavía no publicaste ningún aviso:'),
-          seg('el vecino no está recibiendo novedades del municipio.', 'advertencia'),
-        ],
-      }];
+    if (items.length === 0) {
+      return [{ segmentos: [
+        seg('Todavía no publicaste nada:'),
+        seg('el vecino no está recibiendo novedades del municipio.', 'advertencia'),
+      ] }];
     }
-    if (sinAvisar.length > 0) {
-      return [{
-        segmentos: [
-          seg(
-            `${sinAvisar.length} ${sinAvisar.length === 1 ? 'aviso vigente todavía no se notificó' : 'avisos vigentes todavía no se notificaron'}`,
-            'advertencia',
-          ),
-          seg('al celular del vecino.'),
-        ],
-      }];
+    if (pendientes > 0) {
+      return [{ segmentos: [
+        seg(`${pendientes} ${pendientes === 1 ? 'publicación espera' : 'publicaciones esperan'} una decisión`, 'advertencia'),
+        seg('— obras sin publicar o novedades sin notificar.'),
+      ] }];
     }
-    return [{
-      segmentos: [
-        seg(`${vigentes.length} ${vigentes.length === 1 ? 'aviso vigente' : 'avisos vigentes'}`, 'bueno'),
-        seg('en la app del vecino, todos notificados.'),
-      ],
-    }];
-  }, [avisos.length, sinAvisar.length, vigentes.length]);
+    const alAire = destacados.length + novedades.length + obras.filter((o) => o.publicada).length;
+    return [{ segmentos: [
+      seg(`${alAire} ${alAire === 1 ? 'publicación' : 'publicaciones'} al aire`, 'bueno'),
+      seg('en la app del vecino.'),
+    ] }];
+  }, [items.length, pendientes, destacados.length, novedades.length, obras]);
 
   const heroKpis = useMemo(() => ([
-    { etiqueta: 'Vigentes', valor: String(vigentes.length) },
-    { etiqueta: 'Sin avisar', valor: String(sinAvisar.length) },
-    { etiqueta: 'Publicados', valor: String(avisos.length) },
-    { etiqueta: 'Vecinos alcanzados', valor: String(alcanzados) },
-  ]), [vigentes.length, sinAvisar.length, avisos.length, alcanzados]);
+    { etiqueta: 'En el banner', valor: String(destacados.length) },
+    { etiqueta: 'Novedades', valor: String(novedades.length) },
+    { etiqueta: 'Obras publicadas', valor: String(obras.filter((o) => o.publicada).length) },
+    { etiqueta: 'Esperan decisión', valor: String(pendientes) },
+  ]), [destacados.length, novedades.length, obras, pendientes]);
 
-  const columnas = useMemo<ColumnSpec<Aviso>[]>(() => [
+  const columnas = useMemo<ColumnSpec<Publicacion>[]>(() => [
     {
       id: 'titulo',
-      header: 'Aviso',
+      header: 'Publicación',
       width: 'minmax(220px, 2fr)',
       kind: 'entity',
-      cell: (a) => (
+      cell: (p) => (
         <EntityCell
-          icon={a.fijado ? Pin : Megaphone}
-          title={a.titulo}
-          subtitle={a.descripcion}
+          icon={p.origen === 'obra' ? Hammer : p.tipo === 'destacado' ? Pin : Megaphone}
+          title={p.titulo}
+          subtitle={p.descripcion || undefined}
         />
       ),
+    },
+    {
+      id: 'donde',
+      header: 'Dónde sale',
+      width: 'minmax(110px, 0.8fr)',
+      kind: 'text',
+      cell: (p) => TIPO_LABEL[p.tipo] || 'Novedad',
     },
     {
       id: 'estado',
       header: 'Estado',
       width: 'minmax(120px, 0.8fr)',
       kind: 'chip',
-      cell: (a) => {
-        const e = estadoDe(a);
+      cell: (p) => {
+        const e = estadoDe(p);
         return <ChipEstado label={ESTADO_LABEL[e]} tone={ESTADO_TONE[e]} />;
       },
     },
     {
-      id: 'vigencia',
-      header: 'Vigencia',
+      id: 'detalle',
+      header: 'Vigencia / avance',
       width: 'minmax(150px, 1fr)',
       kind: 'text',
-      cell: (a) => vigenciaTexto(a),
+      cell: (p) => detalleDe(p),
     },
     {
       id: 'avisado',
       header: 'Avisado',
-      width: 'minmax(120px, 0.8fr)',
+      width: 'minmax(110px, 0.7fr)',
       align: 'right',
       kind: 'text',
-      cell: (a) =>
-        a.enviado_at
-          ? `${a.enviados_count} ${a.enviados_count === 1 ? 'vecino' : 'vecinos'}`
-          : 'todavía no',
+      cell: (p) => p.origen === 'obra' ? '—'
+        : p.enviado_at ? `${p.enviados_count} ${p.enviados_count === 1 ? 'vecino' : 'vecinos'}` : 'todavía no',
     },
     { id: 'acciones', header: '', width: '52px', kind: 'actions' },
   ], []);
 
   const abrirNuevo = () => {
-    setEditId(null);
+    setEditando(null);
     setForm(FORM_VACIO);
     setSheetOpen(true);
   };
 
-  const abrirEdicion = (a: Aviso) => {
-    setEditId(a.id);
+  const abrirEdicion = (p: Publicacion) => {
+    setEditando(p);
     setForm({
-      titulo: a.titulo,
-      descripcion: a.descripcion,
-      tipo: a.tipo,
-      fecha_desde: a.fecha_desde || '',
-      fecha_hasta: a.fecha_hasta || '',
-      fijado: a.fijado,
-      activo: a.activo,
+      titulo: p.titulo,
+      descripcion: p.descripcion,
+      imagen_url: p.imagen_url || '',
+      tipo: p.tipo,
+      fecha_desde: p.fecha_desde || '',
+      fecha_hasta: p.fecha_hasta || '',
+      activo: p.activo,
+      avance: p.avance !== null ? String(p.avance) : '',
+      estado_obra: p.estado_obra || 'en_ejecucion',
+      publicada: p.publicada,
     });
     setSheetOpen(true);
   };
 
   const guardar = async () => {
-    if (!form.titulo.trim() || !form.descripcion.trim()) {
-      toast.error('El aviso necesita título y texto');
-      return;
-    }
+    if (!form.titulo.trim()) { toast.error('Falta el título'); return; }
     setGuardando(true);
     try {
-      const payload = {
-        titulo: form.titulo.trim(),
-        descripcion: form.descripcion.trim(),
-        tipo: form.tipo,
-        fecha_desde: form.fecha_desde || null,
-        fecha_hasta: form.fecha_hasta || null,
-        fijado: form.fijado,
-        ...(editId ? { activo: form.activo } : {}),
-      };
-      if (editId) await noticiasApi.update(editId, payload);
-      else await noticiasApi.create(payload);
-      toast.success(editId ? 'Aviso actualizado' : 'Aviso publicado');
+      if (editando?.origen === 'obra') {
+        // La obra se edita EN SU PROYECTO: acá no se crea una copia.
+        await proyectosApi.update(editando.id, {
+          publico: form.publicada,
+          estado_obra: form.estado_obra,
+          avance: form.avance ? Number(form.avance) : null,
+          foto_url: form.imagen_url.trim() || null,
+          descripcion: form.descripcion.trim() || null,
+        });
+        toast.success(form.publicada ? 'La obra ya se ve en la app del vecino' : 'La obra dejó de publicarse');
+      } else {
+        const payload = {
+          titulo: form.titulo.trim(),
+          descripcion: form.descripcion.trim(),
+          imagen_url: form.imagen_url.trim() || null,
+          tipo: form.tipo,
+          fijado: form.tipo === 'destacado',
+          fecha_desde: form.fecha_desde || null,
+          fecha_hasta: form.fecha_hasta || null,
+          ...(editando ? { activo: form.activo } : {}),
+        };
+        if (editando) await noticiasApi.update(editando.id, payload);
+        else await noticiasApi.create(payload);
+        toast.success(editando ? 'Publicación actualizada' : 'Publicada');
+      }
       setSheetOpen(false);
       await cargar();
     } catch {
-      toast.error('No se pudo guardar el aviso');
+      toast.error('No se pudo guardar');
     } finally {
       setGuardando(false);
     }
@@ -299,12 +367,19 @@ export default function Avisos() {
   const borrar = async () => {
     if (!aBorrar) return;
     try {
-      await noticiasApi.delete(aBorrar.id);
-      toast.success('Aviso eliminado');
+      if (aBorrar.origen === 'obra') {
+        // Una obra NO se borra desde acá: se deja de publicar. Borrarla sería
+        // borrar el proyecto de Tesorería con sus gastos imputados.
+        await proyectosApi.update(aBorrar.id, { publico: false });
+        toast.success('La obra dejó de publicarse');
+      } else {
+        await noticiasApi.delete(aBorrar.id);
+        toast.success('Publicación eliminada');
+      }
       setABorrar(null);
       await cargar();
     } catch {
-      toast.error('No se pudo eliminar');
+      toast.error('No se pudo completar');
     }
   };
 
@@ -319,85 +394,97 @@ export default function Avisos() {
       setAAvisar(null);
       await cargar();
     } catch {
-      toast.error('No se pudo enviar el aviso');
+      toast.error('No se pudo enviar');
     } finally {
       setEnviando(false);
     }
   };
 
+  const esObra = editando?.origen === 'obra';
+
   return (
     <>
-      <SemanticAbmPage<Aviso>
+      <SemanticAbmPage<Publicacion>
         moduleKey="comunicacion"
         eyebrow="Comunicación"
-        title="Avisos"
-        description="Lo que el municipio le cuenta al vecino sin que el vecino pregunte."
-        hero={{
-          etiqueta: 'COMUNICACIÓN',
-          frases: heroFrases,
-          kpis: heroKpis,
-        }}
+        title="Publicaciones"
+        description="Todo lo que el vecino ve en su app, en un solo lugar."
+        hero={{ etiqueta: 'COMUNICACIÓN', frases: heroFrases, kpis: heroKpis }}
         pista={{
-          titulo: 'El aviso se apaga solo',
+          titulo: 'Las obras las carga Tesorería',
           texto:
-            'Poniéndole fecha de fin, el aviso desaparece del celular del vecino cuando corresponde. Sin fecha, queda hasta que lo bajes.',
+            'Las obras aparecen acá solas, tomadas de los proyectos de Tesorería. Comunicación decide cuáles se publican y les pone la foto y el avance. La obra sigue siendo una sola en el sistema.',
         }}
         searchPlaceholder="Buscar por título o texto…"
         views={['table']}
         activeView="table"
-        // Una sola vista: el segmented no se dibuja y el handler no se llama.
         onViewChange={() => {}}
         search={search}
         onSearchChange={setSearch}
-        primaryAction={{ label: 'Nuevo aviso', onClick: abrirNuevo }}
+        primaryAction={{ label: 'Nueva publicación', onClick: abrirNuevo }}
         selects={[]}
         statusTabs={[
-          { id: 'todos', label: 'Todos', count: avisos.length },
-          { id: 'vigentes', label: 'Vigentes', count: vigentes.length },
-          { id: 'sin-avisar', label: 'Sin avisar', count: sinAvisar.length },
-          {
-            id: 'terminados',
-            label: 'Terminados',
-            count: avisos.filter((a) => ['vencido', 'bajado'].includes(estadoDe(a))).length,
-          },
+          { id: 'todos', label: 'Todo', count: items.length },
+          { id: 'destacados', label: 'Banner', count: destacados.length },
+          { id: 'novedades', label: 'Novedades', count: novedades.length },
+          { id: 'obras', label: 'Obras', count: obras.length },
+          { id: 'pendientes', label: 'Esperan decisión', count: pendientes },
         ]}
-        activeStatus={estadoTab}
-        onStatusChange={setEstadoTab}
+        activeStatus={tab}
+        onStatusChange={setTab}
         kind="plain"
         columns={columnas}
         rows={visibles}
-        rowKey={(a) => a.id}
+        rowKey={(p) => `${p.origen}-${p.id}`}
         rowActions={[
           { id: 'edit', label: 'Editar', icon: Pencil, onClick: abrirEdicion },
           {
             id: 'avisar',
             label: 'Avisar a los vecinos',
             icon: Send,
-            onClick: (a: Aviso) => setAAvisar(a),
+            onClick: (p: Publicacion) => {
+              if (p.origen === 'obra') {
+                toast.info('Las obras no se notifican: se ven en el bloque de obras de la app.');
+                return;
+              }
+              setAAvisar(p);
+            },
           },
-          { id: 'del', label: 'Eliminar', icon: Trash2, danger: true, onClick: (a: Aviso) => setABorrar(a) },
+          {
+            id: 'del',
+            label: 'Quitar del feed',
+            icon: Trash2,
+            danger: true,
+            onClick: (p: Publicacion) => setABorrar(p),
+          },
         ]}
         onRowClick={abrirEdicion}
         loading={loading}
         emptyMessage={
           search.trim()
-            ? `Ningún aviso coincide con "${search.trim()}".`
-            : 'Todavía no publicaste ningún aviso. Lo que escribas acá le aparece al vecino en la app: un corte de agua, una obra que arranca, el cambio de cronograma.'
+            ? `Nada coincide con "${search.trim()}".`
+            : tab === 'obras'
+              ? 'No hay obras cargadas. Las carga Tesorería como proyectos y aparecen acá para publicar.'
+            : tab === 'destacados'
+              ? 'Nada en el banner. Lo que marques como Destacado rota arriba de todo en la app del vecino.'
+            : tab === 'pendientes'
+              ? 'No hay nada esperando decisión.'
+            : 'Todavía no publicaste nada. Lo que cargues acá le aparece al vecino en la app.'
         }
         footer={{
-          showing: `Mostrando ${visibles.length} de ${avisos.length}`,
-          note: 'Avisar manda una notificación al celular de todos los vecinos del municipio. Se hace una sola vez por aviso y no se puede deshacer.',
+          showing: `Mostrando ${visibles.length} de ${items.length}`,
+          note: 'Avisar manda una notificación al celular de todos los vecinos, una sola vez por publicación. Las obras no se notifican.',
         }}
       />
 
       <Sheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        title={editId ? 'Editar aviso' : 'Nuevo aviso'}
+        title={esObra ? 'Publicar la obra' : editando ? 'Editar publicación' : 'Nueva publicación'}
         description={
-          editId
-            ? 'Cambiá el texto o la vigencia y guardá.'
-            : 'Escribí lo que querés que le llegue al vecino.'
+          esObra
+            ? 'Esta obra la cargó Tesorería. Acá decidís si el vecino la ve y con qué foto.'
+            : 'Una imagen, un título y un texto. El tipo decide dónde aparece.'
         }
         stickyFooter={
           <div className="flex justify-end gap-2">
@@ -415,12 +502,25 @@ export default function Avisos() {
               style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               {guardando && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editId ? 'Guardar cambios' : 'Publicar aviso'}
+              {esObra ? 'Guardar' : editando ? 'Guardar cambios' : 'Publicar'}
             </button>
           </div>
         }
       >
         <div className="grid gap-4">
+          {!esObra && (
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                Dónde aparece
+              </label>
+              <ModernSelect
+                options={TIPOS}
+                value={form.tipo}
+                onChange={(v) => setForm((f) => ({ ...f, tipo: v }))}
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
               Título
@@ -429,11 +529,17 @@ export default function Avisos() {
               type="text"
               value={form.titulo}
               onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+              disabled={esObra}
               placeholder="Corte de agua en el centro"
               maxLength={200}
-              className="w-full px-3 py-2 rounded-xl border text-base outline-none"
+              className="w-full px-3 py-2 rounded-xl border text-base outline-none disabled:opacity-60"
               style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.text }}
             />
+            {esObra && (
+              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                El nombre de la obra se cambia en Tesorería, para que no queden dos nombres distintos.
+              </p>
+            )}
           </div>
 
           <div>
@@ -448,66 +554,116 @@ export default function Avisos() {
               className="w-full px-3 py-2 rounded-xl border text-base outline-none resize-none"
               style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.text }}
             />
-            <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
-              Este texto es el que le llega al celular: corto y concreto.
-            </p>
           </div>
 
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
-              Tipo
+              Imagen
             </label>
-            <ModernSelect
-              options={TIPOS}
-              value={form.tipo}
-              onChange={(v) => setForm((f) => ({ ...f, tipo: v as FormState['tipo'] }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
-                Desde
-              </label>
-              <DatePicker
-                value={form.fecha_desde}
-                onChange={(v) => setForm((f) => ({ ...f, fecha_desde: v || '' }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
-                Hasta
-              </label>
-              <DatePicker
-                value={form.fecha_hasta}
-                onChange={(v) => setForm((f) => ({ ...f, fecha_hasta: v || '' }))}
-              />
-            </div>
-          </div>
-          <p className="text-[11px] -mt-2" style={{ color: theme.textSecondary }}>
-            Sin fechas, el aviso queda hasta que lo bajes. Con fecha de fin, se apaga solo.
-          </p>
-
-          <label className="flex items-center gap-2.5 cursor-pointer">
             <input
-              type="checkbox"
-              checked={form.fijado}
-              onChange={(e) => setForm((f) => ({ ...f, fijado: e.target.checked }))}
-              className="w-4 h-4"
+              type="url"
+              value={form.imagen_url}
+              onChange={(e) => setForm((f) => ({ ...f, imagen_url: e.target.value }))}
+              placeholder="https://…"
+              className="w-full px-3 py-2 rounded-xl border text-base outline-none"
+              style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.text }}
             />
-            <span className="text-sm" style={{ color: theme.text }}>Fijar arriba de todo</span>
-          </label>
-
-          {editId !== null && (
-            <label className="flex items-center gap-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.activo}
-                onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
-                className="w-4 h-4"
+            {form.imagen_url.trim() && (
+              <img
+                src={form.imagen_url}
+                alt=""
+                className="mt-2 w-full h-32 object-cover rounded-xl"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
-              <span className="text-sm" style={{ color: theme.text }}>Visible para el vecino</span>
-            </label>
+            )}
+            <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+              Sin imagen la publicación sale igual, con el ícono del municipio.
+            </p>
+          </div>
+
+          {esObra ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    Cómo viene
+                  </label>
+                  <ModernSelect
+                    options={ESTADOS_OBRA}
+                    value={form.estado_obra}
+                    onChange={(v) => setForm((f) => ({ ...f, estado_obra: v }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    Avance (%)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.avance}
+                    onChange={(e) => setForm((f) => ({ ...f, avance: e.target.value }))}
+                    placeholder="60"
+                    className="w-full px-3 py-2 rounded-xl border text-base outline-none"
+                    style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.text }}
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.publicada}
+                  onChange={(e) => setForm((f) => ({ ...f, publicada: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm" style={{ color: theme.text }}>
+                  Mostrar esta obra al vecino
+                  <span className="block text-[11px]" style={{ color: theme.textSecondary }}>
+                    Sin tildar, la obra sigue en Tesorería pero no se ve en la app.
+                  </span>
+                </span>
+              </label>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    Desde
+                  </label>
+                  <DatePicker
+                    value={form.fecha_desde}
+                    onChange={(v) => setForm((f) => ({ ...f, fecha_desde: v || '' }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    Hasta
+                  </label>
+                  <DatePicker
+                    value={form.fecha_hasta}
+                    onChange={(v) => setForm((f) => ({ ...f, fecha_hasta: v || '' }))}
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] -mt-2" style={{ color: theme.textSecondary }}>
+                Sin fechas queda hasta que la bajes. Con fecha de fin, se apaga sola.
+              </p>
+
+              {editando && (
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.activo}
+                    onChange={(e) => setForm((f) => ({ ...f, activo: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm" style={{ color: theme.text }}>Visible para el vecino</span>
+                </label>
+              )}
+            </>
           )}
         </div>
       </Sheet>
@@ -516,9 +672,13 @@ export default function Avisos() {
         isOpen={aBorrar !== null}
         onClose={() => setABorrar(null)}
         onConfirm={borrar}
-        title="Eliminar el aviso"
-        message={`"${aBorrar?.titulo}" se borra del feed del vecino. Si sólo querés que deje de verse, destildá "Visible para el vecino".`}
-        confirmText="Eliminar"
+        title={aBorrar?.origen === 'obra' ? 'Dejar de publicar la obra' : 'Eliminar la publicación'}
+        message={
+          aBorrar?.origen === 'obra'
+            ? `"${aBorrar?.titulo}" deja de verse en la app. La obra y sus gastos siguen en Tesorería.`
+            : `"${aBorrar?.titulo}" se borra del feed del vecino.`
+        }
+        confirmText={aBorrar?.origen === 'obra' ? 'Dejar de publicar' : 'Eliminar'}
         variant="danger"
       />
 
