@@ -251,3 +251,47 @@ en producción — a prod llega con la promoción, con su script idempotente.
   De todo eso, lo único que le sirve al vecino es cuánto tarda una respuesta, y
   ese dato va donde lo necesita: al crear el reclamo ("suelen responderse en 3
   días"), no como panel de estadísticas. **Pendiente**: ponerlo ahí.
+
+---
+
+## 7. Sondeo: ¿hay geometría real para segmentar? (2026-08-29)
+
+**La pregunta.** El dueño planteó: *"con eso podemos geolocalizar los reclamos o
+lo que sea y ubicarlos en esos segmentos"*. Para eso las zonas necesitan
+**contorno**, y hoy las 494 zonas de la base tienen nombre y **cero polígonos**
+(`zonas.poligono` y `zonas.osm_id` existen y están vacías en toda la base).
+Hay 1.487 reclamos con coordenadas esperando contra qué cruzarse.
+
+Se midió con `backend/scripts/sondear_regiones_osm.py` (no escribe nada).
+
+**El resultado, en Chubut:**
+
+| Municipio | Regiones con contorno en OSM |
+|---|---|
+| Comodoro Rivadavia | 141 |
+| Trelew | 62 |
+| Puerto Madryn | 48 |
+| Rawson | 32 |
+| Esquel | 31 |
+| Sarmiento | 11 |
+| 10 pueblos chicos (barrido alfabético) | 1 cada uno |
+
+**Lo que dice:** en **ciudades** los barrios ya están dibujados en OSM y son
+gratis — 325 contornos sólo en esas seis. En **pueblos chicos** no hay
+subdivisiones: el único polígono es el borde del municipio, que sirve para
+saber si un punto cayó adentro y para nada más.
+
+Conclusión operativa: la geolocalización automática por zona es viable donde
+hay ciudad, que es donde hay volumen de reclamos. Para el resto, las zonas
+declaradas a mano por el municipio siguen siendo la respuesta — y eso ya
+funciona sin geometría.
+
+**Dos trampas del sondeo, pagadas y arregladas** (quien lo vuelva a correr no
+tiene que pisarlas):
+1. Buscar por nombre sin provincia trae el municipio equivocado: *Sarmiento*
+   existe en Chubut y en Córdoba, y el primer sondeo midió el de Córdoba.
+2. Nominatim devuelve **sólo el nodo** de la ciudad para "Trelew, Chubut" — un
+   punto, sin contorno. La relación administrativa existe pero se llama
+   **"Municipio de Trelew"**. Con un solo intento, Trelew y Rawson figuraban
+   como "no están en OSM", que era falso: tienen 62 y 32 contornos. Con el
+   arreglo, Esquel pasó de 1 región a 31.
