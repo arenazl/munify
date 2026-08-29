@@ -2150,6 +2150,15 @@ export const noticiasApi = {
   create: (data: Record<string, unknown>) => api.post('/noticias', data),
   update: (id: number, data: Record<string, unknown>) => api.patch(`/noticias/${id}`, data),
   delete: (id: number) => api.delete(`/noticias/${id}`),
+  /** Sube la foto de la publicación y devuelve su URL ya alojada.
+   *  El que carga esto tiene la foto en el celular, no una URL. */
+  subirImagen: (archivo: File) => {
+    const fd = new FormData();
+    fd.append('file', archivo);
+    return api.post<{ url: string }>('/noticias/imagen', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   /** Push + campana a los vecinos del muni. Idempotente: si ya se avisó,
    *  devuelve `ya_enviado` y no vuelve a mandar. */
   enviar: (id: number) => api.post<{ enviados: number; ya_enviado: boolean }>(`/noticias/${id}/enviar`),

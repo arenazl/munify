@@ -26,7 +26,7 @@
  *    lleva barrio, sólo lo ven los vecinos de ese barrio.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Hammer, Loader2, Megaphone, Pencil, Pin, Send, Trash2 } from 'lucide-react';
+import { Hammer, ImagePlus, Loader2, Megaphone, Pencil, Pin, Send, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
@@ -64,8 +64,8 @@ interface Publicacion {
   estado_obra: string | null;
   /** Sólo obras: si Comunicación ya decidió publicarla. */
   publicada: boolean;
-  /** A quién: null = todo el municipio. */
-  barrio_id: number | null;
+  /** A quién: lista vacía = todo el municipio. */
+  barrio_ids: number[];
   /** Cada cuánto se repite, ya escrito por el backend ("Todos los martes"). */
   cronograma_texto: string | null;
   recurrencia: string | null;
@@ -106,8 +106,8 @@ type FormState = {
   avance: string;
   estado_obra: string;
   publicada: boolean;
-  /** '' = todo el municipio */
-  barrio_id: string;
+  /** vacío = todo el municipio */
+  barrio_ids: number[];
   /** '' = una sola vez */
   recurrencia: string;
   /** índices de días, ej. [1, 4] */
@@ -118,7 +118,7 @@ const FORM_VACIO: FormState = {
   titulo: '', descripcion: '', imagen_url: '', tipo: 'novedad',
   fecha_desde: '', fecha_hasta: '', activo: true,
   avance: '', estado_obra: 'en_ejecucion', publicada: false,
-  barrio_id: '', recurrencia: '', dias: [],
+  barrio_ids: [], recurrencia: '', dias: [],
 };
 
 /** 'YYYY-MM-DD' de hoy en hora LOCAL. Nunca `toISOString()`: es UTC y de noche
@@ -187,6 +187,7 @@ export default function Avisos() {
   const [editando, setEditando] = useState<Publicacion | null>(null);
   const [form, setForm] = useState<FormState>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [aBorrar, setABorrar] = useState<Publicacion | null>(null);
   const [aAvisar, setAAvisar] = useState<Publicacion | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -214,7 +215,7 @@ export default function Avisos() {
         enviado_at: (n.enviado_at as string) ?? null,
         enviados_count: (n.enviados_count as number) ?? 0,
         avance: null, avance_real: null, estado_obra: null, publicada: true,
-        barrio_id: (n.barrio_id as number) ?? null,
+        barrio_ids: (n.barrio_ids as number[]) ?? [],
         cronograma_texto: (n.cronograma_texto as string) ?? null,
         recurrencia: (n.recurrencia as string) ?? null,
         dias_semana: (n.dias_semana as string) ?? null,
@@ -237,7 +238,7 @@ export default function Avisos() {
         estado_obra: (p.estado_obra as string) ?? null,
         publicada: Boolean(p.publico),
         // Una obra es del municipio entero y no se repite.
-        barrio_id: null, cronograma_texto: null, recurrencia: null, dias_semana: null,
+        barrio_ids: [], cronograma_texto: null, recurrencia: null, dias_semana: null,
       }));
 
       setItems([...novedades, ...obras]);
@@ -258,10 +259,14 @@ export default function Avisos() {
       .catch(() => setBarrios([]));
   }, [user?.municipio_id]);
 
+  /** Los que todavía no eligió. El combo AGREGA: no representa un valor
+   *  seleccionado, por eso su `value` queda siempre vacío. */
   const opcionesBarrio = useMemo<SelectOption[]>(() => ([
-    { value: '', label: 'Todo el municipio' },
-    ...barrios.map((b) => ({ value: String(b.id), label: b.nombre })),
-  ]), [barrios]);
+    { value: '', label: 'Agregar barrio' },
+    ...barrios
+      .filter((b) => !form.barrio_ids.includes(b.id))
+      .map((b) => ({ value: String(b.id), label: b.nombre })),
+  ]), [barrios, form.barrio_ids]);
 
   const destacados = useMemo(() => items.filter((i) => i.tipo === 'destacado'), [items]);
   const novedades = useMemo(
@@ -340,7 +345,16 @@ export default function Avisos() {
       header: 'A quién',
       width: 'minmax(120px, 0.9fr)',
       kind: 'text',
-      cell: (p) => barrios.find((b) => b.id === p.barrio_id)?.nombre || 'Todo el municipio',
+      cell: (p) => {
+        if (!p.barrio_ids.length) return 'Todo el municipio';
+        const nombres = p.barrio_ids
+          .map((id) => barrios.find((b) => b.id === id)?.nombre)
+          .filter(Boolean) as string[];
+        // Con muchos barrios la celda se vuelve ilegible: se nombra hasta dos
+        // y el resto se cuenta.
+        if (nombres.length <= 2) return nombres.join(' y ');
+        return `${nombres[0]} y ${nombres.length - 1} barrios más`;
+      },
     },
     {
       id: 'estado',
@@ -390,11 +404,26 @@ export default function Avisos() {
       avance: p.avance !== null ? String(p.avance) : '',
       estado_obra: p.estado_obra || 'en_ejecucion',
       publicada: p.publicada,
-      barrio_id: p.barrio_id ? String(p.barrio_id) : '',
+      barrio_ids: p.barrio_ids || [],
       recurrencia: p.recurrencia || '',
       dias: (p.dias_semana || '').split(',').filter(Boolean).map(Number),
     });
     setSheetOpen(true);
+  };
+
+  /** La foto sale del celular o de la compu, no de una URL. Se sube al vuelo
+   *  y lo que queda en el formulario es la URL ya alojada. */
+  const subirFoto = async (archivo: File | undefined) => {
+    if (!archivo) return;
+    setSubiendoFoto(true);
+    try {
+      const { data } = await noticiasApi.subirImagen(archivo);
+      setForm((f) => ({ ...f, imagen_url: data.url }));
+    } catch {
+      toast.error('No se pudo subir la imagen. Probá con otra o pegá la dirección.');
+    } finally {
+      setSubiendoFoto(false);
+    }
   };
 
   const guardar = async () => {
@@ -426,7 +455,7 @@ export default function Avisos() {
           fijado: form.tipo === 'destacado',
           fecha_desde: form.fecha_desde || null,
           fecha_hasta: form.fecha_hasta || null,
-          barrio_id: form.barrio_id ? Number(form.barrio_id) : null,
+          barrio_ids: form.barrio_ids,
           recurrencia: form.recurrencia || null,
           // Los dias solo tienen sentido en la semanal; en las demas se
           // limpian para que no queden dias huerfanos de una eleccion previa.
@@ -644,22 +673,52 @@ export default function Avisos() {
             <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
               Imagen
             </label>
-            <input
-              type="url"
-              value={form.imagen_url}
-              onChange={(e) => setForm((f) => ({ ...f, imagen_url: e.target.value }))}
-              placeholder="https://…"
-              className="w-full px-3 py-2 rounded-xl border text-base outline-none"
-              style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.text }}
-            />
-            {form.imagen_url.trim() && (
-              <img
-                src={form.imagen_url}
-                alt=""
-                className="mt-2 w-full h-32 object-cover rounded-xl"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              />
+
+            {form.imagen_url.trim() ? (
+              <div className="relative">
+                <img
+                  src={form.imagen_url}
+                  alt=""
+                  className="w-full h-40 object-cover rounded-xl"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, imagen_url: '' }))}
+                  aria-label="Quitar la imagen"
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` }}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <label
+                className="flex flex-col items-center justify-center gap-1.5 w-full h-28 rounded-xl border border-dashed cursor-pointer transition-colors"
+                style={{ backgroundColor: theme.background, borderColor: theme.border, color: theme.textSecondary }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); subirFoto(e.dataTransfer.files?.[0]); }}
+              >
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => subirFoto(e.target.files?.[0])}
+                />
+                {subiendoFoto ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-xs">Subiendo…</span>
+                  </>
+                ) : (
+                  <>
+                    <ImagePlus className="h-5 w-5" />
+                    <span className="text-xs">Elegí una foto o arrastrala acá</span>
+                  </>
+                )}
+              </label>
             )}
+
             <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
               Sin imagen la publicación sale igual, con el ícono del municipio.
             </p>
@@ -788,16 +847,44 @@ export default function Avisos() {
                 <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
                   A quién le llega
                 </label>
+
+                {form.barrio_ids.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {form.barrio_ids.map((id) => {
+                      const nombre = barrios.find((b) => b.id === id)?.nombre || `Barrio ${id}`;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setForm((f) => ({
+                            ...f, barrio_ids: f.barrio_ids.filter((x) => x !== id),
+                          }))}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium"
+                          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                        >
+                          {nombre}
+                          <X className="h-3 w-3" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <ModernSelect
                   options={opcionesBarrio}
-                  value={form.barrio_id}
-                  onChange={(v) => setForm((f) => ({ ...f, barrio_id: v }))}
-                  placeholder="Todo el municipio"
+                  value=""
+                  onChange={(v) => {
+                    if (!v) return;
+                    setForm((f) => ({ ...f, barrio_ids: [...f.barrio_ids, Number(v)] }));
+                  }}
+                  placeholder={form.barrio_ids.length ? 'Agregar otro barrio' : 'Todo el municipio'}
                 />
                 <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
                   {barrios.length === 0
                     ? 'Este municipio todavía no tiene barrios cargados, así que la publicación va a todos.'
-                    : 'Con un barrio elegido, sólo la ven los vecinos que declararon ese barrio en su perfil.'}
+                    : form.barrio_ids.length === 0
+                      ? 'Sin barrios elegidos le llega a todo el municipio. Un corte de agua que toca tres barrios es UNA publicación con esos tres.'
+                      : 'Sólo la ven los vecinos que declararon alguno de esos barrios en su perfil.'}
                 </p>
               </div>
 

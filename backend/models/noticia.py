@@ -1,5 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Date, Boolean, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy import Table
+
 from core.database import Base
 
 
@@ -42,13 +44,17 @@ class Noticia(Base):
 
     # --- Etapa 3: a quien y cada cuanto ---
 
-    # A QUIEN. NULL = a todo el municipio, que es el caso normal (un corte de
-    # agua general). Con barrio, solo lo ven los vecinos de ese barrio: el que
-    # no tiene barrio cargado ve unicamente los avisos generales, que es lo
-    # correcto — mostrarle avisos de un barrio que no es el suyo es peor que
-    # no mostrarle nada.
-    barrio_id = Column(Integer, ForeignKey("barrios.id", ondelete="SET NULL"),
-                       nullable=True, index=True)
+    # A QUIEN: la tabla puente `noticia_barrios`. SIN barrios = a todo el
+    # municipio, que es el caso normal (un corte de agua general).
+    #
+    # Son VARIOS y no uno porque un corte de agua toca tres barrios, y con un
+    # solo barrio habia que cargar la misma publicacion tres veces y bajarla
+    # tres veces. El vecino que no declaro su barrio ve unicamente los avisos
+    # generales: mostrarle los de un barrio que no es el suyo es peor que no
+    # mostrarle nada.
+    #
+    # Se consulta explicito con un select sobre la puente, no con relationship
+    # lazy: en async un lazy load fuera de sesion revienta en runtime.
 
     # CADA CUANTO. NULL = una sola vez. Un CRONOGRAMA (la recoleccion, la
     # poda) no genera una publicacion por semana: es UNA publicacion que dice
@@ -68,3 +74,13 @@ class Noticia(Base):
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# La puente. Es un Table y no un modelo porque no tiene nada propio que
+# guardar: solo dice que publicacion va a que barrio.
+noticia_barrios = Table(
+    "noticia_barrios",
+    Base.metadata,
+    Column("noticia_id", Integer, ForeignKey("noticias.id", ondelete="CASCADE"), primary_key=True),
+    Column("barrio_id", Integer, ForeignKey("barrios.id", ondelete="CASCADE"), primary_key=True),
+)

@@ -4,18 +4,23 @@ El canal ya existia (la tabla y las tres pantallas que la muestran); lo que
 faltaba era poder cargarlo y avisar. Ver
 `docs/comunicacion/01-modulo-comunicacion.md`.
 """
+import os
 from datetime import datetime
 from typing import List, Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException
+import cloudinary
+import cloudinary.uploader
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.database import get_db
+from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from core.security import require_roles
 from models.enums import RolUsuario
-from models.noticia import Noticia
+from models.noticia import Noticia, noticia_barrios
 from models.user import User as UserModel
 from models.user import User
 from schemas.noticia import EnvioResponse, NoticiaCreate, NoticiaResponse, NoticiaUpdate
@@ -24,6 +29,18 @@ from services.push_service import crear_notificacion_db, send_push_to_users
 router = APIRouter()
 
 ART = ZoneInfo("America/Argentina/Buenos_Aires")
+
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+)
+
+# Lo mismo que acepta el reclamo. 10MB es de sobra para una foto de celular
+# ya comprimida, y corta el caso de alguien subiendo un PDF escaneado.
+FORMATOS = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
+EXTENSIONES = {".jpg", ".jpeg", ".png", ".webp"}
+TAMANIO_MAXIMO = 10 * 1024 * 1024
 
 # Cuantas novedades ve el vecino de una. El feed es una tira corta, no un
 # archivo historico: lo viejo se consulta entrando a la novedad.
@@ -60,11 +77,42 @@ def cronograma_texto(n: Noticia) -> Optional[str]:
     return None
 
 
-def _con_texto(n: Noticia) -> dict:
-    """La fila + el texto del cronograma, que no es una columna."""
+def _con_texto(n: Noticia, barrios: Optional[List[int]] = None) -> dict:
+    """La fila + el texto del cronograma y los barrios, que no son columnas."""
     d = {c.name: getattr(n, c.name) for c in n.__table__.columns}
     d["cronograma_texto"] = cronograma_texto(n)
+    d["barrio_ids"] = barrios or []
     return d
+
+
+async def _barrios_de(db: AsyncSession, ids: List[int]) -> dict[int, List[int]]:
+    """A que barrios va cada publicacion, en UNA query para todas.
+
+    Una query por noticia seria N+1 en la pantalla de gestion, que lista
+    todas las del municipio."""
+    if not ids:
+        return {}
+    r = await db.execute(
+        select(noticia_barrios.c.noticia_id, noticia_barrios.c.barrio_id)
+        .where(noticia_barrios.c.noticia_id.in_(ids))
+    )
+    salida: dict[int, List[int]] = {}
+    for nid, bid in r.all():
+        salida.setdefault(nid, []).append(bid)
+    return salida
+
+
+async def _fijar_barrios(db: AsyncSession, noticia_id: int, ids: List[int]) -> None:
+    """Deja la publicacion apuntando EXACTAMENTE a esos barrios.
+
+    Se borra y se reescribe en vez de calcular el diff: son dos o tres filas
+    y el diff es codigo que se rompe callado."""
+    await db.execute(noticia_barrios.delete().where(noticia_barrios.c.noticia_id == noticia_id))
+    if ids:
+        await db.execute(
+            noticia_barrios.insert(),
+            [{"noticia_id": noticia_id, "barrio_id": b} for b in dict.fromkeys(ids)],
+        )
 
 
 def _hoy():
@@ -114,9 +162,15 @@ async def get_noticias_publico(
             select(UserModel.barrio_id).where(UserModel.id == vecino_id)
         )).scalar_one_or_none()
 
-    alcance = [Noticia.barrio_id.is_(None)]
+    # "General" = la publicacion no tiene NINGUN barrio en la puente.
+    dirigidas = select(noticia_barrios.c.noticia_id)
+    es_general = ~Noticia.id.in_(dirigidas)
+    alcance = [es_general]
     if barrio_vecino:
-        alcance.append(Noticia.barrio_id == barrio_vecino)
+        alcance.append(Noticia.id.in_(
+            select(noticia_barrios.c.noticia_id)
+            .where(noticia_barrios.c.barrio_id == barrio_vecino)
+        ))
 
     result = await db.execute(
         select(Noticia)
@@ -130,7 +184,9 @@ async def get_noticias_publico(
         .order_by(Noticia.fijado.desc(), Noticia.created_at.desc())
         .limit(TOPE_FEED)
     )
-    return [_con_texto(n) for n in result.scalars().all()]
+    filas = result.scalars().all()
+    por_noticia = await _barrios_de(db, [n.id for n in filas])
+    return [_con_texto(n, por_noticia.get(n.id)) for n in filas]
 
 
 @router.get("", response_model=List[NoticiaResponse])
@@ -144,7 +200,55 @@ async def get_noticias(
         .where(Noticia.municipio_id == current_user.municipio_id)
         .order_by(Noticia.fijado.desc(), Noticia.created_at.desc())
     )
-    return [_con_texto(n) for n in result.scalars().all()]
+    filas = result.scalars().all()
+    por_noticia = await _barrios_de(db, [n.id for n in filas])
+    return [_con_texto(n, por_noticia.get(n.id)) for n in filas]
+
+
+@router.post("/imagen")
+async def subir_imagen(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles(["admin", "supervisor"])),
+):
+    """Sube la foto de la publicacion y devuelve su URL.
+
+    Existe porque el campo Imagen pedia una URL, y el que carga esto es un
+    empleado municipal que tiene la foto en el celular, no una URL. Con ese
+    campo, en la practica se publicaba todo sin imagen.
+
+    Reusa Cloudinary, que ya se usa para las fotos de reclamo. No guarda fila:
+    la URL viaja en el formulario y se guarda con la noticia. Si el operador
+    cierra el panel sin publicar, queda una imagen huerfana en Cloudinary —
+    barato y preferible a exigir que la noticia exista antes de la foto.
+    """
+    if file.content_type not in FORMATOS:
+        raise HTTPException(status_code=400, detail="Tiene que ser una imagen jpg, png o webp")
+    if os.path.splitext(file.filename or "")[1].lower() not in EXTENSIONES:
+        raise HTTPException(status_code=400, detail="Extension de archivo no permitida")
+
+    contenido = await file.read()
+    if len(contenido) > TAMANIO_MAXIMO:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La imagen es muy grande. Maximo {TAMANIO_MAXIMO // 1024 // 1024}MB",
+        )
+    await file.seek(0)
+
+    # Carpeta POR MUNICIPIO: la cuenta de Cloudinary es compartida entre
+    # tenants y sin esto todas las fotos caen en la misma bolsa.
+    municipio_id = get_effective_municipio_id(request, current_user)
+    try:
+        subida = cloudinary.uploader.upload(
+            file.file,
+            folder=f"publicaciones/{municipio_id}",
+            resource_type="image",
+            allowed_formats=["jpg", "png", "jpeg", "webp"],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo subir la imagen: {e}")
+
+    return {"url": subida["secure_url"]}
 
 
 @router.post("", response_model=NoticiaResponse)
@@ -155,15 +259,19 @@ async def create_noticia(
 ):
     """Crea la novedad en el municipio DEL USUARIO (no en el que venga en el
     payload) y deja constancia de quien la publico."""
+    campos = data.model_dump()
+    barrios = campos.pop("barrio_ids", []) or []
     noticia = Noticia(
-        **data.model_dump(),
+        **campos,
         municipio_id=current_user.municipio_id,
         creador_id=current_user.id,
     )
     db.add(noticia)
+    await db.flush()
+    await _fijar_barrios(db, noticia.id, barrios)
     await db.commit()
     await db.refresh(noticia)
-    return _con_texto(noticia)
+    return _con_texto(noticia, barrios)
 
 
 @router.patch("/{noticia_id}", response_model=NoticiaResponse)
@@ -174,11 +282,18 @@ async def update_noticia(
     current_user: User = Depends(require_roles(["admin", "supervisor"])),
 ):
     noticia = await _del_muni(db, noticia_id, current_user.municipio_id)
-    for field, value in data.model_dump(exclude_unset=True).items():
+    campos = data.model_dump(exclude_unset=True)
+    # None = el que edita no mando el campo y no se toca. Lista vacia SI es un
+    # cambio: significa "pasala a todo el municipio".
+    barrios = campos.pop("barrio_ids", None)
+    for field, value in campos.items():
         setattr(noticia, field, value)
+    if barrios is not None:
+        await _fijar_barrios(db, noticia.id, barrios)
     await db.commit()
     await db.refresh(noticia)
-    return _con_texto(noticia)
+    actuales = (await _barrios_de(db, [noticia.id])).get(noticia.id, [])
+    return _con_texto(noticia, actuales)
 
 
 @router.delete("/{noticia_id}")

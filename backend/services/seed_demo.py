@@ -2488,6 +2488,7 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
 
     hoy = datetime.utcnow().date()
     creados = 0
+    dirigidas: list = []
     for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto,
          recurrencia, dias, segmentada) in AVISOS_DEMO:
         created = (datetime.utcnow() - timedelta(days=creado_hace)).replace(
@@ -2506,12 +2507,27 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
             enviados_count=vecinos if avisado else 0,
             recurrencia=recurrencia,
             dias_semana=dias,
-            barrio_id=primer_barrio if segmentada else None,
             created_at=created,
         ))
+        # A que barrios va: la puente se llena despues del flush, cuando la
+        # noticia ya tiene id.
+        if segmentada and primer_barrio:
+            dirigidas.append((titulo, primer_barrio))
         creados += 1
 
     await db.flush()
+
+    if dirigidas:
+        from models.noticia import noticia_barrios
+        for titulo, barrio in dirigidas:
+            nid = (await db.execute(
+                select(Noticia.id).where(
+                    Noticia.municipio_id == municipio_id, Noticia.titulo == titulo)
+            )).scalar_one_or_none()
+            if nid:
+                await db.execute(noticia_barrios.insert(),
+                                 [{"noticia_id": nid, "barrio_id": barrio}])
+
     if log:
         log.hito("avisos", avisos=creados)
     return creados

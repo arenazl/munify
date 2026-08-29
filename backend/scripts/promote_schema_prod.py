@@ -125,6 +125,10 @@ COLUMNAS = [
     ("zonas", "poligono", "ALTER TABLE `zonas` ADD COLUMN `poligono` longtext NULL"),
 
     # --- Modulo Comunicacion (avisos, obras publicas, cronogramas) ---------
+    # OJO: `noticias.barrio_id` NO esta y no es un olvido. Una publicacion va
+    # a VARIOS barrios y eso vive en la tabla puente `noticia_barrios`, que la
+    # crea el create_all del arranque. La columna existio un rato en qa y se
+    # elimino antes de que llegara a produccion.
     # El DDL de estas 26 no se escribio a mano: se leyo del information_schema
     # de qa, con su tipo, nullability y default reales.
     ("noticias", "tipo",
@@ -141,8 +145,6 @@ COLUMNAS = [
      "ALTER TABLE `noticias` ADD COLUMN `enviados_count` int NOT NULL DEFAULT '0'"),
     ("noticias", "creador_id",
      "ALTER TABLE `noticias` ADD COLUMN `creador_id` int NULL"),
-    ("noticias", "barrio_id",
-     "ALTER TABLE `noticias` ADD COLUMN `barrio_id` int NULL"),
     ("noticias", "recurrencia",
      "ALTER TABLE `noticias` ADD COLUMN `recurrencia` varchar(20) NULL"),
     ("noticias", "dias_semana",
@@ -197,8 +199,6 @@ INDICES = [
      "ALTER TABLE `ordenes_trabajo` ADD INDEX `ix_ot_origen` (`origen`)"),
     ("ordenes_trabajo", "ix_ot_poi", "ALTER TABLE `ordenes_trabajo` ADD INDEX `ix_ot_poi` (`poi_id`)"),
     ("reclamos", "ix_reclamo_poi", "ALTER TABLE `reclamos` ADD INDEX `ix_reclamo_poi` (`poi_id`)"),
-    ("noticias", "ix_noticias_barrio",
-     "ALTER TABLE `noticias` ADD INDEX `ix_noticias_barrio` (`barrio_id`)"),
     # El feed del vecino filtra por activo + vigencia en cada carga.
     ("noticias", "ix_noticias_vigencia",
      "ALTER TABLE `noticias` ADD INDEX `ix_noticias_vigencia` (`activo`, `fecha_hasta`)"),
@@ -218,9 +218,6 @@ FKS = [
     ("reclamos", "fk_reclamo_poi",
      "ALTER TABLE `reclamos` ADD CONSTRAINT `fk_reclamo_poi` FOREIGN KEY (`poi_id`) "
      "REFERENCES `puntos_interes` (`id`) ON DELETE SET NULL"),
-    ("noticias", "fk_noticia_barrio",
-     "ALTER TABLE `noticias` ADD CONSTRAINT `fk_noticia_barrio` FOREIGN KEY (`barrio_id`) "
-     "REFERENCES `barrios` (`id`) ON DELETE SET NULL"),
     ("usuarios", "fk_usuario_barrio",
      "ALTER TABLE `usuarios` ADD CONSTRAINT `fk_usuario_barrio` FOREIGN KEY (`barrio_id`) "
      "REFERENCES `barrios` (`id`) ON DELETE SET NULL"),

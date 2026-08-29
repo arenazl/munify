@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 
 from pydantic import BaseModel
 
@@ -24,8 +24,8 @@ class NoticiaBase(BaseModel):
     fecha_desde: Optional[date] = None
     fecha_hasta: Optional[date] = None
     fijado: bool = False
-    # A quien: NULL = todo el municipio. Con barrio, solo ese barrio.
-    barrio_id: Optional[int] = None
+    # A quien: lista vacia = todo el municipio. Con barrios, solo esos.
+    barrio_ids: List[int] = []
     # Cada cuanto: NULL = una sola vez. semanal | quincenal | mensual
     recurrencia: Optional[str] = None
     # Para la semanal: "1,4" = martes y viernes (0=lunes).
@@ -46,7 +46,8 @@ class NoticiaUpdate(BaseModel):
     fecha_desde: Optional[date] = None
     fecha_hasta: Optional[date] = None
     fijado: Optional[bool] = None
-    barrio_id: Optional[int] = None
+    # None = no se toca. Lista (aunque este vacia) = se reemplaza entera.
+    barrio_ids: Optional[List[int]] = None
     recurrencia: Optional[str] = None
     dias_semana: Optional[str] = None
     activo: Optional[bool] = None
