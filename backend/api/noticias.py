@@ -20,7 +20,7 @@ from core.database import get_db
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from core.security import require_roles
 from models.enums import RolUsuario
-from models.noticia import Noticia, noticia_barrios
+from models.noticia import Noticia, noticia_zonas
 from models.user import User as UserModel
 from models.user import User
 from schemas.noticia import EnvioResponse, NoticiaCreate, NoticiaResponse, NoticiaUpdate
@@ -77,41 +77,41 @@ def cronograma_texto(n: Noticia) -> Optional[str]:
     return None
 
 
-def _con_texto(n: Noticia, barrios: Optional[List[int]] = None) -> dict:
-    """La fila + el texto del cronograma y los barrios, que no son columnas."""
+def _con_texto(n: Noticia, zonas: Optional[List[int]] = None) -> dict:
+    """La fila + el texto del cronograma y las zonas, que no son columnas."""
     d = {c.name: getattr(n, c.name) for c in n.__table__.columns}
     d["cronograma_texto"] = cronograma_texto(n)
-    d["barrio_ids"] = barrios or []
+    d["zona_ids"] = zonas or []
     return d
 
 
-async def _barrios_de(db: AsyncSession, ids: List[int]) -> dict[int, List[int]]:
-    """A que barrios va cada publicacion, en UNA query para todas.
+async def _zonas_de(db: AsyncSession, ids: List[int]) -> dict[int, List[int]]:
+    """A que zonas va cada publicacion, en UNA query para todas.
 
     Una query por noticia seria N+1 en la pantalla de gestion, que lista
     todas las del municipio."""
     if not ids:
         return {}
     r = await db.execute(
-        select(noticia_barrios.c.noticia_id, noticia_barrios.c.barrio_id)
-        .where(noticia_barrios.c.noticia_id.in_(ids))
+        select(noticia_zonas.c.noticia_id, noticia_zonas.c.zona_id)
+        .where(noticia_zonas.c.noticia_id.in_(ids))
     )
     salida: dict[int, List[int]] = {}
-    for nid, bid in r.all():
-        salida.setdefault(nid, []).append(bid)
+    for nid, zid in r.all():
+        salida.setdefault(nid, []).append(zid)
     return salida
 
 
-async def _fijar_barrios(db: AsyncSession, noticia_id: int, ids: List[int]) -> None:
-    """Deja la publicacion apuntando EXACTAMENTE a esos barrios.
+async def _fijar_zonas(db: AsyncSession, noticia_id: int, ids: List[int]) -> None:
+    """Deja la publicacion apuntando EXACTAMENTE a esas zonas.
 
     Se borra y se reescribe en vez de calcular el diff: son dos o tres filas
     y el diff es codigo que se rompe callado."""
-    await db.execute(noticia_barrios.delete().where(noticia_barrios.c.noticia_id == noticia_id))
+    await db.execute(noticia_zonas.delete().where(noticia_zonas.c.noticia_id == noticia_id))
     if ids:
         await db.execute(
-            noticia_barrios.insert(),
-            [{"noticia_id": noticia_id, "barrio_id": b} for b in dict.fromkeys(ids)],
+            noticia_zonas.insert(),
+            [{"noticia_id": noticia_id, "zona_id": z} for z in dict.fromkeys(ids)],
         )
 
 
@@ -142,34 +142,34 @@ async def get_noticias_publico(
     vecino_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Lo que ve el vecino: lo activo, VIGENTE hoy, de SU barrio, fijado arriba.
+    """Lo que ve el vecino: lo activo, VIGENTE hoy, de SU zona, fijado arriba.
 
     Vigencia: las fechas nulas no acotan (una noticia comun no vence). Con
     `fecha_hasta` cumplida el aviso desaparece solo, sin que nadie lo baje a
     mano — es la diferencia entre un aviso y un cartel viejo pegado.
 
-    Segmentacion (Etapa 3): un aviso sin barrio es para todo el municipio y lo
-    ve cualquiera. Un aviso CON barrio lo ven solo los vecinos de ese barrio;
-    el vecino que no declaro barrio ve unicamente los generales. Mostrarle
-    avisos de un barrio que no es el suyo es peor que no mostrarle nada: deja
+    Segmentacion (Etapa 3): un aviso sin zonas es para todo el municipio y lo
+    ve cualquiera. Un aviso CON zonas lo ven solo los vecinos de esas zonas;
+    el vecino que no declaro zona ve unicamente los generales. Mostrarle
+    avisos de una zona que no es la suya es peor que no mostrarle nada: deja
     de creerle al canal.
     """
     hoy = _hoy()
 
-    barrio_vecino = None
+    zona_vecino = None
     if vecino_id:
-        barrio_vecino = (await db.execute(
-            select(UserModel.barrio_id).where(UserModel.id == vecino_id)
+        zona_vecino = (await db.execute(
+            select(UserModel.zona_id).where(UserModel.id == vecino_id)
         )).scalar_one_or_none()
 
-    # "General" = la publicacion no tiene NINGUN barrio en la puente.
-    dirigidas = select(noticia_barrios.c.noticia_id)
+    # "General" = la publicacion no tiene NINGUNA zona en la puente.
+    dirigidas = select(noticia_zonas.c.noticia_id)
     es_general = ~Noticia.id.in_(dirigidas)
     alcance = [es_general]
-    if barrio_vecino:
+    if zona_vecino:
         alcance.append(Noticia.id.in_(
-            select(noticia_barrios.c.noticia_id)
-            .where(noticia_barrios.c.barrio_id == barrio_vecino)
+            select(noticia_zonas.c.noticia_id)
+            .where(noticia_zonas.c.zona_id == zona_vecino)
         ))
 
     result = await db.execute(
@@ -185,7 +185,7 @@ async def get_noticias_publico(
         .limit(TOPE_FEED)
     )
     filas = result.scalars().all()
-    por_noticia = await _barrios_de(db, [n.id for n in filas])
+    por_noticia = await _zonas_de(db, [n.id for n in filas])
     return [_con_texto(n, por_noticia.get(n.id)) for n in filas]
 
 
@@ -201,7 +201,7 @@ async def get_noticias(
         .order_by(Noticia.fijado.desc(), Noticia.created_at.desc())
     )
     filas = result.scalars().all()
-    por_noticia = await _barrios_de(db, [n.id for n in filas])
+    por_noticia = await _zonas_de(db, [n.id for n in filas])
     return [_con_texto(n, por_noticia.get(n.id)) for n in filas]
 
 
@@ -260,7 +260,7 @@ async def create_noticia(
     """Crea la novedad en el municipio DEL USUARIO (no en el que venga en el
     payload) y deja constancia de quien la publico."""
     campos = data.model_dump()
-    barrios = campos.pop("barrio_ids", []) or []
+    zonas = campos.pop("zona_ids", []) or []
     noticia = Noticia(
         **campos,
         municipio_id=current_user.municipio_id,
@@ -268,10 +268,10 @@ async def create_noticia(
     )
     db.add(noticia)
     await db.flush()
-    await _fijar_barrios(db, noticia.id, barrios)
+    await _fijar_zonas(db, noticia.id, zonas)
     await db.commit()
     await db.refresh(noticia)
-    return _con_texto(noticia, barrios)
+    return _con_texto(noticia, zonas)
 
 
 @router.patch("/{noticia_id}", response_model=NoticiaResponse)
@@ -285,14 +285,14 @@ async def update_noticia(
     campos = data.model_dump(exclude_unset=True)
     # None = el que edita no mando el campo y no se toca. Lista vacia SI es un
     # cambio: significa "pasala a todo el municipio".
-    barrios = campos.pop("barrio_ids", None)
+    zonas = campos.pop("zona_ids", None)
     for field, value in campos.items():
         setattr(noticia, field, value)
-    if barrios is not None:
-        await _fijar_barrios(db, noticia.id, barrios)
+    if zonas is not None:
+        await _fijar_zonas(db, noticia.id, zonas)
     await db.commit()
     await db.refresh(noticia)
-    actuales = (await _barrios_de(db, [noticia.id])).get(noticia.id, [])
+    actuales = (await _zonas_de(db, [noticia.id])).get(noticia.id, [])
     return _con_texto(noticia, actuales)
 
 

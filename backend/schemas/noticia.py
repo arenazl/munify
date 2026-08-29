@@ -24,8 +24,8 @@ class NoticiaBase(BaseModel):
     fecha_desde: Optional[date] = None
     fecha_hasta: Optional[date] = None
     fijado: bool = False
-    # A quien: lista vacia = todo el municipio. Con barrios, solo esos.
-    barrio_ids: List[int] = []
+    # A quien: lista vacia = todo el municipio. Con zonas, solo esas.
+    zona_ids: List[int] = []
     # Cada cuanto: NULL = una sola vez. semanal | quincenal | mensual
     recurrencia: Optional[str] = None
     # Para la semanal: "1,4" = martes y viernes (0=lunes).
@@ -47,7 +47,7 @@ class NoticiaUpdate(BaseModel):
     fecha_hasta: Optional[date] = None
     fijado: Optional[bool] = None
     # None = no se toca. Lista (aunque este vacia) = se reemplaza entera.
-    barrio_ids: Optional[List[int]] = None
+    zona_ids: Optional[List[int]] = None
     recurrencia: Optional[str] = None
     dias_semana: Optional[str] = None
     activo: Optional[bool] = None

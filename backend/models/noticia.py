@@ -44,13 +44,18 @@ class Noticia(Base):
 
     # --- Etapa 3: a quien y cada cuanto ---
 
-    # A QUIEN: la tabla puente `noticia_barrios`. SIN barrios = a todo el
+    # A QUIEN: la tabla puente `noticia_zonas`. SIN zonas = a todo el
     # municipio, que es el caso normal (un corte de agua general).
     #
-    # Son VARIOS y no uno porque un corte de agua toca tres barrios, y con un
-    # solo barrio habia que cargar la misma publicacion tres veces y bajarla
-    # tres veces. El vecino que no declaro su barrio ve unicamente los avisos
-    # generales: mostrarle los de un barrio que no es el suyo es peor que no
+    # ZONA y no barrio: los 80 municipios de la base tienen sus zonas cargadas
+    # (494 en total) y CERO barrios tienen zona asignada; los municipios
+    # nuevos nacen con zonas y sin barrios. La zona es la unidad que siempre
+    # esta — el barrio depende de que ese pedazo del pais este mapeado.
+    #
+    # Son VARIAS y no una porque un corte de agua toca tres zonas, y con una
+    # sola habia que cargar la misma publicacion tres veces y bajarla tres
+    # veces. El vecino que no declaro su zona ve unicamente los avisos
+    # generales: mostrarle los de una zona que no es la suya es peor que no
     # mostrarle nada.
     #
     # Se consulta explicito con un select sobre la puente, no con relationship
@@ -77,10 +82,10 @@ class Noticia(Base):
 
 
 # La puente. Es un Table y no un modelo porque no tiene nada propio que
-# guardar: solo dice que publicacion va a que barrio.
-noticia_barrios = Table(
-    "noticia_barrios",
+# guardar: solo dice que publicacion va a que zona.
+noticia_zonas = Table(
+    "noticia_zonas",
     Base.metadata,
     Column("noticia_id", Integer, ForeignKey("noticias.id", ondelete="CASCADE"), primary_key=True),
-    Column("barrio_id", Integer, ForeignKey("barrios.id", ondelete="CASCADE"), primary_key=True),
+    Column("zona_id", Integer, ForeignKey("zonas.id", ondelete="CASCADE"), primary_key=True),
 )

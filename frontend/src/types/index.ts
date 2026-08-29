@@ -21,9 +21,10 @@ export interface User {
   telefono?: string;
   dni?: string;
   direccion?: string;
-  // El barrio que el vecino declaro. Es lo que permite segmentar los avisos:
-  // la direccion es texto libre y no se puede agrupar por ella.
-  barrio_id?: number | null;
+  // La zona que el vecino declaró. Es lo que permite segmentar los avisos:
+  // la dirección es texto libre y no se puede agrupar por ella. Zona y no
+  // barrio porque no todo el país está mapeado a nivel barrio.
+  zona_id?: number | null;
   rol: RolUsuario;
   activo: boolean;
   empleado_id?: number;

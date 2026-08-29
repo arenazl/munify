@@ -23,7 +23,7 @@
  *    confirmación y después queda como constancia.
  *  - **Un cronograma es UNA publicación.** "Recolección los martes y viernes"
  *    no son 104 avisos por año: es un aviso que dice cuándo se repite. Y si
- *    lleva barrio, sólo lo ven los vecinos de ese barrio.
+ *    lleva zonas, sólo lo ven los vecinos de esas zonas.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Hammer, ImagePlus, Loader2, Megaphone, Pencil, Pin, Send, Trash2, X } from 'lucide-react';
@@ -37,8 +37,7 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { seg } from '../lib/semanticHero';
-import { noticiasApi, proyectosApi, municipiosApi } from '../lib/api';
-import { useAuth } from '../contexts/AuthContext';
+import { noticiasApi, proyectosApi, zonasApi } from '../lib/api';
 
 /** Una publicación del feed. `origen` dice de qué tabla salió: las novedades
  *  viven en `noticias`, las obras en `proyectos` (Tesorería). El resto de la
@@ -65,7 +64,7 @@ interface Publicacion {
   /** Sólo obras: si Comunicación ya decidió publicarla. */
   publicada: boolean;
   /** A quién: lista vacía = todo el municipio. */
-  barrio_ids: number[];
+  zona_ids: number[];
   /** Cada cuánto se repite, ya escrito por el backend ("Todos los martes"). */
   cronograma_texto: string | null;
   recurrencia: string | null;
@@ -107,7 +106,7 @@ type FormState = {
   estado_obra: string;
   publicada: boolean;
   /** vacío = todo el municipio */
-  barrio_ids: number[];
+  zona_ids: number[];
   /** '' = una sola vez */
   recurrencia: string;
   /** índices de días, ej. [1, 4] */
@@ -118,7 +117,7 @@ const FORM_VACIO: FormState = {
   titulo: '', descripcion: '', imagen_url: '', tipo: 'novedad',
   fecha_desde: '', fecha_hasta: '', activo: true,
   avance: '', estado_obra: 'en_ejecucion', publicada: false,
-  barrio_ids: [], recurrencia: '', dias: [],
+  zona_ids: [], recurrencia: '', dias: [],
 };
 
 /** 'YYYY-MM-DD' de hoy en hora LOCAL. Nunca `toISOString()`: es UTC y de noche
@@ -177,9 +176,8 @@ const detalleDe = (p: Publicacion) => {
 
 export default function Avisos() {
   const { theme } = useTheme();
-  const { user } = useAuth();
   const [items, setItems] = useState<Publicacion[]>([]);
-  const [barrios, setBarrios] = useState<Array<{ id: number; nombre: string }>>([]);
+  const [zonas, setZonas] = useState<Array<{ id: number; nombre: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('todos');
@@ -215,7 +213,7 @@ export default function Avisos() {
         enviado_at: (n.enviado_at as string) ?? null,
         enviados_count: (n.enviados_count as number) ?? 0,
         avance: null, avance_real: null, estado_obra: null, publicada: true,
-        barrio_ids: (n.barrio_ids as number[]) ?? [],
+        zona_ids: (n.zona_ids as number[]) ?? [],
         cronograma_texto: (n.cronograma_texto as string) ?? null,
         recurrencia: (n.recurrencia as string) ?? null,
         dias_semana: (n.dias_semana as string) ?? null,
@@ -238,7 +236,7 @@ export default function Avisos() {
         estado_obra: (p.estado_obra as string) ?? null,
         publicada: Boolean(p.publico),
         // Una obra es del municipio entero y no se repite.
-        barrio_ids: [], cronograma_texto: null, recurrencia: null, dias_semana: null,
+        zona_ids: [], cronograma_texto: null, recurrencia: null, dias_semana: null,
       }));
 
       setItems([...novedades, ...obras]);
@@ -250,23 +248,22 @@ export default function Avisos() {
   };
   useEffect(() => { cargar(); }, []);
 
-  // Los barrios del municipio: sin ellos no se puede segmentar y el selector
+  // Las zonas del municipio: sin ellas no se puede segmentar y el selector
   // queda en "todo el municipio", que es el comportamiento de siempre.
   useEffect(() => {
-    if (!user?.municipio_id) return;
-    municipiosApi.getBarrios(user.municipio_id)
-      .then((r) => setBarrios((r.data as Array<{ id: number; nombre: string }>) || []))
-      .catch(() => setBarrios([]));
-  }, [user?.municipio_id]);
+    zonasApi.getAll(true)
+      .then((r) => setZonas((r.data as Array<{ id: number; nombre: string }>) || []))
+      .catch(() => setZonas([]));
+  }, []);
 
-  /** Los que todavía no eligió. El combo AGREGA: no representa un valor
+  /** Las que todavía no eligió. El combo AGREGA: no representa un valor
    *  seleccionado, por eso su `value` queda siempre vacío. */
-  const opcionesBarrio = useMemo<SelectOption[]>(() => ([
-    { value: '', label: 'Agregar barrio' },
-    ...barrios
-      .filter((b) => !form.barrio_ids.includes(b.id))
-      .map((b) => ({ value: String(b.id), label: b.nombre })),
-  ]), [barrios, form.barrio_ids]);
+  const opcionesZona = useMemo<SelectOption[]>(() => ([
+    { value: '', label: 'Agregar zona' },
+    ...zonas
+      .filter((z) => !form.zona_ids.includes(z.id))
+      .map((z) => ({ value: String(z.id), label: z.nombre })),
+  ]), [zonas, form.zona_ids]);
 
   const destacados = useMemo(() => items.filter((i) => i.tipo === 'destacado'), [items]);
   const novedades = useMemo(
@@ -346,14 +343,14 @@ export default function Avisos() {
       width: 'minmax(120px, 0.9fr)',
       kind: 'text',
       cell: (p) => {
-        if (!p.barrio_ids.length) return 'Todo el municipio';
-        const nombres = p.barrio_ids
-          .map((id) => barrios.find((b) => b.id === id)?.nombre)
+        if (!p.zona_ids.length) return 'Todo el municipio';
+        const nombres = p.zona_ids
+          .map((id) => zonas.find((z) => z.id === id)?.nombre)
           .filter(Boolean) as string[];
-        // Con muchos barrios la celda se vuelve ilegible: se nombra hasta dos
+        // Con muchas zonas la celda se vuelve ilegible: se nombran hasta dos
         // y el resto se cuenta.
         if (nombres.length <= 2) return nombres.join(' y ');
-        return `${nombres[0]} y ${nombres.length - 1} barrios más`;
+        return `${nombres[0]} y ${nombres.length - 1} zonas más`;
       },
     },
     {
@@ -383,7 +380,7 @@ export default function Avisos() {
         : p.enviado_at ? `${p.enviados_count} ${p.enviados_count === 1 ? 'vecino' : 'vecinos'}` : 'todavía no',
     },
     { id: 'acciones', header: '', width: '52px', kind: 'actions' },
-  ], [barrios]);
+  ], [zonas]);
 
   const abrirNuevo = () => {
     setEditando(null);
@@ -404,7 +401,7 @@ export default function Avisos() {
       avance: p.avance !== null ? String(p.avance) : '',
       estado_obra: p.estado_obra || 'en_ejecucion',
       publicada: p.publicada,
-      barrio_ids: p.barrio_ids || [],
+      zona_ids: p.zona_ids || [],
       recurrencia: p.recurrencia || '',
       dias: (p.dias_semana || '').split(',').filter(Boolean).map(Number),
     });
@@ -455,7 +452,7 @@ export default function Avisos() {
           fijado: form.tipo === 'destacado',
           fecha_desde: form.fecha_desde || null,
           fecha_hasta: form.fecha_hasta || null,
-          barrio_ids: form.barrio_ids,
+          zona_ids: form.zona_ids,
           recurrencia: form.recurrencia || null,
           // Los dias solo tienen sentido en la semanal; en las demas se
           // limpian para que no queden dias huerfanos de una eleccion previa.
@@ -848,16 +845,16 @@ export default function Avisos() {
                   A quién le llega
                 </label>
 
-                {form.barrio_ids.length > 0 && (
+                {form.zona_ids.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {form.barrio_ids.map((id) => {
-                      const nombre = barrios.find((b) => b.id === id)?.nombre || `Barrio ${id}`;
+                    {form.zona_ids.map((id) => {
+                      const nombre = zonas.find((z) => z.id === id)?.nombre || `Zona ${id}`;
                       return (
                         <button
                           key={id}
                           type="button"
                           onClick={() => setForm((f) => ({
-                            ...f, barrio_ids: f.barrio_ids.filter((x) => x !== id),
+                            ...f, zona_ids: f.zona_ids.filter((x) => x !== id),
                           }))}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium"
                           style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
@@ -871,20 +868,20 @@ export default function Avisos() {
                 )}
 
                 <ModernSelect
-                  options={opcionesBarrio}
+                  options={opcionesZona}
                   value=""
                   onChange={(v) => {
                     if (!v) return;
-                    setForm((f) => ({ ...f, barrio_ids: [...f.barrio_ids, Number(v)] }));
+                    setForm((f) => ({ ...f, zona_ids: [...f.zona_ids, Number(v)] }));
                   }}
-                  placeholder={form.barrio_ids.length ? 'Agregar otro barrio' : 'Todo el municipio'}
+                  placeholder={form.zona_ids.length ? 'Agregar otra zona' : 'Todo el municipio'}
                 />
                 <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
-                  {barrios.length === 0
-                    ? 'Este municipio todavía no tiene barrios cargados, así que la publicación va a todos.'
-                    : form.barrio_ids.length === 0
-                      ? 'Sin barrios elegidos le llega a todo el municipio. Un corte de agua que toca tres barrios es UNA publicación con esos tres.'
-                      : 'Sólo la ven los vecinos que declararon alguno de esos barrios en su perfil.'}
+                  {zonas.length === 0
+                    ? 'Este municipio todavía no tiene zonas cargadas, así que la publicación va a todos.'
+                    : form.zona_ids.length === 0
+                      ? 'Sin zonas elegidas le llega a todo el municipio. Un corte de agua que toca tres zonas es UNA publicación con esas tres.'
+                      : 'Sólo la ven los vecinos que declararon alguna de esas zonas en su perfil.'}
                 </p>
               </div>
 

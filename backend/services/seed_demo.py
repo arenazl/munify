@@ -2448,7 +2448,7 @@ FOTO = {
 # semanal, que dias (0 = lunes). Lo que ya se contaba en el texto ("los martes
 # y viernes") ahora tambien es un dato: asi el vecino lo ve como cronograma y
 # no como un aviso que vence. El ultimo campo marca la unica segmentada de la
-# demo, para que se vea que un aviso puede ir a un solo barrio.
+# demo, para que se vea que un aviso puede ir a una sola zona.
 AVISOS_DEMO = [
     ("Corte de agua en el centro",
      "Manana de 8 a 14 no va a haber agua por una reparacion en la red. Recomendamos juntar antes.",
@@ -2476,14 +2476,14 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
 
     `enviados_count` sale de los vecinos que la demo realmente creo: un numero
     inventado ahi seria un dato falso en pantalla."""
-    from models.barrio import Barrio
     from models.noticia import Noticia
+    from models.zona import Zona
 
-    # El barrio de la publicacion segmentada. Si la demo no llego a cargar
-    # barrios, esa publicacion sale para todo el municipio: mejor sin
-    # segmentar que apuntando a un barrio que no existe.
-    primer_barrio = (await db.execute(
-        select(Barrio.id).where(Barrio.municipio_id == municipio_id).order_by(Barrio.nombre).limit(1)
+    # La zona de la publicacion segmentada. Si la demo no llego a cargar
+    # zonas, esa publicacion sale para todo el municipio: mejor sin segmentar
+    # que apuntando a una zona que no existe.
+    primera_zona = (await db.execute(
+        select(Zona.id).where(Zona.municipio_id == municipio_id).order_by(Zona.nombre).limit(1)
     )).scalar_one_or_none()
 
     hoy = datetime.utcnow().date()
@@ -2509,24 +2509,24 @@ async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=No
             dias_semana=dias,
             created_at=created,
         ))
-        # A que barrios va: la puente se llena despues del flush, cuando la
+        # A que zonas va: la puente se llena despues del flush, cuando la
         # noticia ya tiene id.
-        if segmentada and primer_barrio:
-            dirigidas.append((titulo, primer_barrio))
+        if segmentada and primera_zona:
+            dirigidas.append((titulo, primera_zona))
         creados += 1
 
     await db.flush()
 
     if dirigidas:
-        from models.noticia import noticia_barrios
-        for titulo, barrio in dirigidas:
+        from models.noticia import noticia_zonas
+        for titulo, zona in dirigidas:
             nid = (await db.execute(
                 select(Noticia.id).where(
                     Noticia.municipio_id == municipio_id, Noticia.titulo == titulo)
             )).scalar_one_or_none()
             if nid:
-                await db.execute(noticia_barrios.insert(),
-                                 [{"noticia_id": nid, "barrio_id": barrio}])
+                await db.execute(noticia_zonas.insert(),
+                                 [{"noticia_id": nid, "zona_id": zona}])
 
     if log:
         log.hito("avisos", avisos=creados)

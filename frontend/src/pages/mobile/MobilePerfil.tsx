@@ -18,7 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import NotificationSettings from '../../components/NotificationSettings';
 import { ModernSelect, type SelectOption } from '../../components/ui/ModernSelect';
-import { municipiosApi, usersApi } from '../../lib/api';
+import { zonasApi, usersApi } from '../../lib/api';
 
 export default function MobilePerfil() {
   const { theme, currentMode, setPreset } = useTheme();
@@ -31,46 +31,46 @@ export default function MobilePerfil() {
   const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-  // El barrio del vecino: con esto el municipio le manda solo lo que le toca
-  // (la recoleccion de SU barrio, no la de los otros doce).
-  const [barrios, setBarrios] = useState<Array<{ id: number; nombre: string }>>([]);
-  const [barrioId, setBarrioId] = useState<string>(user?.barrio_id ? String(user.barrio_id) : '');
-  const [guardandoBarrio, setGuardandoBarrio] = useState(false);
+  // La zona del vecino: con esto el municipio le manda solo lo que le toca
+  // (la recolección de SU zona, no la de las otras seis).
+  const [zonas, setZonas] = useState<Array<{ id: number; nombre: string }>>([]);
+  const [zonaId, setZonaId] = useState<string>(user?.zona_id ? String(user.zona_id) : '');
+  const [guardandoZona, setGuardandoZona] = useState(false);
 
   // El user llega DESPUES del primer render (el contexto lo resuelve en un
   // efecto), asi que el valor inicial del useState siempre se calcula con
   // `user` en null: sin esto el selector mostraba "Todo el municipio" aunque
-  // el vecino ya tuviera su barrio guardado.
+  // el vecino ya tuviera su zona guardada.
   useEffect(() => {
-    setBarrioId(user?.barrio_id ? String(user.barrio_id) : '');
-  }, [user?.barrio_id]);
+    setZonaId(user?.zona_id ? String(user.zona_id) : '');
+  }, [user?.zona_id]);
 
   useEffect(() => {
     if (!user?.municipio_id) return;
-    municipiosApi.getBarrios(user.municipio_id)
-      .then((r) => setBarrios((r.data as Array<{ id: number; nombre: string }>) || []))
-      .catch(() => setBarrios([]));
+    zonasApi.getAll(true)
+      .then((r) => setZonas((r.data as Array<{ id: number; nombre: string }>) || []))
+      .catch(() => setZonas([]));
   }, [user?.municipio_id]);
 
-  const guardarBarrio = async (valor: string) => {
-    const anterior = barrioId;
-    setBarrioId(valor);
-    setGuardandoBarrio(true);
+  const guardarZona = async (valor: string) => {
+    const anterior = zonaId;
+    setZonaId(valor);
+    setGuardandoZona(true);
     try {
-      await usersApi.updateMyProfile({ barrio_id: valor ? Number(valor) : null });
+      await usersApi.updateMyProfile({ zona_id: valor ? Number(valor) : null });
       // El contexto guarda al usuario en localStorage y lo restaura al
-      // recargar: sin refrescarlo, el barrio quedaba bien en el servidor pero
+      // recargar: sin refrescarlo, la zona quedaba bien en el servidor pero
       // la pantalla volvia a "Todo el municipio" en la proxima entrada.
       await refreshUser();
-      toast.success(valor ? 'Listo: vas a recibir los avisos de tu barrio' : 'Vas a recibir los avisos generales');
+      toast.success(valor ? 'Listo: vas a recibir los avisos de tu zona' : 'Vas a recibir los avisos generales');
     } catch {
-      // Se vuelve atras: dejar el selector mostrando un barrio que no se
-      // guardo haria creer al vecino que esta recibiendo avisos que no le
+      // Se vuelve atrás: dejar el selector mostrando una zona que no se
+      // guardó haría creer al vecino que está recibiendo avisos que no le
       // van a llegar.
-      setBarrioId(anterior);
-      toast.error('No se pudo guardar el barrio');
+      setZonaId(anterior);
+      toast.error('No se pudo guardar la zona');
     } finally {
-      setGuardandoBarrio(false);
+      setGuardandoZona(false);
     }
   };
 
@@ -119,9 +119,9 @@ export default function MobilePerfil() {
     );
   }
 
-  const opcionesBarrio: SelectOption[] = [
+  const opcionesZona: SelectOption[] = [
     { value: '', label: 'Todo el municipio' },
-    ...barrios.map((b) => ({ value: String(b.id), label: b.nombre })),
+    ...zonas.map((z) => ({ value: String(z.id), label: z.nombre })),
   ];
 
   const menuItems = [
@@ -217,7 +217,7 @@ export default function MobilePerfil() {
         </button>
       </div>
 
-      {barrios.length > 0 && (
+      {zonas.length > 0 && (
         <div
           className="rounded-2xl p-4"
           style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
@@ -230,18 +230,18 @@ export default function MobilePerfil() {
               <MapPin className="h-5 w-5" style={{ color: theme.primary }} />
             </div>
             <div className="flex-1">
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Tu barrio</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Tu zona</p>
               <p className="text-xs" style={{ color: theme.textSecondary }}>
                 Para recibir los avisos que son de tu zona
               </p>
             </div>
           </div>
           <ModernSelect
-            options={opcionesBarrio}
-            value={barrioId}
-            onChange={guardarBarrio}
-            placeholder="Elegí tu barrio"
-            disabled={guardandoBarrio}
+            options={opcionesZona}
+            value={zonaId}
+            onChange={guardarZona}
+            placeholder="Elegí tu zona"
+            disabled={guardandoZona}
           />
         </div>
       )}

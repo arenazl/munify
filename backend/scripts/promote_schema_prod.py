@@ -125,10 +125,9 @@ COLUMNAS = [
     ("zonas", "poligono", "ALTER TABLE `zonas` ADD COLUMN `poligono` longtext NULL"),
 
     # --- Modulo Comunicacion (avisos, obras publicas, cronogramas) ---------
-    # OJO: `noticias.barrio_id` NO esta y no es un olvido. Una publicacion va
-    # a VARIOS barrios y eso vive en la tabla puente `noticia_barrios`, que la
-    # crea el create_all del arranque. La columna existio un rato en qa y se
-    # elimino antes de que llegara a produccion.
+    # OJO: no hay columna de barrio ni de zona en `noticias`, y no es un
+    # olvido. Una publicacion va a VARIAS zonas y eso vive en la tabla puente
+    # `noticia_zonas`, que la crea el create_all del arranque.
     # El DDL de estas 26 no se escribio a mano: se leyo del information_schema
     # de qa, con su tipo, nullability y default reales.
     ("noticias", "tipo",
@@ -149,8 +148,10 @@ COLUMNAS = [
      "ALTER TABLE `noticias` ADD COLUMN `recurrencia` varchar(20) NULL"),
     ("noticias", "dias_semana",
      "ALTER TABLE `noticias` ADD COLUMN `dias_semana` varchar(20) NULL"),
-    ("usuarios", "barrio_id",
-     "ALTER TABLE `usuarios` ADD COLUMN `barrio_id` int NULL"),
+    # La ZONA que el vecino declara. Zona y no barrio: todos los municipios
+    # tienen zonas cargadas y no todo el pais esta mapeado a nivel barrio.
+    ("usuarios", "zona_id",
+     "ALTER TABLE `usuarios` ADD COLUMN `zona_id` int NULL"),
     ("proyectos", "publico",
      "ALTER TABLE `proyectos` ADD COLUMN `publico` tinyint(1) NOT NULL DEFAULT '0'"),
     ("proyectos", "estado_obra",
@@ -202,8 +203,8 @@ INDICES = [
     # El feed del vecino filtra por activo + vigencia en cada carga.
     ("noticias", "ix_noticias_vigencia",
      "ALTER TABLE `noticias` ADD INDEX `ix_noticias_vigencia` (`activo`, `fecha_hasta`)"),
-    ("usuarios", "ix_usuarios_barrio",
-     "ALTER TABLE `usuarios` ADD INDEX `ix_usuarios_barrio` (`barrio_id`)"),
+    ("usuarios", "ix_usuarios_zona",
+     "ALTER TABLE `usuarios` ADD INDEX `ix_usuarios_zona` (`zona_id`)"),
     ("proyectos", "ix_proyectos_publicos",
      "ALTER TABLE `proyectos` ADD INDEX `ix_proyectos_publicos` (`municipio_id`, `publico`, `activo`)"),
 ]
@@ -218,9 +219,9 @@ FKS = [
     ("reclamos", "fk_reclamo_poi",
      "ALTER TABLE `reclamos` ADD CONSTRAINT `fk_reclamo_poi` FOREIGN KEY (`poi_id`) "
      "REFERENCES `puntos_interes` (`id`) ON DELETE SET NULL"),
-    ("usuarios", "fk_usuario_barrio",
-     "ALTER TABLE `usuarios` ADD CONSTRAINT `fk_usuario_barrio` FOREIGN KEY (`barrio_id`) "
-     "REFERENCES `barrios` (`id`) ON DELETE SET NULL"),
+    ("usuarios", "fk_usuario_zona",
+     "ALTER TABLE `usuarios` ADD CONSTRAINT `fk_usuario_zona` FOREIGN KEY (`zona_id`) "
+     "REFERENCES `zonas` (`id`) ON DELETE SET NULL"),
 ]
 
 ENUM_ESTADO_OT = (
