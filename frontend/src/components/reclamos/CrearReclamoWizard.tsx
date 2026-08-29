@@ -16,6 +16,7 @@ import {
   History,
   Camera,
   X as XIcon,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { triggerNotificationPostCreation } from '../NotificationActivationSheet';
@@ -26,6 +27,7 @@ import { DynamicIcon } from '../ui/DynamicIcon';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import {
   reclamosApi,
+  publicoApi,
   categoriasReclamoApi,
   clasificacionApi,
   usersApi,
@@ -118,6 +120,11 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   const kycVerificado = user?.rol === 'vecino' && (user?.nivel_verificacion ?? 0) >= 2;
 
   const [categorias, setCategorias] = useState<CategoriaReclamo[]>([]);
+  /** Cuántos días tarda el municipio en responder, y sobre cuántos reclamos
+   *  está medido. Se muestra en el paso final para bajarle la ansiedad al
+   *  vecino: la pregunta que se hace al mandar un reclamo es "¿esto lo va a
+   *  leer alguien?". `null` = todavía no hay con qué responderla. */
+  const [respuestaTipica, setRespuestaTipica] = useState<{ dias: number; sobre: number } | null>(null);
 
   const [form, setForm] = useState<ReclamoForm>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
@@ -983,8 +990,46 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   // Step 4: Confirmación
   // ============================================================
 
+  useEffect(() => {
+    if (!open) return;
+    publicoApi.getEstadisticas(user?.municipio_id)
+      .then((r) => {
+        const d = r.data as { tiempo_promedio_resolucion_dias?: number; resueltos?: number } | null;
+        // Con menos de tres resueltos el promedio es anécdota, no promedio; y
+        // un municipio que arranca tendría 0 días, que sería una promesa
+        // falsa. En los dos casos no se muestra nada.
+        if (d && (d.resueltos ?? 0) >= 3 && (d.tiempo_promedio_resolucion_dias ?? 0) > 0) {
+          setRespuestaTipica({ dias: d.tiempo_promedio_resolucion_dias!, sobre: d.resueltos! });
+        } else {
+          setRespuestaTipica(null);
+        }
+      })
+      .catch(() => setRespuestaTipica(null));
+  }, [open, user?.municipio_id]);
+
   const step4Content = (
     <div className="space-y-4">
+      {respuestaTipica && (
+        <div
+          className="p-3 rounded-xl flex items-start gap-2.5"
+          style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+        >
+          <Clock className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
+          <div className="text-xs" style={{ color: theme.text }}>
+            <p className="font-semibold">
+              Los reclamos suelen responderse en {
+                respuestaTipica.dias < 1
+                  ? 'menos de un día'
+                  : `${Math.round(respuestaTipica.dias)} ${Math.round(respuestaTipica.dias) === 1 ? 'día' : 'días'}`
+              }
+            </p>
+            <p className="mt-0.5" style={{ color: theme.textSecondary }}>
+              Medido sobre los {respuestaTipica.sobre} reclamos que el municipio ya resolvió. Te vamos a avisar cada vez que el tuyo cambie de estado.
+            </p>
+          </div>
+        </div>
+      )}
+
       {categoriaSeleccionada && (
         <div
           className="p-4 rounded-xl"
