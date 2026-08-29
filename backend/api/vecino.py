@@ -198,7 +198,7 @@ async def recomendaciones_vecino(
         select(func.count(Partida.id)).where(partida_filter)
     )
     cant_partidas = partidas_q.scalar() or 0
-    if cant_partidas == 0:
+    if tasas_on and cant_partidas == 0:
         recs.append(Recomendacion(
             tipo="tasas", icono="Search", color="#6366f1",
             titulo="Asociá tus tasas municipales",
