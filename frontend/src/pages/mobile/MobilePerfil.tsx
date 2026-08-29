@@ -28,7 +28,7 @@ export default function MobilePerfil() {
   const toggleDarkMode = () => {
     setPreset(isDarkMode ? 'niebla' : 'carbon');
   };
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   // El barrio del vecino: con esto el municipio le manda solo lo que le toca
@@ -58,6 +58,10 @@ export default function MobilePerfil() {
     setGuardandoBarrio(true);
     try {
       await usersApi.updateMyProfile({ barrio_id: valor ? Number(valor) : null });
+      // El contexto guarda al usuario en localStorage y lo restaura al
+      // recargar: sin refrescarlo, el barrio quedaba bien en el servidor pero
+      // la pantalla volvia a "Todo el municipio" en la proxima entrada.
+      await refreshUser();
       toast.success(valor ? 'Listo: vas a recibir los avisos de tu barrio' : 'Vas a recibir los avisos generales');
     } catch {
       // Se vuelve atras: dejar el selector mostrando un barrio que no se
