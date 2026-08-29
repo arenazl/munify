@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, FileCheck, Map, ScanLine, Receipt, Wallet,
   LayoutDashboard, CalendarClock, Activity, Sparkles, PiggyBank, Hammer,
-  FileSignature, Users, MapPin, Megaphone, Truck, UserCheck,
+  FileSignature, Users, MapPin, Megaphone, Truck, UserCheck, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -41,6 +41,7 @@ export const MODULOS: ModuloDef[] = [
   { key: 'ordenes_trabajo', label: 'Órdenes de trabajo', descripcion: 'OTs de campo con cuadrillas y materiales', icon: Hammer, optIn: true },
   { key: 'poi', label: 'Puntos de interés', descripcion: 'POIs en el mapa (hospital, escuela, bomberos...) con radio de zona y prioridad', icon: MapPin, optIn: true },
   { key: 'flota', label: 'Flota', descripcion: 'Vehículos del municipio, combustible y consumo real por unidad', icon: Truck, optIn: true },
+  { key: 'reservas', label: 'Reservas', descripcion: 'Préstamo de salón, cancha y maquinaria al vecino', icon: CalendarCheck, optIn: true },
   { key: 'presentismo', label: 'Presentismo', descripcion: 'Jornadas fichadas por la cuadrilla; alimenta el premio de Sueldos', icon: UserCheck, optIn: true },
   { key: 'comunicacion', label: 'Comunicación', descripcion: 'Avisos y novedades del municipio al celular del vecino', icon: Megaphone, optIn: true },
 ];

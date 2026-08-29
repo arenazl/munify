@@ -82,6 +82,8 @@ class ItemCreate(BaseModel):
     # Activos
     identificador: Optional[str] = None
     estado_activo: Optional[EstadoActivo] = None
+    # Se puede prestar al vecino (salon, cancha, camion de agua).
+    reservable: Optional[bool] = None
     # Flota: un activo con `tipo_combustible` cargado ES un vehiculo del
     # municipio y aparece en Recursos -> Flota. No hay tabla de vehiculos.
     marca_modelo: Optional[str] = None
@@ -110,6 +112,8 @@ class ItemUpdate(BaseModel):
     identificador: Optional[str] = None
     estado_activo: Optional[EstadoActivo] = None
     activo: Optional[bool] = None
+    # Se puede prestar al vecino (salon, cancha, camion de agua).
+    reservable: Optional[bool] = None
     # Flota: un activo con `tipo_combustible` cargado ES un vehiculo del
     # municipio y aparece en Recursos -> Flota. No hay tabla de vehiculos.
     marca_modelo: Optional[str] = None
@@ -138,6 +142,8 @@ class ItemResponse(BaseModel):
     estado_activo: Optional[EstadoActivo] = None
     ocupado_por_ot_id: Optional[int] = None
     ocupado_por_ot_numero: Optional[str] = None
+    # Se puede prestar al vecino (salon, cancha, camion de agua).
+    reservable: Optional[bool] = None
     # Flota: un activo con `tipo_combustible` cargado ES un vehiculo del
     # municipio y aparece en Recursos -> Flota. No hay tabla de vehiculos.
     marca_modelo: Optional[str] = None

@@ -33,6 +33,7 @@ type FormState = {
   // --- Vehículo (módulo Flota). Un activo con estos datos ES un vehículo:
   //     no hay tabla aparte. En un martillo quedan todos vacíos. ---
   esVehiculo: boolean;
+  reservable: boolean;
   marca_modelo: string;
   anio: string;
   tipo_combustible: string;
@@ -46,7 +47,7 @@ const FORM_VACIO: FormState = {
   categoria_id: '', nombre: '', descripcion: '',
   stock_actual: '', stock_minimo: '', unidad: '',
   identificador: '', estado_activo: 'disponible',
-  esVehiculo: false, marca_modelo: '', anio: '', tipo_combustible: '',
+  esVehiculo: false, reservable: false, marca_modelo: '', anio: '', tipo_combustible: '',
   km_actual: '', vencimiento_vtv: '', vencimiento_seguro: '', km_proximo_service: '',
 };
 
@@ -180,6 +181,7 @@ export default function Inventario() {
       // Es vehículo si tiene combustible cargado: ese es el campo que lo hace
       // aparecer en Flota, así que es el que define el tilde.
       esVehiculo: Boolean(item.tipo_combustible),
+      reservable: Boolean(item.reservable),
       marca_modelo: item.marca_modelo || '',
       anio: item.anio != null ? String(item.anio) : '',
       tipo_combustible: item.tipo_combustible || '',
@@ -217,6 +219,7 @@ export default function Inventario() {
         // Flota: los campos van SIEMPRE, en null cuando se destilda. Así
         // desmarcar "es un vehículo" lo saca de la flota de verdad, en vez de
         // dejar datos huérfanos que lo siguen mostrando ahí.
+        payload.reservable = form.reservable;
         payload.marca_modelo = form.esVehiculo ? (form.marca_modelo.trim() || null) : null;
         payload.anio = form.esVehiculo && form.anio ? Number(form.anio) : null;
         payload.tipo_combustible = form.esVehiculo ? (form.tipo_combustible || null) : null;
@@ -538,6 +541,26 @@ export default function Inventario() {
                     Tomado por {selected.ocupado_por_ot_numero || 'una OT'}. Se libera al cerrar la orden.
                   </p>
                 )}
+              </div>
+
+              {/* --- RESERVABLE (módulo Reservas) ---
+                  La mayoría de los activos NO se prestan: una motosierra
+                  municipal no sale del corralón. Por eso va apagado. */}
+              <div className="col-span-2">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.reservable}
+                    onChange={e => setForm({ ...form, reservable: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm" style={{ color: theme.text }}>
+                    Se puede prestar al vecino
+                    <span className="block text-[11px]" style={{ color: theme.textSecondary }}>
+                      Aparece en Recursos → Reservas y el vecino puede pedirlo.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {/* --- VEHÍCULO (módulo Flota) ---

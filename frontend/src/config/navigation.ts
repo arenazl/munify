@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout, Megaphone, Truck, UserCheck,
+  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -443,6 +443,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('flota'),
       categoria: 'Recursos',
       description: 'Vehículos, combustible y consumo por unidad'
+    },
+    {
+      name: 'Reservas',
+      href: '/gestion/reservas',
+      icon: CalendarCheck,
+      show: isAdminOrSupervisor && modulosActivos.has('reservas'),
+      categoria: 'Recursos',
+      description: 'Salón, cancha y maquinaria que se presta'
     },
     {
       name: 'Presentismo',

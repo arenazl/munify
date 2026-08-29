@@ -318,6 +318,8 @@ export interface InventarioItem {
   // Activos
   identificador?: string | null;
   estado_activo?: EstadoActivo | null;
+  /** Se puede prestar al vecino: aparece en Recursos → Reservas. */
+  reservable?: boolean;
   // Flota: un activo con `tipo_combustible` cargado ES un vehículo del
   // municipio y aparece en Recursos → Flota. No hay tabla de vehículos.
   marca_modelo?: string | null;

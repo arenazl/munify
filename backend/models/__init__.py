@@ -28,6 +28,7 @@ from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
 from .historial_orden_trabajo import HistorialOrdenTrabajo
 from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
 from .flota import FlotaCarga
+from .reserva import Reserva
 from .poi import PoiTipo, PuntoInteres
 from .enums import (
     EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana,
@@ -274,4 +275,5 @@ __all__ += [
     "ContaduriaRetencion",
     "TarjetaCredito",
     "FlotaCarga",
+    "Reserva",
 ]

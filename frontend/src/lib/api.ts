@@ -2561,6 +2561,19 @@ export const presentismoApi = {
   mes: (mes?: string) => api.get('/presentismo/mes', { params: mes ? { mes } : undefined }),
 };
 
+/** Reservas (módulo Recursos): lo que el municipio presta al vecino. */
+export const reservasApi = {
+  list: () => api.get('/reservas'),
+  disponibles: (municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.get('/reservas/disponibles', { params: { municipio_id: mId } });
+  },
+  crear: (data: Record<string, unknown>) => api.post('/reservas', data),
+  aprobar: (id: number) => api.post(`/reservas/${id}/aprobar`),
+  rechazar: (id: number, motivo: string) => api.post(`/reservas/${id}/rechazar`, { motivo }),
+  cancelar: (id: number) => api.post(`/reservas/${id}/cancelar`),
+};
+
 export const flotaApi = {
   vehiculos: () => api.get('/flota/vehiculos'),
   cargas: (itemId: number) => api.get(`/flota/vehiculos/${itemId}/cargas`),

@@ -96,6 +96,11 @@ class InventarioItem(Base):
         Integer, ForeignKey("ordenes_trabajo.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # --- Reservas (modulo Recursos, Etapa 3) ---
+    # El bien se puede prestar al vecino (salon, cancha, camion de agua). La
+    # mayoria de los activos NO: una motosierra municipal no se presta.
+    reservable = Column(Boolean, nullable=False, default=False, server_default="0")
+
     # --- Flota (modulo Recursos, Etapa 1) ---
     # Un vehiculo del municipio es un ACTIVO comun con estos datos cargados;
     # no hay tabla de vehiculos aparte. En un martillo quedan todos en NULL.
