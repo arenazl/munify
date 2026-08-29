@@ -11,6 +11,7 @@ from .empleado_categoria import empleado_categoria
 from .empleado import Empleado
 from .empleado_cuadrilla import EmpleadoCuadrilla
 from .empleado_ausencia import EmpleadoAusencia
+from .empleado_jornada import EmpleadoJornada
 from .empleado_horario import EmpleadoHorario
 from .empleado_metrica import EmpleadoMetrica
 from .empleado_capacitacion import EmpleadoCapacitacion
@@ -70,6 +71,7 @@ __all__ = [
     "Empleado",
     "EmpleadoCuadrilla",
     "EmpleadoAusencia",
+    "EmpleadoJornada",
     "EmpleadoHorario",
     "EmpleadoMetrica",
     "EmpleadoCapacitacion",
