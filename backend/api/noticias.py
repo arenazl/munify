@@ -29,7 +29,9 @@ ART = ZoneInfo("America/Argentina/Buenos_Aires")
 # archivo historico: lo viejo se consulta entrando a la novedad.
 TOPE_FEED = 10
 
-DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+# En plural, que es como se lee el cronograma: "todos los sabados", no "todos
+# los sabado". De lunes a viernes el plural no cambia; sabado y domingo si.
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábados", "domingos"]
 
 
 def cronograma_texto(n: Noticia) -> Optional[str]:
@@ -52,7 +54,7 @@ def cronograma_texto(n: Noticia) -> Optional[str]:
             return f"Todos los {', '.join(nombres[:-1])} y {nombres[-1]}"
         return "Todas las semanas"
     if n.recurrencia == "quincenal":
-        return "Cada quince dias"
+        return "Cada quince días"
     if n.recurrencia == "mensual":
         return "Una vez por mes"
     return None
