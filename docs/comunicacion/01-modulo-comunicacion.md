@@ -123,9 +123,20 @@ El proyecto de Tesorería suma `publico`, `estado_obra`, `avance`, `foto_url`,
 (sin token) y el bloque **"Obras en tu ciudad"** en el panel del vecino, con
 la barra de avance como protagonista. Migración:
 `backend/scripts/migrate_obras.py`.
-Dos reglas que quedaron en el código: publicar es **deliberado** (default
-apagado) y el monto es un interruptor **aparte**, que publica lo realmente
-imputado, nunca el presupuesto.
+Tres reglas que quedaron en el código: publicar es **deliberado** (default
+apagado), el monto es un interruptor **aparte** —publica lo realmente
+imputado, nunca el presupuesto— y el **avance son dos campos, no uno**.
+
+**Por qué dos avances** (decisión del dueño, 2026-08-29): `avance` es el real,
+el que lleva Tesorería para gestionar; `avance_publicado` es el que ve el
+vecino. No tienen por qué coincidir, y cuando el intendente quiere comunicar
+otra cosa, publicar **no puede ensuciar el número con el que el municipio se
+maneja adentro**. Al marcar la obra como pública, Comunicación precarga el real
+como *plantilla* y desde ahí el publicado vive su propia vida. `NULL` en el
+publicado = la obra se ve sin barra de avance.
+Migración: `backend/scripts/migrate_avance_publicado.py`, con backfill — las
+obras ya publicadas heredan su avance actual, para que a nadie se le caiga la
+barra por una migración.
 
 
 Las obras ya existen como **proyectos de Tesorería** con sus gastos imputados.
@@ -200,6 +211,16 @@ en producción — a prod llega con la promoción, con su script idempotente.
   "Recomendaciones para vos" pasó a ser una **tira de pendientes de una
   línea**; las novedades tienen jerarquía (destacada + tira compacta) y
   muestran tipo y vigencia.
-- **Pendiente ahí**: en "Estadísticas del Municipio" las variaciones
-  (`+12%`, `+5%`, `-2 días`, `+0.3`) y el mini gráfico de barras están
-  **hardcodeados**. Hay que calcularlos o sacarlos.
+- **"Estadísticas del Municipio" se sacó entero del panel del vecino**
+  (2026-08-29). Dos motivos, y el segundo es el grave:
+  1. *Mentía.* La línea de tendencia de "Días promedio" era un `path` SVG fijo
+     en el código, igual para todos los municipios; y el gráfico de barras del
+     modal eran seis números escritos a mano, con meses que ni siquiera eran
+     los actuales. Parecían datos.
+  2. Los números que **sí** eran reales —40% de tasa de resolución, 3.9 de
+     calificación— son las dos peores notas del municipio, publicadas por el
+     propio municipio en la primera pantalla que abre el vecino.
+
+  De todo eso, lo único que le sirve al vecino es cuánto tarda una respuesta, y
+  ese dato va donde lo necesita: al crear el reclamo ("suelen responderse en 3
+  días"), no como panel de estadísticas. **Pendiente**: ponerlo ahí.

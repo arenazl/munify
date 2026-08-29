@@ -155,6 +155,10 @@ COLUMNAS = [
      "ALTER TABLE `proyectos` ADD COLUMN `estado_obra` varchar(20) NULL"),
     ("proyectos", "avance",
      "ALTER TABLE `proyectos` ADD COLUMN `avance` int NULL"),
+    # El avance REAL (arriba) es de Tesoreria; este es el que ve el vecino.
+    # Son dos porque publicar otro numero no puede pisar el dato interno.
+    ("proyectos", "avance_publicado",
+     "ALTER TABLE `proyectos` ADD COLUMN `avance_publicado` int NULL"),
     ("proyectos", "foto_url",
      "ALTER TABLE `proyectos` ADD COLUMN `foto_url` varchar(500) NULL"),
     ("proyectos", "latitud",

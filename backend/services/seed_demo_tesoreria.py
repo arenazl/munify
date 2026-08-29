@@ -530,6 +530,10 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
                 presupuesto=presup, estado=estado, activo=True,
                 fecha_inicio=date.today() - timedelta(days=90),
                 publico=publico, estado_obra=est_obra, avance=avance,
+                # Publicada = ya paso por Comunicacion, asi que lleva su
+                # avance publicado. Sin publicar, el publicado va vacio: se
+                # carga recien cuando alguien decide mostrarla.
+                avance_publicado=avance if publico else None,
                 foto_url=foto, mostrar_monto=False,
             ))
             counts["proyectos"] += 1

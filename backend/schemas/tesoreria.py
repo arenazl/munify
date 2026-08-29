@@ -324,7 +324,11 @@ class ProyectoBase(BaseModel):
     # --- Obras a la vista (Etapa 2) ---
     publico: bool = False
     estado_obra: Optional[EstadoObraStr] = None
+    # El avance REAL, el de gestion. No sale a la calle.
     avance: Optional[int] = Field(None, ge=0, le=100)
+    # El que ve el vecino. Lo maneja Comunicacion y puede no coincidir con el
+    # real: son dos decisiones distintas y no tienen por que dar lo mismo.
+    avance_publicado: Optional[int] = Field(None, ge=0, le=100)
     foto_url: Optional[str] = Field(None, max_length=500)
     latitud: Optional[float] = None
     longitud: Optional[float] = None
@@ -346,6 +350,7 @@ class ProyectoUpdate(BaseModel):
     publico: Optional[bool] = None
     estado_obra: Optional[EstadoObraStr] = None
     avance: Optional[int] = Field(None, ge=0, le=100)
+    avance_publicado: Optional[int] = Field(None, ge=0, le=100)
     foto_url: Optional[str] = Field(None, max_length=500)
     latitud: Optional[float] = None
     longitud: Optional[float] = None

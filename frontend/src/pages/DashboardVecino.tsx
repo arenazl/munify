@@ -1,15 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileText, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin,
-  ChevronRight, Trophy, Map, Megaphone, Calendar, Newspaper, Hammer,
-  FileCheck, TrendingUp,
-  TrendingDown, Building2, Star, BarChart3, X, Users, Target,
-  Zap, Activity,
+  FileText, CheckCircle, Clock, AlertTriangle,
+  ChevronRight, Megaphone, Newspaper, Hammer, FileCheck, Star,
   Search, PlusCircle, Upload, Loader, ShieldCheck, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, configuracionApi, publicoApi, vecinoApi, api } from '../lib/api';
+import { reclamosApi, configuracionApi, vecinoApi, api } from '../lib/api';
 import { logoDelMunicipio } from '../brands';
 import { PORTADA_FALLBACK } from '../config/themePresets';
 import type { Recomendacion } from '../lib/api';
@@ -38,17 +35,6 @@ interface MisEstadisticas {
   en_curso: number;
   resueltos: number;
   rechazados: number;
-}
-
-interface EstadisticasPublicas {
-  total_reclamos: number;
-  resueltos: number;
-  en_curso: number;
-  nuevos: number;
-  tasa_resolucion: number;
-  tiempo_promedio_resolucion_dias: number;
-  calificacion_promedio: number;
-  por_categoria: Array<{ categoria: string; cantidad: number }>;
 }
 
 interface DashboardComponente {
@@ -285,8 +271,6 @@ export default function DashboardVecino() {
   // La config se sigue trayendo, pero hoy nadie la lee: el único consumidor
   // era el gate de los KPI cards, que se sacaron el 2026-08-29.
   const [, setDashboardConfig] = useState<DashboardConfig | null>(null);
-  const [estadisticasPublicas, setEstadisticasPublicas] = useState<EstadisticasPublicas | null>(null);
-  const [modalEstadistica, setModalEstadistica] = useState<string | null>(null);
   const [recomendaciones, setRecomendaciones] = useState<Recomendacion[]>([]);
   const [noticias, setNoticias] = useState<NoticiaItem[]>([]);
   const [obras, setObras] = useState<ObraItem[]>([]);
@@ -297,13 +281,10 @@ export default function DashboardVecino() {
 
   const fetchData = async () => {
     try {
-      const [reclamosRes, configRes, dashConfigRes, estadisticasRes, recsRes] = await Promise.all([
+      const [reclamosRes, configRes, dashConfigRes, recsRes] = await Promise.all([
         reclamosApi.getMisReclamos(),
         configuracionApi.getPublica('municipio').catch(() => ({ data: {} })),
         configuracionApi.getDashboardConfig('vecino').catch(() => ({ data: { config: null } })),
-        // Estadísticas del municipio del vecino (sin municipio_id mezclaba
-        // los números de TODOS los municipios en el widget "Tu Municipio")
-        publicoApi.getEstadisticas(user?.municipio_id).catch(() => ({ data: null })),
         vecinoApi.recomendaciones().catch(() => ({ data: [] })),
       ]);
 
@@ -354,10 +335,6 @@ export default function DashboardVecino() {
 
       if (dashConfigRes.data?.config) {
         setDashboardConfig(dashConfigRes.data.config);
-      }
-
-      if (estadisticasRes.data) {
-        setEstadisticasPublicas(estadisticasRes.data);
       }
 
       if (recsRes.data) {
@@ -571,324 +548,21 @@ export default function DashboardVecino() {
         </div>
       )}
 
-      {/* Estadísticas del Municipio - Versión moderna con gráficos */}
-      {estadisticasPublicas && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
-              <Activity className="h-5 w-5" style={{ color: theme.primary }} />
-              Estadísticas del Municipio
-            </h2>
-            {/* Las cuatro variaciones (+12%, +5%, -2 días, +0.3) y el mini
-                gráfico de barras se sacaron el 2026-08-29: estaban ESCRITAS A
-                MANO en el código, no salían de ningún cálculo. Los cuatro
-                números que quedan sí son reales (vienen de
-                /portal-publico/estadisticas). Si algún día se quiere tendencia,
-                se calcula en el backend contra el mes anterior — no se dibuja. */}
-            <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
-              Actualizado hoy
-            </span>
-          </div>
+      {/* El bloque "Estadisticas del Municipio" se saco el 2026-08-29.
+          Dos motivos, el segundo mas grave que el primero:
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Card: Total Reclamos */}
-            <button
-              onClick={() => setModalEstadistica('total')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, ${theme.primary}, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${theme.primary}15` }}>
-                  <Building2 className="w-5 h-5" style={{ color: theme.primary }} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.total_reclamos}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Reclamos totales</p>
-              
-            </button>
+          1. MENTIA. La linea de tendencia de "Dias promedio" era un path
+             SVG fijo en el codigo (M0,28 L15,20 ... L100,8) y el grafico
+             de barras del modal eran seis numeros escritos a mano con
+             meses que ni siquiera eran los actuales. Parecian datos.
+          2. Los numeros que SI eran reales (40% de resolucion, 3.9 de
+             calificacion) son las dos peores notas del municipio,
+             publicadas por el propio municipio en la primera pantalla que
+             abre el vecino.
 
-            {/* Card: Tasa Resolución */}
-            <button
-              onClick={() => setModalEstadistica('resolucion')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, #22c55e, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#22c55e15' }}>
-                  <Target className="w-5 h-5" style={{ color: '#22c55e' }} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.tasa_resolucion.toFixed(0)}%</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Tasa de resolución</p>
-              {/* Mini gráfico circular */}
-              <div className="mt-3 flex justify-center">
-                <div className="relative w-10 h-10">
-                  <svg className="w-10 h-10 -rotate-90">
-                    <circle cx="20" cy="20" r="16" fill="none" strokeWidth="4" stroke={`${theme.border}`} />
-                    <circle
-                      cx="20" cy="20" r="16" fill="none" strokeWidth="4" stroke="#22c55e"
-                      strokeDasharray={`${estadisticasPublicas.tasa_resolucion} 100`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </button>
-
-            {/* Card: Tiempo Promedio */}
-            <button
-              onClick={() => setModalEstadistica('tiempo')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, #f59e0b, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f59e0b15' }}>
-                  <Zap className="w-5 h-5" style={{ color: '#f59e0b' }} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.tiempo_promedio_resolucion_dias.toFixed(1)}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Días promedio</p>
-              {/* Mini gráfico de línea */}
-              <div className="mt-3 h-8 flex items-end">
-                <svg className="w-full h-8" viewBox="0 0 100 32" preserveAspectRatio="none">
-                  <path
-                    d="M0,28 L15,20 L30,24 L45,16 L60,18 L75,10 L100,8"
-                    fill="none"
-                    stroke="#f59e0b"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M0,28 L15,20 L30,24 L45,16 L60,18 L75,10 L100,8 L100,32 L0,32 Z"
-                    fill="url(#gradientAmber)"
-                    opacity="0.2"
-                  />
-                  <defs>
-                    <linearGradient id="gradientAmber" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-            </button>
-
-            {/* Card: Calificación */}
-            <button
-              onClick={() => setModalEstadistica('calificacion')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, #eab308, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#eab30815' }}>
-                  <Star className="w-5 h-5" style={{ color: '#eab308' }} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.calificacion_promedio.toFixed(1)}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Calificación</p>
-              {/* Estrellas */}
-              <div className="mt-3 flex gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className="w-4 h-4"
-                    fill={star <= Math.round(estadisticasPublicas.calificacion_promedio) ? '#eab308' : 'none'}
-                    stroke="#eab308"
-                  />
-                ))}
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Estadísticas */}
-      {modalEstadistica && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setModalEstadistica(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl p-6 max-h-[80vh] overflow-y-auto"
-            style={{ backgroundColor: theme.card }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold" style={{ color: theme.text }}>
-                {modalEstadistica === 'total' && 'Reclamos del Municipio'}
-                {modalEstadistica === 'resolucion' && 'Tasa de Resolución'}
-                {modalEstadistica === 'tiempo' && 'Tiempo de Respuesta'}
-                {modalEstadistica === 'calificacion' && 'Calificación del Servicio'}
-              </h3>
-              <button
-                onClick={() => setModalEstadistica(null)}
-                className="p-2 rounded-full hover:bg-black/10 transition-colors"
-              >
-                <X className="w-5 h-5" style={{ color: theme.textSecondary }} />
-              </button>
-            </div>
-
-            {modalEstadistica === 'total' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="p-3 rounded-xl text-center" style={{ backgroundColor: `${theme.primary}10` }}>
-                    <p className="text-xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.total_reclamos}</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Total</p>
-                  </div>
-                  <div className="p-3 rounded-xl text-center" style={{ backgroundColor: '#22c55e10' }}>
-                    <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{estadisticasPublicas.resueltos}</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Resueltos</p>
-                  </div>
-                  <div className="p-3 rounded-xl text-center" style={{ backgroundColor: '#f59e0b10' }}>
-                    <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{estadisticasPublicas.en_curso}</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>En proceso</p>
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-                  <p className="text-sm font-medium mb-3" style={{ color: theme.text }}>Reclamos por mes (últimos 6 meses)</p>
-                  <div className="flex items-end gap-2 h-24">
-                    {[45, 62, 55, 78, 85, 92].map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full rounded-t" style={{ height: `${h}%`, backgroundColor: i === 5 ? theme.primary : `${theme.primary}50` }} />
-                        <span className="text-[10px]" style={{ color: theme.textSecondary }}>{['Ago', 'Sep', 'Oct', 'Nov', 'Dic', 'Ene'][i]}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  Este mes se recibieron un 12% más de reclamos que el mes anterior. Las categorías más reportadas son: Alumbrado (25%), Baches (20%) y Limpieza (18%).
-                </p>
-              </div>
-            )}
-
-            {modalEstadistica === 'resolucion' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="flex justify-center mb-4">
-                  <div className="relative w-32 h-32">
-                    <svg className="w-32 h-32 -rotate-90">
-                      <circle cx="64" cy="64" r="56" fill="none" strokeWidth="12" stroke={theme.border} />
-                      <circle
-                        cx="64" cy="64" r="56" fill="none" strokeWidth="12" stroke="#22c55e"
-                        strokeDasharray={`${estadisticasPublicas.tasa_resolucion * 3.52} 352`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.tasa_resolucion.toFixed(0)}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl" style={{ backgroundColor: '#22c55e10' }}>
-                    <p className="text-lg font-bold" style={{ color: '#22c55e' }}>{estadisticasPublicas.resueltos}</p>
-                    <p className="text-xs" style={{ color: theme.textSecondary }}>Resueltos satisfactoriamente</p>
-                  </div>
-                  <div className="p-3 rounded-xl" style={{ backgroundColor: '#ef444410' }}>
-                    <p className="text-lg font-bold" style={{ color: '#ef4444' }}>{estadisticasPublicas.total_reclamos - estadisticasPublicas.resueltos}</p>
-                    <p className="text-xs" style={{ color: theme.textSecondary }}>Pendientes de resolución</p>
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  La tasa de resolución mejoró un 5% respecto al mes anterior. El objetivo del municipio es alcanzar el 95% para fin de año.
-                </p>
-              </div>
-            )}
-
-            {modalEstadistica === 'tiempo' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="text-center mb-4">
-                  <p className="text-4xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.tiempo_promedio_resolucion_dias.toFixed(1)}</p>
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>días promedio de resolución</p>
-                </div>
-                <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-                  <p className="text-sm font-medium mb-3" style={{ color: theme.text }}>Evolución del tiempo de respuesta</p>
-                  <svg className="w-full h-20" viewBox="0 0 200 60" preserveAspectRatio="none">
-                    <path
-                      d="M0,45 L30,38 L60,42 L90,30 L120,32 L150,22 L200,18"
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M0,45 L30,38 L60,42 L90,30 L120,32 L150,22 L200,18 L200,60 L0,60 Z"
-                      fill="url(#gradientModal)"
-                      opacity="0.3"
-                    />
-                    <defs>
-                      <linearGradient id="gradientModal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-lg font-bold" style={{ color: '#22c55e' }}>1.2</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Alumbrado</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold" style={{ color: '#f59e0b' }}>3.5</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Baches</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold" style={{ color: '#3b82f6' }}>2.1</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Limpieza</p>
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  El tiempo de respuesta se redujo 2 días respecto al trimestre anterior gracias a la optimización de procesos internos.
-                </p>
-              </div>
-            )}
-
-            {modalEstadistica === 'calificacion' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="text-center mb-4">
-                  <div className="flex justify-center gap-2 mb-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className="w-8 h-8"
-                        fill={star <= Math.round(estadisticasPublicas.calificacion_promedio) ? '#eab308' : 'none'}
-                        stroke="#eab308"
-                      />
-                    ))}
-                  </div>
-                  <p className="text-3xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.calificacion_promedio.toFixed(1)}</p>
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>de 5 estrellas</p>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { stars: 5, percent: 45 },
-                    { stars: 4, percent: 30 },
-                    { stars: 3, percent: 15 },
-                    { stars: 2, percent: 7 },
-                    { stars: 1, percent: 3 },
-                  ].map((item) => (
-                    <div key={item.stars} className="flex items-center gap-2">
-                      <span className="text-xs w-12" style={{ color: theme.textSecondary }}>{item.stars} estrellas</span>
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
-                        <div className="h-full rounded-full" style={{ width: `${item.percent}%`, backgroundColor: '#eab308' }} />
-                      </div>
-                      <span className="text-xs w-8 text-right" style={{ color: theme.textSecondary }}>{item.percent}%</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  El 75% de los vecinos calificó el servicio con 4 o 5 estrellas. Los aspectos mejor valorados son la rapidez y la comunicación.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          El unico dato que le sirve al vecino de todo eso es cuanto tarda
+          una respuesta, y ese va en el momento en que crea el reclamo
+          ("suelen responderse en 3 dias"), no como panel de estadisticas. */}
 
       {/* Tus Gestiones - Reclamos y Trámites lado a lado */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -64,7 +64,20 @@ class Proyecto(Base):
 
     # 0..100. NULL = el municipio todavia no lo cargo, y entonces la tarjeta
     # no muestra barra: un 0% inventado seria peor que no decir nada.
+    #
+    # ESTE es el avance REAL, el de adentro: lo lleva Tesoreria y es el que
+    # mira el municipio para gestionar. NUNCA se publica tal cual.
     avance = Column(Integer, nullable=True)
+
+    # Y este es el que ve el vecino. Son dos campos y no uno por una razon
+    # concreta: el avance real y lo que el intendente decide comunicar no
+    # tienen por que coincidir, y cuando no coinciden, publicar NO puede
+    # ensuciar el numero con el que el municipio se maneja adentro.
+    # NULL = no se publica barra (la obra igual se ve, con su estado).
+    # Al marcarla publica, la pantalla de Comunicacion lo precarga con el
+    # avance real como PLANTILLA — despues es de Comunicacion, no de
+    # Tesoreria, y editarlo no toca `avance`.
+    avance_publicado = Column(Integer, nullable=True)
 
     foto_url = Column(String(500), nullable=True)
 

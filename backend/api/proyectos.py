@@ -153,12 +153,13 @@ async def obras_publicas(
         invertido = {pid: total for pid, total in r2.all()}
 
     orden = {"en_ejecucion": 0, "terminada": 1, "por_empezar": 2}
-    obras.sort(key=lambda o: (orden.get(o.estado_obra or "", 3), -(o.avance or 0)))
+    # Se ordena por lo PUBLICADO: el real no sale de la casa.
+    obras.sort(key=lambda o: (orden.get(o.estado_obra or "", 3), -(o.avance_publicado or 0)))
 
     return [
         ObraPublica(
             id=o.id, nombre=o.nombre, descripcion=o.descripcion,
-            estado_obra=o.estado_obra, avance=o.avance, foto_url=o.foto_url,
+            estado_obra=o.estado_obra, avance=o.avance_publicado, foto_url=o.foto_url,
             latitud=o.latitud, longitud=o.longitud,
             fecha_inicio=o.fecha_inicio, fecha_fin=o.fecha_fin,
             invertido=invertido.get(o.id) if o.mostrar_monto else None,

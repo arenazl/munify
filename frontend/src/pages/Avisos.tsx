@@ -56,7 +56,11 @@ interface Publicacion {
   activo: boolean;
   enviado_at: string | null;
   enviados_count: number;
+  /** El que ve el vecino. Es el que se edita aca. */
   avance: number | null;
+  /** El REAL, el que lleva Tesoreria. Se muestra como referencia y NO se toca:
+   *  publicar otro numero no puede ensuciar el dato interno del municipio. */
+  avance_real: number | null;
   estado_obra: string | null;
   /** Sólo obras: si Comunicación ya decidió publicarla. */
   publicada: boolean;
@@ -209,7 +213,7 @@ export default function Avisos() {
         activo: Boolean(n.activo),
         enviado_at: (n.enviado_at as string) ?? null,
         enviados_count: (n.enviados_count as number) ?? 0,
-        avance: null, estado_obra: null, publicada: true,
+        avance: null, avance_real: null, estado_obra: null, publicada: true,
         barrio_id: (n.barrio_id as number) ?? null,
         cronograma_texto: (n.cronograma_texto as string) ?? null,
         recurrencia: (n.recurrencia as string) ?? null,
@@ -226,7 +230,10 @@ export default function Avisos() {
         fecha_desde: null, fecha_hasta: null,
         activo: Boolean(p.activo),
         enviado_at: null, enviados_count: 0,
-        avance: (p.avance as number) ?? null,
+        // Al publicar por primera vez, el real hace de PLANTILLA. De ahi en
+        // mas el publicado es de Comunicacion y vive su propia vida.
+        avance: (p.avance_publicado as number) ?? (p.avance as number) ?? null,
+        avance_real: (p.avance as number) ?? null,
         estado_obra: (p.estado_obra as string) ?? null,
         publicada: Boolean(p.publico),
         // Una obra es del municipio entero y no se repite.
@@ -403,7 +410,9 @@ export default function Avisos() {
         await proyectosApi.update(editando.id, {
           publico: form.publicada,
           estado_obra: form.estado_obra,
-          avance: form.avance ? Number(form.avance) : null,
+          // Solo el publicado. `avance` (el real de Tesoreria) no se manda:
+          // editarlo desde aca era pisar el numero con el que se gestiona.
+          avance_publicado: form.avance ? Number(form.avance) : null,
           foto_url: form.imagen_url.trim() || null,
           descripcion: form.descripcion.trim() || null,
         });
@@ -671,7 +680,7 @@ export default function Avisos() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
-                    Avance (%)
+                    Avance que se publica (%)
                   </label>
                   <input
                     type="number"
@@ -685,6 +694,12 @@ export default function Avisos() {
                   />
                 </div>
               </div>
+
+              <p className="text-[11px] -mt-1" style={{ color: theme.textSecondary }}>
+                {editando?.avance_real !== null && editando?.avance_real !== undefined
+                  ? `Tesorería lleva esta obra al ${editando.avance_real}%. El número de arriba es el que ve el vecino y puede ser otro: cambiarlo no toca el de Tesorería.`
+                  : 'Es el número que ve el vecino. Vacío, la obra se publica sin barra de avance.'}
+              </p>
 
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
