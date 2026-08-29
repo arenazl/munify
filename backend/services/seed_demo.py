@@ -2369,11 +2369,13 @@ async def seed_demo_completo(
     # circuito completo (campo + inventario + sueldos + contaduría). El seed
     # corre una sola vez por muni nuevo, no hace falta chequear duplicados.
     from models.municipio_modulo import MunicipioModulo
-    _modulos = ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria')
+    _modulos = ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria', 'comunicacion')
     for _mod in _modulos:
         db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()
     log.hito("modulos", modulos=list(_modulos))
+
+    avisos_creados = await _seed_avisos(db, municipio_id, len(vecinos_demo), log)
 
     return {
         "dependencias": len(muni_deps),
@@ -2392,6 +2394,7 @@ async def seed_demo_completo(
         "solicitudes": solicitudes_creadas,
         "ordenes_trabajo": ots_creadas,
         "inventario_items": inv_res["items"],
+        "avisos": avisos_creados,
         # La demo tiene que poder DECIR si hablo de la ciudad del cliente o si
         # se quedo corta. Sin esto una demo sin geografia se ve igual de bien en
         # la respuesta del alta y el problema aparece recien en pantalla.
@@ -2403,6 +2406,74 @@ async def seed_demo_completo(
             "puntos": len(geo),
         },
     }
+
+
+# ============================================================
+# Avisos al vecino (modulo Comunicacion)
+# ============================================================
+
+# La demo tiene que mostrar la pantalla EN USO, no una lista vacia: por eso
+# hay avisos ya notificados, uno vigente SIN notificar (para que el tablero
+# tenga algo para hacer), uno programado y uno vencido (que prueba que la
+# vigencia apaga el aviso sola). Contenido municipal generico: ningun nombre
+# de persona ni dato que se pueda confundir con real.
+#
+# (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado)
+#   creado_hace: dias hacia atras del created_at
+#   desde/hasta: dias respecto de HOY (None = sin fecha)
+AVISOS_DEMO = [
+    ("Corte de agua en el centro",
+     "Manana de 8 a 14 no va a haber agua por una reparacion en la red. Recomendamos juntar antes.",
+     "aviso", 1, 0, 1, True, True),
+    ("Cambia el cronograma de recoleccion",
+     "Desde esta semana los residuos reciclables se retiran los martes y viernes por la manana.",
+     "aviso", 2, 0, 6, False, True),
+    ("Vacunacion antirrabica gratuita",
+     "Los sabados de 9 a 13 en la plaza central. Traer al animal con correa o en transportadora.",
+     "aviso", 0, 0, 10, False, False),
+    ("Poda de arbolado",
+     "La proxima semana empieza la poda programada. Los dias que toque cada sector se avisan por este medio.",
+     "aviso", 0, 3, 12, False, False),
+    ("Termino la obra de cordon cuneta",
+     "Se completaron las diez cuadras previstas. La proxima etapa arranca el mes que viene.",
+     "noticia", 8, None, None, False, True),
+    ("Feria de emprendedores",
+     "El fin de semana pasado la feria reunio a mas de treinta puestos de vecinos de la ciudad.",
+     "aviso", 12, -10, -3, False, True),
+]
+
+
+async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=None) -> int:
+    """Siembra el feed de novedades del vecino con historia.
+
+    `enviados_count` sale de los vecinos que la demo realmente creo: un numero
+    inventado ahi seria un dato falso en pantalla."""
+    from models.noticia import Noticia
+
+    hoy = datetime.utcnow().date()
+    creados = 0
+    for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado) in AVISOS_DEMO:
+        created = (datetime.utcnow() - timedelta(days=creado_hace)).replace(
+            hour=9 + (creados * 3) % 8, minute=(creados * 13) % 60, second=0, microsecond=0)
+        db.add(Noticia(
+            municipio_id=municipio_id,
+            titulo=titulo,
+            descripcion=texto,
+            tipo=tipo,
+            fecha_desde=(hoy + timedelta(days=desde)) if desde is not None else None,
+            fecha_hasta=(hoy + timedelta(days=hasta)) if hasta is not None else None,
+            fijado=fijado,
+            activo=True,
+            enviado_at=(created + timedelta(hours=2)) if avisado else None,
+            enviados_count=vecinos if avisado else 0,
+            created_at=created,
+        ))
+        creados += 1
+
+    await db.flush()
+    if log:
+        log.hito("avisos", avisos=creados)
+    return creados
 
 
 # ============================================================
