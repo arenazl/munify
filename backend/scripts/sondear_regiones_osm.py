@@ -57,22 +57,43 @@ def _pedir(url: str, datos: bytes | None = None, timeout: int = 120):
         return json.loads(resp.read().decode())
 
 
-def osm_id_de(nombre: str, provincia: str, pais: str) -> str | None:
-    """La relacion OSM del municipio, o None si Nominatim no la encuentra.
-
-    Se piden relaciones y no puntos: un punto no tiene contorno, y lo que se
-    esta midiendo es justamente si hay contorno."""
-    q = urllib.parse.urlencode({
-        "q": f"{nombre}, {provincia}, {pais}",
-        "format": "json",
-        "limit": 5,
-    })
+def _buscar_relacion(consulta: str) -> str | None:
+    """La relacion OSM de mayor importancia para esa consulta, o None."""
+    q = urllib.parse.urlencode({"q": consulta, "format": "json", "limit": 10})
     try:
-        for r in _pedir(f"{NOMINATIM}?{q}"):
-            if r.get("osm_type") == "relation":
-                return f"relation/{r['osm_id']}"
+        rels = [r for r in _pedir(f"{NOMINATIM}?{q}") if r.get("osm_type") == "relation"]
     except Exception as e:
         print(f"      nominatim fallo: {str(e)[:70]}")
+        return None
+    if not rels:
+        return None
+    # Entre varias homonimas, la del municipio es la que Nominatim rankea mas
+    # alto.
+    mejor = max(rels, key=lambda r: float(r.get("importance") or 0))
+    return f"relation/{mejor['osm_id']}"
+
+
+def osm_id_de(nombre: str, provincia: str, pais: str) -> str | None:
+    """La relacion OSM del municipio, o None si no aparece.
+
+    DOS INTENTOS, y el segundo no es un capricho. Buscar "Trelew, Chubut"
+    devuelve UN SOLO resultado y es el NODO de la ciudad — un punto, sin
+    contorno; la relacion administrativa existe pero se llama "Municipio de
+    Trelew" y no sale con el nombre pelado. Con un solo intento, Trelew y
+    Rawson figuraban como "no estan en OSM", que era falso.
+    """
+    formas = [
+        f"{nombre}, {provincia}, {pais}",
+        # Como nombra OSM a los municipios argentinos.
+        f"Municipio de {nombre}, {provincia}, {pais}",
+    ]
+    for i, forma in enumerate(formas):
+        oid = _buscar_relacion(forma)
+        if oid:
+            if i:
+                print(f"      (encontrado como '{forma.split(',')[0]}')")
+            return oid
+        time.sleep(PAUSA_NOMINATIM)
     return None
 
 
@@ -130,8 +151,12 @@ async def municipios(provincia: str | None, pais: str, limite: int):
     return [tuple(f) for f in filas]
 
 
-async def municipios_por_nombre(nombres: list[str], pais: str):
-    """Los del catalogo que coincidan por nombre, en el orden pedido."""
+async def municipios_por_nombre(nombres: list[str], pais: str, provincia: str | None = None):
+    """Los del catalogo que coincidan por nombre, en el orden pedido.
+
+    La provincia NO es opcional en la practica: hay municipios homonimos en
+    varias provincias (Sarmiento existe en Chubut y en Cordoba), y sin
+    filtrar se sondea el equivocado sin que se note."""
     import os
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
@@ -141,9 +166,14 @@ async def municipios_por_nombre(nombres: list[str], pais: str):
     salida = []
     async with engine.connect() as c:
         for n in nombres:
+            cond = "pais = :pais AND nombre = :n"
+            params = {"pais": pais, "n": n}
+            if provincia:
+                cond += " AND provincia = :prov"
+                params["prov"] = provincia
             fila = (await c.execute(text(
                 "SELECT nombre, provincia, pais FROM municipios_catalogo "
-                "WHERE pais = :pais AND nombre = :n LIMIT 1"), {"pais": pais, "n": n})).fetchone()
+                f"WHERE {cond} LIMIT 1"), params)).fetchone()
             if fila:
                 salida.append(tuple(fila))
             else:
@@ -166,7 +196,7 @@ def main():
     import asyncio
     if args.nombres:
         pedidos = [n.strip() for n in args.nombres.split(",") if n.strip()]
-        lista = asyncio.run(municipios_por_nombre(pedidos, args.pais))
+        lista = asyncio.run(municipios_por_nombre(pedidos, args.pais, args.provincia))
     else:
         lista = asyncio.run(municipios(args.provincia, args.pais, args.limite))
     if not lista:

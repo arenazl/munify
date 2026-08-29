@@ -20,6 +20,8 @@ function RecIcono({ nombre, color }: { nombre: string; color: string }) {
   return <Icon className="w-5 h-5" style={{ color }} />;
 }
 import { useTheme } from '../contexts/ThemeContext';
+import { NovedadDestacada, NovedadCompacta } from '../components/comunicacion/NovedadCards';
+import type { NoticiaItem } from '../components/comunicacion/novedades';
 import { useAuth } from '../contexts/AuthContext';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
@@ -50,23 +52,6 @@ interface DashboardConfig {
 
 // Noticia real del municipio (GET /noticias/publico). NUNCA se muestran noticias
 // de relleno: si el muni no cargó noticias, el bloque "Novedades" se oculta.
-interface NoticiaItem {
-  id: number;
-  titulo: string;
-  descripcion: string;
-  imagen: string | null;
-  fecha: string;
-  categoria?: string;
-  /** aviso | noticia | alerta: cambia el peso visual, no la tabla. */
-  tipo: string;
-  /** Lo que el municipio quiere arriba de todo. */
-  fijado: boolean;
-  /** 'YYYY-MM-DD' o null. Con esto la tarjeta dice cuánto le queda. */
-  fechaHasta: string | null;
-  fechaDesde: string | null;
-  /** "Todos los martes y viernes". Lo escribe el backend. */
-  cronograma: string | null;
-}
 
 // Respuesta cruda del endpoint público de noticias
 interface NoticiaApiResponse {
@@ -220,38 +205,8 @@ interface ObraItem {
   invertido: string | null;
 }
 
-/** 'YYYY-MM-DD' de hoy en hora LOCAL (nunca toISOString: es UTC y de noche
- *  adelanta un día, y un aviso vigente hasta hoy se leería vencido). */
-function hoyISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
-const diasEntre = (desde: string, hasta: string) =>
-  Math.round((new Date(`${hasta}T00:00:00`).getTime() - new Date(`${desde}T00:00:00`).getTime()) / 86400000);
 
-/**
- * Lo que le queda al aviso, en criollo. Es el dato que al vecino le sirve
- * ("me queda hoy") y que ninguna tarjeta le estaba diciendo. Devuelve null
- * cuando no hay nada que avisar: una noticia sin vencimiento no urge.
- */
-function urgenciaDe(n: NoticiaItem): { texto: string; fuerte: boolean } | null {
-  const hoy = hoyISO();
-  if (n.fechaDesde && n.fechaDesde > hoy) {
-    const d = diasEntre(hoy, n.fechaDesde);
-    return { texto: d === 1 ? 'Arranca mañana' : `Arranca en ${d} días`, fuerte: false };
-  }
-  // Lo que se repite no vence: al vecino le sirve saber CUANDO vuelve a pasar,
-  // no cuantos dias le quedan a un aviso que va a seguir estando.
-  if (n.cronograma) return { texto: n.cronograma, fuerte: false };
-  if (!n.fechaHasta) return null;
-  const d = diasEntre(hoy, n.fechaHasta);
-  if (d < 0) return null;
-  if (d === 0) return { texto: 'Último día', fuerte: true };
-  if (d === 1) return { texto: 'Hasta mañana', fuerte: true };
-  if (d <= 7) return { texto: `Quedan ${d} días`, fuerte: false };
-  return null;
-}
 
 export default function DashboardVecino() {
   const { theme } = useTheme();
@@ -1130,29 +1085,7 @@ function ObraCard({
   );
 }
 
-/** Peso visual del aviso. El color sale de tokens del tema, nunca de un hex
- *  suelto: la misma tarjeta tiene que funcionar en los 12 fondos. */
-function estiloTipo(tipo: string, theme: ReturnType<typeof useTheme>['theme']) {
-  if (tipo === 'alerta') return { label: 'Alerta', color: 'var(--pl-red)' };
-  if (tipo === 'noticia') return { label: 'Noticia', color: theme.primary };
-  return { label: 'Aviso', color: 'var(--pl-amber)' };
-}
 
-/** Chip chico sobre la foto: legible sobre cualquier imagen gracias al velo. */
-function ChipNovedad({ texto, color, solido }: { texto: string; color: string; solido?: boolean }) {
-  return (
-    <span
-      className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md backdrop-blur-sm"
-      style={
-        solido
-          ? { backgroundColor: color, color: 'var(--pl-on-accent)' }
-          : { backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', boxShadow: `inset 0 0 0 1px ${color}` }
-      }
-    >
-      {texto}
-    </span>
-  );
-}
 
 /**
  * BANNER del feed: rota entre las novedades destacadas.
@@ -1209,134 +1142,5 @@ function BannerNovedades({
   );
 }
 
-/**
- * La novedad DESTACADA: la que el municipio fijó, a lo ancho y con la foto
- * grande. Antes todas las tarjetas pesaban lo mismo y el corte de agua de
- * mañana se leía igual que una noticia de hace diez días.
- */
-function NovedadDestacada({
-  noticia,
-  theme,
-}: {
-  noticia: NoticiaItem;
-  theme: ReturnType<typeof useTheme>['theme'];
-}) {
-  const tipo = estiloTipo(noticia.tipo, theme);
-  const urgencia = urgenciaDe(noticia);
 
-  return (
-    <article
-      className="relative rounded-2xl overflow-hidden group"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="relative h-52 md:h-64">
-        {noticia.imagen ? (
-          <img
-            src={noticia.imagen}
-            alt=""
-            loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${theme.primary}30, ${theme.primary}08)` }}
-          >
-            <Newspaper className="w-12 h-12" style={{ color: `${theme.primary}80` }} />
-          </div>
-        )}
-
-        {/* Velo: garantiza contraste del texto sobre CUALQUIER foto. */}
-        <div
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 45%, transparent 75%)' }}
-        />
-
-        <div className="absolute top-3 left-3 flex items-center gap-2">
-          <ChipNovedad texto={tipo.label} color={tipo.color} solido />
-          {noticia.fijado && <ChipNovedad texto="Destacado" color={tipo.color} />}
-        </div>
-
-        {urgencia && (
-          <div className="absolute top-3 right-3">
-            <ChipNovedad
-              texto={urgencia.texto}
-              color={urgencia.fuerte ? 'var(--pl-red)' : 'var(--pl-amber)'}
-              solido={urgencia.fuerte}
-            />
-          </div>
-        )}
-
-        <div className="absolute inset-x-0 bottom-0 p-4 md:p-5">
-          <h3 className="text-white font-bold text-lg md:text-xl leading-tight mb-1.5">
-            {noticia.titulo}
-          </h3>
-          <p className="text-white/80 text-sm leading-snug line-clamp-2 max-w-2xl">
-            {noticia.descripcion}
-          </p>
-          <div className="flex items-center gap-1.5 mt-2.5 text-white/60 text-xs">
-            <Clock className="w-3.5 h-3.5" />
-            {noticia.fecha}
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/** Las demás novedades: foto chica a la izquierda y el texto al lado. Entra
- *  el triple de información en la misma altura que una tarjeta de antes. */
-function NovedadCompacta({
-  noticia,
-  theme,
-}: {
-  noticia: NoticiaItem;
-  theme: ReturnType<typeof useTheme>['theme'];
-}) {
-  const tipo = estiloTipo(noticia.tipo, theme);
-  const urgencia = urgenciaDe(noticia);
-
-  return (
-    <article
-      className="rounded-xl overflow-hidden flex gap-3 p-2.5 transition-colors"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0" style={{ backgroundColor: theme.backgroundSecondary }}>
-        {noticia.imagen ? (
-          <img src={noticia.imagen} alt="" loading="lazy" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Newspaper className="w-6 h-6" style={{ color: `${theme.primary}70` }} />
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: tipo.color }}>
-            {tipo.label}
-          </span>
-          {urgencia && (
-            <span
-              className="text-[10px] font-semibold"
-              style={{ color: urgencia.fuerte ? 'var(--pl-red)' : theme.textSecondary }}
-            >
-              · {urgencia.texto}
-            </span>
-          )}
-        </div>
-        <h4 className="font-semibold text-sm leading-tight line-clamp-1" style={{ color: theme.text }}>
-          {noticia.titulo}
-        </h4>
-        <p className="text-xs leading-snug line-clamp-2 mt-0.5" style={{ color: theme.textSecondary }}>
-          {noticia.descripcion}
-        </p>
-        <div className="flex items-center gap-1 mt-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
-          <Clock className="w-3 h-3" />
-          {noticia.fecha}
-        </div>
-      </div>
-    </article>
-  );
-}
 

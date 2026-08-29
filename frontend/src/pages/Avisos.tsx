@@ -37,6 +37,8 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { seg } from '../lib/semanticHero';
+import { NovedadDestacada, NovedadCompacta } from '../components/comunicacion/NovedadCards';
+import { cronogramaTexto } from '../lib/cronograma';
 import { noticiasApi, proyectosApi, zonasApi } from '../lib/api';
 
 /** Una publicación del feed. `origen` dice de qué tabla salió: las novedades
@@ -510,6 +512,22 @@ export default function Avisos() {
     }
   };
 
+  /** Lo que hay cargado en el formulario, con la forma que espera la tarjeta
+   *  del feed. Se arma en vivo: es lo que hace que la vista previa sea previa
+   *  y no un dibujo de cómo quedó la vez pasada. */
+  const comoLoVeElVecino = useMemo(() => ({
+    id: editando?.id ?? 0,
+    titulo: form.titulo.trim() || 'Título de la publicación',
+    descripcion: form.descripcion.trim() || 'El texto que escribas va a aparecer acá.',
+    imagen: form.imagen_url.trim() || null,
+    fecha: new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }),
+    tipo: form.tipo === 'destacado' ? 'aviso' : 'noticia',
+    fijado: form.tipo === 'destacado',
+    fechaHasta: form.fecha_hasta || null,
+    fechaDesde: form.fecha_desde || null,
+    cronograma: cronogramaTexto(form.recurrencia, form.dias),
+  }), [form, editando?.id]);
+
   const esObra = editando?.origen === 'obra';
 
   return (
@@ -897,6 +915,25 @@ export default function Avisos() {
                 </label>
               )}
             </>
+          )}
+
+          {!esObra && (
+            <div className="pt-2">
+              <p className="text-xs font-medium mb-2" style={{ color: theme.textSecondary }}>
+                Así lo va a ver el vecino
+              </p>
+              <div
+                className="rounded-2xl p-3"
+                style={{ backgroundColor: theme.backgroundSecondary }}
+              >
+                {form.tipo === 'destacado'
+                  ? <NovedadDestacada noticia={comoLoVeElVecino} theme={theme} />
+                  : <NovedadCompacta noticia={comoLoVeElVecino} theme={theme} />}
+              </div>
+              <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
+                Es la misma tarjeta que dibuja la app, no una aproximación.
+              </p>
+            </div>
           )}
         </div>
       </Sheet>
