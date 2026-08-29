@@ -454,6 +454,14 @@ SLA_CONFIGS_DEMO = [
 # reclamo insignia que más se muestra en las demos.
 # (titulo, descripcion, categoria_nombre, estado, direccion,
 #  dep_codigo, zona_nombre, barrio_nombre, lat_offset, lng_offset, historial)
+# Munify NO cobra tasas (decisión del dueño, 2026-08-29). Las demos ya no
+# siembran partidas ni deudas: mostraban al vecino boletas para pagar de un
+# circuito que el producto no ofrece, y eso confunde en una demostración.
+# El código de la siembra queda intacto abajo, gobernado por esta constante:
+# si el producto vuelve a cubrir tasas, se prende acá y vuelve entero.
+SEMBRAR_TASAS = False
+
+
 def _punto_con_focos(i: int) -> int:
     """Regla del dueño: toda demo nace con RECURRENCIA real. Los primeros
     reclamos se apilan en tres esquinas (4 + 3 + 2, ver FOCOS_DEMO) para que el
@@ -1522,6 +1530,8 @@ async def seed_demo_completo(
         select(TipoTasa).where(TipoTasa.codigo.in_(["abl", "patente_automotor", "multa_transito"]))
     )
     tipos_map = {t.codigo: t for t in tipos_q.scalars().all()}
+    if not SEMBRAR_TASAS:
+        tipos_map = {}      # ver SEMBRAR_TASAS: la demo no muestra tasas
 
     # Solo generar si el catalogo esta poblado.
     if tipos_map:

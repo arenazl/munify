@@ -825,16 +825,12 @@ async def crear_municipio_demo(
         await db.rollback()
         log.hito("turnero", estado="fallo", motivo=f"{type(e).__name__}: {str(e)[:300]}")
 
-    # 5. Seed de tasas (best-effort): partidas + deudas ficticias para el demo
-    # del Boton de Pago GIRE. Requiere seed_tipos_tasa.py ya corrido (global).
-    try:
-        from scripts.seed_tasas_completo import seed_para_municipio as seed_tasas
-        await seed_tasas(municipio.id, limpiar=False)
-        log.hito("tasas_completo")
-    except Exception as e:
-        print(f"[CREAR DEMO] Seed de tasas fallo (best-effort): {e}")
-        log.hito("tasas_completo", estado="fallo",
-                 motivo=f"{type(e).__name__}: {str(e)[:300]}")
+    # 5. Tasas: NO se siembran (dueño, 2026-08-29). Munify no cubre el cobro de
+    # tasas hoy, y la demo mostraba al vecino boletas vencidas de un circuito
+    # que el producto no ofrece. El módulo ademas paso a OPT-IN
+    # (lib/enums/modulos.ts): sin fila explicita ya no aparece en ningun lado.
+    # El seeder sigue existiendo (scripts/seed_tasas_completo.py) para cuando
+    # se retome: se vuelve a enganchar aca.
 
     # 6. Seed Tesoreria (best-effort): activa el modulo + carga catalogos
     # (15 tipos concepto, 300 conceptos, 10 tipos empleado), 5 cajas/fondos

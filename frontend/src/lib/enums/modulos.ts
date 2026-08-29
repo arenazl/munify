@@ -26,7 +26,10 @@ export const MODULOS: ModuloDef[] = [
   { key: 'tramites', label: 'Trámites', descripcion: 'Trámites online con documentación y turnos', icon: FileCheck, optIn: false },
   { key: 'mapa', label: 'Mapa', descripcion: 'Mapa de reclamos con capa de calor', icon: Map, optIn: false },
   { key: 'mostrador', label: 'Mostrador', descripcion: 'Ventanilla asistida con biometría', icon: ScanLine, optIn: false },
-  { key: 'tasas', label: 'Tasas', descripcion: 'Padrón y deudas (canal ciudadano, no calcula tasas)', icon: Receipt, optIn: false },
+  // OPT-IN desde 2026-08-29: Munify no cubre tasas hoy y el módulo aparecía
+  // solo en todos los municipios (sin fila = activo). Ahora hay que prenderlo
+  // a propósito; los munis que ya lo tienen prendido no se ven afectados.
+  { key: 'tasas', label: 'Tasas', descripcion: 'Padrón y deudas (canal ciudadano, no calcula tasas)', icon: Receipt, optIn: true },
   { key: 'pagos', label: 'Cobros', descripcion: 'Cobro online (gateway por proveedor)', icon: Wallet, optIn: false },
   { key: 'tablero', label: 'Tablero', descripcion: 'Kanban de reclamos', icon: LayoutDashboard, optIn: false },
   { key: 'planificacion', label: 'Planificación', descripcion: 'Agenda semanal de trabajos', icon: CalendarClock, optIn: false },

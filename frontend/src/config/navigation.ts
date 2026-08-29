@@ -563,7 +563,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Tasas',
       href: '/gestion/mis-tasas',
       icon: BarChart3,
-      show: isVecino,
+      // Antes era `show: isVecino` a secas: el vecino veía "Tasas" aunque su
+      // municipio no tuviera el módulo. Ahora sigue la misma regla que el
+      // resto de los módulos opt-in.
+      show: isVecino && modulosActivos.has('tasas'),
       categoria: 'Mi cuenta',
       description: 'Tasas y boletas pendientes (ABL, patente, multas)',
       badgeKey: 'tasas',
