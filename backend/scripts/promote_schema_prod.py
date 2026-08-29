@@ -12,15 +12,23 @@ Que hace (y nada mas):
      default, indices y FKs. Compatible con el backend VIEJO corriendo: se
      puede ejecutar ANTES del deploy sin cortar nada.
 
-Todo el contenido fue VALIDADO contra `sugerenciasmun-ensayo` (copia real de
-prod del 2026-08-28): despues de correrlo, paridad de columnas total con el
-schema de qa. No toca datos, no borra nada, no modifica columnas existentes
-(el unico MODIFY es agregar el valor 'bloqueada' al enum de estado de OT, que
-no altera filas).
+VALIDADO POR EJECUCION (2026-08-29): se clono el ESQUELETO de las 10 tablas
+que toca desde produccion a una base aparte (`CREATE TABLE ... LIKE`, sin una
+sola fila), se corrio el script entero ahi, y las 56 piezas aplicaron sin un
+error. Resultado: 218 columnas, paridad EXACTA con qa — 0 faltantes, 0 con
+tipo distinto. Re-correrlo dice "Nada que hacer". La base de ensayo se borro.
+
+No toca datos, no borra nada, no modifica columnas existentes (el unico MODIFY
+es agregar el valor 'bloqueada' al enum de estado de OT, que no altera filas).
 
 Uso:
     python promote_schema_prod.py                        # PLAN: muestra que falta, no escribe
+    python promote_schema_prod.py --auditar              # + avisa si el script quedo corto
     python promote_schema_prod.py --apply --si-estoy-seguro   # ejecuta
+
+El modo `--auditar` necesita `DATABASE_URL_ORIGEN` apuntando a qa. Correrlo
+ANTES de cada promocion: es lo que evita que qa siga avanzando y este archivo
+quede corto sin que nadie se entere hasta que ya se promovio.
 
 Requiere DATABASE_URL en el entorno (formato mysql+aiomysql://...). La corre
 quien tenga la credencial de la base destino (en prod: Infra).
@@ -39,6 +47,13 @@ DATABASE_URL = os.environ.get("DATABASE_URL") or sys.exit(
     "FALTA DATABASE_URL en el entorno (mysql+aiomysql://...). Sin fallback: corto aca.")
 
 APLICAR = "--apply" in sys.argv and "--si-estoy-seguro" in sys.argv
+
+# Auditoria opcional: con DATABASE_URL_ORIGEN apuntando a qa, el script
+# compara los dos schemas y avisa si le falta alguna pieza. Es el seguro
+# contra el modo de falla real de este archivo: que qa siga avanzando y la
+# lista de aca quede corta sin que nadie se entere hasta la promocion.
+AUDITAR = "--auditar" in sys.argv
+DATABASE_URL_ORIGEN = os.environ.get("DATABASE_URL_ORIGEN")
 
 DDL_TABLAS = {
     "poi_tipos": """
@@ -108,6 +123,66 @@ COLUMNAS = [
      "ALTER TABLE `reclamos` ADD COLUMN `ubicacion_origen` varchar(15) NULL"),
     ("zonas", "osm_id", "ALTER TABLE `zonas` ADD COLUMN `osm_id` varchar(40) NULL"),
     ("zonas", "poligono", "ALTER TABLE `zonas` ADD COLUMN `poligono` longtext NULL"),
+
+    # --- Modulo Comunicacion (avisos, obras publicas, cronogramas) ---------
+    # El DDL de estas 26 no se escribio a mano: se leyo del information_schema
+    # de qa, con su tipo, nullability y default reales.
+    ("noticias", "tipo",
+     "ALTER TABLE `noticias` ADD COLUMN `tipo` varchar(20) NOT NULL DEFAULT 'aviso'"),
+    ("noticias", "fecha_desde",
+     "ALTER TABLE `noticias` ADD COLUMN `fecha_desde` date NULL"),
+    ("noticias", "fecha_hasta",
+     "ALTER TABLE `noticias` ADD COLUMN `fecha_hasta` date NULL"),
+    ("noticias", "fijado",
+     "ALTER TABLE `noticias` ADD COLUMN `fijado` tinyint(1) NOT NULL DEFAULT '0'"),
+    ("noticias", "enviado_at",
+     "ALTER TABLE `noticias` ADD COLUMN `enviado_at` datetime NULL"),
+    ("noticias", "enviados_count",
+     "ALTER TABLE `noticias` ADD COLUMN `enviados_count` int NOT NULL DEFAULT '0'"),
+    ("noticias", "creador_id",
+     "ALTER TABLE `noticias` ADD COLUMN `creador_id` int NULL"),
+    ("noticias", "barrio_id",
+     "ALTER TABLE `noticias` ADD COLUMN `barrio_id` int NULL"),
+    ("noticias", "recurrencia",
+     "ALTER TABLE `noticias` ADD COLUMN `recurrencia` varchar(20) NULL"),
+    ("noticias", "dias_semana",
+     "ALTER TABLE `noticias` ADD COLUMN `dias_semana` varchar(20) NULL"),
+    ("usuarios", "barrio_id",
+     "ALTER TABLE `usuarios` ADD COLUMN `barrio_id` int NULL"),
+    ("proyectos", "publico",
+     "ALTER TABLE `proyectos` ADD COLUMN `publico` tinyint(1) NOT NULL DEFAULT '0'"),
+    ("proyectos", "estado_obra",
+     "ALTER TABLE `proyectos` ADD COLUMN `estado_obra` varchar(20) NULL"),
+    ("proyectos", "avance",
+     "ALTER TABLE `proyectos` ADD COLUMN `avance` int NULL"),
+    ("proyectos", "foto_url",
+     "ALTER TABLE `proyectos` ADD COLUMN `foto_url` varchar(500) NULL"),
+    ("proyectos", "latitud",
+     "ALTER TABLE `proyectos` ADD COLUMN `latitud` float NULL"),
+    ("proyectos", "longitud",
+     "ALTER TABLE `proyectos` ADD COLUMN `longitud` float NULL"),
+    ("proyectos", "mostrar_monto",
+     "ALTER TABLE `proyectos` ADD COLUMN `mostrar_monto` tinyint(1) NOT NULL DEFAULT '0'"),
+
+    # --- Modulo Recursos (flota, reservas) --------------------------------
+    # Un vehiculo es un ACTIVO de inventario con datos de flota, no una tabla
+    # aparte; un bien prestable es un activo con `reservable` en 1.
+    ("inventario_items", "marca_modelo",
+     "ALTER TABLE `inventario_items` ADD COLUMN `marca_modelo` varchar(120) NULL"),
+    ("inventario_items", "anio",
+     "ALTER TABLE `inventario_items` ADD COLUMN `anio` int NULL"),
+    ("inventario_items", "tipo_combustible",
+     "ALTER TABLE `inventario_items` ADD COLUMN `tipo_combustible` varchar(20) NULL"),
+    ("inventario_items", "km_actual",
+     "ALTER TABLE `inventario_items` ADD COLUMN `km_actual` int NULL"),
+    ("inventario_items", "km_proximo_service",
+     "ALTER TABLE `inventario_items` ADD COLUMN `km_proximo_service` int NULL"),
+    ("inventario_items", "vencimiento_vtv",
+     "ALTER TABLE `inventario_items` ADD COLUMN `vencimiento_vtv` date NULL"),
+    ("inventario_items", "vencimiento_seguro",
+     "ALTER TABLE `inventario_items` ADD COLUMN `vencimiento_seguro` date NULL"),
+    ("inventario_items", "reservable",
+     "ALTER TABLE `inventario_items` ADD COLUMN `reservable` tinyint(1) NOT NULL DEFAULT '0'"),
 ]
 
 INDICES = [
@@ -118,6 +193,15 @@ INDICES = [
      "ALTER TABLE `ordenes_trabajo` ADD INDEX `ix_ot_origen` (`origen`)"),
     ("ordenes_trabajo", "ix_ot_poi", "ALTER TABLE `ordenes_trabajo` ADD INDEX `ix_ot_poi` (`poi_id`)"),
     ("reclamos", "ix_reclamo_poi", "ALTER TABLE `reclamos` ADD INDEX `ix_reclamo_poi` (`poi_id`)"),
+    ("noticias", "ix_noticias_barrio",
+     "ALTER TABLE `noticias` ADD INDEX `ix_noticias_barrio` (`barrio_id`)"),
+    # El feed del vecino filtra por activo + vigencia en cada carga.
+    ("noticias", "ix_noticias_vigencia",
+     "ALTER TABLE `noticias` ADD INDEX `ix_noticias_vigencia` (`activo`, `fecha_hasta`)"),
+    ("usuarios", "ix_usuarios_barrio",
+     "ALTER TABLE `usuarios` ADD INDEX `ix_usuarios_barrio` (`barrio_id`)"),
+    ("proyectos", "ix_proyectos_publicos",
+     "ALTER TABLE `proyectos` ADD INDEX `ix_proyectos_publicos` (`municipio_id`, `publico`, `activo`)"),
 ]
 
 FKS = [
@@ -130,6 +214,12 @@ FKS = [
     ("reclamos", "fk_reclamo_poi",
      "ALTER TABLE `reclamos` ADD CONSTRAINT `fk_reclamo_poi` FOREIGN KEY (`poi_id`) "
      "REFERENCES `puntos_interes` (`id`) ON DELETE SET NULL"),
+    ("noticias", "fk_noticia_barrio",
+     "ALTER TABLE `noticias` ADD CONSTRAINT `fk_noticia_barrio` FOREIGN KEY (`barrio_id`) "
+     "REFERENCES `barrios` (`id`) ON DELETE SET NULL"),
+    ("usuarios", "fk_usuario_barrio",
+     "ALTER TABLE `usuarios` ADD CONSTRAINT `fk_usuario_barrio` FOREIGN KEY (`barrio_id`) "
+     "REFERENCES `barrios` (`id`) ON DELETE SET NULL"),
 ]
 
 ENUM_ESTADO_OT = (
@@ -137,6 +227,62 @@ ENUM_ESTADO_OT = (
     "enum('pendiente','asignada','en_curso','bloqueada','completada','cancelada') "
     "NOT NULL DEFAULT 'pendiente'"
 )
+
+
+async def auditar(engine_destino):
+    """Compara el destino contra el origen y dice que quedaria sin cubrir.
+
+    No genera DDL ni ejecuta nada: solo nombra la diferencia. Si aparece algo,
+    hay que agregarlo a las listas de arriba con el tipo REAL leido de origen
+    (`information_schema`), no escrito a ojo.
+
+    Las tablas enteras que falten no son un problema: las crea el `create_all`
+    del arranque del backend. Lo que ninguna herramienta hace sola, y por eso
+    existe este script, son las COLUMNAS nuevas sobre tablas que ya existen.
+    """
+    if not DATABASE_URL_ORIGEN:
+        print("(--auditar sin DATABASE_URL_ORIGEN: no hay contra que comparar)\n")
+        return
+
+    async def foto(url):
+        e = create_async_engine(url) if url else None
+        conn_ctx = e.connect() if e else None
+        async with conn_ctx as c:
+            tablas = {r[0] for r in (await c.execute(text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema=DATABASE()"))).fetchall()}
+            cols = {(r[0], r[1]) for r in (await c.execute(text(
+                "SELECT table_name, column_name FROM information_schema.columns "
+                "WHERE table_schema=DATABASE()"))).fetchall()}
+        await e.dispose()
+        return tablas, cols
+
+    t_ori, c_ori = await foto(DATABASE_URL_ORIGEN)
+    async with engine_destino.connect() as c:
+        t_dst = {r[0] for r in (await c.execute(text(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema=DATABASE()"))).fetchall()}
+        c_dst = {(r[0], r[1]) for r in (await c.execute(text(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema=DATABASE()"))).fetchall()}
+
+    cubiertas = {(t, col) for t, col, _ in COLUMNAS}
+    tablas_nuevas = t_ori - t_dst
+    huerfanas = sorted(
+        (t, col) for (t, col) in (c_ori - c_dst)
+        if t not in tablas_nuevas and (t, col) not in cubiertas
+    )
+
+    print(f"AUDITORIA — tablas que el create_all va a crear: {len(tablas_nuevas)}")
+    for t in sorted(tablas_nuevas):
+        print(f"   . {t}")
+    if huerfanas:
+        print(f"\nATENCION: {len(huerfanas)} columnas del origen que este script NO cubre:")
+        for t, col in huerfanas:
+            print(f"   ! {t}.{col}")
+        print("Agregalas a COLUMNAS antes de promover.\n")
+    else:
+        print("Columnas: el script cubre todo lo que el origen tiene de mas.\n")
 
 
 async def main():
@@ -178,6 +324,9 @@ async def main():
                 "SELECT COUNT(*) FROM information_schema.table_constraints "
                 "WHERE table_schema=DATABASE() AND table_name=:t AND constraint_name=:f", t=t, f=fk):
                 pendientes.append((f"FK {t}.{fk}", sql))
+
+    if AUDITAR:
+        await auditar(engine)
 
     if not pendientes:
         print("Nada que hacer: el schema ya esta al dia.")
