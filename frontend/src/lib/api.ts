@@ -2552,6 +2552,14 @@ export const parajesApi = {
   delete: (id: number) => api.delete(`/tesoreria/parajes/${id}`),
 };
 
+/** Flota municipal (módulo Recursos). El vehículo es un activo de inventario;
+ *  acá viven su consumo y sus cargas de combustible. */
+export const flotaApi = {
+  vehiculos: () => api.get('/flota/vehiculos'),
+  cargas: (itemId: number) => api.get(`/flota/vehiculos/${itemId}/cargas`),
+  registrarCarga: (data: Record<string, unknown>) => api.post('/flota/cargas', data),
+};
+
 export const proyectosApi = {
   list: (params?: { estado?: string; activo?: boolean; search?: string; include_resumen?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/proyectos', { params }),

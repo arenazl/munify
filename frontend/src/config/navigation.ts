@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout, Megaphone,
+  History, Sprout, Megaphone, Truck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -26,6 +26,7 @@ export const ICONO_CATEGORIA: Record<string, LucideIcon> = {
   'Contaduría': Receipt,
   'Campo': Hammer,
   'Comunicación': Megaphone,
+  'Recursos': Truck,
   'Mi Área': Layers,
   'Atención al vecino': Building2,
   'Configuración': Settings,
@@ -432,6 +433,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: false,
       categoria: 'Contaduría',
       description: 'OPs vencidas, próximas, top beneficiarios'
+    },
+    // === RECURSOS (módulo nuevo 2026-08-29, opt-in) ===
+    // Lo que el municipio administra de sí mismo. Ver docs/recursos/.
+    {
+      name: 'Flota',
+      href: '/gestion/flota',
+      icon: Truck,
+      show: isAdminOrSupervisor && modulosActivos.has('flota'),
+      categoria: 'Recursos',
+      description: 'Vehículos, combustible y consumo por unidad'
     },
     // === COMUNICACIÓN (módulo nuevo 2026-08-29, opt-in) ===
     // Lo que el municipio le cuenta al vecino sin que el vecino pregunte.
