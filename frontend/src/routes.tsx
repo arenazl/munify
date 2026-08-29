@@ -102,6 +102,7 @@ import OrdenesPago from './pages/OrdenesPago';
 import TesoreriaCajas from './pages/TesoreriaCajas';
 import Avisos from './pages/Avisos';
 import Flota from './pages/Flota';
+import Presentismo from './pages/Presentismo';
 import TesoreriaConciliacion from './pages/TesoreriaConciliacion';
 import SueldosEmpleados from './pages/SueldosEmpleados';
 import ReportesContaduria from './pages/ReportesContaduria';
@@ -264,6 +265,7 @@ export const router = createBrowserRouter([
       { path: 'tesoreria/agenda', element: <Navigate to="/gestion/tesoreria/pagos-programados" replace /> },
       { path: 'contaduria/ordenes-pago', element: <ProtectedRoute roles={['admin', 'supervisor']}><OrdenesPago /></ProtectedRoute> },
       { path: 'tesoreria/cajas', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaCajas /></ProtectedRoute> },
+      { path: 'presentismo', element: <Presentismo /> },
       { path: 'flota', element: <ProtectedRoute roles={['admin', 'supervisor']}><Flota /></ProtectedRoute> },
       { path: 'avisos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Avisos /></ProtectedRoute> },
       { path: 'tesoreria/conciliacion', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaConciliacion /></ProtectedRoute> },

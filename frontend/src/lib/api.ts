@@ -2554,6 +2554,13 @@ export const parajesApi = {
 
 /** Flota municipal (módulo Recursos). El vehículo es un activo de inventario;
  *  acá viven su consumo y sus cargas de combustible. */
+/** Presentismo (módulo Recursos). El empleado ficha; el gestor mira el mes. */
+export const presentismoApi = {
+  fichar: (coords: { lat?: number; lng?: number }) => api.post('/presentismo/fichar', coords),
+  miJornada: () => api.get('/presentismo/mi-jornada'),
+  mes: (mes?: string) => api.get('/presentismo/mes', { params: mes ? { mes } : undefined }),
+};
+
 export const flotaApi = {
   vehiculos: () => api.get('/flota/vehiculos'),
   cargas: (itemId: number) => api.get(`/flota/vehiculos/${itemId}/cargas`),

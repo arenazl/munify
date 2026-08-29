@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout, Megaphone, Truck,
+  History, Sprout, Megaphone, Truck, UserCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -443,6 +443,24 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('flota'),
       categoria: 'Recursos',
       description: 'Vehículos, combustible y consumo por unidad'
+    },
+    {
+      name: 'Presentismo',
+      href: '/gestion/presentismo',
+      icon: UserCheck,
+      show: isAdminOrSupervisor && modulosActivos.has('presentismo'),
+      categoria: 'Recursos',
+      description: 'Quién vino, quién avisó y quién no'
+    },
+    {
+      // Misma pantalla, otra cara: el empleado ve su botón de fichar. Los dos
+      // `show` son excluyentes por rol, así que nunca aparecen juntos.
+      name: 'Jornada',
+      href: '/gestion/presentismo',
+      icon: UserCheck,
+      show: hasEmpleado && !isAdminOrSupervisor && modulosActivos.has('presentismo'),
+      categoria: 'Mi cuenta',
+      description: 'Fichar la entrada y la salida'
     },
     // === COMUNICACIÓN (módulo nuevo 2026-08-29, opt-in) ===
     // Lo que el municipio le cuenta al vecino sin que el vecino pregunte.
