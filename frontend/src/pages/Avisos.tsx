@@ -21,6 +21,9 @@
  *    tenga que acordarse de bajar.
  *  - **Avisar es irreversible.** El push le llega a todo el municipio: pide
  *    confirmación y después queda como constancia.
+ *  - **Un cronograma es UNA publicación.** "Recolección los martes y viernes"
+ *    no son 104 avisos por año: es un aviso que dice cuándo se repite. Y si
+ *    lleva barrio, sólo lo ven los vecinos de ese barrio.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Hammer, Loader2, Megaphone, Pencil, Pin, Send, Trash2 } from 'lucide-react';
@@ -34,7 +37,8 @@ import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { seg } from '../lib/semanticHero';
-import { noticiasApi, proyectosApi } from '../lib/api';
+import { noticiasApi, proyectosApi, municipiosApi } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 /** Una publicación del feed. `origen` dice de qué tabla salió: las novedades
  *  viven en `noticias`, las obras en `proyectos` (Tesorería). El resto de la
@@ -56,12 +60,30 @@ interface Publicacion {
   estado_obra: string | null;
   /** Sólo obras: si Comunicación ya decidió publicarla. */
   publicada: boolean;
+  /** A quién: null = todo el municipio. */
+  barrio_id: number | null;
+  /** Cada cuánto se repite, ya escrito por el backend ("Todos los martes"). */
+  cronograma_texto: string | null;
+  recurrencia: string | null;
+  dias_semana: string | null;
 }
 
 const TIPOS: SelectOption[] = [
   { value: 'destacado', label: 'Destacado', description: 'El banner grande de arriba. Si hay varios, van rotando' },
   { value: 'novedad', label: 'Novedad', description: 'Las tarjetas del medio del feed' },
 ];
+
+/** Cada cuánto vuelve a pasar. Una sola vez es lo normal: la recurrencia es
+ *  para lo que el vecino necesita tener presente (recolección, feria, poda). */
+const RECURRENCIAS: SelectOption[] = [
+  { value: '', label: 'Una sola vez', description: 'Un aviso puntual: un corte, una convocatoria' },
+  { value: 'semanal', label: 'Todas las semanas', description: 'Elegís qué días' },
+  { value: 'quincenal', label: 'Cada quince días' },
+  { value: 'mensual', label: 'Una vez por mes' },
+];
+
+/** 0 = lunes, como en el backend. */
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const ESTADOS_OBRA: SelectOption[] = [
   { value: 'por_empezar', label: 'Por empezar' },
@@ -80,12 +102,19 @@ type FormState = {
   avance: string;
   estado_obra: string;
   publicada: boolean;
+  /** '' = todo el municipio */
+  barrio_id: string;
+  /** '' = una sola vez */
+  recurrencia: string;
+  /** índices de días, ej. [1, 4] */
+  dias: number[];
 };
 
 const FORM_VACIO: FormState = {
   titulo: '', descripcion: '', imagen_url: '', tipo: 'novedad',
   fecha_desde: '', fecha_hasta: '', activo: true,
   avance: '', estado_obra: 'en_ejecucion', publicada: false,
+  barrio_id: '', recurrencia: '', dias: [],
 };
 
 /** 'YYYY-MM-DD' de hoy en hora LOCAL. Nunca `toISOString()`: es UTC y de noche
@@ -131,6 +160,9 @@ const detalleDe = (p: Publicacion) => {
   if (p.origen === 'obra') {
     return p.avance !== null ? `${p.avance}% de avance` : 'sin avance cargado';
   }
+  // Si se repite, eso es lo que importa saber: "todos los martes" le dice mas
+  // al operador que "del 1/9 al 31/12".
+  if (p.cronograma_texto) return p.cronograma_texto;
   const desde = fmtFecha(p.fecha_desde);
   const hasta = fmtFecha(p.fecha_hasta);
   if (desde && hasta) return `Del ${desde} al ${hasta}`;
@@ -141,7 +173,9 @@ const detalleDe = (p: Publicacion) => {
 
 export default function Avisos() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [items, setItems] = useState<Publicacion[]>([]);
+  const [barrios, setBarrios] = useState<Array<{ id: number; nombre: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('todos');
@@ -176,6 +210,10 @@ export default function Avisos() {
         enviado_at: (n.enviado_at as string) ?? null,
         enviados_count: (n.enviados_count as number) ?? 0,
         avance: null, estado_obra: null, publicada: true,
+        barrio_id: (n.barrio_id as number) ?? null,
+        cronograma_texto: (n.cronograma_texto as string) ?? null,
+        recurrencia: (n.recurrencia as string) ?? null,
+        dias_semana: (n.dias_semana as string) ?? null,
       }));
 
       const obras: Publicacion[] = ((pRes.data as Record<string, unknown>[]) || []).map((p) => ({
@@ -191,6 +229,8 @@ export default function Avisos() {
         avance: (p.avance as number) ?? null,
         estado_obra: (p.estado_obra as string) ?? null,
         publicada: Boolean(p.publico),
+        // Una obra es del municipio entero y no se repite.
+        barrio_id: null, cronograma_texto: null, recurrencia: null, dias_semana: null,
       }));
 
       setItems([...novedades, ...obras]);
@@ -201,6 +241,20 @@ export default function Avisos() {
     }
   };
   useEffect(() => { cargar(); }, []);
+
+  // Los barrios del municipio: sin ellos no se puede segmentar y el selector
+  // queda en "todo el municipio", que es el comportamiento de siempre.
+  useEffect(() => {
+    if (!user?.municipio_id) return;
+    municipiosApi.getBarrios(user.municipio_id)
+      .then((r) => setBarrios((r.data as Array<{ id: number; nombre: string }>) || []))
+      .catch(() => setBarrios([]));
+  }, [user?.municipio_id]);
+
+  const opcionesBarrio = useMemo<SelectOption[]>(() => ([
+    { value: '', label: 'Todo el municipio' },
+    ...barrios.map((b) => ({ value: String(b.id), label: b.nombre })),
+  ]), [barrios]);
 
   const destacados = useMemo(() => items.filter((i) => i.tipo === 'destacado'), [items]);
   const novedades = useMemo(
@@ -275,6 +329,13 @@ export default function Avisos() {
       cell: (p) => TIPO_LABEL[p.tipo] || 'Novedad',
     },
     {
+      id: 'quien',
+      header: 'A quién',
+      width: 'minmax(120px, 0.9fr)',
+      kind: 'text',
+      cell: (p) => barrios.find((b) => b.id === p.barrio_id)?.nombre || 'Todo el municipio',
+    },
+    {
       id: 'estado',
       header: 'Estado',
       width: 'minmax(120px, 0.8fr)',
@@ -286,7 +347,7 @@ export default function Avisos() {
     },
     {
       id: 'detalle',
-      header: 'Vigencia / avance',
+      header: 'Cuándo',
       width: 'minmax(150px, 1fr)',
       kind: 'text',
       cell: (p) => detalleDe(p),
@@ -301,7 +362,7 @@ export default function Avisos() {
         : p.enviado_at ? `${p.enviados_count} ${p.enviados_count === 1 ? 'vecino' : 'vecinos'}` : 'todavía no',
     },
     { id: 'acciones', header: '', width: '52px', kind: 'actions' },
-  ], []);
+  ], [barrios]);
 
   const abrirNuevo = () => {
     setEditando(null);
@@ -322,12 +383,19 @@ export default function Avisos() {
       avance: p.avance !== null ? String(p.avance) : '',
       estado_obra: p.estado_obra || 'en_ejecucion',
       publicada: p.publicada,
+      barrio_id: p.barrio_id ? String(p.barrio_id) : '',
+      recurrencia: p.recurrencia || '',
+      dias: (p.dias_semana || '').split(',').filter(Boolean).map(Number),
     });
     setSheetOpen(true);
   };
 
   const guardar = async () => {
     if (!form.titulo.trim()) { toast.error('Falta el título'); return; }
+    if (form.recurrencia === 'semanal' && form.dias.length === 0) {
+      toast.error('Elegí qué días de la semana se repite');
+      return;
+    }
     setGuardando(true);
     try {
       if (editando?.origen === 'obra') {
@@ -349,6 +417,13 @@ export default function Avisos() {
           fijado: form.tipo === 'destacado',
           fecha_desde: form.fecha_desde || null,
           fecha_hasta: form.fecha_hasta || null,
+          barrio_id: form.barrio_id ? Number(form.barrio_id) : null,
+          recurrencia: form.recurrencia || null,
+          // Los dias solo tienen sentido en la semanal; en las demas se
+          // limpian para que no queden dias huerfanos de una eleccion previa.
+          dias_semana: form.recurrencia === 'semanal' && form.dias.length
+            ? [...form.dias].sort((a, b) => a - b).join(',')
+            : null,
           ...(editando ? { activo: form.activo } : {}),
         };
         if (editando) await noticiasApi.update(editando.id, payload);
@@ -651,6 +726,65 @@ export default function Avisos() {
               <p className="text-[11px] -mt-2" style={{ color: theme.textSecondary }}>
                 Sin fechas queda hasta que la bajes. Con fecha de fin, se apaga sola.
               </p>
+
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                  Se repite
+                </label>
+                <ModernSelect
+                  options={RECURRENCIAS}
+                  value={form.recurrencia}
+                  onChange={(v) => setForm((f) => ({ ...f, recurrencia: v, dias: v === 'semanal' ? f.dias : [] }))}
+                  placeholder="Una sola vez"
+                />
+                {form.recurrencia === 'semanal' && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {DIAS_SEMANA.map((d, i) => {
+                      const elegido = form.dias.includes(i);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setForm((f) => ({
+                            ...f,
+                            dias: elegido ? f.dias.filter((x) => x !== i) : [...f.dias, i],
+                          }))}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                          style={{
+                            backgroundColor: elegido ? theme.primary : theme.background,
+                            color: elegido ? 'var(--pl-on-accent)' : theme.text,
+                            borderColor: elegido ? theme.primary : theme.border,
+                          }}
+                        >
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {form.recurrencia && (
+                  <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
+                    Es UNA publicación que dice cuándo se repite, no una por semana. El vecino la ve con su cronograma.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                  A quién le llega
+                </label>
+                <ModernSelect
+                  options={opcionesBarrio}
+                  value={form.barrio_id}
+                  onChange={(v) => setForm((f) => ({ ...f, barrio_id: v }))}
+                  placeholder="Todo el municipio"
+                />
+                <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                  {barrios.length === 0
+                    ? 'Este municipio todavía no tiene barrios cargados, así que la publicación va a todos.'
+                    : 'Con un barrio elegido, sólo la ven los vecinos que declararon ese barrio en su perfil.'}
+                </p>
+              </div>
 
               {editando && (
                 <label className="flex items-center gap-2.5 cursor-pointer">

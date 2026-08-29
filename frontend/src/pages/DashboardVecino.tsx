@@ -78,6 +78,8 @@ interface NoticiaItem {
   /** 'YYYY-MM-DD' o null. Con esto la tarjeta dice cuánto le queda. */
   fechaHasta: string | null;
   fechaDesde: string | null;
+  /** "Todos los martes y viernes". Lo escribe el backend. */
+  cronograma: string | null;
 }
 
 // Respuesta cruda del endpoint público de noticias
@@ -91,6 +93,7 @@ interface NoticiaApiResponse {
   fecha_hasta?: string | null;
   imagen_url: string | null;
   created_at: string;
+  cronograma_texto?: string | null;
 }
 
 function mapNoticia(n: NoticiaApiResponse): NoticiaItem {
@@ -113,6 +116,7 @@ function mapNoticia(n: NoticiaApiResponse): NoticiaItem {
     fijado: Boolean(n.fijado),
     fechaHasta: n.fecha_hasta ?? null,
     fechaDesde: n.fecha_desde ?? null,
+    cronograma: n.cronograma_texto ?? null,
   };
 }
 
@@ -251,6 +255,9 @@ function urgenciaDe(n: NoticiaItem): { texto: string; fuerte: boolean } | null {
     const d = diasEntre(hoy, n.fechaDesde);
     return { texto: d === 1 ? 'Arranca mañana' : `Arranca en ${d} días`, fuerte: false };
   }
+  // Lo que se repite no vence: al vecino le sirve saber CUANDO vuelve a pasar,
+  // no cuantos dias le quedan a un aviso que va a seguir estando.
+  if (n.cronograma) return { texto: n.cronograma, fuerte: false };
   if (!n.fechaHasta) return null;
   const d = diasEntre(hoy, n.fechaHasta);
   if (d < 0) return null;
@@ -305,7 +312,9 @@ export default function DashboardVecino() {
       if (user?.municipio_id) {
         try {
           const noticiasRes = await api.get('/noticias/publico', {
-            params: { municipio_id: user.municipio_id },
+            // `vecino_id` es lo que permite filtrar por barrio: sin el, el
+            // vecino ve solo los avisos generales del municipio.
+            params: { municipio_id: user.municipio_id, vecino_id: user.id },
           });
           const items = (noticiasRes.data as NoticiaApiResponse[] | null) || [];
           setNoticias(items.map(mapNoticia));

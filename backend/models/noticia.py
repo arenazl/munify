@@ -40,6 +40,24 @@ class Noticia(Base):
     # Lo importante queda arriba del feed, sin importar la fecha.
     fijado = Column(Boolean, nullable=False, default=False, server_default="0")
 
+    # --- Etapa 3: a quien y cada cuanto ---
+
+    # A QUIEN. NULL = a todo el municipio, que es el caso normal (un corte de
+    # agua general). Con barrio, solo lo ven los vecinos de ese barrio: el que
+    # no tiene barrio cargado ve unicamente los avisos generales, que es lo
+    # correcto — mostrarle avisos de un barrio que no es el suyo es peor que
+    # no mostrarle nada.
+    barrio_id = Column(Integer, ForeignKey("barrios.id", ondelete="SET NULL"),
+                       nullable=True, index=True)
+
+    # CADA CUANTO. NULL = una sola vez. Un CRONOGRAMA (la recoleccion, la
+    # poda) no genera una publicacion por semana: es UNA publicacion que dice
+    # cuando se repite. Generar cincuenta filas por ano seria basura en la
+    # base y un feed inservible.
+    recurrencia = Column(String(20), nullable=True)   # semanal | quincenal | mensual
+    # Para la semanal: "1,4" = martes y viernes (0=lunes, como weekday()).
+    dias_semana = Column(String(20), nullable=True)
+
     # Constancia del envio: con esto el boton sabe que ya se aviso y no
     # vuelve a mandarlo (idempotencia visible para el operador).
     enviado_at = Column(DateTime(timezone=True), nullable=True)

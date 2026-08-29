@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
@@ -10,11 +10,15 @@ import {
   HelpCircle,
   Moon,
   Sun,
-  Building2
+  Building2,
+  MapPin
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import NotificationSettings from '../../components/NotificationSettings';
+import { ModernSelect, type SelectOption } from '../../components/ui/ModernSelect';
+import { municipiosApi, usersApi } from '../../lib/api';
 
 export default function MobilePerfil() {
   const { theme, currentMode, setPreset } = useTheme();
@@ -27,6 +31,36 @@ export default function MobilePerfil() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  // El barrio del vecino: con esto el municipio le manda solo lo que le toca
+  // (la recoleccion de SU barrio, no la de los otros doce).
+  const [barrios, setBarrios] = useState<Array<{ id: number; nombre: string }>>([]);
+  const [barrioId, setBarrioId] = useState<string>(user?.barrio_id ? String(user.barrio_id) : '');
+  const [guardandoBarrio, setGuardandoBarrio] = useState(false);
+
+  useEffect(() => {
+    if (!user?.municipio_id) return;
+    municipiosApi.getBarrios(user.municipio_id)
+      .then((r) => setBarrios((r.data as Array<{ id: number; nombre: string }>) || []))
+      .catch(() => setBarrios([]));
+  }, [user?.municipio_id]);
+
+  const guardarBarrio = async (valor: string) => {
+    const anterior = barrioId;
+    setBarrioId(valor);
+    setGuardandoBarrio(true);
+    try {
+      await usersApi.updateMyProfile({ barrio_id: valor ? Number(valor) : null });
+      toast.success(valor ? 'Listo: vas a recibir los avisos de tu barrio' : 'Vas a recibir los avisos generales');
+    } catch {
+      // Se vuelve atras: dejar el selector mostrando un barrio que no se
+      // guardo haria creer al vecino que esta recibiendo avisos que no le
+      // van a llegar.
+      setBarrioId(anterior);
+      toast.error('No se pudo guardar el barrio');
+    } finally {
+      setGuardandoBarrio(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -72,6 +106,11 @@ export default function MobilePerfil() {
       </div>
     );
   }
+
+  const opcionesBarrio: SelectOption[] = [
+    { value: '', label: 'Todo el municipio' },
+    ...barrios.map((b) => ({ value: String(b.id), label: b.nombre })),
+  ];
 
   const menuItems = [
     {
@@ -165,6 +204,35 @@ export default function MobilePerfil() {
           Cambiar
         </button>
       </div>
+
+      {barrios.length > 0 && (
+        <div
+          className="rounded-2xl p-4"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}15` }}
+            >
+              <MapPin className="h-5 w-5" style={{ color: theme.primary }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Tu barrio</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Para recibir los avisos que son de tu zona
+              </p>
+            </div>
+          </div>
+          <ModernSelect
+            options={opcionesBarrio}
+            value={barrioId}
+            onChange={guardarBarrio}
+            placeholder="Elegí tu barrio"
+            disabled={guardandoBarrio}
+          />
+        </div>
+      )}
 
       <div
         className="rounded-2xl overflow-hidden"

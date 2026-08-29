@@ -603,7 +603,7 @@ export const usersApi = {
   delete: (id: number) => api.delete(`/users/${id}`),
   // Perfil propio
   getMyProfile: () => api.get('/users/me'),
-  updateMyProfile: (data: { nombre?: string; apellido?: string; telefono?: string; dni?: string; direccion?: string }) =>
+  updateMyProfile: (data: { nombre?: string; apellido?: string; telefono?: string; dni?: string; direccion?: string; barrio_id?: number | null }) =>
     api.put('/users/me', data),
   // Cambio de email con validación
   requestEmailChange: (nuevoEmail: string) =>

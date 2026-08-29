@@ -5,7 +5,7 @@ faltaba era poder cargarlo y avisar. Ver
 `docs/comunicacion/01-modulo-comunicacion.md`.
 """
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +16,7 @@ from core.database import get_db
 from core.security import require_roles
 from models.enums import RolUsuario
 from models.noticia import Noticia
+from models.user import User as UserModel
 from models.user import User
 from schemas.noticia import EnvioResponse, NoticiaCreate, NoticiaResponse, NoticiaUpdate
 from services.push_service import crear_notificacion_db, send_push_to_users
@@ -27,6 +28,41 @@ ART = ZoneInfo("America/Argentina/Buenos_Aires")
 # Cuantas novedades ve el vecino de una. El feed es una tira corta, no un
 # archivo historico: lo viejo se consulta entrando a la novedad.
 TOPE_FEED = 10
+
+DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+
+
+def cronograma_texto(n: Noticia) -> Optional[str]:
+    """Como se lee la recurrencia, en castellano. None si no se repite.
+
+    Lo arma el backend a proposito: si cada pantalla del vecino tradujera
+    "1,4" por su cuenta, en dos meses tendriamos tres textos distintos para
+    el mismo cronograma.
+    """
+    if not n.recurrencia:
+        return None
+    if n.recurrencia == "semanal" and n.dias_semana:
+        try:
+            nombres = [DIAS[int(d)] for d in n.dias_semana.split(",") if d.strip().isdigit()]
+        except (ValueError, IndexError):
+            nombres = []
+        if len(nombres) == 1:
+            return f"Todos los {nombres[0]}"
+        if len(nombres) > 1:
+            return f"Todos los {', '.join(nombres[:-1])} y {nombres[-1]}"
+        return "Todas las semanas"
+    if n.recurrencia == "quincenal":
+        return "Cada quince dias"
+    if n.recurrencia == "mensual":
+        return "Una vez por mes"
+    return None
+
+
+def _con_texto(n: Noticia) -> dict:
+    """La fila + el texto del cronograma, que no es una columna."""
+    d = {c.name: getattr(n, c.name) for c in n.__table__.columns}
+    d["cronograma_texto"] = cronograma_texto(n)
+    return d
 
 
 def _hoy():
@@ -51,14 +87,35 @@ async def _del_muni(db: AsyncSession, noticia_id: int, municipio_id: int) -> Not
 
 
 @router.get("/publico", response_model=List[NoticiaResponse])
-async def get_noticias_publico(municipio_id: int, db: AsyncSession = Depends(get_db)):
-    """Lo que ve el vecino: lo activo, VIGENTE hoy, con lo fijado arriba.
+async def get_noticias_publico(
+    municipio_id: int,
+    vecino_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Lo que ve el vecino: lo activo, VIGENTE hoy, de SU barrio, fijado arriba.
 
     Vigencia: las fechas nulas no acotan (una noticia comun no vence). Con
     `fecha_hasta` cumplida el aviso desaparece solo, sin que nadie lo baje a
     mano — es la diferencia entre un aviso y un cartel viejo pegado.
+
+    Segmentacion (Etapa 3): un aviso sin barrio es para todo el municipio y lo
+    ve cualquiera. Un aviso CON barrio lo ven solo los vecinos de ese barrio;
+    el vecino que no declaro barrio ve unicamente los generales. Mostrarle
+    avisos de un barrio que no es el suyo es peor que no mostrarle nada: deja
+    de creerle al canal.
     """
     hoy = _hoy()
+
+    barrio_vecino = None
+    if vecino_id:
+        barrio_vecino = (await db.execute(
+            select(UserModel.barrio_id).where(UserModel.id == vecino_id)
+        )).scalar_one_or_none()
+
+    alcance = [Noticia.barrio_id.is_(None)]
+    if barrio_vecino:
+        alcance.append(Noticia.barrio_id == barrio_vecino)
+
     result = await db.execute(
         select(Noticia)
         .where(
@@ -66,11 +123,12 @@ async def get_noticias_publico(municipio_id: int, db: AsyncSession = Depends(get
             Noticia.activo == True,  # noqa: E712
             or_(Noticia.fecha_desde.is_(None), Noticia.fecha_desde <= hoy),
             or_(Noticia.fecha_hasta.is_(None), Noticia.fecha_hasta >= hoy),
+            or_(*alcance),
         )
         .order_by(Noticia.fijado.desc(), Noticia.created_at.desc())
         .limit(TOPE_FEED)
     )
-    return result.scalars().all()
+    return [_con_texto(n) for n in result.scalars().all()]
 
 
 @router.get("", response_model=List[NoticiaResponse])
@@ -84,7 +142,7 @@ async def get_noticias(
         .where(Noticia.municipio_id == current_user.municipio_id)
         .order_by(Noticia.fijado.desc(), Noticia.created_at.desc())
     )
-    return result.scalars().all()
+    return [_con_texto(n) for n in result.scalars().all()]
 
 
 @router.post("", response_model=NoticiaResponse)

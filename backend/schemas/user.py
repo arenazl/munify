@@ -49,6 +49,9 @@ class UserProfileUpdate(BaseModel):
     telefono: Optional[str] = None
     dni: Optional[str] = None
     direccion: Optional[str] = None
+    # El barrio lo elige el vecino de una lista: la direccion es texto libre y
+    # no permite segmentar los avisos ("recoleccion en Villa Elisa").
+    barrio_id: Optional[int] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -59,6 +62,7 @@ class UserResponse(BaseModel):
     telefono: Optional[str]
     dni: Optional[str]
     direccion: Optional[str]
+    barrio_id: Optional[int] = None
     es_anonimo: bool
     rol: RolUsuario
     activo: bool

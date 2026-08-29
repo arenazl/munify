@@ -24,6 +24,12 @@ class NoticiaBase(BaseModel):
     fecha_desde: Optional[date] = None
     fecha_hasta: Optional[date] = None
     fijado: bool = False
+    # A quien: NULL = todo el municipio. Con barrio, solo ese barrio.
+    barrio_id: Optional[int] = None
+    # Cada cuanto: NULL = una sola vez. semanal | quincenal | mensual
+    recurrencia: Optional[str] = None
+    # Para la semanal: "1,4" = martes y viernes (0=lunes).
+    dias_semana: Optional[str] = None
 
 
 class NoticiaCreate(NoticiaBase):
@@ -40,11 +46,18 @@ class NoticiaUpdate(BaseModel):
     fecha_desde: Optional[date] = None
     fecha_hasta: Optional[date] = None
     fijado: Optional[bool] = None
+    barrio_id: Optional[int] = None
+    recurrencia: Optional[str] = None
+    dias_semana: Optional[str] = None
     activo: Optional[bool] = None
 
 
 class NoticiaResponse(NoticiaBase):
     id: int
+    # Como se lee el cronograma, ya escrito: "Todos los martes y viernes".
+    # Lo arma el backend para que las tres pantallas del vecino no repitan
+    # la misma logica de traduccion cada una a su manera.
+    cronograma_texto: Optional[str] = None
     municipio_id: int
     activo: bool
     enviado_at: Optional[datetime] = None
