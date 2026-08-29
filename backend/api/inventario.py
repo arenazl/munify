@@ -8,6 +8,7 @@ Multi-tenant estricto (todo filtra por municipio_id). Gestión reservada a
 admin/supervisor. Opt-in por `municipio_modulos.modulo = 'inventario'`.
 El cruce con OT (reservar/consumir/liberar) vive en `api/ordenes_trabajo.py`.
 """
+from datetime import date
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -81,6 +82,15 @@ class ItemCreate(BaseModel):
     # Activos
     identificador: Optional[str] = None
     estado_activo: Optional[EstadoActivo] = None
+    # Flota: un activo con `tipo_combustible` cargado ES un vehiculo del
+    # municipio y aparece en Recursos -> Flota. No hay tabla de vehiculos.
+    marca_modelo: Optional[str] = None
+    anio: Optional[int] = None
+    km_actual: Optional[int] = None
+    tipo_combustible: Optional[str] = None
+    vencimiento_vtv: Optional[date] = None
+    vencimiento_seguro: Optional[date] = None
+    km_proximo_service: Optional[int] = None
 
     @field_validator("nombre")
     @classmethod
@@ -100,6 +110,16 @@ class ItemUpdate(BaseModel):
     identificador: Optional[str] = None
     estado_activo: Optional[EstadoActivo] = None
     activo: Optional[bool] = None
+    # Flota: un activo con `tipo_combustible` cargado ES un vehiculo del
+    # municipio y aparece en Recursos -> Flota. No hay tabla de vehiculos.
+    marca_modelo: Optional[str] = None
+    anio: Optional[int] = None
+    km_actual: Optional[int] = None
+    tipo_combustible: Optional[str] = None
+    vencimiento_vtv: Optional[date] = None
+    vencimiento_seguro: Optional[date] = None
+    km_proximo_service: Optional[int] = None
+
 
 
 class ItemResponse(BaseModel):
@@ -118,6 +138,15 @@ class ItemResponse(BaseModel):
     estado_activo: Optional[EstadoActivo] = None
     ocupado_por_ot_id: Optional[int] = None
     ocupado_por_ot_numero: Optional[str] = None
+    # Flota: un activo con `tipo_combustible` cargado ES un vehiculo del
+    # municipio y aparece en Recursos -> Flota. No hay tabla de vehiculos.
+    marca_modelo: Optional[str] = None
+    anio: Optional[int] = None
+    km_actual: Optional[int] = None
+    tipo_combustible: Optional[str] = None
+    vencimiento_vtv: Optional[date] = None
+    vencimiento_seguro: Optional[date] = None
+    km_proximo_service: Optional[int] = None
     activo: bool
     bajo_stock: bool = False
 

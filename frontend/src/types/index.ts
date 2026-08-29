@@ -318,6 +318,15 @@ export interface InventarioItem {
   // Activos
   identificador?: string | null;
   estado_activo?: EstadoActivo | null;
+  // Flota: un activo con `tipo_combustible` cargado ES un vehículo del
+  // municipio y aparece en Recursos → Flota. No hay tabla de vehículos.
+  marca_modelo?: string | null;
+  anio?: number | null;
+  km_actual?: number | null;
+  tipo_combustible?: string | null;
+  vencimiento_vtv?: string | null;
+  vencimiento_seguro?: string | null;
+  km_proximo_service?: number | null;
   ocupado_por_ot_id?: number | null;
   ocupado_por_ot_numero?: string | null;
   activo: boolean;

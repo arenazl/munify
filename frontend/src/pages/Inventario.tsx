@@ -7,6 +7,7 @@ import { ABMPage, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
+import { DatePicker } from '../components/ui/DatePicker';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { SemanticHero } from '../components/ui/SemanticHero';
 import { seg, type HeroFrase } from '../lib/semanticHero';
@@ -29,13 +30,32 @@ type FormState = {
   unidad: string;
   identificador: string;
   estado_activo: EstadoActivo;
+  // --- Vehículo (módulo Flota). Un activo con estos datos ES un vehículo:
+  //     no hay tabla aparte. En un martillo quedan todos vacíos. ---
+  esVehiculo: boolean;
+  marca_modelo: string;
+  anio: string;
+  tipo_combustible: string;
+  km_actual: string;
+  vencimiento_vtv: string;
+  vencimiento_seguro: string;
+  km_proximo_service: string;
 };
 
 const FORM_VACIO: FormState = {
   categoria_id: '', nombre: '', descripcion: '',
   stock_actual: '', stock_minimo: '', unidad: '',
   identificador: '', estado_activo: 'disponible',
+  esVehiculo: false, marca_modelo: '', anio: '', tipo_combustible: '',
+  km_actual: '', vencimiento_vtv: '', vencimiento_seguro: '', km_proximo_service: '',
 };
+
+const COMBUSTIBLES: SelectOption[] = [
+  { value: 'nafta', label: 'Nafta' },
+  { value: 'gasoil', label: 'Gasoil' },
+  { value: 'gnc', label: 'GNC' },
+  { value: 'electrico', label: 'Eléctrico' },
+];
 
 export default function Inventario() {
   const { theme } = useTheme();
@@ -157,6 +177,16 @@ export default function Inventario() {
       unidad: item.unidad || '',
       identificador: item.identificador || '',
       estado_activo: item.estado_activo || 'disponible',
+      // Es vehículo si tiene combustible cargado: ese es el campo que lo hace
+      // aparecer en Flota, así que es el que define el tilde.
+      esVehiculo: Boolean(item.tipo_combustible),
+      marca_modelo: item.marca_modelo || '',
+      anio: item.anio != null ? String(item.anio) : '',
+      tipo_combustible: item.tipo_combustible || '',
+      km_actual: item.km_actual != null ? String(item.km_actual) : '',
+      vencimiento_vtv: item.vencimiento_vtv || '',
+      vencimiento_seguro: item.vencimiento_seguro || '',
+      km_proximo_service: item.km_proximo_service != null ? String(item.km_proximo_service) : '',
     });
     setSheetOpen(true);
   };
@@ -184,6 +214,17 @@ export default function Inventario() {
       } else if (naturalezaForm === 'activo') {
         payload.identificador = form.identificador.trim() || null;
         payload.estado_activo = form.estado_activo;
+        // Flota: los campos van SIEMPRE, en null cuando se destilda. Así
+        // desmarcar "es un vehículo" lo saca de la flota de verdad, en vez de
+        // dejar datos huérfanos que lo siguen mostrando ahí.
+        payload.marca_modelo = form.esVehiculo ? (form.marca_modelo.trim() || null) : null;
+        payload.anio = form.esVehiculo && form.anio ? Number(form.anio) : null;
+        payload.tipo_combustible = form.esVehiculo ? (form.tipo_combustible || null) : null;
+        payload.km_actual = form.esVehiculo && form.km_actual ? Number(form.km_actual) : null;
+        payload.vencimiento_vtv = form.esVehiculo ? (form.vencimiento_vtv || null) : null;
+        payload.vencimiento_seguro = form.esVehiculo ? (form.vencimiento_seguro || null) : null;
+        payload.km_proximo_service = form.esVehiculo && form.km_proximo_service
+          ? Number(form.km_proximo_service) : null;
       }
       if (selected) {
         await inventarioApi.updateItem(selected.id, payload);
@@ -498,6 +539,87 @@ export default function Inventario() {
                   </p>
                 )}
               </div>
+
+              {/* --- VEHÍCULO (módulo Flota) ---
+                  Plegado a propósito: la mayoría de los activos son
+                  herramientas y no tienen patente. Con el tilde aparecen los
+                  campos que convierten a este activo en un vehículo de la
+                  flota, y ahí empieza a contar su consumo. */}
+              <div className="col-span-2">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.esVehiculo}
+                    onChange={e => setForm({ ...form, esVehiculo: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm" style={{ color: theme.text }}>
+                    Es un vehículo de la flota
+                    <span className="block text-[11px]" style={{ color: theme.textSecondary }}>
+                      Aparece en Recursos → Flota y se le puede cargar combustible.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {form.esVehiculo && (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Marca y modelo</p>
+                    <input type="text" value={form.marca_modelo}
+                      onChange={e => setForm({ ...form, marca_modelo: e.target.value })}
+                      placeholder="Toyota Hilux 4x4"
+                      className="w-full px-3 py-2 rounded-lg" style={inputStyle} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Año</p>
+                    <input type="number" value={form.anio}
+                      onChange={e => setForm({ ...form, anio: e.target.value })}
+                      placeholder="2021"
+                      className="w-full px-3 py-2 rounded-lg" style={inputStyle} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Combustible</p>
+                    <ModernSelect
+                      value={form.tipo_combustible}
+                      onChange={(v) => setForm({ ...form, tipo_combustible: v })}
+                      options={COMBUSTIBLES}
+                      placeholder="Elegí el combustible"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Kilómetros</p>
+                    <input type="number" value={form.km_actual}
+                      onChange={e => setForm({ ...form, km_actual: e.target.value })}
+                      placeholder="82000"
+                      className="w-full px-3 py-2 rounded-lg" style={inputStyle} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Vence la VTV</p>
+                    <DatePicker
+                      value={form.vencimiento_vtv}
+                      onChange={(v: string | null) => setForm({ ...form, vencimiento_vtv: v || '' })}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Vence el seguro</p>
+                    <DatePicker
+                      value={form.vencimiento_seguro}
+                      onChange={(v: string | null) => setForm({ ...form, vencimiento_seguro: v || '' })}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Próximo service (km)</p>
+                    <input type="number" value={form.km_proximo_service}
+                      onChange={e => setForm({ ...form, km_proximo_service: e.target.value })}
+                      placeholder="88000"
+                      className="w-full px-3 py-2 rounded-lg" style={inputStyle} />
+                    <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                      Cuando el vehículo pase este kilometraje, Flota lo marca con service vencido.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
