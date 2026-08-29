@@ -69,7 +69,17 @@ en la Etapa 3, junto con el trabajo de darle barrio al vecino.
 
 ## 4. Las tres etapas
 
-### Etapa 1 · Avisos
+### Etapa 1 · Avisos — HECHA (2026-08-29, en qa)
+
+Pantalla **Avisos** (kit v2, categoría Comunicación del sidebar, flag
+`comunicacion` opt-in) + `POST /noticias/{id}/enviar` (push + campana,
+idempotente). Migración: `backend/scripts/migrate_avisos.py`.
+De paso se cerró un leak entre tenants: `update` y `delete` de noticias
+buscaban por id **sin filtrar municipio**, y el `POST` tomaba el
+`municipio_id` del payload.
+Las demos nacen con seis avisos que cubren los cuatro estados y fotos reales
+(Openverse/Flickr, licencia comercial, verificadas una por una).
+
 
 El municipio publica un aviso y le llega al vecino.
 
@@ -102,7 +112,17 @@ idéntico al resto de los ABM:
 **Criterio de terminado:** un admin de San Pedro Norte escribe un aviso en QA,
 lo publica, y aparece en el feed del vecino y como notificación en el celular.
 
-### Etapa 2 · Obras
+### Etapa 2 · Obras — HECHA (2026-08-29, en qa)
+
+El proyecto de Tesorería suma `publico`, `estado_obra`, `avance`, `foto_url`,
+`latitud`, `longitud` y `mostrar_monto`; `GET /tesoreria/proyectos/publicas`
+(sin token) y el bloque **"Obras en tu ciudad"** en el panel del vecino, con
+la barra de avance como protagonista. Migración:
+`backend/scripts/migrate_obras.py`.
+Dos reglas que quedaron en el código: publicar es **deliberado** (default
+apagado) y el monto es un interruptor **aparte**, que publica lo realmente
+imputado, nunca el presupuesto.
+
 
 Las obras ya existen como **proyectos de Tesorería** con sus gastos imputados.
 Esta etapa las publica: el vecino ve qué se está haciendo, dónde y cómo viene.
@@ -113,7 +133,7 @@ Esta etapa las publica: el vecino ve qué se está haciendo, dónde y cómo vien
 - Sin inventar plata: se muestra avance y fotos, no el gasto, salvo que el
   municipio lo prenda.
 
-### Etapa 3 · Cronogramas y segmentación
+### Etapa 3 · Cronogramas y segmentación — PENDIENTE
 
 - Avisos **recurrentes** (recolección, poda, barrido) que se repiten solos, con
   el mismo motor de recurrencia que ya usa la agenda de pagos.
@@ -129,3 +149,18 @@ Todo se desarrolla contra el **branch `qa`** y la base **`sugerenciasmun-ensayo`
 (el clon de producción del 2026-08-28, que desde hoy es la base de QA: la
 `sugerenciasmun-qa` vieja queda fuera de uso). Los ALTER se aplican ahí, nunca
 en producción — a prod llega con la promoción, con su script idempotente.
+
+---
+
+## 6. Lo que cambió alrededor (misma tanda, 2026-08-29)
+
+- **Tasas pasó a OPT-IN** (`lib/enums/modulos.ts`): Munify no cubre el cobro
+  de tasas y el módulo aparecía solo en todos los municipios. Salió del
+  seeder de demos y las recomendaciones del vecino lo respetan.
+- **Panel del vecino**: se borraron los cuatro KPI cards que repetían el hero;
+  "Recomendaciones para vos" pasó a ser una **tira de pendientes de una
+  línea**; las novedades tienen jerarquía (destacada + tira compacta) y
+  muestran tipo y vigencia.
+- **Pendiente ahí**: en "Estadísticas del Municipio" las variaciones
+  (`+12%`, `+5%`, `-2 días`, `+0.3`) y el mini gráfico de barras están
+  **hardcodeados**. Hay que calcularlos o sacarlos.
