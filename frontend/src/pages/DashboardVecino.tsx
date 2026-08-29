@@ -5,7 +5,7 @@ import {
   ChevronRight, Trophy, Map, Megaphone, Calendar, Newspaper, Hammer,
   FileCheck, TrendingUp,
   TrendingDown, Building2, Star, BarChart3, X, Users, Target,
-  Zap, ArrowUpRight, ArrowDownRight, Activity,
+  Zap, Activity,
   Search, PlusCircle, Upload, Loader, ShieldCheck, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -562,6 +562,12 @@ export default function DashboardVecino() {
               <Activity className="h-5 w-5" style={{ color: theme.primary }} />
               Estadísticas del Municipio
             </h2>
+            {/* Las cuatro variaciones (+12%, +5%, -2 días, +0.3) y el mini
+                gráfico de barras se sacaron el 2026-08-29: estaban ESCRITAS A
+                MANO en el código, no salían de ningún cálculo. Los cuatro
+                números que quedan sí son reales (vienen de
+                /portal-publico/estadisticas). Si algún día se quiere tendencia,
+                se calcula en el backend contra el mes anterior — no se dibuja. */}
             <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
               Actualizado hoy
             </span>
@@ -579,23 +585,10 @@ export default function DashboardVecino() {
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${theme.primary}15` }}>
                   <Building2 className="w-5 h-5" style={{ color: theme.primary }} />
                 </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowUpRight className="w-3 h-3" />
-                  +12%
-                </div>
               </div>
               <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.total_reclamos}</p>
               <p className="text-xs" style={{ color: theme.textSecondary }}>Reclamos totales</p>
-              {/* Mini gráfico de barras */}
-              <div className="flex items-end gap-0.5 mt-3 h-8">
-                {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-t transition-all group-hover:opacity-100"
-                    style={{ height: `${h}%`, backgroundColor: i === 6 ? theme.primary : `${theme.primary}30`, opacity: 0.7 }}
-                  />
-                ))}
-              </div>
+              
             </button>
 
             {/* Card: Tasa Resolución */}
@@ -608,10 +601,6 @@ export default function DashboardVecino() {
               <div className="flex items-center justify-between mb-2">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#22c55e15' }}>
                   <Target className="w-5 h-5" style={{ color: '#22c55e' }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowUpRight className="w-3 h-3" />
-                  +5%
                 </div>
               </div>
               <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.tasa_resolucion.toFixed(0)}%</p>
@@ -641,10 +630,6 @@ export default function DashboardVecino() {
               <div className="flex items-center justify-between mb-2">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f59e0b15' }}>
                   <Zap className="w-5 h-5" style={{ color: '#f59e0b' }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowDownRight className="w-3 h-3" />
-                  -2 días
                 </div>
               </div>
               <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.tiempo_promedio_resolucion_dias.toFixed(1)}</p>
@@ -684,10 +669,6 @@ export default function DashboardVecino() {
               <div className="flex items-center justify-between mb-2">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#eab30815' }}>
                   <Star className="w-5 h-5" style={{ color: '#eab308' }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowUpRight className="w-3 h-3" />
-                  +0.3
                 </div>
               </div>
               <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.calificacion_promedio.toFixed(1)}</p>
