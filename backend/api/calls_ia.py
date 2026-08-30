@@ -36,21 +36,40 @@ class ConsultaIA(BaseModel):
 
 
 async def _groq(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:
+    cuerpo: dict = {
+        "model": settings.GROQ_MODEL,
+        "messages": mensajes,
+        "temperature": 0.6,
+        # 700 alcanzaba justo para el razonamiento y NADA para la respuesta.
+        "max_tokens": 1500,
+    }
+    # GOTCHA (2026-08-30): gpt-oss RAZONA por default, y en Groq el reasoning
+    # se descuenta de max_tokens. Con un prompt largo (la ficha del municipio
+    # + los hechos de un modulo) se gastaba los 700 tokens pensando y devolvia
+    # `content` VACIO con finish_reason=length: el chat quedaba mudo y los
+    # guiones de /calls en blanco. Medido: 698 de 700 tokens en reasoning.
+    # Con effort bajo, 9 tokens de razonamiento y la respuesta completa.
+    if "gpt-oss" in settings.GROQ_MODEL:
+        cuerpo["reasoning_effort"] = "low"
     r = await cli.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
-        json={
-            "model": settings.GROQ_MODEL,
-            "messages": mensajes,
-            "temperature": 0.6,
-            "max_tokens": 700,
-        },
+        json=cuerpo,
     )
     j = r.json()
     if r.status_code != 200:
         detalle = (j.get("error") or {}).get("message") or f"HTTP {r.status_code}"
         raise HTTPException(status_code=502, detail=f"Groq no respondio: {detalle[:200]}")
-    return (j["choices"][0]["message"]["content"] or "").strip()
+    eleccion = j["choices"][0]
+    texto = (eleccion["message"].get("content") or "").strip()
+    if not texto:
+        # Callarse en silencio es peor que fallar: el front no puede distinguir
+        # "no tengo nada que decir" de "me quede sin tokens".
+        raise HTTPException(
+            status_code=502,
+            detail=f"Groq devolvio una respuesta vacia (finish_reason={eleccion.get('finish_reason')})",
+        )
+    return texto
 
 
 async def _gemini(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:

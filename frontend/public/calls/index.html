@@ -483,6 +483,15 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .g-txt p{margin:0}
 .g-txt p+p{margin-top:10px}
 .g-txt b{color:var(--ink);font-weight:700}
+/* El pie del guion: de donde salio el texto y como pedir otro. Discreto — es
+   informacion del vendedor, no algo que se lea por telefono. */
+.g-txt.g-load{color:var(--ink3);font-style:italic}
+.g-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding-top:9px;
+ border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)}
+.g-pie .ok{color:var(--ok)}
+.lnk{background:none;border:0;padding:0;cursor:pointer;color:var(--acc);font-size:11.5px;
+ font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.lnk:hover{color:var(--ink)}
 @media(max-width:420px){ .tabs{grid-template-columns:repeat(2,1fr)} }
 /* DATO DE COLOR (columna derecha): lo que se sabe ANTES de marcar. Vivia en el
    centro y empujaba la narracion fuera de la pantalla (dueño, 2026-08-30). */
@@ -664,7 +673,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 20:20 · 506cb5c</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 20:49 · acab58e</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -710,34 +719,131 @@ function cierreDe(pais, muni){
   const r = t => t.replace('{M}', muni || 'tu municipio').replace('{MESES}', MESES_GRATIS);
   return { link: r(c.link), duda: r(c.duda) };
 }
-/* EL GUION DE LOS CUATRO TABS (dueño, 2026-08-30). No son bullets de folleto:
-   es lo que se DICE cuando el otro engancha con un tema. "Toca en plataforma,
-   bueno, te cuento que la plataforma esta centrada en una aplicacion de
-   celular, que se puede bajar con un QR..." — se lee tal cual, en voz alta.
-   Cada cosa que se promete aca la tiene que poder mostrar la demo cinco
-   minutos despues. */
+/* LOS CUATRO TEMAS (dueño, 2026-08-30). Cada uno trae su MINI BASE DE DATOS:
+   los hechos reales del modulo, en crudo. El texto que se lee en voz alta NO
+   esta escrito aca — lo arma la IA en el momento, cruzando estos hechos con la
+   ficha del municipio (si ya tienen app de reclamos, cuantos habitantes, que
+   areas hay). Asi la misma explicacion suena distinta en un pueblo de 8.000
+   que en uno de 200.000.
+   `base` es el paracaidas: lo que se muestra si la IA no contesta (sin red,
+   rate limit, o la pagina abierta como archivo local). El tab nunca queda en
+   blanco: por telefono, un panel vacio es peor que un guion generico. */
 const GUION = [
   { id:'plat', t:'Plataforma',
     ic:'<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/>',
-    p:['Es una plataforma online, y para el vecino es una <b>aplicación de celular</b>: la baja escaneando un QR y ya entra, con el nombre, los barrios y las calles del municipio adentro.',
-       'Desde ahí recibe <b>notificaciones en tiempo real</b> del estado de sus gestiones — un reclamo que hizo, un trámite que arrancó o un turno que pidió. No tiene que llamar ni acercarse a preguntar cómo viene.',
-       'Y del lado de ustedes es <b>un solo tablero</b>: todo lo que entra cae ordenado, con área responsable y fecha. En el momento se ve qué está pendiente y quién lo tiene.'] },
+    kb:['Para el vecino es una aplicacion de celular: la baja escaneando un QR, y tambien entra desde la web.',
+        'Al entrar ya tiene SU municipio adentro: los barrios, las calles y el mapa reales del lugar.',
+        'Recibe notificaciones en tiempo real del estado de sus gestiones: un reclamo, un tramite o un turno.',
+        'Del lado del municipio es un solo tablero: todo lo que entra cae ordenado, con area responsable y fecha.',
+        'Cada municipio la usa con su marca: su logo, sus colores y su nombre.',
+        'Los modulos se prenden y se apagan: se arranca por uno y se suman los demas cuando quieran.',
+        'Antes de decidir se les arma la demo con los datos reales de su ejido, y la prueban andando.'],
+    base:['Es una plataforma online, y para el vecino es una aplicación de celular que baja con un QR: la abre y ya tiene su municipio adentro, con sus barrios y sus calles.',
+          'Desde ahí recibe notificaciones en tiempo real del estado de sus gestiones, sin llamar ni acercarse a preguntar.',
+          'Y del lado de ustedes es un solo tablero: todo lo que entra cae ordenado, con área responsable y fecha.'] },
   { id:'rec', t:'Reclamos',
     ic:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
-    p:['El vecino, desde el celular, <b>saca una foto</b> y avisa de un problema en la calle: un bache, una luminaria quemada, una rama caída. Escribe como habla, no completa un formulario.',
-       'Eso le llega al <b>área responsable en segundos</b>, ya clasificado. Y el vecino tiene devolución en tiempo real: sabe que alguien tomó su caso, y le avisamos cuando se resolvió.',
-       'Ahí está el cambio importante. Para el municipio queda la <b>trazabilidad completa</b> — quién lo tomó, cuánto tardó, qué zona se rompe siempre — y para el vecino, la sensación de que lo escucharon. Eso se nota en la calle.'] },
+    kb:['El vecino saca una foto desde el celular, con la ubicacion, y escribe como habla: no completa un formulario.',
+        'La IA clasifica el reclamo y lo manda al area que corresponde, en segundos.',
+        'Del reclamo sale una ORDEN DE TRABAJO: cuadrilla asignada, materiales y plazo. Nada queda en un cuaderno.',
+        'El capataz recibe la orden de trabajo en su celular y la cierra con su parte de lo que hizo.',
+        'El vecino sigue el estado en tiempo real y le llega el aviso cuando se resolvio.',
+        'Queda la trazabilidad completa: quien lo tomo, cuanto tardo y que area esta tapada.',
+        'Mapa de calor: donde se rompe siempre, para dejar de tapar el mismo bache cuatro veces.'],
+    base:['El vecino, desde el celular, saca una foto y avisa de un problema en la calle. Escribe como habla, no completa un formulario, y eso le llega al área responsable en segundos.',
+          'De ahí sale una orden de trabajo con cuadrilla, materiales y plazo, que el capataz recibe en su celular y cierra con su parte.',
+          'El vecino tiene devolución en tiempo real, y para ustedes queda la trazabilidad: quién lo tomó y cuánto tardó.'] },
   { id:'tra', t:'Trámites',
     ic:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6"/>',
-    p:['El vecino <b>saca el turno online</b> y ve la disponibilidad real en el momento, sin llamar por teléfono ni ir a preguntar.',
-       'Antes de arrancar <b>ve cuánto sale y lo paga</b> desde el celular, y le llega un WhatsApp con los requisitos: viene con todo y no vuelve dos veces.',
-       'Habilitaciones, permisos de obra, certificados, inscripciones — los que ustedes tengan. Se termina la cola en la ventanilla y el "vuelva mañana".'] },
-  { id:'com', t:'Comunicación',
-    ic:'<path d="M3 11l18-8-8 18-2-8-8-2Z"/>',
-    p:['Vas a poder <b>informar las obras</b> que estás haciendo y su avance, los eventos, y las alertas urgentes cuando pasa algo.',
-       'Le llega como <b>notificación al celular</b> del vecino, no como un cartel que nadie lee ni un posteo que el algoritmo esconde.',
-       'Y se <b>mide el alcance</b>: cuántos vecinos la vieron de verdad. Dejás de depender de un grupo de Facebook para contar lo que hace el municipio.'] }
+    kb:['El vecino saca el turno online y ve la disponibilidad real en el momento.',
+        'Ve cuanto sale el tramite antes de arrancar, y lo paga desde el celular con Mercado Pago.',
+        'Le llega un WhatsApp con los requisitos: viene con todo y no vuelve dos veces.',
+        'Habilitaciones comerciales, permisos de obra, certificados, inscripciones: los que el municipio tenga.',
+        'El municipio arma su propio arbol de tramites y define quien atiende cada uno.',
+        'Se termina la cola en la ventanilla y el vuelva mañana.'],
+    base:['El vecino saca el turno online y ve la disponibilidad real en el momento, sin llamar por teléfono.',
+          'Antes de arrancar ve cuánto sale y lo puede pagar desde el celular, y le llega un WhatsApp con los requisitos: viene con todo y no vuelve dos veces.',
+          'Habilitaciones, permisos de obra, certificados, inscripciones: los que ustedes tengan.'] },
+  { id:'tes', t:'Tesorería',
+    ic:'<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>',
+    kb:['El vecino entra, ve lo que debe de tasas y lo paga desde el celular. Queda el comprobante de los dos lados.',
+        'Se registran todos los pagos y se concilian: deja de haber un cuaderno por caja.',
+        'Cajas y fondos: en que se fue cada peso, con los gastos imputados por proyecto u obra.',
+        'Ordenes de pago y agenda de pagos: que hay que pagar esta semana y a quien.',
+        'INVENTARIO de los bienes del municipio: que hay, donde esta y quien lo tiene a cargo.',
+        'Sueldos y liquidaciones del personal municipal.',
+        'Se importa el Excel que ya usan, asi arrancan con su historia adentro y no cargan nada dos veces.'],
+    base:['El vecino entra, ve lo que debe de tasas y lo paga desde el celular, y del lado de ustedes queda el pago registrado y conciliado.',
+          'Adentro se ordena la plata: cajas y fondos, gastos por proyecto u obra, órdenes de pago y la agenda de lo que hay que pagar.',
+          'Y está el inventario de los bienes del municipio: qué hay, dónde está y quién lo tiene. Les importamos el Excel que ya usan para arrancar con su historia adentro.'] }
 ];
+
+/* El guion se le pide a la IA con la ficha del municipio adelante, pero la
+   respuesta se CACHEA por municipio+modulo: el endpoint publico tiene rate
+   limit (40/hora) y tocar cuatro tabs en cada llamada lo quema en diez
+   municipios. "Otra vuelta" borra el cache de ese tab y vuelve a pedir. */
+const KEY_GUION = 'munify_llamados_guion';
+let guionCache = (function(){ try { return JSON.parse(localStorage.getItem(KEY_GUION) || '{}'); } catch(e){ return {}; } })();
+function guionGuardar(){ try { localStorage.setItem(KEY_GUION, JSON.stringify(guionCache)); } catch(e){} }
+
+const GUION_SISTEMA = [
+  'Sos el asistente de un vendedor argentino que esta EN MEDIO de una llamada telefonica a un municipio,',
+  'ofreciendo Munify, una plataforma de gestion municipal.',
+  'Te paso la ficha del municipio y los HECHOS de un modulo. Devolve lo que el vendedor tiene que DECIR',
+  'sobre ese modulo, ahora mismo, en voz alta.',
+  'FORMATO: dos parrafos cortos, maximo 70 palabras EN TOTAL. Español rioplatense, de vos.',
+  'Nada de titulos, ni vinetas, ni negritas, ni comillas: texto corrido para leer.',
+  'Empeza DIRECTO por el contenido. Prohibido arrancar con "mira", "bueno", "claro" o "por supuesto":',
+  'los cuatro modulos se leen uno atras del otro y arrancar siempre igual suena a machete.',
+  'REGLA INVIOLABLE: usa SOLO los hechos que te paso. No inventes funciones, cifras, plazos, precios,',
+  'nombres ni casos de exito. Podes adaptar el enfasis al municipio (su tamaño, sus areas, si ya tienen',
+  'algo digital), pero no agregar un dato que no este en la lista.'
+].join(' ');
+
+async function guionPedir(c, g){
+  const kb = 'HECHOS DEL MODULO "' + g.t + '" (usa solo esto):' + NL + g.kb.map(x => '- ' + x).join(NL);
+  const pedido = 'El del otro lado del telefono acaba de preguntar por ' + g.t + '. Decime que le contesto.';
+  const mensajes = [
+    {role:'system', content: GUION_SISTEMA},
+    {role:'user', content: 'FICHA DEL MUNICIPIO:' + NL + iaContexto(c) + NL + NL + kb + NL + NL + pedido}
+  ];
+  const res = await fetch(IA_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mensajes})});
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.detail || ('HTTP ' + res.status));
+  const txt = String(j.respuesta || '').trim();
+  if (!txt) throw new Error('respuesta vacia');
+  return txt;
+}
+
+function guionPintar(c, g, txt, estado){
+  const caja = document.getElementById('pGuion'); if (!caja) return;
+  const parrafos = String(txt).split(NL).map(x => x.trim()).filter(Boolean);
+  const pie = estado === 'ia'
+    ? '<span class="ok">Armado para ' + esc(c.localidad) + '</span><button type="button" class="lnk" id="gOtra">Otra vuelta</button>'
+    : '<span>Guión base: la IA no contestó.</span><button type="button" class="lnk" id="gOtra">Reintentar</button>';
+  caja.innerHTML = '<div class="g-txt">' + parrafos.map(t => '<p>' + esc(t) + '</p>').join('')
+    + '<div class="g-pie">' + pie + '</div></div>';
+  const b = document.getElementById('gOtra');
+  if (b) b.onclick = () => { delete guionCache[c.id + '|' + g.id]; guionGuardar(); guionAbrir(c, g); };
+}
+
+async function guionAbrir(c, g){
+  const caja = document.getElementById('pGuion'); if (!caja) return;
+  const k = c.id + '|' + g.id, hit = guionCache[k];
+  if (hit){ guionPintar(c, g, hit, 'ia'); return; }
+  caja.innerHTML = '<div class="g-txt g-load">Armando lo que le vas a decir de ' + esc(g.t) + '...</div>';
+  try {
+    const txt = await guionPedir(c, g);
+    if (selId !== c.id) return;              // cambio de municipio mientras pensaba
+    guionCache[k] = txt; guionGuardar();
+    guionPintar(c, g, txt, 'ia');
+  } catch(e){
+    if (selId !== c.id) return;
+    guionPintar(c, g, g.base.join(NL), 'base');
+  }
+}
+
 const ESTADOS = [
   {id:'contactado', lbl:'Contactado'}, {id:'no-atiende', lbl:'No atiende'},
   {id:'rellamar', lbl:'Volver a llamar'}, {id:'descartado', lbl:'Descartado'},
@@ -755,6 +861,7 @@ function metaDiaria(){ let n = 5; try { n = parseInt(localStorage.getItem(KEY_ME
 function cargar(){ try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; } }
 function guardar(){ try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){} }
 function reg(id){ if(!db[id]) db[id] = {estado:'', notas:'', proximo:'', quien:'', hist:[]}; return db[id]; }
+const NL = String.fromCharCode(10);   // salto de linea, sin escapes en medio del HTML
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function telHref(t){ return 'tel:' + String(t).replace(/[^\d+]/g,''); }
 function hoyISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -1235,8 +1342,7 @@ function abrir(id){
     const caja = document.getElementById('pGuion');
     if (ya){ caja.innerHTML = ''; return; }
     b.classList.add('on');
-    const g = GUION.find(x => x.id === b.dataset.g);
-    caja.innerHTML = '<div class="g-txt">' + g.p.map(t => '<p>' + t + '</p>').join('') + '</div>';
+    guionAbrir(c, GUION.find(x => x.id === b.dataset.g));
   });
   // Las cuatro acciones abren su modal. El contexto de la llamada queda
   // guardado para que cada modal se arme con este municipio.
