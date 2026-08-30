@@ -184,10 +184,18 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 /* Tablet en horizontal (y ventanas angostas de escritorio): la columna
    auxiliar se va y quedan lista + ficha, que es lo que se trabaja. Antes
    estas anchuras entraban a la fuerza y apretaban la ficha. */
+/* Tablet (1001-1300): no entran tres columnas a lo ancho, pero ESCONDER la
+   tercera se lleva puestas "Lo que viene", "Recordar" y "Avance", que son
+   justo lo que ordena el dia. En vez de ocultarla, baja abajo de la lista:
+   dos columnas, y la ficha ocupa las dos filas a la derecha. */
 @media(min-width:1001px) and (max-width:1300px){
-  .ops{grid-template-columns:300px minmax(0,1fr)}
-  .extra{display:none}
+  .ops{grid-template-columns:300px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .lista-col{grid-column:1;grid-row:1}
+  .extra{display:block;grid-column:1;grid-row:2;max-height:40vh;margin-top:10px}
+  .ficha-col{grid-column:2;grid-row:1 / -1}
 }
+.f-body{overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+.extra{overscroll-behavior:contain;touch-action:pan-y}
 .ops-col{min-width:0;min-height:0}
 .lista-col,.ficha-col,.extra{overflow-y:auto;overflow-x:hidden;
  overscroll-behavior:contain;touch-action:pan-y}
@@ -291,7 +299,7 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .badge.n{border-color:var(--purple);color:var(--purple)}
 .badge.ojo{border-color:var(--warn);color:var(--warn)}
 
-.ficha{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+.ficha{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;max-height:100%;
  touch-action:pan-y}
 /* El cuerpo de la ficha SOLO va vertical, EN TODOS LOS ANCHOS (antes vivia
    solo en la media query mobile y el desktop quedaba sin la regla): un
