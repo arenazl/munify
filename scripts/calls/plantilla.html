@@ -637,7 +637,10 @@ function urlDemo(c){
 }
 /* A quien se le pasa la posta. Un solo lugar: si manana atiende otra persona,
    se cambia aca y no en cinco textos sueltos. */
-const POSTA = { nombre: 'Lucas', wa: '5491160526449' };
+/* El aviso de la posta va al WhatsApp Business de Munify ("Munify Me"),
+   que NO es el 11 6052-6449 de la landing: ese es el publico, para que
+   escriban los intendentes. Este es el interno, donde llegan las postas. */
+const POSTA = { nombre: 'Lucas', wa: '5491138518148' };
 const ORDEN_PAIS = ['Argentina'];
 const rankPais = c => { const i = ORDEN_PAIS.indexOf(c.pais); return i < 0 ? 99 : i; };
 

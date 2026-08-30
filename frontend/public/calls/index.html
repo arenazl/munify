@@ -543,7 +543,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 16:31 · fd0c22c</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 16:33 · 9dfe28a</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -637,7 +637,10 @@ function urlDemo(c){
 }
 /* A quien se le pasa la posta. Un solo lugar: si manana atiende otra persona,
    se cambia aca y no en cinco textos sueltos. */
-const POSTA = { nombre: 'Lucas', wa: '5491160526449' };
+/* El aviso de la posta va al WhatsApp Business de Munify ("Munify Me"),
+   que NO es el 11 6052-6449 de la landing: ese es el publico, para que
+   escriban los intendentes. Este es el interno, donde llegan las postas. */
+const POSTA = { nombre: 'Lucas', wa: '5491138518148' };
 const ORDEN_PAIS = ['Argentina'];
 const rankPais = c => { const i = ORDEN_PAIS.indexOf(c.pais); return i < 0 ? 99 : i; };
 
