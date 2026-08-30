@@ -208,6 +208,13 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 /* El boton que crea la demo EN VIVO, durante la llamada. Va arriba del cierre
    y pesa visualmente: es la accion que convierte la charla en una demostracion. */
 /* Pasar la posta: el WhatsApp del prospecto y el aviso a quien sigue. */
+/* El link que se le manda al intendente: visible, copiable y corto. */
+.lnk{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;
+ border:1px dashed var(--acc);border-radius:9px;background:var(--bg2)}
+.lnk code{flex:1;min-width:0;font:500 11.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;
+ color:var(--acc);overflow-wrap:anywhere}
+.lnk .cp{flex:0 0 auto;background:var(--acc);color:#fff;border:0;border-radius:7px;
+ padding:6px 10px;font:700 11px var(--font-disp);cursor:pointer;white-space:nowrap}
 .hoff{border:1px solid var(--line);border-radius:var(--r);padding:11px 12px;background:var(--bg2)}
 .hoff .t{font:700 12px var(--font-disp);margin-bottom:7px;display:flex;align-items:center;gap:7px}
 .hoff .t svg{width:14px;height:14px;stroke:var(--ok);fill:none;stroke-width:2}
@@ -543,7 +550,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 16:33 · 9dfe28a</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 17:45 · 151c27a</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -564,19 +571,19 @@ const KEY = 'munify_llamados_v1', KEY_TEMA = 'munify_llamados_tema', KEY_VISTA =
    afina, que es el error barato. Nunca al reves. */
 const CIERRE = {
   'Argentina': {
-    link: 'Te paso un link ahora. Ponés el nombre de {M} y en cinco minutos tenés la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tenés {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    link: 'Te paso un link ahora. Lo abrís y ya aparece {M} cargado, no tenés que escribir nada. En cinco minutos tenés la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tenés {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
     duda: '¿Te molestaría que arreglemos una llamada de diez o quince minutos? Te lo dejo andando y te muestro en criollo cómo empezar a usarlo. Salís de esa reunión sabiendo trabajar con la aplicación.'
   },
   'Paraguay': {
-    link: 'Le paso un link ahora mismo. Pone el nombre de {M} y en cinco minutos tiene la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    link: 'Le paso un link ahora mismo. Lo abre y ya aparece {M} cargado, no tiene que escribir nada. En cinco minutos tiene la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
     duda: '¿Le molestaría que coordinemos una llamada de diez o quince minutos? Se lo dejo andando y le muestro de manera sencilla cómo empezar a usarlo. Sale de esa reunión sabiendo trabajar con la aplicación.'
   },
   'Perú': {
-    link: 'Le paso un enlace ahora mismo. Coloca el nombre de {M} y en cinco minutos tiene la plataforma funcionando con los datos reales de la municipalidad: sus barrios, sus calles, su mapa. No es una presentación, es el producto operativo. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    link: 'Le paso un enlace ahora mismo. Lo abre y ya aparece {M} cargado, no tiene que escribir nada. En cinco minutos tiene la plataforma funcionando con los datos reales de la municipalidad: sus barrios, sus calles, su mapa. No es una presentación, es el producto operativo. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
     duda: '¿Le incomodaría que coordinemos una llamada de diez o quince minutos? Se lo dejo operativo y le muestro de manera sencilla cómo empezar a usarlo. Sale de esa reunión sabiendo trabajar con la plataforma.'
   },
   'Uruguay': {
-    link: 'Le paso un link ahora. Pone el nombre de {M} y en cinco minutos tiene la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    link: 'Le paso un link ahora. Lo abre y ya aparece {M} cargado, no tiene que escribir nada. En cinco minutos tiene la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
     duda: '¿Le molestaría que coordinemos una llamada de diez o quince minutos? Se lo dejo andando y le muestro de manera sencilla cómo empezar a usarlo. Sale de esa reunión sabiendo trabajar con la aplicación.'
   }
 };
@@ -1044,7 +1051,9 @@ function abrir(id){
           + '<div class="cierre-ojo"><b>No mandes el link a secas.</b> A un intendente un link suelto no le mueve la aguja: lo abre, no entiende qué está mirando y ahí muere. El link va SIEMPRE con la frase, y si titubea, ofrecele la reunión de quince minutos.</div>'
         + '</div>'
       + '</div>'
-      + '<button class="btn sm" id="pCopiarCierre" style="margin-top:8px">Copiar el cierre</button></div>'
+      + '<div class="lnk"><code id="pLinkTxt">' + esc(urlDemo(c)) + '</code>'
+        + '<button class="cp" id="pCopiarLink">Copiar link</button></div>'
+      + '<button class="btn sm" id="pCopiarCierre" style="margin-top:8px">Copiar el cierre CON el link</button></div>'
     + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg></i>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
@@ -1091,7 +1100,14 @@ function abrir(id){
   armarAviso();
 
   const bc = document.getElementById('pCopiarCierre');
-  if (bc) bc.onclick = () => copiar(cie.link + '\n\n' + cie.duda, 'pCopiarCierre', 'Copiar el cierre');
+  // El cierre se copia CON el link adentro: el speech promete "te paso un link"
+  // y sin eso quien vende se queda con la frase y sin nada que pegar.
+  if (bc) bc.onclick = () => copiar(
+    cie.link + '\n\n' + urlDemo(c) + '\n\n' + cie.duda,
+    'pCopiarCierre', 'Copiar el cierre CON el link');
+  // Y el link solo, para pegarlo suelto en el chat.
+  const bl = document.getElementById('pCopiarLink');
+  if (bl) bl.onclick = () => copiar(urlDemo(c), 'pCopiarLink', 'Copiar link');
   document.querySelectorAll('#pEstados .eb').forEach(b => b.onclick = () => {
     r.estado = (r.estado === b.dataset.e) ? '' : b.dataset.e;
     r.hist.push({t:new Date().toISOString(), tipo:'estado', txt: r.estado ? ('Marcado: ' + LBL[r.estado]) : 'Estado borrado'});
