@@ -521,7 +521,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 15:48 · acdc46d</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 15:58 · 65ed3e9</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -597,12 +597,23 @@ function agendados(){
     .sort((a,b) => a.r.proximo.localeCompare(b.r.proximo));
 }
 function delPais(arr){ return paisHoy ? arr.filter(c => c.pais === paisHoy) : arr; }
+/* Orden de paises para la ronda (dueno, 2026-08-30): ARGENTINA PRIMERO, y
+   recien cuando se agote, el resto. Ordenar solo por poblacion ponia arriba a
+   Ciudad de la Costa (~600.000) por sobre cualquier municipio argentino, y
+   arrancar la operacion por el mercado que menos se conoce es al reves de lo
+   que conviene. Dentro de cada pais sigue mandando la poblacion.
+   Un pais que no este listado va al final, no se pierde. */
+const ORDEN_PAIS = ['Argentina'];
+const rankPais = c => { const i = ORDEN_PAIS.indexOf(c.pais); return i < 0 ? 99 : i; };
+
 /* La cola del dia: primero lo prometido que ya vencio, despues los pendientes
-   de mayor poblacion. Con un pais elegido manda ese; si se agota, sigue el resto. */
+   por pais prioritario y, dentro de cada uno, de mayor poblacion. Con un pais
+   elegido a mano manda ese; si se agota, sigue el resto. */
 function colaDelDia(n){
   const hoy = hoyISO();
   const deuda = agendados().filter(x => x.r.proximo <= hoy).map(x => x.c);
-  const frescos = pendientes().slice().sort((a,b) => poblacion(b) - poblacion(a));
+  const frescos = pendientes().slice().sort((a,b) =>
+    rankPais(a) - rankPais(b) || poblacion(b) - poblacion(a));
   const cola = [];
   const push = c => { if (c && !cola.some(x => x.id === c.id)) cola.push(c); };
   delPais(deuda).forEach(push);
@@ -740,7 +751,8 @@ function pintarHoy(){
   } else {
     const f = FUNC[c.id] || {}, inv = INVEST[c.id] || {}, r = db[c.id] || {};
     const porque = (r.proximo && r.proximo <= hoyISO()) ? 'Le prometiste volver hoy'
-      : (paisHoy ? 'El más grande sin llamar de ' + paisHoy : 'El más grande sin llamar');
+      : (paisHoy ? 'El más grande sin llamar de ' + paisHoy
+                 : 'El más grande sin llamar de ' + c.pais);
     cont.innerHTML = '<div class="k">' + porque + '</div><h2>' + esc(c.localidad) + '</h2>'
       + '<div class="s">' + esc(c.region) + ' · ' + esc(c.pais) + ' · ' + esc(c.habitantes) + ' hab.'
       + (f.intendente ? ' · Preguntá por <b>' + esc(f.intendente) + '</b>' : '') + '</div>'
