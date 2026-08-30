@@ -207,6 +207,20 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
    en el momento en que la charla se pone buena. */
 /* El boton que crea la demo EN VIVO, durante la llamada. Va arriba del cierre
    y pesa visualmente: es la accion que convierte la charla en una demostracion. */
+/* Pasar la posta: el WhatsApp del prospecto y el aviso a quien sigue. */
+.hoff{border:1px solid var(--line);border-radius:var(--r);padding:11px 12px;background:var(--bg2)}
+.hoff .t{font:700 12px var(--font-disp);margin-bottom:7px;display:flex;align-items:center;gap:7px}
+.hoff .t svg{width:14px;height:14px;stroke:var(--ok);fill:none;stroke-width:2}
+.hoff .fila{display:flex;gap:7px}
+.hoff input{flex:1;min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px 11px;
+ font:400 14px var(--font);background:var(--card);color:var(--ink)}
+.hoff input:focus{outline:none;border-color:var(--ok)}
+.hoff .av{flex:0 0 auto;background:var(--ok);color:#fff;border:0;border-radius:9px;padding:9px 13px;
+ font:700 12.5px var(--font-disp);cursor:pointer;white-space:nowrap;text-decoration:none;
+ display:inline-flex;align-items:center;gap:6px}
+.hoff .av[aria-disabled="true"]{opacity:.42;pointer-events:none}
+.hoff .ay{margin-top:7px;font:400 11.5px/1.45 var(--font);color:var(--ink2)}
+.hoff .ay b{color:var(--ink)}
 .demo-btn{display:flex;align-items:center;gap:9px;width:100%;justify-content:center;
  background:var(--acc);color:#fff;border:0;border-radius:var(--r);padding:12px 14px;
  font:700 14px var(--font-disp);cursor:pointer;text-decoration:none;margin-bottom:10px}
@@ -529,7 +543,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 16:10 · 0804482</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 16:31 · fd0c22c</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -621,6 +635,9 @@ function urlDemo(c){
   return LANDING + '/demo?m=' + encodeURIComponent(c.localidad)
        + '&pais=' + (ISO_PAIS[c.pais] || 'AR') + '&origen=llamados';
 }
+/* A quien se le pasa la posta. Un solo lugar: si manana atiende otra persona,
+   se cambia aca y no en cinco textos sueltos. */
+const POSTA = { nombre: 'Lucas', wa: '5491160526449' };
 const ORDEN_PAIS = ['Argentina'];
 const rankPais = c => { const i = ORDEN_PAIS.indexOf(c.pais); return i < 0 ? 99 : i; };
 
@@ -1000,6 +1017,15 @@ function abrir(id){
         + '<div class="box script">' + esc(sp.script) + '</div>'
         + (sp.angulo ? '<div class="box"><b>Ángulo:</b> ' + esc(sp.angulo) + '</div>' : '')
         + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
+    + '<div class="sec"><label><i class="sic w"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg></i>Pasar la posta</label>'
+      + '<div class="hoff">'
+        + '<div class="t"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg>Pedile el WhatsApp</div>'
+        + '<div class="fila">'
+          + '<input id="pWa" type="tel" inputmode="tel" placeholder="WhatsApp del contacto" value="' + esc(r.wa || '') + '">'
+          + '<a class="av" id="pAvisar" aria-disabled="' + (r.wa ? 'false' : 'true') + '" target="_blank" rel="noopener">Avisar a ' + POSTA.nombre + '</a>'
+        + '</div>'
+        + '<div class="ay">No hace falta que haya aceptado la demo: alcanza con que esté interesado. Decile <b>“en cinco minutos te escribe un técnico, se llama ' + POSTA.nombre + ', y te ayuda con esto”</b>.</div>'
+      + '</div></div>'
     + '<div class="sec"><label><i class="sic ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></i>El cierre</label>'
       + '<a class="demo-btn" href="' + urlDemo(c) + '" target="_blank" rel="noopener">'
         + '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>'
@@ -1038,6 +1064,29 @@ function abrir(id){
   if (bs) bs.onclick = () => copiar(sp.script, 'pCopiarScript', 'Copiar speech');
   // El cierre se copia en texto plano, listo para pegarlo en el WhatsApp que
   // sigue a la llamada: por eso lleva el nombre del municipio ya adentro.
+  // El WhatsApp se guarda apenas se tipea: si la llamada se corta, el numero no
+  // se pierde. El aviso se rearma con lo ultimo escrito.
+  const iwa = document.getElementById('pWa'), bav = document.getElementById('pAvisar');
+  function armarAviso(){
+    const num = (iwa.value || '').replace(/[^\d+]/g, '');
+    bav.setAttribute('aria-disabled', num.length < 8 ? 'true' : 'false');
+    const txt = POSTA.nombre + ', te paso una posta.\n\n'
+      + (f.intendente ? f.intendente + ' \u2014 ' + (f.cargo || 'intendente') + ' de ' : 'Intendente de ')
+      + c.localidad + ' (' + c.region + ', ' + c.pais + ')\n'
+      + 'WhatsApp: ' + num + '\n\n'
+      + 'Est\u00e1 interesado. Qued\u00f3 en que lo contact\u00e1s vos.';
+    bav.href = 'https://wa.me/' + POSTA.wa + '?text=' + encodeURIComponent(txt);
+  }
+  iwa.oninput = () => { const rr = reg(id); rr.wa = iwa.value.trim(); guardar(); armarAviso(); };
+  bav.onclick = () => {
+    if (bav.getAttribute('aria-disabled') === 'true') return;
+    const rr = reg(id);
+    rr.hist.push({t:new Date().toISOString(), tipo:'nota',
+                  txt:'Posta pasada a ' + POSTA.nombre + ' (' + (rr.wa||'') + ')'});
+    guardar(); pintarHist();
+  };
+  armarAviso();
+
   const bc = document.getElementById('pCopiarCierre');
   if (bc) bc.onclick = () => copiar(cie.link + '\n\n' + cie.duda, 'pCopiarCierre', 'Copiar el cierre');
   document.querySelectorAll('#pEstados .eb').forEach(b => b.onclick = () => {
