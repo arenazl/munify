@@ -404,13 +404,13 @@ export default function Login() {
         </div>
 
         {/* ===== PANEL (derecha) ===== */}
-        <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-10 lg:p-16">
+        <div className="lg:w-1/2 flex items-center justify-center px-6 py-6 sm:px-10 sm:py-8 lg:px-16 lg:py-6">
           <div className="w-full max-w-md">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: `${accent}1f` }}>
-              <Sparkles className="h-6 w-6" style={{ color: accent }} />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${accent}1f` }}>
+              <Sparkles className="h-5 w-5" style={{ color: accent }} />
             </div>
             <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
-            <p className="text-white/60 mt-1 mb-6">
+            <p className="text-white/60 mt-1 mb-3">
               {sinPerfiles
                 ? 'Ingresá con tu cuenta'
                 : muniPropio ? `Elegí un perfil para entrar a ${muniPropio}` : 'Elegí un perfil para entrar a la demo'}
@@ -425,10 +425,10 @@ export default function Login() {
               const vecinos = demoUsers.filter(u => u.rol === 'vecino');
               const empleados = demoUsers.filter(u => u.rol === 'empleado');
               const Heading = ({ t }: { t: string }) => (
-                <div className="text-[10px] font-bold tracking-[0.2em] text-white/40 mb-2">{t}</div>
+                <div className="text-[10px] font-bold tracking-[0.2em] text-white/40 mb-1.5">{t}</div>
               );
               return (
-                <div className="space-y-4 mb-5">
+                <div className="space-y-3 mb-2">
                   {/* ADMINISTRACIÓN — verde del brand, destacado arriba */}
                   {admins.map(u => (
                     <div key={u.email}>
@@ -437,7 +437,7 @@ export default function Login() {
                         type="button"
                         onClick={() => quickLogin(u.email, 'demo123')}
                         disabled={loading}
-                        className="w-full flex items-center gap-3 p-3.5 rounded-2xl text-left transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 shadow-lg"
+                        className="w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 shadow-lg"
                         style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: fondoHero }}
                       >
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-black/15">
@@ -455,21 +455,23 @@ export default function Login() {
                   {dependenciaUsers.length > 0 && (
                     <div>
                       <Heading t="ÁREAS" />
-                      <div className="space-y-2">
+                      {/* Dos columnas: con seis dependencias, una sola fila por
+                          area empujaba media pantalla de scroll. */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {dependenciaUsers.map(dep => (
                           <button
                             key={dep.email}
                             type="button"
                             onClick={() => quickLogin(dep.email, 'demo123')}
                             disabled={loading}
-                            className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
+                            className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
                             style={{ backgroundColor: `${dep.color || accent}1f`, border: `1px solid ${dep.color || accent}33` }}
                           >
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${dep.color || accent}2e` }}>
-                              <Building2 className="h-5 w-5" style={{ color: dep.color || accent }} />
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${dep.color || accent}2e` }}>
+                              <Building2 className="h-4 w-4" style={{ color: dep.color || accent }} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-white truncate">{dep.nombre_dependencia}</div>
+                              <div className="text-[13px] font-bold text-white truncate">{dep.nombre_dependencia}</div>
                               <div className="text-[11px] text-white/50 truncate">
                                 {dep.reclamos_count} {dep.reclamos_count === 1 ? 'reclamo' : 'reclamos'} · {dep.tramites_count} {dep.tramites_count === 1 ? 'trámite' : 'trámites'}
                               </div>
@@ -492,13 +494,13 @@ export default function Login() {
                             type="button"
                             onClick={() => quickLogin(u.email, 'demo123')}
                             disabled={loading}
-                            className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-all hover:brightness-125 active:scale-[0.98] disabled:opacity-50"
+                            className="flex items-center gap-2 p-2 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.98] disabled:opacity-50"
                             style={{ backgroundColor: '#3b82f61a', border: '1px solid #3b82f633' }}
                           >
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: '#3b82f626' }}>
-                              <User className="h-4 w-4" style={{ color: '#7cb0ff' }} />
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#3b82f626' }}>
+                              <User className="h-3.5 w-3.5" style={{ color: '#7cb0ff' }} />
                             </div>
-                            <div className="min-w-0 w-full">
+                            <div className="min-w-0">
                               <div className="text-[11px] font-bold text-white truncate">{u.nombre}</div>
                               <div className="text-[9px] text-white/45 truncate">Ciudadano</div>
                             </div>
@@ -512,18 +514,18 @@ export default function Login() {
                   {empleados.length > 0 && (
                     <div>
                       <Heading t="CAMPO" />
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {empleados.map(u => (
                           <button
                             key={u.email}
                             type="button"
                             onClick={() => quickLogin(u.email, 'demo123')}
                             disabled={loading}
-                            className="flex items-center gap-2.5 p-3 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
+                            className="flex items-center gap-2 p-2 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
                             style={{ backgroundColor: '#f59e0b1a', border: '1px solid #f59e0b33' }}
                           >
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#f59e0b26' }}>
-                              <Wrench className="h-4 w-4" style={{ color: '#fbbf24' }} />
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#f59e0b26' }}>
+                              <Wrench className="h-3.5 w-3.5" style={{ color: '#fbbf24' }} />
                             </div>
                             <div className="min-w-0">
                               <div className="text-[11px] font-bold text-white truncate">{u.nombre_completo}</div>

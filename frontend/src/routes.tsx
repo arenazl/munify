@@ -81,7 +81,7 @@ import SeedLogs from './pages/SeedLogs';
 import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
 import Demo from './pages/Demo';
-import DemoReady from './pages/DemoReady';
+import DemoListo from './pages/DemoListo';
 import PresentacionMunify from './pages/PresentacionMunify';
 import MunicipioAcceso from './pages/MunicipioAcceso';
 import DependenciasConfig from './pages/DependenciasConfig';
@@ -175,7 +175,7 @@ export const router = createBrowserRouter([
 
   // === RUTAS PÚBLICAS ===
   { path: '/demo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Demo /> },
-  { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoReady /> },
+  { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
   // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
   { path: '/presentacion', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <PresentacionMunify /> },
   // Marca mono-tenant: /bienvenido (selector de municipios de Munify) NUNCA se
