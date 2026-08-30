@@ -154,6 +154,12 @@ const BRANDS: Record<string, Brand> = {
 // marca por el host (sin env var por site). Infra bindea el mismo repo/branch a
 // cada dominio y listo. Fallback: VITE_BRAND (build) y por último 'munify'.
 const HOST_TO_BRAND: Record<string, string> = {
+  // Dominio propio, sobre el MISMO proyecto de Cloudflare Pages que munify-qa:
+  // como la marca sale del host, un solo deploy sirve a las dos y Paraguay
+  // Limpio nunca queda en una version distinta de la app.
+  'pylimpio.munify.com.ar': 'paraguay-limpio',
+  // El de Netlify queda hasta que se dé de baja ese site (sirve un build
+  // congelado del 27/08 por los créditos agotados de la cuenta).
   'paraguay-limpio.netlify.app': 'paraguay-limpio',
 };
 
