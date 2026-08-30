@@ -154,6 +154,28 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
  padding:9px 12px;color:var(--ink);outline:none;font-size:14px}
 .ia-input input:focus{border-color:var(--purple)}
 .ia-nota{font-size:11.5px;color:var(--ink3);padding:0 13px 11px;line-height:1.5}
+/* La chuleta de modulos. Densa a proposito: entra en 270px y se lee de reojo. */
+.mods{display:flex;flex-direction:column;gap:5px}
+.mod{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--card2)}
+.mod>button{width:100%;text-align:left;background:none;border:0;cursor:pointer;padding:8px 10px;
+ display:flex;gap:8px;align-items:flex-start;color:inherit;font:inherit}
+.mod>button:hover{background:var(--card)}
+.mod .ic{flex:0 0 15px;height:15px;margin-top:1px}
+.mod .ic svg{width:15px;height:15px;stroke:var(--acc);fill:none;stroke-width:2;
+ stroke-linecap:round;stroke-linejoin:round}
+.mod .tx{flex:1;min-width:0}
+.mod .tx b{display:block;font:700 12.5px var(--font-disp);letter-spacing:-.1px}
+.mod .tx i{display:block;font-style:normal;font-size:11.5px;line-height:1.4;color:var(--ink2);margin-top:2px}
+.mod .car{flex:0 0 10px;height:10px;margin-top:4px;transition:transform .18s}
+.mod .car svg{width:10px;height:10px;stroke:var(--ink3);fill:none;stroke-width:2.6;
+ stroke-linecap:round;stroke-linejoin:round}
+.mod.on .car{transform:rotate(90deg)}
+.mod ul{display:none;margin:0;padding:0 10px 9px 32px;list-style:none}
+.mod.on ul{display:block}
+.mod li{position:relative;font-size:11.8px;line-height:1.45;color:var(--ink2);padding:3px 0 3px 11px}
+.mod li:before{content:"";position:absolute;left:0;top:9px;width:4px;height:4px;
+ border-radius:99px;background:var(--acc)}
+.mod li b{color:var(--ink);font-weight:700}
 .tarj{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
 .tarj h3{margin:0 0 10px;display:flex;align-items:center;gap:8px;font:700 14px/1.25 var(--font-display);
  letter-spacing:-.2px;color:var(--ink)}
@@ -366,12 +388,47 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .f-head h2{margin:0 0 3px;font-size:23px;letter-spacing:-.4px}
 .f-head .meta{font-size:13px;white-space:normal}
 .f-body{padding:14px 16px 18px}
+/* La barra de acciones: pegada bajo el titulo, siempre visible mientras se
+   scrollea el libreto. Son las cuatro cosas que se TOCAN en una llamada. */
+.f-acc{display:flex;gap:6px;padding:9px 16px;border-bottom:1px solid var(--line);
+ background:var(--card);position:sticky;top:0;z-index:3}
+.f-acc button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;
+ border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--ink2);
+ padding:8px 4px;cursor:pointer;font:700 11px var(--font-disp);transition:.15s}
+.f-acc button svg{width:17px;height:17px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.f-acc button:hover{border-color:var(--acc);color:var(--ink);transform:translateY(-1px)}
+.f-acc button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.f-acc .a-wa svg{stroke:var(--ok)} .f-acc .a-demo svg{stroke:var(--acc)}
+.f-acc .a-cie svg{stroke:var(--warn)} .f-acc .a-ia svg{stroke:var(--purple)}
+/* Marca cuando el WhatsApp ya se cargo: de un vistazo se sabe si esa llamada
+   ya dejo la posta o no. */
+.f-acc button.hecho{border-color:var(--ok);background:var(--ok-soft,var(--card2));color:var(--ink)}
+
+/* Modal de accion. Vive fuera de la ficha (fixed) para no heredar su scroll. */
+.fmod{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:18px}
+.fmod.on{display:flex}
+.fmod .velo{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.fmod .caja{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;
+ width:min(560px,100%);max-height:min(92vh,860px);display:flex;flex-direction:column;
+ box-shadow:0 24px 60px rgba(0,0,0,.4)}
+.fmod .cab2{display:flex;align-items:center;gap:9px;padding:13px 15px;border-bottom:1px solid var(--line)}
+.fmod .cab2 h3{margin:0;flex:1;min-width:0;font:800 16px var(--font-disp);letter-spacing:-.2px}
+.fmod .cab2 .mu{font-size:12px;color:var(--ink3);white-space:nowrap}
+.fmod .x{background:none;border:0;color:var(--ink3);font-size:24px;line-height:1;cursor:pointer;padding:0 2px}
+/* La accion principal del modal no puede quedar abajo de todo ni encima del
+   texto: pie propio, fuera de lo que scrollea. */
+.fmod .pie3{padding:11px 15px;border-top:1px solid var(--line);background:var(--card);
+ border-radius:0 0 16px 16px}
+.fmod .pie3 .btn{width:100%;padding:11px;font-size:14px}
+.fmod .cue{padding:14px 15px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+@media(max-width:700px){ .fmod{padding:0} .fmod .caja{max-height:100%;height:100%;border-radius:0} }
+
 .sec{margin-bottom:16px}
 .sec:last-child{margin-bottom:0}
 /* Titulos de seccion con IDENTIDAD (pedido del dueño, 2026-08-28): la Sora
    de los heroes, chiquita y con su marca de acento — un golpe de vista y ya
    sabes que viene, en lugar del microrotulo gris que hacia "panel panel". */
-.sec>label{display:flex;align-items:center;gap:8px;font:700 14.5px/1.25 var(--font-display);
+.sec>label{display:flex;align-items:center;gap:8px;font:700 15.5px/1.25 var(--font-display);
  letter-spacing:-.2px;color:var(--ink);margin-bottom:8px}
 /* El iconito diferenciador de cada seccion (pedido del dueño): un pantallazo
    y ya sabes que informacion agrega el panel. SVG inline, color semantico. */
@@ -384,11 +441,11 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
    SEMANTICA (script/perfil/dato/ojo) conservan su tarjeta tintada: son los
    que tienen que saltar a la vista. */
 .box{background:transparent;border:0;border-left:2px solid var(--line);border-radius:0;
- padding:2px 0 2px 13px;font-size:13.5px;color:var(--ink2);line-height:1.6;overflow-wrap:anywhere}
+ padding:2px 0 2px 13px;font-size:15px;color:var(--ink2);line-height:1.62;overflow-wrap:anywhere}
 .box+.box{margin-top:9px}
 .box.script,.box.perfil,.box.dato,.box.ojo{background:var(--card2);border:1px solid var(--line);
  border-radius:10px;padding:11px 13px}
-.box.script{border-left:3px solid var(--acc);color:var(--ink)}
+.box.script{border-left:3px solid var(--acc);color:var(--ink);font-size:15.5px;line-height:1.68}
 .box.perfil{border-left:3px solid var(--purple)}
 .box.dato{border-left:3px solid var(--ok)}
 .box.ojo{border-left:3px solid var(--warn)}
@@ -489,6 +546,19 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
  .fila2{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* El zoom al 80% de la tablet entra las tres columnas pero se come el libreto:
+   15px quedan en 12 reales, y esto se lee EN VOZ ALTA con el telefono al oido.
+   Se compensa al reves — 18,5 por 0,8 vuelve a los 15 del escritorio. Va al
+   FINAL a proposito: mas arriba lo pisan las reglas base del mismo selector.
+   Sube solo el texto que se lee, no la interfaz. */
+@media(min-width:1001px) and (max-width:1300px){
+  .f-body .box{font-size:18px;line-height:1.6}
+  .f-body .box.script{font-size:18.5px;line-height:1.66}
+  .f-body .sec>label{font-size:18px}
+  .f-body .quien .nom{font-size:22px}
+  .cierre-frase{font-size:16px}
+  .mod .tx b{font-size:14px} .mod .tx i{font-size:13px} .mod li{font-size:13px}
+}
 </style></head>
 <body>
 <header class="top"><div class="top-in">
@@ -539,18 +609,18 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
       </div>
       <div class="ops-col ficha-col" id="fichaCol"><div class="ficha" id="ficha"></div></div>
       <div class="ops-col extra">
-        <div class="tarj"><h3><i class="sic w"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></i>Lo que viene</h3><div id="agenda2"></div></div>
-        <div class="tarj" style="margin-top:13px"><h3><i class="sic o"><svg viewBox="0 0 24 24"><path d="M5 20V9M12 20V4M19 20v-9"/></svg></i>Avance</h3><div id="porPais2"></div></div>
+        <div class="tarj"><h3><i class="sic a"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></i>Qué módulos tienen</h3><div class="mods" id="modsBox"></div></div>
         <div class="tarj" style="margin-top:13px"><h3><i class="sic w"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4.2 10.3c.8.8 1.4 1.6 1.6 2.7h5.2c.2-1.1.8-1.9 1.6-2.7A6 6 0 0 0 12 3Z"/></svg></i>Recordar</h3><div class="tips" id="tipsBox"></div></div>
       </div>
     </div>
   </div>
 </div>
 <div class="ov" id="ov"></div></div>
+<div class="fmod" id="fmod"></div>
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 17:45 · 151c27a</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 18:34 · 07fe726</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -596,6 +666,39 @@ function cierreDe(pais, muni){
   const r = t => t.replace('{M}', muni || 'tu municipio').replace('{MESES}', MESES_GRATIS);
   return { link: r(c.link), duda: r(c.duda) };
 }
+/* Que vende cada modulo, en la lengua del intendente. Cada bullet es algo que
+   la app HACE — si manana deja de hacerlo, se saca de aca: prometer de mas en
+   la llamada lo paga la demo cinco minutos despues. */
+const MODULOS = [
+  { id:'rec', t:'Reclamos', g:'El vecino saca una foto y el municipio se entera al toque.',
+    ic:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    b:['Reporta desde el celular con <b>foto y ubicaci\u00f3n</b>, escribiendo como habla: la IA lo clasifica y lo manda al \u00e1rea que corresponde.',
+       'Sale una <b>orden de trabajo</b> con cuadrilla, materiales y plazo. Nada queda en un cuaderno.',
+       'El vecino sigue el estado <b>en tiempo real</b> y le llega el aviso cuando se resolvi\u00f3.',
+       '<b>Mapa de calor</b>: d\u00f3nde se rompe siempre y qu\u00e9 \u00e1rea tarda.'] },
+  { id:'tra', t:'Tr\u00e1mites', g:'Sin cola, sin ventanilla, sin "vuelva ma\u00f1ana".',
+    ic:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6"/>',
+    b:['Saca el <b>turno online</b> y ve la disponibilidad real en el momento.',
+       'Ve <b>cu\u00e1nto sale</b> antes de arrancar, y paga con <b>Mercado Pago</b>.',
+       'Le llega un <b>WhatsApp con los requisitos</b>: viene con todo y no vuelve dos veces.',
+       'Habilitaciones, permisos de obra, certificados, inscripciones. Los que tenga el municipio.'] },
+  { id:'cob', t:'Cobros y tesorer\u00eda', g:'El vecino ve lo que debe y paga. Y adentro, la plata ordenada.',
+    ic:'<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>',
+    b:['El vecino entra, <b>ve su deuda de tasas y la paga</b> desde el celular.',
+       'Cajas, fondos, <b>agenda de pagos</b> y gastos por proyecto u obra: en qu\u00e9 se fue cada peso.',
+       '<b>Stock de los bienes del municipio</b>: qu\u00e9 hay, d\u00f3nde est\u00e1 y qui\u00e9n lo tiene.',
+       'Le <b>importamos el Excel</b> que ya usan y arrancan con su historia adentro.'] },
+  { id:'com', t:'Comunicaciones', g:'Hablarle al vecino sin depender de un grupo de Facebook.',
+    ic:'<path d="M3 11l18-8-8 18-2-8-8-2Z"/>',
+    b:['Obras, eventos, <b>alertas urgentes</b>: la novedad aparece en el inicio de la app.',
+       'Llega como <b>notificaci\u00f3n al celular</b>, no como un cartel que nadie lee.',
+       'Se <b>mide el alcance</b>: cu\u00e1ntos la vieron de verdad.'] },
+  { id:'cam', t:'Campo y personal', g:'Saber qu\u00e9 hizo cada cuadrilla hoy, sin llamar a nadie.',
+    ic:'<path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Z"/><path d="M9 9h6"/>',
+    b:['Las <b>\u00f3rdenes de trabajo</b> del d\u00eda en el celular del capataz, con su parte al cerrar.',
+       '<b>Flota</b>: qu\u00e9 m\u00e1quina est\u00e1 en qu\u00e9 obra.',
+       '<b>Presentismo y jornada</b> del personal municipal.'] }
+];
 const ESTADOS = [
   {id:'contactado', lbl:'Contactado'}, {id:'no-atiende', lbl:'No atiende'},
   {id:'rellamar', lbl:'Volver a llamar'}, {id:'descartado', lbl:'Descartado'},
@@ -839,7 +942,6 @@ function pintarHoy(){
   const cuentaAg = document.getElementById('agendaCuenta');
   if (cuentaAg) cuentaAg.textContent = ag.length || '';
   document.getElementById('agenda').innerHTML = html;
-  document.getElementById('agenda2').innerHTML = html;
   document.querySelectorAll('[data-abrir]').forEach(el => el.onclick = ev => {
     if (ev.target.closest('a')) return; irA('ops'); abrir(el.dataset.abrir);
   });
@@ -852,7 +954,6 @@ function pintarHoy(){
       + '<span class="num">' + hechos + '/' + tot + '</span></div>';
   }).join('');
   document.getElementById('porPais').innerHTML = ph;
-  document.getElementById('porPais2').innerHTML = ph;
 
   const hoyLl = movimientos(600).filter(m => m.h.tipo === 'llamada' && m.h.t.slice(0,10) === hoy).length;
   const cts = CONTACTOS.filter(x => (db[x.id]||{}).estado === 'contactado').length;
@@ -979,6 +1080,24 @@ function tipsPara(){
   return propios.concat(genericos);
 }
 
+/* Se pinta una sola vez: no depende del municipio ni del dia. */
+function pintarModulos(){
+  const cont = document.getElementById('modsBox'); if (!cont) return;
+  cont.innerHTML = MODULOS.map(m =>
+    '<div class="mod" data-m="' + m.id + '">'
+    + '<button type="button"><span class="ic"><svg viewBox="0 0 24 24">' + m.ic + '</svg></span>'
+      + '<span class="tx"><b>' + esc(m.t) + '</b><i>' + esc(m.g) + '</i></span>'
+      + '<span class="car"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span></button>'
+    + '<ul>' + m.b.map(x => '<li>' + x + '</li>').join('') + '</ul></div>').join('');
+  /* Uno abierto por vez: la columna es angosta y con dos abiertos hay que
+     scrollear justo cuando no se puede mirar la pantalla. */
+  cont.querySelectorAll('.mod > button').forEach(b => b.onclick = () => {
+    const d = b.parentElement, ya = d.classList.contains('on');
+    cont.querySelectorAll('.mod').forEach(x => x.classList.remove('on'));
+    if (!ya) d.classList.add('on');
+  });
+}
+
 function pintarTip(){
   const caja = document.getElementById('tipsBox'); if (!caja) return;
   const lista = tipsPara(); if (!lista.length) return;
@@ -1017,6 +1136,12 @@ function abrir(id){
       '<div class="f-head"><div><h2>' + esc(c.localidad) + '</h2>'
       + '<div class="meta">' + esc(c.region) + ' · ' + esc(c.pais) + ' · ' + esc(c.habitantes) + ' hab. · ' + esc(c.lote) + '</div></div>'
       + '<button class="cerrar-ficha" id="cerrarFicha" aria-label="Cerrar">&times;</button></div>'
+    + '<div class="f-acc">'
+      + '<button type="button" class="a-wa' + (r.wa ? ' hecho' : '') + '" data-acc="wa"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg><span>WhatsApp</span></button>'
+      + '<button type="button" class="a-demo" data-acc="demo"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg><span>Demo</span></button>'
+      + '<button type="button" class="a-cie" data-acc="cierre"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span>Cierre</span></button>'
+      + '<button type="button" class="a-ia" data-acc="ia"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/></svg><span>Asistente</span></button>'
+    + '</div>'
     + '<div class="f-body">'
     + '<div class="p-tel"><a class="tel-btn" href="' + telHref(c.telefono) + '" id="pLlamar">Llamar ' + esc(c.telefono) + '</a>'
     + '<button class="btn" id="pCopiar">Copiar</button></div>'
@@ -1027,33 +1152,6 @@ function abrir(id){
         + '<div class="box script">' + esc(sp.script) + '</div>'
         + (sp.angulo ? '<div class="box"><b>Ángulo:</b> ' + esc(sp.angulo) + '</div>' : '')
         + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
-    + '<div class="sec"><label><i class="sic w"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg></i>Pasar la posta</label>'
-      + '<div class="hoff">'
-        + '<div class="t"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg>Pedile el WhatsApp</div>'
-        + '<div class="fila">'
-          + '<input id="pWa" type="tel" inputmode="tel" placeholder="WhatsApp del contacto" value="' + esc(r.wa || '') + '">'
-          + '<a class="av" id="pAvisar" aria-disabled="' + (r.wa ? 'false' : 'true') + '" target="_blank" rel="noopener">Avisar a ' + POSTA.nombre + '</a>'
-        + '</div>'
-        + '<div class="ay">No hace falta que haya aceptado la demo: alcanza con que esté interesado. Decile <b>“en cinco minutos te escribe un técnico, se llama ' + POSTA.nombre + ', y te ayuda con esto”</b>.</div>'
-      + '</div></div>'
-    + '<div class="sec"><label><i class="sic ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></i>El cierre</label>'
-      + '<a class="demo-btn" href="' + urlDemo(c) + '" target="_blank" rel="noopener">'
-        + '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>'
-        + 'Crear la demo de ' + esc(c.localidad) + '</a>'
-      + '<div class="demo-nota">Se abre con el municipio ya cargado. Compartí pantalla y creala mientras hablás: en dos minutos lo ve andando con sus barrios y sus calles.</div>'
-      + '<div class="cierre-b">'
-        + '<div class="cab">Frase que cierra<span class="cuando">cuando la charla se puso buena</span></div>'
-        + '<div class="cuerpo">'
-          + '<div class="cierre-p"><span class="n">1</span><div class="t"><b>Primero el link, nunca solo</b>'
-            + '<div class="cierre-frase">' + esc(cie.link) + '</div></div></div>'
-          + '<div class="cierre-p"><span class="n">2</span><div class="t"><b>Si duda o dice que no sabe</b>'
-            + '<div class="cierre-frase">' + esc(cie.duda) + '</div></div></div>'
-          + '<div class="cierre-ojo"><b>No mandes el link a secas.</b> A un intendente un link suelto no le mueve la aguja: lo abre, no entiende qué está mirando y ahí muere. El link va SIEMPRE con la frase, y si titubea, ofrecele la reunión de quince minutos.</div>'
-        + '</div>'
-      + '</div>'
-      + '<div class="lnk"><code id="pLinkTxt">' + esc(urlDemo(c)) + '</code>'
-        + '<button class="cp" id="pCopiarLink">Copiar link</button></div>'
-      + '<button class="btn sm" id="pCopiarCierre" style="margin-top:8px">Copiar el cierre CON el link</button></div>'
     + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg></i>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
@@ -1064,9 +1162,9 @@ function abrir(id){
       + '<input class="f" id="pProximo" type="date" value="' + esc(r.proximo) + '"></div>'
       + '<button class="btn p" id="pGuardar" style="margin-top:9px;width:100%">Guardar en el historial</button></div>'
     + '<div class="sec"><label><i class="sic n"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i>Historial</label><div class="hist" id="pHist"></div></div>'
-    + '<div class="ia-wrap" id="iaBox"></div></div>';
+    + '</div>';
 
-  pintarHist(); iaMontar(c);
+  pintarHist();
   document.getElementById('fichaCol').classList.add('on');
   document.getElementById('ov').classList.add('on');
   const cf = document.getElementById('cerrarFicha'); if (cf) cf.onclick = cerrarFicha;
@@ -1074,40 +1172,12 @@ function abrir(id){
   document.getElementById('pCopiar').onclick = () => copiar(c.telefono, 'pCopiar', 'Copiar');
   const bs = document.getElementById('pCopiarScript');
   if (bs) bs.onclick = () => copiar(sp.script, 'pCopiarScript', 'Copiar speech');
-  // El cierre se copia en texto plano, listo para pegarlo en el WhatsApp que
-  // sigue a la llamada: por eso lleva el nombre del municipio ya adentro.
-  // El WhatsApp se guarda apenas se tipea: si la llamada se corta, el numero no
-  // se pierde. El aviso se rearma con lo ultimo escrito.
-  const iwa = document.getElementById('pWa'), bav = document.getElementById('pAvisar');
-  function armarAviso(){
-    const num = (iwa.value || '').replace(/[^\d+]/g, '');
-    bav.setAttribute('aria-disabled', num.length < 8 ? 'true' : 'false');
-    const txt = POSTA.nombre + ', te paso una posta.\n\n'
-      + (f.intendente ? f.intendente + ' \u2014 ' + (f.cargo || 'intendente') + ' de ' : 'Intendente de ')
-      + c.localidad + ' (' + c.region + ', ' + c.pais + ')\n'
-      + 'WhatsApp: ' + num + '\n\n'
-      + 'Est\u00e1 interesado. Qued\u00f3 en que lo contact\u00e1s vos.';
-    bav.href = 'https://wa.me/' + POSTA.wa + '?text=' + encodeURIComponent(txt);
-  }
-  iwa.oninput = () => { const rr = reg(id); rr.wa = iwa.value.trim(); guardar(); armarAviso(); };
-  bav.onclick = () => {
-    if (bav.getAttribute('aria-disabled') === 'true') return;
-    const rr = reg(id);
-    rr.hist.push({t:new Date().toISOString(), tipo:'nota',
-                  txt:'Posta pasada a ' + POSTA.nombre + ' (' + (rr.wa||'') + ')'});
-    guardar(); pintarHist();
-  };
-  armarAviso();
+  // Las cuatro acciones abren su modal. El contexto de la llamada queda
+  // guardado para que cada modal se arme con este municipio.
+  FICHA = { id: id, c: c, r: r, cie: cie, f: f, sp: sp };
+  document.querySelectorAll('.f-acc button').forEach(b =>
+    b.onclick = () => abrirAccion(b.dataset.acc));
 
-  const bc = document.getElementById('pCopiarCierre');
-  // El cierre se copia CON el link adentro: el speech promete "te paso un link"
-  // y sin eso quien vende se queda con la frase y sin nada que pegar.
-  if (bc) bc.onclick = () => copiar(
-    cie.link + '\n\n' + urlDemo(c) + '\n\n' + cie.duda,
-    'pCopiarCierre', 'Copiar el cierre CON el link');
-  // Y el link solo, para pegarlo suelto en el chat.
-  const bl = document.getElementById('pCopiarLink');
-  if (bl) bl.onclick = () => copiar(urlDemo(c), 'pCopiarLink', 'Copiar link');
   document.querySelectorAll('#pEstados .eb').forEach(b => b.onclick = () => {
     r.estado = (r.estado === b.dataset.e) ? '' : b.dataset.e;
     r.hist.push({t:new Date().toISOString(), tipo:'estado', txt: r.estado ? ('Marcado: ' + LBL[r.estado]) : 'Estado borrado'});
@@ -1176,17 +1246,22 @@ const IA_SISTEMA = [
 
 const IA_SUGERENCIAS = [
   'Armame el arranque de la llamada para este municipio',
-  'Me dicen que ya tienen un sistema de reclamos, que les contesto',
-  'Me dicen que no hay presupuesto, que les contesto',
+  'Me dicen que ya tienen un sistema de reclamos, \u00bfqu\u00e9 les contesto?',
+  'Me dicen que no hay presupuesto, \u00bfqu\u00e9 les contesto?',
+  'Me dicen que lo tienen que ver con el Concejo, \u00bfqu\u00e9 les contesto?',
+  'La ventaja de Tr\u00e1mites en dos frases, para leer en voz alta',
+  'La ventaja de Reclamos en dos frases, para leer en voz alta',
+  '\u00bfPor qu\u00e9 elegirnos a nosotros y no a otro proveedor?',
+  'Tres frases gatillo para despertarle inter\u00e9s',
   'Escribime el mail de seguimiento',
-  'Que le pregunto para saber si vale la pena insistir'
+  '\u00bfQu\u00e9 le pregunto para saber si vale la pena insistir?'
 ];
 
 function iaPintar(c){
   const cont = document.getElementById('iaMsgs'); if (!cont) return;
   if (!iaChat.length){
     cont.innerHTML = '<div class="ia-msg ia">Tengo la ficha de <b>' + esc(c.localidad) + '</b> a mano. '
-      + 'Preguntame como encarar la llamada, como contestar una objecion o pedime el mail de seguimiento.</div>';
+      + 'Preguntame c\u00f3mo encarar la llamada, c\u00f3mo contestar una objeci\u00f3n o pedime el mail de seguimiento.</div>';
   } else {
     cont.innerHTML = iaChat.map(m => '<div class="ia-msg ' + m.rol + '">' + esc(m.txt) + '</div>').join('');
   }
@@ -1222,13 +1297,12 @@ function iaMontar(c){
   iaChat = []; iaCargando = false;
   const cont = document.getElementById('iaBox'); if (!cont) return;
   cont.innerHTML =
-      '<div class="ia-head"><i class="sic p"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/></svg></i>Asistente</div>'
-    + '<div class="ia-msgs" id="iaMsgs"></div>'
+      '<div class="ia-msgs" id="iaMsgs"></div>'
     + '<div class="ia-sug" id="iaSug">' + IA_SUGERENCIAS.map((s, i) =>
         '<button data-i="' + i + '">' + esc(s) + '</button>').join('') + '</div>'
     + '<div class="ia-input"><input id="iaInp" placeholder="Preguntale algo sobre esta llamada..." autocomplete="off">'
     + '<button class="btn p" id="iaEnviar">Preguntar</button></div>'
-    + '<div class="ia-nota">Responde con la ficha de arriba como contexto. No conoce datos actuales del municipio '
+    + '<div class="ia-nota">Responde con la ficha de este municipio como contexto. No conoce datos actuales del municipio '
     + '(quien es el intendente hoy, obras, cifras): eso sale del relevamiento, no de la IA.</div>';
   iaPintar(c);
   document.getElementById('iaSug').querySelectorAll('button').forEach(b =>
@@ -1239,6 +1313,113 @@ function iaMontar(c){
   inp.onkeydown = e => { if (e.key === 'Enter') mandar(); };
 }
 
+/* El municipio de la llamada en curso: cada modal se arma con esto. */
+let FICHA = null;
+
+function cerrarModal(){
+  const m = document.getElementById('fmod'); if (m) m.classList.remove('on');
+}
+
+function abrirAccion(tipo){
+  if (!FICHA) return;
+  const c = FICHA.c, r = FICHA.r, cie = FICHA.cie;
+  const m = document.getElementById('fmod');
+  const tit = { wa:'Pedile el WhatsApp', demo:'Crear la demo', cierre:'El cierre', ia:'Asistente' }[tipo] || '';
+  /* El pie va FUERA del area que scrollea: la accion principal del modal
+     tiene que estar siempre a la vista sin tapar lo que hay que leer. */
+  let cue = '', pie = '';
+
+  if (tipo === 'wa'){
+    cue = '<div class="hoff">'
+      + '<div class="t"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg>El n\u00famero del contacto</div>'
+      + '<div class="fila">'
+        + '<input id="pWa" type="tel" inputmode="tel" placeholder="WhatsApp del contacto" value="' + esc(r.wa || '') + '">'
+        + '<a class="av" id="pAvisar" aria-disabled="' + (r.wa ? 'false' : 'true') + '" target="_blank" rel="noopener">Avisar a ' + POSTA.nombre + '</a>'
+      + '</div>'
+      + '<div class="ay">No hace falta que haya aceptado la demo: alcanza con que est\u00e9 interesado. Decile <b>\u201cen cinco minutos te escribe un t\u00e9cnico, se llama ' + POSTA.nombre + ', y te ayuda con esto\u201d</b>.</div>'
+      + '</div>';
+  } else if (tipo === 'demo'){
+    cue = '<a class="demo-btn" href="' + urlDemo(c) + '" target="_blank" rel="noopener">'
+      + '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>'
+      + 'Crear la demo de ' + esc(c.localidad) + '</a>'
+      + '<div class="demo-nota">Se abre con el municipio ya cargado. Compart\u00ed pantalla y creala mientras habl\u00e1s: en dos minutos lo ve andando con sus barrios y sus calles.</div>'
+      + '<div class="lnk"><code id="pLinkTxt">' + esc(urlDemo(c)) + '</code>'
+      + '<button class="cp" id="pCopiarLink">Copiar link</button></div>';
+  } else if (tipo === 'cierre'){
+    cue = '<div class="cierre-b">'
+      + '<div class="cab">Frase que cierra<span class="cuando">cuando la charla se puso buena</span></div>'
+      + '<div class="cuerpo">'
+        + '<div class="cierre-p"><span class="n">1</span><div class="t"><b>Primero el link, nunca solo</b>'
+          + '<div class="cierre-frase">' + esc(cie.link) + '</div></div></div>'
+        + '<div class="cierre-p"><span class="n">2</span><div class="t"><b>Si duda o dice que no sabe</b>'
+          + '<div class="cierre-frase">' + esc(cie.duda) + '</div></div></div>'
+        + '<div class="cierre-ojo"><b>No mandes el link a secas.</b> A un intendente un link suelto no le mueve la aguja: lo abre, no entiende qu\u00e9 est\u00e1 mirando y ah\u00ed muere. El link va SIEMPRE con la frase, y si titubea, ofrecele la reuni\u00f3n de quince minutos.</div>'
+      + '</div></div>'
+      + '<div class="lnk"><code id="pLinkTxt">' + esc(urlDemo(c)) + '</code>'
+      + '<button class="cp" id="pCopiarLink">Copiar link</button></div>'
+      ;
+    pie = '<button class="btn p" id="pCopiarCierre">Copiar el cierre CON el link</button>';
+  } else if (tipo === 'ia'){
+    cue = '<div class="ia-wrap" id="iaBox"></div>';
+  }
+
+  m.innerHTML = '<div class="velo" data-cerrar="1"></div><div class="caja">'
+    + '<div class="cab2"><h3>' + esc(tit) + '</h3><span class="mu">' + esc(c.localidad) + '</span>'
+    + '<button class="x" data-cerrar="1" aria-label="Cerrar">&times;</button></div>'
+    + '<div class="cue">' + cue + '</div>'
+    + (pie ? '<div class="pie3">' + pie + '</div>' : '') + '</div>';
+  m.classList.add('on');
+  m.querySelectorAll('[data-cerrar]').forEach(x => x.onclick = cerrarModal);
+
+  if (tipo === 'wa') wireWa();
+  if (tipo === 'demo' || tipo === 'cierre') wireLink();
+  if (tipo === 'ia') iaMontar(c);
+}
+
+/* El WhatsApp se guarda apenas se tipea: si la llamada se corta, el numero no
+   se pierde. El aviso se rearma con lo ultimo escrito. */
+function wireWa(){
+  const c = FICHA.c, f = FICHA.f, id = FICHA.id;
+  const iwa = document.getElementById('pWa'), bav = document.getElementById('pAvisar');
+  function armar(){
+    const num = (iwa.value || '').replace(/[^\d+]/g, '');
+    bav.setAttribute('aria-disabled', num.length < 8 ? 'true' : 'false');
+    const txt = POSTA.nombre + ', te paso una posta.\n\n'
+      + (f.intendente ? f.intendente + ' \u2014 ' + (f.cargo || 'intendente') + ' de ' : 'Intendente de ')
+      + c.localidad + ' (' + c.region + ', ' + c.pais + ')\n'
+      + 'WhatsApp: ' + num + '\n\n'
+      + 'Est\u00e1 interesado. Qued\u00f3 en que lo contact\u00e1s vos.';
+    bav.href = 'https://wa.me/' + POSTA.wa + '?text=' + encodeURIComponent(txt);
+  }
+  iwa.oninput = () => {
+    const rr = reg(id); rr.wa = iwa.value.trim(); guardar(); armar();
+    /* La marca en la barra se prende sola: al cerrar el modal ya se ve que
+       esa llamada dejo el numero. */
+    const bt = document.querySelector('.f-acc .a-wa');
+    if (bt) bt.classList.toggle('hecho', !!rr.wa);
+  };
+  bav.onclick = () => {
+    if (bav.getAttribute('aria-disabled') === 'true') return;
+    const rr = reg(id);
+    rr.hist.push({t:new Date().toISOString(), tipo:'nota',
+                  txt:'Posta pasada a ' + POSTA.nombre + ' (' + (rr.wa||'') + ')'});
+    guardar(); pintarHist();
+  };
+  armar();
+}
+
+function wireLink(){
+  const c = FICHA.c, cie = FICHA.cie;
+  const bl = document.getElementById('pCopiarLink');
+  if (bl) bl.onclick = () => copiar(urlDemo(c), 'pCopiarLink', 'Copiar link');
+  // El cierre se copia CON el link adentro: el speech promete "te paso un link"
+  // y sin eso quien vende se queda con la frase y sin nada que pegar.
+  const bc = document.getElementById('pCopiarCierre');
+  if (bc) bc.onclick = () => copiar(
+    cie.link + '\n\n' + urlDemo(c) + '\n\n' + cie.duda,
+    'pCopiarCierre', 'Copiar el cierre CON el link');
+}
+
 function pintarHist(){
   const r = reg(selId), el = document.getElementById('pHist'); if (!el) return;
   const h = (r.hist || []).slice().reverse();
@@ -1247,7 +1428,7 @@ function pintarHist(){
         + '<span class="dot" style="background:' + (COL[x.tipo]||'var(--line2)') + '"></span>' + esc(x.txt) + '</div>').join('')
     : '<div class="vacio">Todavía no hay movimientos en este municipio.</div>';
 }
-function cerrarFicha(){
+function cerrarFicha(){ cerrarModal();
   document.getElementById('fichaCol').classList.remove('on');
   document.getElementById('ov').classList.remove('on');
 }
@@ -1276,7 +1457,7 @@ function pintarPie(){
   document.getElementById('pieBar').style.width = pct + '%';
   document.getElementById('pieTxt').textContent = hechos + ' de ' + n + ' gestionados (' + pct + '%)';
 }
-function pintar(){ pintarKpis(); pintarPie(); pintarHoy(); if (vista === 'ops'){ pintarFiltros(); pintarLista(); } }
+function pintar(){ pintarModulos(); pintarKpis(); pintarPie(); pintarHoy(); if (vista === 'ops'){ pintarFiltros(); pintarLista(); } }
 function irA(v){
   vista = v;
   // El CSS necesita saber en que vista estamos: "Trabajar" usa el modo
