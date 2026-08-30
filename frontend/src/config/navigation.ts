@@ -363,9 +363,19 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Tesorería',
       description: 'Mapa de contactos y gastos'
     },
-    // NOTA: 'Contactos' (/gestion/tesoreria/contactos) salió del sidebar — es
-    // el padrón de personas y proveedores (ABM de referencia); se llega por el
-    // tile de Configuración → Tesorería.
+    {
+      // VUELVE al sidebar (2026-08-30) a pedido del cliente de San Pedro Norte.
+      // Habia salido el 2026-08-02 por decision de producto —se llegaba por el
+      // tile de Configuracion → Tesoreria—, pero es la pantalla donde esta el
+      // boton "Unificar duplicados", que se usa despues de cada importacion de
+      // Excel: enterrarla dos clicks adentro la volvia inencontrable.
+      name: 'Contactos',
+      href: '/gestion/tesoreria/contactos',
+      icon: Users,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Padrón de personas y proveedores'
+    },
     {
       // Oculto por decisión de producto (2026-08-02). Gate original:
       //   show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
