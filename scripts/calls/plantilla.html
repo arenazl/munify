@@ -407,7 +407,7 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 /* Modal de accion. Vive fuera de la ficha (fixed) para no heredar su scroll. */
 .fmod{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:18px}
 .fmod.on{display:flex}
-.fmod .velo{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.fmod .velo{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
 .fmod .caja{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;
  width:min(560px,100%);max-height:min(92vh,860px);display:flex;flex-direction:column;
  box-shadow:0 24px 60px rgba(0,0,0,.4)}
@@ -421,7 +421,18 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
  border-radius:0 0 16px 16px}
 .fmod .pie3 .btn{width:100%;padding:11px;font-size:14px}
 .fmod .cue{padding:14px 15px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-@media(max-width:700px){ .fmod{padding:0} .fmod .caja{max-height:100%;height:100%;border-radius:0} }
+@media(max-width:700px){
+  /* Hoja anclada abajo: crece con su contenido, no pinta media pantalla en
+     blanco, y deja los controles donde esta el pulgar. */
+  .fmod{padding:0;align-items:flex-end}
+  .fmod .caja{width:100%;max-height:92dvh;border-radius:16px 16px 0 0}
+  /* El titulo no puede quedar abajo del reloj y la senal (doc 11). */
+  .fmod .cab2{padding-top:max(env(safe-area-inset-top),13px)}
+  /* Ni el pie abajo del borde inferior ni del indicador de gestos. */
+  .fmod .pie3{padding-bottom:max(env(safe-area-inset-bottom),11px);border-radius:0}
+  .fmod .cue{padding-bottom:max(env(safe-area-inset-bottom),20px)}
+  .fmod .pie3 + .cue, .fmod .cue:has(+ .pie3){padding-bottom:20px}
+}
 
 .sec{margin-bottom:16px}
 .sec:last-child{margin-bottom:0}
@@ -484,12 +495,10 @@ textarea:focus,input.f:focus{border-color:var(--acc)}
 /* "Recordar" como ROTADOR (dueño, 2026-08-28): eran tres parrafos apilados,
    la parte mas larga y estatica de la columna. Un consejo por vez, rota cada
    10 s, y el punto lo frena — mismo patron que el resto de la app. */
-.tips{display:block}
+.tips{display:flex;flex-direction:column;gap:7px}
+.tips .box.tip{margin:0;font-size:12px;line-height:1.45;padding:9px 11px}
+.tips .box.tip b{display:block;font-size:12.5px;margin-bottom:3px}
 .tips .tip{min-height:150px}
-.tip-pts{display:flex;gap:5px;margin-top:9px}
-.tip-pts button{border:0;padding:0;cursor:pointer;width:8px;height:8px;border-radius:4px;
- background:var(--line2);transition:width .25s}
-.tip-pts button.act{width:20px;background:var(--warn)}
 @media(prefers-reduced-motion:reduce){.tip-pts button{transition:none}}
 
 /* El pie es parte del SHELL (fila del flex del body), ya no `position:fixed`:
@@ -558,6 +567,13 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
   .f-body .quien .nom{font-size:22px}
   .cierre-frase{font-size:16px}
   .mod .tx b{font-size:14px} .mod .tx i{font-size:13px} .mod li{font-size:13px}
+}
+
+/* En el telefono la cabecera del cierre entraba a los tirones y partia las
+   dos frases en cuatro renglones: el "cuando" pasa abajo, en su linea. */
+@media(max-width:700px){
+  .cierre-b > .cab{flex-wrap:wrap;line-height:1.3}
+  .cierre-b > .cab .cuando{margin-left:0;flex:0 0 100%;margin-top:2px}
 }
 </style></head>
 <body>
@@ -880,7 +896,7 @@ function pintarMetaDia(){
     + '<span class="frase">' + frase + '</span></div>'
     + '<div class="pasos">' + Array.from({length: meta}, function(_, i){
         return '<i class="' + (i < hechas ? 'ok' : (i === hechas ? 'hoy' : '')) + '"></i>'; }).join('') + '</div>'
-    + '<div class="meta-cfg">Mi objetivo por día: <input id="inpMeta" type="number" min="1" max="20" value="' + meta + '"> llamadas</div>';
+    + '<div class="meta-cfg">Mi objetivo por día: <input id="inpMeta" type="number" autocomplete="off" min="1" max="20" value="' + meta + '"> llamadas</div>';
   const inp = document.getElementById('inpMeta');
   inp.onchange = () => {
     const v = Math.max(1, Math.min(20, parseInt(inp.value, 10) || 5));
@@ -1071,7 +1087,8 @@ function tipsPara(){
   if (!c) return TIPS;
   const f = FUNC[c.id] || {}, r = db[c.id] || {};
   const propios = [];
-  if (f.nota) propios.push({titulo: 'Ojo con ' + c.localidad, texto: f.nota});
+  /* La nota del municipio NO se repite aca: ya esta arriba en la ficha, en el
+     recuadro "Ojo", y verla dos veces en la misma pantalla es ruido. */
   if (r.quien || r.notas) propios.push({titulo: 'La última vez',
     texto: (r.quien ? 'Hablaste con ' + r.quien + '. ' : '') + (r.notas || '')});
   const esAR = c.pais === 'Argentina';
@@ -1101,15 +1118,11 @@ function pintarModulos(){
 function pintarTip(){
   const caja = document.getElementById('tipsBox'); if (!caja) return;
   const lista = tipsPara(); if (!lista.length) return;
-  const i = tipIdx % lista.length, t = lista[i];
-  caja.innerHTML = '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>'
-    + '<div class="tip-pts">' + lista.map((x, j) =>
-      '<button data-i="' + j + '"' + (j === i ? ' class="act"' : '')
-      + ' aria-label="Ver consejo ' + (j + 1) + '"></button>').join('') + '</div>';
-  caja.querySelectorAll('.tip-pts button').forEach(b =>
-    b.onclick = () => { tipIdx = +b.dataset.i; tipManual = true; pintarTip(); });
+  /* Los tres a la vista. Antes era un carrusel: escondia dos tercios del
+     consejo justo cuando hace falta, y rotaba solo mientras se lo leia. */
+  caja.innerHTML = lista.map(t =>
+    '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>').join('');
 }
-setInterval(() => { if (!tipManual && tipsPara().length > 1){ tipIdx += 1; pintarTip(); } }, 10000);
 
 function abrir(id){
   const c = CONTACTOS.find(x => x.id === id); if (!c) return;
@@ -1156,10 +1169,10 @@ function abrir(id){
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
     + '<div class="sec"><label><i class="sic w"><svg viewBox="0 0 24 24"><path d="M17 3l4 4L8 20H4v-4L17 3Z"/></svg></i>Qué me dijo</label>'
-      + '<textarea id="pNotas" rows="3" placeholder="Con quién hablé, qué área, qué dijo...">' + esc(r.notas) + '</textarea>'
+      + '<textarea id="pNotas" rows="3" autocomplete="off" placeholder="Con quién hablé, qué área, qué dijo...">' + esc(r.notas) + '</textarea>'
       + '<div class="fila2" style="margin-top:9px">'
-      + '<input class="f" id="pQuien" placeholder="Con quién hablé" value="' + esc(r.quien) + '">'
-      + '<input class="f" id="pProximo" type="date" value="' + esc(r.proximo) + '"></div>'
+      + '<input class="f" id="pQuien" autocomplete="off" autocorrect="off" placeholder="Con quién hablé" value="' + esc(r.quien) + '">'
+      + '<input class="f" id="pProximo" type="date" autocomplete="off" value="' + esc(r.proximo) + '"></div>'
       + '<button class="btn p" id="pGuardar" style="margin-top:9px;width:100%">Guardar en el historial</button></div>'
     + '<div class="sec"><label><i class="sic n"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i>Historial</label><div class="hist" id="pHist"></div></div>'
     + '</div>';
@@ -1333,7 +1346,7 @@ function abrirAccion(tipo){
     cue = '<div class="hoff">'
       + '<div class="t"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg>El n\u00famero del contacto</div>'
       + '<div class="fila">'
-        + '<input id="pWa" type="tel" inputmode="tel" placeholder="WhatsApp del contacto" value="' + esc(r.wa || '') + '">'
+        + '<input id="pWa" type="tel" inputmode="tel" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="WhatsApp del contacto" value="' + esc(r.wa || '') + '">'
         + '<a class="av" id="pAvisar" aria-disabled="' + (r.wa ? 'false' : 'true') + '" target="_blank" rel="noopener">Avisar a ' + POSTA.nombre + '</a>'
       + '</div>'
       + '<div class="ay">No hace falta que haya aceptado la demo: alcanza con que est\u00e9 interesado. Decile <b>\u201cen cinco minutos te escribe un t\u00e9cnico, se llama ' + POSTA.nombre + ', y te ayuda con esto\u201d</b>.</div>'
