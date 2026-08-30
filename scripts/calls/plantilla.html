@@ -184,10 +184,44 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 /* Tablet en horizontal (y ventanas angostas de escritorio): la columna
    auxiliar se va y quedan lista + ficha, que es lo que se trabaja. Antes
    estas anchuras entraban a la fuerza y apretaban la ficha. */
+/* TABLET (1001-1300): las tres columnas ENTRAN, con un zoom de 0.8. Es lo que
+   el dueno hacia a mano en su tablet de 1080px. Antes se escondia la tercera y
+   con ella se iban "Lo que viene", "Recordar" y "Avance": una tablet de 11"
+   quedaba PEOR que un telefono, que al menos las apila.
+   El zoom va en .wrap y no en el body: el body fija el alto de la ventana. */
 @media(min-width:1001px) and (max-width:1300px){
-  .ops{grid-template-columns:300px minmax(0,1fr)}
-  .extra{display:none}
+  .wrap{zoom:.8}
+  .ops{grid-template-columns:320px minmax(0,1fr) 270px}
+  .extra{display:block}
 }
+@supports not (zoom: 1){
+  @media(min-width:1001px) and (max-width:1300px){
+    .wrap{transform:scale(.8);transform-origin:top center;width:125%;margin-left:-12.5%}
+  }
+}
+.f-body{overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+.extra{overscroll-behavior:contain;touch-action:pan-y}
+/* EL CIERRE — el bloque que remata la llamada. Va marcado aparte del speech
+   a proposito: el speech es para ABRIR y esto es para CERRAR, y quien llama no
+   es el dueno del producto sino alguien contratado. Tiene que saltar a la vista
+   en el momento en que la charla se pone buena. */
+.cierre-b{border:1px solid var(--ok);border-radius:var(--r);overflow:hidden;margin-top:2px}
+.cierre-b > .cab{background:var(--ok);color:#fff;padding:8px 12px;display:flex;align-items:center;gap:8px;
+ font:800 12px/1.2 var(--font-disp);letter-spacing:.04em;text-transform:uppercase}
+.cierre-b > .cab .cuando{margin-left:auto;font:600 10px var(--font);text-transform:none;letter-spacing:0;opacity:.9}
+.cierre-b .cuerpo{padding:12px}
+.cierre-p{display:flex;gap:10px;margin-bottom:12px}
+.cierre-p:last-child{margin-bottom:0}
+.cierre-p .n{flex:0 0 20px;height:20px;border-radius:99px;background:var(--ok);color:#fff;
+ display:flex;align-items:center;justify-content:center;font:800 11px var(--font-disp)}
+.cierre-p .t{flex:1;min-width:0}
+.cierre-p .t b{display:block;font:700 12.5px var(--font-disp);margin-bottom:3px}
+.cierre-frase{background:var(--bg2);border-left:3px solid var(--ok);border-radius:0 8px 8px 0;
+ padding:9px 11px;font:400 13px/1.55 var(--font);color:var(--ink)}
+.cierre-frase em{font-style:normal;background:rgba(16,163,74,.14);border-radius:3px;padding:0 3px}
+.cierre-ojo{margin-top:11px;padding:9px 11px;border-radius:8px;background:rgba(220,38,38,.07);
+ border:1px solid rgba(220,38,38,.25);font:400 12px/1.5 var(--font);color:var(--ink2)}
+.cierre-ojo b{color:var(--bad)}
 .ops-col{min-width:0;min-height:0}
 .lista-col,.ficha-col,.extra{overflow-y:auto;overflow-x:hidden;
  overscroll-behavior:contain;touch-action:pan-y}
@@ -291,7 +325,7 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .badge.n{border-color:var(--purple);color:var(--purple)}
 .badge.ojo{border-color:var(--warn);color:var(--warn)}
 
-.ficha{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+.ficha{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;max-height:100%;
  touch-action:pan-y}
 /* El cuerpo de la ficha SOLO va vertical, EN TODOS LOS ANCHOS (antes vivia
    solo en la media query mobile y el desktop quedaba sin la regla): un
@@ -502,6 +536,37 @@ const TIPS = DATOS.tips || [];
 const FUNC = DATOS.funcionarios || {};
 const INVEST = DATOS.investigacion || {};
 const KEY = 'munify_llamados_v1', KEY_TEMA = 'munify_llamados_tema', KEY_VISTA = 'munify_llamados_vista';
+/* El cierre por pais. Misma promesa, las palabras del lugar. El fallback es
+   la variante de USTED, que es la que sirve para cualquier pais nuevo: si
+   manana entra Bolivia o Chile, arranca tratando de usted y despues se
+   afina, que es el error barato. Nunca al reves. */
+const CIERRE = {
+  'Argentina': {
+    link: 'Te paso un link ahora. Ponés el nombre de {M} y en cinco minutos tenés la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tenés {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    duda: '¿Te molestaría que arreglemos una llamada de diez o quince minutos? Te lo dejo andando y te muestro en criollo cómo empezar a usarlo. Salís de esa reunión sabiendo trabajar con la aplicación.'
+  },
+  'Paraguay': {
+    link: 'Le paso un link ahora mismo. Pone el nombre de {M} y en cinco minutos tiene la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    duda: '¿Le molestaría que coordinemos una llamada de diez o quince minutos? Se lo dejo andando y le muestro de manera sencilla cómo empezar a usarlo. Sale de esa reunión sabiendo trabajar con la aplicación.'
+  },
+  'Perú': {
+    link: 'Le paso un enlace ahora mismo. Coloca el nombre de {M} y en cinco minutos tiene la plataforma funcionando con los datos reales de la municipalidad: sus barrios, sus calles, su mapa. No es una presentación, es el producto operativo. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    duda: '¿Le incomodaría que coordinemos una llamada de diez o quince minutos? Se lo dejo operativo y le muestro de manera sencilla cómo empezar a usarlo. Sale de esa reunión sabiendo trabajar con la plataforma.'
+  },
+  'Uruguay': {
+    link: 'Le paso un link ahora. Pone el nombre de {M} y en cinco minutos tiene la plataforma andando con los datos reales del municipio: sus barrios, sus calles, su mapa. No es una presentación, es el producto funcionando. Lo tiene {MESES} para usarlo de verdad, y la capacitación de lo que necesiten a medida la hacemos nosotros.',
+    duda: '¿Le molestaría que coordinemos una llamada de diez o quince minutos? Se lo dejo andando y le muestro de manera sencilla cómo empezar a usarlo. Sale de esa reunión sabiendo trabajar con la aplicación.'
+  }
+};
+/* Los meses de prueba se declaran UNA vez: es el numero que el vendedor dice
+   por telefono y el que el intendente despues lee en la web. Si dejan de
+   coincidir, la llamada pierde credibilidad justo en el remate. */
+const MESES_GRATIS = 'un mes gratis';
+function cierreDe(pais, muni){
+  const c = CIERRE[pais] || CIERRE['Uruguay'];   // fallback: usted
+  const r = t => t.replace('{M}', muni || 'tu municipio').replace('{MESES}', MESES_GRATIS);
+  return { link: r(c.link), duda: r(c.duda) };
+}
 const ESTADOS = [
   {id:'contactado', lbl:'Contactado'}, {id:'no-atiende', lbl:'No atiende'},
   {id:'rellamar', lbl:'Volver a llamar'}, {id:'descartado', lbl:'Descartado'},
@@ -862,6 +927,8 @@ function abrir(id){
   selId = id;
   tipIdx = 0; tipManual = false; pintarTip();
   const r = reg(id), sp = SPEECH[c.pais] || {}, f = FUNC[c.id] || {}, inv = INVEST[c.id] || {};
+  // El cierre habla como el pais del municipio, no como Buenos Aires.
+  const cie = cierreDe(c.pais, c.localidad);
   const quien = f.intendente
     ? '<div class="quien"><div class="k">Preguntá por</div><div class="nom">' + esc(f.intendente) + '</div>'
       + '<div class="sub">' + esc(f.cargo || 'Intendente') + (f.partido ? ' · ' + esc(f.partido) : '')
@@ -890,6 +957,18 @@ function abrir(id){
         + '<div class="box script">' + esc(sp.script) + '</div>'
         + (sp.angulo ? '<div class="box"><b>Ángulo:</b> ' + esc(sp.angulo) + '</div>' : '')
         + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
+    + '<div class="sec"><label><i class="sic ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></i>El cierre</label>'
+      + '<div class="cierre-b">'
+        + '<div class="cab">Frase que cierra<span class="cuando">cuando la charla se puso buena</span></div>'
+        + '<div class="cuerpo">'
+          + '<div class="cierre-p"><span class="n">1</span><div class="t"><b>Primero el link, nunca solo</b>'
+            + '<div class="cierre-frase">' + esc(cie.link) + '</div></div></div>'
+          + '<div class="cierre-p"><span class="n">2</span><div class="t"><b>Si duda o dice que no sabe</b>'
+            + '<div class="cierre-frase">' + esc(cie.duda) + '</div></div></div>'
+          + '<div class="cierre-ojo"><b>No mandes el link a secas.</b> A un intendente un link suelto no le mueve la aguja: lo abre, no entiende qué está mirando y ahí muere. El link va SIEMPRE con la frase, y si titubea, ofrecele la reunión de quince minutos.</div>'
+        + '</div>'
+      + '</div>'
+      + '<button class="btn sm" id="pCopiarCierre" style="margin-top:8px">Copiar el cierre</button></div>'
     + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg></i>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
@@ -910,6 +989,10 @@ function abrir(id){
   document.getElementById('pCopiar').onclick = () => copiar(c.telefono, 'pCopiar', 'Copiar');
   const bs = document.getElementById('pCopiarScript');
   if (bs) bs.onclick = () => copiar(sp.script, 'pCopiarScript', 'Copiar speech');
+  // El cierre se copia en texto plano, listo para pegarlo en el WhatsApp que
+  // sigue a la llamada: por eso lleva el nombre del municipio ya adentro.
+  const bc = document.getElementById('pCopiarCierre');
+  if (bc) bc.onclick = () => copiar(cie.link + '\n\n' + cie.duda, 'pCopiarCierre', 'Copiar el cierre');
   document.querySelectorAll('#pEstados .eb').forEach(b => b.onclick = () => {
     r.estado = (r.estado === b.dataset.e) ? '' : b.dataset.e;
     r.hist.push({t:new Date().toISOString(), tipo:'estado', txt: r.estado ? ('Marcado: ' + LBL[r.estado]) : 'Estado borrado'});
