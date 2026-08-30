@@ -205,6 +205,14 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
    a proposito: el speech es para ABRIR y esto es para CERRAR, y quien llama no
    es el dueno del producto sino alguien contratado. Tiene que saltar a la vista
    en el momento en que la charla se pone buena. */
+/* El boton que crea la demo EN VIVO, durante la llamada. Va arriba del cierre
+   y pesa visualmente: es la accion que convierte la charla en una demostracion. */
+.demo-btn{display:flex;align-items:center;gap:9px;width:100%;justify-content:center;
+ background:var(--acc);color:#fff;border:0;border-radius:var(--r);padding:12px 14px;
+ font:700 14px var(--font-disp);cursor:pointer;text-decoration:none;margin-bottom:10px}
+.demo-btn:hover{filter:brightness(1.07)}
+.demo-btn svg{width:17px;height:17px;flex:0 0 17px;stroke:currentColor;fill:none;stroke-width:2}
+.demo-nota{font:400 11.5px/1.5 var(--font);color:var(--ink2);margin:-4px 0 12px;padding-left:2px}
 .cierre-b{border:1px solid var(--ok);border-radius:var(--r);overflow:hidden;margin-top:2px}
 .cierre-b > .cab{background:var(--ok);color:#fff;padding:8px 12px;display:flex;align-items:center;gap:8px;
  font:800 12px/1.2 var(--font-disp);letter-spacing:.04em;text-transform:uppercase}
@@ -603,8 +611,32 @@ function delPais(arr){ return paisHoy ? arr.filter(c => c.pais === paisHoy) : ar
    arrancar la operacion por el mercado que menos se conoce es al reves de lo
    que conviene. Dentro de cada pais sigue mandando la poblacion.
    Un pais que no este listado va al final, no se pierde. */
+/* De donde sale la pantalla que crea la demo. Se elige por HOST para que la
+   ronda de QA no cree municipios en la base productiva: produccion son dos
+   hostnames listados y todo lo demas es QA, que es el lado seguro del error. */
+const LANDING = ['app.munify.com.ar','munify.com.ar','www.munify.com.ar'].indexOf(location.hostname) !== -1
+  ? 'https://munify.com.ar' : 'https://qa.munify.com.ar';
+const ISO_PAIS = {'Argentina':'AR','Paraguay':'PY','Uruguay':'UY','Chile':'CL','Perú':'PE','Bolivia':'BO'};
+function urlDemo(c){
+  return LANDING + '/demo?m=' + encodeURIComponent(c.localidad)
+       + '&pais=' + (ISO_PAIS[c.pais] || 'AR') + '&origen=llamados';
+}
 const ORDEN_PAIS = ['Argentina'];
 const rankPais = c => { const i = ORDEN_PAIS.indexOf(c.pais); return i < 0 ? 99 : i; };
+
+/* Dentro del pais, el orden es AL AZAR (dueno, 2026-08-30) — no por poblacion:
+   asi la ronda pasea por Cordoba, Entre Rios, Salta y Jujuy en vez de bajar la
+   lista de los mas grandes, que caen casi todos en las mismas tres provincias.
+
+   Pero al azar ESTABLE por dia: se siembra con la fecha, no con Math.random().
+   Si cambiara en cada refresco, el sugerido de arriba y la cola de abajo
+   dirian cosas distintas cada vez que se toca algo, y quien llama pierde el
+   hilo de a quien venia siguiendo. Manana la baraja es otra. */
+function azarDelDia(id){
+  let h = 0, sem = hoyISO() + '|' + id;
+  for (let i = 0; i < sem.length; i++) h = (h * 31 + sem.charCodeAt(i)) >>> 0;
+  return h / 4294967295;
+}
 
 /* La cola del dia: primero lo prometido que ya vencio, despues los pendientes
    por pais prioritario y, dentro de cada uno, de mayor poblacion. Con un pais
@@ -613,7 +645,7 @@ function colaDelDia(n){
   const hoy = hoyISO();
   const deuda = agendados().filter(x => x.r.proximo <= hoy).map(x => x.c);
   const frescos = pendientes().slice().sort((a,b) =>
-    rankPais(a) - rankPais(b) || poblacion(b) - poblacion(a));
+    rankPais(a) - rankPais(b) || azarDelDia(a.id) - azarDelDia(b.id));
   const cola = [];
   const push = c => { if (c && !cola.some(x => x.id === c.id)) cola.push(c); };
   delPais(deuda).forEach(push);
@@ -751,8 +783,7 @@ function pintarHoy(){
   } else {
     const f = FUNC[c.id] || {}, inv = INVEST[c.id] || {}, r = db[c.id] || {};
     const porque = (r.proximo && r.proximo <= hoyISO()) ? 'Le prometiste volver hoy'
-      : (paisHoy ? 'El más grande sin llamar de ' + paisHoy
-                 : 'El más grande sin llamar de ' + c.pais);
+      : 'Para arrancar hoy · ' + (paisHoy || c.pais);
     cont.innerHTML = '<div class="k">' + porque + '</div><h2>' + esc(c.localidad) + '</h2>'
       + '<div class="s">' + esc(c.region) + ' · ' + esc(c.pais) + ' · ' + esc(c.habitantes) + ' hab.'
       + (f.intendente ? ' · Preguntá por <b>' + esc(f.intendente) + '</b>' : '') + '</div>'
@@ -970,6 +1001,10 @@ function abrir(id){
         + (sp.angulo ? '<div class="box"><b>Ángulo:</b> ' + esc(sp.angulo) + '</div>' : '')
         + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
     + '<div class="sec"><label><i class="sic ok"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></i>El cierre</label>'
+      + '<a class="demo-btn" href="' + urlDemo(c) + '" target="_blank" rel="noopener">'
+        + '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>'
+        + 'Crear la demo de ' + esc(c.localidad) + '</a>'
+      + '<div class="demo-nota">Se abre con el municipio ya cargado. Compartí pantalla y creala mientras hablás: en dos minutos lo ve andando con sus barrios y sus calles.</div>'
       + '<div class="cierre-b">'
         + '<div class="cab">Frase que cierra<span class="cuando">cuando la charla se puso buena</span></div>'
         + '<div class="cuerpo">'
