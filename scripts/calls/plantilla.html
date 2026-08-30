@@ -461,11 +461,39 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .box.dato{border-left:3px solid var(--ok)}
 .box.ojo{border-left:3px solid var(--warn)}
 .box b{color:var(--ink)}
-.quien{background:linear-gradient(135deg,var(--acc-soft),transparent);border:1px solid var(--acc);
- border-radius:10px;padding:12px 14px;margin-bottom:13px}
-.quien .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);font-weight:700}
-.quien .nom{font-size:19px;font-weight:800;letter-spacing:-.3px;margin:3px 0 1px}
-.quien .sub{font-size:12.5px;color:var(--ink2)}
+/* LA NARRACION: parrafos separados, no un ladrillo. Por telefono se pierde
+   el renglon si son cinco lineas seguidas (dueño, 2026-08-30). */
+.box.script p{margin:0}
+.box.script p+p{margin-top:10px}
+/* Los cuatro TABS del guion (dueño, 2026-08-30): "una vez que le hiciste la
+   introduccion, abajo aparece el detalle un poquito mas de cada modulo".
+   Cerrados de arranque: el centro es la narracion y nada mas; se abre el que
+   el otro pida. */
+.g-hint{font-size:12.5px;color:var(--ink3);margin-bottom:9px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tab{border:1px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:9px;
+ padding:9px 6px;cursor:pointer;font-size:12.5px;font-weight:700;transition:.12s;
+ display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.tab svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tab:hover{border-color:var(--acc);color:var(--ink)}
+.tab.on{border-color:var(--acc);background:var(--acc-soft);color:var(--ink)}
+.g-txt{margin-top:9px;background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--acc);
+ border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.66;color:var(--ink)}
+.g-txt p{margin:0}
+.g-txt p+p{margin-top:10px}
+.g-txt b{color:var(--ink);font-weight:700}
+@media(max-width:420px){ .tabs{grid-template-columns:repeat(2,1fr)} }
+/* DATO DE COLOR (columna derecha): lo que se sabe ANTES de marcar. Vivia en el
+   centro y empujaba la narracion fuera de la pantalla (dueño, 2026-08-30). */
+.color-box{display:flex;flex-direction:column;gap:9px}
+.color-it{font-size:12.3px;line-height:1.5;color:var(--ink2);border-left:2px solid var(--line);padding-left:11px}
+.color-it b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+ color:var(--ink3);font-weight:700;margin-bottom:3px}
+.color-it.jefe{border-left-color:var(--acc)} .color-it.jefe .n{font-size:14.5px;font-weight:800;color:var(--ink)}
+.color-it.perfil{border-left-color:var(--purple)}
+.color-it.hielo{border-left-color:var(--ok)}
+.color-it a{color:var(--acc);overflow-wrap:anywhere}
 .p-tel{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:13px}
 .p-tel a.tel-btn{flex:1;justify-content:center;font-size:16px;padding:13px}
 .btn{border:1px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:9px;padding:9px 13px;
@@ -625,7 +653,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
       </div>
       <div class="ops-col ficha-col" id="fichaCol"><div class="ficha" id="ficha"></div></div>
       <div class="ops-col extra">
-        <div class="tarj"><h3><i class="sic a"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></i>Qué módulos tienen</h3><div class="mods" id="modsBox"></div></div>
+        <div class="tarj"><h3><i class="sic p"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></i>Dato de color</h3><div class="color-box" id="colorBox"></div></div>
         <div class="tarj" style="margin-top:13px"><h3><i class="sic w"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4.2 10.3c.8.8 1.4 1.6 1.6 2.7h5.2c.2-1.1.8-1.9 1.6-2.7A6 6 0 0 0 12 3Z"/></svg></i>Recordar</h3><div class="tips" id="tipsBox"></div></div>
       </div>
     </div>
@@ -682,38 +710,33 @@ function cierreDe(pais, muni){
   const r = t => t.replace('{M}', muni || 'tu municipio').replace('{MESES}', MESES_GRATIS);
   return { link: r(c.link), duda: r(c.duda) };
 }
-/* Que vende cada modulo, en la lengua del intendente. Cada bullet es algo que
-   la app HACE — si manana deja de hacerlo, se saca de aca: prometer de mas en
-   la llamada lo paga la demo cinco minutos despues. */
-const MODULOS = [
-  { id:'rec', t:'Reclamos', g:'El vecino saca una foto y el municipio se entera al toque.',
+/* EL GUION DE LOS CUATRO TABS (dueño, 2026-08-30). No son bullets de folleto:
+   es lo que se DICE cuando el otro engancha con un tema. "Toca en plataforma,
+   bueno, te cuento que la plataforma esta centrada en una aplicacion de
+   celular, que se puede bajar con un QR..." — se lee tal cual, en voz alta.
+   Cada cosa que se promete aca la tiene que poder mostrar la demo cinco
+   minutos despues. */
+const GUION = [
+  { id:'plat', t:'Plataforma',
+    ic:'<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/>',
+    p:['Es una plataforma online, y para el vecino es una <b>aplicación de celular</b>: la baja escaneando un QR y ya entra, con el nombre, los barrios y las calles del municipio adentro.',
+       'Desde ahí recibe <b>notificaciones en tiempo real</b> del estado de sus gestiones — un reclamo que hizo, un trámite que arrancó o un turno que pidió. No tiene que llamar ni acercarse a preguntar cómo viene.',
+       'Y del lado de ustedes es <b>un solo tablero</b>: todo lo que entra cae ordenado, con área responsable y fecha. En el momento se ve qué está pendiente y quién lo tiene.'] },
+  { id:'rec', t:'Reclamos',
     ic:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
-    b:['Reporta desde el celular con <b>foto y ubicaci\u00f3n</b>, escribiendo como habla: la IA lo clasifica y lo manda al \u00e1rea que corresponde.',
-       'Sale una <b>orden de trabajo</b> con cuadrilla, materiales y plazo. Nada queda en un cuaderno.',
-       'El vecino sigue el estado <b>en tiempo real</b> y le llega el aviso cuando se resolvi\u00f3.',
-       '<b>Mapa de calor</b>: d\u00f3nde se rompe siempre y qu\u00e9 \u00e1rea tarda.'] },
-  { id:'tra', t:'Tr\u00e1mites', g:'Sin cola, sin ventanilla, sin "vuelva ma\u00f1ana".',
+    p:['El vecino, desde el celular, <b>saca una foto</b> y avisa de un problema en la calle: un bache, una luminaria quemada, una rama caída. Escribe como habla, no completa un formulario.',
+       'Eso le llega al <b>área responsable en segundos</b>, ya clasificado. Y el vecino tiene devolución en tiempo real: sabe que alguien tomó su caso, y le avisamos cuando se resolvió.',
+       'Ahí está el cambio importante. Para el municipio queda la <b>trazabilidad completa</b> — quién lo tomó, cuánto tardó, qué zona se rompe siempre — y para el vecino, la sensación de que lo escucharon. Eso se nota en la calle.'] },
+  { id:'tra', t:'Trámites',
     ic:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6"/>',
-    b:['Saca el <b>turno online</b> y ve la disponibilidad real en el momento.',
-       'Ve <b>cu\u00e1nto sale</b> antes de arrancar, y paga con <b>Mercado Pago</b>.',
-       'Le llega un <b>WhatsApp con los requisitos</b>: viene con todo y no vuelve dos veces.',
-       'Habilitaciones, permisos de obra, certificados, inscripciones. Los que tenga el municipio.'] },
-  { id:'cob', t:'Cobros y tesorer\u00eda', g:'El vecino ve lo que debe y paga. Y adentro, la plata ordenada.',
-    ic:'<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>',
-    b:['El vecino entra, <b>ve su deuda de tasas y la paga</b> desde el celular.',
-       'Cajas, fondos, <b>agenda de pagos</b> y gastos por proyecto u obra: en qu\u00e9 se fue cada peso.',
-       '<b>Stock de los bienes del municipio</b>: qu\u00e9 hay, d\u00f3nde est\u00e1 y qui\u00e9n lo tiene.',
-       'Le <b>importamos el Excel</b> que ya usan y arrancan con su historia adentro.'] },
-  { id:'com', t:'Comunicaciones', g:'Hablarle al vecino sin depender de un grupo de Facebook.',
+    p:['El vecino <b>saca el turno online</b> y ve la disponibilidad real en el momento, sin llamar por teléfono ni ir a preguntar.',
+       'Antes de arrancar <b>ve cuánto sale y lo paga</b> desde el celular, y le llega un WhatsApp con los requisitos: viene con todo y no vuelve dos veces.',
+       'Habilitaciones, permisos de obra, certificados, inscripciones — los que ustedes tengan. Se termina la cola en la ventanilla y el "vuelva mañana".'] },
+  { id:'com', t:'Comunicación',
     ic:'<path d="M3 11l18-8-8 18-2-8-8-2Z"/>',
-    b:['Obras, eventos, <b>alertas urgentes</b>: la novedad aparece en el inicio de la app.',
-       'Llega como <b>notificaci\u00f3n al celular</b>, no como un cartel que nadie lee.',
-       'Se <b>mide el alcance</b>: cu\u00e1ntos la vieron de verdad.'] },
-  { id:'cam', t:'Campo y personal', g:'Saber qu\u00e9 hizo cada cuadrilla hoy, sin llamar a nadie.',
-    ic:'<path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Z"/><path d="M9 9h6"/>',
-    b:['Las <b>\u00f3rdenes de trabajo</b> del d\u00eda en el celular del capataz, con su parte al cerrar.',
-       '<b>Flota</b>: qu\u00e9 m\u00e1quina est\u00e1 en qu\u00e9 obra.',
-       '<b>Presentismo y jornada</b> del personal municipal.'] }
+    p:['Vas a poder <b>informar las obras</b> que estás haciendo y su avance, los eventos, y las alertas urgentes cuando pasa algo.',
+       'Le llega como <b>notificación al celular</b> del vecino, no como un cartel que nadie lee ni un posteo que el algoritmo esconde.',
+       'Y se <b>mide el alcance</b>: cuántos vecinos la vieron de verdad. Dejás de depender de un grupo de Facebook para contar lo que hace el municipio.'] }
 ];
 const ESTADOS = [
   {id:'contactado', lbl:'Contactado'}, {id:'no-atiende', lbl:'No atiende'},
@@ -1097,22 +1120,25 @@ function tipsPara(){
   return propios.concat(genericos);
 }
 
-/* Se pinta una sola vez: no depende del municipio ni del dia. */
-function pintarModulos(){
-  const cont = document.getElementById('modsBox'); if (!cont) return;
-  cont.innerHTML = MODULOS.map(m =>
-    '<div class="mod" data-m="' + m.id + '">'
-    + '<button type="button"><span class="ic"><svg viewBox="0 0 24 24">' + m.ic + '</svg></span>'
-      + '<span class="tx"><b>' + esc(m.t) + '</b><i>' + esc(m.g) + '</i></span>'
-      + '<span class="car"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span></button>'
-    + '<ul>' + m.b.map(x => '<li>' + x + '</li>').join('') + '</ul></div>').join('');
-  /* Uno abierto por vez: la columna es angosta y con dos abiertos hay que
-     scrollear justo cuando no se puede mirar la pantalla. */
-  cont.querySelectorAll('.mod > button').forEach(b => b.onclick = () => {
-    const d = b.parentElement, ya = d.classList.contains('on');
-    cont.querySelectorAll('.mod').forEach(x => x.classList.remove('on'));
-    if (!ya) d.classList.add('on');
-  });
+/* DATO DE COLOR: todo lo que se sabe del municipio ANTES de marcar. Vive en la
+   columna derecha, en el lugar donde estaba "Recordar" (dueño, 2026-08-30):
+   en el centro empujaba la narracion fuera de la pantalla, y es informacion
+   para prepararse, no para leer mientras se habla. */
+function pintarDatoColor(c){
+  const cont = document.getElementById('colorBox'); if (!cont) return;
+  if (!c){ cont.innerHTML = '<div class="vacio" style="padding:14px 6px">Elegí un municipio y acá aparece lo que averiguamos del lugar.</div>'; return; }
+  const f = FUNC[c.id] || {}, inv = INVEST[c.id] || {};
+  const it = [];
+  if (f.intendente) it.push('<div class="color-it jefe"><b>Quién manda</b><span class="n">' + esc(f.intendente) + '</span><br>'
+    + esc(f.cargo || 'Intendente') + (f.partido ? ' · ' + esc(f.partido) : '')
+    + (f.confianza && f.confianza !== 'alta' ? ' · dato ' + esc(f.confianza) + ', confirmalo' : '') + '</div>');
+  if (c.perfil) it.push('<div class="color-it perfil"><b>Cómo llega el municipio</b>' + esc(c.perfil) + '</div>');
+  if (inv.estructura) it.push('<div class="color-it"><b>Áreas</b>' + esc(inv.estructura) + '</div>');
+  if (inv.digital) it.push('<div class="color-it"><b>Digitalización</b>' + esc(inv.digital) + '</div>');
+  if (inv.color) it.push('<div class="color-it hielo"><b>Para romper el hielo</b>' + esc(inv.color) + '</div>');
+  if (inv.web) it.push('<div class="color-it"><b>Web</b><a href="' + esc(inv.web) + '" target="_blank" rel="noopener">' + esc(inv.web) + '</a></div>');
+  cont.innerHTML = it.length ? it.join('')
+    : '<div class="vacio" style="padding:14px 6px">De este municipio todavía no averiguamos nada.</div>';
 }
 
 function pintarTip(){
@@ -1124,27 +1150,39 @@ function pintarTip(){
     '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>').join('');
 }
 
+/* LA NARRACION (dueño, 2026-08-30). Antes la ficha gritaba "Pregunta por
+   Diego Costarelli" en un cartel y el speech entraba directo al pitch — pero
+   el intendente casi nunca atiende el telefono. Ahora la apertura ubica la
+   llamada, pide por el nombre, y en la MISMA frase da la salida (Modernizacion
+   o el secretario). Despues el motivo BIEN CORTO: los cuatro ejes nombrados y
+   nada mas. El detalle vive en los tabs de abajo, para cuando enganchan. */
+function narracion(c, f){
+  const cargo = (f.cargo || 'Intendente');
+  const cargoL = cargo.toLowerCase();
+  // Uruguay son Intendencias departamentales; el resto, Municipalidad.
+  const ente = (c.pais === 'Uruguay' ? 'la Intendencia de ' : 'la Municipalidad de ') + c.localidad;
+  const pedido = f.intendente
+    ? 'Me habían dado para hablar con ' + f.intendente + ', si puede ser'
+    : 'Quería hablar con el ' + cargoL + ', si puede ser';
+  return [
+    '¿Qué tal? Buenos días, te llamo de Munify. Me estoy comunicando con ' + ente + ', ¿verdad?',
+    pedido + '. Y si no está, con algún representante o responsable del área de Modernización, o con el secretario del ' + cargoL + '.',
+    'Te cuento en dos líneas por qué llamo: le queremos presentar una plataforma online para la relación con el vecino. Nuestra visión es conectar al vecino con el municipio, y lo hacemos con cuatro cosas: la gestión de los reclamos, los turnos para trámites, la tesorería, y la comunicación de todo lo que va haciendo el municipio.'
+  ];
+}
+
 function abrir(id){
   const c = CONTACTOS.find(x => x.id === id); if (!c) return;
   selId = id;
   tipIdx = 0; tipManual = false; pintarTip();
-  const r = reg(id), sp = SPEECH[c.pais] || {}, f = FUNC[c.id] || {}, inv = INVEST[c.id] || {};
+  const r = reg(id), sp = SPEECH[c.pais] || {}, f = FUNC[c.id] || {};
   // El cierre habla como el pais del municipio, no como Buenos Aires.
   const cie = cierreDe(c.pais, c.localidad);
-  const quien = f.intendente
-    ? '<div class="quien"><div class="k">Preguntá por</div><div class="nom">' + esc(f.intendente) + '</div>'
-      + '<div class="sub">' + esc(f.cargo || 'Intendente') + (f.partido ? ' · ' + esc(f.partido) : '')
-      + (f.confianza && f.confianza !== 'alta' ? ' · dato ' + esc(f.confianza) + ', confirmalo' : '') + '</div></div>'
-    : '';
+  /* El nombre del intendente ya no va en un cartel aparte: entra DENTRO de la
+     narracion. Y todo lo que averiguamos del municipio se fue a la columna
+     derecha ("Dato de color"): el centro es la narracion y nada mas. */
+  const nar = narracion(c, f);
   const ojo = f.nota ? '<div class="box ojo" style="margin-bottom:13px"><b>Ojo:</b> ' + esc(f.nota) + '</div>' : '';
-  const invest = (inv.estructura || inv.digital || inv.color || inv.web)
-    ? '<div class="sec"><label><i class="sic a"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></i>Lo que averiguamos del municipio</label>'
-      + (inv.estructura ? '<div class="box"><b>Áreas:</b> ' + esc(inv.estructura) + '</div>' : '')
-      + (inv.digital ? '<div class="box"><b>Digitalización:</b> ' + esc(inv.digital) + '</div>' : '')
-      + (inv.color ? '<div class="box dato"><b>Para romper el hielo:</b> ' + esc(inv.color) + '</div>' : '')
-      + (inv.web ? '<div class="box"><b>Web:</b> ' + esc(inv.web) + '</div>' : '')
-      + '</div>' : '';
-
   document.getElementById('ficha').innerHTML =
       '<div class="f-head"><div><h2>' + esc(c.localidad) + '</h2>'
       + '<div class="meta">' + esc(c.region) + ' · ' + esc(c.pais) + ' · ' + esc(c.habitantes) + ' hab. · ' + esc(c.lote) + '</div></div>'
@@ -1158,13 +1196,16 @@ function abrir(id){
     + '<div class="f-body">'
     + '<div class="p-tel"><a class="tel-btn" href="' + telHref(c.telefono) + '" id="pLlamar">Llamar ' + esc(c.telefono) + '</a>'
     + '<button class="btn" id="pCopiar">Copiar</button></div>'
-    + quien + ojo
-    + '<div class="sec"><label><i class="sic p"><svg viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></i>Cómo llega el municipio</label><div class="box perfil">' + esc(c.perfil) + '</div></div>'
-    + invest
-    + (sp.script ? '<div class="sec"><label><i class="sic a"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg></i>Speech para ' + esc(c.pais) + '</label>'
-        + '<div class="box script">' + esc(sp.script) + '</div>'
-        + (sp.angulo ? '<div class="box"><b>Ángulo:</b> ' + esc(sp.angulo) + '</div>' : '')
-        + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar speech</button></div>' : '')
+    + ojo
+    + '<div class="sec"><label><i class="sic a"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/></svg></i>Lo que decís</label>'
+      + '<div class="box script">' + nar.map(x => '<p>' + esc(x) + '</p>').join('') + '</div>'
+      + '<button class="btn sm" id="pCopiarScript" style="margin-top:8px">Copiar</button></div>'
+    + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></i>Si te preguntan por</label>'
+      + '<div class="g-hint">Tocá el que te pidan y leelo tal cual.</div>'
+      + '<div class="tabs" id="pTabs">'
+      + GUION.map(g => '<button type="button" class="tab" data-g="' + g.id + '">'
+          + '<svg viewBox="0 0 24 24">' + g.ic + '</svg><span>' + esc(g.t) + '</span></button>').join('')
+      + '</div><div id="pGuion"></div></div>'
     + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg></i>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
@@ -1178,13 +1219,25 @@ function abrir(id){
     + '</div>';
 
   pintarHist();
+  pintarDatoColor(c);
   document.getElementById('fichaCol').classList.add('on');
   document.getElementById('ov').classList.add('on');
   const cf = document.getElementById('cerrarFicha'); if (cf) cf.onclick = cerrarFicha;
   document.getElementById('pLlamar').onclick = () => { marcarLlamada(id); abrir(id); };
   document.getElementById('pCopiar').onclick = () => copiar(c.telefono, 'pCopiar', 'Copiar');
   const bs = document.getElementById('pCopiarScript');
-  if (bs) bs.onclick = () => copiar(sp.script, 'pCopiarScript', 'Copiar speech');
+  if (bs) bs.onclick = () => copiar(nar.join('\n\n'), 'pCopiarScript', 'Copiar');
+  /* Un tab por vez, y el mismo toque lo cierra: la ficha tiene que volver a
+     ser solo la narracion cuando el tema se agoto. */
+  document.querySelectorAll('#pTabs .tab').forEach(b => b.onclick = () => {
+    const ya = b.classList.contains('on');
+    document.querySelectorAll('#pTabs .tab').forEach(x => x.classList.remove('on'));
+    const caja = document.getElementById('pGuion');
+    if (ya){ caja.innerHTML = ''; return; }
+    b.classList.add('on');
+    const g = GUION.find(x => x.id === b.dataset.g);
+    caja.innerHTML = '<div class="g-txt">' + g.p.map(t => '<p>' + t + '</p>').join('') + '</div>';
+  });
   // Las cuatro acciones abren su modal. El contexto de la llamada queda
   // guardado para que cada modal se arme con este municipio.
   FICHA = { id: id, c: c, r: r, cie: cie, f: f, sp: sp };
@@ -1447,7 +1500,7 @@ function cerrarFicha(){ cerrarModal();
 }
 function fichaVacia(){
   document.getElementById('ficha').innerHTML = '<div class="vacio" style="padding:70px 26px">'
-    + 'Elegí un municipio de la lista y acá aparece su ficha: a quién preguntar, el speech de su país y lo que averiguamos del lugar.</div>';
+    + 'Elegí un municipio de la lista y acá aparece su ficha: el teléfono, lo que decís al llamar y el detalle de cada módulo.</div>';
 }
 function copiar(txt, btnId, orig){
   const b = document.getElementById(btnId);
@@ -1470,7 +1523,7 @@ function pintarPie(){
   document.getElementById('pieBar').style.width = pct + '%';
   document.getElementById('pieTxt').textContent = hechos + ' de ' + n + ' gestionados (' + pct + '%)';
 }
-function pintar(){ pintarModulos(); pintarKpis(); pintarPie(); pintarHoy(); if (vista === 'ops'){ pintarFiltros(); pintarLista(); } }
+function pintar(){ pintarDatoColor(CONTACTOS.find(x => x.id === selId)); pintarKpis(); pintarPie(); pintarHoy(); if (vista === 'ops'){ pintarFiltros(); pintarLista(); } }
 function irA(v){
   vista = v;
   // El CSS necesita saber en que vista estamos: "Trabajar" usa el modo
