@@ -184,15 +184,25 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 /* Tablet en horizontal (y ventanas angostas de escritorio): la columna
    auxiliar se va y quedan lista + ficha, que es lo que se trabaja. Antes
    estas anchuras entraban a la fuerza y apretaban la ficha. */
-/* Tablet (1001-1300): no entran tres columnas a lo ancho, pero ESCONDER la
-   tercera se lleva puestas "Lo que viene", "Recordar" y "Avance", que son
-   justo lo que ordena el dia. En vez de ocultarla, baja abajo de la lista:
-   dos columnas, y la ficha ocupa las dos filas a la derecha. */
+/* TABLET (1001-1300): las tres columnas ENTRAN, con un zoom de 0.8.
+   Es lo que el dueno venia haciendo a mano en su tablet de 1080px: al 80%
+   el contenido tiene 1350px logicos y las tres columnas entran comodas.
+   Antes se escondia la tercera (`.extra{display:none}`) y con ella se iban
+   "Lo que viene", "Recordar" y "Avance", que son lo que ordena el dia.
+
+   El zoom va en .wrap y no en el body a proposito: el body es el que fija el
+   alto de la ventana, y escalarlo desajusta el 100vh del shell. */
 @media(min-width:1001px) and (max-width:1300px){
-  .ops{grid-template-columns:300px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
-  .lista-col{grid-column:1;grid-row:1}
-  .extra{display:block;grid-column:1;grid-row:2;max-height:40vh;margin-top:10px}
-  .ficha-col{grid-column:2;grid-row:1 / -1}
+  .wrap{zoom:.8}
+  .ops{grid-template-columns:320px minmax(0,1fr) 270px}
+  .extra{display:block}
+}
+/* Safari todavia no toma `zoom` en todos lados: el fallback escala igual, con
+   el ancho compensado para que no quede una franja muerta a la derecha. */
+@supports not (zoom: 1){
+  @media(min-width:1001px) and (max-width:1300px){
+    .wrap{transform:scale(.8);transform-origin:top center;width:125%;margin-left:-12.5%}
+  }
 }
 .f-body{overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
 .extra{overscroll-behavior:contain;touch-action:pan-y}
