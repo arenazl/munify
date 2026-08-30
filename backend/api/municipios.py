@@ -450,6 +450,7 @@ PAISES_CATALOGO = {"AR", "PY", "CL", "UY", "PE", "BO"}
 async def buscar_municipios_catalogo(
     q: str = "",
     pais: str = "AR",
+    provincia: str = "",
     db: AsyncSession = Depends(get_db),
 ):
     """Autocomplete PÚBLICO del catálogo oficial de municipios.
@@ -474,19 +475,55 @@ async def buscar_municipios_catalogo(
         raise HTTPException(status_code=400, detail=f"País no soportado: {pais}")
     if len(q) < 2:
         return []
-    rows = (await db.execute(text("""
+    # `provincia` es opcional: la pantalla de demos deja elegir provincia
+    # primero para desambiguar homonimos (6 'San Martin' en Argentina).
+    params = {"pais": pais, "patt": f"%{q}%", "prefijo": f"{q}%"}
+    filtro_prov = ""
+    if (provincia or "").strip():
+        filtro_prov = " AND provincia = :provincia"
+        params["provincia"] = provincia.strip()
+    rows = (await db.execute(text(f"""
         SELECT id, nombre, provincia, lat, lng, pais, alias
         FROM municipios_catalogo
-        WHERE pais = :pais AND (nombre LIKE :patt OR alias LIKE :patt)
+        WHERE pais = :pais AND (nombre LIKE :patt OR alias LIKE :patt){filtro_prov}
         ORDER BY (nombre LIKE :prefijo) DESC, CHAR_LENGTH(nombre), nombre
         LIMIT 10
-    """), {"pais": pais, "patt": f"%{q}%", "prefijo": f"{q}%"})).fetchall()
+    """), params)).fetchall()
     return [
         {"id": r[0], "nombre": r[1], "provincia": r[2],
          "lat": float(r[3]), "lng": float(r[4]), "pais": r[5],
          "alias": [a for a in (r[6] or "").split("|") if a]}
         for r in rows
     ]
+
+
+@router.get("/catalogo/provincias")
+async def provincias_catalogo(
+    pais: str = "AR",
+    db: AsyncSession = Depends(get_db),
+):
+    """Provincias/departamentos de un pais, con cuantos municipios tiene cada una.
+
+    Alimenta el combo de la pantalla publica de demos (sitio comercial): el
+    prospecto elige su provincia y el autocomplete de municipio filtra por ahi.
+    El conteo NO es decorativo — es lo que dibuja la barra de cada provincia,
+    asi que sale de la tabla, nunca hardcodeado.
+
+    El nombre del nivel cambia por pais (provincia en AR/PY, region en CL,
+    departamento en UY/BO, departamento en PE); la clave se llama `provincia`
+    en todos porque es la columna del catalogo.
+    """
+    pais = (pais or "AR").upper()
+    if pais not in PAISES_CATALOGO:
+        raise HTTPException(status_code=400, detail=f"Pais no soportado: {pais}")
+    rows = (await db.execute(text("""
+        SELECT provincia, COUNT(*) AS total
+        FROM municipios_catalogo
+        WHERE pais = :pais AND provincia IS NOT NULL AND provincia <> ''
+        GROUP BY provincia
+        ORDER BY total DESC, provincia
+    """), {"pais": pais})).fetchall()
+    return [{"provincia": r[0], "total": int(r[1])} for r in rows]
 
 
 @router.get("/argentina")
