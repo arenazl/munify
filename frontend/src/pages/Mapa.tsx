@@ -781,12 +781,20 @@ function ZoomRuedaDeAUno() {
   useEffect(() => {
     map.scrollWheelZoom.disable();
     const contenedor = map.getContainer();
-    let ultimo = 0;
+    // Se cuenta el GESTO, no el tiempo. Un tope de milisegundos entre zooms no
+    // alcanza: un solo golpe de rueda dispara eventos durante medio segundo o
+    // mas --- las ruedas modernas y los trackpads mandan decenas con inercia ---
+    // asi que con 140 ms de tope entraban cinco o seis niveles por golpe. Acá
+    // el primer evento hace el zoom y los siguientes quedan ignorados hasta que
+    // haya SILENCIO: mientras sigan llegando, es el mismo gesto.
+    let enGesto = false;
+    let finGesto: ReturnType<typeof setTimeout> | null = null;
     const alGirar = (e: WheelEvent) => {
       e.preventDefault();
-      const ahora = Date.now();
-      if (ahora - ultimo < 140) return;   // el resto del mismo gesto
-      ultimo = ahora;
+      if (finGesto) clearTimeout(finGesto);
+      finGesto = setTimeout(() => { enGesto = false; }, 260);
+      if (enGesto) return;                // sigue el mismo golpe de rueda
+      enGesto = true;
       const paso = e.deltaY > 0 ? -1 : 1;
       const destino = Math.min(
         map.getMaxZoom(),
@@ -797,7 +805,10 @@ function ZoomRuedaDeAUno() {
       }
     };
     contenedor.addEventListener('wheel', alGirar, { passive: false });
-    return () => contenedor.removeEventListener('wheel', alGirar);
+    return () => {
+      contenedor.removeEventListener('wheel', alGirar);
+      if (finGesto) clearTimeout(finGesto);
+    };
   }, [map]);
   return null;
 }
