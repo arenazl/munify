@@ -1750,6 +1750,21 @@ export default function Mapa() {
   /** El time-lapse manda sobre el filtro de período (corriendo o congelado). */
   const tlActivo = tlEstado !== 'inactivo';
 
+  /* En el telefono el reproductor se monta ABAJO del mapa, que ya se come casi
+     toda la pantalla: al apretar "Evolucion" la banda aparecia a 968px con una
+     ventana de 664 y el usuario no veia nada pasar (dueño, 2026-08-31). Se lo
+     trae a la vista apenas se monta. En desktop no molesta: si ya esta visible,
+     el navegador no scrollea. */
+  useEffect(() => {
+    if (!tlActivo) return;
+    const t = setTimeout(() => {
+      document.querySelector('.mtl-banda, [class^="mtl-"]')
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [tlActivo]);
+
+
   /**
    * Ventana visible del time-lapse. `null` = modo normal, sin tocar nada.
    *

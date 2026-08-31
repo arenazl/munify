@@ -2508,9 +2508,19 @@ button.av2-chip:hover { opacity: 0.85; }
   flex: 1 1 auto;
   min-height: 0;
   margin-top: 10px;
+  /* El lienzo tiene que ESTIRARSE, y para eso su padre tiene que ser flex.
+     Con `height: 100%` sobre un padre flexible con `min-height: 0` el alto se
+     resolvia en CERO: medido en un iPhone, el mapa quedaba en 364x0 y la
+     pantalla completa mostraba un vacio (dueño, 2026-08-31). */
+  display: flex;
+  flex-direction: column;
 }
 .av2-mapa-full:fullscreen .av2-mapa-lienzo,
-.av2-mapa-full--expandido .av2-mapa-lienzo { height: 100%; min-height: 0; }
+.av2-mapa-full--expandido .av2-mapa-lienzo {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
 
 /* Dentro del envoltorio quedan también el informe y el ranking, que en pantalla
    completa no son lo que se mira y le robarían alto al mapa. */
