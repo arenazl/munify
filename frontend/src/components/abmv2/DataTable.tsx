@@ -213,6 +213,27 @@ const esDotData = (v: unknown): v is DotCellData =>
 const esMetricData = (v: unknown): v is MetricCellData =>
   typeof v === 'object' && v !== null && typeof (v as MetricCellData).value === 'string';
 
+/** Texto pelado devuelto por un `cell`, vestido segun el `kind` de la columna.
+ *
+ *  `cell` y `kind` no compiten: el primero dice QUE mostrar y el segundo COMO
+ *  se ve un texto en esta tabla. Antes, declarar `cell` desactivaba el `kind`
+ *  y esa celda salia sin clase, heredando el tamaño del contenedor — 16px
+ *  contra los 12 del resto de la grilla. Si el `cell` devuelve JSX se respeta
+ *  tal cual: ahi la pantalla ya decidio como se pinta.
+ */
+function vestirSegunKind<Row>(col: ColumnSpec<Row>, contenido: ReactNode): ReactNode {
+  if (typeof contenido !== 'string' && typeof contenido !== 'number') return contenido;
+  const texto = String(contenido);
+  switch (col.kind) {
+    case 'date':
+      return <span className="av2-tabla-fecha av2-tnum">{texto}</span>;
+    case 'money':
+      return <span className="av2-money av2-tabla-monto">{texto}</span>;
+    default:
+      return <span className="av2-tabla-texto">{texto}</span>;
+  }
+}
+
 /** Render por defecto de una celda según ColumnSpec.kind (ver doc de arriba). */
 function celdaPorDefecto<Row>(col: ColumnSpec<Row>, row: Row): ReactNode {
   const valor = (row as Record<string, unknown>)[col.id];
@@ -518,7 +539,7 @@ export function DataTable<Row>({
             col.kind === 'actions'
               ? renderAcciones(row)
               : col.cell
-                ? col.cell(row)
+                ? vestirSegunKind(col, col.cell(row))
                 : celdaPorDefecto(col, row);
           // El handle vive DENTRO de la primera celda y no en una columna
           // propia: una columna extra movería todo el grid al entrar en modo
