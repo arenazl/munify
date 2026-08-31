@@ -36,6 +36,25 @@ export interface MunifyLogoProps {
   title?: string;
 }
 
+/** Luminancia relativa (WCAG) — la base para medir contraste de verdad. */
+function luminancia(hex: string): number {
+  const c = (hex || '').replace('#', '');
+  if (c.length < 6) return 0;
+  const canal = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * canal(parseInt(c.slice(0, 2), 16))
+       + 0.7152 * canal(parseInt(c.slice(2, 4), 16))
+       + 0.0722 * canal(parseInt(c.slice(4, 6), 16));
+}
+
+/** Razon de contraste entre dos colores (1 = iguales, 21 = blanco/negro). */
+function contraste(a: string, b: string): number {
+  const la = luminancia(a), lb = luminancia(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
 // Calcula si un color es claro (luminance > 0.5) para decidir contraste
 function isLightColor(hex: string): boolean {
   if (!hex) return false;
@@ -68,10 +87,19 @@ export function MunifyLogo({
   //  - check siempre VERDE.
   const BODY_DARK = '#112a6c';   // azul brand oscuro, va sobre sidebar/bg claro
   const BODY_LIGHT = '#aebee0';  // celeste claro, va sobre sidebar/bg oscuro
-  const CHECK_GREEN = '#18a24d'; // verde tilde, constante
+  const CHECK_GREEN = '#18a24d'; // el verde de siempre, ahora como respaldo
+
+  /* El tilde toma el ACENTO de la app: si el municipio elige violeta o
+     terracota, el logo acompaña en vez de quedarse con un verde que ya no
+     pertenece a ninguna otra parte de la pantalla.
+     La guarda: sobre un fondo con el que el acento casi no contrasta (un gris
+     sobre un sidebar gris) el tilde se perderia — ahi vuelve al verde. Un logo
+     que desaparece es peor que un logo de otro color. */
+  const tilde = (fondo: string) =>
+    theme.primary && contraste(theme.primary, fondo) >= 1.9 ? theme.primary : CHECK_GREEN;
 
   let bodyColor = BODY_DARK;
-  let checkColor = CHECK_GREEN;
+  let checkColor = tilde(theme.background);
 
   if (colorPair) {
     [bodyColor, checkColor] = colorPair;
@@ -85,11 +113,11 @@ export function MunifyLogo({
   } else if (variant === 'sidebar' || (variant === 'auto' && theme.sidebar)) {
     const sidebarIsLight = isLightColor(theme.sidebar);
     bodyColor = sidebarIsLight ? BODY_DARK : BODY_LIGHT;
-    checkColor = CHECK_GREEN;
+    checkColor = tilde(theme.sidebar);
   } else if (variant === 'content') {
     const bgIsLight = isLightColor(theme.background);
     bodyColor = bgIsLight ? BODY_DARK : BODY_LIGHT;
-    checkColor = CHECK_GREEN;
+    checkColor = tilde(theme.background);
   }
 
   const c1 = bodyColor;

@@ -359,7 +359,9 @@ export const sidebarModes: SidebarModeOption[] = [
 //
 // Grafito + azul es el par del canvas ("Munify - Rail y topbar", 6a).
 export const defaultThemeConfig = {
-  presetId: 'grafito',
+  // Marino: el oscuro FRIO, el azul de la marca. Antes era Grafito, un gris
+  // neutro que no dice nada de Munify.
+  presetId: 'marino',
   accentId: 'azul',
   sidebarMode: 'organico' as SidebarMode,
 };
