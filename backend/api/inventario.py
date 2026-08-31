@@ -81,6 +81,8 @@ class ItemCreate(BaseModel):
     categoria_id: int
     nombre: str
     descripcion: Optional[str] = None
+    # Donde queda guardado. Opcional: no se le inventa ubicacion a nada.
+    deposito_id: Optional[int] = None
     # Consumibles
     stock_actual: Optional[float] = None
     stock_minimo: Optional[float] = None
@@ -112,6 +114,7 @@ class ItemUpdate(BaseModel):
     categoria_id: Optional[int] = None
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
+    deposito_id: Optional[int] = None
     stock_actual: Optional[float] = None
     stock_minimo: Optional[float] = None
     unidad: Optional[str] = None
@@ -136,6 +139,8 @@ class ItemResponse(BaseModel):
     id: int
     categoria_id: int
     categoria_nombre: Optional[str] = None
+    deposito_id: Optional[int] = None
+    deposito_nombre: Optional[str] = None
     categoria_icono: Optional[str] = None
     categoria_color: Optional[str] = None
     nombre: str
@@ -176,6 +181,8 @@ def _categoria_to_response(cat: InventarioCategoria, items_count: int = 0) -> Ca
 
 def _item_to_response(item: InventarioItem) -> ItemResponse:
     resp = ItemResponse.model_validate(item)
+    if item.deposito:
+        resp.deposito_nombre = item.deposito.nombre
     if item.categoria:
         resp.categoria_nombre = item.categoria.nombre
         resp.categoria_icono = item.categoria.icono
@@ -205,6 +212,7 @@ async def _get_item(db: AsyncSession, item_id: int, municipio_id: int) -> Invent
         select(InventarioItem)
         .options(
             selectinload(InventarioItem.categoria),
+            selectinload(InventarioItem.deposito),
             selectinload(InventarioItem.ocupado_por_ot),
         )
         .where(
@@ -353,6 +361,7 @@ async def listar_items(
         select(InventarioItem)
         .options(
             selectinload(InventarioItem.categoria),
+            selectinload(InventarioItem.deposito),
             selectinload(InventarioItem.ocupado_por_ot),
         )
         .where(InventarioItem.municipio_id == municipio_id)
@@ -411,6 +420,7 @@ async def crear_item(
         nombre=data.nombre,
         descripcion=data.descripcion,
         naturaleza=cat.naturaleza,  # la naturaleza la manda la categoría
+        deposito_id=data.deposito_id,
     )
     if cat.naturaleza == NaturalezaInventario.CONSUMIBLE:
         item.stock_actual = data.stock_actual if data.stock_actual is not None else 0

@@ -253,7 +253,7 @@ export default function Configuracion() {
     if (hijoId === 'muni') {
       const data = await cargarDatosFormularioMuni();
       setDatosMuni(data);
-    } else if (['tipos-poi', 'cat-inv', 'cat-reclamo'].includes(hijoId)) {
+    } else if (['tipos-poi', 'cat-inv', 'cat-reclamo', 'depositos'].includes(hijoId)) {
       const catData = await cargarCatalogoReal(hijoId);
       setCatalogoReal(catData);
     } else if (hijoId === 'vecinos') {
@@ -588,24 +588,30 @@ export default function Configuracion() {
 
           {tipo === 'abm' && hijoId === 'inv' && (
             <PantallaDeAjuste
-              eyebrow={`${padre.label.toUpperCase()} · DEPÓSITO`}
+              eyebrow={`${padre.label.toUpperCase()} · CATÁLOGO`}
               veredicto={
                 puenteInv
-                  ? `${puenteInv.total} artículos en el depósito${puenteInv.bajoStock.length ? `, ${puenteInv.bajoStock.length} bajo el mínimo.` : ', ninguno bajo el mínimo.'}`
-                  : 'El inventario vive en Operaciones: acá se llega, no se edita.'
+                  ? `${puenteInv.total} artículos en el catálogo${puenteInv.bajoStock.length ? `, ${puenteInv.bajoStock.length} bajo el mínimo.` : ', ninguno bajo el mínimo.'}`
+                  : 'El catálogo de artículos se administra en su propia pantalla.'
               }
               resaltado={puenteInv?.bajoStock.length ? `${puenteInv.bajoStock.length} bajo el mínimo` : undefined}
               tono={puenteInv?.bajoStock.length ? 'malo' : 'bueno'}
             >
+              {/* El inventario NO es una operación: es el catálogo de bienes y
+                  materiales del municipio. Lo operacional son los MOVIMIENTOS
+                  —entradas, salidas, ajustes y lo que se lleva cada orden— que
+                  tienen su propia pantalla. Decía "vive en Operaciones" y
+                  mandaba a un ABM de artículos (dueño, 2026-08-31). */}
               <PuenteDeModulo
                 configuraAca={[
-                  { label: 'Categorías de inventario', nota: 'Las familias en las que se agrupa el depósito', grupoId: 'inventario', ajusteId: 'cat-inv' },
+                  { label: 'Categorías de inventario', nota: 'Las familias en las que se agrupa, y si son activos o consumibles', grupoId: 'inventario', ajusteId: 'cat-inv' },
+                  { label: 'Depósitos', nota: 'Dónde está guardada cada cosa: central, corralón, vivero', grupoId: 'inventario', ajusteId: 'depositos' },
                 ]}
                 viveEn={{
-                  titulo: 'Vive en Operaciones',
-                  motivo: 'El stock se mueve con las órdenes de trabajo: entradas, salidas y reservas son operación, no configuración.',
-                  checklist: ['Cargar entradas y salidas', 'Reservar materiales para una OT', 'Ver el stock por depósito'],
-                  botonLabel: 'Abrir el inventario',
+                  titulo: 'La lista completa, en su pantalla',
+                  motivo: 'Son cientos de artículos con stock, patente y vencimientos: el catálogo entero no entra en un panel de ajustes. Lo que se mueve todos los días son los movimientos, que tienen pantalla aparte.',
+                  checklist: ['Alta y baja de artículos', 'Stock, mínimo y unidad de cada uno', 'Patente, VTV y seguro de los vehículos'],
+                  botonLabel: 'Abrir el catálogo',
                   ruta: '/gestion/inventario',
                 }}
                 lista={

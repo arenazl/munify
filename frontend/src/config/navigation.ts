@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck,
+  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -252,6 +252,18 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: userRole === 'empleado' || ((isSupervisor || isAdmin) && hasEmpleado),
       categoria: 'Campo',
       description: 'Mis tareas asignadas en campo'
+    },
+    {
+      // Lo OPERACIONAL del inventario: el stock se mueve todos los días y hay
+      // que poder cargarlo sin pasar por Configuración. El catálogo de
+      // artículos (/gestion/inventario) sigue llegándose desde Configuración:
+      // una fila sólo cambia si alguien la edita a mano (dueño, 2026-08-31).
+      name: 'Movimientos',
+      href: '/gestion/inventario/movimientos',
+      icon: PackageOpen,
+      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
+      categoria: 'Campo',
+      description: 'Entradas, salidas y ajustes de stock'
     },
     // NOTA: 'Inventario' (/gestion/inventario) salió del sidebar — se llega por
     // el tile de Configuración → Catálogos, al lado de "Categorías Inventario".

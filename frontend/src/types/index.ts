@@ -307,6 +307,8 @@ export interface InventarioCategoria {
 }
 
 export interface InventarioItem {
+  deposito_id?: number | null;
+  deposito_nombre?: string | null;
   id: number;
   categoria_id: number;
   categoria_nombre?: string | null;

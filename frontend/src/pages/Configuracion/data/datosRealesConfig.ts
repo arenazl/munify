@@ -83,6 +83,40 @@ export async function cargarCatalogoReal(hijoId: string): Promise<{ veredicto: s
     };
   }
 
+  if (hijoId === 'depositos') {
+    const res = await inventarioApi.listDepositos();
+    const list = (res.data || []) as Array<{
+      id: number; nombre: string; descripcion?: string | null; direccion?: string | null;
+      activo?: boolean; orden?: number; items_count?: number;
+    }>;
+    const filas: FilaCatalogo[] = list.map((d, i) => ({
+      id: String(d.id),
+      nombre: d.nombre,
+      desc: d.descripcion || d.direccion || undefined,
+      colorNombre: '#B4560F',
+      tinte: '#B4560F15',
+      color: '#B4560F',
+      glifo: 'Warehouse',
+      uso: d.items_count ?? 0,
+      usoCol: '#0D1412',
+      usoNota: 'artículos guardados',
+      estado: d.activo !== false ? 'Activo' : 'Desactivado',
+      estadoCol: d.activo !== false ? '#00794F' : '#98A3A0',
+      pistaBg: d.activo !== false ? '#00B37E' : '#D7DDDC',
+      perilla: '#FFFFFF',
+      fondo: '#FFFFFF',
+      orden: d.orden ?? i + 1,
+    }));
+    const total = filas.reduce((a: number, f) => a + Number(f.uso ?? 0), 0);
+    return {
+      veredicto: filas.length
+        ? `${filas.length} ${filas.length === 1 ? 'depósito' : 'depósitos'} guardando ${total} ${total === 1 ? 'artículo' : 'artículos'}.`
+        : 'Todavía no hay depósitos: los artículos quedan sin ubicación.',
+      filas,
+      pie: `Mostrando ${filas.length} ${filas.length === 1 ? 'depósito' : 'depósitos'}`,
+    };
+  }
+
   if (hijoId === 'tipos-poi') {
     const res = await poiApi.listTipos();
     const list = (res.data || []) as any[];

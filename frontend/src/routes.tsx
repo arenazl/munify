@@ -71,6 +71,7 @@ import GestionCuadrillas from './pages/GestionCuadrillas';
 import OrdenesTrabajo from './pages/OrdenesTrabajo';
 import Inventario from './pages/Inventario';
 import InventarioCategoriasConfig from './pages/InventarioCategoriasConfig';
+import InventarioMovimientos from './pages/InventarioMovimientos';
 import POITiposConfig from './pages/POITiposConfig';
 import CatalogoTramites from './pages/CatalogoTramites';
 import GestionAusencias from './pages/GestionAusencias';
@@ -246,6 +247,9 @@ export const router = createBrowserRouter([
       { path: 'ordenes-trabajo', element: <ProtectedRoute roles={['admin', 'supervisor', 'empleado']}><OrdenesTrabajo /></ProtectedRoute> },
       // Inventario (activos + consumibles; se cruza con las OT)
       { path: 'inventario', element: <ProtectedRoute roles={['admin', 'supervisor']}><Inventario /></ProtectedRoute> },
+      // El LIBRO del deposito: entradas, salidas, ajustes y lo que se llevo
+      // cada OT. Esto es la operacion; el inventario de arriba es el catalogo.
+      { path: 'inventario/movimientos', element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioMovimientos /></ProtectedRoute> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor', 'empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)

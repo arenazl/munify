@@ -49,6 +49,9 @@ export class MockDataService {
       { id: 'inventario', label: 'Inventario', hijos: [
         { id: 'inv', label: 'Inventario', tipo: 'abm', n: '240' },
         { id: 'cat-inv', label: 'Categorías de inventario', tipo: 'catalogo', n: '8' },
+        // Dónde está guardada cada cosa. La pantalla lo prometía desde antes
+        // de que la columna existiera (dueño, 2026-08-31).
+        { id: 'depositos', label: 'Depósitos', tipo: 'catalogo', n: '3' },
       ] },
       { id: 'tesoreria', label: 'Tesorería', hijos: [
         { id: 'conceptos-liq', label: 'Conceptos de liquidación', tipo: 'catalogo', n: '9' },

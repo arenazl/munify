@@ -23,6 +23,8 @@ import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 type FormState = {
   categoria_id: string;
+  /** Dónde queda guardado. Vacío = sin ubicación (lo que existía antes). */
+  deposito_id: string;
   nombre: string;
   descripcion: string;
   stock_actual: string;
@@ -44,7 +46,7 @@ type FormState = {
 };
 
 const FORM_VACIO: FormState = {
-  categoria_id: '', nombre: '', descripcion: '',
+  categoria_id: '', deposito_id: '', nombre: '', descripcion: '',
   stock_actual: '', stock_minimo: '', unidad: '',
   identificador: '', estado_activo: 'disponible',
   esVehiculo: false, reservable: false, marca_modelo: '', anio: '', tipo_combustible: '',
@@ -78,6 +80,7 @@ export default function Inventario() {
   const [selected, setSelected] = useState<InventarioItem | null>(null);
   const [form, setForm] = useState<FormState>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
+  const [depositos, setDepositos] = useState<{ id: number; nombre: string }[]>([]);
   const [toDelete, setToDelete] = useState<InventarioItem | null>(null);
 
   const esGestor = user?.rol === 'admin' || user?.rol === 'supervisor';
@@ -112,6 +115,16 @@ export default function Inventario() {
     } catch { /* best-effort */ }
   }, []);
   useEffect(() => { if (esGestor) cargarCategorias(); }, [esGestor, cargarCategorias]);
+
+  /* Los depósitos vienen sembrados (central, corralón, vivero) y el municipio
+     los edita en Configuración; acá sólo se elige uno. */
+  const cargarDepositos = useCallback(async () => {
+    try {
+      const res = await inventarioApi.listDepositos({ activo: true });
+      setDepositos(Array.isArray(res.data) ? res.data : []);
+    } catch { /* sin depósitos, el selector queda vacío y el ítem sin ubicación */ }
+  }, []);
+  useEffect(() => { if (esGestor) cargarDepositos(); }, [esGestor, cargarDepositos]);
 
   const conteosNaturaleza = useMemo(() => {
     const c: Record<string, number> = {};
@@ -171,6 +184,7 @@ export default function Inventario() {
     setSelected(item);
     setForm({
       categoria_id: String(item.categoria_id),
+      deposito_id: item.deposito_id ? String(item.deposito_id) : '',
       nombre: item.nombre,
       descripcion: item.descripcion || '',
       stock_actual: item.stock_actual != null ? String(item.stock_actual) : '',
@@ -208,6 +222,7 @@ export default function Inventario() {
         categoria_id: Number(form.categoria_id),
         nombre: form.nombre.trim(),
         descripcion: form.descripcion.trim() || null,
+        deposito_id: form.deposito_id ? Number(form.deposito_id) : null,
       };
       if (naturalezaForm === 'consumible') {
         payload.stock_actual = form.stock_actual ? Number(form.stock_actual) : 0;
@@ -270,6 +285,11 @@ export default function Inventario() {
       label: `${c.nombre} · ${naturalezaLabels[c.naturaleza]}`,
     }));
   }, [categorias, selected]);
+
+  const depositoOptions: SelectOption[] = useMemo(() => [
+    { value: '', label: 'Sin depósito asignado' },
+    ...depositos.map(d => ({ value: String(d.id), label: d.nombre })),
+  ], [depositos]);
 
   const categoriaFiltroOptions: SelectOption[] = useMemo(() =>
     categorias.map(c => ({ value: String(c.id), label: c.nombre })),
@@ -468,6 +488,18 @@ export default function Inventario() {
                 {naturalezaForm === 'activo' ? 'Bien reutilizable (se toma/libera en OT)' : 'Material con stock (se descuenta al usarse)'}
               </p>
             )}
+          </div>
+
+          {/* Dónde está guardado. Hasta 2026-08-31 el inventario no sabía
+              ubicación: no se podía contestar dónde estaba una cosa. */}
+          <div>
+            <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Depósito</p>
+            <ModernSelect
+              value={form.deposito_id}
+              onChange={(v) => setForm({ ...form, deposito_id: v })}
+              options={depositoOptions}
+              placeholder="Sin depósito asignado"
+            />
           </div>
 
           <div>

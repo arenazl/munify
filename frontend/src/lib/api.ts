@@ -1571,6 +1571,33 @@ export const inventarioApi = {
   updateItem: (id: number, data: Record<string, unknown>) =>
     api.put(`/inventario/items/${id}`, data),
   deleteItem: (id: number) => api.delete(`/inventario/items/${id}`),
+  // Depósitos: dónde está guardada cada cosa.
+  listDepositos: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/depositos', { params }),
+  createDeposito: (data: Record<string, unknown>) =>
+    api.post('/inventario/depositos', data),
+  updateDeposito: (id: number, data: Record<string, unknown>) =>
+    api.put(`/inventario/depositos/${id}`, data),
+  deleteDeposito: (id: number) => api.delete(`/inventario/depositos/${id}`),
+  // Movimientos: el libro del depósito. `createMovimiento` sólo acepta
+  // entrada/salida/ajuste — los de OT los escribe el cierre de la orden.
+  listMovimientos: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/movimientos', { params }),
+  createMovimiento: (data: Record<string, unknown>) =>
+    api.post('/inventario/movimientos', data),
+  historialItem: (id: number, params?: Record<string, string | number>) =>
+    api.get(`/inventario/items/${id}/movimientos`, { params }),
+  // Órdenes de compra: al recibirlas entra el stock.
+  listOrdenesCompra: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/ordenes-compra', { params }),
+  createOrdenCompra: (data: Record<string, unknown>) =>
+    api.post('/inventario/ordenes-compra', data),
+  updateOrdenCompra: (id: number, data: Record<string, unknown>) =>
+    api.put(`/inventario/ordenes-compra/${id}`, data),
+  recibirOrdenCompra: (id: number, data: Record<string, unknown>) =>
+    api.post(`/inventario/ordenes-compra/${id}/recibir`, data),
+  cancelarOrdenCompra: (id: number) =>
+    api.delete(`/inventario/ordenes-compra/${id}`),
 };
 
 export const tramitesApi = {
