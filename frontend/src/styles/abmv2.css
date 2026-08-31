@@ -2503,16 +2503,25 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-mapa-full:fullscreen .av2-controles,
 .av2-mapa-full--expandido .av2-controles { flex: 0 0 auto; }
 
-/* En el TELEFONO esos controles se apilan en varias filas: medido en un
-   iPhone 13, ocupaban 395px de 664 —el 60% de la pantalla— y al mapa le
-   quedaban 249. Pantalla completa que muestra menos mapa que la vista normal
-   no es pantalla completa (dueño, 2026-08-31).
-   No se esconden —sin la pregunta y los filtros el mapa no se maneja—: se les
-   pone un techo y scrollean adentro. El mapa se queda con el 60% largo. */
+/* En el TELEFONO estos controles se apilan y se comen la pantalla: medido en
+   un iPhone 13, 375px de 664 —y el mapa quedaba en 249, MENOS que los 568 de
+   la vista normal—. Una pantalla completa que muestra menos mapa que la vista
+   comun no es pantalla completa (dueño, 2026-08-31).
+
+   De esos 375, la ORACION con su play son 42: eso es lo unico que hace falta
+   para mirar el recorrido. La cabecera (124) y los combos de la pregunta
+   (144) se pliegan — para cambiar la consulta se sale de pantalla completa,
+   que en un telefono es un toque. En desktop no cambia nada: alla los
+   controles entran en una linea. */
 @media (max-width: 860px) {
+  .av2-mapa-full:fullscreen .cg-cabecera,
+  .av2-mapa-full--expandido .cg-cabecera,
+  .av2-mapa-full:fullscreen .cg-consulta,
+  .av2-mapa-full--expandido .cg-consulta { display: none; }
+
   .av2-mapa-full:fullscreen .av2-controles,
   .av2-mapa-full--expandido .av2-controles {
-    max-height: 38dvh;
+    max-height: 30dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
