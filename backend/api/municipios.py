@@ -4,6 +4,7 @@ API de Municipios - Endpoints publicos y protegidos
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text, delete
+from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
 from pydantic import BaseModel
 from math import radians, cos, sin, asin, sqrt
@@ -806,69 +807,114 @@ async def crear_municipio_demo(
             # Silenciamos el error — el fallback de CABA ya está asignado
             pass
 
-    # 2. Crear fila del municipio con coords (reales o fallback)
-    municipio = Municipio(
-        nombre=nombre_limpio,
-        codigo=codigo,
-        pais=(data.pais or "AR").upper(),
-        latitud=lat,
-        longitud=lng,
-        radio_km=10.0,
-        color_primario="#0088cc",
-        color_secundario="#005fa3",
-        zoom_mapa_default=13,
-        activo=True,
-        abm_en_sidebar=False,
-        demo_protegido=bool(demo_pin),
-        # Las demos NUEVAS abren en tema CLARO (decisión del dueño,
-        # 2026-08-27): la demo se muestra en oficinas con luz y el claro
-        # "papel" es la identidad de la marca — el dark queda a un click
-        # (la luna) como efecto del vendedor. 'marfil' es el claro cálido
-        # del set de fondos; el usuario que elige otro tema pisa esto
-        # (prioridad: localStorage > tema_config > default global). Las
-        # demos existentes no se tocan.
-        tema_config={"presetId": "marfil"},
-    )
-    db.add(municipio)
-    await db.flush()
-
-    # 2. Sembrar categorías default (10 reclamo + 10 trámite)
-    await crear_categorias_default(db, municipio.id)
-    await db.flush()
-
-    # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud.
-    # Es LA semilla única y coherente — categorías, trámites y reclamos ya
-    # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
-    # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
-    # la coherencia dependencia↔categoría con asignaciones random.
+    # ============================================================
+    # ALTA + SEMILLA, con reintento si el nombre quedo ocupado
     #
-    # Va envuelto para que el log quede grabado TAMBIÉN si revienta acá: es el
-    # caso que hay que poder mirar desde la consola del super admin.
-    # El id se captura ANTES del try: si la semilla revienta, la sesión queda
-    # con rollback pendiente y `municipio.id` ya no se puede leer
-    # (PendingRollbackError) — la bitácora del alta fallido se perdía justo en
-    # el caso que tenía que cubrir (visto con San Salvador de Jujuy).
-    muni_id = municipio.id
-    try:
-        seed_info = await seed_demo_completo(db, municipio.id, codigo,
-                                             password=demo_pin or "demo123",
-                                             log=log)
-        await db.commit()
-    except Exception as e:
-        log.error(e)
-        await db.rollback()
-        # La fila del municipio puede sobrevivir al rollback (se escribio antes
-        # del punto que fallo). Sin esto queda una cascara: municipio sin un
-        # solo usuario, imposible de usar, y encima ocupando el nombre para el
-        # proximo intento. Se limpia en su propia operacion, best-effort.
+    # Entre el chequeo de disponibilidad y el INSERT pasan ~20 segundos de
+    # semilla. En el medio otro vendedor puede estar creando la misma ciudad,
+    # o puede quedar algun rastro que choque. Si eso pasa, el que lo paga es
+    # el que esta hablando por telefono con el intendente: ve "no pudimos
+    # crear la demo" y se queda sin nada que mostrar.
+    #
+    # Por eso una colision de unicidad NO se propaga: se reintenta con el
+    # sufijo siguiente (moreno-2, moreno-3) y el vendedor no se entera.
+    # Cualquier otro error si se propaga — si la base esta caida o el seed
+    # tiene un bug, reintentar es esconder el problema y hacer esperar tres
+    # veces de gusto.
+    # ============================================================
+    async def _alta(codigo_actual: str):
+        # 2. Crear fila del municipio con coords (reales o fallback)
+        municipio = Municipio(
+            nombre=nombre_limpio,
+            codigo=codigo_actual,
+            pais=(data.pais or "AR").upper(),
+            latitud=lat,
+            longitud=lng,
+            radio_km=10.0,
+            color_primario="#0088cc",
+            color_secundario="#005fa3",
+            zoom_mapa_default=13,
+            activo=True,
+            abm_en_sidebar=False,
+            demo_protegido=bool(demo_pin),
+            # Las demos NUEVAS abren en tema CLARO (decisión del dueño,
+            # 2026-08-27): la demo se muestra en oficinas con luz y el claro
+            # "papel" es la identidad de la marca — el dark queda a un click
+            # (la luna) como efecto del vendedor. 'marfil' es el claro cálido
+            # del set de fondos; el usuario que elige otro tema pisa esto
+            # (prioridad: localStorage > tema_config > default global). Las
+            # demos existentes no se tocan.
+            tema_config={"presetId": "marfil"},
+        )
+        db.add(municipio)
+        await db.flush()
+
+        # 2. Sembrar categorías default (10 reclamo + 10 trámite)
+        await crear_categorias_default(db, municipio.id)
+        await db.flush()
+
+        # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud.
+        # Es LA semilla única y coherente — categorías, trámites y reclamos ya
+        # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
+        # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
+        # la coherencia dependencia↔categoría con asignaciones random.
+        #
+        # Va envuelto para que el log quede grabado TAMBIÉN si revienta acá: es el
+        # caso que hay que poder mirar desde la consola del super admin.
+        # El id se captura ANTES del try: si la semilla revienta, la sesión queda
+        # con rollback pendiente y `municipio.id` ya no se puede leer
+        # (PendingRollbackError) — la bitácora del alta fallido se perdía justo en
+        # el caso que tenía que cubrir (visto con San Salvador de Jujuy).
+        muni_id = municipio.id
         try:
-            await db.execute(delete(Municipio).where(
-                Municipio.id == muni_id, Municipio.codigo == codigo))
+            seed_info = await seed_demo_completo(db, municipio.id, codigo_actual,
+                                                 password=demo_pin or "demo123",
+                                                 log=log)
             await db.commit()
         except Exception:
             await db.rollback()
-        await log.guardar(municipio_id=muni_id)
-        raise
+            # La fila del municipio puede sobrevivir al rollback (se escribio antes
+            # del punto que fallo). Sin esto queda una cascara: municipio sin un
+            # solo usuario, imposible de usar, y encima ocupando el nombre para el
+            # proximo intento. Se limpia en su propia operacion, best-effort.
+            try:
+                await db.execute(delete(Municipio).where(
+                    Municipio.id == muni_id, Municipio.codigo == codigo_actual))
+                await db.commit()
+            except Exception:
+                await db.rollback()
+            # El helper limpia y propaga; QUIEN decide que hacer con el error
+            # es el bucle de afuera. Si guardara la bitacora aca, un reintento
+            # que despues sale bien dejaria un "fallo" escrito igual — y peor,
+            # reusaria en la vuelta siguiente un log ya cerrado.
+            raise
+        return municipio, muni_id, seed_info
+
+    intentos = 0
+    while True:
+        try:
+            municipio, muni_id, seed_info = await _alta(codigo)
+            break
+        except IntegrityError:
+            intentos += 1
+            if intentos >= 3:
+                log.hito("colision", estado="fallo",
+                         motivo="tres nombres seguidos ocupados")
+                await log.guardar(municipio_id=None)
+                raise HTTPException(
+                    status_code=409,
+                    detail="No pudimos reservar un nombre para la demo. Probá de nuevo.",
+                )
+            suffix += 1
+            codigo = f"{base_codigo}-{suffix}"
+            log.hito("colision", estado="degradado",
+                     motivo=f"nombre ocupado, reintento como {codigo}")
+        except Exception as e:
+            # Base caida, seed roto, timeout: esto NO se reintenta — seria
+            # esconder el problema y hacer esperar tres veces de gusto.
+            log.error(e)
+            await log.guardar(municipio_id=None)
+            raise
 
     # 4. Turnero (best-effort): agenda, horarios y turnos de ejemplo sobre
     # los trámites ya creados en el paso 3.
