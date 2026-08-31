@@ -745,6 +745,47 @@ function InvalidarAlRedimensionar() {
   return null;
 }
 
+/**
+ * Un gesto de rueda = un nivel de zoom.
+ *
+ * El zoom por rueda de Leaflet ACUMULA píxeles: `wheelPxPerZoomLevel` divide el
+ * desplazamiento y devuelve cuántos niveles saltar de una. Con una rueda de alta
+ * resolución --- o un trackpad, que manda decenas de eventos por gesto --- un
+ * empujoncito se convierte en varios niveles y el mapa se va de viaje. Subir el
+ * umbral sólo corre el problema de lugar: sigue dependiendo de cuántos píxeles
+ * reporte el dispositivo.
+ *
+ * Acá el zoom deja de ser proporcional al desplazamiento y pasa a ser discreto:
+ * cada gesto mueve exactamente un nivel, y los eventos que llegan pegados dentro
+ * de la misma ventana se ignoran. `setZoomAround` mantiene bajo el cursor el
+ * punto que estabas mirando, igual que el zoom nativo.
+ */
+function ZoomRuedaDeAUno() {
+  const map = useMap();
+  useEffect(() => {
+    map.scrollWheelZoom.disable();
+    const contenedor = map.getContainer();
+    let ultimo = 0;
+    const alGirar = (e: WheelEvent) => {
+      e.preventDefault();
+      const ahora = Date.now();
+      if (ahora - ultimo < 140) return;   // el resto del mismo gesto
+      ultimo = ahora;
+      const paso = e.deltaY > 0 ? -1 : 1;
+      const destino = Math.min(
+        map.getMaxZoom(),
+        Math.max(map.getMinZoom(), map.getZoom() + paso),
+      );
+      if (destino !== map.getZoom()) {
+        map.setZoomAround(map.mouseEventToContainerPoint(e), destino);
+      }
+    };
+    contenedor.addEventListener('wheel', alGirar, { passive: false });
+    return () => contenedor.removeEventListener('wheel', alGirar);
+  }, [map]);
+  return null;
+}
+
 function HotspotLayer({ hotspots }: { hotspots: Hotspot[] }) {
   return (
     <>
@@ -3627,6 +3668,17 @@ export default function Mapa() {
           filtros adentro y contesta abajo con datos reales. La botonera del
           kit queda arriba sólo para elegir la superficie (reclamos / puntos
           de interés), que no es una consulta sino otro trabajo. */}
+      {/* La pantalla completa toma ESTE bloque, no sólo el lienzo: adentro van
+          la pregunta, la frase con los filtros, el botón del recorrido y la
+          banda del time-lapse. Maximizar sólo el mapa dejaba afuera todo lo
+          que se usa para manejarlo, y el mapa grande quedaba mudo.
+
+          En estado normal el envoltorio es `display: contents`: no genera caja
+          y el layout de la página queda exactamente como estaba. */}
+      <div
+        className={`av2-mapa-full${expandidoCss ? ' av2-mapa-full--expandido' : ''}`}
+        ref={lienzoRef}
+      >
       <div className="av2-controles">
         {controlesMapa.length > 0 && (
           <AdaptiveFilter
@@ -3655,7 +3707,7 @@ export default function Mapa() {
       {/* ============================ MODO RECLAMOS ============================ */}
       {!isPuntos && (
         <>
-      <div className={`av2-mapa${expandidoCss ? ' av2-mapa--expandido' : ''}`} ref={lienzoRef}>
+      <div className="av2-mapa">
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}
         {/* El filtro claro/oscuro va en el WRAPPER, no en el MapContainer:
@@ -3679,6 +3731,7 @@ export default function Mapa() {
             <FitBoundsToMarkers reclamos={reclamosFiltrados} signal={fitSignal} />
             <MapController target={mapTarget} />
             <InvalidarAlRedimensionar />
+            <ZoomRuedaDeAUno />
 
             {/* ---- REGIONES: cada barrio pintado con el color de su distrito ----
                  Va PRIMERO para que quede debajo de los pines. Con un distrito
@@ -4077,6 +4130,7 @@ export default function Mapa() {
       </div>
         </>
       )}
+      </div>{/* /av2-mapa-full */}
 
       {/* ============================= MODO PUNTOS ============================= */}
       {isPuntos && (
@@ -4100,6 +4154,7 @@ export default function Mapa() {
                 <FitBoundsToLatLngs points={poiPoints} signal={poiFitSignal} />
                 <MapController target={mapTarget} />
                 <InvalidarAlRedimensionar />
+            <ZoomRuedaDeAUno />
                 <PoiClickHandler onPick={abrirNuevoPoi} />
 
                 {pois.map((poi) => {

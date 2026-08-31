@@ -2476,21 +2476,48 @@ button.av2-chip:hover { opacity: 0.85; }
 
    El alto va por `dvh` para que la barra del navegador del teléfono, que
    aparece y desaparece al scrollear, no deje al mapa cortado. */
-.av2-mapa:fullscreen { margin-top: 0; border: 0; border-radius: 0; }
-.av2-mapa:fullscreen .av2-mapa-lienzo { height: 100%; min-height: 0; }
+/* Lo que se maximiza es el BLOQUE (pregunta + filtros + mapa + banda del
+   recorrido), no el lienzo solo: un mapa a pantalla completa sin sus controles
+   no se puede manejar. Mientras no está maximizado el envoltorio es
+   `display: contents` --- no genera caja, así que la página se arma igual que
+   antes de que existiera. */
+.av2-mapa-full { display: contents; }
 
-.av2-mapa--expandido {
+.av2-mapa-full:fullscreen,
+.av2-mapa-full--expandido {
+  display: flex;
+  flex-direction: column;
+  background: var(--pl-bg);
+  padding: 10px 12px 0;
+  overflow: hidden;
+}
+.av2-mapa-full--expandido {
   position: fixed;
   inset: 0;
   z-index: var(--pl-z-modal, 1000);
-  margin-top: 0;
-  border: 0;
-  border-radius: 0;
+  height: 100dvh;          /* dvh: la barra del navegador del teléfono aparece
+                              y desaparece, y con vh el mapa quedaba cortado */
 }
-.av2-mapa--expandido .av2-mapa-lienzo {
-  height: 100dvh;
+
+/* La barra conserva su alto natural y el mapa se queda con todo el resto. */
+.av2-mapa-full:fullscreen .av2-controles,
+.av2-mapa-full--expandido .av2-controles { flex: 0 0 auto; }
+
+.av2-mapa-full:fullscreen .av2-mapa,
+.av2-mapa-full--expandido .av2-mapa {
+  flex: 1 1 auto;
   min-height: 0;
+  margin-top: 10px;
 }
+.av2-mapa-full:fullscreen .av2-mapa-lienzo,
+.av2-mapa-full--expandido .av2-mapa-lienzo { height: 100%; min-height: 0; }
+
+/* Dentro del envoltorio quedan también el informe y el ranking, que en pantalla
+   completa no son lo que se mira y le robarían alto al mapa. */
+.av2-mapa-full:fullscreen .av2-informe,
+.av2-mapa-full--expandido .av2-informe,
+.av2-mapa-full:fullscreen #mapa-zonas-calientes,
+.av2-mapa-full--expandido #mapa-zonas-calientes { display: none; }
 
 /* --- Leyenda de densidad, flotante abajo a la izquierda. La rampa NO es
    una paleta propia: son los tres matices de VEREDICTO (bueno →
