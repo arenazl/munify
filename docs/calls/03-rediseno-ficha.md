@@ -58,6 +58,15 @@ necesita una narrativa que ya conoce, no una sorpresa.
 - **Trámites** y **Tesorería**: redactados sobre lo que los módulos ya hacen.
   **Falta que el dueño los valide.**
 
+**El refresh de cada tema.** Arriba a la derecha del panel hay un icono de
+refresh: si a la tercera llamada del día ya te aburriste de tu propio libreto,
+la IA lo dice **de otra forma**. El prompt le pasa el texto original y le
+prohíbe agregar nada que no esté ahí — sólo reordenar, cambiar palabras y
+elegir el énfasis según el municipio. Queda marcado *"Dicho de otra forma"* con
+un **"volver al mío"** a un clic, y si la IA falla vuelve el original solo.
+Verificado contra la IA de QA: reescribió los tres párrafos de Reclamos sin
+agregar una sola función que no estuviera en el original.
+
 > **Ojo:** la narración nombra **comunicación** como cuarto eje, pero el cuarto
 > tab es **Tesorería**. Si preguntan por comunicación no hay tab (sí está el
 > panel de la derecha). Sumar un quinto es una entrada más en `GUION`.
@@ -110,9 +119,27 @@ asistente**, no sólo los tabs.
 ### 5. La columna derecha: "Dato de color"
 
 Debajo de los paneles de módulos va lo que se sabe **antes** de marcar: quién
-manda (con el nivel de confianza del dato), cómo llega el municipio, áreas,
-digitalización, para romper el hielo y la web. Se repinta con cada municipio
-que se abre (`pintarDatoColor`).
+manda (con el nivel de confianza del dato), cómo llega el municipio, áreas, qué
+usan hoy, para romper el hielo y la web. Se repinta con cada municipio que se
+abre (`pintarDatoColor`).
+
+Era un ladrillo de texto corrido — *"un membrete del Clarín del 80"* (dueño,
+2026-08-30). Ahora **cada dato es su propio panel con su icono**, y lo largo se
+recorta a seis líneas con un **"más"** que lo abre en el lugar: en esa columna
+hay que barrer de un vistazo, no leer.
+
+Y **"Qué usan hoy" se dibuja**, que es el dato que decide la conversación:
+
+- un **veredicto** de un vistazo, con su color — *Ya tienen app propia* (rojo,
+  competimos), *Tienen web, no app* (ámbar), *Terreno virgen* (verde), *Sin
+  relevar* (gris);
+- los **canales** que ya tienen como chips con icono: App, Web, Teléfono,
+  WhatsApp, Redes, Presencial.
+
+Los dos salen de **leer el texto del relevamiento** (`investigacion.digital`),
+no de un dato nuevo: si el texto no nombra un canal, el chip no aparece. Es una
+lectura por palabras clave y puede errar en un caso raro — el párrafo completo
+queda debajo, siempre.
 
 **"Recordar" se eliminó entero** (dueño, 2026-08-30): los tres consejos
 genéricos, la rotación, el `TIPS` de los datos y su parte en `build_calls.py`.

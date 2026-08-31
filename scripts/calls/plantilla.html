@@ -484,6 +484,16 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .g-txt p{margin:0}
 .g-txt p+p{margin-top:10px}
 .g-txt b{color:var(--ink);font-weight:700}
+.g-txt{position:relative}
+.g-txt.otra{border-left-color:var(--purple)}
+.g-re{position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:8px;cursor:pointer;
+ background:var(--card2);border:1px solid var(--line2);color:var(--ink3);display:flex;align-items:center;
+ justify-content:center;transition:.14s}
+.g-re svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.g-re:hover{border-color:var(--acc);color:var(--acc);transform:rotate(-45deg)}
+.g-txt p{padding-right:30px}
+.g-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding-top:9px;
+ border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)}
 /* El boton que le pide a la IA el angulo de ESE modulo para ESTE municipio.
    Vive dentro del panel, debajo de los bullets fijos: primero lo que el
    modulo hace, despues por que le sirve a ellos. */
@@ -503,14 +513,35 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 @media(max-width:420px){ .tabs{grid-template-columns:repeat(2,1fr)} }
 /* DATO DE COLOR (columna derecha): lo que se sabe ANTES de marcar. Vivia en el
    centro y empujaba la narracion fuera de la pantalla (dueño, 2026-08-30). */
-.color-box{display:flex;flex-direction:column;gap:9px}
-.color-it{font-size:12.3px;line-height:1.5;color:var(--ink2);border-left:2px solid var(--line);padding-left:11px}
-.color-it b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
- color:var(--ink3);font-weight:700;margin-bottom:3px}
-.color-it.jefe{border-left-color:var(--acc)} .color-it.jefe .n{font-size:14.5px;font-weight:800;color:var(--ink)}
-.color-it.perfil{border-left-color:var(--purple)}
-.color-it.hielo{border-left-color:var(--ok)}
-.color-it a{color:var(--acc);overflow-wrap:anywhere}
+.color-box{display:flex;flex-direction:column;gap:7px}
+.co{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.co-h{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+ color:var(--ink3);font-weight:700;margin-bottom:5px}
+.co-ic{width:13px;height:13px;flex:none;display:inline-flex;color:var(--ink3)}
+.co-ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.co-b{font-size:12.3px;line-height:1.5;color:var(--ink2)}
+.co.jefe .co-ic{color:var(--acc)} .co.perfil .co-ic{color:var(--purple)}
+.co.hielo .co-ic{color:var(--ok)} .co.digital .co-ic{color:var(--warn)}
+.co .n{display:block;font-size:14.5px;font-weight:800;color:var(--ink);line-height:1.25}
+.co .s{display:block;font-size:11.5px;color:var(--ink3);margin-top:2px}
+.co a{color:var(--acc);overflow-wrap:anywhere}
+/* Seis lineas y corta: en la columna se barre de un vistazo, no se lee. */
+.co p.rec{margin:0;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.co p.rec.todo{-webkit-line-clamp:unset;overflow:visible}
+.co-mas{margin-top:5px}
+/* El veredicto comercial de un vistazo: contra que competimos en este lugar. */
+.ver{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;border-radius:999px;
+ padding:3px 9px;margin-bottom:7px;border:1px solid}
+.ver:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.ver.compite{color:var(--bad);border-color:var(--bad)}
+.ver.parcial{color:var(--warn);border-color:var(--warn)}
+.ver.virgen{color:var(--ok);border-color:var(--ok)}
+.ver.nada{color:var(--ink3);border-color:var(--line2)}
+/* Los canales que ya tienen, dibujados: se ve el terreno sin leer el parrafo. */
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--ink2);
+ background:var(--card);border:1px solid var(--line2);border-radius:7px;padding:3px 7px}
+.chip svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .p-tel{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:13px}
 .p-tel a.tel-btn{flex:1;justify-content:center;font-size:16px;padding:13px}
 .btn{border:1px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:9px;padding:9px 13px;
@@ -1263,25 +1294,139 @@ async function modIA(c, m){
   }
 }
 
-/* DATO DE COLOR: todo lo que se sabe del municipio ANTES de marcar. Vive en la
-   columna derecha, en el lugar donde estaba "Recordar" (dueño, 2026-08-30):
-   en el centro empujaba la narracion fuera de la pantalla, y es informacion
-   para prepararse, no para leer mientras se habla. */
+/* DATO DE COLOR: lo que se sabe del municipio ANTES de marcar. Era un ladrillo
+   de texto corrido — "un membrete del Clarin del 80" (dueño, 2026-08-30). Ahora
+   cada dato es su propio panel con icono, y lo largo se recorta a seis lineas
+   con un "más" que lo abre: en la columna hay que barrer de un vistazo, no leer.
+   La digitalizacion ademas se DIBUJA: los canales que ya tienen salen como
+   chips, y arriba el veredicto de si competimos o el terreno esta virgen. */
+const CO_IC = {
+  jefe:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>',
+  perfil:'<path d="M3 20V9l9-6 9 6v11"/><path d="M9 20v-6h6v6"/>',
+  areas:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  digital:'<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/>',
+  hielo:'<path d="M12 3v18M5 8l14 8M19 8 5 16"/>',
+  web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/>'
+};
+
+/* Los canales que el municipio YA tiene, leidos del texto del relevamiento.
+   Es una lectura de lo que dice la ficha, no un dato nuevo: si el texto no lo
+   nombra, el chip no aparece. */
+const CO_CANALES = [
+  {k:'App',       re:/\bapp\b|aplicaci/i,            ic:'<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/>'},
+  {k:'Web',       re:/portal|web|online|formulario/i, ic:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>'},
+  {k:'Teléfono',  re:/tel[eé]fono|\b147\b|0800|l[ií]nea/i, ic:'<path d="M4 4h5l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v5a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/>'},
+  {k:'WhatsApp',  re:/whatsapp/i,                    ic:'<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L3 21l2-5.6A8.5 8.5 0 1 1 21 11.5Z"/>'},
+  {k:'Redes',     re:/facebook|instagram|redes/i,    ic:'<path d="M3 11l18-8-8 18-2-8-8-2Z"/>'},
+  {k:'Presencial',re:/presencial|ventanilla/i,       ic:'<path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/>'}
+];
+
+/* El veredicto comercial, de un vistazo: contra que competimos. */
+function coVeredicto(t){
+  if (!t) return {cl:'nada', tx:'Sin relevar'};
+  if (/no tienen|sin app|nada digital|no cuenta con|no posee/i.test(t)) return {cl:'virgen', tx:'Terreno virgen'};
+  if (/\bapp\b|aplicaci/i.test(t)) return {cl:'compite', tx:'Ya tienen app propia'};
+  if (/portal|web|online|formulario/i.test(t)) return {cl:'parcial', tx:'Tienen web, no app'};
+  return {cl:'nada', tx:'Sin relevar'};
+}
+
+function coPanel(clase, icono, rotulo, cuerpo, extra){
+  return '<div class="co ' + clase + '">'
+    + '<div class="co-h"><i class="co-ic"><svg viewBox="0 0 24 24">' + icono + '</svg></i>' + esc(rotulo) + '</div>'
+    + (extra || '')
+    + '<div class="co-b">' + cuerpo + '</div></div>';
+}
+
 function pintarDatoColor(c){
   const cont = document.getElementById('colorBox'); if (!cont) return;
   if (!c){ cont.innerHTML = '<div class="vacio" style="padding:14px 6px">Elegí un municipio y acá aparece lo que averiguamos del lugar.</div>'; return; }
   const f = FUNC[c.id] || {}, inv = INVEST[c.id] || {};
   const it = [];
-  if (f.intendente) it.push('<div class="color-it jefe"><b>Quién manda</b><span class="n">' + esc(f.intendente) + '</span><br>'
-    + esc(f.cargo || 'Intendente') + (f.partido ? ' · ' + esc(f.partido) : '')
-    + (f.confianza && f.confianza !== 'alta' ? ' · dato ' + esc(f.confianza) + ', confirmalo' : '') + '</div>');
-  if (c.perfil) it.push('<div class="color-it perfil"><b>Cómo llega el municipio</b>' + esc(c.perfil) + '</div>');
-  if (inv.estructura) it.push('<div class="color-it"><b>Áreas</b>' + esc(inv.estructura) + '</div>');
-  if (inv.digital) it.push('<div class="color-it"><b>Digitalización</b>' + esc(inv.digital) + '</div>');
-  if (inv.color) it.push('<div class="color-it hielo"><b>Para romper el hielo</b>' + esc(inv.color) + '</div>');
-  if (inv.web) it.push('<div class="color-it"><b>Web</b><a href="' + esc(inv.web) + '" target="_blank" rel="noopener">' + esc(inv.web) + '</a></div>');
+  if (f.intendente) it.push(coPanel('jefe', CO_IC.jefe, 'Quién manda',
+    '<span class="n">' + esc(f.intendente) + '</span><span class="s">' + esc(f.cargo || 'Intendente')
+    + (f.partido ? ' · ' + esc(f.partido) : '')
+    + (f.confianza && f.confianza !== 'alta' ? ' · dato ' + esc(f.confianza) + ', confirmalo' : '') + '</span>'));
+  if (c.perfil) it.push(coPanel('perfil', CO_IC.perfil, 'Cómo llega', '<p class="rec">' + esc(c.perfil) + '</p>'));
+  if (inv.estructura) it.push(coPanel('areas', CO_IC.areas, 'Áreas', '<p class="rec">' + esc(inv.estructura) + '</p>'));
+  if (inv.digital){
+    const v = coVeredicto(inv.digital);
+    const chips = CO_CANALES.filter(x => x.re.test(inv.digital)).map(x =>
+      '<span class="chip"><svg viewBox="0 0 24 24">' + x.ic + '</svg>' + x.k + '</span>').join('');
+    it.push(coPanel('digital', CO_IC.digital, 'Qué usan hoy',
+      '<p class="rec">' + esc(inv.digital) + '</p>',
+      '<div class="ver ' + v.cl + '">' + esc(v.tx) + '</div>' + (chips ? '<div class="chips">' + chips + '</div>' : '')));
+  }
+  if (inv.color) it.push(coPanel('hielo', CO_IC.hielo, 'Para romper el hielo', '<p class="rec">' + esc(inv.color) + '</p>'));
+  if (inv.web) it.push(coPanel('web', CO_IC.web, 'Web',
+    '<a href="' + esc(inv.web) + '" target="_blank" rel="noopener">' + esc(inv.web.replace(/^https?:\/\//, '').replace(/\/$/, '')) + '</a>'));
   cont.innerHTML = it.length ? it.join('')
     : '<div class="vacio" style="padding:14px 6px">De este municipio todavía no averiguamos nada.</div>';
+  /* Lo largo arranca recortado; el "más" lo abre en el lugar. */
+  cont.querySelectorAll('p.rec').forEach(p => {
+    if (p.scrollHeight <= p.clientHeight + 2) return;
+    const b = document.createElement('button');
+    b.className = 'lnk co-mas'; b.type = 'button'; b.textContent = 'más';
+    b.onclick = () => { const ab = p.classList.toggle('todo'); b.textContent = ab ? 'menos' : 'más'; };
+    p.parentElement.appendChild(b);
+  });
+}
+
+/* El texto del tema es FIJO — es el speech. Pero al lado tiene un refresh
+   (dueño, 2026-08-30): si a la tercera llamada del dia ya te aburriste de tu
+   propio libreto, la IA te lo dice de otra forma. Mismo contenido, otras
+   palabras: no puede agregar nada que no este en el original. El original
+   siempre esta a un clic ("volver al mio").  */
+const TEMA_SISTEMA = [
+  'Sos el asistente de un vendedor argentino que esta en medio de una llamada a un municipio.',
+  'Te paso un parrafo que el vendedor ya usa para explicar un modulo de Munify, y la ficha del municipio.',
+  'Reescribilo con OTRAS PALABRAS, para que no suene machete de tanto repetirlo.',
+  'REGLA INVIOLABLE: no agregues NADA que no este en el texto original. Ni una funcion, ni una cifra,',
+  'ni un plazo, ni un ejemplo. Solo podes reordenar, cambiar las palabras y elegir el enfasis segun',
+  'el municipio. Si el original no lo dice, no existe.',
+  'NUNCA mas largo que el original: mismo largo o mas corto, en la misma cantidad de parrafos.',
+  'Español rioplatense, de vos.',
+  'Nada de titulos ni vinetas: texto corrido para leer en voz alta. Empeza directo, sin "mira" ni "bueno".'
+].join(' ');
+
+function pintarTema(c, g, txt, estado){
+  const caja = document.getElementById('pGuion'); if (!caja || !g) return;
+  const parrafos = txt ? String(txt).split(NL).map(x => x.trim()).filter(Boolean) : g.p;
+  const refresh = '<button type="button" class="g-re" id="gRe" title="Decilo de otra forma">'
+    + '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg></button>';
+  caja.innerHTML = '<div class="g-txt' + (estado === 'ia' ? ' otra' : '') + '">' + refresh
+    + parrafos.map(t => '<p>' + esc(t) + '</p>').join('')
+    + (estado === 'ia' ? '<div class="g-pie"><span>Dicho de otra forma</span>'
+        + '<button type="button" class="lnk" id="gMio">volver al mío</button></div>' : '')
+    + (estado === 'pensando' ? '<div class="g-pie"><span>Buscando otra manera de decirlo...</span></div>' : '')
+    + '</div>';
+  const re = document.getElementById('gRe'); if (re) re.onclick = () => temaOtra(c, g);
+  const mio = document.getElementById('gMio'); if (mio) mio.onclick = () => pintarTema(c, g);
+}
+
+async function temaOtra(c, g){
+  pintarTema(c, g, null, 'pensando');
+  try {
+    const mensajes = [
+      {role:'system', content: TEMA_SISTEMA},
+      {role:'user', content: 'FICHA DEL MUNICIPIO:' + NL + iaContexto(c) + NL + NL
+        + 'TEXTO ORIGINAL (' + g.t + '), no agregues nada que no este aca:' + NL + g.p.join(NL + NL)}
+    ];
+    const res = await fetch(IA_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({mensajes})});
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.detail || ('HTTP ' + res.status));
+    const txt = String(j.respuesta || '').trim();
+    if (!txt) throw new Error('respuesta vacia');
+    if (selId !== c.id) return;
+    pintarTema(c, g, txt, 'ia');
+  } catch(e){
+    if (selId !== c.id) return;
+    /* Nunca dejarlo sin texto: vuelve el original con el aviso al pie. */
+    pintarTema(c, g);
+    const cj = document.querySelector('#pGuion .g-txt');
+    if (cj) cj.insertAdjacentHTML('beforeend',
+      '<div class="g-pie"><span>No pude reescribirlo ahora.</span></div>');
+  }
 }
 
 /* LA NARRACION (dueño, 2026-08-30). Antes la ficha gritaba "Pregunta por
@@ -1369,8 +1514,7 @@ function abrir(id){
     const caja = document.getElementById('pGuion');
     if (ya){ caja.innerHTML = ''; return; }
     b.classList.add('on');
-    const g = GUION.find(x => x.id === b.dataset.g);
-    caja.innerHTML = '<div class="g-txt">' + g.p.map(t => '<p>' + esc(t) + '</p>').join('') + '</div>';
+    pintarTema(c, GUION.find(x => x.id === b.dataset.g));
   });
   // Las cuatro acciones abren su modal. El contexto de la llamada queda
   // guardado para que cada modal se arme con este municipio.
