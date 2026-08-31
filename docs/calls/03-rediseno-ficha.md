@@ -78,9 +78,13 @@ llamada.
 *Why:* los bullets solos eran, en palabras del dueño, un mazacote que no
 alcanzaba. La consulta del asesor mientras habla es otra cosa que el speech.
 
-La regla del prompt es dura: **usar SOLO los hechos de la lista y los datos de
-la ficha**. Puede cambiar el énfasis según el municipio, no agregar una función
-que no exista.
+La regla del prompt es dura y explícita: **cada función que mencione tiene que
+estar en la lista de hechos; si no está, no existe**. Prohibido traer funciones
+de otros módulos (si la lista no habla de fotos, no hay fotos), inventar cifras,
+plazos o casos de éxito. Del municipio puede usar el contexto —tamaño, áreas,
+si ya tienen algo digital— para elegir el énfasis, nunca para agregar una
+función. *Why:* un dato inventado dicho por teléfono a un intendente es un
+papelón irreparable.
 
 - **Cache** por municipio+módulo en `localStorage` (el endpoint tiene rate
   limit de 40/hora). El link **"Otra vuelta"** borra ese cache y pide de nuevo;

@@ -682,7 +682,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 21:12 · 3382d0a</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 21:39 · e141d59</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -1242,16 +1242,20 @@ function modiaGuardar(){ try { localStorage.setItem(KEY_MODIA, JSON.stringify(mo
 const MODIA_SISTEMA = [
   'Sos el asistente de un vendedor argentino que esta EN MEDIO de una llamada a un municipio,',
   'ofreciendo Munify, una plataforma de gestion municipal.',
-  'Te paso la ficha del municipio y los HECHOS de uno de sus modulos.',
-  'Devolve el ANGULO de ese modulo para ESE municipio en particular: por que le sirve a ellos,',
-  'que problema concreto de ese lugar resuelve, con que enganchar.',
+  'Te paso la ficha del municipio y los HECHOS de UNO de sus modulos.',
+  'Contale que hace ese modulo, dicho de manera que a ESTE municipio le cierre: por que le sirve a ellos,',
+  'con que enganchar.',
   'FORMATO: dos parrafos de 25 palabras cada uno. 55 palabras EN TOTAL como maximo, es un tope duro:',
   'esto se lee en una columna angosta, en el medio de una llamada. Español rioplatense, de vos.',
   'Nada de titulos, ni vinetas, ni negritas, ni comillas de ningun tipo: texto corrido para decir en voz alta.',
   'Empeza DIRECTO por el contenido. Prohibido arrancar con "mira", "bueno", "claro" o "por supuesto".',
-  'REGLA INVIOLABLE: usa SOLO los hechos que te paso y los datos de la ficha. No inventes funciones,',
-  'cifras, plazos, precios, nombres ni casos de exito. Un dato inventado dicho a un intendente es',
-  'un papelon irreparable.'
+  'REGLA INVIOLABLE, la mas importante de todas: CADA funcion que menciones tiene que estar,',
+  'textualmente, en la lista de hechos que te paso. Si no esta en la lista, NO EXISTE: no la digas.',
+  'Prohibido traer funciones de OTROS modulos (si la lista no habla de fotos, no hay fotos; si no habla',
+  'de geolocalizacion, no hay geolocalizacion). Prohibido inventar cifras, plazos, precios, casos de exito',
+  'o integraciones. De la ficha del municipio podes usar el contexto —su tamaño, sus areas, si ya tienen',
+  'algo digital, como piensa el intendente— para elegir el enfasis, pero NUNCA para agregar una funcion.',
+  'Un dato inventado dicho por telefono a un intendente es un papelon irreparable: preferi decir menos.'
 ].join(' ');
 
 async function modIA(c, m){
@@ -1276,7 +1280,7 @@ async function modIA(c, m){
     const mensajes = [
       {role:'system', content: MODIA_SISTEMA},
       {role:'user', content: 'FICHA DEL MUNICIPIO:' + NL + iaContexto(c) + NL + NL + kb + NL + NL
-        + 'Decime el angulo de ' + m.t + ' para este municipio.'}
+        + 'Decime que le cuento de ' + m.t + ', usando SOLO los hechos de arriba.'}
     ];
     const res = await fetch(IA_URL, {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({mensajes})});
