@@ -153,6 +153,17 @@ Cemento Portland 50kg — stock 22 bolsas
   25/08  ajuste         6.60   saldo 22.00   Conteo físico de depósito
 ```
 
+### En las demos nuevas
+
+`seed_demo_completo` (paso 8) ya llamaba a `seed_inventario(incluir_demo=True)`,
+así que **toda demo nueva nace con el depósito completo**: los tres depósitos,
+los 90 días de movimientos y las dos órdenes de compra. El hito del log lo
+reporta (`items`, `depositos`, `movimientos`, `ordenes_compra`).
+
+El borrado de una demo limpia también las tablas nuevas, **en orden**: primero
+las líneas de compra y los movimientos, después los ítems, y al final depósitos
+y categorías. Al revés, las FK con RESTRICT frenan el borrado.
+
 ---
 
 ## 5. Qué se tocó

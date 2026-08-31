@@ -1209,8 +1209,13 @@ async def eliminar_municipio_demo(
         # Turnero + campo (2026-07)
         "turnos", "ordenes_trabajo", "municipio_modulos",
         "agenda_configs", "agenda_excepciones",
-        # Inventario demo (seed_inventario) — quedaban huerfanos al borrar
-        "inventario_items", "inventario_categorias",
+        # Inventario demo (seed_inventario) — quedaban huerfanos al borrar.
+        # ORDEN: primero lo que apunta a los items (lineas de compra y
+        # movimientos), despues los items, y al final depositos y categorias.
+        # Al reves, las FK con RESTRICT frenan el borrado.
+        "inventario_orden_compra_lineas", "inventario_movimientos",
+        "inventario_ordenes_compra",
+        "inventario_items", "inventario_categorias", "inventario_depositos",
         # Tasas demo
         "tasas_partidas",
         # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)

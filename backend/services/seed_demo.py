@@ -1728,8 +1728,17 @@ async def seed_demo_completo(
     # descontaba stock ni tomaba una máquina. Ahora el inventario existe primero
     # y las OT completadas descuentan de verdad.
     from services.inventario_seed import seed_inventario
+    # `seed_inventario` trae ademas los depositos (siempre) y, con demo, los 90
+    # dias de movimientos y las dos ordenes de compra: el deposito nace con
+    # historia, no vacio (dueño, 2026-08-31).
     inv_res = await seed_inventario(db, municipio_id, incluir_demo=True)
-    log.hito("inventario", items=inv_res["items"])
+    log.hito(
+        "inventario",
+        items=inv_res["items"],
+        depositos=inv_res.get("depositos", 0),
+        movimientos=inv_res.get("movimientos", 0),
+        ordenes_compra=inv_res.get("ordenes_compra", 0),
+    )
 
     # ------------------------------------------------------------------
     # 9. TRES MESES DE VIDA MUNICIPAL — 50 reclamos con su circuito
