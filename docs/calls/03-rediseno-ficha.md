@@ -203,3 +203,38 @@ en combo y no en píldoras.
 países (154)"* son 132px en un control de 127 — se cortaba con puntos. Quedaron
 *"Países: todos (154)"* (112px) y *"Todas las prov. (154)"* (123px), y en
 pantalla angosta *"Todos"* / *"Todas"*.
+
+---
+
+## Los botones, con vida; y el cierre, detrás de uno solo
+
+Pedido del dueño (2026-08-30): *"a los botones de arriba y a los de abajo
+vamos a darles un poco de vida, está muy muerto eso"*.
+
+**Cada botón usa SU color en todo**, no sólo en el iconito. Las cuatro acciones
+de arriba (WhatsApp verde, Demo azul, Cierre ámbar, Asistente violeta) llevan un
+disco tintado detrás del icono, y al pasar el mouse el borde, la sombra y el
+disco toman ese color; el icono crece un punto y el botón se levanta 2px.
+Al soltar, se hunde.
+
+Los cuatro temas de abajo hacen lo mismo con un color cada uno —Plataforma
+azul, Reclamos ámbar, Trámites violeta, Tesorería verde— y el abierto se pinta
+de su color con una **barrita abajo** que lo ata al texto que aparece. El panel
+de texto lleva el filete izquierdo del mismo color, así se ve de dónde salió, y
+entra con un fade corto para que se note que cambió. Cuando el texto es el
+reescrito por IA, el filete pasa a punteado.
+
+Todo con `color-mix` sobre los tokens del tema (nada de hex nuevos), con la
+declaración sólida antes como respaldo, y anulado bajo
+`prefers-reduced-motion`.
+
+**El cierre de la llamada, detrás de un solo botón.** *Cómo terminó la llamada*,
+*Qué me dijo* y el *Historial* vivían siempre desplegados al pie, alargando la
+ficha justo cuando hay que leer arriba. Ahora hay un botón ancho —**"Grabar
+estado"**— y ahí se abre todo. Si el municipio ya tiene estado, el botón lo
+dice: *"Contactado — cambiar"*.
+
+- Al abrirlo, la ficha scrollea sola hasta el formulario.
+- Marcar un estado repinta la ficha, así que el desplegado se recuerda
+  (`cierreAbierto`) para que no se cierre solo en la cara del usuario.
+- Cambiar de municipio lo vuelve a cerrar.

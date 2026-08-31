@@ -408,17 +408,34 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
    scrollea el libreto. Son las cuatro cosas que se TOCAN en una llamada. */
 .f-acc{display:flex;gap:6px;padding:9px 16px;border-bottom:1px solid var(--line);
  background:var(--card);position:sticky;top:0;z-index:3}
-.f-acc button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;
- border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--ink2);
- padding:8px 4px;cursor:pointer;font:700 11px var(--font-disp);transition:.15s}
-.f-acc button svg{width:17px;height:17px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.f-acc button:hover{border-color:var(--acc);color:var(--ink);transform:translateY(-1px)}
-.f-acc button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.f-acc .a-wa svg{stroke:var(--ok)} .f-acc .a-demo svg{stroke:var(--acc)}
-.f-acc .a-cie svg{stroke:var(--warn)} .f-acc .a-ia svg{stroke:var(--purple)}
+.f-acc button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;
+ border:1px solid var(--line);border-radius:11px;background:var(--card2);color:var(--ink2);
+ padding:9px 4px;cursor:pointer;font:700 11px var(--font-disp);position:relative;overflow:hidden;
+ transition:transform .16s cubic-bezier(.2,.8,.3,1.2),border-color .16s,background .16s,box-shadow .16s}
+/* Cada accion tiene SU color y lo usa en todo: el disco del icono, el borde al
+   pasar y la sombra. Antes eran cuatro cajas grises con un iconito de color —
+   "muy muerto" (dueño, 2026-08-30). */
+.f-acc .a-wa{--c:var(--ok)} .f-acc .a-demo{--c:var(--acc)}
+.f-acc .a-cie{--c:var(--warn)} .f-acc .a-ia{--c:var(--purple)}
+.f-acc button svg{width:17px;height:17px;fill:none;stroke:var(--c);stroke-width:2;
+ stroke-linecap:round;stroke-linejoin:round;transition:transform .16s cubic-bezier(.2,.8,.3,1.2)}
+/* El disco detras del icono: da peso y separa el simbolo del texto. */
+.f-acc button:before{content:"";position:absolute;top:6px;left:50%;width:26px;height:26px;margin-left:-13px;
+ border-radius:50%;background:var(--card);transition:background .16s,transform .16s}
+.f-acc button:before{background:color-mix(in srgb, var(--c) 13%, transparent)}
+.f-acc button svg{position:relative}
+.f-acc button:hover{color:var(--ink);border-color:var(--c);transform:translateY(-2px)}
+.f-acc button:hover{box-shadow:0 6px 16px -8px var(--c)}
+.f-acc button:hover:before{background:color-mix(in srgb, var(--c) 22%, transparent);transform:scale(1.12)}
+.f-acc button:hover svg{transform:scale(1.1)}
+.f-acc button:active{transform:translateY(0) scale(.97)}
+.f-acc button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;position:relative}
 /* Marca cuando el WhatsApp ya se cargo: de un vistazo se sabe si esa llamada
    ya dejo la posta o no. */
-.f-acc button.hecho{border-color:var(--ok);background:var(--ok-soft,var(--card2));color:var(--ink)}
+.f-acc button.hecho{border-color:var(--c);color:var(--ink)}
+.f-acc button.hecho{background:color-mix(in srgb, var(--c) 10%, var(--card2))}
+.f-acc button.hecho:after{content:"";position:absolute;top:7px;right:8px;width:5px;height:5px;
+ border-radius:50%;background:var(--c)}
 
 /* Modal de accion. Vive fuera de la ficha (fixed) para no heredar su scroll. */
 .fmod{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:18px}
@@ -487,20 +504,58 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
    el otro pida. */
 .g-hint{font-size:12.5px;color:var(--ink3);margin-bottom:9px}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.tab{border:1px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:9px;
- padding:9px 6px;cursor:pointer;font-size:12.5px;font-weight:700;transition:.12s;
- display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
-.tab svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tab{border:1px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:10px;
+ padding:10px 6px;cursor:pointer;font-size:12.5px;font-weight:700;position:relative;overflow:hidden;
+ display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;
+ transition:transform .16s cubic-bezier(.2,.8,.3,1.2),border-color .16s,background .16s,box-shadow .16s}
+/* Un color por tema: de un vistazo se sabe cual esta abierto, aunque el ojo
+   este en el telefono y no en la pantalla. */
+.tab[data-g=plat]{--c:var(--acc)} .tab[data-g=rec]{--c:var(--warn)}
+.tab[data-g=tra]{--c:var(--purple)} .tab[data-g=tes]{--c:var(--ok)}
+.tab svg{width:17px;height:17px;fill:none;stroke:var(--c);stroke-width:2;stroke-linecap:round;
+ stroke-linejoin:round;transition:transform .16s cubic-bezier(.2,.8,.3,1.2)}
 .tab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.tab:hover{border-color:var(--acc);color:var(--ink)}
-.tab.on{border-color:var(--acc);background:var(--acc-soft);color:var(--ink)}
-.g-txt{margin-top:9px;background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--acc);
- border-radius:10px;padding:12px 14px;font-size:15px;line-height:1.66;color:var(--ink)}
+.tab:hover{color:var(--ink);border-color:var(--c);transform:translateY(-2px)}
+.tab:hover{box-shadow:0 6px 16px -9px var(--c)}
+.tab:hover svg{transform:scale(1.12)}
+.tab:active{transform:translateY(0) scale(.97)}
+/* El abierto se pinta de su color y saca una barrita abajo, que ata el boton
+   con el texto que aparece debajo. */
+.tab.on{border-color:var(--c);color:var(--ink)}
+.tab.on{background:color-mix(in srgb, var(--c) 12%, var(--card2))}
+.tab.on:after{content:"";position:absolute;left:22%;right:22%;bottom:0;height:3px;border-radius:3px 3px 0 0;
+ background:var(--c)}
+/* EL CIERRE: un solo boton al pie de la ficha. Lo de registrar la llamada no
+   compite con lo que hay que leer mientras se habla. */
+.cierre-zona{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.cierre-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;
+ border:1px solid var(--line2);background:var(--card2);color:var(--ink);border-radius:11px;
+ padding:13px 14px;cursor:pointer;font:700 14px var(--font-disp);
+ transition:transform .16s cubic-bezier(.2,.8,.3,1.2),border-color .16s,background .16s,box-shadow .16s}
+.cierre-btn svg{width:16px;height:16px;fill:none;stroke:var(--acc);stroke-width:2;
+ stroke-linecap:round;stroke-linejoin:round}
+.cierre-btn .car{width:14px;height:14px;display:inline-flex;transition:transform .2s}
+.cierre-btn .car svg{width:14px;height:14px;stroke:var(--ink3)}
+.cierre-btn:hover{border-color:var(--acc);transform:translateY(-2px);box-shadow:0 6px 16px -9px var(--acc)}
+.cierre-btn:active{transform:translateY(0) scale(.99)}
+.cierre-zona.on .cierre-btn{border-color:var(--acc);background:var(--acc-soft)}
+.cierre-zona.on .cierre-btn .car{transform:rotate(180deg)}
+.cierre-c{display:none;padding-top:15px}
+.cierre-zona.on .cierre-c{display:block;animation:gEntra .22s cubic-bezier(.2,.8,.3,1)}
+/* El texto entra: sin esto el panel aparece de golpe y no se nota que cambio. */
+@keyframes gEntra{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.g-txt{margin-top:9px;background:var(--card2);border:1px solid var(--line);
+ border-left:3px solid var(--gc,var(--acc));border-radius:10px;padding:12px 14px;font-size:15px;
+ line-height:1.66;color:var(--ink);animation:gEntra .22s cubic-bezier(.2,.8,.3,1)}
 .g-txt p{margin:0}
 .g-txt p+p{margin-top:10px}
 .g-txt b{color:var(--ink);font-weight:700}
 .g-txt{position:relative}
-.g-txt.otra{border-left-color:var(--purple)}
+/* El panel se ata al tab que lo abrio por el color del filete: se ve de donde
+   salio sin tener que mirar cual quedo marcado. */
+.g-txt[data-g=plat]{--gc:var(--acc)} .g-txt[data-g=rec]{--gc:var(--warn)}
+.g-txt[data-g=tra]{--gc:var(--purple)} .g-txt[data-g=tes]{--gc:var(--ok)}
+.g-txt.otra{border-left-style:dashed}
 .g-re{position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:8px;cursor:pointer;
  background:var(--card2);border:1px solid var(--line2);color:var(--ink3);display:flex;align-items:center;
  justify-content:center;transition:.14s}
@@ -639,7 +694,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
  /* En el telefono los formularios de a dos quedan apretados: una columna. */
  .fila2{grid-template-columns:1fr}
 }
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* El zoom al 80% de la tablet entra las tres columnas pero se come el libreto:
    15px quedan en 12 reales, y esto se lee EN VOZ ALTA con el telefono al oido.
    Se compensa al reves — 18,5 por 0,8 vuelve a los 15 del escritorio. Va al
@@ -721,7 +776,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 22:22 · fbbd7c7e</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 23:06 · 0a61f57a</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -871,6 +926,9 @@ const LBL = Object.fromEntries(ESTADOS.map(e => [e.id, e.lbl]));
 const COL = {llamada:'var(--acc)', estado:'var(--ok)', nota:'var(--purple)', agenda:'var(--warn)'};
 
 let db = cargar(), vista = 'hoy', fPais = '', fRegion = '', fEstado = '', q = '', selId = null;
+/* Si el formulario del cierre estaba desplegado, sobrevive al repintado de la
+   ficha; cambiar de municipio lo vuelve a cerrar. */
+let cierreAbierto = false;
 let paisHoy = '';
 let tope = 25;   // cuantas filas se dibujan de una
 const KEY_META = 'munify_llamados_meta', KEY_PAIS = 'munify_llamados_paishoy';
@@ -1416,7 +1474,7 @@ function pintarTema(c, g, txt, estado){
   const parrafos = txt ? String(txt).split(NL).map(x => x.trim()).filter(Boolean) : g.p;
   const refresh = '<button type="button" class="g-re" id="gRe" title="Decilo de otra forma">'
     + '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg></button>';
-  caja.innerHTML = '<div class="g-txt' + (estado === 'ia' ? ' otra' : '') + '">' + refresh
+  caja.innerHTML = '<div class="g-txt' + (estado === 'ia' ? ' otra' : '') + '" data-g="' + g.id + '">' + refresh
     + parrafos.map(t => '<p>' + esc(t) + '</p>').join('')
     + (estado === 'ia' ? '<div class="g-pie"><span>Dicho de otra forma</span>'
         + '<button type="button" class="lnk" id="gMio">volver al mío</button></div>' : '')
@@ -1475,6 +1533,7 @@ function narracion(c, f){
 
 function abrir(id){
   const c = CONTACTOS.find(x => x.id === id); if (!c) return;
+  if (selId !== id) cierreAbierto = false;
   selId = id;
   const r = reg(id), sp = SPEECH[c.pais] || {}, f = FUNC[c.id] || {};
   // El cierre habla como el pais del municipio, no como Buenos Aires.
@@ -1507,6 +1566,14 @@ function abrir(id){
       + GUION.map(g => '<button type="button" class="tab" data-g="' + g.id + '">'
           + '<svg viewBox="0 0 24 24">' + g.ic + '</svg><span>' + esc(g.t) + '</span></button>').join('')
       + '</div><div id="pGuion"></div></div>'
+    /* Todo lo de DESPUES de la llamada vive detras de un solo boton (dueño,
+       2026-08-30): mientras hablas no se registra nada, y tener el formulario
+       desplegado abajo alarga la ficha justo cuando hay que leer arriba. */
+    + '<div class="cierre-zona" id="zCierre"><button type="button" class="cierre-btn" id="btnCierre">'
+      + '<svg viewBox="0 0 24 24"><path d="M17 3l4 4L8 20H4v-4L17 3Z"/></svg>'
+      + '<span id="txtCierre">' + (r.estado ? esc(LBL[r.estado]) + ' — cambiar' : 'Grabar estado') + '</span>'
+      + '<i class="car"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></i></button>'
+    + '<div class="cierre-c">'
     + '<div class="sec"><label><i class="sic o"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg></i>Cómo terminó la llamada</label><div class="estados" id="pEstados">'
       + ESTADOS.map(e => '<button class="eb' + (r.estado===e.id?' on':'') + '" data-e="' + e.id + '">' + e.lbl + '</button>').join('')
       + '</div></div>'
@@ -1517,8 +1584,17 @@ function abrir(id){
       + '<input class="f" id="pProximo" type="date" autocomplete="off" value="' + esc(r.proximo) + '"></div>'
       + '<button class="btn p" id="pGuardar" style="margin-top:9px;width:100%">Guardar en el historial</button></div>'
     + '<div class="sec"><label><i class="sic n"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i>Historial</label><div class="hist" id="pHist"></div></div>'
+    + '</div></div>'
     + '</div>';
 
+  const bc = document.getElementById('btnCierre');
+  if (bc) bc.onclick = () => {
+    const z = document.getElementById('zCierre');
+    const abierto = z.classList.toggle('on');
+    // Abrirlo sin verlo no sirve: la ficha scrollea sola hasta el formulario.
+    if (abierto) setTimeout(() => z.scrollIntoView({block:'nearest', behavior:'smooth'}), 60);
+  };
+  if (cierreAbierto) document.getElementById('zCierre').classList.add('on');
   pintarHist();
   pintarModulos(c);
   pintarDatoColor(c);
@@ -1546,6 +1622,7 @@ function abrir(id){
     b.onclick = () => abrirAccion(b.dataset.acc));
 
   document.querySelectorAll('#pEstados .eb').forEach(b => b.onclick = () => {
+    cierreAbierto = true;                    // abrir() repinta: que no se cierre solo
     r.estado = (r.estado === b.dataset.e) ? '' : b.dataset.e;
     r.hist.push({t:new Date().toISOString(), tipo:'estado', txt: r.estado ? ('Marcado: ' + LBL[r.estado]) : 'Estado borrado'});
     guardar(); abrir(id); pintarKpis(); pintarPie(); pintarHoy();
