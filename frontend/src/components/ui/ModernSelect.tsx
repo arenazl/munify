@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, ReactNode, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalHost } from '../../lib/portalHost';
 import { ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { abreviarPalabras } from '../../lib/textAbbreviation';
@@ -110,6 +111,9 @@ export function ModernSelect({
   // color — manda el CSS de clases (así el look sale íntegro de tokens --pl-*).
   const esV2 = variant === 'v2';
   const [isOpen, setIsOpen] = useState(false);
+  // Dónde se cuelga el menú. En pantalla completa NO puede ser `body`:
+  // el navegador sólo dibuja el subárbol del elemento maximizado.
+  const hostPortal = usePortalHost();
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -445,7 +449,7 @@ export function ModernSelect({
             )}
           </div>
         </div>,
-        document.body
+        hostPortal
       )}
     </div>
   );

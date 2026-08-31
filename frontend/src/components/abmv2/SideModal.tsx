@@ -37,6 +37,7 @@
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { portalHost } from '../../lib/portalHost';
 import { Link } from 'react-router-dom';
 import { Trash2, X } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -462,7 +463,7 @@ export function SideModal(props: SideModalComponentProps) {
     </div>
   );
 
-  return createPortal(drawer, document.body);
+  return createPortal(drawer, portalHost());
 }
 
 export default SideModal;
