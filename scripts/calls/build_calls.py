@@ -177,6 +177,13 @@ def main() -> int:
         print("ERROR: no salio ningun municipio de las planillas. Reviso docs/regiones/.")
         return 1
 
+    # Paises que NO se llaman por ahora (dueño, 2026-08-30). No se borra nada de
+    # las planillas: se filtran al armar el archivo, asi que volver a incluir un
+    # pais es sacarlo de este set y correr el build de nuevo.
+    fuera = {"Argentina"}
+    afuera = [c for c in contactos if c["pais"] in fuera]
+    contactos = [c for c in contactos if c["pais"] not in fuera]
+
     vistos = Counter()
     for c in contactos:                       # el id: pais-localidad, con sufijo si repite
         base = slug(c["pais"], c["localidad"])
@@ -184,11 +191,19 @@ def main() -> int:
         c["id"] = base if vistos[base] == 1 else f"{base}-{vistos[base]}"
 
     speeches, tips = leer_speeches()
+    speeches = {k: v for k, v in speeches.items() if k not in fuera}
     funcionarios = curado("funcionarios.json")
     investigacion = curado("investigacion.json")
 
     ids = {c["id"] for c in contactos}
-    huerfanos = [k for k in list(funcionarios) + list(investigacion) if k not in ids]
+    # Las fichas de los municipios excluidos no viajan al archivo (son peso
+    # muerto), pero tampoco cuentan como huerfanas: siguen curadas y esperando
+    # a que el pais vuelva al padron.
+    ids_fuera = {slug(c["pais"], c["localidad"]) for c in afuera}
+    funcionarios = {k: v for k, v in funcionarios.items() if k in ids}
+    investigacion = {k: v for k, v in investigacion.items() if k in ids}
+    huerfanos = [k for k in list(funcionarios) + list(investigacion)
+                 if k not in ids and k not in ids_fuera]
     sin_tel = [c["localidad"] for c in contactos if not c["telefono"]]
     sin_func = [c["localidad"] for c in contactos if c["id"] not in funcionarios]
 
@@ -204,6 +219,9 @@ def main() -> int:
 
     print(f"\nOK -> {os.path.relpath(SALIDA, RAIZ)}  ({round(os.path.getsize(SALIDA)/1024, 1)} KB)")
     print(f"  municipios     {len(contactos)}  {dict(Counter(c['pais'] for c in contactos))}")
+    if afuera:
+        print(f"  fuera del padron  {len(afuera)}  {dict(Counter(c['pais'] for c in afuera))}"
+              f"   (siguen en las planillas; se filtran aca)")
     print(f"  con intendente {len(contactos) - len(sin_func)} de {len(contactos)}")
     print(f"  investigados   {len(investigacion)}")
     print(f"  speeches       {', '.join(speeches) or '(ninguno)'}")

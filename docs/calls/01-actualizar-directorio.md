@@ -49,6 +49,30 @@ Netlify publica solo con el push; no hay deploy manual.
 
 ---
 
+## Sacar (o volver a poner) un país entero
+
+Desde el **2026-08-30 Argentina está fuera del padrón**: los 93 municipios
+argentinos no viajan al archivo. **No se borró nada** — siguen en las planillas
+de `docs/regiones/` y sus fichas curadas (intendente, investigación) quedan
+intactas esperando.
+
+El filtro es una línea en `build_calls.py`:
+
+```python
+fuera = {"Argentina"}
+```
+
+Para volver a incluirlo, se saca del set y se corre el build. Lo que sale con
+el país: sus municipios, su speech y sus fichas curadas (que dejan de contar
+como huérfanas). El resumen del build lo dice:
+
+```
+  municipios     61  {'Paraguay': 24, 'Perú': 26, 'Uruguay': 11}
+  fuera del padron  93  {'Argentina': 93}   (siguen en las planillas; se filtran aca)
+```
+
+---
+
 ## Caso 1: agregar municipios nuevos
 
 1. Poné la planilla nueva en `docs/regiones/` (mismo formato que las otras:
