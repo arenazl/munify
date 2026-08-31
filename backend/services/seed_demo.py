@@ -965,6 +965,10 @@ async def _seed_zonas(
             codigo=codigo,
             latitud_centro=z.get("lat"),
             longitud_centro=z.get("lon"),
+            # El contorno viene del padron (`catalogo_zonas`). Sin esto la zona
+            # nacia siendo un punto y el mapa del municipio no tenia una sola
+            # division que dibujar --- que es de lo unico que habla el mapa.
+            poligono=z.get("poligono"),
             activo=True,
         )
         db.add(zona)

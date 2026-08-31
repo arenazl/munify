@@ -216,6 +216,53 @@ async def poligono_del_catalogo(db, nombre: str, pais: str,
     return anillo if isinstance(anillo, list) and len(anillo) >= 3 else None
 
 
+async def zonas_del_catalogo(db, anillo: list) -> list[dict]:
+    """Las localidades del municipio, con su contorno, desde `catalogo_zonas`.
+
+    Es el padron: georef dice que localidades tiene cada municipio y el contorno
+    ya viene resuelto y validado. Overpass sigue haciendo falta para las CALLES
+    --- las direcciones reales de los reclamos de la demo --- pero para las zonas
+    no: pedirselas devolvia nodos, o sea puntos sin area, y encima dependia de
+    que el servicio estuviera arriba. Un municipio nacia con los nombres de sus
+    localidades y sin una sola division dibujada en el mapa.
+
+    Se busca por GEOMETRIA --- la localidad cuyo centro cae dentro del contorno
+    del municipio --- y no por el nombre del municipio: el nombre ya se resolvio
+    un paso antes, al conseguir ese contorno, y repetir la busqueda por texto
+    reabre el problema de los homonimos.
+    """
+    from sqlalchemy import text
+
+    xs = [p[0] for p in anillo]
+    ys = [p[1] for p in anillo]
+    filas = (await db.execute(text(
+        "SELECT nombre, lat, lng, poligono FROM catalogo_zonas "
+        "WHERE lat BETWEEN :y0 AND :y1 AND lng BETWEEN :x0 AND :x1"),
+        {"x0": min(xs), "x1": max(xs), "y0": min(ys), "y1": max(ys)})).fetchall()
+
+    zonas = []
+    for nombre, la, ln, poly in filas:
+        if la is None or ln is None:
+            continue
+        if not _dentro((float(ln), float(la)), anillo):
+            continue
+        zonas.append({"nombre": nombre, "lat": float(la), "lon": float(ln),
+                      "poligono": poly})
+    return zonas
+
+
+def _dentro(pt, anillo) -> bool:
+    x, y = pt
+    dentro = False
+    n = len(anillo)
+    for i in range(n):
+        x1, y1 = anillo[i][:2]
+        x2, y2 = anillo[(i + 1) % n][:2]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            dentro = not dentro
+    return dentro
+
+
 # ==========================================================================
 # 2. Barrios y calles: UNA consulta a Overpass, cacheada
 # ==========================================================================
@@ -516,6 +563,20 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
     if not anillo:
         return {**vacio, "degradacion": "sin_poligono_en_catalogo"}
 
+    # --- zonas: del PADRON, no de la red ---
+    # Estan en la base, con el contorno ya resuelto y validado. Overpass las
+    # devolvia como nodos --- puntos sin area --- y ademas hay que estar
+    # esperando que conteste.
+    with _paso("geo:zonas") as pzz:
+        zonas_padron = await zonas_del_catalogo(db, anillo)
+        if zonas_padron:
+            pzz.ok(zonas=len(zonas_padron),
+                   con_contorno=sum(1 for z in zonas_padron if z["poligono"]),
+                   fuente="catalogo_zonas")
+        else:
+            pzz.degradado("el municipio no tiene localidades en catalogo_zonas",
+                          fuente=None)
+
     # --- barrios y calles ---
     with _paso("geo:osm") as po:
         try:
@@ -525,8 +586,11 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
                   calles=len(osm.get("calles") or []),
                   direcciones=len(osm.get("direcciones") or []))
         except OsmNoDisponible as e:
+            # Sin Overpass no hay calles, pero las zonas ya no dependen de el:
+            # la demo nace con sus localidades dibujadas igual.
             po.fallo(f"Overpass no respondio: {e}")
-            return {**vacio, "poligono": anillo, "fuente_poligono": "municipios_catalogo",
+            return {**vacio, "zonas": zonas_padron, "poligono": anillo,
+                    "fuente_poligono": "municipios_catalogo",
                     "degradacion": f"overpass_no_disponible: {e}"}
 
     # --- zonas, barrios y puntos ---
@@ -547,4 +611,9 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
         else:
             pp.ok(**detalle)
 
-    return {**armado, "poligono": anillo, "fuente_poligono": "municipios_catalogo"}
+    # El padron gana sobre lo que devolvio Overpass: sus zonas traen contorno.
+    # Las de OSM sólo entran si el municipio no está en el padrón todavía.
+    zonas = zonas_padron or armado["zonas"]
+    return {**armado, "zonas": zonas, "poligono": anillo,
+            "fuente_poligono": "municipios_catalogo",
+            "fuente_zonas": "catalogo_zonas" if zonas_padron else "overpass"}
