@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Boxes, Plus, AlertTriangle, Package } from 'lucide-react';
+import { AlertTriangle, Package, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage, ABMTable } from '../components/ui/ABMPage';
+import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
+import { EntityCell, ChipEstado } from '../components/abmv2/DataTable';
+import type { ColumnSpec, ViewKind } from '../components/abmv2/types';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import { SemanticHero } from '../components/ui/SemanticHero';
 import { seg, type HeroFrase } from '../lib/semanticHero';
 import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { inventarioApi } from '../lib/api';
@@ -86,7 +87,12 @@ export default function Inventario() {
   const [categorias, setCategorias] = useState<InventarioCategoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filtroNaturaleza, setFiltroNaturaleza] = useState<string>('');
+  /* `tab` reemplaza a `filtroNaturaleza`: ademas de activo/consumible ahora
+     filtra "en uso" y "bajo el minimo", que antes eran numeros muertos en el
+     hero. Los dos primeros los filtra el servidor (params.naturaleza); los dos
+     ultimos se resuelven en cliente sobre lo ya traido. */
+  const [tab, setTab] = useState<string>('');
+  const [vista, setVista] = useState<ViewKind>('table');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('');
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -106,7 +112,7 @@ export default function Inventario() {
     setLoading(true);
     try {
       const params: Record<string, string | number> = {};
-      if (filtroNaturaleza) params.naturaleza = filtroNaturaleza;
+      if (tab === 'activo' || tab === 'consumible') params.naturaleza = tab;
       if (filtroCategoria) params.categoria_id = Number(filtroCategoria);
       if (search.trim()) params.search = search.trim();
       const res = await inventarioApi.listItems(params);
@@ -116,7 +122,7 @@ export default function Inventario() {
     } finally {
       setLoading(false);
     }
-  }, [filtroNaturaleza, filtroCategoria, search]);
+  }, [tab, filtroCategoria, search]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -153,6 +159,14 @@ export default function Inventario() {
       .finally(() => { if (vivo) setCargandoHist(false); });
     return () => { vivo = false; };
   }, [sheetOpen, selected]);
+
+  /* "En uso" y "bajo el minimo" se calculan una vez: los usan el hero, los KPIs
+     y los tabs. Antes vivian adentro del useMemo del hero y no se podian
+     reutilizar para filtrar. */
+  const enUsoCount = useMemo(
+    () => todos.filter(t => t.estado_activo === 'en_uso').length, [todos]);
+  const bajoMinimoCount = useMemo(
+    () => todos.filter(t => t.bajo_stock).length, [todos]);
 
   const conteosNaturaleza = useMemo(() => {
     const c: Record<string, number> = {};
@@ -326,7 +340,7 @@ export default function Inventario() {
   const inputStyle = { backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` };
 
   // Descriptor de "qué tiene / en qué estado" según naturaleza (tabla + card).
-  const renderEstadoCelda = (item: InventarioItem) => {
+  const renderEstadoCelda = useCallback((item: InventarioItem) => {
     if (item.naturaleza === 'consumible') {
       const c = item.bajo_stock ? estadoActivoColors.en_uso : theme.textSecondary;
       return (
@@ -347,127 +361,143 @@ export default function Inventario() {
         )}
       </span>
     );
-  };
+  }, [theme.textSecondary]);
 
-  const columns = [
+  /* Columnas del kit v2. La tabla vieja (`ABMTable`) usaba `key/header/render`;
+     el `DataTable` del kit pide `id/width/kind/cell` y con eso sabe alinear,
+     agrupar y pintar los chips solo. */
+  const columnas = useMemo<ColumnSpec<InventarioItem>[]>(() => [
     {
-      key: 'nombre', header: 'Ítem', width: '280px',
-      sortValue: (it: InventarioItem) => it.nombre,
-      render: (it: InventarioItem) => (
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${it.categoria_color || '#3b82f6'}20` }}>
-            <DynamicIcon name={it.categoria_icono || 'Package'} className="h-4 w-4" style={{ color: it.categoria_color || '#3b82f6' }} />
-          </div>
-          <div className="min-w-0">
-            <span className="text-sm font-medium truncate block" style={{ color: theme.text }}>{it.nombre}</span>
-            {it.identificador && <span className="text-[11px] font-mono" style={{ color: theme.textSecondary }}>{it.identificador}</span>}
-          </div>
-        </div>
+      id: 'nombre',
+      header: 'Ítem',
+      width: 'minmax(200px, 2fr)',
+      kind: 'entity',
+      cell: (it) => (
+        <EntityCell
+          icon={<DynamicIcon name={it.categoria_icono || 'Package'} className="h-4 w-4" style={{ color: it.categoria_color || '#3b82f6' }} />}
+          tileColor={it.categoria_color || '#3b82f6'}
+          title={it.nombre}
+          subtitle={it.identificador || undefined}
+        />
       ),
     },
     {
-      key: 'categoria', header: 'Categoría',
-      sortValue: (it: InventarioItem) => it.categoria_nombre || '',
-      render: (it: InventarioItem) => (
-        <span className="text-xs" style={{ color: theme.textSecondary }}>{it.categoria_nombre || '—'}</span>
+      id: 'categoria',
+      header: 'Categoría',
+      width: 'minmax(120px, 0.9fr)',
+      kind: 'text',
+      cell: (it) => it.categoria_nombre || '—',
+    },
+    {
+      id: 'deposito',
+      header: 'Dónde está',
+      width: 'minmax(120px, 0.9fr)',
+      kind: 'text',
+      cell: (it) => it.deposito_nombre || '—',
+    },
+    {
+      id: 'naturaleza',
+      header: 'Qué es',
+      width: 'minmax(110px, 0.7fr)',
+      kind: 'chip',
+      cell: (it) => (
+        <ChipEstado
+          label={naturalezaLabels[it.naturaleza] ?? it.naturaleza}
+          tone={it.naturaleza === 'activo' ? 'blue' : 'green'}
+        />
       ),
     },
     {
-      key: 'naturaleza', header: 'Tipo',
-      sortValue: (it: InventarioItem) => it.naturaleza,
-      render: (it: InventarioItem) => {
-        const c = naturalezaColors[it.naturaleza] || theme.textSecondary;
-        const NatIcon = naturalezaIcons[it.naturaleza];
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ backgroundColor: `${c}15`, color: c }}>
-            {NatIcon && <NatIcon className="h-3 w-3" />}{naturalezaLabels[it.naturaleza]}
-          </span>
-        );
-      },
+      id: 'estado',
+      header: 'Stock / Estado',
+      width: 'minmax(140px, 1fr)',
+      kind: 'text',
+      cell: renderEstadoCelda,
     },
-    {
-      key: 'estado', header: 'Stock / Estado',
-      sortValue: (it: InventarioItem) => it.naturaleza === 'consumible' ? String(it.stock_actual ?? 0) : (it.estado_activo || ''),
-      render: renderEstadoCelda,
-    },
-  ];
+    { id: 'acciones', header: '', width: '48px', kind: 'actions' },
+  ], [renderEstadoCelda]);
+
+  /* Los cinco KPIs del hero. El de "en uso" y el de "bajo el mínimo" son los
+     que el dueño no podía abrir: eran un número y nada más. Ahora cada uno
+     filtra la lista (dueño, 2026-08-31). */
+  /* Los tabs de naturaleza los filtra el servidor; estos dos, el cliente. */
+  const visibles = useMemo(() => {
+    if (tab === 'en_uso') return items.filter(it => it.estado_activo === 'en_uso');
+    if (tab === 'bajo_minimo') return items.filter(it => it.bajo_stock);
+    return items;
+  }, [items, tab]);
+
+  const heroKpis = useMemo(() => ([
+    { etiqueta: 'Ítems', valor: String(todos.length) },
+    { etiqueta: 'Activos', valor: String(conteosNaturaleza.activo || 0) },
+    { etiqueta: 'Consumibles', valor: String(conteosNaturaleza.consumible || 0) },
+    { etiqueta: 'En uso ahora', valor: String(enUsoCount) },
+    { etiqueta: 'Bajo el mínimo', valor: String(bajoMinimoCount) },
+  ]), [todos.length, conteosNaturaleza, enUsoCount, bajoMinimoCount]);
 
   return (
     <>
-      <div className="px-3 sm:px-6 pt-3">
-        <SemanticHero etiqueta="INVENTARIO · ESTADO" frases={heroFrases} />
-      </div>
-
-      <ABMPage
+      <SemanticAbmPage<InventarioItem>
+        moduleKey="inventario"
+        eyebrow="Inventario"
         title="Inventario"
-        icon={<Boxes className="h-5 w-5" />}
-        searchPlaceholder="Buscar por nombre o identificador..."
-        searchValue={search}
+        description="Los bienes y materiales del municipio: qué hay, dónde está y de qué hay poco."
+        hero={{ etiqueta: 'INVENTARIO · ESTADO', frases: heroFrases, kpis: heroKpis }}
+        pista={{
+          titulo: 'Acá se define, no se mueve',
+          texto:
+            'El stock no se edita a mano desde esta lista: cambia con las entradas, salidas y ajustes del libro de Movimientos, y con lo que consume cada orden de trabajo. Así el número siempre tiene una historia que lo explica.',
+        }}
+        searchPlaceholder="Buscar por nombre o identificador…"
+        views={['table', 'cards']}
+        activeView={vista}
+        onViewChange={setVista}
+        search={search}
         onSearchChange={setSearch}
-        loading={loading}
-        isEmpty={items.length === 0}
-        emptyMessage="No hay ítems cargados. Creá el primero. Las categorías se configuran en Configuración → Categorías de Inventario."
-        buttonLabel="Nuevo ítem"
-        buttonIcon={<Plus className="h-4 w-4 mr-1.5" />}
-        onAdd={esGestor ? abrirNuevo : undefined}
-        defaultViewMode="table"
-        viewStorageKey="inventario_view"
-        toolbar={{
-          statusPills: {
-            value: filtroNaturaleza,
-            onChange: (v: string) => setFiltroNaturaleza(v),
-            items: (Object.keys(naturalezaLabels) as NaturalezaInventario[]).map(n => ({
-              key: n,
-              label: naturalezaLabels[n],
-              icon: naturalezaIcons[n],
-              color: naturalezaColors[n],
-              count: conteosNaturaleza[n] || 0,
-            })),
-          },
-          combos: [{
-            key: 'categoria',
-            placeholder: 'Todas las categorías',
+        primaryAction={esGestor ? { label: 'Nuevo ítem', onClick: abrirNuevo } : undefined}
+        selects={[
+          {
+            id: 'categoria',
+            label: 'Categoría',
             value: filtroCategoria,
             onChange: setFiltroCategoria,
-            options: categoriaFiltroOptions,
-            searchable: true,
-          }],
-          layout: 'left',
-        }}
-        tableView={
-          <ABMTable
-            data={items}
-            columns={columns}
-            keyExtractor={(it: InventarioItem) => it.id}
-            onRowClick={(it: InventarioItem) => abrirEdit(it)}
-            defaultSortKey="nombre"
-            defaultSortDirection="asc"
-          />
+            options: [{ value: '', label: 'Todas las categorías' }, ...categoriaFiltroOptions],
+          },
+        ]}
+        statusTabs={[
+          { id: '', label: 'Todos', count: todos.length },
+          { id: 'activo', label: naturalezaLabels.activo, count: conteosNaturaleza.activo || 0 },
+          { id: 'consumible', label: naturalezaLabels.consumible, count: conteosNaturaleza.consumible || 0 },
+          { id: 'en_uso', label: 'En uso', count: enUsoCount },
+          { id: 'bajo_minimo', label: 'Bajo el mínimo', count: bajoMinimoCount },
+        ]}
+        activeStatus={tab}
+        onStatusChange={setTab}
+        kind="plain"
+        columns={columnas}
+        rows={visibles}
+        rowKey={(it) => String(it.id)}
+        rowActions={esGestor ? [
+          { id: 'edit', label: 'Editar', icon: Pencil, onClick: (it: InventarioItem) => abrirEdit(it) },
+          { id: 'del', label: 'Eliminar', icon: Trash2, danger: true, onClick: (it: InventarioItem) => setToDelete(it) },
+        ] : []}
+        onRowClick={(it) => abrirEdit(it)}
+        loading={loading}
+        emptyMessage={
+          search.trim()
+            ? `Nada coincide con "${search.trim()}".`
+            : tab === 'bajo_minimo'
+              ? 'No hay nada bajo el mínimo. El depósito está en orden.'
+            : tab === 'en_uso'
+              ? 'No hay ninguna máquina tomada por una orden en este momento.'
+            : 'No hay ítems cargados. Creá el primero; las familias se configuran en Categorías de inventario.'
         }
-      >
-        {items.map(it => {
-          const c = naturalezaColors[it.naturaleza] || theme.textSecondary;
-          return (
-            <div
-              key={it.id}
-              onClick={() => abrirEdit(it)}
-              className="rounded-2xl p-4 cursor-pointer transition-all hover:scale-[1.01]"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${c}` }}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${it.categoria_color || '#3b82f6'}20` }}>
-                  <DynamicIcon name={it.categoria_icono || 'Package'} className="h-5 w-5" style={{ color: it.categoria_color || '#3b82f6' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold truncate" style={{ color: theme.text }}>{it.nombre}</h3>
-                  <p className="text-[11px] mb-1.5" style={{ color: theme.textSecondary }}>{it.categoria_nombre}</p>
-                  {renderEstadoCelda(it)}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </ABMPage>
+        footer={{
+          showing: `Mostrando ${visibles.length} de ${todos.length}`,
+          note: 'El stock se mueve desde Movimientos y desde las órdenes de trabajo, no editando la ficha.',
+        }}
+      />
+
 
       <Sheet
         open={sheetOpen}

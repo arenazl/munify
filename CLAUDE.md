@@ -123,6 +123,17 @@ combo cuando no; la forma la decide el espacio).
 *Why:* el dueño detectó implementaciones nuevas cayendo al ABM y controles
 viejos (2026-08-14). El estándar estético vive en el kit, no en cada pantalla.
 
+**6.ter. Si TOCÁS una pantalla que usa `ABMPage`, la MIGRÁS a `abmv2`.**
+No alcanza con que lo nuevo use el kit: `ABMPage` **no debería existir más**
+(dueño, 2026-08-31). No es una migración masiva de golpe — es la regla del
+campamento: la pantalla que se toca, se deja migrada. Quedan **28** usando
+`components/ui/ABMPage` (`grep -rln "components/ui/ABMPage" frontend/src/pages/`).
+Cuando el contador llegue a cero, se borra el componente.
+
+Si migrar la pantalla es mucho más grande que el arreglo pedido, se avisa
+antes y se decide — pero el default es migrarla, no sumar un parche más al
+componente viejo.
+
 ### 7. Multi-tenant (backend)
 - TODA query con `municipio_id` filtra por `current_user.municipio_id`. Sin excepciones.
 

@@ -520,6 +520,14 @@ async def _sincronizar_recursos(db: AsyncSession, ot: OrdenTrabajo,
                 orden_trabajo_id=ot.id, item_id=item.id,
                 tipo=TipoRecursoOT.RESERVA, item_nombre=item.nombre,
             ))
+            # La TOMA tambien deja renglon en el libro. Sin esto el historial
+            # de una maquina mostraba la devolucion sin la toma que la explica
+            # (dueño, 2026-08-31): media historia es peor que ninguna.
+            await registrar_movimiento(
+                db, item, TipoMovimientoInventario.RESERVA_OT, 0,
+                motivo=f"Tomado por {ot.numero or 'una orden'}",
+                orden_trabajo_id=ot.id,
+            )
 
 
 async def _liberar_activo(db: AsyncSession, item_id: int, ot_id: int, municipio_id: int):

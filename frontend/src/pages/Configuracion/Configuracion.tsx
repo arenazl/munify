@@ -20,6 +20,7 @@ import DependenciaSheet, { type DependenciaEditable } from '../../components/con
 import DemoDniCard from '../../components/config/DemoDniCard';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import InventarioDepositosConfig from '../InventarioDepositosConfig';
+import Inventario from '../Inventario';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
@@ -247,7 +248,6 @@ export default function Configuracion() {
   /* Datos reales de las pantallas PUENTE (Vecinos, Inventario): un número
      cierto para el veredicto y, si existe, la mini-lista de solo lectura. */
   const [puenteVecinos, setPuenteVecinos] = useState<{ total: number } | null>(null);
-  const [puenteInv, setPuenteInv] = useState<{ total: number; bajoStock: any[] } | null>(null);
 
   // Cargar datos reales según el tab activo
   const cargarPanelReal = useCallback(async () => {
@@ -260,10 +260,6 @@ export default function Configuracion() {
     } else if (hijoId === 'vecinos') {
       const res = await dashboardApi.getStats();
       setPuenteVecinos({ total: res.data?.total ?? 0 });
-    } else if (hijoId === 'inv') {
-      const res = await inventarioApi.listItems({ limit: 500 });
-      const items: any[] = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
-      setPuenteInv({ total: items.length, bajoStock: items.filter((i) => i.bajo_stock) });
     }
   }, [hijoId]);
 
@@ -592,51 +588,13 @@ export default function Configuracion() {
               (dueño, 2026-08-31). */}
           {tipo === 'abm' && hijoId === 'depositos' && <InventarioDepositosConfig />}
 
-          {tipo === 'abm' && hijoId === 'inv' && (
-            <PantallaDeAjuste
-              eyebrow={`${padre.label.toUpperCase()} · CATÁLOGO`}
-              veredicto={
-                puenteInv
-                  ? `${puenteInv.total} artículos en el catálogo${puenteInv.bajoStock.length ? `, ${puenteInv.bajoStock.length} bajo el mínimo.` : ', ninguno bajo el mínimo.'}`
-                  : 'El catálogo de artículos se administra en su propia pantalla.'
-              }
-              resaltado={puenteInv?.bajoStock.length ? `${puenteInv.bajoStock.length} bajo el mínimo` : undefined}
-              tono={puenteInv?.bajoStock.length ? 'malo' : 'bueno'}
-            >
-              {/* El inventario NO es una operación: es el catálogo de bienes y
-                  materiales del municipio. Lo operacional son los MOVIMIENTOS
-                  —entradas, salidas, ajustes y lo que se lleva cada orden— que
-                  tienen su propia pantalla. Decía "vive en Operaciones" y
-                  mandaba a un ABM de artículos (dueño, 2026-08-31). */}
-              <PuenteDeModulo
-                configuraAca={[
-                  { label: 'Categorías de inventario', nota: 'Las familias en las que se agrupa, y si son activos o consumibles', grupoId: 'inventario', ajusteId: 'cat-inv' },
-                  { label: 'Depósitos', nota: 'Dónde está guardada cada cosa: central, corralón, vivero', grupoId: 'inventario', ajusteId: 'depositos' },
-                ]}
-                viveEn={{
-                  titulo: 'La lista completa, en su pantalla',
-                  motivo: 'Son cientos de artículos con stock, patente y vencimientos: el catálogo entero no entra en un panel de ajustes. Lo que se mueve todos los días son los movimientos, que tienen pantalla aparte.',
-                  checklist: ['Alta y baja de artículos', 'Stock, mínimo y unidad de cada uno', 'Patente, VTV y seguro de los vehículos'],
-                  botonLabel: 'Abrir el catálogo',
-                  ruta: '/gestion/inventario',
-                }}
-                lista={
-                  puenteInv && puenteInv.bajoStock.length
-                    ? {
-                        titulo: 'Lo que está bajo el mínimo',
-                        filas: puenteInv.bajoStock.slice(0, 3).map((i: any) => ({
-                          nombre: i.nombre,
-                          sub: i.categoria_nombre,
-                          valor: `${i.stock_actual} de ${i.stock_minimo} ${i.unidad ?? ''}`.trim(),
-                          valorColor: 'var(--pl-red-700)',
-                        })),
-                      }
-                    : undefined
-                }
-                onIrAlAjuste={irAlAjuste}
-              />
-            </PantallaDeAjuste>
-          )}
+          {/* El CATALOGO, embebido — no un cartel que manda a otra pantalla.
+              Es un ABM de ficha: una fila solo cambia si alguien la edita a
+              mano, igual que Personal o Cuadrillas, y por eso vive en
+              Configuracion y no en el sidebar. Lo que se mueve todos los dias
+              —el stock— tiene sus propias pantallas: Movimientos y Compras
+              (dueño, 2026-08-31). */}
+          {tipo === 'abm' && hijoId === 'inv' && <Inventario />}
 
           {tipo === 'abm' && hijoId !== 'vecinos' && hijoId !== 'inv' && hijoId !== 'depositos' && data && (
             <AbmDeConfiguracion
