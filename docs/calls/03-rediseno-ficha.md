@@ -171,3 +171,35 @@ KB.
 Todo en `scripts/calls/plantilla.html` (la ficha se arma en `abrir()`), y
 después `python scripts/calls/build_calls.py` para regenerar
 `frontend/public/calls/index.html`. **Nunca editar el `index.html` generado.**
+
+---
+
+## Los filtros: estados arriba, provincia abajo
+
+Pedido del dueño (2026-08-30). Antes había tres números informativos en la
+topbar (Contactados / Rellamar / Sin llamar) **y** un combo de seis opciones en
+la columna: el mismo dato contado dos veces, y para filtrar había que abrir un
+desplegable.
+
+**Los estados pasaron a ser píldoras en la topbar** (`F_ESTADOS`), y la píldora
+**es** el filtro: muestra su número y se toca. La activa se pinta del color de
+su estado, el mismo código que los botones "Cómo terminó la llamada" de la
+ficha. El mismo toque la apaga.
+
+- Las que están en cero **no ocupan lugar** — salvo la activa, que tiene que
+  seguir viéndose para poder salir del filtro.
+- Tocar una desde la vista **Hoy** salta a **Trabajar**, que es donde vive la
+  lista. Y `irA()` repinta las píldoras: la topbar es la misma en las dos
+  vistas, y una activa que miente sobre el filtro puesto es peor que no tenerla.
+- En el teléfono **ya no se esconden** (antes sí, eran decorativas): pasan a una
+  segunda línea propia que se arrastra al costado.
+
+**El segundo combo ahora es la provincia** (`selRegion`, sobre `c.region`), que
+se lee del país elegido: sin país, las 59 del padrón; con Perú, sus 13. Si se
+cambia el país, la provincia se resetea sola. Es una taxonomía larga, así que va
+en combo y no en píldoras.
+
+**Los labels se abrevian, no se cortan.** Medido en el combo real: *"Todos los
+países (154)"* son 132px en un control de 127 — se cortaba con puntos. Quedaron
+*"Países: todos (154)"* (112px) y *"Todas las prov. (154)"* (123px), y en
+pantalla angosta *"Todos"* / *"Todas"*.

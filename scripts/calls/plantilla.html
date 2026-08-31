@@ -85,10 +85,25 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .tema:hover{border-color:var(--acc);color:var(--acc)}
 .tema.on{border-color:var(--acc);color:var(--acc);background:var(--acc-soft)}
 .tema svg{width:17px;height:17px;display:block}
-.kpis{display:flex;gap:7px;flex-wrap:wrap}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.kpis{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;
+ scrollbar-width:none;min-width:0}
+.kpis::-webkit-scrollbar{display:none}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12.5px;
+ color:var(--ink2);white-space:nowrap;cursor:pointer;font-weight:600;transition:.12s;flex:none}
 .kpi b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:13.5px}
-.kpi.ok b{color:var(--ok)} .kpi.warn b{color:var(--warn)} .kpi.pu b{color:var(--purple)}
+.kpi:hover{border-color:var(--ink3);color:var(--ink)}
+.kpi.ok b{color:var(--ok)} .kpi.warn b{color:var(--warn)}
+.kpi.pu b{color:var(--purple)} .kpi.bad b{color:var(--bad)}
+/* La activa se pinta del color de su estado: el mismo codigo que los botones
+   "Como termino la llamada" de la ficha, para que sea el mismo idioma. */
+.kpi.on{color:#fff;border-color:var(--acc);background:var(--acc)}
+.kpi.on b{color:#fff}
+.kpi.ok.on{background:var(--ok);border-color:var(--ok);color:#04240f}
+.kpi.ok.on b{color:#04240f}
+.kpi.warn.on{background:var(--warn);border-color:var(--warn);color:#1a1200}
+.kpi.warn.on b{color:#1a1200}
+.kpi.pu.on{background:var(--purple);border-color:var(--purple)}
+.kpi.bad.on{background:var(--bad);border-color:var(--bad)}
 
 .hoy-grid{display:grid;grid-template-columns:1.25fr .95fr;gap:13px;margin-top:14px}
 .big{background:linear-gradient(140deg,var(--acc),var(--purple));border-radius:14px;padding:20px;color:#fff}
@@ -613,10 +628,13 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
  .foot-in .btn.sm{padding:5px 9px;font-size:12px;white-space:nowrap}
  #pieTxt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
  .vtag{display:none}
- /* Los KPIs duplicaban el alto del header sticky en el telefono (dos pisos
-    pegados arriba = media pantalla). El dato vive igual en "Como venis" y
-    en el pie: en mobile el header queda de UNA linea. */
- header.top .kpis{display:none}
+ /* Antes los KPIs se escondian en el telefono: eran tres numeros repetidos y
+    duplicaban el alto del header. Ahora son EL filtro de estado, asi que no
+    pueden desaparecer — pasan a una segunda linea propia que se arrastra al
+    costado, con las pildoras en cero ya fuera de la lista. */
+ .top-in{flex-wrap:wrap;row-gap:8px}
+ header.top .kpis{order:9;width:100%;padding-bottom:2px}
+ .kpi{padding:4px 10px;font-size:12px}
  .big h2{font-size:27px}
  /* En el telefono los formularios de a dos quedan apretados: una columna. */
  .fila2{grid-template-columns:1fr}
@@ -683,7 +701,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
           <div class="buscar"><input id="q" type="search" placeholder="Buscar municipio, intendente o teléfono..." autocomplete="off"></div>
           <div class="dos">
             <div class="sel"><select id="selPais" aria-label="Filtrar por país"></select></div>
-            <div class="sel"><select id="selEstado" aria-label="Filtrar por estado"></select></div>
+            <div class="sel"><select id="selRegion" aria-label="Filtrar por provincia"></select></div>
           </div>
           <div class="conteo" id="conteo"></div>
         </div>
@@ -852,7 +870,7 @@ const ESTADOS = [
 const LBL = Object.fromEntries(ESTADOS.map(e => [e.id, e.lbl]));
 const COL = {llamada:'var(--acc)', estado:'var(--ok)', nota:'var(--purple)', agenda:'var(--warn)'};
 
-let db = cargar(), vista = 'hoy', fPais = '', fEstado = '', q = '', selId = null;
+let db = cargar(), vista = 'hoy', fPais = '', fRegion = '', fEstado = '', q = '', selId = null;
 let paisHoy = '';
 let tope = 25;   // cuantas filas se dibujan de una
 const KEY_META = 'munify_llamados_meta', KEY_PAIS = 'munify_llamados_paishoy';
@@ -1122,6 +1140,7 @@ function filtrados(){
   const t = q.trim().toLowerCase();
   return CONTACTOS.filter(c => {
     if (fPais && c.pais !== fPais) return false;
+    if (fRegion && c.region !== fRegion) return false;
     const e = (db[c.id]||{}).estado || '';
     if (fEstado === 'pend' ? e !== '' : fEstado && e !== fEstado) return false;
     if (!t) return true;
@@ -1139,34 +1158,38 @@ function pintarFiltros(){
   const corto = angosto();
   const paises = [...new Set(CONTACTOS.map(c => c.pais))];
   const sp = document.getElementById('selPais');
-  sp.innerHTML = '<option value="">' + (corto ? 'Todos' : 'Todos los países')
+  /* Medido: "Todos los países (154)" son 132px en un combo de 127 — se cortaba
+     con puntos suspensivos. Se ABREVIA, que es la regla del kit, no se corta. */
+  sp.innerHTML = '<option value="">' + (corto ? 'Todos' : 'Países: todos')
     + ' (' + CONTACTOS.length + ')</option>'
     + paises.map(p => '<option value="' + esc(p) + '"' + (fPais===p?' selected':'') + '>'
         + esc(p) + ' (' + CONTACTOS.filter(c => c.pais === p).length + ')</option>').join('');
-  sp.onchange = () => { fPais = sp.value; tope = 25; pintarFiltros(); pintarLista(); };
+  sp.onchange = () => { fPais = sp.value; fRegion = ''; tope = 25; pintarFiltros(); pintarLista(); };
 
-  const se = document.getElementById('selEstado');
-  const opts = [{id:'', lbl: corto ? 'Cualquiera' : 'Cualquier estado'},
-                {id:'pend', lbl:'Sin llamar'}].concat(ESTADOS);
-  se.innerHTML = opts.map(o => {
-    const base = fPais ? CONTACTOS.filter(c => c.pais === fPais) : CONTACTOS;
-    const n = o.id === '' ? base.length
-      : o.id === 'pend' ? base.filter(c => !((db[c.id]||{}).estado)).length
-      : base.filter(c => (db[c.id]||{}).estado === o.id).length;
-    return '<option value="' + o.id + '"' + (fEstado===o.id?' selected':'') + '>' + o.lbl + ' (' + n + ')</option>';
-  }).join('');
-  se.onchange = () => { fEstado = se.value; tope = 25; pintarFiltros(); pintarLista(); };
+  /* La provincia se lee del pais elegido: sin pais, todas las del padron.
+     Es una taxonomia larga (solo Argentina tiene mas de veinte), asi que va
+     en combo y no en pildoras. */
+  const base = fPais ? CONTACTOS.filter(c => c.pais === fPais) : CONTACTOS;
+  const regiones = [...new Set(base.map(c => c.region).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'es'));
+  if (fRegion && !regiones.includes(fRegion)) fRegion = '';   // cambio el pais
+  const sr = document.getElementById('selRegion');
+  sr.innerHTML = '<option value="">' + (corto ? 'Todas' : 'Todas las prov.')
+    + ' (' + base.length + ')</option>'
+    + regiones.map(r => '<option value="' + esc(r) + '"' + (fRegion===r?' selected':'') + '>'
+        + esc(r) + ' (' + base.filter(c => c.region === r).length + ')</option>').join('');
+  sr.onchange = () => { fRegion = sr.value; tope = 25; pintarFiltros(); pintarLista(); };
 }
 function pintarConteo(n){
   const el = document.getElementById('conteo'); if (!el) return;
-  const hayFiltro = fPais || fEstado || q.trim();
+  const hayFiltro = fPais || fRegion || fEstado || q.trim();
   el.innerHTML = '<span><b>' + n + '</b> ' + (n === 1 ? 'municipio' : 'municipios') + '</span>'
     + (hayFiltro ? '<span class="limpiar" id="limpiar">Ver todos</span>' : '');
   const l = document.getElementById('limpiar');
   if (l) l.onclick = () => {
-    fPais = ''; fEstado = ''; q = ''; tope = 25;
+    fPais = ''; fRegion = ''; fEstado = ''; q = ''; tope = 25;
     document.getElementById('q').value = '';
-    pintarFiltros(); pintarLista();
+    pintarKpis(); pintarFiltros(); pintarLista();
   };
 }
 function pintarLista(){
@@ -1787,13 +1810,40 @@ function copiar(txt, btnId, orig){
   else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select();
          try { document.execCommand('copy'); } catch(e){} document.body.removeChild(t); fin(); }
 }
+/* Los estados como PILDORAS en la topbar (dueño, 2026-08-30). Antes eran tres
+   numeros informativos arriba y un combo de seis opciones abajo: el mismo dato
+   contado dos veces, y para filtrar habia que abrir un desplegable. Ahora la
+   pildora ES el filtro y muestra su numero. Se tocan, no se despliegan. */
+const F_ESTADOS = [
+  {id:'',           lbl:'Todos',     corto:'Todos', cl:''},
+  {id:'pend',       lbl:'Sin llamar',corto:'Sin llamar', cl:'warn'},
+  {id:'contactado', lbl:'Contactado',corto:'Contact.', cl:'ok'},
+  {id:'no-atiende', lbl:'No atiende',corto:'No atiende', cl:'warn'},
+  {id:'rellamar',   lbl:'Volver a llamar', corto:'Rellamar', cl:'pu'},
+  {id:'descartado', lbl:'Descartado',corto:'Descart.', cl:'bad'}
+];
+function contarEstado(id, base){
+  const arr = base || CONTACTOS;
+  return id === '' ? arr.length
+    : id === 'pend' ? arr.filter(c => !((db[c.id]||{}).estado)).length
+    : arr.filter(c => (db[c.id]||{}).estado === id).length;
+}
 function pintarKpis(){
-  const c = CONTACTOS.filter(x => (db[x.id]||{}).estado === 'contactado').length;
-  const r = CONTACTOS.filter(x => (db[x.id]||{}).estado === 'rellamar').length;
-  document.getElementById('kpis').innerHTML =
-      '<span class="kpi ok">Contactados <b>' + c + '</b></span>'
-    + '<span class="kpi pu">Rellamar <b>' + r + '</b></span>'
-    + '<span class="kpi warn">Sin llamar <b>' + pendientes().length + '</b></span>';
+  const caja = document.getElementById('kpis'); if (!caja) return;
+  const corto = angosto();
+  /* Los que estan en cero no ocupan lugar en la barra — salvo el activo, que
+     tiene que seguir viendose para poder salir del filtro. */
+  caja.innerHTML = F_ESTADOS.filter(e => e.id === '' || e.id === fEstado || contarEstado(e.id))
+    .map(e => '<button type="button" class="kpi' + (e.cl ? ' ' + e.cl : '')
+      + (fEstado === e.id ? ' on' : '') + '" data-fe="' + e.id + '">'
+      + esc(corto ? e.corto : e.lbl) + ' <b>' + contarEstado(e.id) + '</b></button>').join('');
+  caja.querySelectorAll('[data-fe]').forEach(b => b.onclick = () => {
+    fEstado = (fEstado === b.dataset.fe) ? '' : b.dataset.fe;
+    tope = 25;
+    // Filtrar desde "Hoy" no tendria donde verse: la lista vive en Trabajar.
+    if (vista !== 'ops') irA('ops');
+    else { pintarKpis(); pintarFiltros(); pintarLista(); }
+  });
 }
 function pintarPie(){
   const n = CONTACTOS.length, hechos = n - pendientes().length;
@@ -1810,6 +1860,9 @@ function irA(v){
   document.getElementById('vHoy').style.display = v === 'hoy' ? '' : 'none';
   document.getElementById('vOps').style.display = v === 'ops' ? '' : 'none';
   document.querySelectorAll('#switch button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  // Las pildoras viven en la topbar, que es la MISMA en las dos vistas: si no
+  // se repintan al cambiar, la activa queda mintiendo sobre el filtro puesto.
+  pintarKpis();
   try { localStorage.setItem(KEY_VISTA, v); } catch(e){}
   if (v === 'ops'){ pintarFiltros(); pintarLista(); if (!selId) fichaVacia(); }
   // El shell es fijo: quien scrollea es el contenedor, no la ventana.
