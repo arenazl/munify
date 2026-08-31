@@ -1659,16 +1659,38 @@ async def seed_demo_completo(
     # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)
     # ------------------------------------------------------------------
+    # La geografia NO puede tirar abajo la creacion. Que falte el mapa es una
+    # demo con menos, pero una demo; que reviente el alta es no tener nada. Ya
+    # se degradaba cuando la geografia venia VACIA --- lo que faltaba era
+    # aguantar que el paso se ROMPA, que es lo que paso de verdad: un error de
+    # programacion al crear la zona mataba el alta entera y el usuario veia "No
+    # pudimos crear la demo" despues de esperar todos los pasos.
+    # SAVEPOINT y no rollback pelado: si el bloque falla se deshace SOLO lo suyo
+    # y la transaccion sigue viva. Un `db.rollback()` aca se llevaria puesto todo
+    # lo que ya se creo antes en el alta --- dependencias, categorias, tasas ---
+    # y la demo quedaria peor que sin zonas.
+    zonas: dict = {}
     with log.paso("zonas") as _p:
-        zonas = await _seed_zonas(db, municipio_id, geo_ctx["zonas"])
+        try:
+            async with db.begin_nested():
+                zonas = await _seed_zonas(db, municipio_id, geo_ctx["zonas"])
+        except Exception as ex:
+            zonas = {}
+            _p.fallo(f"no se pudieron crear las zonas: {ex}")
         if zonas:
             _p.ok(zonas=len(zonas), nombres=list(zonas.keys()))
         else:
             _p.degradado(
-                "OSM no devolvio ninguna division para esta ciudad; el municipio "
-                "queda sin zonas (antes se inventaban Centro/Norte/Sur)")
+                "sin divisiones para esta ciudad; el municipio queda sin zonas "
+                "(antes se inventaban Centro/Norte/Sur)")
+    barrios: dict = {}
     with log.paso("barrios") as _p:
-        barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"])
+        try:
+            async with db.begin_nested():
+                barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"])
+        except Exception as ex:
+            barrios = {}
+            _p.fallo(f"no se pudieron crear los barrios: {ex}")
         if barrios:
             _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15])
         else:
