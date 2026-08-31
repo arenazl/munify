@@ -2515,9 +2515,13 @@ button.av2-chip:hover { opacity: 0.85; }
    controles entran en una linea. */
 @media (max-width: 860px) {
   .av2-mapa-full:fullscreen .cg-cabecera,
-  .av2-mapa-full--expandido .cg-cabecera,
-  .av2-mapa-full:fullscreen .cg-consulta,
-  .av2-mapa-full--expandido .cg-consulta { display: none; }
+  .av2-mapa-full--expandido .cg-cabecera { display: none; }
+
+  /* De la fila de la consulta se pliegan los combos, NO el play: el play vive
+     ahi adentro y es justamente lo que se viene a tocar en pantalla completa
+     (se escondia con ellos — medido: playVisible false). */
+  .av2-mapa-full:fullscreen .cg-consulta > *:not(.cg-continuacion),
+  .av2-mapa-full--expandido .cg-consulta > *:not(.cg-continuacion) { display: none; }
 
   .av2-mapa-full:fullscreen .av2-controles,
   .av2-mapa-full--expandido .av2-controles {
