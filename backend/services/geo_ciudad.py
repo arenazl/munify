@@ -611,9 +611,22 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
         else:
             pp.ok(**detalle)
 
-    # El padron gana sobre lo que devolvio Overpass: sus zonas traen contorno.
-    # Las de OSM sólo entran si el municipio no está en el padrón todavía.
-    zonas = zonas_padron or armado["zonas"]
+    # QUIEN MANDA depende de que clase de municipio es, y esto ya estaba resuelto
+    # aguas arriba: en un PARTIDO (Moron, La Matanza) la division son sus
+    # localidades, y ahi el padron gana porque las trae con contorno. En una
+    # CIUDAD --- una sola localidad, que es ella misma --- la division real son
+    # sus barrios, y `armar()` ya los promueve a zonas; imponer el padron ahi
+    # devolveria UNA zona que abarca el 100% de los reclamos y no divide nada,
+    # que es exactamente el bug que arreglo el fix de Villa Carlos Paz.
+    #
+    # Sin barrios en OSM queda la unica localidad del padron, que al menos trae
+    # su contorno: peor es no dibujar nada.
+    if len(zonas_padron) > 1:
+        zonas, fuente_zonas = zonas_padron, "catalogo_zonas"
+    elif armado["zonas"]:
+        zonas, fuente_zonas = armado["zonas"], "osm_barrios_de_la_ciudad"
+    else:
+        zonas, fuente_zonas = zonas_padron, "catalogo_zonas"
     return {**armado, "zonas": zonas, "poligono": anillo,
             "fuente_poligono": "municipios_catalogo",
-            "fuente_zonas": "catalogo_zonas" if zonas_padron else "overpass"}
+            "fuente_zonas": fuente_zonas}
