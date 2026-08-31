@@ -363,14 +363,14 @@ const TIMELAPSE_PASO_MIN_DIAS = 2;
    paso se ve entrar cada grupo sin que la pantalla dé un salto; los topes
    evitan los dos extremos malos: un municipio con quince reclamos despachado en
    tres ticks, y uno con miles convertido en un recorrido eterno. */
-const TIMELAPSE_RECLAMOS_POR_PASO = 4;
+const TIMELAPSE_RECLAMOS_POR_PASO = 2;
 const TIMELAPSE_PASOS_MIN = 10;
-const TIMELAPSE_PASOS_MAX = 40;
-/* Ritmo del recorrido. A 520 ms la vuelta quedaba en ~14 s, pero se sentía un
-   fast-forward: los reclamos aparecían y desaparecían sin que se pudiera seguir
-   ninguno. A 700 ms un recorrido típico queda en 20-25 s, que es el tiempo que
-   alguien puede hablar encima sin que se le escape ni aburra. */
-const TIMELAPSE_INTERVALO_MS = 700;
+const TIMELAPSE_PASOS_MAX = 55;
+/* Ritmo del recorrido. Con 520 ms era un fast-forward donde no se podía seguir
+   ningún reclamo. A 1000 ms, y con dos reclamos por paso, cada tick se puede
+   leer: entra el reclamo, se ve dónde cae y se alcanza a decir qué es. Un
+   recorrido típico queda en 40-50 s, y el que quiera apurarlo tiene 2x y 4x. */
+const TIMELAPSE_INTERVALO_MS = 1000;
 
 /** Estados del time-lapse. `pausado`/`finalizado` congelan la última ventana. */
 type TimelapseEstado = 'inactivo' | 'reproduciendo' | 'pausado' | 'finalizado';
@@ -1792,6 +1792,32 @@ export default function Mapa() {
     () => aplicarTiempo(reclamosAlcance),
     [aplicarTiempo, reclamosAlcance],
   );
+
+  /**
+   * El último reclamo que entró, escrito para leerse al pasar.
+   *
+   * Es lo que le da sentido al recorrido: sin esto aparecen puntos de colores
+   * en el mapa y no se sabe qué es ninguno. Se elige el más nuevo de lo
+   * acumulado hasta el cursor —el que acaba de sumarse— y se arma la frase con
+   * lo que el reclamo REALMENTE tiene: si no hay dirección va el barrio, y si
+   * no hay ninguno de los dos, sólo la categoría. Nunca un relleno inventado.
+   */
+  const reclamoEntrando = useMemo(() => {
+    if (!ventanaTimelapse) return null;
+    let ultimo: Reclamo | null = null;
+    let masNuevo = -Infinity;
+    for (const r of reclamosFiltrados) {
+      const t = new Date(r.created_at).getTime();
+      if (t <= ventanaTimelapse.hasta && t > masNuevo) {
+        masNuevo = t;
+        ultimo = r;
+      }
+    }
+    if (!ultimo) return null;
+    const lugar = ultimo.direccion?.trim() || ultimo.zona?.nombre?.trim();
+    const que = ultimo.categoria?.nombre?.trim();
+    return [que, lugar].filter(Boolean).join(' — ') || null;
+  }, [ventanaTimelapse, reclamosFiltrados]);
 
   // Radiografía de lo que se está por dibujar. Lo importante es `sinArea`: un
   // reclamo sin dependencia asignada no puede tomar color de área y cae al
@@ -4047,9 +4073,9 @@ export default function Mapa() {
             controles de algo que el usuario todavía no pidió. */}
         {tlActivo && timelapsePlan && !isPuntos && (
           <MapaTimelapseBanda
-            ventanaDias={timelapsePlan.ventanaDias}
             rangoLabel={rangoVentanaLabel}
             reclamosEnVentana={reclamosFiltrados.length}
+            entrando={reclamoEntrando}
             comparacion={comparacionVentana}
             reproduciendo={tlEstado === 'reproduciendo'}
             finalizado={tlEstado === 'finalizado'}

@@ -4,7 +4,7 @@
  * Se monta debajo de la consulta guiada SÓLO mientras el recorrido está
  * activo. Tres pisos, en este orden:
  *
- *   1. CABECERA en una línea: play redondo · "VENTANA DE N DÍAS" + el rango
+ *   1. CABECERA en una línea: play redondo · "ACUMULADO" + el rango
  *      grande · el conteo de la ventana con su comparación · velocidades
  *      (1x/2x/4x), bucle y salida.
  *   2. EL ELECTRO (`components/ui/Electro`): el pulso del período completo,
@@ -37,12 +37,16 @@ export interface RemateTimelapse {
 }
 
 interface Props {
-  /** Ancho de la ventana móvil, en días. */
-  ventanaDias: number;
   /** Rango de la ventana visible ("2 – 31 jul"). */
   rangoLabel: string;
   /** Cuántos reclamos entran en la ventana visible. */
   reclamosEnVentana: number;
+  /**
+   * El último reclamo que entró, ya escrito ("Bache — Av. Rivadavia 1200").
+   * Es lo que convierte al recorrido en algo que se puede narrar: sin esto
+   * aparecen puntos de colores y no se sabe qué es cada uno.
+   */
+  entrando: string | null;
   /** Cómo viene esa ventana contra la anterior (dato real, nunca inventado). */
   comparacion: ComparacionVentana;
 
@@ -73,9 +77,9 @@ interface Props {
 const VELOCIDADES: VelocidadTimelapse[] = [1, 2, 4];
 
 export default function MapaTimelapseBanda({
-  ventanaDias,
   rangoLabel,
   reclamosEnVentana,
+  entrando,
   comparacion,
   reproduciendo,
   finalizado,
@@ -116,7 +120,7 @@ export default function MapaTimelapseBanda({
         <div className="mtl-rango">
           {reproduciendo || rangoLabel ? (
             <>
-              <span className="mtl-rotulo">Ventana de {ventanaDias} días</span>
+              <span className="mtl-rotulo">Acumulado</span>
               <span className="mtl-fechas">{rangoLabel}</span>
             </>
           ) : (
@@ -135,6 +139,15 @@ export default function MapaTimelapseBanda({
             {comparacion.texto}
           </span>
         </div>
+
+        {/* Qué acaba de entrar. Va al lado del conteo y no sobre el mapa: ahí
+            taparía justo la zona donde cayó el reclamo. */}
+        {entrando && (
+          <div className="mtl-entrando" role="status" aria-live="polite">
+            <span className="mtl-entrando-punto" aria-hidden />
+            <span className="mtl-entrando-texto" title={entrando}>{entrando}</span>
+          </div>
+        )}
 
         <div className="mtl-controles">
           <div className="mtl-vel" role="group" aria-label="Velocidad del recorrido">
