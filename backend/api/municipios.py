@@ -3,7 +3,7 @@ API de Municipios - Endpoints publicos y protegidos
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, delete
 from typing import Optional, List
 from pydantic import BaseModel
 from math import radians, cos, sin, asin, sqrt
@@ -754,7 +754,18 @@ async def crear_municipio_demo(
     suffix = 1
     while True:
         r = await db.execute(select(Municipio).where(Municipio.codigo == codigo))
-        if not r.scalar_one_or_none():
+        libre_muni = r.scalar_one_or_none() is None
+        # No alcanza con que el CODIGO este libre: los usuarios del seed se
+        # llaman `<rol>@<codigo>.demo.com` y su email es unico en toda la base.
+        # Si quedaron usuarios de una demo anterior (un borrado a medias, un
+        # alta que reventó despues de crearlos), el codigo figura libre y el
+        # alta muere con "Duplicate entry ... ix_usuarios_email" — pasó en qa
+        # con la segunda demo de Moreno, delante del prospecto.
+        r2 = await db.execute(
+            select(User.id).where(User.email.like(f"%@{codigo}.demo.com")).limit(1)
+        )
+        libre_mail = r2.scalar_one_or_none() is None
+        if libre_muni and libre_mail:
             break
         suffix += 1
         codigo = f"{base_codigo}-{suffix}"
@@ -846,6 +857,16 @@ async def crear_municipio_demo(
     except Exception as e:
         log.error(e)
         await db.rollback()
+        # La fila del municipio puede sobrevivir al rollback (se escribio antes
+        # del punto que fallo). Sin esto queda una cascara: municipio sin un
+        # solo usuario, imposible de usar, y encima ocupando el nombre para el
+        # proximo intento. Se limpia en su propia operacion, best-effort.
+        try:
+            await db.execute(delete(Municipio).where(
+                Municipio.id == muni_id, Municipio.codigo == codigo))
+            await db.commit()
+        except Exception:
+            await db.rollback()
         await log.guardar(municipio_id=muni_id)
         raise
 
