@@ -72,6 +72,8 @@ import OrdenesTrabajo from './pages/OrdenesTrabajo';
 import Inventario from './pages/Inventario';
 import InventarioCategoriasConfig from './pages/InventarioCategoriasConfig';
 import InventarioMovimientos from './pages/InventarioMovimientos';
+import InventarioDepositosConfig from './pages/InventarioDepositosConfig';
+import InventarioOrdenesCompra from './pages/InventarioOrdenesCompra';
 import POITiposConfig from './pages/POITiposConfig';
 import CatalogoTramites from './pages/CatalogoTramites';
 import GestionAusencias from './pages/GestionAusencias';
@@ -250,6 +252,8 @@ export const router = createBrowserRouter([
       // El LIBRO del deposito: entradas, salidas, ajustes y lo que se llevo
       // cada OT. Esto es la operacion; el inventario de arriba es el catalogo.
       { path: 'inventario/movimientos', element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioMovimientos /></ProtectedRoute> },
+      // La reposicion: al recibirla, el stock entra por la puerta del libro.
+      { path: 'inventario/compras', element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioOrdenesCompra /></ProtectedRoute> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor', 'empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)
@@ -332,6 +336,12 @@ export const router = createBrowserRouter([
       {
         path: 'categorias-inventario',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioCategoriasConfig /></ProtectedRoute>
+      },
+      {
+        // Donde esta guardada cada cosa. Vienen tres del template y el
+        // municipio los edita, como las categorias.
+        path: 'depositos',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioDepositosConfig /></ProtectedRoute>
       },
       {
         path: 'poi-tipos',

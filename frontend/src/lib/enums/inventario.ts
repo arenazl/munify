@@ -71,3 +71,37 @@ export const NATURALEZA_OPTIONS = (Object.keys(naturalezaLabels) as NaturalezaIn
 
 export const ESTADO_ACTIVO_OPTIONS = (Object.keys(estadoActivoLabels) as EstadoActivo[])
   .map((e) => ({ value: e, label: estadoActivoLabels[e] }));
+
+// ---------------- Movimientos de stock ----------------
+// Single Source of Truth: los usan la pantalla de Movimientos y el historial
+// de la ficha del artículo. Un tipo nuevo se agrega SOLO acá.
+
+export const movimientoLabels: Record<string, string> = {
+  entrada: 'Entrada',
+  salida: 'Salida',
+  ajuste: 'Ajuste',
+  consumo_ot: 'Consumo por OT',
+  reserva_ot: 'Tomado por OT',
+  devolucion_ot: 'Devuelto de OT',
+};
+
+/** Los que suman al stock y los que restan. El ajuste no está en ninguno:
+ *  fija el saldo, no lo mueve. */
+export const movimientoSuman = new Set(['entrada', 'devolucion_ot']);
+export const movimientoRestan = new Set(['salida', 'consumo_ot']);
+
+export const movimientoColors: Record<string, string> = {
+  entrada: '#10b981',
+  devolucion_ot: '#10b981',
+  salida: '#f59e0b',
+  consumo_ot: '#f59e0b',
+  reserva_ot: '#3b82f6',
+  ajuste: '#8b5cf6',
+};
+
+/** El signo que se muestra delante de la cantidad. */
+export function signoMovimiento(tipo: string): string {
+  if (movimientoSuman.has(tipo)) return '+';
+  if (movimientoRestan.has(tipo)) return '−';
+  return '';
+}

@@ -23,6 +23,9 @@ import { inventarioApi } from '../lib/api';
 import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { formatFechaAR } from '../lib/tesoreria-helpers';
+import {
+  movimientoLabels, movimientoSuman, movimientoRestan, signoMovimiento,
+} from '../lib/enums/inventario';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface Movimiento {
@@ -45,16 +48,8 @@ interface Movimiento {
 interface ItemMini { id: number; nombre: string; naturaleza: string; unidad?: string | null; stock_actual?: number | null }
 interface DepositoMini { id: number; nombre: string }
 
-/* Single source of truth de los tipos. Si mañana aparece uno nuevo, el patrón
-   con fallback evita que la pantalla se rompa (regla 3 de CLAUDE.md). */
-const TIPO_LABEL: Record<string, string> = {
-  entrada: 'Entrada',
-  salida: 'Salida',
-  ajuste: 'Ajuste',
-  consumo_ot: 'Consumo por OT',
-  reserva_ot: 'Tomado por OT',
-  devolucion_ot: 'Devuelto de OT',
-};
+/* Los rótulos, colores y signos salen de `lib/enums/inventario` — los comparte
+   con el historial de la ficha del artículo (regla 2: un solo lugar). */
 const TIPO_ICON: Record<string, typeof Package> = {
   entrada: ArrowDownToLine,
   salida: ArrowUpFromLine,
@@ -73,8 +68,8 @@ const TIPO_TONO: Record<string, ChipTone> = {
   reserva_ot: 'blue',
   ajuste: 'red',
 };
-const SUMAN = new Set(['entrada', 'devolucion_ot']);
-const RESTAN = new Set(['salida', 'consumo_ot']);
+const SUMAN = movimientoSuman;
+const RESTAN = movimientoRestan;
 
 // Sólo estos tres se cargan a mano: los de OT los escribe el cierre de la orden.
 const TIPOS_MANUALES = ['entrada', 'salida', 'ajuste'] as const;
@@ -180,7 +175,7 @@ export default function InventarioMovimientos() {
       width: 'minmax(130px, 0.9fr)',
       kind: 'chip',
       cell: (m) => (
-        <ChipEstado label={TIPO_LABEL[m.tipo] ?? m.tipo} tone={TIPO_TONO[m.tipo] ?? 'gray'} />
+        <ChipEstado label={movimientoLabels[m.tipo] ?? m.tipo} tone={TIPO_TONO[m.tipo] ?? 'gray'} />
       ),
     },
     {
@@ -193,8 +188,7 @@ export default function InventarioMovimientos() {
         const u = itemPorId.get(m.item_id)?.unidad ?? '';
         // El signo lo da el tipo: sumar y restar tienen que distinguirse de un
         // vistazo, y el ajuste no tiene signo (fija un valor, no lo mueve).
-        const signo = SUMAN.has(m.tipo) ? '+' : RESTAN.has(m.tipo) ? '−' : '';
-        return `${signo}${m.cantidad} ${u}`.trim();
+        return `${signoMovimiento(m.tipo)}${m.cantidad} ${u}`.trim();
       },
     },
     {
@@ -357,7 +351,7 @@ export default function InventarioMovimientos() {
             label="Qué pasó"
             value={form.tipo}
             onChange={(v) => setForm((f) => ({ ...f, tipo: String(v) }))}
-            options={TIPOS_MANUALES.map((t) => ({ value: t, label: TIPO_LABEL[t] }))}
+            options={TIPOS_MANUALES.map((t) => ({ value: t, label: movimientoLabels[t] }))}
           />
           <div>
             <label className="block text-sm font-medium mb-1">

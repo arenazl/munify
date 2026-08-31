@@ -265,6 +265,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Campo',
       description: 'Entradas, salidas y ajustes de stock'
     },
+    {
+      // La reposición. Va al lado de Movimientos porque son la misma tarea:
+      // que el depósito no se quede sin nada.
+      name: 'Compras',
+      href: '/gestion/inventario/compras',
+      icon: Truck,
+      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
+      categoria: 'Campo',
+      description: 'Órdenes de compra y reposición'
+    },
     // NOTA: 'Inventario' (/gestion/inventario) salió del sidebar — se llega por
     // el tile de Configuración → Catálogos, al lado de "Categorías Inventario".
     // NOTA: 'Personal' (/gestion/empleados) y 'Cuadrillas' (/gestion/cuadrillas)

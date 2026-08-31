@@ -19,6 +19,7 @@ import PuenteDeModulo from '../../components/config/PuenteDeModulo';
 import DependenciaSheet, { type DependenciaEditable } from '../../components/config/DependenciaSheet';
 import DemoDniCard from '../../components/config/DemoDniCard';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
+import InventarioDepositosConfig from '../InventarioDepositosConfig';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
@@ -253,7 +254,7 @@ export default function Configuracion() {
     if (hijoId === 'muni') {
       const data = await cargarDatosFormularioMuni();
       setDatosMuni(data);
-    } else if (['tipos-poi', 'cat-inv', 'cat-reclamo', 'depositos'].includes(hijoId)) {
+    } else if (['tipos-poi', 'cat-inv', 'cat-reclamo'].includes(hijoId)) {
       const catData = await cargarCatalogoReal(hijoId);
       setCatalogoReal(catData);
     } else if (hijoId === 'vecinos') {
@@ -586,6 +587,11 @@ export default function Configuracion() {
             </PantallaDeAjuste>
           )}
 
+          {/* Depósitos: el ABM completo embebido, con alta y edición. Es el
+              catálogo que la pantalla venía prometiendo sin que existiera
+              (dueño, 2026-08-31). */}
+          {tipo === 'abm' && hijoId === 'depositos' && <InventarioDepositosConfig />}
+
           {tipo === 'abm' && hijoId === 'inv' && (
             <PantallaDeAjuste
               eyebrow={`${padre.label.toUpperCase()} · CATÁLOGO`}
@@ -632,7 +638,7 @@ export default function Configuracion() {
             </PantallaDeAjuste>
           )}
 
-          {tipo === 'abm' && hijoId !== 'vecinos' && hijoId !== 'inv' && data && (
+          {tipo === 'abm' && hijoId !== 'vecinos' && hijoId !== 'inv' && hijoId !== 'depositos' && data && (
             <AbmDeConfiguracion
               key={`${hijoId}-${recarga}`}
               spec={data}

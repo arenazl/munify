@@ -17,9 +17,11 @@ import {
   naturalezaLabels, naturalezaColors, naturalezaIcons,
   estadoActivoLabel, estadoActivoColor, estadoActivoColors,
   ESTADO_ACTIVO_OPTIONS,
+  movimientoLabels, movimientoColors, signoMovimiento,
 } from '../lib/enums/inventario';
 import type { InventarioItem, InventarioCategoria, NaturalezaInventario, EstadoActivo } from '../types';
 import { useReportarTotal } from '../components/abmv2/useEmbed';
+import { formatFechaAR } from '../lib/tesoreria-helpers';
 
 type FormState = {
   categoria_id: string;
@@ -44,6 +46,17 @@ type FormState = {
   vencimiento_seguro: string;
   km_proximo_service: string;
 };
+
+interface MovimientoItem {
+  id: number;
+  tipo: string;
+  cantidad: number;
+  stock_resultante?: number | null;
+  contraparte?: string | null;
+  motivo?: string | null;
+  usuario_nombre?: string | null;
+  fecha?: string | null;
+}
 
 const FORM_VACIO: FormState = {
   categoria_id: '', deposito_id: '', nombre: '', descripcion: '',
@@ -81,6 +94,10 @@ export default function Inventario() {
   const [form, setForm] = useState<FormState>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
   const [depositos, setDepositos] = useState<{ id: number; nombre: string }[]>([]);
+  /* El historial del artículo: qué entró, qué salió y quién se lo llevó. Se
+     pide sólo al abrir una ficha existente — en el alta no hay nada que ver. */
+  const [historial, setHistorial] = useState<MovimientoItem[]>([]);
+  const [cargandoHist, setCargandoHist] = useState(false);
   const [toDelete, setToDelete] = useState<InventarioItem | null>(null);
 
   const esGestor = user?.rol === 'admin' || user?.rol === 'supervisor';
@@ -125,6 +142,17 @@ export default function Inventario() {
     } catch { /* sin depósitos, el selector queda vacío y el ítem sin ubicación */ }
   }, []);
   useEffect(() => { if (esGestor) cargarDepositos(); }, [esGestor, cargarDepositos]);
+
+  useEffect(() => {
+    if (!sheetOpen || !selected) { setHistorial([]); return; }
+    let vivo = true;
+    setCargandoHist(true);
+    inventarioApi.historialItem(selected.id, { limit: 30 })
+      .then(res => { if (vivo) setHistorial(Array.isArray(res.data) ? res.data : []); })
+      .catch(() => { if (vivo) setHistorial([]); })
+      .finally(() => { if (vivo) setCargandoHist(false); });
+    return () => { vivo = false; };
+  }, [sheetOpen, selected]);
 
   const conteosNaturaleza = useMemo(() => {
     const c: Record<string, number> = {};
@@ -682,6 +710,55 @@ export default function Inventario() {
             <div className="rounded-xl p-4 flex items-center gap-2 text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
               <Package className="h-4 w-4" />
               Elegí una categoría para ver los campos correspondientes.
+            </div>
+          )}
+
+          {/* La historia del artículo. Vive acá y no en una pantalla aparte
+              porque la pregunta ("¿por qué quedan seis bolsas?") se hace
+              mirando la ficha, no buscando en el libro entero. */}
+          {selected && (
+            <div>
+              <p className="text-xs font-semibold uppercase mb-2" style={{ color: theme.textSecondary }}>
+                Movimientos
+              </p>
+              {cargandoHist ? (
+                <p className="text-sm" style={{ color: theme.textSecondary }}>Buscando la historia…</p>
+              ) : historial.length === 0 ? (
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  Todavía no se movió. Lo que entre, salga o se ajuste va a quedar acá.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {historial.map(mv => {
+                    const color = movimientoColors[mv.tipo] ?? theme.textSecondary;
+                    return (
+                      <div key={mv.id} className="flex items-start gap-3 rounded-lg px-3 py-2"
+                        style={{ backgroundColor: theme.backgroundSecondary }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium" style={{ color: theme.text }}>
+                            {movimientoLabels[mv.tipo] ?? mv.tipo}
+                            {mv.contraparte ? ` · ${mv.contraparte}` : ''}
+                          </p>
+                          <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                            {[mv.fecha ? formatFechaAR(mv.fecha) : null, mv.motivo, mv.usuario_nombre]
+                              .filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                        <div className="text-right flex-none">
+                          <p className="text-[13px] font-semibold" style={{ color }}>
+                            {signoMovimiento(mv.tipo)}{mv.cantidad}
+                          </p>
+                          {mv.stock_resultante != null && (
+                            <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                              quedó {mv.stock_resultante}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

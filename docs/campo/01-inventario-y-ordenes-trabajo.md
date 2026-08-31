@@ -193,6 +193,25 @@ en "bajo el mínimo" y hay que poder explicar por qué se quedaron sin nada.
 
 Migración: `scripts/migrate_add_inventario_deposito_movimientos.py` (idempotente).
 
+### Las pantallas
+
+| Pantalla | Ruta | Qué es |
+|---|---|---|
+| **Movimientos** | `/gestion/inventario/movimientos` | El libro. Filtros por depósito y tipo; el alta sólo ofrece entrada/salida/ajuste. Los renglones **no se editan**: un movimiento es un hecho, y para corregir se carga un ajuste, que deja rastro. |
+| **Compras** | `/gestion/inventario/compras` | Órdenes de compra. Recibir (entera o en partes) es lo que hace entrar el stock. Cancelar no revierte lo recibido. |
+| **Depósitos** | Configuración → Inventario → Depósitos | ABM embebido (`InventarioDepositosConfig`, sobre `CategoriaConfigBase`). Un depósito con artículos adentro no se da de baja. |
+| Historial del artículo | dentro del Sheet de Inventario | Los últimos 30 movimientos de ese ítem, con el saldo que fue quedando. |
+
+Ambas operacionales entran al sidebar bajo **Campo**, con el flag `inventario`.
+Los rótulos, colores y signos de los movimientos son SSoT en
+`lib/enums/inventario.ts` (`movimientoLabels`, `movimientoColors`,
+`signoMovimiento`) — los comparten la pantalla y el historial de la ficha.
+
+**El puente de Configuración dejó de mentir**: ya no dice que el inventario
+"vive en Operaciones". Dice lo que es — el catálogo vive en su pantalla porque
+son cientos de artículos con stock, patente y vencimientos — y lo operacional
+son los movimientos, que ahora tienen dónde verse.
+
 ## 10. Estado (2026-07-03)
 
 - Fases 1-4 COMPLETAS y en prod. Inventario base + cruce OT + formato (prioridad,
@@ -205,11 +224,13 @@ Migración: `scripts/migrate_add_inventario_deposito_movimientos.py` (idempotent
 
 ### 2026-08-31 — depósitos, movimientos y órdenes de compra
 
-Backend COMPLETO y verificado en QA (ver §9.bis): 12 endpoints nuevos, seed con
-90 días de historia, migración aplicada. **Falta el frontend** (pantalla de
-movimientos, historial en el Sheet del ítem, ABM de depósitos, pantalla de
-órdenes de compra) y **corregir el puente de Configuración**, que sigue
-diciendo que el inventario "vive en Operaciones" cuando es un catálogo.
+COMPLETO, backend y frontend (ver §9.bis): 12 endpoints, cuatro superficies
+nuevas y el puente de Configuración corregido. Seed con 90 días de historia.
+
+Verificado en QA: la historia cierra en 7 de 7 consumibles, y el circuito de
+compra probado punta a punta — 25 pedidas, llegan 10 (`recibida_parcial`,
+stock 22→32), llegan las 15 restantes (`recibida`, 32→47), dos movimientos de
+entrada con sus saldos correctos.
 
 Al probar el seed aparecieron **dos migraciones que QA nunca había corrido** —
 `migrate_reservas.py` (tabla `reservas` + `inventario_items.reservable`) y
