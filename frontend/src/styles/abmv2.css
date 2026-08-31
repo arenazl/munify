@@ -4657,3 +4657,14 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-filtros-estado b { font-variant-numeric: tabular-nums; color: var(--pl-text-3); }
 .av2-filtros-estado--activo { background: var(--pl-green-050); color: var(--pl-text); }
 .av2-filtros-estado:disabled { opacity: 0.45; cursor: default; }
+
+/* [PAGEACCIONES] Acciones sueltas de una pantalla SIN toolbar — un reporte no
+   tiene buscador ni CTA, pero puede tener su boton de tutorial. Va alineado a
+   la derecha, arriba del contenido. Si la pantalla tiene toolbar, el boton va
+   ahi: esto es solo para las que no la tienen. */
+.av2-page-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 12px;
+}

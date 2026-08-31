@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
-import { BarChart3, Users, Briefcase, Calendar, Repeat, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Briefcase, Calendar, Repeat, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage } from '../components/ui/ABMPage';
+import { PageHeader } from '../components/abmv2/PageHeader';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import type { HeroFrase } from '../lib/semanticHero';
+import { seg } from '../lib/semanticHero';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 import { agendaPagosApi } from '../lib/api';
@@ -35,9 +38,6 @@ export default function ReportesSueldos() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
-  }
 
   useEffect(() => {
     (async () => {
@@ -49,44 +49,63 @@ export default function ReportesSueldos() {
     })();
   }, []);
 
+  /* Los hooks del hero van ANTES de cualquier return: abajo se llamaban
+     condicionalmente y eso es el React #310 en runtime (regla 16). */
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    const emp = Number(data?.cantidad_empleados ?? 0);
+    const liq = Number(data?.cantidad_pagos_activos ?? 0);
+    if (!emp) {
+      return [{ segmentos: [
+        seg('Todavía no hay empleados con liquidación:'),
+        seg('la masa salarial del mes está en cero.', 'advertencia'),
+      ] }];
+    }
+    return [{ segmentos: [
+      seg(`${fmtMoney(data?.masa_salarial_mes ?? '0')} de masa salarial este mes`, 'bueno'),
+      seg(`entre ${emp} ${emp === 1 ? 'empleado' : 'empleados'} y ${liq} ${liq === 1 ? 'liquidación activa' : 'liquidaciones activas'}.`),
+    ] }];
+  }, [data]);
+
+  const heroKpis = useMemo(() => ([
+    { etiqueta: 'Masa salarial', valor: fmtMoney(data?.masa_salarial_mes ?? '0') },
+    { etiqueta: 'Empleados', valor: String(data?.cantidad_empleados ?? 0) },
+    { etiqueta: 'Liquidaciones', valor: String(data?.cantidad_pagos_activos ?? 0) },
+  ]), [data]);
+
+  /* El guard de rol va DESPUES de los hooks: arriba cortaba el render antes
+     de llamarlos y React tira el #310 (regla 16, lo atrapa eslint y no tsc). */
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
+  }
+
   if (loading) return (
     <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>
   );
 
-  const { masa_salarial_mes = '0', cantidad_empleados = 0, cantidad_pagos_activos = 0,
-          top_sueldos = [], proximos_pagos = [], frecuencias = [] } = data || {};
+
+  // Los tres numeros del hero salen de `data`; aca quedan los del cuerpo.
+  const { top_sueldos = [], proximos_pagos = [], frecuencias = [] } = data || {};
   const totalFrecuencias = frecuencias.reduce((s: number, f: any) => s + parseFloat(f.monto || '0'), 0);
 
   return (
     <>
-    <ABMPage
-      title="Reportes de Sueldos"
-      icon={<BarChart3 className="h-5 w-5" />}
-      searchPlaceholder=""
-      searchValue=""
-      onSearchChange={() => {}}
-      headerActions={<TourButton tourKey="sueldos-reportes" title="Ver tutorial de Reportes" />}
-      tourAnchors={{ kpis: 'rep-sue-kpis' }}
-      loading={false}
-      isEmpty={false}
-      emptyMessage=""
-      kpis={[
-        {
-          label: 'Masa salarial', value: fmtMoney(masa_salarial_mes),
-          icon: Briefcase, color: theme.primary,
-          footnote: 'Suma de liquidaciones activas',
-          highlighted: true,
-        },
-        {
-          label: 'Empleados activos', value: String(cantidad_empleados),
-          icon: Users, color: '#3b82f6', footnote: 'Contactos tipo=empleado',
-        },
-        {
-          label: 'Liquidaciones', value: String(cantidad_pagos_activos),
-          icon: Repeat, color: '#10b981', footnote: 'Pagos programados activos',
-        },
-      ]}
-    >
+    <div className="av2-page" data-module="sueldos">
+      <PageHeader
+        eyebrow="Sueldos"
+        title="Reportes de Sueldos"
+        description="La masa salarial del mes, quiénes cobran más y qué liquidaciones están activas."
+      />
+      <div className="av2-hero-wrap">
+        <SemanticHero
+          etiqueta="SUELDOS · MES ACTUAL"
+          frases={heroFrases}
+          kpis={heroKpis}
+          className="av2-hero"
+        />
+      </div>
+      <div className="av2-page-acciones">
+        <TourButton tourKey="sueldos-reportes" title="Ver tutorial de Reportes" />
+      </div>
       <div className="col-span-full space-y-4" data-tour="rep-sue">
         {/* Top sueldos */}
         <Section title="Top sueldos" subtitle="Empleados con mayor sueldo base" icon={<Briefcase className="h-4 w-4" />} accent={theme.primary}>
@@ -184,7 +203,7 @@ export default function ReportesSueldos() {
           )}
         </Section>
       </div>
-    </ABMPage>
+    </div>
     <MunifyTour tourKey="sueldos-reportes" steps={TOUR_STEPS} />
     </>
   );

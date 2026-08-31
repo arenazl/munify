@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, PiggyBank, Tag, Building2, TrendingUp, Loader2 } from 'lucide-react';
+import { PiggyBank, Tag, Building2, TrendingUp, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage } from '../components/ui/ABMPage';
+import { PageHeader } from '../components/abmv2/PageHeader';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 
@@ -30,9 +30,6 @@ export default function ReportesTesoreria() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
-  }
 
   useEffect(() => {
     (async () => {
@@ -44,6 +41,12 @@ export default function ReportesTesoreria() {
     })();
   }, []);
 
+  /* El guard de rol va DESPUES de los hooks: arriba cortaba el render antes
+     de llamarlos y React tira el #310 (regla 16, lo atrapa eslint y no tsc). */
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
+  }
+
   if (loading) return (
     <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>
   );
@@ -54,17 +57,15 @@ export default function ReportesTesoreria() {
 
   return (
     <>
-    <ABMPage
-      title="Reportes de Tesorería"
-      icon={<BarChart3 className="h-5 w-5" />}
-      searchPlaceholder=""
-      searchValue=""
-      onSearchChange={() => {}}
-      headerActions={<TourButton tourKey="tesoreria-reportes" title="Ver tutorial de Reportes" />}
-      loading={false}
-      isEmpty={false}
-      emptyMessage=""
-    >
+    <div className="av2-page" data-module="tesoreria">
+      <PageHeader
+        eyebrow="Tesorería"
+        title="Reportes de Tesorería"
+        description="En qué se fue la plata este mes: por caja, por proyecto y a quién se le pagó."
+      />
+      <div className="av2-page-acciones">
+        <TourButton tourKey="tesoreria-reportes" title="Ver tutorial de Reportes" />
+      </div>
       <div className="col-span-full space-y-4" data-tour="rep-tes">
         {/* Egresos por caja */}
         <Section
@@ -167,7 +168,7 @@ export default function ReportesTesoreria() {
           )}
         </Section>
       </div>
-    </ABMPage>
+    </div>
     <MunifyTour tourKey="tesoreria-reportes" steps={TOUR_STEPS} />
     </>
   );

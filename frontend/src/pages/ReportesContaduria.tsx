@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, AlertTriangle, Calendar, TrendingUp, Loader2, Download, Globe } from 'lucide-react';
+import { AlertTriangle, Calendar, TrendingUp, Loader2, Download, Globe, BarChart3} from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage } from '../components/ui/ABMPage';
+import { PageHeader } from '../components/abmv2/PageHeader';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 
@@ -53,9 +53,6 @@ export default function ReportesContaduria() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
-  }
 
   useEffect(() => {
     (async () => {
@@ -67,6 +64,12 @@ export default function ReportesContaduria() {
     })();
   }, []);
 
+  /* El guard de rol va DESPUES de los hooks: arriba cortaba el render antes
+     de llamarlos y React tira el #310 (regla 16, lo atrapa eslint y no tsc). */
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
+  }
+
   if (loading) return (
     <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>
   );
@@ -76,17 +79,15 @@ export default function ReportesContaduria() {
 
   return (
     <>
-    <ABMPage
-      title="Reportes de Contaduría"
-      icon={<BarChart3 className="h-5 w-5" />}
-      searchPlaceholder=""
-      searchValue=""
-      onSearchChange={() => {}}
-      headerActions={<TourButton tourKey="contaduria-reportes" title="Ver tutorial de Reportes" />}
-      loading={false}
-      isEmpty={false}
-      emptyMessage=""
-    >
+    <div className="av2-page" data-module="contaduria">
+      <PageHeader
+        eyebrow="Contaduría"
+        title="Reportes de Contaduría"
+        description="Los números que el municipio publica y los que usa para cerrar el mes."
+      />
+      <div className="av2-page-acciones">
+        <TourButton tourKey="contaduria-reportes" title="Ver tutorial de Reportes" />
+      </div>
       <div className="col-span-full space-y-4" data-tour="rep-cont">
         {/* Portal de Transparencia: export JSON/CSV */}
         <div
@@ -230,7 +231,7 @@ export default function ReportesContaduria() {
           )}
         </Section>
       </div>
-    </ABMPage>
+    </div>
     <MunifyTour tourKey="contaduria-reportes" steps={TOUR_STEPS} />
     </>
   );
