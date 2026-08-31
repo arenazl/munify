@@ -556,12 +556,19 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .g-txt[data-g=plat]{--gc:var(--acc)} .g-txt[data-g=rec]{--gc:var(--warn)}
 .g-txt[data-g=tra]{--gc:var(--purple)} .g-txt[data-g=tes]{--gc:var(--ok)}
 .g-txt.otra{border-left-style:dashed}
-.g-re{position:absolute;top:9px;right:9px;width:26px;height:26px;border-radius:8px;cursor:pointer;
- background:var(--card2);border:1px solid var(--line2);color:var(--ink3);display:flex;align-items:center;
+/* "Decilo de otra forma" se usa EN VIVO, mientras se habla: tiene que verse sin
+   buscarlo. Antes era gris sobre gris del mismo color de la caja --- se perdia.
+   Ahora lleva el color de acento, su propio fondo y un poco mas de cuerpo. */
+.g-re{position:absolute;top:9px;right:9px;width:32px;height:32px;border-radius:9px;cursor:pointer;
+ background:color-mix(in srgb, var(--acc) 12%, var(--card));
+ border:1px solid color-mix(in srgb, var(--acc) 38%, transparent);
+ color:var(--acc);display:flex;align-items:center;
  justify-content:center;transition:.14s}
-.g-re svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.g-re:hover{border-color:var(--acc);color:var(--acc);transform:rotate(-45deg)}
-.g-txt p{padding-right:30px}
+.g-re svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.g-re:hover{background:var(--acc);border-color:var(--acc);color:#fff;transform:rotate(-45deg)}
+.g-re:hover{box-shadow:0 4px 12px -4px var(--acc)}
+.g-re:active{transform:rotate(-45deg) scale(.92)}
+.g-txt p{padding-right:38px}   /* el refresh crecio a 32px: sin esto lo pisa */
 .g-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding-top:9px;
  border-top:1px solid var(--line);font-size:11.5px;color:var(--ink3)}
 /* El boton que le pide a la IA el angulo de ESE modulo para ESTE municipio.
@@ -580,7 +587,18 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
 .mod-txt.error{font-style:normal}
 .mod-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:9px;padding-top:8px;
  border-top:1px solid var(--line);font-size:11px;color:var(--ink3)}
-@media(max-width:420px){ .tabs{grid-template-columns:repeat(2,1fr)} }
+/* Los cuatro pilares SIEMPRE en una linea, aunque el telefono sea angosto: son
+   el indice de la empresa y partidos en dos filas ocupan media pantalla de la
+   ficha, justo lo que hay que leer mientras se habla. En vez de envolver, se
+   achican: menos padding, letra mas chica y el icono un punto menor. */
+@media(max-width:420px){
+  .tabs{gap:4px}
+  .tab{padding:8px 3px;font-size:11px;gap:4px}
+  .tab svg{width:15px;height:15px}
+}
+@media(max-width:340px){
+  .tab{padding:7px 2px;font-size:10px;letter-spacing:-.2px}
+}
 /* DATO DE COLOR (columna derecha): lo que se sabe ANTES de marcar. Vivia en el
    centro y empujaba la narracion fuera de la pantalla (dueño, 2026-08-30). */
 .color-box{display:flex;flex-direction:column;gap:7px}
@@ -776,7 +794,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 30/08 23:11 · 1706cad1</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 31/08 12:36 · f4511968</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
