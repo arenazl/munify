@@ -358,12 +358,19 @@ const TIMELAPSE_VENTANA_DIAS = 30;
 //   · dataset de 365 días → recorrido 335 d ÷ paso 12 d = 28 pasos ≈ 25 s
 // Antes era paso FIJO de 7 días cada 800 ms: 90 días se despachaban en ~10 s
 // (imposible de narrar) y un año tardaba casi un minuto.
-const TIMELAPSE_PASOS_OBJETIVO = 30;
 const TIMELAPSE_PASO_MIN_DIAS = 2;
-/* Ritmo del recorrido. Con 900 ms el año entero tardaba ~25 s y la ventana
-   se arrastraba: se veía muerto. A 520 ms la vuelta completa queda en ~14 s,
-   que es el tiempo que alguien puede hablar encima sin que se haga largo. */
-const TIMELAPSE_INTERVALO_MS = 520;
+/* Cuántos reclamos entran por tick, y los topes del recorrido. Con cuatro por
+   paso se ve entrar cada grupo sin que la pantalla dé un salto; los topes
+   evitan los dos extremos malos: un municipio con quince reclamos despachado en
+   tres ticks, y uno con miles convertido en un recorrido eterno. */
+const TIMELAPSE_RECLAMOS_POR_PASO = 4;
+const TIMELAPSE_PASOS_MIN = 10;
+const TIMELAPSE_PASOS_MAX = 40;
+/* Ritmo del recorrido. A 520 ms la vuelta quedaba en ~14 s, pero se sentía un
+   fast-forward: los reclamos aparecían y desaparecían sin que se pudiera seguir
+   ninguno. A 700 ms un recorrido típico queda en 20-25 s, que es el tiempo que
+   alguien puede hablar encima sin que se le escape ni aburra. */
+const TIMELAPSE_INTERVALO_MS = 700;
 
 /** Estados del time-lapse. `pausado`/`finalizado` congelan la última ventana. */
 type TimelapseEstado = 'inactivo' | 'reproduciendo' | 'pausado' | 'finalizado';
@@ -388,14 +395,23 @@ interface TimelapsePlan {
  * tercio del recorrido: con una ventana más ancha que los datos, el time-lapse
  * mostraría siempre lo mismo y no narraría nada.
  */
-function planificarTimelapse(rango: { min: number; max: number }): TimelapsePlan {
+function planificarTimelapse(
+  rango: { min: number; max: number },
+  cantidad: number,
+): TimelapsePlan {
   const totalDias = Math.max(1, Math.ceil((rango.max - rango.min) / DIA_MS));
   const ventanaDias = Math.min(TIMELAPSE_VENTANA_DIAS, Math.max(1, Math.ceil(totalDias / 3)));
   const recorrido = Math.max(1, totalDias - ventanaDias);
-  const pasoDias = Math.max(
-    TIMELAPSE_PASO_MIN_DIAS,
-    Math.ceil(recorrido / TIMELAPSE_PASOS_OBJETIVO),
+  // Los pasos salen de CUÁNTOS reclamos hay, no de cuántos días abarca el
+  // período. Partir el calendario en treinta pedazos iguales daba un recorrido
+  // legible sólo por casualidad: seis reclamos en quince meses son veintiocho
+  // ticks donde no pasa nada y dos donde pasa todo. Apuntando a unos pocos
+  // reclamos por tick, el ritmo lo termina marcando la actividad real.
+  const pasos = Math.min(
+    TIMELAPSE_PASOS_MAX,
+    Math.max(TIMELAPSE_PASOS_MIN, Math.round(cantidad / TIMELAPSE_RECLAMOS_POR_PASO)),
   );
+  const pasoDias = Math.max(TIMELAPSE_PASO_MIN_DIAS, Math.ceil(recorrido / pasos));
   return { ventanaDias, pasoDias, cursorInicial: ventanaDias, cursorFinal: totalDias };
 }
 
@@ -1637,20 +1653,6 @@ export default function Mapa() {
     return { min, max: dateRange.max };
   }, [dateRange, preguntaUsaPeriodo, timePreset]);
 
-  const timelapsePlan = useMemo(
-    () => (rangoVisible ? planificarTimelapse(rangoVisible) : null),
-    [rangoVisible],
-  );
-
-  /** El time-lapse manda sobre el filtro de período (corriendo o congelado). */
-  const tlActivo = tlEstado !== 'inactivo';
-
-  /** Ventana visible del time-lapse. `null` = modo normal, sin tocar nada. */
-  const ventanaTimelapse = useMemo(() => {
-    if (!tlActivo || !rangoVisible || !timelapsePlan) return null;
-    const hasta = rangoVisible.min + animationDay * DIA_MS;
-    return { desde: hasta - timelapsePlan.ventanaDias * DIA_MS, hasta };
-  }, [tlActivo, rangoVisible, timelapsePlan, animationDay]);
 
   /** Con qué se dibuja el lienzo. Sin pregunta ("ver todo") se muestran los
    *  reclamos uno por uno: es la vista donde se va a buscar un caso puntual. */
@@ -1739,6 +1741,31 @@ export default function Mapa() {
     () => aplicarAlcance(reclamosPorLugar),
     [aplicarAlcance, reclamosPorLugar],
   );
+
+  const timelapsePlan = useMemo(
+    () => (rangoVisible ? planificarTimelapse(rangoVisible, reclamosAlcance.length) : null),
+    [rangoVisible, reclamosAlcance.length],
+  );
+
+  /** El time-lapse manda sobre el filtro de período (corriendo o congelado). */
+  const tlActivo = tlEstado !== 'inactivo';
+
+  /**
+   * Ventana visible del time-lapse. `null` = modo normal, sin tocar nada.
+   *
+   * ACUMULA: va desde el primer reclamo hasta el cursor, y no se borra nada
+   * atrás. Con una ventana móvil de 30 días el mapa mostraba siempre más o
+   * menos la misma cantidad de pines --- los viejos se apagaban a medida que
+   * entraban los nuevos --- así que el recorrido contaba el ritmo pero nunca la
+   * acumulación, que es lo que hay que ver: cómo se le va llenando el
+   * municipio. La comparación entre el principio y el final no se pierde: el
+   * remate la calcula aparte, con su propia ventana.
+   */
+  const ventanaTimelapse = useMemo(() => {
+    if (!tlActivo || !rangoVisible || !timelapsePlan) return null;
+    const hasta = rangoVisible.min + animationDay * DIA_MS;
+    return { desde: rangoVisible.min, hasta };
+  }, [tlActivo, rangoVisible, timelapsePlan, animationDay]);
 
   // 4) TIEMPO. El time-lapse (ventana móvil) MANDA sobre el preset, y hay
   //    preguntas donde el período no significa nada ("lo atrasado" es viejo por
