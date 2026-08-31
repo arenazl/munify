@@ -43,34 +43,50 @@ Tres párrafos que se arman por municipio en `narracion(c, f)`:
 El cartel "Preguntá por" **se fue**: el nombre se dice adentro del speech.
 El botón copia la narración con los saltos de párrafo.
 
-### 3. Los cuatro tabs — el detalle lo escribe la IA en el momento
+### 3. Los cuatro tabs del speech — DETERMINÍSTICOS
 
 Debajo de la narración: **Plataforma · Reclamos · Trámites · Tesorería**
 (constante `GUION`). Arrancan cerrados —el centro tiene que ser la narración—
 y se abre el que el otro pida; el mismo toque lo cierra.
 
-**El texto no está escrito.** Cada tab lleva su **mini base de datos** (`kb`):
-los hechos reales de ese módulo, en crudo. Al tocarlo, esos hechos viajan
-junto con la ficha del municipio (`iaContexto`) al endpoint que ya existía,
-`/api/public/calls/ia`, y la IA devuelve dos párrafos de hasta 70 palabras
-para leer en voz alta. Así la misma explicación suena distinta en un pueblo de
-8.000 que en uno de 200.000, y toma en cuenta si ya tienen algo digital.
+**Son texto fijo, escrito, en criollo.** Nada de IA acá: son parte del speech,
+y lo que se dice por teléfono no puede cambiar en cada llamada. El asesor
+necesita una narrativa que ya conoce, no una sorpresa.
 
-La regla del prompt es dura: **usar SOLO los hechos de la lista**. Puede
-cambiar el énfasis según el municipio, no agregar una función que no exista.
-
-- **Cache** por municipio+módulo en `localStorage`: el endpoint tiene rate
-  limit de 40/hora y tocar cuatro tabs en cada llamada lo quema en diez
-  municipios. El link **"Otra vuelta"** borra ese cache y pide de nuevo.
-- **Paracaídas**: si la IA no contesta (sin red, rate limit, la página abierta
-  como archivo local) se muestra el guion `base` escrito a mano, con el aviso
-  *"Guión base: la IA no contestó"* y un **Reintentar**. Por teléfono, un
-  panel en blanco es peor que un texto genérico.
+- **Plataforma** y **Reclamos** (con la orden de trabajo adentro): dictados
+  por el dueño.
+- **Trámites** y **Tesorería**: redactados sobre lo que los módulos ya hacen.
+  **Falta que el dueño los valide.**
 
 > **Ojo:** la narración nombra **comunicación** como cuarto eje, pero el cuarto
-> tab es **Tesorería** (el dueño lo cambió sobre la marcha). Si preguntan por
-> comunicación no hay guion. Sumar un quinto tab es agregar una entrada al
-> array `GUION` con su `kb` y su `base`.
+> tab es **Tesorería**. Si preguntan por comunicación no hay tab (sí está el
+> panel de la derecha). Sumar un quinto es una entrada más en `GUION`.
+
+### 4. Los paneles de la derecha — ahí sí, IA con botón
+
+Vuelve **"Qué módulos tienen"** arriba de la columna derecha, con los cinco
+módulos plegables: Reclamos, Trámites, Cobros y tesorería, Comunicaciones,
+Campo y personal. Cada uno muestra sus bullets fijos —lo que el módulo hace— y
+un botón **"Contame más de X"**.
+
+Ese botón manda a la IA la **mini base de datos** de ese módulo (`kb`: los
+hechos en crudo) junto con la ficha del municipio, y devuelve **el ángulo de
+ese módulo para ese lugar**: por qué le sirve a ellos, con qué enganchar. Dos
+párrafos, tope duro de 55 palabras — es una columna angosta y se lee en plena
+llamada.
+
+*Why:* los bullets solos eran, en palabras del dueño, un mazacote que no
+alcanzaba. La consulta del asesor mientras habla es otra cosa que el speech.
+
+La regla del prompt es dura: **usar SOLO los hechos de la lista y los datos de
+la ficha**. Puede cambiar el énfasis según el municipio, no agregar una función
+que no exista.
+
+- **Cache** por municipio+módulo en `localStorage` (el endpoint tiene rate
+  limit de 40/hora). El link **"Otra vuelta"** borra ese cache y pide de nuevo;
+  con el texto a la vista, el botón de abajo se esconde.
+- Si la IA falla: *"No pude generarlo ahora"* + **Reintentar**. Los bullets
+  fijos siguen ahí, así que el panel nunca queda vacío.
 
 ### El bug que apareció haciendo esto
 
@@ -87,29 +103,34 @@ que decir" de "me quedé sin tokens"). Medido después del fix: 9 tokens de
 razonamiento y la respuesta completa. **Esto arregla también el chat del
 asistente**, no sólo los tabs.
 
-### 4. La columna derecha: "Dato de color"
+### 5. La columna derecha: "Dato de color"
 
-Ocupa el lugar donde estaba **"Recordar"**, y adentro va todo lo que se sabe
+Debajo de los paneles de módulos, donde estaba **"Recordar"**, va lo que se sabe
 **antes** de marcar: quién manda (con el nivel de confianza del dato), cómo
 llega el municipio, áreas, digitalización, para romper el hielo y la web.
 Se repinta con cada municipio que se abre (`pintarDatoColor`).
 
-La tarjeta **"Qué módulos tienen"** se eliminó: eran viñetas cortas que no
-alcanzaban para decir nada por teléfono, y los tabs del centro las reemplazan.
-Los tres consejos de **"Recordar"** siguen, debajo del dato de color.
+Los tres consejos de **"Recordar"** siguen, al final de la columna.
 
 ## Verificado
 
-Smoke con Playwright sobre el `index.html` generado, servido por HTTP y con
-el endpoint interceptado: la narración se arma con el municipio y el
-intendente reales; los cuatro tabs abren, cierran y muestran el "Armando lo
-que le vas a decir de..."; el prompt que sale lleva la KB del módulo **y** la
-ficha del municipio; reabrir un tab no vuelve a pedir (cache) y "Otra vuelta"
-sí; con el endpoint en 502 aparece el guion base con su aviso. **Cero errores
-de JS.**
+Smoke con Playwright sobre el `index.html` generado, servido por HTTP y con el
+endpoint interceptado:
 
-Y contra la IA real de QA, los cuatro guiones de Godoy Cruz salieron de 88 a
-99 palabras, en dos párrafos, sin inventar nada fuera de la KB.
+- la narración se arma con el municipio y el intendente reales;
+- los cuatro tabs del centro abren con su texto fijo y **cero llamadas a la
+  IA** (determinístico, como tiene que ser);
+- en la derecha, el botón de cada módulo muestra "Buscando el ángulo para
+  ...", el prompt que sale lleva la KB de ese módulo **y** la ficha del
+  municipio, reabrir el panel no vuelve a pedir (cache) y "Otra vuelta" sí;
+- con el endpoint en 502 aparece "No pude generarlo ahora" + Reintentar, con
+  los bullets fijos intactos;
+- **cero errores de JS.**
+
+Contra la IA real (Groq, con el fix del backend): los ángulos de Godoy Cruz y
+Luque salieron de 50 palabras cada uno, en dos párrafos, tomando en cuenta que
+Godoy Cruz ya tiene app de reclamos propia — y sin inventar nada fuera de la
+KB.
 
 ## Dónde se toca
 
