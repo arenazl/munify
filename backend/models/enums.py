@@ -94,6 +94,35 @@ class TipoRecursoOT(str, enum.Enum):
     CONSUMO = "consumo"   # Gasta un consumible (descuenta stock al completar)
 
 
+class TipoMovimientoInventario(str, enum.Enum):
+    """Por que se movio el stock. Todo cambio de `stock_actual` deja uno.
+
+    Los tres primeros los carga una persona; los tres ultimos los escribe el
+    sistema cuando una OT toma, devuelve o gasta algo. Separarlos permite
+    contestar "quien lo saco" sin tener que abrir cada orden de trabajo.
+    """
+    ENTRADA = "entrada"          # compra, donacion, devolucion de proveedor
+    SALIDA = "salida"            # entrega a un area, prestamo, baja
+    AJUSTE = "ajuste"            # conteo fisico, rotura, robo, error de carga
+    CONSUMO_OT = "consumo_ot"    # lo gasto una orden de trabajo al completarse
+    RESERVA_OT = "reserva_ot"    # una OT tomo un activo
+    DEVOLUCION_OT = "devolucion_ot"  # la OT lo devolvio al cerrarse
+
+
+class EstadoOrdenCompra(str, enum.Enum):
+    """Ciclo de una orden de compra, corto a proposito.
+
+    Un municipio chico no necesita aprobaciones en cadena: se arma, se manda
+    al proveedor y se recibe (entera o en partes). Cada recepcion genera los
+    movimientos de ENTRADA correspondientes.
+    """
+    BORRADOR = "borrador"
+    ENVIADA = "enviada"
+    RECIBIDA_PARCIAL = "recibida_parcial"
+    RECIBIDA = "recibida"
+    CANCELADA = "cancelada"
+
+
 class TipoAusencia(str, enum.Enum):
     VACACIONES = "vacaciones"
     LICENCIA_MEDICA = "licencia_medica"

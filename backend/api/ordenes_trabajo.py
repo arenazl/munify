@@ -26,8 +26,10 @@ from models import (
     OrigenOT, Reclamo, CategoriaReclamo, HistorialReclamo, HistorialOrdenTrabajo,
     Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+    TipoMovimientoInventario,
 )
 from models.enums import RolUsuario, EstadoReclamo
+from services.inventario_movimientos import registrar_movimiento
 from services.notificacion_service import NotificacionService
 from services import push_service
 
@@ -550,6 +552,13 @@ async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int
             if item.ocupado_por_ot_id in (ot.id, None):
                 item.estado_activo = EstadoActivo.DISPONIBLE
                 item.ocupado_por_ot_id = None
+                # El activo vuelve al deposito: queda el renglon para poder
+                # contestar quien lo tuvo y hasta cuando, sin abrir la OT.
+                await registrar_movimiento(
+                    db, item, TipoMovimientoInventario.DEVOLUCION_OT, 0,
+                    motivo=f"Devuelto al cerrar {ot.numero or 'la orden'}",
+                    orden_trabajo_id=ot.id,
+                )
         elif rec.tipo == TipoRecursoOT.CONSUMO and descontar_consumos and not rec.aplicado:
             real = consumos_reales.get(rec.id)
             cant = real if real is not None else rec.cantidad
@@ -558,7 +567,13 @@ async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int
             if real is not None:
                 rec.cantidad = cant  # el registro refleja el consumo real informado
             if item.stock_actual is not None and cant:
-                item.stock_actual = max(0.0, (item.stock_actual or 0) - cant)
+                # El descuento pasa por el libro: es la UNICA puerta que mueve
+                # stock, si no el historial vuelve a mentir (2026-08-31).
+                await registrar_movimiento(
+                    db, item, TipoMovimientoInventario.CONSUMO_OT, cant,
+                    motivo=f"Consumido por {ot.numero or 'la orden'}",
+                    orden_trabajo_id=ot.id,
+                )
             rec.aplicado = True
 
 

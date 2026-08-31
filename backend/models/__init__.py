@@ -26,13 +26,18 @@ from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
 from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
 from .historial_orden_trabajo import HistorialOrdenTrabajo
-from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
+from .inventario import (
+    InventarioCategoria, InventarioItem, OrdenTrabajoRecurso,
+    InventarioDeposito, InventarioMovimiento,
+    InventarioOrdenCompra, InventarioOrdenCompraLinea,
+)
 from .flota import FlotaCarga
 from .reserva import Reserva
 from .poi import PoiTipo, PuntoInteres
 from .enums import (
     EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana,
     EstadoOrdenTrabajo, PrioridadOT, OrigenOT, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+    TipoMovimientoInventario, EstadoOrdenCompra,
 )
 from .gamificacion import (
     PuntosUsuario, HistorialPuntos, BadgeUsuario,
@@ -102,6 +107,12 @@ __all__ = [
     # Inventario (activos + consumibles)
     "InventarioCategoria",
     "InventarioItem",
+    "InventarioDeposito",
+    "InventarioMovimiento",
+    "InventarioOrdenCompra",
+    "InventarioOrdenCompraLinea",
+    "TipoMovimientoInventario",
+    "EstadoOrdenCompra",
     "OrdenTrabajoRecurso",
     "NaturalezaInventario",
     "EstadoActivo",

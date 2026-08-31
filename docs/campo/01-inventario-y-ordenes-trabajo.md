@@ -147,6 +147,52 @@ Endpoints (todos multi-tenant, roles admin/supervisor salvo lectura que suma emp
 - **Verificar live post-deploy**: el backend lo deploya Infra (CD), no es
   instantáneo. Chequear el OpenAPI de Cloud Run antes de asumir que está vivo.
 
+## 9.bis. Depósitos, movimientos y órdenes de compra (2026-08-31)
+
+La pantalla de Configuración prometía tres cosas que **no existían**: "entradas,
+salidas y ajustes de stock", "órdenes de compra y reposición" y "depósitos:
+central, corralón y vivero". El stock sólo se movía como efecto colateral de
+completar una OT, y el historial de un artículo no existía. El dueño pidió que
+existieran de verdad.
+
+**`inventario_depositos`** — dónde está guardada cada cosa. Tabla y no string
+libre porque el municipio los administra y los movimientos apuntan a ellos.
+`inventario_items.deposito_id` es NULL para lo que ya existía: no se le puede
+inventar una ubicación a algo que nunca la tuvo.
+
+**`inventario_movimientos`** — el libro del depósito. **Todo** cambio de
+`stock_actual` deja un renglón, con el saldo resultante guardado (`stock_resultante`):
+sin eso, reconstruir el pasado obliga a recalcular la cadena entera. Seis tipos:
+`entrada` / `salida` / `ajuste` los carga una persona; `consumo_ot` /
+`reserva_ot` / `devolucion_ot` los escribe el cierre de la OT.
+
+> **El AJUSTE fija el stock, no lo mueve.** Es un conteo físico: la única forma
+> honesta de corregir sin inventar una entrada o una salida que nunca ocurrió.
+> El renglón guarda el delta y el saldo al que se llegó.
+
+**`inventario_ordenes_compra` (+ líneas)** — la reposición, corta a propósito:
+borrador → enviada → recibida (total o parcial) → cancelada. Al recibir escribe
+las ENTRADAS, así que no es una contabilidad paralela: es la puerta por la que
+entra el stock. Cancelar **no** revierte lo ya recibido (entró de verdad; para
+sacarlo, un ajuste).
+
+**UNA sola puerta**: `services/inventario_movimientos.py::registrar_movimiento`.
+El ABM de ítems, la recepción de una OC y el cierre de una OT pasan todos por
+ahí. Si aparece otro camino que toque `stock_actual` sin pasar por esa función,
+el historial vuelve a mentir — no agregar uno.
+
+**En la semilla** (pedido explícito del dueño): los tres depósitos van SIEMPRE,
+con demo o sin demo, porque son estructura como las categorías
+(`TEMPLATE_DEPOSITOS`). Y `seed_movimientos_demo` le da **90 días de historia**
+al depósito: carga inicial, consumos, una entrega, la recepción de una OC y un
+conteo físico final. La serie es **determinística** (se deriva del stock de cada
+ítem, sin azar) y **termina en el ajuste por conteo**, así el saldo final
+coincide exacto con el stock del ítem: la historia explica el número en lugar de
+contradecirlo. Los ítems en cero también llevan historia — son los que aparecen
+en "bajo el mínimo" y hay que poder explicar por qué se quedaron sin nada.
+
+Migración: `scripts/migrate_add_inventario_deposito_movimientos.py` (idempotente).
+
 ## 10. Estado (2026-07-03)
 
 - Fases 1-4 COMPLETAS y en prod. Inventario base + cruce OT + formato (prioridad,
@@ -156,3 +202,17 @@ Endpoints (todos multi-tenant, roles admin/supervisor salvo lectura que suma emp
 - **Posibles siguientes pasos** (no pedidos aún): PDF server-side "formal" con
   reportlab; reserva por rango de fechas (hoy un activo es 1 OT a la vez, sin
   calendario de disponibilidad); alertas de reposición por stock mínimo.
+
+### 2026-08-31 — depósitos, movimientos y órdenes de compra
+
+Backend COMPLETO y verificado en QA (ver §9.bis): 12 endpoints nuevos, seed con
+90 días de historia, migración aplicada. **Falta el frontend** (pantalla de
+movimientos, historial en el Sheet del ítem, ABM de depósitos, pantalla de
+órdenes de compra) y **corregir el puente de Configuración**, que sigue
+diciendo que el inventario "vive en Operaciones" cuando es un catálogo.
+
+Al probar el seed aparecieron **dos migraciones que QA nunca había corrido** —
+`migrate_reservas.py` (tabla `reservas` + `inventario_items.reservable`) y
+`migrate_flota.py` (tabla `flota_cargas` + 6 columnas de flota). El modelo las
+tenía y la base no: cualquier consulta a `inventario_items` por ORM venía
+fallando en QA. Quedaron aplicadas.
