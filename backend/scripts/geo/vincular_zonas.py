@@ -95,7 +95,7 @@ async def main():
     url = settings.DATABASE_URL
     if args.db:
         url = url.rsplit("/", 1)[0] + "/" + args.db
-    engine = create_async_engine(url)
+    engine = create_async_engine(url, pool_pre_ping=True)
 
     async with engine.connect() as c:
         q = """SELECT z.id, z.nombre, z.municipio_id, m.nombre muni, m.latitud, m.longitud,
