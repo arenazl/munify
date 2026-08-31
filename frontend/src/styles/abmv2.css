@@ -2503,6 +2503,21 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-mapa-full:fullscreen .av2-controles,
 .av2-mapa-full--expandido .av2-controles { flex: 0 0 auto; }
 
+/* En el TELEFONO esos controles se apilan en varias filas: medido en un
+   iPhone 13, ocupaban 395px de 664 —el 60% de la pantalla— y al mapa le
+   quedaban 249. Pantalla completa que muestra menos mapa que la vista normal
+   no es pantalla completa (dueño, 2026-08-31).
+   No se esconden —sin la pregunta y los filtros el mapa no se maneja—: se les
+   pone un techo y scrollean adentro. El mapa se queda con el 60% largo. */
+@media (max-width: 860px) {
+  .av2-mapa-full:fullscreen .av2-controles,
+  .av2-mapa-full--expandido .av2-controles {
+    max-height: 38dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 .av2-mapa-full:fullscreen .av2-mapa,
 .av2-mapa-full--expandido .av2-mapa {
   flex: 1 1 auto;
