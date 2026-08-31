@@ -217,25 +217,28 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 `gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update` manualmente para
 Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 
-> ### El flujo termina en el COMMIT LOCAL (desde 2026-08-06)
+> ### SE PUSHEA SIEMPRE a `qa` (desde 2026-08-30)
 >
-> **Se trabaja local. Claude hace `commit`, NUNCA `git push`.** Ni a `qa` ni, obviamente,
-> a `master`. Un push **es una intervención en la infraestructura del user**: dispara el CD,
-> reconstruye el site de Netlify y toca un ambiente que él usa para probar.
+> **El ciclo termina en el PUSH, no en el commit.** Desarrollar → gates (build /
+> `tsc` / eslint / pyflakes) → commit → **`git push origin qa`** → informar. Sin
+> preguntar, después de cada bloque terminado.
 >
-> El ciclo es: **desarrollar → gates (build / `tsc` / eslint / pyflakes) → commit local →
-> informar**. El push se hace **sólo cuando el user lo pide**, caso por caso.
+> *Why:* el dueño prueba en `qa` desde el celular y la tablet, no en el working
+> tree de Claude. Un arreglo sin pushear **no existe para él**: el 2026-08-30
+> reportó dos veces un bug del logo que ya estaba corregido en local, y perdió
+> tiempo en algo resuelto. Orden textual: *"siempre subí los cambios"*.
 >
-> Reparto de ambientes: **local** para desarrollar y ver el cambio funcionando · **`qa`**
-> sólo para pruebas, cuando él lo decide · **producción** para producción.
+> **OJO — son DOS repos.** `landing/` está en el `.gitignore` de este repo porque
+> tiene su propio git (`arenazl/landing`). Un push desde la raíz **no sube la
+> landing**: hay que pushear cada uno a su rama `qa` y verificar con
+> `git log --oneline origin/qa -1` en cada repo.
 >
-> **Prohibido preguntar** "¿lo commiteo?" — el commit local va sin consultar, es
-> responsabilidad de Claude. Lo que no va por iniciativa propia es el **push**, y lo que
-> jamás va es el **deploy** (eso lo dispara Infra).
+> Antes de decir "arreglado", confirmar que lo arreglado está **publicado**: si el
+> reporte vino de `qa`, verificar contra `qa` en vivo, no contra el archivo local.
 >
-> Esto **reemplaza** la regla anterior de "push a `qa` siempre, sin preguntar" y el
-> "NO se levantan servers locales NUNCA": el user pasó a trabajar local porque le resulta
-> mucho más ágil.
+> Sigue vedado SIEMPRE: `master`, promover qa→prod y escribir en la base de
+> producción. Esto **reemplaza** la regla anterior de "commit local, push sólo a
+> pedido" (2026-08-06).
 
 > ### REGLA DE ORO de secretos y variables (norma del ecosistema)
 >
