@@ -19,6 +19,13 @@ class Zona(Base):
     # Límites geográficos (opcional, para visualización en mapa)
     latitud_centro = Column(Float, nullable=True)
     longitud_centro = Column(Float, nullable=True)
+    # El CONTORNO de la zona, `[[lon, lat], ...]` como texto JSON — el orden de
+    # GeoJSON, que `api/zonas.py::regiones_mapa` invierte a [lat, lng] para
+    # Leaflet. Es lo que el mapa dibuja: sin esto la zona es un punto y el
+    # municipio no tiene una sola division que mostrar. Las dos columnas ya
+    # existian en la base; faltaban en el modelo.
+    poligono = Column(Text, nullable=True)
+    osm_id = Column(String(40), nullable=True)
 
     activo = Column(Boolean, default=True)
 
