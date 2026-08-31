@@ -51,24 +51,26 @@ Netlify publica solo con el push; no hay deploy manual.
 
 ## Sacar (o volver a poner) un país entero
 
-Desde el **2026-08-30 Argentina está fuera del padrón**: los 93 municipios
-argentinos no viajan al archivo. **No se borró nada** — siguen en las planillas
-de `docs/regiones/` y sus fichas curadas (intendente, investigación) quedan
-intactas esperando.
+El **2026-08-30 se sacó Argentina** y el **31 volvió**: el padrón está
+completo otra vez (154 municipios). Sirve como ejemplo de que sacar un país
+**no borra nada** — mientras estuvo afuera, sus 93 municipios siguieron en las
+planillas de `docs/regiones/` y sus fichas curadas (intendente, investigación)
+quedaron intactas.
 
 El filtro es una línea en `build_calls.py`:
 
 ```python
-fuera = {"Argentina"}
+fuera = set()              # vacío: entran todos
+fuera = {"Argentina"}      # así se saca uno
 ```
 
-Para volver a incluirlo, se saca del set y se corre el build. Lo que sale con
+Para sacar un país se agrega al set; para devolverlo, se saca y se corre el build. Lo que sale con
 el país: sus municipios, su speech y sus fichas curadas (que dejan de contar
 como huérfanas). El resumen del build lo dice:
 
 ```
-  municipios     61  {'Paraguay': 24, 'Perú': 26, 'Uruguay': 11}
-  fuera del padron  93  {'Argentina': 93}   (siguen en las planillas; se filtran aca)
+  municipios     154  {'Argentina': 93, 'Paraguay': 24, 'Perú': 26, 'Uruguay': 11}
+  fuera del padron  93  {'Argentina': 93}   (aparece sólo si hay alguno excluido)
 ```
 
 ---

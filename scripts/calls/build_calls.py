@@ -180,7 +180,7 @@ def main() -> int:
     # Paises que NO se llaman por ahora (dueño, 2026-08-30). No se borra nada de
     # las planillas: se filtran al armar el archivo, asi que volver a incluir un
     # pais es sacarlo de este set y correr el build de nuevo.
-    fuera = {"Argentina"}
+    fuera = set()
     afuera = [c for c in contactos if c["pais"] in fuera]
     contactos = [c for c in contactos if c["pais"] not in fuera]
 
