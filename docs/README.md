@@ -16,7 +16,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`salesbot/`](salesbot/) | Specs de la integración SalesBot ↔ Munify (API, turnos, verificación) |
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
-| [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
+| [`campo/`](campo/) | Módulo de campo: `01` órdenes de trabajo + inventario (activos/consumibles) + formato/PDF · `02` **el depósito**: movimientos de stock, órdenes de compra y ubicaciones |
 | [`financiero/`](financiero/) | **Qué hace hoy el módulo financiero** (Contaduría + Tesorería + Sueldos + dashboard): descripción funcional fiel, base para buscar mejoras |
 | [`comunicacion/`](comunicacion/) | **Módulo NUEVO** (a construir): avisos al vecino, obras a la vista, cronogramas. Tres etapas, spec de la primera |
 | [`recursos/`](recursos/) | **Módulo NUEVO** (a construir): flota y combustible, presentismo de cuadrillas, reservas. Tres etapas, consolidado con OT+Inventario |
