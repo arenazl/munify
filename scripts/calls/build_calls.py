@@ -192,7 +192,7 @@ def main() -> int:
     sin_tel = [c["localidad"] for c in contactos if not c["telefono"]]
     sin_func = [c["localidad"] for c in contactos if c["id"] not in funcionarios]
 
-    datos = {"contactos": contactos, "speeches": speeches, "tips": tips,
+    datos = {"contactos": contactos, "speeches": speeches,
              "funcionarios": funcionarios, "investigacion": investigacion}
     html = io.open(PLANTILLA, encoding="utf-8").read()
     if "/*__DATOS__*/{}" not in html:
@@ -206,7 +206,7 @@ def main() -> int:
     print(f"  municipios     {len(contactos)}  {dict(Counter(c['pais'] for c in contactos))}")
     print(f"  con intendente {len(contactos) - len(sin_func)} de {len(contactos)}")
     print(f"  investigados   {len(investigacion)}")
-    print(f"  speeches       {', '.join(speeches) or '(ninguno)'}   tips: {len(tips)}")
+    print(f"  speeches       {', '.join(speeches) or '(ninguno)'}")
     if sin_tel:
         print(f"  [!] SIN TELEFONO ({len(sin_tel)}): {', '.join(sin_tel[:8])}")
     if sin_func:

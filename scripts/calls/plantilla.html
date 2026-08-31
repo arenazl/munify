@@ -536,15 +536,6 @@ textarea:focus,input.f:focus{border-color:var(--acc)}
 .h-it time{color:var(--ink3);font-size:11.5px;display:block;margin-bottom:2px}
 .h-it .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
 .vacio{color:var(--ink3);font-size:13.5px;padding:20px 12px;line-height:1.6;text-align:center}
-.tip b{color:var(--ink);display:block;margin-bottom:3px}
-/* "Recordar" como ROTADOR (dueño, 2026-08-28): eran tres parrafos apilados,
-   la parte mas larga y estatica de la columna. Un consejo por vez, rota cada
-   10 s, y el punto lo frena — mismo patron que el resto de la app. */
-.tips{display:flex;flex-direction:column;gap:7px}
-.tips .box.tip{margin:0;font-size:12px;line-height:1.45;padding:9px 11px}
-.tips .box.tip b{display:block;font-size:12.5px;margin-bottom:3px}
-.tips .tip{min-height:150px}
-@media(prefers-reduced-motion:reduce){.tip-pts button{transition:none}}
 
 /* El pie es parte del SHELL (fila del flex del body), ya no `position:fixed`:
    asi no tapa el contenido ni obliga a un padding-bottom magico de 92px, y en
@@ -672,7 +663,6 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
       <div class="ops-col extra">
         <div class="tarj"><h3><i class="sic a"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></i>Qué módulos tienen</h3><div class="mods" id="modsBox"></div></div>
         <div class="tarj" style="margin-top:13px"><h3><i class="sic p"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></i>Dato de color</h3><div class="color-box" id="colorBox"></div></div>
-        <div class="tarj" style="margin-top:13px"><h3><i class="sic w"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4.2 10.3c.8.8 1.4 1.6 1.6 2.7h5.2c.2-1.1.8-1.9 1.6-2.7A6 6 0 0 0 12 3Z"/></svg></i>Recordar</h3><div class="tips" id="tipsBox"></div></div>
       </div>
     </div>
   </div>
@@ -693,7 +683,6 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 const DATOS = /*__DATOS__*/{};
 const CONTACTOS = DATOS.contactos || [];
 const SPEECH = DATOS.speeches || {};
-const TIPS = DATOS.tips || [];
 const FUNC = DATOS.funcionarios || {};
 const INVEST = DATOS.investigacion || {};
 const KEY = 'munify_llamados_v1', KEY_TEMA = 'munify_llamados_tema', KEY_VISTA = 'munify_llamados_vista';
@@ -1183,31 +1172,6 @@ function pintarLista(){
   cont.querySelectorAll('a[data-tel]').forEach(a => a.onclick = () => { marcarLlamada(a.dataset.tel); setTimeout(() => abrir(a.dataset.tel), 200); });
 }
 
-/* ============================================================
-   "Recordar" CONTEXTUAL (dueño, 2026-08-28): los consejos cambian con la
-   SELECCION. Con una ficha abierta, primero lo propio de ese municipio —
-   el "ojo" del intendente y lo que anotaste la ultima vez (datos reales,
-   nada inventado)— y despues los genericos, ordenados por pais: fuera de
-   Argentina, la carta de "empresa argentina establecida" abre; en
-   Argentina va al final. Un consejo por vez, rota cada 10 s.
-   ============================================================ */
-let tipIdx = 0, tipManual = false;
-
-function tipsPara(){
-  const c = selId != null ? CONTACTOS.find(x => x.id === selId) : null;
-  if (!c) return TIPS;
-  const f = FUNC[c.id] || {}, r = db[c.id] || {};
-  const propios = [];
-  /* La nota del municipio NO se repite aca: ya esta arriba en la ficha, en el
-     recuadro "Ojo", y verla dos veces en la misma pantalla es ruido. */
-  if (r.quien || r.notas) propios.push({titulo: 'La última vez',
-    texto: (r.quien ? 'Hablaste con ' + r.quien + '. ' : '') + (r.notas || '')});
-  const esAR = c.pais === 'Argentina';
-  const peso = t => /comtec|argentin/i.test(t.titulo + ' ' + t.texto) ? (esAR ? 1 : -1) : 0;
-  const genericos = TIPS.slice().sort((a, b) => peso(a) - peso(b));
-  return propios.concat(genericos);
-}
-
 /* Los paneles de modulos: bullets fijos + el boton que le pide a la IA el
    dato de color de ese modulo PARA ESTE municipio. Se repintan con cada
    municipio que se abre, porque lo que genera la IA depende de la ficha. */
@@ -1320,15 +1284,6 @@ function pintarDatoColor(c){
     : '<div class="vacio" style="padding:14px 6px">De este municipio todavía no averiguamos nada.</div>';
 }
 
-function pintarTip(){
-  const caja = document.getElementById('tipsBox'); if (!caja) return;
-  const lista = tipsPara(); if (!lista.length) return;
-  /* Los tres a la vista. Antes era un carrusel: escondia dos tercios del
-     consejo justo cuando hace falta, y rotaba solo mientras se lo leia. */
-  caja.innerHTML = lista.map(t =>
-    '<div class="box tip"><b>' + esc(t.titulo) + '</b>' + esc(t.texto) + '</div>').join('');
-}
-
 /* LA NARRACION (dueño, 2026-08-30). Antes la ficha gritaba "Pregunta por
    Diego Costarelli" en un cartel y el speech entraba directo al pitch — pero
    el intendente casi nunca atiende el telefono. Ahora la apertura ubica la
@@ -1353,7 +1308,6 @@ function narracion(c, f){
 function abrir(id){
   const c = CONTACTOS.find(x => x.id === id); if (!c) return;
   selId = id;
-  tipIdx = 0; tipManual = false; pintarTip();
   const r = reg(id), sp = SPEECH[c.pais] || {}, f = FUNC[c.id] || {};
   // El cierre habla como el pais del municipio, no como Buenos Aires.
   const cie = cierreDe(c.pais, c.localidad);
@@ -1885,7 +1839,6 @@ document.addEventListener('touchend', (e) => {
   aplicarTema(t);
   document.getElementById('btnTema').onclick = () =>
     aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'oscuro' : 'claro');
-  pintarTip();
   // Recordatorios: el SW se registra siempre (para que la PWA sea instalable);
   // el permiso y la suscripcion solo con el boton.
   if (hayPush){

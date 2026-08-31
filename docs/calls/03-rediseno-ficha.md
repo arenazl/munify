@@ -109,12 +109,15 @@ asistente**, no sólo los tabs.
 
 ### 5. La columna derecha: "Dato de color"
 
-Debajo de los paneles de módulos, donde estaba **"Recordar"**, va lo que se sabe
-**antes** de marcar: quién manda (con el nivel de confianza del dato), cómo
-llega el municipio, áreas, digitalización, para romper el hielo y la web.
-Se repinta con cada municipio que se abre (`pintarDatoColor`).
+Debajo de los paneles de módulos va lo que se sabe **antes** de marcar: quién
+manda (con el nivel de confianza del dato), cómo llega el municipio, áreas,
+digitalización, para romper el hielo y la web. Se repinta con cada municipio
+que se abre (`pintarDatoColor`).
 
-Los tres consejos de **"Recordar"** siguen, al final de la columna.
+**"Recordar" se eliminó entero** (dueño, 2026-08-30): los tres consejos
+genéricos, la rotación, el `TIPS` de los datos y su parte en `build_calls.py`.
+Con eso se fue también el consejo *"La última vez"*, que repetía lo anotado en
+la llamada anterior — eso ya vive en el Historial de la ficha.
 
 ## Verificado
 
