@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from sqlalchemy import select  # noqa: E402
 from core.database import AsyncSessionLocal  # noqa: E402
 from models import Municipio  # noqa: E402
-from services.inventario_seed import seed_inventario, activar_modulo_inventario  # noqa: E402
+from services.inventario_seed import seed_inventario, activar_modulo_patrimonio  # noqa: E402
 
 
 async def run(aplicar: bool):
@@ -40,10 +40,10 @@ async def run(aplicar: bool):
                 print(f"  [dry] {mid}: {nombre}")
                 continue
             cats = (await seed_inventario(db, mid, incluir_demo=False))["categorias"]
-            await activar_modulo_inventario(db, mid)
+            await activar_modulo_patrimonio(db, mid)
             await db.commit()
             total_cats += cats
-            print(f"  OK {mid}: {nombre} — +{cats} categorías, flag inventario activo")
+            print(f"  OK {mid}: {nombre} — +{cats} categorías, flag patrimonio activo")
 
         if aplicar:
             print(f"\nListo. Categorías de inventario creadas: {total_cats}.")

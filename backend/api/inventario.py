@@ -5,7 +5,8 @@ Dos naturalezas con mecánicas opuestas:
   - CONSUMIBLE: material con stock; una OT lo descuenta al completarse.
 
 Multi-tenant estricto (todo filtra por municipio_id). Gestión reservada a
-admin/supervisor. Opt-in por `municipio_modulos.modulo = 'inventario'`.
+admin/supervisor. Opt-in por `municipio_modulos.modulo = 'patrimonio'`
+(la fusión de los viejos `inventario` + `flota`, 2026-09-02).
 El cruce con OT (reservar/consumir/liberar) vive en `api/ordenes_trabajo.py`.
 """
 from datetime import date, datetime, time as dtime

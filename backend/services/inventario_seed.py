@@ -17,6 +17,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import (
+    FlotaCarga,
     InventarioCategoria, InventarioItem,
     InventarioDeposito, InventarioMovimiento,
     InventarioOrdenCompra, InventarioOrdenCompraLinea,
@@ -54,6 +55,29 @@ ITEMS_DEMO_ACTIVOS = {
         ("Grupo electrógeno", "Herramienta 3"),
     ],
 }
+# Perfil de flota de los vehículos demo. Sin esto la pantalla Flota de
+# Patrimonio nace VACÍA: un vehículo "de flota" es un activo con
+# `tipo_combustible` cargado, y los ítems de arriba no lo traen.
+# Igual criterio que el resto del archivo: datos claramente demo (el dominio
+# sigue siendo la numeración interna, no una patente inventada) y serie
+# DETERMINÍSTICA, sin azar.
+#   nombre -> (marca_modelo, año, combustible, km inicial,
+#              km por tramo, litros por tramo, días entre cargas)
+# El consumo que la pantalla calcula sale de km/litros por tramo:
+# utilitaria ~11 l/100km, volcador ~26, 4x4 ~13.
+FLOTA_DEMO = {
+    "Camioneta utilitaria": ("Ford Ranger 2.2 TDI", 2019, "gasoil", 84300, 420, 48.0, 9),
+    "Camión volcador":      ("Iveco Tector 170E22", 2016, "gasoil", 147800, 260, 68.0, 11),
+    "Camioneta 4x4":        ("Toyota Hilux 4x4 2.8", 2022, "gasoil", 36500, 380, 50.0, 8),
+}
+# Oscilación fija por tramo (litros y km usan distinto corrimiento, así el
+# consumo por carga varía como en la realidad pero la serie es reproducible).
+FLOTA_VAIVEN = (1.0, 0.88, 1.10, 0.95, 1.06, 0.92, 1.12, 0.90, 1.04, 0.98)
+# Precios de referencia DEMO del litro de gasoil (no son precios reales):
+# las cargas viejas salen algo menos, así el gasto mensual no es una línea plana.
+FLOTA_PRECIO_LITRO = 1350.0
+FLOTA_PRECIO_LITRO_VIEJO = 1240.0
+
 ITEMS_DEMO_CONSUMIBLES = {
     "Materiales": [
         ("Cemento Portland 50kg", 40, 10, "bolsas"),
@@ -247,6 +271,78 @@ async def seed_movimientos_demo(db: AsyncSession, municipio_id: int, deps: dict)
     return {"movimientos": creados, "ordenes_compra": 2}
 
 
+async def seed_flota_demo(db: AsyncSession, municipio_id: int) -> dict:
+    """Le da HISTORIA a la flota: ~90 días de cargas de combustible.
+
+    Mismo principio que `seed_movimientos_demo`: una pantalla sin datos se ve
+    igual que un módulo que no existe. Completa los datos de flota de los
+    vehículos demo (marca, año, combustible, km) y les siembra la bitácora de
+    cargas con la que la pantalla calcula consumo cada 100 km, litros y gasto
+    del mes.
+
+    Idempotente por dos vías: si el muni ya tiene cargas no hace nada, y los
+    datos de flota sólo se completan donde están en NULL (lo editado a mano no
+    se pisa). Sirve tanto para demos nuevas como para retro-llenar un muni que
+    ya tenía los ítems sembrados sin perfil de flota.
+    """
+    ya = (await db.execute(
+        select(func.count(FlotaCarga.id)).where(FlotaCarga.municipio_id == municipio_id)
+    )).scalar() or 0
+    if ya:
+        return {"cargas_flota": 0}
+
+    hoy = datetime.now().date()
+    n_vaiven = len(FLOTA_VAIVEN)
+    creadas = 0
+
+    for v_idx, (nombre, perfil) in enumerate(sorted(FLOTA_DEMO.items())):
+        marca_modelo, anio, combustible, km_inicial, km_tramo, litros_tramo, dias_tramo = perfil
+        item = (await db.execute(
+            select(InventarioItem).where(
+                InventarioItem.municipio_id == municipio_id,
+                InventarioItem.nombre == nombre,
+                InventarioItem.activo == True,  # noqa: E712
+            )
+        )).scalars().first()
+        if not item:
+            continue
+
+        # La carga más nueva es de HOY (la ronda matinal del corralón): el
+        # KPI de litros/gasto del endpoint filtra por MES CALENDARIO, y con la
+        # última carga "hace unos días" una demo generada el 1 o el 2 del mes
+        # mostraría el mes vacío. La serie cubre ~90 días hacia atrás.
+        n_cargas = 90 // dias_tramo + 1
+
+        km = km_inicial
+        for i in range(n_cargas):
+            fecha = hoy - timedelta(days=(n_cargas - 1 - i) * dias_tramo)
+            if i > 0:
+                km += int(km_tramo * FLOTA_VAIVEN[(i + 3) % n_vaiven])
+            litros = round(litros_tramo * FLOTA_VAIVEN[i % n_vaiven], 1)
+            precio = FLOTA_PRECIO_LITRO if (hoy - fecha).days <= 45 else FLOTA_PRECIO_LITRO_VIEJO
+            db.add(FlotaCarga(
+                municipio_id=municipio_id, item_id=item.id,
+                fecha=fecha, litros=litros, importe=round(litros * precio, 2), km=km,
+                observaciones="Arranque del registro de flota" if i == 0 else None,
+            ))
+            creadas += 1
+
+        # El perfil del vehículo, sólo donde falta.
+        item.marca_modelo = item.marca_modelo or marca_modelo
+        item.anio = item.anio or anio
+        item.tipo_combustible = item.tipo_combustible or combustible
+        item.km_actual = item.km_actual or km
+        item.km_proximo_service = item.km_proximo_service or (km + 4000)
+        # Un vehículo con la VTV cerca del vencimiento: la demo también tiene
+        # que mostrar ese estado, no sólo el "todo en orden".
+        item.vencimiento_vtv = item.vencimiento_vtv or (
+            hoy + timedelta(days=12 if v_idx == 1 else 150 + 30 * v_idx))
+        item.vencimiento_seguro = item.vencimiento_seguro or (hoy + timedelta(days=80 + 20 * v_idx))
+
+    await db.flush()
+    return {"cargas_flota": creadas}
+
+
 async def seed_inventario(db: AsyncSession, municipio_id: int, incluir_demo: bool = True) -> dict:
     """Siembra categorías template (y opcionalmente ítems demo) para un muni.
 
@@ -326,23 +422,28 @@ async def seed_inventario(db: AsyncSession, municipio_id: int, incluir_demo: boo
     # La historia del deposito: sin 90 dias de movimientos, el libro arranca
     # vacio y la demo no muestra nada (regla de demos con historico).
     res_mov = await seed_movimientos_demo(db, municipio_id, deps)
+    # Y la de la flota: mismo principio para la pantalla de vehículos.
+    res_flota = await seed_flota_demo(db, municipio_id)
     return {
         "categorias": cats_creadas, "items": items_creados,
-        "depositos": res_dep["depositos"], **res_mov,
+        "depositos": res_dep["depositos"], **res_mov, **res_flota,
     }
 
 
-async def activar_modulo_inventario(db: AsyncSession, municipio_id: int) -> None:
-    """Activa (o crea) el flag `inventario` en municipio_modulos."""
+async def activar_modulo_patrimonio(db: AsyncSession, municipio_id: int) -> None:
+    """Activa (o crea) el flag `patrimonio` en municipio_modulos.
+
+    `patrimonio` es la fusión de los viejos `inventario` + `flota` (2026-09-02);
+    los nombres viejos ya no existen en el catálogo ni en el sidebar."""
     from models.municipio_modulo import MunicipioModulo
     row = (await db.execute(
         select(MunicipioModulo).where(
             MunicipioModulo.municipio_id == municipio_id,
-            MunicipioModulo.modulo == "inventario",
+            MunicipioModulo.modulo == "patrimonio",
         )
     )).scalar_one_or_none()
     if row:
         row.activo = True
     else:
-        db.add(MunicipioModulo(municipio_id=municipio_id, modulo="inventario", activo=True))
+        db.add(MunicipioModulo(municipio_id=municipio_id, modulo="patrimonio", activo=True))
     await db.flush()

@@ -109,11 +109,25 @@ la tabla y en el sidebar, pero no en el catálogo del front).
   **"Trabajos"** (lo que el municipio HACE).
 
 ### PENDIENTE
-1. **Probarlo en Merlo** (el tenant de prueba de ahora en adelante). Nadie lo
-   abrió todavía.
-2. **Llevarlo a la semilla**: las demos nuevas tienen que nacer con
-   `patrimonio`. Mirar `backend/services/seed_demo.py` y
-   `backend/scripts/semillas/`. Hoy siguen sembrando el esquema viejo.
+1. **Probarlo en Merlo** (el tenant de prueba de ahora en adelante).
+   → **HECHO por API (2026-09-02, sesión siguiente):** login admin de Merlo
+   contra QA; `/modulos` devuelve `patrimonio` activo (y cero rastros de
+   `inventario`/`flota`); items (15), movimientos (42), órdenes de compra (2)
+   y flota (3 vehículos) responden 200 con datos. Falta sólo la pasada VISUAL
+   del dueño en `qa-app.munify.com.ar`.
+2. **Llevarlo a la semilla** → **HECHO (2026-09-02, sesión siguiente):**
+   - `seed_demo.py` y `seed_paraguay_limpio.py` siembran `patrimonio` (no más
+     `inventario`); `activar_modulo_inventario` pasó a
+     `activar_modulo_patrimonio`.
+   - **La pantalla Flota nacía VACÍA en toda demo**: un "vehículo de flota" es
+     un activo con `tipo_combustible`, y los ítems demo no lo traían. Ahora
+     `seed_flota_demo()` (en `inventario_seed.py`) completa el perfil de los 3
+     vehículos (marca/año/gasoil/km/VTV — una VTV por vencer a propósito) y
+     siembra ~90 días de cargas determinísticas. La última carga es de HOY
+     porque el KPI del endpoint filtra por MES CALENDARIO (una demo generada
+     el día 1-2 mostraría el mes vacío). Merlo quedó retro-llenado (32 cargas)
+     y verificado por API: consumo 26.4/13.0/11.4 l/100km, litros y gasto del
+     mes poblados.
 3. **Producción**: el mismo script lo corre **Infra**, no nosotros.
 
 ---

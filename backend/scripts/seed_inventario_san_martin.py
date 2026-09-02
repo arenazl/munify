@@ -19,7 +19,7 @@ from models import (  # noqa: E402
     Municipio, OrdenTrabajo, InventarioItem, OrdenTrabajoRecurso,
     EstadoActivo, NaturalezaInventario, TipoRecursoOT, EstadoOrdenTrabajo,
 )
-from services.inventario_seed import seed_inventario, activar_modulo_inventario  # noqa: E402
+from services.inventario_seed import seed_inventario, activar_modulo_patrimonio  # noqa: E402
 
 MUNI_ID = 145  # General San Martín (caso de demo)
 
@@ -32,10 +32,10 @@ async def run():
             return
         print(f"Municipio {MUNI_ID}: {muni.nombre}")
 
-        await activar_modulo_inventario(db, MUNI_ID)
+        await activar_modulo_patrimonio(db, MUNI_ID)
         res = await seed_inventario(db, MUNI_ID, incluir_demo=True)
         await db.commit()
-        print(f"Flag 'inventario' activado. Categorías creadas: {res['categorias']}, ítems creados: {res['items']}")
+        print(f"Flag 'patrimonio' activado. Categorías creadas: {res['categorias']}, ítems creados: {res['items']}")
 
         # Vincular recursos a OTs vigentes para que la demo muestre el cruce.
         ots = (await db.execute(
