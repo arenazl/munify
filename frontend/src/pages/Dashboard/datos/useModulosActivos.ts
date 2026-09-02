@@ -4,7 +4,7 @@
  * Mismo espíritu que el gating de Configuración (`MODULOS_DEL_GRUPO`, commit
  * cc797ae): `modulosApi.list()` devuelve las filas de `municipio_modulos` y
  * `moduloEfectivo()` resuelve el estado real —fila explícita manda; sin fila,
- * opt-out = activo y opt-in (o clave desconocida, ej. 'inventario', que es un
+ * opt-out = activo y opt-in (o clave desconocida, que es un
  * flag sólo-backend) = oculto.
  *
  * `resuelto` es MITAD DEL GATE DE PÁGINA del dashboard: hasta que no sabemos
