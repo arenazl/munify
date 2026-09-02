@@ -393,7 +393,8 @@ def _cerca(punto: tuple[float, float], candidatos: list[dict],
 def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
           centro: Optional[tuple[float, float]] = None,
           max_zonas: int = MAX_ZONAS,
-          max_barrios: int = MAX_BARRIOS) -> dict:
+          max_barrios: int = MAX_BARRIOS,
+          zonas_padron: Optional[list[dict]] = None) -> dict:
     """Zonas, barrios y puntos listos para la semilla. Todo determinista.
 
     `cantidad_puntos` es un PARAMETRO a proposito: cuando la semilla suba de 13
@@ -415,15 +416,27 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
     # ser las zonas; si tampoco hay barrios, se cae mas abajo a las calles
     # principales. En un partido (Lujan, Merlo) hay varias localidades y este
     # caso no toca nada.
+    zp = zonas_padron or []
     if len(gruesas) <= 1:
-        if finas:
+        if len(zp) > 1:
+            # EL PADRON YA DIVIDE (bug Rafaela, 2026-09-02): con 12 localidades
+            # del catalogo como zonas, promover los 86 barrios de OSM a zonas
+            # era COMERSELOS — el caller despues impone el padron y los barrios
+            # quedaban en CERO teniendo el dato en la fuente. Si el padron
+            # divide, los barrios se quedan donde estan: de barrios.
+            gruesas = []
+        elif finas:
             gruesas = finas
             finas = []
         else:
             gruesas = []
 
     degradacion: Optional[str] = None
-    if not gruesas and calles:
+    if len(zp) > 1 and not gruesas:
+        # Las zonas las pone el padron: sin division propia de OSM no hay nada
+        # que degradar ni que inventar por calles.
+        pass
+    elif not gruesas and calles:
         # Sin ninguna division en OSM, las zonas toman el nombre de las calles
         # mas principales de la ciudad. Siguen siendo nombres REALES que el
         # intendente reconoce; lo que no se hace es llamarlas Norte/Sur.
@@ -501,9 +514,14 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
             candidatos.append(sin_altura[ib])
             ib += 1
 
+    # Los puntos se asignan contra las zonas que van a EXISTIR en la demo: si
+    # el padron divide, contra el padron — asignar contra zonas del armado que
+    # el caller despues descarta dejaba zona_nombre apuntando a nombres que no
+    # existen como zona.
+    zonas_asignables = zp if len(zp) > 1 else zonas
     puntos = []
     for p in candidatos[:cantidad_puntos]:
-        zona = _cerca((p["lat"], p["lon"]), zonas)
+        zona = _cerca((p["lat"], p["lon"]), zonas_asignables)
         barrio = _cerca((p["lat"], p["lon"]), barrios, MAX_KM_BARRIO)
         puntos.append({**p,
                        "zona_nombre": zona["nombre"] if zona else None,
@@ -605,7 +623,8 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
     # --- zonas, barrios y puntos ---
     with _paso("geo:puntos") as pp:
         centro = (lat, lon) if lat is not None and lon is not None else None
-        armado = armar(nombre, osm, cantidad_puntos, centro=centro)
+        armado = armar(nombre, osm, cantidad_puntos, centro=centro,
+                       zonas_padron=zonas_padron)
         detalle = {
             "zonas": len(armado["zonas"]),
             "barrios": len(armado["barrios"]),
@@ -623,10 +642,12 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
     # QUIEN MANDA depende de que clase de municipio es, y esto ya estaba resuelto
     # aguas arriba: en un PARTIDO (Moron, La Matanza) la division son sus
     # localidades, y ahi el padron gana porque las trae con contorno. En una
-    # CIUDAD --- una sola localidad, que es ella misma --- la division real son
-    # sus barrios, y `armar()` ya los promueve a zonas; imponer el padron ahi
-    # devolveria UNA zona que abarca el 100% de los reclamos y no divide nada,
-    # que es exactamente el bug que arreglo el fix de Villa Carlos Paz.
+    # CIUDAD sin padron que divida, la division real son sus barrios y `armar()`
+    # los promueve a zonas (fix de Villa Carlos Paz). OJO con la combinacion que
+    # fallaba (Rafaela, 2026-09-02): ciudad de UNA gruesa pero CON padron de 12
+    # localidades — armar() promovia los 86 barrios a zonas, aca el padron las
+    # pisaba, y la demo quedaba con 0 barrios teniendo el dato en OSM. Por eso
+    # armar() recibe `zonas_padron` y NO promueve cuando el padron divide.
     #
     # Sin barrios en OSM queda la unica localidad del padron, que al menos trae
     # su contorno: peor es no dibujar nada.
