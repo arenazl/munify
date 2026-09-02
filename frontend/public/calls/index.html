@@ -845,7 +845,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 02/09 00:43 · 96caa631</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 02/09 00:49 · 97198d90</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -927,11 +927,24 @@ const GUION = [
     p:['El vecino saca el turno online y ve la disponibilidad real en el momento, sin llamar por teléfono ni ir a preguntar.',
        'Antes de arrancar ve cuánto sale y lo puede pagar desde el celular, y le llega un WhatsApp con los requisitos: viene con todo y no vuelve dos veces.',
        'Habilitaciones, permisos de obra, certificados, inscripciones: ustedes arman su propio árbol de trámites y definen quién atiende cada uno. Se termina la cola en la ventanilla y el "vuelva mañana".'] },
+  /* REFERENCIAS vive ACA, en el centro, y en NINGUN otro lado (dueño,
+     2026-09-02): es speech que se lee por telefono, no material de consulta
+     de la columna derecha. Las reglas del tema no se negocian:
+     - NUNCA nombres de municipios clientes, ni telefonos ni contactos. El
+       motivo que se dice de frente es el REAL: hay acuerdo de
+       confidencialidad con cada municipio y lo que manejan adentro es su
+       gestion interna.
+     - NUNCA una cantidad exacta: "pocos y elegidos".
+     - Jamas inventar un municipio cliente ni un caso de exito: los
+       intendentes se conocen entre ellos y eso no se arregla mas.
+     - El latiguillo TERMINA SIEMPRE en el gancho: la referencia que se
+       ofrece es la DEMO, guiada, en cinco minutos. Primero el no, e
+       inmediatamente despues el gancho — nunca el no solo. */
   { id:'ref', t:'Referencias', sinIA:true,
     ic:'<path d="M12 2l2.4 6.6H21l-5.3 4 2 6.6L12 15.2 6.3 19.2l2-6.6L3 8.6h6.6L12 2Z"/>',
-    p:['Tenemos presencia en Buenos Aires y en Córdoba, con municipios trabajando con nuestras aplicaciones.',
-       'Nombres no te doy, y es a favor tuyo: el día que estés vos adentro, tampoco voy a andar contando por ahí lo que tenés. Y si me preguntás cuántos somos, te digo la verdad: pocos y elegidos. Prefiero cinco municipios donde el intendente me tiene el teléfono, a cincuenta donde soy un proveedor más.',
-       'Igual la mejor referencia no es el teléfono de otro intendente, es verlo funcionando. En diez minutos te lo muestro andando, con datos reales, y sacás tus propias conclusiones.'] },
+    p:['Tenemos presencia en Buenos Aires y en Córdoba, con municipios trabajando con nuestras aplicaciones. Y si me preguntás cuántos somos, te digo la verdad: pocos y elegidos. Prefiero cinco municipios donde el intendente me tiene el teléfono, a cincuenta donde soy un proveedor más.',
+       'Nombres no te puedo dar, y no es una evasiva: con cada municipio firmamos un acuerdo de confidencialidad. Ellos usan esto como gestión interna, y esa información es privada, no se divulga. Es la misma discreción que vas a tener vos el día que estés adentro: tampoco voy a andar contando por ahí lo que tenés.',
+       'Pero quedáte tranquilo, porque la mejor referencia no es el teléfono de otro intendente: es que lo pruebes vos. Te armo una demo con los datos reales de tu municipio y en cinco minutos la tenés andando. Te voy guiando yo mientras la abrís, y sacás tus propias conclusiones.'] },
   { id:'tes', t:'Tesorería',
     ic:'<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>',
     p:['El vecino entra, ve lo que debe de tasas y lo paga desde el celular. Del lado de ustedes el pago queda registrado y conciliado solo, sin el cuaderno de cada caja.',
@@ -996,23 +1009,6 @@ const MODULOS = [
         'Se mide el alcance real: cuantos vecinos la vieron.',
         'Sirve para contar el avance de una obra, no solo para anunciar que empezo.',
         'Deja de depender de un grupo de Facebook o de que el vecino siga la cuenta del municipio.'] },
-  { id:'ref', t:'Referencias', g:'Qué contestás cuando te preguntan quién más lo usa.',
-    /* SIN IA, a proposito (dueño, 2026-09-02). En los otros modulos la IA suma
-       porque adapta el pitch a ESE municipio; aca no hay nada que adaptar y el
-       requisito es justamente que la respuesta NO varie. Un "estamos en Marcos
-       Paz" alucinado, dicho por telefono a un intendente, no se arregla mas.
-       La frase se piensa una vez y queda. */
-    sinIA:true,
-    ic:'<path d="M12 2l2.4 6.6H21l-5.3 4 2 6.6L12 15.2 6.3 19.2l2-6.6L3 8.6h6.6L12 2Z"/>',
-    b:['<b>La frase:</b> "Tenemos presencia en <b>Buenos Aires y en Córdoba</b>, con municipios trabajando con nuestras aplicaciones."',
-       '<b>Si piden nombres:</b> "Nombres no doy, y es a favor tuyo: el día que seas cliente tampoco voy a andar contando lo que tenés adentro."',
-       '<b>Si insisten con el número:</b> "Pocos y elegidos. Prefiero cinco municipios donde el intendente me tiene el teléfono, a cincuenta donde soy un proveedor más."',
-       '<b>Y cerrás siempre acá:</b> "En diez minutos te lo muestro andando, con datos reales." La demo en vivo es la referencia — no un teléfono de otro intendente.'],
-    kb:['Munify tiene presencia en Buenos Aires y en Cordoba: hay municipios trabajando con nuestras aplicaciones.',
-        'NUNCA se dan nombres de municipios, ni telefonos ni contactos de referencia. No es una evasiva: es la misma discrecion que va a tener el que pregunta cuando sea cliente. Se dice asi, de frente.',
-        'Si preguntan cuantos municipios son, NO se da un numero. La respuesta es que son pocos y elegidos, y que al que entra ahora lo atiende el equipo y no un ticket.',
-        'La referencia que se ofrece es la DEMO EN VIVO con datos reales, no el telefono de otro intendente.',
-        'Jamas inventar una cantidad de municipios, un nombre de municipio cliente ni un caso de exito. Un dato inventado dicho por telefono a un intendente es un papelon irreparable, y los intendentes se conocen entre ellos.'] },
   { id:'cam', t:'Campo y personal', g:'Saber qué hizo cada cuadrilla hoy, sin llamar a nadie.',
     ic:'<path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7Z"/><path d="M9 9h6"/>',
     b:['Las <b>órdenes de trabajo</b> del día en el celular del capataz, con su parte al cerrar.',
