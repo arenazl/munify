@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from core.config import settings
+from services.groq_common import opciones_modelo
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ async def _call_groq(prompt: str, max_tokens: int = 8000) -> Optional[str]:
                     "temperature": 0.2,
                     "max_tokens": max_tokens,
                     "response_format": {"type": "json_object"},
+                    **opciones_modelo(),
                 },
             )
         if response.status_code != 200:

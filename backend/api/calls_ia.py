@@ -23,6 +23,7 @@ import httpx
 
 from core.config import settings
 from core.rate_limit import limiter
+from services.groq_common import opciones_modelo
 
 router = APIRouter()
 
@@ -46,14 +47,9 @@ async def _groq(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:
         # 700 alcanzaba justo para el razonamiento y NADA para la respuesta.
         "max_tokens": 1500,
     }
-    # GOTCHA (2026-08-30): gpt-oss RAZONA por default, y en Groq el reasoning
-    # se descuenta de max_tokens. Con un prompt largo (la ficha del municipio
-    # + los hechos de un modulo) se gastaba los 700 tokens pensando y devolvia
-    # `content` VACIO con finish_reason=length: el chat quedaba mudo y los
-    # guiones de /calls en blanco. Medido: 698 de 700 tokens en reasoning.
-    # Con effort bajo, 9 tokens de razonamiento y la respuesta completa.
-    if "gpt-oss" in settings.GROQ_MODEL:
-        cuerpo["reasoning_effort"] = "low"
+    # El gotcha de gpt-oss (razona y ese reasoning se descuenta de
+    # max_tokens, dejando `content` vacio) vive en services/groq_common.
+    cuerpo.update(opciones_modelo())
     r = await cli.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},

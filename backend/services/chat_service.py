@@ -8,6 +8,7 @@ contestara con otro modelo sin que nadie se enterara.
 import httpx
 from typing import Optional, List, Union
 from core.config import settings
+from services.groq_common import opciones_modelo
 
 
 async def call_groq(messages: List[dict], max_tokens: int = 1000) -> Optional[str]:
@@ -35,7 +36,8 @@ async def call_groq(messages: List[dict], max_tokens: int = 1000) -> Optional[st
                     "model": settings.GROQ_MODEL,
                     "messages": messages,
                     "max_tokens": max_tokens,
-                    "temperature": 0.7
+                    "temperature": 0.7,
+                    **opciones_modelo(),
                 }
             )
 

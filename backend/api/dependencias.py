@@ -796,6 +796,8 @@ async def listar_tramites_asignados(
 from pydantic import BaseModel
 from core.config import settings
 import httpx
+
+from services.groq_common import opciones_modelo
 import json
 import re
 
@@ -860,7 +862,7 @@ Responde SOLO con JSON válido: {{"<dependencia_id>": [<lista de IDs>]}}"""
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"},
-                    json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1, "max_tokens": 2000}
+                    json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1, "max_tokens": 2000, **opciones_modelo()}
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -1243,7 +1245,7 @@ Respondé SOLO con JSON valido en este formato exacto:
                     r = await client.post(
                         "https://api.groq.com/openai/v1/chat/completions",
                         headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"},
-                        json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 800},
+                        json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 800, **opciones_modelo()},
                     )
                     if r.status_code == 200:
                         body = r.json()

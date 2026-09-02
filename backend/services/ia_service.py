@@ -7,6 +7,7 @@ import json
 import re
 from typing import List, Dict, Optional
 from core.config import settings
+from services.groq_common import MIN_TOKENS_RESPUESTA_CORTA, opciones_modelo
 
 
 # =============================================================================
@@ -422,7 +423,10 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
                     "model": settings.GROQ_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.1,
-                    "max_tokens": 300,
+                    # Con 300 y sin apagar el razonamiento, un municipio
+                    # con muchas categorias devolvia content VACIO.
+                    "max_tokens": MIN_TOKENS_RESPUESTA_CORTA,
+                    **opciones_modelo(),
                 }
             )
 

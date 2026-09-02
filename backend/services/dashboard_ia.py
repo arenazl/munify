@@ -41,6 +41,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from services.groq_common import opciones_modelo
 from core.ia_config import get_ia_config
 
 logger = logging.getLogger(__name__)
@@ -93,10 +94,8 @@ async def _call_llm(prompt: str, max_tokens: int = 4000, modelo: Optional[str] =
         "max_tokens": max_tokens,
         "response_format": {"type": "json_object"},
     }
-    # gpt-oss razona por default y ese reasoning se descuenta de max_tokens:
-    # sin esto la respuesta puede volver vacia (mismo gotcha que calls_ia).
-    if "gpt-oss" in model:
-        cuerpo["reasoning_effort"] = "low"
+    # El gotcha de gpt-oss vive en services/groq_common.
+    cuerpo.update(opciones_modelo(model))
     try:
         async with httpx.AsyncClient(timeout=28.0) as client:
             response = await client.post(
