@@ -16,10 +16,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-import httpx
 
 from core.config import settings
-from services.groq_common import opciones_modelo
+from services.groq_common import llamar_groq
 
 logger = logging.getLogger(__name__)
 
@@ -54,50 +53,27 @@ def cache_invalidate(municipio_id: int, kind: Optional[str] = None) -> None:
         _CACHE.pop((municipio_id, kind), None)
 
 
-async def _call_groq(prompt: str, max_tokens: int = 8000) -> Optional[str]:
-    """Llama a Groq (OpenAI-compatible). Tier gratuito generoso con Llama 3.3.
-    None si key no configurada o falla."""
-    if not settings.GROQ_API_KEY:
-        return None
-    try:
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            response = await client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": settings.GROQ_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2,
-                    "max_tokens": max_tokens,
-                    "response_format": {"type": "json_object"},
-                    **opciones_modelo(),
-                },
-            )
-        if response.status_code != 200:
-            logger.error(
-                "[RevisionIA] Groq status=%s body=%s",
-                response.status_code,
-                response.text[:500],
-            )
-            return None
-        data = response.json()
-        return (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
-    except Exception as e:
-        logger.exception("[RevisionIA] Error llamando Groq: %s", e)
-        return None
+async def _call_groq(prompt: str, max_tokens: int = 8000,
+                     feature: str = "revision",
+                     municipio_id: Optional[int] = None) -> Optional[str]:
+    """Groq via el cliente unico (que ademas registra el consumo)."""
+    r = await llamar_groq(
+        prompt,
+        feature=feature,
+        municipio_id=municipio_id,
+        max_tokens=max_tokens,
+        temperature=0.2,
+        json_object=True,
+    )
+    return r.texto
 
 
-async def _call_llm(prompt: str, max_tokens: int = 8000) -> Optional[str]:
+async def _call_llm(prompt: str, max_tokens: int = 8000,
+                    feature: str = "revision",
+                    municipio_id: Optional[int] = None) -> Optional[str]:
     """Groq, unico proveedor desde el 2026-09-01. El texto o None."""
-    text = await _call_groq(prompt, max_tokens=max_tokens)
+    text = await _call_groq(prompt, max_tokens=max_tokens, feature=feature,
+                            municipio_id=municipio_id)
     if text:
         logger.info("[RevisionIA] Groq respondio OK")
     return text

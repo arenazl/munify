@@ -36,12 +36,11 @@ def _json_default(o: Any) -> Any:
 def _safe_dumps(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, default=_json_default)
 
-import httpx
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from services.groq_common import opciones_modelo
+from services.groq_common import llamar_groq
 from core.ia_config import get_ia_config
 
 logger = logging.getLogger(__name__)
@@ -80,44 +79,21 @@ def cache_invalidate(municipio_id: int, modulo: Optional[str] = None) -> None:
 # LLM caller
 # ===================================================================
 
-async def _call_llm(prompt: str, max_tokens: int = 4000, modelo: Optional[str] = None) -> Optional[str]:
-    """Groq, unico proveedor desde el 2026-09-01. `modelo` viene de la config
-    de IA del municipio; si ahi quedo guardado un modelo de Gemini se ignora y
-    va el de Groq (esa tabla se migra aparte)."""
-    if not settings.GROQ_API_KEY:
-        return None
-    model = modelo if (modelo and "gemini" not in modelo.lower()) else settings.GROQ_MODEL
-    cuerpo = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-        "max_tokens": max_tokens,
-        "response_format": {"type": "json_object"},
-    }
-    # El gotcha de gpt-oss vive en services/groq_common.
-    cuerpo.update(opciones_modelo(model))
-    try:
-        async with httpx.AsyncClient(timeout=28.0) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json=cuerpo,
-            )
-        if response.status_code != 200:
-            logger.error("[DashboardIA] Groq status=%s body=%s", response.status_code, response.text[:300])
-            return None
-        data = response.json()
-        return (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
-    except Exception as e:
-        logger.exception("[DashboardIA] Groq exc: %s", e)
-        return None
+async def _call_llm(prompt: str, max_tokens: int = 4000, modelo: Optional[str] = None,
+                    feature: str = "dashboard", municipio_id: Optional[int] = None) -> Optional[str]:
+    """Groq via el cliente unico. `modelo` viene de la config del municipio; si
+    ahi quedo guardado uno de Gemini se ignora (esa tabla se migra aparte)."""
+    r = await llamar_groq(
+        prompt,
+        feature=feature,
+        municipio_id=municipio_id,
+        max_tokens=max_tokens,
+        temperature=0.2,
+        modelo=modelo,
+        json_object=True,
+        timeout=28.0,
+    )
+    return r.texto
 
 
 def _parse_json_safely(text_resp: str) -> Optional[Any]:
@@ -286,7 +262,8 @@ async def build_reclamos_dashboard(db: AsyncSession, municipio_id: int, force: b
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
+        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo,
+                                  feature="dashboard_reclamos", municipio_id=municipio_id)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]
@@ -430,7 +407,8 @@ async def build_tramites_dashboard(db: AsyncSession, municipio_id: int, force: b
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
+        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo,
+                                  feature="dashboard_tramites", municipio_id=municipio_id)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]
@@ -588,7 +566,8 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
+        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo,
+                                  feature="dashboard_tesoreria", municipio_id=municipio_id)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]

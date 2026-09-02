@@ -52,6 +52,7 @@ import Mostrador from './pages/Mostrador';
 import SidebarConfig from './pages/SidebarConfig';
 import ModulosMunicipio from './pages/admin/ModulosMunicipio';
 import ConfiguracionIA from './pages/ConfiguracionIA';
+import ConsumoIA from './pages/ConsumoIA';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -442,6 +443,11 @@ export const router = createBrowserRouter([
       {
         path: 'configuracion-ia',
         element: <ProtectedRoute roles={['admin']}><ConfiguracionIA /></ProtectedRoute>
+      },
+      // Consumo de IA: tokens, latencia y llamadas que no devolvieron nada
+      {
+        path: 'admin/consumo-ia',
+        element: <ProtectedRoute roles={['admin']}><ConsumoIA /></ProtectedRoute>
       },
       // Ajustes -> Configuración (compat: ambas rutas viejas redirigen).
       {

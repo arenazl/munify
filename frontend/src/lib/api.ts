@@ -1355,6 +1355,41 @@ export const iaConfigApi = {
   adminModelos: () => api.get<string[]>('/admin/ia-config/modelos'),
 };
 
+export interface FilaUsoIA {
+  clave: string;
+  llamadas: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
+  tokens_por_llamada: number;
+  latencia_media_ms: number;
+  vacias: number;
+  errores: number;
+  fallbacks: number;
+}
+
+export interface ResumenUsoIA {
+  desde: string;
+  hasta: string;
+  llamadas: number;
+  tokens: number;
+  tokens_por_llamada: number;
+  latencia_media_ms: number;
+  /** % de llamadas que no devolvieron nada (la firma del bug de gpt-oss). */
+  tasa_vacias: number;
+  /** % en que la app resolvió sin IA y el usuario no se enteró. */
+  tasa_fallback: number;
+  cuota_requests_restante: number | null;
+  cuota_tokens_restante: number | null;
+  por_feature: FilaUsoIA[];
+  por_modelo: FilaUsoIA[];
+}
+
+export const iaUsoApi = {
+  resumen: (dias = 7, municipioId?: number) =>
+    api.get<ResumenUsoIA>('/admin/ia-uso/resumen', { params: { dias, municipio_id: municipioId } }),
+};
+
 export const whatsappApi = {
   // Configuración
   getConfig: () => api.get('/whatsapp/config'),

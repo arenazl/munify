@@ -715,7 +715,7 @@ async def clasificar_reclamo_endpoint(
 
     # Clasificar. Si el muni tiene la IA deshabilitada, forzamos solo matching
     # local (keywords): sigue sugiriendo categoria, sin LLM (gratis, no se rompe).
-    # Si esta habilitada, usa el modelo de Gemini configurado para ese muni.
+    # Si esta habilitada, usa el modelo configurado para ese muni.
     from core.ia_config import get_ia_config
     cfg = await get_ia_config(db, data.municipio_id)
     usar_ia = data.usar_ia and cfg.habilitada
@@ -724,6 +724,7 @@ async def clasificar_reclamo_endpoint(
         categorias=categorias,
         usar_ia=usar_ia,
         modelo=cfg.modelo,
+        municipio_id=data.municipio_id,
     )
 
     return resultado

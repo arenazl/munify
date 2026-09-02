@@ -5,61 +5,23 @@ Un solo proveedor: Groq. El fallback a Gemini se saco el 2026-09-01 —
 Gemini no se usa por costo, y un fallback silencioso hacia que la app
 contestara con otro modelo sin que nadie se enterara.
 """
-import httpx
 from typing import Optional, List, Union
 from core.config import settings
-from services.groq_common import opciones_modelo
+from services.groq_common import llamar_groq
 
 
-async def call_groq(messages: List[dict], max_tokens: int = 1000) -> Optional[str]:
-    """
-    Llama a Groq API con formato de mensajes (compatible OpenAI).
-
-    Args:
-        messages: Lista de mensajes con formato [{"role": "system|user|assistant", "content": "..."}]
-        max_tokens: Máximo de tokens en la respuesta
-    """
-    if not settings.GROQ_API_KEY:
-        print("[GROQ] No API key configured")
-        return None
-
-    try:
-        print(f"[GROQ] Calling API with {len(messages)} messages, model: {settings.GROQ_MODEL}")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}"
-                },
-                json={
-                    "model": settings.GROQ_MODEL,
-                    "messages": messages,
-                    "max_tokens": max_tokens,
-                    "temperature": 0.7,
-                    **opciones_modelo(),
-                }
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                text = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-                print(f"[GROQ] Response OK, length={len(text) if text else 0} chars")
-                # Log completo para debug (primeros y últimos 500 chars si es largo)
-                if text:
-                    if len(text) > 1200:
-                        print(f"[GROQ] Response INICIO:\n{text[:600]}")
-                        print(f"[GROQ] ... [{len(text)-1200} chars omitidos] ...")
-                        print(f"[GROQ] Response FIN:\n{text[-600:]}")
-                    else:
-                        print(f"[GROQ] Response COMPLETA:\n{text}")
-                return text.strip() if text else None
-            else:
-                print(f"[GROQ] Error {response.status_code}: {response.text[:200]}")
-                return None
-    except Exception as e:
-        print(f"[GROQ] Exception: {e}")
-        return None
+async def call_groq(messages: List[dict], max_tokens: int = 1000,
+                    municipio_id: Optional[int] = None) -> Optional[str]:
+    """Groq via el cliente unico (services/groq_common), que ademas registra
+    el consumo de cada llamada."""
+    r = await llamar_groq(
+        messages,
+        feature="chat",
+        municipio_id=municipio_id,
+        max_tokens=max_tokens,
+        temperature=0.7,
+    )
+    return r.texto
 
 
 def get_provider_order() -> List[str]:
@@ -67,7 +29,8 @@ def get_provider_order() -> List[str]:
     return ["groq"]
 
 
-async def chat(prompt: Union[str, List[dict]], max_tokens: int = 500) -> Optional[str]:
+async def chat(prompt: Union[str, List[dict]], max_tokens: int = 500,
+               municipio_id: Optional[int] = None) -> Optional[str]:
     """
     Servicio principal de chat con IA.
     Intenta con el proveedor principal y hace fallback si falla.
@@ -87,7 +50,7 @@ async def chat(prompt: Union[str, List[dict]], max_tokens: int = 500) -> Optiona
     else:
         messages = prompt
 
-    response = await call_groq(messages, max_tokens)
+    response = await call_groq(messages, max_tokens, municipio_id=municipio_id)
     if response:
         return response
 

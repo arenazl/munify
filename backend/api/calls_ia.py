@@ -19,11 +19,9 @@ por IP y topes de tamaño para que no sirva de proxy gratis a terceros.
 """
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-import httpx
-
 from core.config import settings
 from core.rate_limit import limiter
-from services.groq_common import opciones_modelo
+from services.groq_common import llamar_groq
 
 router = APIRouter()
 
@@ -39,45 +37,21 @@ class ConsultaIA(BaseModel):
     mensajes: list[MensajeIA] = Field(min_length=1, max_length=24)
 
 
-async def _groq(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:
-    cuerpo: dict = {
-        "model": settings.GROQ_MODEL,
-        "messages": mensajes,
-        "temperature": 0.6,
-        # 700 alcanzaba justo para el razonamiento y NADA para la respuesta.
-        "max_tokens": 1500,
-    }
-    # El gotcha de gpt-oss (razona y ese reasoning se descuenta de
-    # max_tokens, dejando `content` vacio) vive en services/groq_common.
-    cuerpo.update(opciones_modelo())
-    r = await cli.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
-        json=cuerpo,
+async def _groq(mensajes: list[dict]) -> str:
+    """El asistente de /calls contra Groq. Sin fallback a otro proveedor a
+    proposito: si la key fallo, se renueva la key."""
+    r = await llamar_groq(
+        mensajes,
+        feature="calls_ia",
+        max_tokens=1500,
+        temperature=0.6,
+        timeout=45.0,
     )
-    j = r.json()
-    # Sin fallback, la key es el unico punto de falla que importa: que el error
-    # diga "renovala" y no un 502 generico que obligue a leer logs.
-    if r.status_code in (401, 403):
-        raise HTTPException(
-            status_code=502,
-            detail="La key de Groq no es valida o vencio — hay que renovarla en Secret Manager",
-        )
-    if r.status_code == 429:
-        raise HTTPException(status_code=502, detail="Groq esta limitando por cuota (429) — reintentar en un rato")
-    if r.status_code != 200:
-        detalle = (j.get("error") or {}).get("message") or f"HTTP {r.status_code}"
-        raise HTTPException(status_code=502, detail=f"Groq no respondio: {detalle[:200]}")
-    eleccion = j["choices"][0]
-    texto = (eleccion["message"].get("content") or "").strip()
-    if not texto:
+    if not r.ok:
         # Callarse en silencio es peor que fallar: el front no puede distinguir
         # "no tengo nada que decir" de "me quede sin tokens".
-        raise HTTPException(
-            status_code=502,
-            detail=f"Groq devolvio una respuesta vacia (finish_reason={eleccion.get('finish_reason')})",
-        )
-    return texto
+        raise HTTPException(status_code=502, detail=r.detalle or "Groq no respondio")
+    return r.texto
 
 
 @router.post("/ia")
@@ -97,5 +71,4 @@ async def preguntar_ia(request: Request, data: ConsultaIA):
         raise HTTPException(status_code=413, detail="La consulta es demasiado larga")
 
     mensajes = [m.model_dump() for m in data.mensajes]
-    async with httpx.AsyncClient(timeout=45.0) as cli:
-        return {"respuesta": await _groq(cli, mensajes), "proveedor": "groq"}
+    return {"respuesta": await _groq(mensajes), "proveedor": "groq"}

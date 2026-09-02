@@ -645,7 +645,8 @@ async def crear_reclamo_bot(
 
     # Clasificacion: IA si el muni la tiene habilitada, sino keywords local (gratis).
     cfg = await get_ia_config(db, municipio_id)
-    resultado = await clasificar_reclamo(desc, categorias, usar_ia=cfg.habilitada, modelo=cfg.modelo)
+    resultado = await clasificar_reclamo(desc, categorias, usar_ia=cfg.habilitada,
+                                         modelo=cfg.modelo, municipio_id=municipio_id)
     sugerencias = resultado.get("sugerencias") or []
     # La IA puede devolver un id que no es del muni, o [] si el texto no es un
     # reclamo claro -> validamos contra cat_ids y caemos a la primera categoria

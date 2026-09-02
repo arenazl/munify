@@ -795,9 +795,8 @@ async def listar_tramites_asignados(
 
 from pydantic import BaseModel
 from core.config import settings
-import httpx
 
-from services.groq_common import opciones_modelo
+from services.groq_common import llamar_groq
 import json
 import re
 
@@ -856,23 +855,16 @@ Responde SOLO con JSON válido: {{"<dependencia_id>": [<lista de IDs>]}}"""
 
     result = None
 
-    if settings.GROQ_API_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"},
-                    json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.1, "max_tokens": 2000, **opciones_modelo()}
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    text_response = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-                    json_match = re.search(r'\{[\s\S]*\}', text_response)
-                    if json_match:
-                        result = json.loads(json_match.group())
-                        logger.info(f"[IA] Auto-asignación con Groq exitosa para {tipo}")
-        except Exception as e:
-            logger.error(f"[IA] Error en Groq: {e}")
+    r = await llamar_groq(prompt, feature="asignar_dependencias", max_tokens=2000,
+                          temperature=0.1, timeout=30.0)
+    if r.ok:
+        json_match = re.search(r'\{[\s\S]*\}', r.texto)
+        if json_match:
+            try:
+                result = json.loads(json_match.group())
+                logger.info(f"[IA] Auto-asignación con Groq exitosa para {tipo}")
+            except json.JSONDecodeError as e:
+                logger.error(f"[IA] Groq devolvió un JSON inválido para {tipo}: {e}")
 
     return result or {}
 
@@ -1240,20 +1232,14 @@ Respondé SOLO con JSON valido en este formato exacto:
 
         ia_items: Optional[list[SugerenciaJerarquicaItem]] = None
         try:
-            if settings.GROQ_API_KEY:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    r = await client.post(
-                        "https://api.groq.com/openai/v1/chat/completions",
-                        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"},
-                        json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 800, **opciones_modelo()},
-                    )
-                    if r.status_code == 200:
-                        body = r.json()
-                        text_resp = body.get('choices', [{}])[0].get('message', {}).get('content', '')
-                        m = re.search(r'\{[\s\S]*\}', text_resp)
-                        if m:
-                            parsed = json.loads(m.group())
-                            ia_items = [SugerenciaJerarquicaItem(**it) for it in parsed.get("items", []) if it.get("nombre")]
+            resp = await llamar_groq(prompt, feature="sugerir_organigrama",
+                                     municipio_id=current_user.municipio_id,
+                                     max_tokens=800, temperature=0.3, timeout=15.0)
+            if resp.ok:
+                m = re.search(r'\{[\s\S]*\}', resp.texto)
+                if m:
+                    parsed = json.loads(m.group())
+                    ia_items = [SugerenciaJerarquicaItem(**it) for it in parsed.get("items", []) if it.get("nombre")]
         except Exception as e:
             logger.warning(f"[Sugerencias IA] Groq fallo: {e}")
 

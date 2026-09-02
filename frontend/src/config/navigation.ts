@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen,
+  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen, Gauge,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -577,11 +577,19 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     },
     {
       name: 'IA',
-      href: '/gestion/admin/configuracion-ia',
+      href: '/gestion/configuracion-ia',
       icon: Sparkles,
       show: isSuperAdmin,
       categoria: 'Super Admin',
       description: 'Prender/apagar IA por municipio y por módulo (Tesorería, Reclamos, Trámites)'
+    },
+    {
+      name: 'Consumo',
+      href: '/gestion/admin/consumo-ia',
+      icon: Gauge,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Tokens, latencia y llamadas de IA que no devolvieron nada'
     },
     {
       name: 'Sidebar',
