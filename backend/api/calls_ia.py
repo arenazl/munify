@@ -14,11 +14,14 @@ enterara (en produccion, que no monta GROQ_API_KEY, /calls venia contestando
 con Gemini). Si la key de Groq falta o vencio, el endpoint falla FUERTE y se
 renueva la key — es la unica señal honesta.
 
-Es un endpoint PUBLICO (la pagina todavia no tiene login): va con rate limit
-por IP y topes de tamaño para que no sirva de proxy gratis a terceros.
+Desde el 2026-09-02 EXIGE LOGIN (`Depends(usuario_calls)`). Antes era publico
+y contestaba a cualquiera: con un 422 en vez de un 401 se comprobo que se podia
+gastar la cuota de Groq de la app desde afuera. El rate limit por IP se queda
+igual, como segunda linea.
 """
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from api.calls import CallsUsuario, usuario_calls
 from core.config import settings
 from core.rate_limit import limiter
 from services.groq_common import llamar_groq
@@ -55,8 +58,12 @@ async def _groq(mensajes: list[dict]) -> str:
 
 
 @router.post("/ia")
-@limiter.limit("40/hour")
-async def preguntar_ia(request: Request, data: ConsultaIA):
+@limiter.limit("120/hour")
+async def preguntar_ia(
+    request: Request,
+    data: ConsultaIA,
+    _: CallsUsuario = Depends(usuario_calls),
+):
     """La conversacion viene armada del front (sistema + ficha + chat); aca
     solo se ejecuta contra Groq. El PROMPT es del front a proposito: la ficha
     del municipio vive alla y este endpoint no conoce el dominio de /calls."""
