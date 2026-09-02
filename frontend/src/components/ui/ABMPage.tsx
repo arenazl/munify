@@ -513,7 +513,13 @@ export function ABMPage({
         )}
         {items.map(it => {
           const active = it.key === value;
-          const hasItems = (it.count || 0) > 0;
+          // Misma semántica que los StatusTab del kit v2: count 0 CONFIRMADO
+          // ⇒ engrisada; count ausente (la página no lo sabe, ej. paginación
+          // server-side que sólo conoce el total del filtro activo) ⇒ píldora
+          // NORMAL y clickeable, sin número. Antes `undefined` contaba como 0
+          // y los tipos CON elementos se veían apagados (dueño, 2026-09-02).
+          const conteoDesconocido = it.count == null;
+          const hasItems = conteoDesconocido || (it.count as number) > 0;
           const Icon = it.icon;
           return (
             <button
@@ -530,7 +536,9 @@ export function ABMPage({
             >
               {Icon && <Icon className="h-3 w-3" />}
               {it.label}
-              {hasItems && <span className="opacity-70">({it.count})</span>}
+              {!conteoDesconocido && (it.count as number) > 0 && (
+                <span className="opacity-70">({it.count})</span>
+              )}
             </button>
           );
         })}

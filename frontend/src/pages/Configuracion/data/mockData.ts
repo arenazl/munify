@@ -54,13 +54,20 @@ export class MockDataService {
         { id: 'depositos', label: 'Depósitos', tipo: 'abm', n: '3' },
       ] },
       { id: 'tesoreria', label: 'Tesorería', hijos: [
+        // Conceptos y Parajes tienen entrada PROPIA en el riel: el embebido de
+        // ConfiguracionTesoreria oculta su barra de tabs (la navegación es el
+        // riel, no dos menús que dicen lo mismo — dueño, 2026-09-02).
+        { id: 'conceptos', label: 'Conceptos de gasto', tipo: 'abm' },
         { id: 'conceptos-liq', label: 'Conceptos de liquidación', tipo: 'catalogo', n: '9' },
         { id: 'cajas', label: 'Cajas y fondos', tipo: 'abm', n: '4' },
         { id: 'retenciones', label: 'Retenciones', tipo: 'abm', n: '6' },
+        { id: 'parajes', label: 'Parajes', tipo: 'abm' },
         { id: 'proyectos', label: 'Proyectos', tipo: 'abm', n: '8' },
         { id: 'tarjetas', label: 'Tarjetas', tipo: 'abm', n: '3' },
         { id: 'contactos', label: 'Contactos', tipo: 'abm', n: '148' },
-        { id: 'tasas', label: 'Catálogo de tasas', tipo: 'abm', n: '31' },
+        // 'tasas' NO va acá (dueño, 2026-09-02): no hay tasas en el producto
+        // hoy, y el día que las haya son su propio módulo, no un catálogo de
+        // Tesorería. La pantalla GestionTasas sigue existiendo en su ruta.
       ] },
       { id: 'integraciones', label: 'Integraciones', hijos: [
         { id: 'pagos', label: 'Proveedores de pago', tipo: 'abm', n: '2' },

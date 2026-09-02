@@ -50,7 +50,10 @@ export default function TesoreriaCajas() {
     setLoading(true);
     try {
       const res = await cajasApi.list({ activo: true, include_saldos: true });
-      setCajas(res.data || []);
+      // Las tarjetas de crédito viven en la MISMA tabla (codigo TARJETA) pero
+      // su interfaz es OTRA: el ABM de Tarjetas. Acá no se listan (dueño,
+      // 2026-09-02) — mezclarlas hacía parecer que el ABM de tarjetas se perdió.
+      setCajas((res.data || []).filter((c: Caja) => !c.es_tarjeta));
     } catch { toast.error('Error cargando cajas'); }
     finally { setLoading(false); }
   };

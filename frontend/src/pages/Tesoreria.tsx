@@ -94,6 +94,10 @@ export default function Tesoreria() {
   const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
   // Filtro de tipo de concepto eliminado — listado plano de conceptos.
   const tipoConceptoFiltro = '';
+  // Filtro por CONCEPTO puntual (dueño, 2026-09-02): se había perdido en una
+  // migración anterior y el cliente productivo filtra sus gastos así. Es
+  // server-side: el endpoint acepta `concepto` por nombre exacto.
+  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
   // Proyecto (obra/partida a la que se imputan gastos). Filtra SERVER-side: un
   // gasto puede estar repartido entre varios proyectos, asi que no alcanza con
@@ -146,6 +150,7 @@ export default function Tesoreria() {
       const params: Record<string, string | number> = { skip: (page - 1) * pageSize, limit: pageSize };
       if (search.trim()) params.search = search.trim();
       if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
+      if (conceptoFiltro) params.concepto = conceptoFiltro;
       if (cajaFiltro) params.caja_id = parseInt(cajaFiltro, 10);
       if (proyectoFiltro) params.proyecto_id = parseInt(proyectoFiltro, 10);
       if (rangoActivo) { params.desde = rangoFechas.desde; params.hasta = rangoFechas.hasta; }
@@ -239,7 +244,7 @@ export default function Tesoreria() {
     if (!esGestor) return;
     fetchGastos();
     /* eslint-disable-next-line */
-  }, [esGestor, page, pageSize, dependenciaFiltro, cajaFiltro, proyectoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+  }, [esGestor, page, pageSize, dependenciaFiltro, conceptoFiltro, cajaFiltro, proyectoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
 
   // Search con debounce
   useEffect(() => {
@@ -597,6 +602,17 @@ export default function Tesoreria() {
           onChange: setSubtipoEmpleadoFiltro,
         } satisfies SelectSpec]
       : []),
+    // Concepto: VOLVIÓ (dueño, 2026-09-02). Sin conceptos cargados no se
+    // dibuja, igual que Proyecto.
+    ...(conceptos.length > 0
+      ? [{
+          id: 'concepto',
+          label: 'Concepto',
+          value: conceptoFiltro,
+          options: [{ value: '', label: 'Todos' }, ...conceptos.map(c => ({ value: c.nombre, label: c.nombre }))],
+          onChange: (v: string) => { setConceptoFiltro(v); setPage(1); },
+        } satisfies SelectSpec]
+      : []),
     {
       id: 'dependencia',
       label: 'Dependencia',
@@ -626,30 +642,38 @@ export default function Tesoreria() {
   ];
 
   // --- PeriodControl: mapea el estado de periodo existente al contrato.
-  // GOTCHA piloto: cuando todosLosMeses=true el contrato no puede expresarlo
-  // (no hay estado "todos" en PeriodControlValue) — el control muestra el
-  // mes/año actual como PROPUESTA y el eyebrow del hero + el resumen dicen la
-  // verdad ("Todos los períodos"). Cualquier interacción con el control aplica
-  // el período elegido (sale de "todos"). Necesidad anotada en dudas.
+  // Desde v2.1 el contrato SÍ expresa "todos los períodos" (`todos`, opt-in
+  // con el flag definido) y el control lo dibuja con el PeriodNavigator del
+  // dueño (modoTodos). Este mapeo era anterior y no pasaba el flag: el
+  // control mostraba un mes como si filtrara mientras la página estaba en
+  // "todos" — el hallazgo de Infra del 2026-09-02.
   const periodValue = useMemo<PeriodControlValue>(() => {
     const unit = modoPeriodo === 'anio' ? ('year' as const) : ('month' as const);
     if (rangoActivo) {
       const d = parseFechaLocal(rangoFechas.desde);
       const h = parseFechaLocal(rangoFechas.hasta);
       return unit === 'year'
-        ? { unit, from: String(d.getFullYear()), to: String(h.getFullYear()) }
+        ? { unit, from: String(d.getFullYear()), to: String(h.getFullYear()), todos: false }
         : {
             unit,
             from: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`,
             to: `${h.getFullYear()}-${pad2(h.getMonth() + 1)}`,
+            todos: false,
           };
     }
     return unit === 'year'
-      ? { unit, from: String(anioActual) }
-      : { unit, from: `${anioActual}-${pad2(mesActual + 1)}` };
-  }, [modoPeriodo, rangoActivo, rangoFechas.desde, rangoFechas.hasta, anioActual, mesActual]);
+      ? { unit, from: String(anioActual), todos: todosLosMeses }
+      : { unit, from: `${anioActual}-${pad2(mesActual + 1)}`, todos: todosLosMeses };
+  }, [modoPeriodo, rangoActivo, rangoFechas.desde, rangoFechas.hasta, anioActual, mesActual, todosLosMeses]);
 
   const handlePeriodChange = (v: PeriodControlValue) => {
+    // Volver a "todos": sin filtro temporal; unit/from quedan como propuesta
+    // de aterrizaje para cuando el usuario vuelva a acotar.
+    if (v.todos) {
+      setTodosLosMeses(true);
+      setRangoFechas({ desde: '', hasta: '' });
+      return;
+    }
     const esAnio = v.unit === 'year';
     setModoPeriodo(esAnio ? 'anio' : 'mes');
     setTodosLosMeses(false);
