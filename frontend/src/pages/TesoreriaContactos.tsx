@@ -212,11 +212,15 @@ export default function TesoreriaContactos() {
   };
 
   const tipoEmpleadoOptions = useMemo(() => ([
-    { value: '', label: 'Empleados' },
+    { value: '', label: 'Tipo de empleado' },
     ...tiposEmpleado.map(t => ({
       value: t.nombre, label: t.nombre, color: t.color || undefined,
     })),
   ]), [tiposEmpleado]);
+
+  // Color del subtipo en la grilla: el que definió el catálogo per-muni para ese tipo.
+  const colorDeSubtipo = (nombre: string) =>
+    tiposEmpleado.find(t => t.nombre === nombre)?.color || '#71717a';
 
   // Filtros: chips por tipo. Si tipo=empleado, aparece combo de subtipo
   // de empleado (del catalogo per-muni) al lado de la pill Empleado.
@@ -271,7 +275,7 @@ export default function TesoreriaContactos() {
                   value={tipoEmpleadoFiltro}
                   onChange={setTipoEmpleadoFiltro}
                   options={tipoEmpleadoOptions}
-                  placeholder="Empleados"
+                  placeholder="Tipo de empleado"
                   searchable
                 />
               </div>
@@ -465,7 +469,7 @@ export default function TesoreriaContactos() {
                 value={tipoEmpleadoFiltro}
                 onChange={setTipoEmpleadoFiltro}
                 options={tipoEmpleadoOptions}
-                placeholder="Empleados"
+                placeholder="Tipo de empleado"
                 searchable
               />
             </div>,
@@ -513,9 +517,9 @@ export default function TesoreriaContactos() {
                   <div className="leading-tight">
                     <StatusPill label={TIPO_LABELS[c.tipo]} color={TIPO_COLORS[c.tipo] || '#71717a'} size="xs" />
                     {c.tipo === 'empleado' && c.subtipo && (
-                      <p className="text-[10px] mt-0.5" style={{ color: theme.textSecondary }}>
-                        {c.subtipo}
-                      </p>
+                      <div className="mt-0.5">
+                        <StatusPill label={c.subtipo} color={colorDeSubtipo(c.subtipo)} size="xs" />
+                      </div>
                     )}
                   </div>
                 ),
@@ -576,9 +580,12 @@ export default function TesoreriaContactos() {
                     {TIPO_LABELS[c.tipo]}
                   </span>
                   {c.tipo === 'empleado' && c.subtipo && (
-                    <p className="text-[10px] mt-0.5 truncate" style={{ color: theme.textSecondary }}>
+                    <span
+                      className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded ml-1"
+                      style={{ backgroundColor: `${colorDeSubtipo(c.subtipo)}20`, color: colorDeSubtipo(c.subtipo) }}
+                    >
                       {c.subtipo}
-                    </p>
+                    </span>
                   )}
                 </div>
               </div>
