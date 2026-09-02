@@ -24,7 +24,6 @@ import Inventario from '../Inventario';
 import ConfiguracionTesoreria from '../ConfiguracionTesoreria';
 import TesoreriaContactos from '../TesoreriaContactos';
 import TarjetasCredito from '../TarjetasCredito';
-import GestionTasas from '../GestionTasas';
 import Empleados from '../Empleados';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
@@ -369,7 +368,6 @@ export default function Configuracion() {
     'tipos-empleado': <ConfiguracionTesoreria tabInicial="tipos-empleado" />,
     contactos: <TesoreriaContactos />,
     tarjetas: <TarjetasCredito />,
-    tasas: <GestionTasas />,
     empleados: <Empleados />,
   };
   const pantallaEmbebida = EMBEBIDO[hijoId];

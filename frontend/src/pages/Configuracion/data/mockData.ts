@@ -65,7 +65,9 @@ export class MockDataService {
         { id: 'proyectos', label: 'Proyectos', tipo: 'abm', n: '8' },
         { id: 'tarjetas', label: 'Tarjetas', tipo: 'abm', n: '3' },
         { id: 'contactos', label: 'Contactos', tipo: 'abm', n: '148' },
-        { id: 'tasas', label: 'Catálogo de tasas', tipo: 'abm', n: '31' },
+        // 'tasas' NO va acá (dueño, 2026-09-02): no hay tasas en el producto
+        // hoy, y el día que las haya son su propio módulo, no un catálogo de
+        // Tesorería. La pantalla GestionTasas sigue existiendo en su ruta.
       ] },
       { id: 'integraciones', label: 'Integraciones', hijos: [
         { id: 'pagos', label: 'Proveedores de pago', tipo: 'abm', n: '2' },
