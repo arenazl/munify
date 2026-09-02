@@ -12,7 +12,7 @@
  * Consumidores: `TopbarV2` (lo dibuja y elige el control del ámbito según
  * `tipoAmbito`) y `PageHeader` (oculta el eyebrow que repite el último tramo).
  */
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { MigasContexto, type Migas, type TipoAmbito } from './migas';
@@ -57,6 +57,18 @@ export function MigasProvider({ items, visible = true, children }: MigasProvider
 
     return { ambito, tipoAmbito, pagina, modulo, tramos: [ambito, pagina], visible };
   }, [location.pathname, items, dependencia, esSuperAdmin, municipio, visible]);
+
+  // La PESTAÑA del navegador dice dónde estás: "Flota · Municipalidad de
+  // Merlo". Con varias pestañas abiertas (QA y prod, dos municipios) el
+  // título genérico de la marca las hacía indistinguibles (dueño, 2026-09-02).
+  // La pantalla va primero porque las pestañas truncan por la derecha: lo que
+  // distingue una pestaña de otra tiene que sobrevivir al recorte.
+  // Manda la miga mientras el shell está montado; en las pantallas públicas
+  // (login, acceso) sigue decidiendo DynamicManifest, como siempre.
+  useEffect(() => {
+    const titulo = [valor.pagina, valor.ambito].filter(Boolean).join(' · ');
+    if (titulo) document.title = titulo;
+  }, [valor.pagina, valor.ambito]);
 
   return <MigasContexto.Provider value={valor}>{children}</MigasContexto.Provider>;
 }

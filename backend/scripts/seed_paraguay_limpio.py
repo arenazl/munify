@@ -1701,11 +1701,12 @@ async def _habilitar_modulos(db: AsyncSession, muni_id: int) -> None:
         select(MunicipioModulo).where(MunicipioModulo.municipio_id == muni_id)
     )).scalars().all()}
     # `patrimonio` = fusión de los viejos `inventario` + `flota` (2026-09-02).
-    for mod in ("ordenes_trabajo", "patrimonio", "sueldos", "contaduria", "tesoreria"):
+    # `contaduria` fuera del default (dueño, 2026-09-02): opt-in manual.
+    for mod in ("ordenes_trabajo", "patrimonio", "sueldos", "tesoreria"):
         if mod not in existentes:
             db.add(MunicipioModulo(municipio_id=muni_id, modulo=mod, activo=True))
     await db.flush()
-    print("[modulos] opt-in habilitados (ordenes_trabajo, patrimonio, sueldos, contaduria, tesoreria)")
+    print("[modulos] opt-in habilitados (ordenes_trabajo, patrimonio, sueldos, tesoreria)")
 
 
 # ============================================================

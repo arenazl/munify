@@ -267,7 +267,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       // El catalogo VUELVE al sidebar: es la puerta del modulo y quien carga su
       // inventario desde cero no puede estar entrando y saliendo de
       // Configuracion todo el dia (dueño, 2026-09-02).
-      name: 'Patrimonio',
+      // Se llama "Inventario" y NO "Patrimonio": repetir el nombre de la
+      // categoria en el item ("Patrimonio > Patrimonio") no decia nada, y la
+      // pantalla de adentro ya se llama Inventario (dueño, 2026-09-02).
+      name: 'Inventario',
       href: '/gestion/inventario',
       icon: PackageOpen,
       show: isAdminOrSupervisor && modulosActivos.has('patrimonio'),
