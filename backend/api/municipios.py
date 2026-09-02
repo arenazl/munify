@@ -151,47 +151,59 @@ async def listar_municipios_publico(
 
 
 class DemoStats(BaseModel):
-    """Cuantas demos se generaron, para el contador de la pagina comercial."""
+    """El listado comercial de la pagina publica: cuantos municipios armaron
+    su demo, y cuales."""
     generadas: int
-    activas: int
-    paises: int
+    municipios: List[str]
 
 
 @router.get("/public/demo-stats", response_model=DemoStats)
 async def stats_demos(db: AsyncSession = Depends(get_db)):
-    """Cuantos municipios generaron su demo (endpoint PUBLICO).
+    """Los municipios que generaron su demo alguna vez (endpoint PUBLICO).
 
-    OJO CON EL ORDEN: esta ruta tiene que quedar declarada ANTES de
-    `/public/{codigo}`, si no ese comodin se come "demo-stats" y devuelve 404.
+    OJO CON EL ORDEN: va declarada ANTES de `/public/{codigo}`, si no ese
+    comodin se come "demo-stats" y devuelve 404.
 
-    `generadas` cuenta el HISTORICO: incluye las demos que despues se dieron de
-    baja. Fueron municipios reales que armaron la suya y se borraron por
-    comodidad nuestra (dueño, 2026-09-02); no contarlas seria subdeclarar algo
-    que paso. `activas` es lo que hay vivo ahora, que es otra cosa y mucho
-    menos: el numero que la comercial muestra es el primero.
+    Devuelve NOMBRES Y NADA MAS. Es material comercial —"mira cuantos ya la
+    tienen"—, no un indice de acceso: con el nombre no se entra a ninguna, y
+    el codigo, que es lo que sirve para entrar, no sale de aca.
 
-    Los dos salen de la base, no hay piso decorativo: el dato real ya es mas
-    del doble del numero que se iba a poner a mano.
+    Tres decisiones, todas del dueño (2026-09-02):
+
+    - Cuenta el HISTORICO, no lo que esta vivo. Las demos dadas de baja fueron
+      municipios reales que armaron la suya y se borraron por comodidad
+      nuestra; no contarlas seria subdeclarar algo que paso. Y sube con cada
+      una nueva, aunque a esa no se le de acceso: se genero igual.
+
+    - Solo lo que existe en el CATALOGO OFICIAL. Ahi se caen las pruebas
+      (`demo2`, `fgfdg`, `lucas`, `San Kika`, `QA Turnero Test 2`...) sin
+      mantener una lista negra a mano: si no es un municipio de verdad, no
+      entra. Se compara tambien contra el nombre antes de la coma, porque hay
+      demos que arrastran el departamento ("Asuncion, Dpto. Central") y son
+      municipios reales igual.
+
+    - Sin la de muestra: esa es nuestra, no un municipio que se acerco solo.
+      Contarla infla el numero, y ademas vive en su propio boton.
+
+    El numero que sale de aca es REAL: no hay piso decorativo. Se evaluo poner
+    uno de 40 a mano y no hizo falta, el dato ya lo supera.
     """
-    generadas = await db.execute(
-        select(func.count()).select_from(Municipio).where(Municipio.es_demo == True)  # noqa: E712
-    )
-    activas = await db.execute(
-        select(func.count()).select_from(Municipio).where(
-            Municipio.es_demo == True,  # noqa: E712
-            Municipio.activo == True,  # noqa: E712
-        )
-    )
-    paises = await db.execute(
-        select(func.count(func.distinct(Municipio.pais))).where(
-            Municipio.es_demo == True  # noqa: E712
-        )
-    )
-    return DemoStats(
-        generadas=generadas.scalar() or 0,
-        activas=activas.scalar() or 0,
-        paises=paises.scalar() or 0,
-    )
+    # COLLATE explicito: `municipios` es utf8mb4_general_ci y
+    # `municipios_catalogo` es utf8mb4_unicode_ci. Sin esto MySQL corta con
+    # "Illegal mix of collations" y el endpoint entero devuelve 500.
+    filas = (await db.execute(text("""
+        SELECT DISTINCT m.nombre
+        FROM municipios m
+        JOIN municipios_catalogo c
+          ON (c.nombre = m.nombre COLLATE utf8mb4_unicode_ci
+              OR c.nombre = SUBSTRING_INDEX(m.nombre, ',', 1) COLLATE utf8mb4_unicode_ci)
+         AND c.pais = m.pais COLLATE utf8mb4_unicode_ci
+        WHERE m.es_demo = 1
+          AND COALESCE(m.demo_publica, 0) = 0
+        ORDER BY m.nombre
+    """))).fetchall()
+    nombres = [f[0] for f in filas]
+    return DemoStats(generadas=len(nombres), municipios=nombres)
 
 
 @router.get("/public/cercano", response_model=Optional[MunicipioCercano])
