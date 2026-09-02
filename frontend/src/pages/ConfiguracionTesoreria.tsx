@@ -78,7 +78,11 @@ export default function ConfiguracionTesoreria({ tabInicial }: { tabInicial?: st
       </div>
       )}
 
-      {/* Tabs — scrollable en mobile para que no se corten los labels */}
+      {/* Tabs — scrollable en mobile para que no se corten los labels.
+          Embebida en la Configuración nueva NO se dibujan: la navegación es
+          el riel de la izquierda, y dos menús con lo mismo era el "doble"
+          que marcó el dueño (2026-09-02). */}
+      {!tabInicial && (
       <div
         className="flex gap-1 border-b overflow-x-auto"
         style={{ borderColor: theme.border, scrollbarWidth: 'none' }}
@@ -115,6 +119,7 @@ export default function ConfiguracionTesoreria({ tabInicial }: { tabInicial?: st
           );
         })}
       </div>
+      )}
 
       {/* Tab contents */}
       <div className="pt-2">

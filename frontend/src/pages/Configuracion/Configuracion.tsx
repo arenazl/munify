@@ -123,7 +123,7 @@ export default function Configuracion() {
     reclamos: 'cat-reclamo',
     tramites: 'arbol-tramite',
     inventario: 'inv',
-    tesoreria: 'conceptos-liq',
+    tesoreria: 'conceptos',
     integraciones: 'pagos',
     super: 'auditoria'
   });
@@ -360,9 +360,11 @@ export default function Configuracion() {
      Inventario y Depósitos. ConfiguracionTesoreria conserva su barra de tabs
      a propósito: Conceptos y Parajes no tienen entrada en este riel. */
   const EMBEBIDO: Record<string, React.ReactNode> = {
+    conceptos: <ConfiguracionTesoreria tabInicial="conceptos" />,
     'conceptos-liq': <ConfiguracionTesoreria tabInicial="conceptos-liq" />,
     cajas: <ConfiguracionTesoreria tabInicial="cajas" />,
     retenciones: <ConfiguracionTesoreria tabInicial="retenciones" />,
+    parajes: <ConfiguracionTesoreria tabInicial="parajes" />,
     proyectos: <ConfiguracionTesoreria tabInicial="proyectos" />,
     'tipos-empleado': <ConfiguracionTesoreria tabInicial="tipos-empleado" />,
     contactos: <TesoreriaContactos />,
@@ -567,8 +569,14 @@ export default function Configuracion() {
           )}
 
           {/* La pantalla real del ajuste, cuando existe: gana sobre el panel
-              de sólo lectura del canvas. */}
-          {pantallaEmbebida}
+              de sólo lectura del canvas. El key por ajuste es OBLIGATORIO:
+              varias entradas del riel montan el MISMO componente con distinto
+              `tabInicial` (ConfiguracionTesoreria), y sin key React reconcilia
+              en vez de remontar — el usuario clickea "Retenciones" en el riel
+              y sigue viendo Cajas. */}
+          {pantallaEmbebida && (
+            <React.Fragment key={hijoId}>{pantallaEmbebida}</React.Fragment>
+          )}
 
           {tipo === 'catalogo' && !pantallaEmbebida && data && (
             <CatalogoDelCanvas
