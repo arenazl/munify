@@ -180,6 +180,14 @@ export const router = createBrowserRouter([
   // === RUTAS PÚBLICAS ===
   { path: '/demo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Demo /> },
   { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
+  // Puerta de DEMOS con prefijo propio (dueño, 2026-09-02): a un municipio
+  // es_demo se entra por /demo/<codigo> hasta que sea facturable; la puerta
+  // pelada /<codigo> redirige acá según la ficha (y al revés). Cuelga de
+  // /demo a propósito: esas rutas despegan la marca pegada de la pestaña
+  // (RUTAS_DE_MUNIFY), así el picker de una demo nunca se pinta de otra
+  // marca. '/demo/listo' le gana por ser estática — el ranking del router.
+  { path: '/demo/:codigo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <MunicipioAcceso /> },
+  { path: '/demo/:codigo/login', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <MunicipioAcceso enLogin /> },
   // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
   { path: '/presentacion', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <PresentacionMunify /> },
   // Marca mono-tenant: /bienvenido (selector de municipios de Munify) NUNCA se
