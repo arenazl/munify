@@ -2416,8 +2416,10 @@ async def seed_demo_completo(
     # `patrimonio` unifica los viejos `inventario` + `flota` (2026-09-02): el
     # sidebar y Configuración sólo conocen el nombre nuevo — una demo sembrada
     # con `inventario` nacería sin la sección Patrimonio visible.
+    # `contaduria` NO va por default (dueño, 2026-09-02): sólo hace órdenes de
+    # pago y no está probada — queda como opt-in desde Configuración.
     from models.municipio_modulo import MunicipioModulo
-    _modulos = ('ordenes_trabajo', 'patrimonio', 'sueldos', 'contaduria', 'comunicacion')
+    _modulos = ('ordenes_trabajo', 'patrimonio', 'sueldos', 'comunicacion')
     for _mod in _modulos:
         db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()
