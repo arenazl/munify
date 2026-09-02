@@ -1203,12 +1203,14 @@ async def seed_demo_completo(
     # escriben una sola vez y los scripts no necesitan saber que existe.
     log = log or SeedLog(muni.nombre if muni else codigo, codigo=codigo)
 
-    # LA GEOGRAFIA DE ESTA CIUDAD, EN VIVO Y SIN CACHE PREVIO.
-    # Poligono oficial desde `municipios_catalogo` + UNA consulta a Overpass
-    # (cacheada en disco para la proxima demo de la misma ciudad). De ahi salen
-    # las zonas, los barrios y los puntos con direccion real. Si algo no esta
-    # disponible, `geografia` degrada y lo explica en `degradacion` --- nunca
-    # levanta y nunca inventa nombres.
+    # LA GEOGRAFIA DE ESTA CIUDAD, TODA DESDE LA BASE (nada online).
+    # Poligono oficial desde `municipios_catalogo`, localidades desde
+    # `catalogo_zonas` y barrios + calles desde `catalogo_geo_osm`, la tabla
+    # que cura offline `scripts/geo/curar_geo_catalogo.py`. De ahi salen las
+    # zonas, los barrios y los puntos con direccion real. Si el municipio no
+    # esta curado, `geografia` degrada —la demo nace con localidades y puntos
+    # dentro de ellas— y lo explica en `degradacion`: nunca levanta y nunca
+    # inventa nombres.
     geo_ctx = await geo_ciudad.geografia(
         db,
         nombre=muni.nombre if muni else codigo,

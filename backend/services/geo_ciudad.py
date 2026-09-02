@@ -64,10 +64,22 @@ misma ciudad sale SIEMPRE igual: mismos barrios, mismas calles, mismas
 coordenadas. Si un vendedor la muestra dos veces, no se le mueve abajo de los
 pies.
 
-EL CACHE ES OPTIMIZACION, NO REQUISITO
---------------------------------------
-Si el JSON de la ciudad existe, se usa y no se toca la red. Si no existe, se
-consulta EN VIVO y se guarda para la proxima. Nunca mas "sin cache -> genericos".
+LA CARTOGRAFIA ES OFFLINE (Lucas, 2026-09-03)
+---------------------------------------------
+Overpass en vivo durante el alta NUNCA funciono: delays de 75 s, caidas, demos
+que nacian sin barrios segun el humor de un servicio publico. La regla nueva:
+
+    1. Los barrios y calles de cada municipio viven PRECARGADOS en la tabla
+       `catalogo_geo_osm`, una fila por municipio del catalogo, curada por el
+       batch `scripts/geo/curar_geo_catalogo.py` (el UNICO que sale a la red).
+    2. El alta LEE esa tabla y nada mas. Si el municipio no esta curado, la
+       demo nace igual —localidades del padron, puntos dentro de ellas, mapa y
+       heatmap— y la bitacora lo dice, para que se cure a mano despues.
+    3. `settings.GEO_OSM_EN_VIVO` (False) es solo para el batch y para depurar.
+
+Y "tiene barrios" / "no tiene" se distingue con UNA query: por eso los nombres
+cardinales sueltos (Norte / Sur / Este / Oeste) se FILTRAN en la entrada y no
+existe ningun fallback que los invente. Un municipio sin barrios queda en cero.
 
 FUENTE / LICENCIA
 -----------------
@@ -132,6 +144,34 @@ MAX_KM_BARRIO = 3.0
 PLACES_ZONA = ("city", "town", "village", "hamlet")
 PLACES_BARRIO = ("suburb", "neighbourhood", "quarter")
 
+# Un barrio que se llama "Norte" a secas no es un barrio: es el relleno que
+# dejaban los seeds viejos y que hacia imposible contar que municipios tienen
+# cartografia y cuales no. Se filtran donde entran (OSM, IA) y en la limpieza
+# de la base. "Barrio Norte" o "Villa Sur" son nombres reales y pasan.
+NOMBRES_CARDINALES = frozenset({"norte", "sur", "este", "oeste"})
+
+# Cuanto se guarda por municipio en `catalogo_geo_osm`. El alta usa un pool
+# deduplicado por calle (ver armar()), asi que guardar 2.400 tramos de Lujan
+# no aporta: con 400 calles y 400 direcciones distintas sobra para 50 reclamos
+# variados y la tabla entera del pais pesa decenas de MB, no GB.
+TOPE_CATALOGO_CALLES = 400
+TOPE_CATALOGO_DIRECCIONES = 400
+FUENTE_OSM = "OpenStreetMap (Overpass API) -- ODbL"
+
+
+def es_cardinal(nombre: str) -> bool:
+    return _norm(nombre or "") in NOMBRES_CARDINALES
+
+
+def sin_cardinales(nombres: list) -> list:
+    """Filtra los cardinales sueltos de una lista de nombres o de places."""
+    out = []
+    for n in nombres or []:
+        texto = n.get("nombre") if isinstance(n, dict) else n
+        if not es_cardinal(texto):
+            out.append(n)
+    return out
+
 
 class OsmNoDisponible(RuntimeError):
     """Overpass no contesto. El llamador degrada; nunca inventa."""
@@ -180,22 +220,26 @@ def ruta_cache(nombre_municipio: str) -> Path:
 # 1. El poligono: de la base, no de la red
 # ==========================================================================
 
-async def poligono_del_catalogo(db, nombre: str, pais: str,
-                                provincia: Optional[str] = None,
-                                lat: Optional[float] = None,
-                                lon: Optional[float] = None) -> Optional[list]:
-    """Contorno oficial del municipio desde `municipios_catalogo`.
+async def municipio_del_catalogo(db, nombre: str, pais: str,
+                                 provincia: Optional[str] = None,
+                                 lat: Optional[float] = None,
+                                 lon: Optional[float] = None) -> Optional[dict]:
+    """La fila de `municipios_catalogo` del municipio, con su contorno oficial.
 
     Se busca por nombre + pais (+ provincia si vino, que es lo que desambigua
     los homonimos: hay dos 'Lujan' en Argentina y seis 'San Martin'). Si el
     nombre no matchea --- el alta pudo normalizar tildes o el usuario escribio un
     alias --- se cae a la fila mas CERCANA a las coordenadas con las que se creo
     el municipio, que vinieron de este mismo catalogo y por lo tanto coinciden.
+
+    Devuelve `{id, nombre, provincia, anillo}`: el `id` es la clave con la que
+    `catalogo_geo_osm` guarda la cartografia curada de ESTE municipio, asi que
+    se resuelve una sola vez aca y no se vuelve a buscar por texto.
     """
     from sqlalchemy import text
 
     filas = (await db.execute(text(
-        "SELECT nombre, provincia, lat, lng, poligono FROM municipios_catalogo "
+        "SELECT nombre, provincia, lat, lng, poligono, id FROM municipios_catalogo "
         "WHERE pais = :p AND poligono IS NOT NULL AND "
         "(nombre = :n OR alias LIKE :al)"),
         {"p": (pais or "AR").upper(), "n": nombre, "al": f"%{nombre}%"})).fetchall()
@@ -208,7 +252,7 @@ async def poligono_del_catalogo(db, nombre: str, pais: str,
         # Ultimo recurso dentro de la BASE (todavia sin salir a la red): la fila
         # del catalogo cuyo centro esta a menos de ~5 km del centro del muni.
         filas = (await db.execute(text(
-            "SELECT nombre, provincia, lat, lng, poligono FROM municipios_catalogo "
+            "SELECT nombre, provincia, lat, lng, poligono, id FROM municipios_catalogo "
             "WHERE pais = :p AND poligono IS NOT NULL "
             "AND ABS(lat - :la) < 0.06 AND ABS(lng - :lo) < 0.06 "
             "ORDER BY ABS(lat - :la) + ABS(lng - :lo) LIMIT 1"),
@@ -222,7 +266,19 @@ async def poligono_del_catalogo(db, nombre: str, pais: str,
         anillo = json.loads(filas[0][4])
     except (ValueError, TypeError):
         return None
-    return anillo if isinstance(anillo, list) and len(anillo) >= 3 else None
+    if not (isinstance(anillo, list) and len(anillo) >= 3):
+        return None
+    return {"id": filas[0][5], "nombre": filas[0][0], "provincia": filas[0][1],
+            "anillo": anillo}
+
+
+async def poligono_del_catalogo(db, nombre: str, pais: str,
+                                provincia: Optional[str] = None,
+                                lat: Optional[float] = None,
+                                lon: Optional[float] = None) -> Optional[list]:
+    """Solo el contorno. Azucar sobre `municipio_del_catalogo` para scripts."""
+    fila = await municipio_del_catalogo(db, nombre, pais, provincia, lat, lon)
+    return fila["anillo"] if fila else None
 
 
 async def zonas_del_catalogo(db, anillo: list) -> list[dict]:
@@ -276,7 +332,7 @@ def _dentro(pt, anillo) -> bool:
 # 2. Barrios y calles: UNA consulta a Overpass, cacheada
 # ==========================================================================
 
-def _consulta(anillo: list) -> str:
+def _consulta(anillo: list, timeout: float = TIMEOUT_SEG) -> str:
     """La consulta Overpass. UNA sola, con dos salidas acotadas.
 
     Dos `out` en vez de uno porque los topes de Overpass son por salida: con un
@@ -286,7 +342,7 @@ def _consulta(anillo: list) -> str:
     El filtro `poly:` toma el contorno en 'lat lon lat lon ...'.
     """
     p = " ".join(f"{c[1]:.5f} {c[0]:.5f}" for c in _simplificar(anillo))
-    return f"""[out:json][timeout:{int(TIMEOUT_SEG)}];
+    return f"""[out:json][timeout:{int(timeout)}];
 (
   node(poly:"{p}")["place"~"^(city|town|village|hamlet|suburb|neighbourhood|quarter)$"]["name"];
   way(poly:"{p}")["place"~"^(suburb|neighbourhood|quarter)$"]["name"];
@@ -299,14 +355,14 @@ node(poly:"{p}")["addr:housenumber"]["addr:street"]->.dir;
 .dir out tags center {TOPE_DIRECCIONES};"""
 
 
-async def _pedir(query: str) -> dict:
+async def _pedir(query: str, timeout: float = TIMEOUT_SEG) -> dict:
     import httpx
 
     ultimo = ""
     for i in range(INTENTOS):
         mirror = MIRRORS[i % len(MIRRORS)]
         try:
-            async with httpx.AsyncClient(timeout=TIMEOUT_SEG,
+            async with httpx.AsyncClient(timeout=timeout,
                                          headers={"User-Agent": UA}) as cli:
                 r = await cli.post(mirror, data={"data": query})
                 r.raise_for_status()
@@ -367,6 +423,8 @@ def _parsear(cruda: dict, anillo: list) -> dict:
     vistos: set = set()
     unicos = []
     for p in places:
+        if es_cardinal(p["nombre"]):
+            continue
         clase = "z" if p["tipo"] in PLACES_ZONA else "b"
         clave = (_norm(p["nombre"]), clase)
         if clave in vistos:
@@ -378,9 +436,135 @@ def _parsear(cruda: dict, anillo: list) -> dict:
             "direcciones": direcciones}
 
 
+def recortar_para_catalogo(datos: dict) -> dict:
+    """Lo que se GUARDA por municipio en `catalogo_geo_osm`.
+
+    Places completos (son pocos y son la parte que importa). Calles: las mas
+    principales primero (tipo, tramos), hasta el tope. Direcciones: UNA por
+    calle —el pool del alta las deduplica igual— hasta el tope, en el orden
+    determinista que ya usa la semilla, asi lo guardado y lo que se armaba en
+    vivo es el mismo universo.
+    """
+    orden = {"primary": 0, "secondary": 1, "tertiary": 2, "residential": 3}
+    calles = sorted(datos.get("calles") or [],
+                    key=lambda c: (orden.get(c.get("tipo"), 9), -int(c.get("tramos") or 0)))
+    por_calle: dict[str, dict] = {}
+    for d in datos.get("direcciones") or []:
+        por_calle.setdefault(d["calle"], d)
+    return {
+        "places": sin_cardinales(datos.get("places") or []),
+        "calles": calles[:TOPE_CATALOGO_CALLES],
+        "direcciones": list(por_calle.values())[:TOPE_CATALOGO_DIRECCIONES],
+        "recortado": {"calles_totales": len(datos.get("calles") or []),
+                      "direcciones_totales": len(datos.get("direcciones") or [])},
+    }
+
+
+def estado_de(datos: dict) -> str:
+    """`ok` si OSM tiene algo de la ciudad; `sin_datos_osm` si respondio vacio.
+    El vacio TAMBIEN se guarda: asi no se le vuelve a pedir a Overpass en cada
+    corrida, y la cuenta "tenemos / no tenemos" sale de la tabla."""
+    return "ok" if (datos.get("places") or datos.get("calles")) else "sin_datos_osm"
+
+
+async def leer_catalogo_geo(db, catalogo_id: str) -> Optional[dict]:
+    """La fila curada del municipio, o None si no esta (o la tabla no existe
+    todavia en este ambiente: prod la recibe por el paquete de promocion)."""
+    from sqlalchemy import text
+
+    try:
+        fila = (await db.execute(text(
+            "SELECT estado, datos, barrios, calles, direcciones, curado_en "
+            "FROM catalogo_geo_osm WHERE municipio_catalogo_id = :i"),
+            {"i": catalogo_id})).fetchone()
+    except Exception:  # noqa: BLE001 -- tabla ausente: se trata como no curado
+        return None
+    if not fila:
+        return None
+    estado, datos_json = fila[0], fila[1]
+    datos: dict = {"places": [], "calles": [], "direcciones": []}
+    if datos_json:
+        try:
+            datos = json.loads(datos_json)
+        except (ValueError, TypeError):
+            datos = {"places": [], "calles": [], "direcciones": []}
+    datos.update({"estado": estado, "cacheado": "catalogo_geo_osm",
+                  "fuente": FUENTE_OSM,
+                  "curado_en": fila[5].isoformat() if fila[5] else None})
+    return datos
+
+
+async def guardar_catalogo_geo(db, fila_catalogo: dict, pais: str, datos: dict,
+                               estado: Optional[str] = None,
+                               detalle: Optional[str] = None) -> str:
+    """Escribe (o pisa) la fila curada del municipio. Devuelve el estado."""
+    from sqlalchemy import text
+
+    estado = estado or estado_de(datos)
+    recorte = recortar_para_catalogo(datos) if estado == "ok" else None
+    barrios = sum(1 for p in (recorte or {}).get("places", []) if p["tipo"] in PLACES_BARRIO)
+    await db.execute(text("""
+        INSERT INTO catalogo_geo_osm
+            (municipio_catalogo_id, pais, nombre, provincia, estado,
+             barrios, calles, direcciones, datos, detalle, fuente, curado_en)
+        VALUES (:i, :p, :n, :prov, :e, :b, :c, :d, :datos, :det, :f, NOW())
+        ON DUPLICATE KEY UPDATE
+            estado = VALUES(estado), barrios = VALUES(barrios),
+            calles = VALUES(calles), direcciones = VALUES(direcciones),
+            datos = VALUES(datos), detalle = VALUES(detalle),
+            fuente = VALUES(fuente), curado_en = NOW()
+    """), {
+        "i": fila_catalogo["id"], "p": (pais or "AR").upper(),
+        "n": fila_catalogo["nombre"], "prov": fila_catalogo.get("provincia"),
+        "e": estado, "b": barrios,
+        "c": len((recorte or {}).get("calles", [])),
+        "d": len((recorte or {}).get("direcciones", [])),
+        "datos": json.dumps(recorte, ensure_ascii=False) if recorte else None,
+        "det": (detalle or "")[:300] or None, "f": FUENTE_OSM,
+    })
+    return estado
+
+
+async def osm_en_vivo(nombre_municipio: str, anillo: list,
+                      timeout: float = TIMEOUT_SEG) -> dict:
+    """UNA consulta a Overpass, parseada. Es lo unico que sale a la red, y solo
+    lo llaman el batch de curacion y `osm_de_ciudad` con GEO_OSM_EN_VIVO.
+
+    `timeout`: el default es el del alta (lo que aguanta un celular). El batch
+    offline pasa uno largo: un partido del conurbano tarda mas de 20 s y no hay
+    nadie esperando."""
+    datos = _parsear(await _pedir(_consulta(anillo, timeout), timeout), anillo)
+    datos.update({"municipio": nombre_municipio, "cacheado": False,
+                  "fuente": FUENTE_OSM})
+    return datos
+
+
 async def osm_de_ciudad(nombre_municipio: str, anillo: list,
-                        refrescar: bool = False) -> dict:
-    """Places, calles y direcciones reales del municipio. Cache primero."""
+                        refrescar: bool = False, *, db=None,
+                        fila_catalogo: Optional[dict] = None,
+                        pais: str = "AR",
+                        en_vivo: Optional[bool] = None) -> Optional[dict]:
+    """Places, calles y direcciones reales del municipio.
+
+    Orden: tabla `catalogo_geo_osm` (lo curado offline) -> cache en disco (lo
+    que quedo de las corridas locales) -> y SOLO si `en_vivo`, Overpass, con
+    write-through a la tabla para que esa ciudad quede curada.
+
+    Devuelve None cuando el municipio no esta curado y no se puede salir a la
+    red: el llamador degrada y lo anota. Nunca inventa.
+    """
+    if en_vivo is None:
+        try:
+            from core.config import settings
+            en_vivo = bool(settings.GEO_OSM_EN_VIVO)
+        except Exception:  # noqa: BLE001 -- scripts sin settings
+            en_vivo = False
+
+    if db is not None and fila_catalogo and not refrescar:
+        curado = await leer_catalogo_geo(db, fila_catalogo["id"])
+        if curado is not None:
+            return curado
+
     ruta = ruta_cache(nombre_municipio)
     if ruta.exists() and not refrescar:
         try:
@@ -388,11 +572,17 @@ async def osm_de_ciudad(nombre_municipio: str, anillo: list,
             datos["cacheado"] = True
             return datos
         except (ValueError, OSError):
-            pass  # cache corrupto: se vuelve a pedir
+            pass  # cache corrupto: se sigue como si no existiera
 
-    datos = _parsear(await _pedir(_consulta(anillo)), anillo)
-    datos.update({"municipio": nombre_municipio, "cacheado": False,
-                  "fuente": "OpenStreetMap (Overpass API) -- ODbL"})
+    if not en_vivo:
+        return None
+
+    datos = await osm_en_vivo(nombre_municipio, anillo)
+    if db is not None and fila_catalogo:
+        try:
+            await guardar_catalogo_geo(db, fila_catalogo, pais, datos)
+        except Exception:  # noqa: BLE001 -- sin tabla la demo se crea igual
+            pass
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         ruta.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
@@ -465,7 +655,9 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
     rompe.
     """
     rnd = random.Random(_slug(nombre_municipio))
-    places = osm.get("places") or []
+    # El filtro de cardinales tambien aca: un cache viejo o una fila curada
+    # antes de la regla no puede volver a meter "Norte" como barrio.
+    places = sin_cardinales(osm.get("places") or [])
     calles = osm.get("calles") or []
     direcciones = osm.get("direcciones") or []
 
@@ -648,14 +840,25 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
 
     # --- poligono ---
     with _paso("geo:poligono") as pz:
-        anillo = await poligono_del_catalogo(db, nombre, pais, provincia, lat, lon)
+        fila = await municipio_del_catalogo(db, nombre, pais, provincia, lat, lon)
+        anillo = fila["anillo"] if fila else None
         if anillo:
-            pz.ok(vertices=len(anillo), fuente="municipios_catalogo")
+            pz.ok(vertices=len(anillo), fuente="municipios_catalogo",
+                  catalogo_id=fila["id"])
         else:
             pz.degradado("el municipio no tiene contorno cargado en municipios_catalogo",
                          fuente=None)
     if not anillo:
-        return {**vacio, "degradacion": "sin_poligono_en_catalogo"}
+        # Sin contorno no hay padron ni cartografia que buscar, pero el mapa
+        # no se pierde: los reclamos caen alrededor del centro con el que se
+        # creo el municipio (que salio del mismo catalogo), con el nombre del
+        # municipio como direccion. Precision honesta de "centro del pueblo".
+        puntos = []
+        if lat is not None and lon is not None:
+            puntos = _puntos_por_localidad(
+                nombre, [{"nombre": nombre, "lat": lat, "lon": lon, "poligono": None}],
+                cantidad_puntos)
+        return {**vacio, "puntos": puntos, "degradacion": "sin_poligono_en_catalogo"}
 
     # --- zonas: del PADRON, no de la red ---
     # Estan en la base, con el contorno ya resuelto y validado. Overpass las
@@ -671,24 +874,41 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
             pzz.degradado("el municipio no tiene localidades en catalogo_zonas",
                           fuente=None)
 
-    # --- barrios y calles ---
+    # --- barrios y calles: de la tabla curada, NUNCA de la red ---
+    def _sin_cartografia(motivo: str) -> dict:
+        # La demo nace igual: localidades del padron y reclamos con lat/lng
+        # DENTRO de ellas (o del centro del municipio si el padron esta
+        # vacio). Es DEGRADADO y no fallo: 'fallo' ponia la bitacora en rojo
+        # y el 2026-09-02 se leyo como "las demos fallan" cuando no fallaban.
+        base = zonas_padron or [{"nombre": nombre, "lat": lat, "lon": lon,
+                                 "poligono": anillo}]
+        puntos = _puntos_por_localidad(nombre, base, cantidad_puntos) \
+            if (zonas_padron or (lat is not None and lon is not None)) else []
+        return {**vacio, "zonas": zonas_padron, "puntos": puntos,
+                "poligono": anillo, "fuente_poligono": "municipios_catalogo",
+                "fuente_zonas": "catalogo_zonas", "degradacion": motivo}
+
     with _paso("geo:osm") as po:
         try:
-            osm = await osm_de_ciudad(nombre, anillo)
-            po.ok(cacheado=osm.get("cacheado"),
+            osm = await osm_de_ciudad(nombre, anillo, db=db, fila_catalogo=fila,
+                                      pais=pais)
+        except OsmNoDisponible as e:
+            po.degradado(f"Overpass no respondio: {e}")
+            return _sin_cartografia(f"overpass_no_disponible: {e}")
+        if osm is None:
+            po.degradado("municipio sin cartografia curada en catalogo_geo_osm: "
+                         "encolar en scripts/geo/curar_geo_catalogo.py",
+                         catalogo_id=fila["id"], fuente=None)
+            return _sin_cartografia("sin_cartografia_curada")
+        if osm.get("estado") == "sin_datos_osm":
+            po.degradado("OSM no tiene barrios ni calles mapeados para este municipio "
+                         "(curado: sin_datos_osm)", cacheado=osm.get("cacheado"),
+                         curado_en=osm.get("curado_en"))
+        else:
+            po.ok(cacheado=osm.get("cacheado"), curado_en=osm.get("curado_en"),
                   places=len(osm.get("places") or []),
                   calles=len(osm.get("calles") or []),
                   direcciones=len(osm.get("direcciones") or []))
-        except OsmNoDisponible as e:
-            # Sin Overpass no hay calles, pero las zonas ya no dependen de el:
-            # la demo nace con sus localidades dibujadas igual. Es DEGRADADO y
-            # no fallo: el alta sobrevive y entrega una demo usable — 'fallo'
-            # ponia toda la bitacora en rojo por un servicio publico caido y
-            # el 2026-09-02 se leyo como "las demos fallan" cuando no fallaban.
-            po.degradado(f"Overpass no respondio: {e}")
-            return {**vacio, "zonas": zonas_padron, "poligono": anillo,
-                    "fuente_poligono": "municipios_catalogo",
-                    "degradacion": f"overpass_no_disponible: {e}"}
 
     # --- zonas, barrios y puntos ---
     with _paso("geo:puntos") as pp:

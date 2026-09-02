@@ -29,12 +29,16 @@ async def cargar_barrios_municipio(
     """
     print(f"[BARRIOS_AUTO] Buscando barrios para {nombre_municipio}, {provincia}...")
 
-    # 1. Obtener sugerencias de la IA
-    barrios_sugeridos = await sugerir_barrios_con_ia(nombre_municipio, provincia)
+    # 1. Obtener sugerencias de la IA. Si no hay, el municipio queda SIN
+    #    barrios: la regla es que "tiene barrios" y "no tiene" se distingan
+    #    con una query, y los cardinales genericos rompian eso (Lucas,
+    #    2026-09-03). Nada de Centro/Norte/Sur/Este/Oeste de relleno.
+    from services.geo_ciudad import sin_cardinales
+    barrios_sugeridos = sin_cardinales(await sugerir_barrios_con_ia(nombre_municipio, provincia))
 
     if not barrios_sugeridos:
-        print(f"[BARRIOS_AUTO] IA no devolvió barrios, usando genéricos")
-        barrios_sugeridos = ["Centro", "Norte", "Sur", "Este", "Oeste"]
+        print(f"[BARRIOS_AUTO] Sin barrios para {nombre_municipio}: queda sin barrios")
+        return 0
 
     print(f"[BARRIOS_AUTO] IA sugirió {len(barrios_sugeridos)} barrios")
 
