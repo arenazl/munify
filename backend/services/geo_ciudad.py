@@ -415,6 +415,43 @@ def _cerca(punto: tuple[float, float], candidatos: list[dict],
     return mejor
 
 
+def _puntos_por_localidad(nombre_municipio: str, localidades: list[dict],
+                          cantidad: int) -> list[dict]:
+    """Reclamos con coordenada REAL a nivel LOCALIDAD, para cuando OSM no dio
+    calles (Lucas, 2026-09-03: sin calles no se pierde el mapa). El punto cae
+    DENTRO del poligono real de la localidad del padron —o en su centro exacto
+    si no hay contorno— y la direccion textual es el nombre de la localidad:
+    ni calle ni altura inventadas (regla 11), precision honesta de localidad.
+    Deterministico: mismo municipio, mismos puntos."""
+    rnd = random.Random(_slug(nombre_municipio) + "|puntos")
+    puntos: list[dict] = []
+    for i in range(cantidad):
+        loc = localidades[i % len(localidades)]
+        lat, lon = float(loc["lat"]), float(loc["lon"])
+        anillo = loc.get("poligono")
+        if isinstance(anillo, str):
+            try:
+                anillo = json.loads(anillo)
+            except (ValueError, TypeError):
+                anillo = None
+        if not (isinstance(anillo, list) and len(anillo) >= 3):
+            anillo = None
+        jlat, jlon = lat, lon
+        for _ in range(12):
+            c_lat = lat + (rnd.random() - 0.5) * 0.008
+            c_lon = lon + (rnd.random() - 0.5) * 0.008
+            if anillo is None or dentro((c_lon, c_lat), anillo):
+                jlat, jlon = c_lat, c_lon
+                break
+        puntos.append({
+            "lat": round(jlat, 6), "lon": round(jlon, 6),
+            "calle": None, "altura": None,
+            "direccion": loc["nombre"], "fuente": "localidad_padron",
+            "zona_nombre": loc["nombre"], "barrio": None,
+        })
+    return puntos
+
+
 def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
           centro: Optional[tuple[float, float]] = None,
           max_zonas: int = MAX_ZONAS,
@@ -690,6 +727,18 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
         zonas, fuente_zonas = armado["zonas"], "osm_barrios_de_la_ciudad"
     else:
         zonas, fuente_zonas = zonas_padron, "catalogo_zonas"
+
+    # SIN CALLES NO SE PIERDE EL MAPA (Lucas, 2026-09-03): si OSM no dio
+    # calles ni direcciones, los reclamos igual llevan lat/lng dentro de las
+    # localidades REALES del padron. NADA de esto bloquea la demo: nace con
+    # puntos, mapa y heatmap; la precision de calle llega con la curacion
+    # offline y queda avisado en la bitacora para curar a mano.
+    if not armado["puntos"] and (zonas_padron or zonas):
+        armado["puntos"] = _puntos_por_localidad(
+            nombre, zonas_padron or zonas, cantidad_puntos)
+        armado["degradacion"] = (armado["degradacion"]
+                                 or "sin_calles_osm_reclamos_a_nivel_localidad")
+
     return {**armado, "zonas": zonas, "poligono": anillo,
             "fuente_poligono": "municipios_catalogo",
             "fuente_zonas": fuente_zonas}
