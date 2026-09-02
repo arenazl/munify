@@ -48,10 +48,15 @@ UPDATE = text(
 
 
 async def main(aplicar: bool) -> None:
-    if "sugerenciasmun-qa" not in settings.DATABASE_URL:
-        # Guarda dura: este script es de QA. Produccion la toca Infra.
-        print("ABORTADO: la DATABASE_URL no apunta a la base de QA.")
-        print("Este script no se corre contra produccion.")
+    # Guarda dura por LISTA NEGRA, no por lista blanca: el nombre de la base de
+    # QA es `sugerenciasmun-ensayo` (Infra, 2026-09-01 — el doc AMBIENTES.md
+    # decia `sugerenciasmun-qa` y estaba desactualizado), y produccion pasa de
+    # `sugerenciasmun` a `munify_prod`. Cortar por el nombre de PRODUCCION
+    # sobrevive a que QA se renombre; al reves, no.
+    base = settings.DATABASE_URL.rsplit("/", 1)[-1].split("?")[0]
+    if base in ("sugerenciasmun", "munify_prod"):
+        print(f"ABORTADO: `{base}` es la base de PRODUCCION.")
+        print("Escribir en produccion es de Infra / requiere OK explicito del dueño.")
         return
 
     engine = create_async_engine(settings.DATABASE_URL)
