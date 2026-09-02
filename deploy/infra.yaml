@@ -12,7 +12,7 @@ backend:
     - ADMIN_OPS_KEY
 
 frontend:
-  host: netlify
+  host: cloudflare_pages          # migrado de Netlify el 2026-08 (base-compartida/20-REPARTO-SECRETOS-Y-PLATAFORMA.md)
   source_dir: frontend
   backend_binding:
     mode: proxy_same_origin
@@ -25,26 +25,30 @@ environments:
     branch: master
     backend_service: munify-api
     backend_origin: https://munify-api-1060106389361.us-east4.run.app
-    netlify_site: reclamos-mun
+    pages_project: munify                     # Cloudflare Pages, munify-a9k.pages.dev -> app.munify.com.ar
     ambiente_marker: prod
-    ambiente_db_esperado: sugerenciasmun      # _ambiente.db_name_esperado (nombre real de la DB de prod)
+    ambiente_db_esperado: munify_prod         # base NUEVA de prod (2026-09-01); la anterior se archiva
   qa:
     branch: qa
     backend_service: munify-api-qa
     backend_origin: https://munify-api-qa-vmpxsxe7ra-uk.a.run.app
-    netlify_site: munify-qa
+    pages_project: munify-qa                  # Cloudflare Pages -> qa-app.munify.com.ar
     ambiente_marker: qa
-    ambiente_db_esperado: sugerenciasmun-qa   # _ambiente.db_name_esperado (nombre real de la DB de qa)
+    ambiente_db_esperado: sugerenciasmun-ensayo   # el nombre REAL de la base de QA (el que decia antes no existio nunca)
     secret_overrides: { DATABASE_URL: DATABASE_URL_QA, SECRET_KEY: SECRET_KEY_QA }
 
 per_env_suffix: _QA
 
 # Datos que consume el gate 15-verify (ambiente qa):
 verify:
-  front_url: https://munify-qa.netlify.app
+  front_url: https://qa-app.munify.com.ar
   own_backend_host: munify-api-qa-vmpxsxe7ra-uk.a.run.app
   forbidden_host: munify-api-1060106389361
-
+  # Sin estas tres, el check de binding no puede leer el BACKEND_ORIGIN del front y el gate da
+  # rojo por falta de dato, no por riesgo real. Van como params 6/7/8 a 15-VERIFY-AISLAMIENTO.sh.
+  verify_health_path: /api/municipios/public
+  verify_site: munify-qa
+  verify_plataforma: cloudflare_pages
 # La tabla marcador _ambiente (la crea/lee el modulo /admin/ops) tiene 2 campos que Infra siembra por
 # ambiente: entorno (= ambiente_marker) y db_name_esperado (= ambiente_db_esperado). El guardarraiz del
 # modulo aborta cualquier op que muta si el marcador no coincide con el nombre real de la DB.
