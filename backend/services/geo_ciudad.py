@@ -91,9 +91,15 @@ MIRRORS = [
 UA = "Munify/1.0 (semilla de demos municipales; https://munify.com.ar)"
 
 # Overpass tarda ~12 s para un partido como Lujan (2.481 calles + 70 places).
-# El timeout es generoso PERO acotado: el alta de la demo no puede colgarse
-# esperando a un servicio publico. Si vence, se degrada y la demo se crea igual.
-TIMEOUT_SEG = 75.0
+# El timeout es del tamaño de lo que un CELULAR aguanta, no del de la buena
+# voluntad: con 75s por intento, un Overpass caido costaba hasta 150s y el
+# navegador del prospecto cortaba el fetch ANTES de que el alta terminara —
+# la demo nacia igual (200 OK en 84s, caso real 2026-09-02) pero el le veia
+# "No pudimos crear la demo" y reintentaba, duplicando municipios. Con 20s
+# por mirror el peor caso de Overpass son 40s y el alta entera queda debajo
+# del umbral de corte movil; si vence, se degrada IGUAL que antes (la demo
+# se crea sin barrios) pero temprano, que es lo que hace la diferencia.
+TIMEOUT_SEG = 20.0
 # Un reintento y nada mas, contra el segundo mirror. Overpass devuelve 429/504
 # seguido; insistir mas solo alarga el alta sin cambiar el resultado.
 INTENTOS = 2
@@ -277,7 +283,7 @@ def _consulta(anillo: list) -> str:
     El filtro `poly:` toma el contorno en 'lat lon lat lon ...'.
     """
     p = " ".join(f"{c[1]:.5f} {c[0]:.5f}" for c in _simplificar(anillo))
-    return f"""[out:json][timeout:120];
+    return f"""[out:json][timeout:{int(TIMEOUT_SEG)}];
 (
   node(poly:"{p}")["place"~"^(city|town|village|hamlet|suburb|neighbourhood|quarter)$"]["name"];
   way(poly:"{p}")["place"~"^(suburb|neighbourhood|quarter)$"]["name"];
