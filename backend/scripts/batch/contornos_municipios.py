@@ -69,17 +69,27 @@ API = "https://www.geoboundaries.org/api/current/gbOpen/{iso3}/{nivel}/"
 
 # Cuando el pais publica SUS municipios con geometria, gana su fuente sobre
 # geoBoundaries: es la division vigente y no la del ultimo censo que alguien
-# consolido. En Argentina ademas cierra perfecto --- el catalogo salio del mismo
-# georef, asi que los ids son los mismos y no hay que emparejar nada.
+# consolido. En Argentina ademas cierra perfecto --- el catalogo salio de
+# georef, cuyo id ES el codigo INDEC, y el IGN publica ese mismo codigo en
+# `in1`: 2.081/2.082 emparejan por id, cero por nombre (medido 2026-09-02).
+#
+# Por que el WFS del IGN y no el geojson de georef: georef publica una
+# version SIMPLIFICADA para dibujar en un mapa chico (2 MB el pais; mediana
+# 11 vertices por municipio, 76% con menos de 20). Con eso, la consulta a
+# OSM que recorta barrios y calles por poligono se comia media ciudad o
+# traia la del vecino. El WFS trae el limite completo (mediana ~290
+# vertices, 64 MB) y aca se muestrea a `--puntos`.
 #
 # geoBoundaries no sirve para Argentina: su ADM2 son departamentos, que
 # contienen VARIOS municipios (probado: 383/2082 y el script aborto solo).
 FUENTES = {
     "AR": {
-        "url": "https://infra.datos.gob.ar/georef/municipios.geojson",
-        "id": "id",
-        "nombre": "nombre",
-        "fuente": "IGN / georef (datos.gob.ar) --- 2.082 municipios",
+        "url": ("https://wms.ign.gob.ar/geoserver/ows?service=WFS&version=2.0.0"
+                "&request=GetFeature&typeName=ign:municipio&outputFormat=application/json"),
+        "archivo": "AR_municipios_ign.geojson",
+        "id": "in1",
+        "nombre": "nam",
+        "fuente": "IGN Argentina, capa `municipio` (WFS) --- 2.114 municipios, limite completo",
     },
 }
 UA = "Munify/1.0 (contornos municipales para demos; https://munify.com.ar)"
@@ -148,7 +158,8 @@ async def main(a: argparse.Namespace) -> int:
     propia = FUENTES.get(a.pais) if not a.forzar_geoboundaries else None
     if propia:
         print(f"{a.pais}: fuente nacional propia")
-        features = bajar_url(propia["url"], f"{a.pais}_municipios.geojson", propia["fuente"])
+        features = bajar_url(propia["url"], propia.get("archivo") or f"{a.pais}_municipios.geojson",
+                             propia["fuente"])
         campo_id, campo_nombre = propia["id"], propia["nombre"]
     else:
         if not a.iso3:
@@ -281,9 +292,12 @@ async def main(a: argparse.Namespace) -> int:
     # Las dos guardas se evaluan TAMBIEN en dry-run: sirven justamente para
     # decidir si un nivel administrativo es usable, y esa respuesta hay que
     # tenerla antes de escribir, no despues.
+    # Los return tempranos tambien sueltan la conexion: sin el dispose, aiomysql
+    # se queja al salir ("Event loop is closed") en cada dry-run.
     if len(aciertos) < total * a.minimo:
         print(f"\nABORTADO: menos del {a.minimo:.0%} matcheo. El nivel {a.nivel} "
               f"probablemente no es el municipal en {a.iso3}. No se carga nada.")
+        await engine.dispose()
         return 1
     if promedio > a.max_por_contorno:
         print(f"\nABORTADO: {promedio:.2f} municipios comparten cada contorno (hasta "
@@ -291,10 +305,12 @@ async def main(a: argparse.Namespace) -> int:
               f"sola area,\nasi que a algunos les tocaria el limite del vecino. Con "
               f"eso los reclamos de la demo caerian en otra ciudad, con apariencia\n"
               f"de dato oficial: el circulo aproximado miente menos. No se escribe nada.")
+        await engine.dispose()
         return 1
 
     if a.dry_run:
         print("\n--dry-run: no se escribio nada")
+        await engine.dispose()
         return 0
 
     async with engine.begin() as conn:
