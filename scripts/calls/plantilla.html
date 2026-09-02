@@ -66,11 +66,28 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 .brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.2px;font-size:17px;
  flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap}
 .brand .txt{overflow:hidden;text-overflow:ellipsis}
-/* El isotipo REAL de Munify (mismo SVG que favicon.svg de la app). Va sobre
-   un cuadradito claro para que el marino se lea igual en tema oscuro. */
+/* El isotipo REAL de Munify (mismo SVG que favicon.svg de la app).
+   En CLARO va sobre un cuadradito blanco. En OSCURO el cuadradito blanco
+   quedaba como un parche pegado al header: ahi el isotipo se dibuja en tinta
+   clara, sin chip, y el brazo toma el acento del tema. */
 .brand i{width:26px;height:26px;border-radius:7px;background:#fff;display:grid;place-items:center;
  font-style:normal;flex:none;box-shadow:0 0 0 1px rgba(17,42,108,.12)}
 .brand i svg{width:17px;height:17px;display:block}
+:root:not([data-tema="claro"]) .brand i{background:transparent;box-shadow:none;width:22px;height:22px}
+:root:not([data-tema="claro"]) .brand i svg{width:22px;height:22px}
+:root:not([data-tema="claro"]) .brand i svg polygon{fill:var(--ink)}
+:root:not([data-tema="claro"]) .brand i svg polygon:nth-of-type(2){fill:var(--acc)}
+
+/* Quien esta usando el pipeline. Con dos personas anotando sobre los mismos
+   154 municipios, saber con que usuario entraste no es decorativo: cada linea
+   del historial se firma con ese nombre. */
+.yo{display:flex;align-items:center;gap:8px;min-width:0}
+.yo .av{width:30px;height:30px;border-radius:999px;background:var(--acc);color:#fff;
+ display:grid;place-items:center;font-weight:800;font-size:14px;flex:none;letter-spacing:0}
+.yo .nom{font-size:19px;font-weight:800;letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yo .salir{border:0;background:transparent;color:var(--ink3);font-size:12px;font-weight:700;
+ cursor:pointer;padding:4px 6px;border-radius:7px}
+.yo .salir:hover{color:var(--ink);background:var(--card2)}
 .spacer{flex:1 1 0;min-width:0}
 /* Los controles de la barra conservan su tamaño: son destinos de toque, no
    texto. Achicarlos rompe el area minima de 34px. */
@@ -768,7 +785,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 <div class="app-scroll"><div class="wrap">
   <div id="vHoy">
     <div class="hoy-top">
-      <span class="tit">Hoy</span>
+      <span class="tit" id="titHoy">Hoy</span>
       <div class="paises" id="paisesHoy"></div>
     </div>
     <div class="hoy-grid">
@@ -1403,6 +1420,7 @@ function guardarSesion(t, u){
 function cerrarSesion(){
   try { localStorage.removeItem(KEY_TOKEN); localStorage.removeItem(KEY_YO); } catch(e){}
   yo = null;
+  pintarYo();
   mostrarPuerta();
 }
 
@@ -1435,6 +1453,18 @@ async function haySesion(){
   } catch(e){ return false; }
 }
 
+function pintarYo(){
+  const t = document.getElementById('titHoy'); if (!t) return;
+  if (!yo || !yo.nombre){ t.className = 'tit'; t.textContent = 'Hoy'; return; }
+  const inicial = yo.nombre.trim().charAt(0).toUpperCase();
+  t.className = 'yo';
+  t.innerHTML = '<span class="av">' + esc(inicial) + '</span>'
+    + '<span class="nom">' + esc(yo.nombre) + '</span>'
+    + '<button type="button" class="salir" id="btnSalir">Salir</button>';
+  const b = document.getElementById('btnSalir');
+  if (b) b.onclick = () => cerrarSesion();
+}
+
 function armarLogin(){
   const f = document.getElementById('formLogin'); if (!f) return;
   f.onsubmit = async (e) => {
@@ -1453,6 +1483,7 @@ function armarLogin(){
       if (!r.ok) throw new Error(j.detail || 'No se pudo entrar');
       guardarSesion(j.token, {usuario:j.usuario, nombre:j.nombre});
       document.getElementById('lgClave').value = '';
+      pintarYo();
       ocultarPuerta();
     } catch(ex){
       err.textContent = String(ex.message || ex);
@@ -2289,7 +2320,8 @@ document.addEventListener('touchend', (e) => {
      sesion, no se ve ni un parpadeo. Sin sesion, tapa todo. */
   armarLogin();
   try { yo = JSON.parse(localStorage.getItem(KEY_YO) || 'null'); } catch(e){}
-  haySesion().then(ok => { if (ok) ocultarPuerta(); else mostrarPuerta(); });
+  pintarYo();
+  haySesion().then(ok => { pintarYo(); if (ok) ocultarPuerta(); else mostrarPuerta(); });
 })();
 </script>
 </body></html>
