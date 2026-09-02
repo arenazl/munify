@@ -96,9 +96,14 @@ from typing import Any, Optional
 
 from services.geo_demo import CACHE_DIR, _norm, _slug, dentro
 
+# Instancias publicas con el planeta completo. El alta usa las dos primeras
+# (INTENTOS); el batch offline recorre todas, porque la noche que se curo AR
+# (2026-09-02) overpass-api.de no contestaba ni /api/status y kumi tiraba 504.
 MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 UA = "Munify/1.0 (semilla de demos municipales; https://munify.com.ar)"
 
@@ -355,11 +360,12 @@ node(poly:"{p}")["addr:housenumber"]["addr:street"]->.dir;
 .dir out tags center {TOPE_DIRECCIONES};"""
 
 
-async def _pedir(query: str, timeout: float = TIMEOUT_SEG) -> dict:
+async def _pedir(query: str, timeout: float = TIMEOUT_SEG,
+                 intentos: int = INTENTOS) -> dict:
     import httpx
 
     ultimo = ""
-    for i in range(INTENTOS):
+    for i in range(intentos):
         mirror = MIRRORS[i % len(MIRRORS)]
         try:
             async with httpx.AsyncClient(timeout=timeout,
@@ -368,7 +374,7 @@ async def _pedir(query: str, timeout: float = TIMEOUT_SEG) -> dict:
                 r.raise_for_status()
                 return r.json()
         except Exception as e:  # noqa: BLE001 -- se reintenta con el otro mirror
-            ultimo = f"{type(e).__name__}: {str(e)[:120]}"
+            ultimo = f"{type(e).__name__}: {' '.join(str(e).split())[:120]}"
     raise OsmNoDisponible(ultimo or "sin respuesta")
 
 
@@ -526,14 +532,16 @@ async def guardar_catalogo_geo(db, fila_catalogo: dict, pais: str, datos: dict,
 
 
 async def osm_en_vivo(nombre_municipio: str, anillo: list,
-                      timeout: float = TIMEOUT_SEG) -> dict:
+                      timeout: float = TIMEOUT_SEG,
+                      intentos: int = INTENTOS) -> dict:
     """UNA consulta a Overpass, parseada. Es lo unico que sale a la red, y solo
     lo llaman el batch de curacion y `osm_de_ciudad` con GEO_OSM_EN_VIVO.
 
-    `timeout`: el default es el del alta (lo que aguanta un celular). El batch
-    offline pasa uno largo: un partido del conurbano tarda mas de 20 s y no hay
-    nadie esperando."""
-    datos = _parsear(await _pedir(_consulta(anillo, timeout), timeout), anillo)
+    `timeout` e `intentos`: los defaults son los del alta (lo que aguanta un
+    celular: 20 s, dos mirrors). El batch offline pasa un timeout largo y todos
+    los mirrors: un partido del conurbano tarda mas de 20 s y no hay nadie
+    esperando."""
+    datos = _parsear(await _pedir(_consulta(anillo, timeout), timeout, intentos), anillo)
     datos.update({"municipio": nombre_municipio, "cacheado": False,
                   "fuente": FUENTE_OSM})
     return datos

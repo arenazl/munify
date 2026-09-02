@@ -66,6 +66,9 @@ def _args() -> argparse.Namespace:
     p.add_argument("--pausa", type=float, default=1.5, help="Segundos entre municipios")
     p.add_argument("--parte", default="", help="k/n: este proceso toma los pendientes i %% n == k "
                                                 "(para correr n workers en paralelo sin pisarse)")
+    p.add_argument("--mirror", type=int, default=-1,
+                   help="Indice del mirror de Overpass por el que empieza este worker "
+                        "(dos workers contra el mismo servidor se roban los slots por IP)")
     return p.parse_args()
 
 
@@ -121,6 +124,10 @@ async def _resumen(conn, pais: str) -> str:
 async def main() -> None:
     args = _args()
     cfg = resolver_db(args)
+    if args.mirror >= 0:
+        k = args.mirror % len(geo_ciudad.MIRRORS)
+        geo_ciudad.MIRRORS[:] = geo_ciudad.MIRRORS[k:] + geo_ciudad.MIRRORS[:k]
+        print(f"Mirror principal: {geo_ciudad.MIRRORS[0]}")
     engine = create_async_engine(cfg.url)
     inicio = time.time()
     try:
@@ -146,7 +153,8 @@ async def main() -> None:
             t0 = time.time()
             try:
                 datos = await geo_ciudad.osm_en_vivo(m["nombre"], m["anillo"],
-                                                     timeout=TIMEOUT_BATCH_SEG)
+                                                     timeout=TIMEOUT_BATCH_SEG,
+                                                     intentos=len(geo_ciudad.MIRRORS))
                 estado, detalle = geo_ciudad.estado_de(datos), None
                 seguidos = 0
             except geo_ciudad.OsmNoDisponible as e:
