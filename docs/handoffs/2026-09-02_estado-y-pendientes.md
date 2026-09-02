@@ -41,8 +41,12 @@
 > catch verifica contra `demo-stats` y si la demo nació lo dice (WhatsApp
 > prellenado), sin invitar al duplicado. OJO al promover la landing: las
 > constantes API/APP difieren por rama (está documentado en el header del
-> archivo). **Proyecto anotado:** alta asíncrona con id de solicitud + bajar
-> los ~80s (Overpass en el medio).
+> archivo).
+> **RCA cerrado con la bitácora `demo_seed_logs`:** los ~84-103s eran
+> **Overpass caído** — 75s de timeout POR MIRROR ×2 (hasta 150s) para después
+> degradar igual. Fix `86a5664a`: 20s por mirror con el `[timeout]` del query
+> alineado → peor caso 40s y degradación temprana. **Proyecto anotado:** alta
+> asíncrona con id de solicitud (el fix definitivo contra cortes de red).
 >
 > **PENDIENTE MAÑANA:** (1) sembrar los usuarios de `/calls` en prod — las
 > claves (`CLAVE_LUCAS`/`CLAVE_SOFI`) las tiene sólo Lucas; hasta entonces el
