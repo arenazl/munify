@@ -34,7 +34,7 @@ environments:
     backend_origin: https://munify-api-qa-vmpxsxe7ra-uk.a.run.app
     pages_project: munify-qa                  # Cloudflare Pages -> qa-app.munify.com.ar
     ambiente_marker: qa
-    ambiente_db_esperado: sugerenciasmun-ensayo   # el nombre REAL de la base de QA (el que decia antes no existio nunca)
+    ambiente_db_esperado: sugerenciasmun-qa   # QA renacio el 2026-09-02 como copia de munify_prod
     secret_overrides: { DATABASE_URL: DATABASE_URL_QA, SECRET_KEY: SECRET_KEY_QA }
 
 per_env_suffix: _QA
