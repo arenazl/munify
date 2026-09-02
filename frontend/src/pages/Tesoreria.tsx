@@ -94,6 +94,10 @@ export default function Tesoreria() {
   const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
   // Filtro de tipo de concepto eliminado — listado plano de conceptos.
   const tipoConceptoFiltro = '';
+  // Filtro por CONCEPTO puntual (dueño, 2026-09-02): se había perdido en una
+  // migración anterior y el cliente productivo filtra sus gastos así. Es
+  // server-side: el endpoint acepta `concepto` por nombre exacto.
+  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
   // Proyecto (obra/partida a la que se imputan gastos). Filtra SERVER-side: un
   // gasto puede estar repartido entre varios proyectos, asi que no alcanza con
@@ -146,6 +150,7 @@ export default function Tesoreria() {
       const params: Record<string, string | number> = { skip: (page - 1) * pageSize, limit: pageSize };
       if (search.trim()) params.search = search.trim();
       if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
+      if (conceptoFiltro) params.concepto = conceptoFiltro;
       if (cajaFiltro) params.caja_id = parseInt(cajaFiltro, 10);
       if (proyectoFiltro) params.proyecto_id = parseInt(proyectoFiltro, 10);
       if (rangoActivo) { params.desde = rangoFechas.desde; params.hasta = rangoFechas.hasta; }
@@ -239,7 +244,7 @@ export default function Tesoreria() {
     if (!esGestor) return;
     fetchGastos();
     /* eslint-disable-next-line */
-  }, [esGestor, page, pageSize, dependenciaFiltro, cajaFiltro, proyectoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+  }, [esGestor, page, pageSize, dependenciaFiltro, conceptoFiltro, cajaFiltro, proyectoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
 
   // Search con debounce
   useEffect(() => {
@@ -595,6 +600,17 @@ export default function Tesoreria() {
           value: subtipoEmpleadoFiltro,
           options: [{ value: '', label: 'Todos' }, ...subtipoEmpleadoOptions],
           onChange: setSubtipoEmpleadoFiltro,
+        } satisfies SelectSpec]
+      : []),
+    // Concepto: VOLVIÓ (dueño, 2026-09-02). Sin conceptos cargados no se
+    // dibuja, igual que Proyecto.
+    ...(conceptos.length > 0
+      ? [{
+          id: 'concepto',
+          label: 'Concepto',
+          value: conceptoFiltro,
+          options: [{ value: '', label: 'Todos' }, ...conceptos.map(c => ({ value: c.nombre, label: c.nombre }))],
+          onChange: (v: string) => { setConceptoFiltro(v); setPage(1); },
         } satisfies SelectSpec]
       : []),
     {

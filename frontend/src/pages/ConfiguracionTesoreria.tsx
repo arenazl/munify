@@ -51,7 +51,9 @@ export default function ConfiguracionTesoreria({ tabInicial }: { tabInicial?: st
 
   return (
     <div className="px-4 py-3 space-y-3">
-      {/* Header */}
+      {/* Header propio SOLO en la ruta suelta: embebida en la Configuración
+          nueva (tabInicial), el título y el volver los pone el contenedor. */}
+      {!tabInicial && (
       <div className="flex items-center gap-3">
         <Link
           to="/gestion/configuracion"
@@ -74,6 +76,7 @@ export default function ConfiguracionTesoreria({ tabInicial }: { tabInicial?: st
           </p>
         </div>
       </div>
+      )}
 
       {/* Tabs — scrollable en mobile para que no se corten los labels */}
       <div
@@ -670,7 +673,8 @@ function CajasTab() {
     setLoading(true);
     try {
       const res = await cajasApi.list({ activo: true, include_saldos: true });
-      setCajas(res.data || []);
+      // Sin tarjetas: misma tabla, otra interfaz (el ABM de Tarjetas del riel).
+      setCajas((res.data || []).filter((c: Caja) => !c.es_tarjeta));
     } catch { toast.error('Error cargando cajas'); } finally { setLoading(false); }
   };
   useEffect(() => { fetch(); }, []);

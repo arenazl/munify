@@ -21,6 +21,11 @@ import DemoDniCard from '../../components/config/DemoDniCard';
 import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import InventarioDepositosConfig from '../InventarioDepositosConfig';
 import Inventario from '../Inventario';
+import ConfiguracionTesoreria from '../ConfiguracionTesoreria';
+import TesoreriaContactos from '../TesoreriaContactos';
+import TarjetasCredito from '../TarjetasCredito';
+import GestionTasas from '../GestionTasas';
+import Empleados from '../Empleados';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
@@ -37,7 +42,7 @@ import {
   cargarCatalogoReal,
   type DatosFormularioMuni
 } from './data/datosRealesConfig';
-import { dashboardApi, inventarioApi, modulosApi } from '../../lib/api';
+import { dashboardApi, modulosApi } from '../../lib/api';
 import { MODULOS } from '../../lib/enums/modulos';
 
 // Grupos de Configuración gateados por los MÓDULOS del municipio: el
@@ -344,7 +349,29 @@ export default function Configuracion() {
 
   const tituloRiel = padre.label.toUpperCase();
   const tipo = hijo.tipo;
-  
+
+  /* PANTALLAS REALES embebidas por ajuste (dueño, 2026-09-02: "dejémosle
+     andando los ABM a tesorería"). La promoción del 01-09 dejó al cliente
+     productivo sin sus ABMs: el sidebar se los había cedido a Configuración
+     ("se llega por el tile") y estos paneles quedaron de SÓLO LECTURA — sin
+     alta (ALTA_DE_AJUSTE vacío), sin lápiz (onEditarFila sólo en
+     dependencias) y con píldoras sin filtro. Hasta que cada panel tenga su
+     edición propia, acá va la pantalla real completa — mismo patrón que
+     Inventario y Depósitos. ConfiguracionTesoreria conserva su barra de tabs
+     a propósito: Conceptos y Parajes no tienen entrada en este riel. */
+  const EMBEBIDO: Record<string, React.ReactNode> = {
+    'conceptos-liq': <ConfiguracionTesoreria tabInicial="conceptos-liq" />,
+    cajas: <ConfiguracionTesoreria tabInicial="cajas" />,
+    retenciones: <ConfiguracionTesoreria tabInicial="retenciones" />,
+    proyectos: <ConfiguracionTesoreria tabInicial="proyectos" />,
+    'tipos-empleado': <ConfiguracionTesoreria tabInicial="tipos-empleado" />,
+    contactos: <TesoreriaContactos />,
+    tarjetas: <TarjetasCredito />,
+    tasas: <GestionTasas />,
+    empleados: <Empleados />,
+  };
+  const pantallaEmbebida = EMBEBIDO[hijoId];
+
   let data: any = null;
   if (tipo === 'abm') {
     // El spec sale de `canvasAbmSpec` (copia tipada del canvas), no del mock:
@@ -539,12 +566,16 @@ export default function Configuracion() {
             </PantallaDeAjuste>
           )}
 
-          {tipo === 'catalogo' && data && (
-            <CatalogoDelCanvas 
-              spec={data} 
-              title={hijo.label} 
-              eyebrow={hijo.label.toUpperCase()} 
-              moduleKey={hijoId} 
+          {/* La pantalla real del ajuste, cuando existe: gana sobre el panel
+              de sólo lectura del canvas. */}
+          {pantallaEmbebida}
+
+          {tipo === 'catalogo' && !pantallaEmbebida && data && (
+            <CatalogoDelCanvas
+              spec={data}
+              title={hijo.label}
+              eyebrow={hijo.label.toUpperCase()}
+              moduleKey={hijoId}
             />
           )}
 
@@ -597,7 +628,7 @@ export default function Configuracion() {
               (dueño, 2026-08-31). */}
           {tipo === 'abm' && hijoId === 'inv' && <Inventario />}
 
-          {tipo === 'abm' && hijoId !== 'vecinos' && hijoId !== 'inv' && hijoId !== 'depositos' && data && (
+          {tipo === 'abm' && !pantallaEmbebida && hijoId !== 'vecinos' && hijoId !== 'inv' && hijoId !== 'depositos' && data && (
             <AbmDeConfiguracion
               key={`${hijoId}-${recarga}`}
               spec={data}

@@ -447,14 +447,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Tesorería',
       description: 'Pagos que se repiten: sueldos, honorarios, alquileres'
     },
-    {
-      name: 'Empleados',
-      href: '/gestion/sueldos/empleados',
-      icon: Users,
-      show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Tesorería',
-      description: 'Personal del muni con sueldo asignado'
-    },
+    // "Empleados" (/gestion/sueldos/empleados) SALIÓ del menú (dueño,
+    // 2026-09-02): es una vista de sólo lectura sobre los contactos de
+    // Tesorería — sin acciones, ABMPage legacy — y confunde con la ficha
+    // real de Personal. La ruta sigue viva; el destino de la pantalla lo
+    // decide el rediseño de RRHH (unificar la persona que cobra con la que
+    // trabaja).
     {
       // Oculto por decisión de producto (2026-08-02): los reportes por módulo
       // no aportan; se rehacen como módulo propio. Gate original:
