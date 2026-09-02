@@ -1,5 +1,45 @@
 # HANDOFF — 2026-09-02 · IA a Groq, login de /calls, telemetría y el módulo Patrimonio
 
+> ## ACTUALIZACIÓN de la sesión siguiente (2026-09-02, tarde)
+>
+> **Infra promovió anoche**: `origin/master` = contenido de qa del 01-09
+> (commit `63b5467f`); el branch `prod-v1` guarda el prod viejo. La promoción
+> dejó al descubierto que la Configuración nueva estaba de SÓLO LECTURA y San
+> Pedro Norte perdió la entrada a sus ABMs. **Todo arreglado en qa**
+> (`06b71ab2..93f7f188`):
+>
+> - Semilla: demos nacen con `patrimonio` + flota con 90 días de historia
+>   (Merlo retro-llenado y verificado por API).
+> - Sidebar: "Patrimonio > Inventario" (no más doble nombre); "Empleados"
+>   (vista sólo-lectura de sueldos) voló del menú.
+> - **Configuración embebe las pantallas reales** (patrón Inventario): riel
+>   Tesorería = Conceptos de gasto · Conceptos de liquidación · Cajas ·
+>   Retenciones · Parajes · Proyectos · Tarjetas · Contactos (sin tasas, no
+>   existen como producto). El engendro (`ConfiguracionTesoreria`) oculta
+>   header y tabs al ir embebido; `key` por ajuste para que remonte.
+> - Gastos: filtro por Concepto restituido; control de período con "Todos los
+>   períodos" real (era una prop sin pasar, el kit v2.1 ya lo tenía).
+> - Cajas ya no mezcla tarjetas (misma tabla, interfaz separada).
+> - PWA: un solo dueño del reload (adiós doble refresco); pestaña del
+>   navegador dice "Pantalla · Municipio".
+> - Contaduría fuera del default de demos (nunca probada; repensar).
+>
+> **CIERRE DE LA NOCHE (Lucas se fue a dormir con la orden "cierren bien
+> prod"):** promoción pedida a Infra como UN paquete — qa hasta `ba81d258`
+> (después del corte de la tarde entraron: puerta `/demo/<codigo>` + la
+> llave `?t=` sobrevive el salto + la sesión ajena ya no pisa la puerta
+> `94240fbf`; píldoras sin conteo `93f7f188`; subtipo con color en Contactos
+> `ba81d258`). Todo el SQL del paquete quedó en
+> `base-compartida/munify/PROMOCION-20260902-BASE.sql` (tablas+índices,
+> orden, fusión de módulos, verificación).
+>
+> **PENDIENTE MAÑANA:** (1) sembrar los usuarios de `/calls` en prod — las
+> claves (`CLAVE_LUCAS`/`CLAVE_SOFI`) las tiene sólo Lucas; hasta entonces el
+> login de /calls en prod no anda (nada más depende de eso); (2) verificación
+> en vivo post-promoción (esta sesión la hace cuando Infra confirme y deja
+> reporte). Proyectos grandes anotados: unificación UX de los ABMs viejos al
+> kit v2, y rediseño RRHH (memoria `project_repensar_rrhh_recursos`).
+
 > Sesión larga y con varios temas cruzados. Esto es la cáscara para seguir en
 > contexto nuevo: qué quedó hecho, qué está a medias y qué decide el dueño.
 > **Todo está pusheado a `qa`.** Nada se tocó en producción.
