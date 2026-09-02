@@ -1,4 +1,4 @@
-import { Calendar, ChevronLeft, ChevronRight, LayoutList } from 'lucide-react';
+import { Calendar, CalendarOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
@@ -88,12 +88,17 @@ export function PeriodNavigator({
   const ultimoMes = ultimoTotal % 12;
   const ultimoAnio = anio + Math.floor(ultimoTotal / 12);
 
+  // En modoTodos las flechas NO se bloquean (dueño, 2026-09-02: el control
+  // arrancaba "muerto" con cursor de prohibido y la única salida era el
+  // botón del calendario — nada intuitivo). El primer click en una flecha
+  // ACOTA (delega en onToggleTodos: aterriza en el período propuesto) y de
+  // ahí en más navegan normal.
   const flechaStyle: React.CSSProperties = {
     backgroundColor: theme.backgroundSecondary,
     color: theme.text,
-    opacity: modoTodos ? 0.4 : 1,
-    cursor: modoTodos ? 'not-allowed' : 'pointer',
   };
+  const alNavegar = (nav: () => void) =>
+    modoTodos && onToggleTodos ? onToggleTodos : nav;
 
   return (
     <div className="inline-flex items-center gap-2 flex-wrap">
@@ -109,7 +114,11 @@ export function PeriodNavigator({
             style={{ borderRight: `1px solid ${theme.border}` }}
           >
             {(['mes', 'anio'] as PeriodModo[]).map(m => {
-              const activo = modo === m;
+              // En "todos" NINGUNA unidad se resalta: "Mes" azul al lado de
+              // "Todos los meses" eran dos señales contradictorias (dueño,
+              // 2026-09-02). Tocar una unidad acá ACOTA a esa unidad (lo
+              // decide el padre en onModoChange).
+              const activo = modo === m && !modoTodos;
               return (
                 <button
                   key={m}
@@ -129,11 +138,10 @@ export function PeriodNavigator({
         )}
 
         <button
-          onClick={onPrev}
-          disabled={modoTodos}
-          className="px-1.5 h-[34px] flex items-center justify-center transition-all hover:brightness-110 disabled:hover:brightness-100"
+          onClick={alNavegar(onPrev)}
+          className="px-1.5 h-[34px] flex items-center justify-center transition-all hover:brightness-110"
           style={flechaStyle}
-          title={modo === 'mes' ? 'Mes anterior' : 'Año anterior'}
+          title={modoTodos ? 'Elegir un período' : modo === 'mes' ? 'Mes anterior' : 'Año anterior'}
           type="button"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -163,11 +171,10 @@ export function PeriodNavigator({
         </div>
 
         <button
-          onClick={onNext}
-          disabled={modoTodos}
-          className="px-1.5 h-[34px] flex items-center justify-center transition-all hover:brightness-110 disabled:hover:brightness-100"
+          onClick={alNavegar(onNext)}
+          className="px-1.5 h-[34px] flex items-center justify-center transition-all hover:brightness-110"
           style={flechaStyle}
-          title={modo === 'mes' ? 'Mes siguiente' : 'Año siguiente'}
+          title={modoTodos ? 'Elegir un período' : modo === 'mes' ? 'Mes siguiente' : 'Año siguiente'}
           type="button"
         >
           <ChevronRight className="h-4 w-4" />
@@ -175,8 +182,9 @@ export function PeriodNavigator({
       </div>
 
       {/* Toggle "Todos los periodos" — solo icono, pegado a la flecha derecha.
-          Icono cambia segun modo: LayoutList = ver todos, Calendar = filtrar por periodo.
-          El title da el contexto en hover. Texto removido para ahorrar ancho. */}
+          Pareja autoexplicativa (dueño, 2026-09-02: la lista no se entendía
+          sin leer el tooltip): Calendar = acotar a un período; CalendarOff
+          (calendario tachado) = sacar el filtro de período, ver todos. */}
       {onToggleTodos && (
         <button
           onClick={onToggleTodos}
@@ -192,7 +200,7 @@ export function PeriodNavigator({
         >
           {modoTodos
             ? <Calendar className="h-4 w-4" />
-            : <LayoutList className="h-4 w-4" />}
+            : <CalendarOff className="h-4 w-4" />}
         </button>
       )}
     </div>

@@ -26,7 +26,7 @@
  * Presentacional puro: todo estado controlado por props. Cero colores fijos —
  * clases `av2-*` + tokens `--pl-*`.
  */
-import { ArrowRight, ArrowUpDown, X } from 'lucide-react';
+import { ArrowRight, ArrowUpDown, Plus, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
 import { useState } from 'react';
@@ -197,8 +197,11 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
         ? { anio: p.anio, mes: 0 }
         : { anio: p.anio, mes: p.anio === hoy.getFullYear() ? hoy.getMonth() : 0 };
     const base: PeriodControlValue = { unit, from: aIso(unit, convertir(propuesta)) };
-    /* Dentro de "todos", el switch solo convierte la propuesta (no sale). */
-    emitir(conTodos(hasta ? { ...base, to: aIso(unit, convertir(hasta)) } : base, enTodos));
+    /* Tocar Mes/Año SIEMPRE acota (dueño, 2026-09-02): antes, dentro de
+       "todos" sólo convertía la propuesta sin salir — un click sin efecto
+       visible. Ahora el gesto tiene un solo significado: "quiero filtrar
+       por esta unidad", y aterriza en el período en curso. */
+    emitir(conTodos(hasta ? { ...base, to: aIso(unit, convertir(hasta)) } : base, false));
   };
 
   const abrirRango = () => {
@@ -250,13 +253,15 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
       {/* Rango "→ Hasta": no aplica en "todos" (no hay período que extender). */}
       {!enTodos &&
         (!rangoAbierto ? (
+          /* El "+" es el gesto que GENERA el between (dueño, 2026-09-02):
+             agregar el segundo extremo, no "ir" a ningún lado. */
           <button
             type="button"
             className="av2-period-hasta"
             onClick={abrirRango}
-            title="Extender a un rango de períodos"
+            title="Agregar un hasta: filtrar entre dos períodos"
           >
-            <ArrowRight size={14} strokeWidth={2} aria-hidden />
+            <Plus size={14} strokeWidth={2} aria-hidden />
             Hasta
           </button>
         ) : (
