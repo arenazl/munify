@@ -150,6 +150,50 @@ async def listar_municipios_publico(
     return result.scalars().all()
 
 
+class DemoStats(BaseModel):
+    """Cuantas demos se generaron, para el contador de la pagina comercial."""
+    generadas: int
+    activas: int
+    paises: int
+
+
+@router.get("/public/demo-stats", response_model=DemoStats)
+async def stats_demos(db: AsyncSession = Depends(get_db)):
+    """Cuantos municipios generaron su demo (endpoint PUBLICO).
+
+    OJO CON EL ORDEN: esta ruta tiene que quedar declarada ANTES de
+    `/public/{codigo}`, si no ese comodin se come "demo-stats" y devuelve 404.
+
+    `generadas` cuenta el HISTORICO: incluye las demos que despues se dieron de
+    baja. Fueron municipios reales que armaron la suya y se borraron por
+    comodidad nuestra (dueño, 2026-09-02); no contarlas seria subdeclarar algo
+    que paso. `activas` es lo que hay vivo ahora, que es otra cosa y mucho
+    menos: el numero que la comercial muestra es el primero.
+
+    Los dos salen de la base, no hay piso decorativo: el dato real ya es mas
+    del doble del numero que se iba a poner a mano.
+    """
+    generadas = await db.execute(
+        select(func.count()).select_from(Municipio).where(Municipio.es_demo == True)  # noqa: E712
+    )
+    activas = await db.execute(
+        select(func.count()).select_from(Municipio).where(
+            Municipio.es_demo == True,  # noqa: E712
+            Municipio.activo == True,  # noqa: E712
+        )
+    )
+    paises = await db.execute(
+        select(func.count(func.distinct(Municipio.pais))).where(
+            Municipio.es_demo == True  # noqa: E712
+        )
+    )
+    return DemoStats(
+        generadas=generadas.scalar() or 0,
+        activas=activas.scalar() or 0,
+        paises=paises.scalar() or 0,
+    )
+
+
 @router.get("/public/cercano", response_model=Optional[MunicipioCercano])
 async def buscar_municipio_cercano(
     lat: float = Query(..., description="Latitud del usuario"),
