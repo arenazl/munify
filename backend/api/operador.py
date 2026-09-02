@@ -3,6 +3,7 @@
 Solo cubre las primitivas que usa el Mostrador:
   - GET  /operador/mostrador/home            -> metricas del operador del dia
   - GET  /operador/vecinos/buscar?dni=...    -> buscador de cliente registrado
+  - POST /operador/vecinos                   -> alta manual de vecino (sin biometria)
   - POST /operador/kyc/iniciar               -> sesion Didit presencial
   - GET  /operador/kyc/{session_id}/estado   -> polling decision Didit
 
@@ -61,6 +62,26 @@ class VecinoEncontrado(BaseModel):
     verificado_at: Optional[str]
 
 
+def _normalizar_dni(dni: str) -> str:
+    """Deja solo digitos: '30.217.134' -> '30217134'."""
+    return "".join(c for c in (dni or "") if c.isdigit())
+
+
+def _vecino_out(u: User) -> VecinoEncontrado:
+    return VecinoEncontrado(
+        user_id=u.id,
+        dni=u.dni or "",
+        nombre=u.nombre,
+        apellido=u.apellido,
+        email=u.email,
+        telefono=u.telefono,
+        direccion=getattr(u, "direccion", None),
+        nivel_verificacion=u.nivel_verificacion or 0,
+        kyc_modo=u.kyc_modo,
+        verificado_at=u.verificado_at.isoformat() if u.verificado_at else None,
+    )
+
+
 @router.get("/vecinos/buscar", response_model=List[VecinoEncontrado])
 async def buscar_vecino(
     dni: Optional[str] = None,
@@ -87,7 +108,14 @@ async def buscar_vecino(
     ]
 
     if dni and dni.strip():
-        conds.append(User.dni == dni.strip())
+        # Match tolerante a formato: compara solo los digitos de ambos lados
+        # ('30.217.134' en BD matchea '30217134' tipeado y viceversa).
+        dni_norm = _normalizar_dni(dni)
+        if not dni_norm:
+            raise HTTPException(status_code=400, detail="DNI inválido")
+        conds.append(
+            func.replace(func.replace(User.dni, ".", ""), " ", "") == dni_norm
+        )
     elif q and q.strip():
         like = f"%{q.strip()}%"
         conds.append(
@@ -103,21 +131,200 @@ async def buscar_vecino(
     r = await db.execute(stmt)
     users = r.scalars().all()
 
-    return [
-        VecinoEncontrado(
-            user_id=u.id,
-            dni=u.dni or "",
-            nombre=u.nombre,
-            apellido=u.apellido,
-            email=u.email,
-            telefono=u.telefono,
-            direccion=getattr(u, "direccion", None),
-            nivel_verificacion=u.nivel_verificacion or 0,
-            kyc_modo=u.kyc_modo,
-            verificado_at=u.verificado_at.isoformat() if u.verificado_at else None,
+    return [_vecino_out(u) for u in users]
+
+
+# ============================================================
+# 1.bis Alta manual de vecino (sin biometria)
+# ============================================================
+
+class AltaManualVecinoRequest(BaseModel):
+    # DNI OPCIONAL: para reclamos no se obliga a presentar documento.
+    # Sin DNI el vecino queda "a medias" (ghost nivel 0): reclamos si,
+    # tramites no (gate 403 kyc_insuficiente en api/tramites.py).
+    dni: Optional[str] = None
+    nombre: str
+    apellido: Optional[str] = None
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    direccion: Optional[str] = None
+
+
+@router.post("/vecinos", response_model=VecinoEncontrado)
+async def alta_manual_vecino(
+    body: AltaManualVecinoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Alta manual de un vecino desde el Mostrador, SIN validacion biometrica.
+
+    Regla de negocio: el alta simple alcanza para RECLAMOS (y turnos). Para
+    TRAMITES la validacion RENAPER del vecino es obligatoria — ese gate vive
+    en api/tramites.py (403 kyc_insuficiente) y el vecino creado aca queda en
+    nivel_verificacion=0 hasta pasar por el flujo 'Por celular' (Didit).
+
+    Solo el nombre es obligatorio (para reclamos no se exige documento).
+
+    Idempotencia:
+      - Con DNI: match por DNI normalizado en el muni (o sin muni).
+      - Sin DNI: match por nombre+apellido+telefono (si hay telefono) entre
+        los vecinos del muni; sin telefono se crea directo (no hay clave
+        confiable para dedupe y preferimos no pisar a un homonimo).
+    """
+    _asegurar_operador(current_user)
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
+
+    dni = _normalizar_dni(body.dni) if body.dni else ""
+    if dni and not (6 <= len(dni) <= 9):
+        raise HTTPException(status_code=422, detail="DNI inválido (6 a 9 dígitos)")
+    nombre = (body.nombre or "").strip()
+    apellido = (body.apellido or "").strip()
+    telefono = (body.telefono or "").strip() or None
+    if not nombre:
+        raise HTTPException(status_code=422, detail="El nombre es obligatorio")
+
+    existente = None
+    if dni:
+        # ¿Ya existe un vecino con ese DNI (en cualquier formato) en este muni?
+        q = await db.execute(
+            select(User).where(
+                func.replace(func.replace(User.dni, ".", ""), " ", "") == dni,
+                User.rol == RolUsuario.VECINO,
+                (User.municipio_id == current_user.municipio_id) | (User.municipio_id.is_(None)),
+            ).limit(1)
         )
-        for u in users
-    ]
+        existente = q.scalar_one_or_none()
+    elif telefono:
+        # Sin DNI: dedupe blando por nombre+apellido+telefono en el muni.
+        q = await db.execute(
+            select(User).where(
+                User.rol == RolUsuario.VECINO,
+                User.municipio_id == current_user.municipio_id,
+                User.telefono == telefono,
+                func.lower(User.nombre) == nombre.lower(),
+                func.lower(func.coalesce(User.apellido, "")) == apellido.lower(),
+            ).limit(1)
+        )
+        existente = q.scalar_one_or_none()
+    if existente:
+        # Completar campos vacios sin pisar lo que ya este cargado.
+        for campo, valor in (
+            ("nombre", nombre),
+            ("apellido", apellido or None),
+            ("telefono", telefono),
+            ("direccion", (body.direccion or "").strip() or None),
+        ):
+            if valor and not getattr(existente, campo, None):
+                setattr(existente, campo, valor)
+        await db.commit()
+        await db.refresh(existente)
+        return _vecino_out(existente)
+
+    # Email: si el operador cargo uno y esta libre, se usa; si esta tomado
+    # por OTRA cuenta, caemos al placeholder (no pisamos cuentas ajenas).
+    from secrets import token_hex, token_urlsafe
+    from core.security import get_password_hash
+
+    email = (body.email or "").strip().lower() or None
+    if email:
+        qe = await db.execute(select(User).where(User.email == email).limit(1))
+        if qe.scalar_one_or_none() is not None:
+            email = None
+    if not email:
+        # Con DNI el placeholder es deterministico (colision => ya existia);
+        # sin DNI no hay clave natural, va token random.
+        sufijo = dni if dni else f"anon-{token_hex(6)}"
+        email = f"v-{sufijo}-{current_user.municipio_id}@vecino.munify.local"
+
+    nuevo = User(
+        email=email,
+        password_hash=get_password_hash(token_urlsafe(16)),
+        nombre=nombre,
+        apellido=apellido,   # puede ir vacio: no se exige para reclamos
+        dni=dni or None,
+        telefono=telefono,
+        direccion=(body.direccion or "").strip() or None,
+        rol=RolUsuario.VECINO,
+        municipio_id=current_user.municipio_id,
+        cuenta_verificada=False,
+        nivel_verificacion=0,   # sin RENAPER: sirve para reclamos, no para tramites
+        kyc_modo=None,
+    )
+    try:
+        db.add(nuevo)
+        await db.commit()
+        await db.refresh(nuevo)
+        return _vecino_out(nuevo)
+    except Exception:
+        # Colision de email placeholder (mismo DNI ya tenia ghost): re-buscar.
+        await db.rollback()
+        q2 = await db.execute(select(User).where(User.email == email).limit(1))
+        u = q2.scalar_one_or_none()
+        if u is None:
+            raise HTTPException(status_code=500, detail="No se pudo crear el vecino")
+        return _vecino_out(u)
+
+
+# ============================================================
+# 1.ter Vecino ANONIMO del muni (para reclamos sin identificar)
+# ============================================================
+
+@router.post("/vecinos/anonimo", response_model=VecinoEncontrado)
+async def vecino_anonimo(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve (creandolo la primera vez) el vecino-sistema 'Anonimo' del
+    muni del operador, para cargar RECLAMOS sin identificar a nadie.
+
+    - Singleton por muni: la clave de idempotencia es el email placeholder
+      fijo `anonimo-m{muni}@vecino.munify.local` (email es unique global).
+      NO se usa `es_anonimo` como clave porque ese flag tambien lo eligen
+      vecinos reales al registrarse.
+    - Nace con es_anonimo=True (las notificaciones ya lo saltean) y
+      nivel_verificacion=0, asi que TRAMITES quedan bloqueados por el gate
+      403 kyc_insuficiente de api/tramites.py — tramites jamas anonimos.
+    """
+    _asegurar_operador(current_user)
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
+
+    email = f"anonimo-m{current_user.municipio_id}@vecino.munify.local"
+    q = await db.execute(select(User).where(User.email == email).limit(1))
+    u = q.scalar_one_or_none()
+    if u:
+        return _vecino_out(u)
+
+    from secrets import token_urlsafe
+    from core.security import get_password_hash
+
+    u = User(
+        email=email,
+        password_hash=get_password_hash(token_urlsafe(16)),
+        nombre="Vecino",
+        apellido="Anónimo",
+        rol=RolUsuario.VECINO,
+        municipio_id=current_user.municipio_id,
+        es_anonimo=True,
+        activo=True,
+        cuenta_verificada=False,
+        nivel_verificacion=0,
+        kyc_modo=None,
+    )
+    try:
+        db.add(u)
+        await db.commit()
+        await db.refresh(u)
+        return _vecino_out(u)
+    except Exception:
+        # Race: otro operador lo creo en paralelo — re-buscar.
+        await db.rollback()
+        q2 = await db.execute(select(User).where(User.email == email).limit(1))
+        u2 = q2.scalar_one_or_none()
+        if u2 is None:
+            raise HTTPException(status_code=500, detail="No se pudo crear el vecino anónimo")
+        return _vecino_out(u2)
 
 
 # ============================================================

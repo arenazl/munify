@@ -1,15 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileText, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin,
-  ChevronRight, Trophy, Map, Megaphone, Calendar, Newspaper,
-  ClipboardList, Sparkles, FileCheck, XCircle, TrendingUp,
-  TrendingDown, Building2, Star, BarChart3, X, Users, Target,
-  Zap, ArrowUpRight, ArrowDownRight, Activity,
+  FileText, CheckCircle, Clock, AlertTriangle,
+  ChevronRight, Megaphone, Newspaper, Hammer, FileCheck, Star,
   Search, PlusCircle, Upload, Loader, ShieldCheck, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, configuracionApi, publicoApi, vecinoApi } from '../lib/api';
+import { reclamosApi, configuracionApi, vecinoApi, api } from '../lib/api';
+import { logoDelMunicipio } from '../brands';
+import { PORTADA_FALLBACK } from '../config/themePresets';
 import type { Recomendacion } from '../lib/api';
 
 const REC_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -21,9 +20,15 @@ function RecIcono({ nombre, color }: { nombre: string; color: string }) {
   return <Icon className="w-5 h-5" style={{ color }} />;
 }
 import { useTheme } from '../contexts/ThemeContext';
+import { NovedadDestacada, NovedadCompacta } from '../components/comunicacion/NovedadCards';
+import type { NoticiaItem } from '../components/comunicacion/novedades';
 import { useAuth } from '../contexts/AuthContext';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
-import type { Reclamo, EstadoReclamo } from '../types';
+import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import type { Reclamo } from '../types';
+import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 
 interface MisEstadisticas {
   total: number;
@@ -32,17 +37,6 @@ interface MisEstadisticas {
   en_curso: number;
   resueltos: number;
   rechazados: number;
-}
-
-interface EstadisticasPublicas {
-  total_reclamos: number;
-  resueltos: number;
-  en_curso: number;
-  nuevos: number;
-  tasa_resolucion: number;
-  tiempo_promedio_resolucion_dias: number;
-  calificacion_promedio: number;
-  por_categoria: Array<{ categoria: string; cantidad: number }>;
 }
 
 interface DashboardComponente {
@@ -56,145 +50,163 @@ interface DashboardConfig {
   componentes: DashboardComponente[];
 }
 
-// Noticias hardcodeadas del municipio - 3 por cada slot del carrusel (4 slots x 3 = 12 noticias)
-const noticiasCarrusel = [
-  // Slot 1
-  [
-    {
-      id: 1,
-      titulo: 'Obra de pavimentación en Av. San Martín',
-      descripcion: 'Se están realizando trabajos de mejoramiento vial en toda la avenida principal.',
-      imagen: 'https://images.unsplash.com/photo-1581094288338-2314dddb7ece?w=400&h=250&fit=crop',
-      fecha: 'Hace 2 días',
-      categoria: 'Obras',
-    },
-    {
-      id: 2,
-      titulo: 'Repavimentación de calles en Barrio Norte',
-      descripcion: 'Continúan los trabajos de bacheo y repavimentación en el sector norte.',
-      imagen: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=400&h=250&fit=crop',
-      fecha: 'Hace 5 días',
-      categoria: 'Obras',
-    },
-    {
-      id: 3,
-      titulo: 'Nueva iluminación LED en el centro',
-      descripcion: 'Se instalaron más de 200 luminarias LED en el casco céntrico.',
-      imagen: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop',
-      fecha: 'Hace 1 semana',
-      categoria: 'Obras',
-    },
-  ],
-  // Slot 2
-  [
-    {
-      id: 4,
-      titulo: 'Festival gratuito este sábado',
-      descripcion: 'Shows en vivo, food trucks y actividades para toda la familia.',
-      imagen: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400&h=250&fit=crop',
-      fecha: 'Hace 1 día',
-      categoria: 'Eventos',
-    },
-    {
-      id: 5,
-      titulo: 'Feria de emprendedores locales',
-      descripcion: 'Más de 50 emprendedores locales expondrán sus productos.',
-      imagen: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=400&h=250&fit=crop',
-      fecha: 'Mañana',
-      categoria: 'Eventos',
-    },
-    {
-      id: 6,
-      titulo: 'Maratón solidaria por el hospital',
-      descripcion: 'Inscripciones abiertas para la carrera de 5K y 10K.',
-      imagen: 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=400&h=250&fit=crop',
-      fecha: 'Próximo domingo',
-      categoria: 'Eventos',
-    },
-  ],
-  // Slot 3
-  [
-    {
-      id: 7,
-      titulo: 'Nuevo centro de atención al vecino',
-      descripcion: 'Ya está habilitado el nuevo CAV en el barrio San José.',
-      imagen: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=250&fit=crop',
-      fecha: 'Hoy',
-      categoria: 'Servicios',
-    },
-    {
-      id: 8,
-      titulo: 'Ampliación de horarios en oficinas',
-      descripcion: 'Ahora podés hacer trámites de 7:00 a 19:00 hs.',
-      imagen: 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400&h=250&fit=crop',
-      fecha: 'Desde el lunes',
-      categoria: 'Servicios',
-    },
-    {
-      id: 9,
-      titulo: 'Nuevo sistema de turnos online',
-      descripcion: 'Sacá tu turno desde la app sin hacer filas.',
-      imagen: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=250&fit=crop',
-      fecha: 'Ya disponible',
-      categoria: 'Servicios',
-    },
-  ],
-  // Slot 4
-  [
-    {
-      id: 10,
-      titulo: 'Campaña de vacunación gratuita',
-      descripcion: 'Vacunas contra la gripe disponibles en todos los centros de salud.',
-      imagen: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=250&fit=crop',
-      fecha: 'Ayer',
-      categoria: 'Salud',
-    },
-    {
-      id: 11,
-      titulo: 'Operativo de salud en barrios',
-      descripcion: 'Controles médicos gratuitos en distintos puntos de la ciudad.',
-      imagen: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=250&fit=crop',
-      fecha: 'Esta semana',
-      categoria: 'Salud',
-    },
-    {
-      id: 12,
-      titulo: 'Charlas sobre prevención de dengue',
-      descripcion: 'Aprende a eliminar criaderos de mosquitos en tu hogar.',
-      imagen: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=250&fit=crop',
-      fecha: 'Viernes 18hs',
-      categoria: 'Salud',
-    },
-  ],
-];
+// Noticia real del municipio (GET /noticias/publico). NUNCA se muestran noticias
+// de relleno: si el muni no cargó noticias, el bloque "Novedades" se oculta.
 
-const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  recibido: { bg: '#cffafe', text: '#0e7490' },
-  en_curso: { bg: '#fef3c7', text: '#92400e' },
-  finalizado: { bg: '#d1fae5', text: '#065f46' },
-  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
-  rechazado: { bg: '#fee2e2', text: '#991b1b' },
-  // Legacy
-  nuevo: { bg: '#e5e7eb', text: '#374151' },
-  asignado: { bg: '#dbeafe', text: '#1e40af' },
-  en_proceso: { bg: '#fef3c7', text: '#92400e' },
-  pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
-  resuelto: { bg: '#d1fae5', text: '#065f46' },
-};
+// Respuesta cruda del endpoint público de noticias
+interface NoticiaApiResponse {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  tipo?: string;
+  fijado?: boolean;
+  fecha_desde?: string | null;
+  fecha_hasta?: string | null;
+  imagen_url: string | null;
+  created_at: string;
+  cronograma_texto?: string | null;
+}
 
-const estadoLabels: Record<EstadoReclamo, string> = {
-  recibido: 'Recibido',
-  en_curso: 'En Curso',
-  finalizado: 'Finalizado',
-  pospuesto: 'Pospuesto',
-  rechazado: 'Rechazado',
-  // Legacy
-  nuevo: 'Nuevo',
-  asignado: 'Asignado',
-  en_proceso: 'En Proceso',
-  pendiente_confirmacion: 'Pendiente',
-  resuelto: 'Resuelto',
-};
+function mapNoticia(n: NoticiaApiResponse): NoticiaItem {
+  let fecha = '';
+  try {
+    fecha = new Date(n.created_at).toLocaleDateString('es-AR', {
+      day: 'numeric',
+      month: 'long',
+    });
+  } catch {
+    fecha = '';
+  }
+  return {
+    id: n.id,
+    titulo: n.titulo,
+    descripcion: n.descripcion,
+    imagen: n.imagen_url,
+    fecha,
+    tipo: n.tipo || 'aviso',
+    fijado: Boolean(n.fijado),
+    fechaHasta: n.fecha_hasta ?? null,
+    fechaDesde: n.fecha_desde ?? null,
+    cronograma: n.cronograma_texto ?? null,
+  };
+}
+
+/**
+ * TIRA DE PENDIENTES — lo que el vecino tiene para hacer, en UNA línea.
+ *
+ * Reemplaza a las cuatro tarjetas de "Recomendaciones para vos", que ocupaban
+ * el mejor lugar del panel para cosas que no son urgentes. Patrón tomado de la
+ * barra de proveedores de RepareYa: rótulo con punto a la izquierda, ítems
+ * compactos con su contexto, y el excedente detrás de "Ver N más" en vez de
+ * apilar. Se ve todo, pero pesa lo que tiene que pesar.
+ *
+ * En pantalla chica la tira NO envuelve: scrollea en horizontal. Una barra que
+ * se parte en tres filas deja de ser una barra.
+ */
+function TiraPendientes({
+  recomendaciones,
+  theme,
+  onIr,
+}: {
+  recomendaciones: Recomendacion[];
+  theme: ReturnType<typeof useTheme>['theme'];
+  onIr: (url: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const VISIBLES = 2;
+  const visibles = abierto ? recomendaciones : recomendaciones.slice(0, VISIBLES);
+  const restantes = recomendaciones.length - visibles.length;
+
+  return (
+    <div
+      className="rounded-2xl px-3 py-2.5 md:px-4"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Rótulo: dice cuántas cosas hay, no "recomendaciones". */}
+        <div className="flex items-center gap-2 flex-shrink-0 pl-1">
+          <span
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: theme.primary }}
+          />
+          <span
+            className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.14em] whitespace-nowrap"
+            style={{ color: theme.textSecondary }}
+          >
+            {recomendaciones.length === 1 ? 'Tenés 1 pendiente' : `Tenés ${recomendaciones.length} pendientes`}
+          </span>
+        </div>
+
+        {/* Los ítems. `min-w-0` + overflow-x: la barra nunca envuelve. */}
+        <div
+          className={`flex-1 min-w-0 flex items-center gap-2 ${abierto ? 'flex-wrap' : 'overflow-x-auto'}`}
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {visibles.map((rec, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => rec.accion_url && onIr(rec.accion_url)}
+              className="group flex items-center gap-2.5 rounded-xl pl-1.5 pr-2.5 py-1.5 flex-shrink-0 max-w-[19rem] transition-colors text-left"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+              title={rec.descripcion}
+            >
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${rec.color}1f` }}
+              >
+                <RecIcono nombre={rec.icono} color={rec.color} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-semibold leading-tight truncate" style={{ color: theme.text }}>
+                  {rec.titulo}
+                </span>
+                <span className="block text-[11px] leading-tight truncate" style={{ color: theme.textSecondary }}>
+                  {rec.accion_label || rec.descripcion}
+                </span>
+              </span>
+              <ChevronRight
+                className="w-4 h-4 flex-shrink-0 transition-transform group-hover:translate-x-0.5"
+                style={{ color: theme.textSecondary }}
+              />
+            </button>
+          ))}
+        </div>
+
+        {/* El excedente: se despliega en el lugar, no manda a otra pantalla. */}
+        {(restantes > 0 || abierto) && (
+          <button
+            type="button"
+            onClick={() => setAbierto((v) => !v)}
+            className="flex items-center gap-1 text-xs font-semibold flex-shrink-0 whitespace-nowrap pr-1"
+            style={{ color: theme.primary }}
+          >
+            {abierto ? 'Ver menos' : `Ver ${restantes} más`}
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${abierto ? 'rotate-90' : ''}`} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Obra que el municipio decidió mostrar (GET /tesoreria/proyectos/publicas).
+ *  Módulo Comunicación, Etapa 2: el proyecto ya vivía en Tesorería con sus
+ *  gastos; acá sale a la calle, con avance y foto en vez de plata. */
+interface ObraItem {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  estado_obra: string | null;
+  avance: number | null;
+  foto_url: string | null;
+  fecha_fin: string | null;
+  /** Sólo llega si el municipio prendió "mostrar monto". */
+  invertido: string | null;
+}
+
+
+
 
 export default function DashboardVecino() {
   const { theme } = useTheme();
@@ -211,10 +223,12 @@ export default function DashboardVecino() {
     rechazados: 0,
   });
   const [nombreMunicipio, setNombreMunicipio] = useState('');
-  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig | null>(null);
-  const [estadisticasPublicas, setEstadisticasPublicas] = useState<EstadisticasPublicas | null>(null);
-  const [modalEstadistica, setModalEstadistica] = useState<string | null>(null);
+  // La config se sigue trayendo, pero hoy nadie la lee: el único consumidor
+  // era el gate de los KPI cards, que se sacaron el 2026-08-29.
+  const [, setDashboardConfig] = useState<DashboardConfig | null>(null);
   const [recomendaciones, setRecomendaciones] = useState<Recomendacion[]>([]);
+  const [noticias, setNoticias] = useState<NoticiaItem[]>([]);
+  const [obras, setObras] = useState<ObraItem[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -222,15 +236,39 @@ export default function DashboardVecino() {
 
   const fetchData = async () => {
     try {
-      const [reclamosRes, configRes, dashConfigRes, estadisticasRes, recsRes] = await Promise.all([
+      const [reclamosRes, configRes, dashConfigRes, recsRes] = await Promise.all([
         reclamosApi.getMisReclamos(),
         configuracionApi.getPublica('municipio').catch(() => ({ data: {} })),
         configuracionApi.getDashboardConfig('vecino').catch(() => ({ data: { config: null } })),
-        // Estadísticas del municipio del vecino (sin municipio_id mezclaba
-        // los números de TODOS los municipios en el widget "Tu Municipio")
-        publicoApi.getEstadisticas(user?.municipio_id).catch(() => ({ data: null })),
         vecinoApi.recomendaciones().catch(() => ({ data: [] })),
       ]);
+
+      // Noticias reales del municipio (público). Si el muni no cargó ninguna,
+      // el bloque de novedades queda oculto — nunca se muestran de relleno.
+      if (user?.municipio_id) {
+        try {
+          const noticiasRes = await api.get('/noticias/publico', {
+            // `vecino_id` es lo que permite filtrar por barrio: sin el, el
+            // vecino ve solo los avisos generales del municipio.
+            params: { municipio_id: user.municipio_id, vecino_id: user.id },
+          });
+          const items = (noticiasRes.data as NoticiaApiResponse[] | null) || [];
+          setNoticias(items.map(mapNoticia));
+        } catch {
+          setNoticias([]);
+        }
+
+        // Obras públicas. Si el muni no publicó ninguna, el bloque no se
+        // dibuja — mismo criterio que las novedades: nada de relleno.
+        try {
+          const obrasRes = await api.get('/tesoreria/proyectos/publicas', {
+            params: { municipio_id: user.municipio_id },
+          });
+          setObras((obrasRes.data as ObraItem[] | null) || []);
+        } catch {
+          setObras([]);
+        }
+      }
 
       const reclamos = reclamosRes.data as Reclamo[];
       setMisReclamos(reclamos);
@@ -254,10 +292,6 @@ export default function DashboardVecino() {
         setDashboardConfig(dashConfigRes.data.config);
       }
 
-      if (estadisticasRes.data) {
-        setEstadisticasPublicas(estadisticasRes.data);
-      }
-
       if (recsRes.data) {
         setRecomendaciones(recsRes.data);
       }
@@ -277,11 +311,7 @@ export default function DashboardVecino() {
     r => r.estado !== 'resuelto' && r.estado !== 'rechazado'
   ).length;
 
-  const isComponentVisible = (componentId: string): boolean => {
-    if (!dashboardConfig?.componentes) return true;
-    const comp = dashboardConfig.componentes.find(c => c.id === componentId);
-    return comp ? comp.visible : true;
-  };
+
 
   if (loading) {
     return (
@@ -296,546 +326,198 @@ export default function DashboardVecino() {
     || localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '')
     || 'Mi Municipio';
 
-  const municipioLogo = municipioActual?.logo_url || localStorage.getItem('municipio_logo_url');
+  // Mismo criterio que el shell: en marca mono-tenant el logo lo pone la marca
+  // (la ficha del muni puede tener el de otra), y `logoDelMunicipio` es el
+  // único lugar donde se decide.
+  const municipioLogo = logoDelMunicipio(
+    municipioActual?.logo_url || localStorage.getItem('municipio_logo_url'),
+  );
+  // Portada del municipio, y si no cargó la suya, la nuestra.
+  //
+  // Hubo una vuelta en la que sin portada propia el banner caía a un gradiente
+  // plano, con el argumento de que la foto de stock era "una ciudad cualquiera,
+  // no la del vecino". El argumento es cierto pero la conclusión estaba mal: el
+  // resultado era que la calidad de la primera pantalla dependía de si el
+  // municipio se había acordado de subir una imagen. Que no la haya subido es
+  // algo que cubrimos nosotros, no una licencia para mostrar menos.
+  const municipioPortada = (municipioActual as { imagen_portada?: string })?.imagen_portada
+    || PORTADA_FALLBACK;
 
-  // Stats cards data
-  const statsCards = [
-    {
-      title: 'Total Reclamos',
-      value: misEstadisticas.total,
-      icon: ClipboardList,
-      iconBg: `${theme.primary}20`,
-      iconColor: theme.primary,
-    },
-    {
-      title: 'Pendientes',
-      value: reclamosPendientes,
-      icon: Clock,
-      iconBg: '#f59e0b20',
-      iconColor: '#f59e0b',
-    },
-    {
-      title: 'Resueltos',
-      value: misEstadisticas.resueltos,
-      icon: CheckCircle,
-      iconBg: '#22c55e20',
-      iconColor: '#22c55e',
-    },
-    {
-      title: 'Rechazados',
-      value: misEstadisticas.rechazados,
-      icon: XCircle,
-      iconBg: '#ef444420',
-      iconColor: '#ef4444',
-    },
+  /** Los números del vecino, cortos para que entren en una fila en el celular. */
+  const kpisVecino: HeroStripKpi[] = [
+    { etiqueta: 'Tus reclamos', etiquetaCorta: 'Tuyos', valor: misEstadisticas.total },
+    { etiqueta: 'En curso', etiquetaCorta: 'En curso', valor: reclamosPendientes },
+    { etiqueta: 'Resueltos', etiquetaCorta: 'Resueltos', valor: misEstadisticas.resueltos },
   ];
+
+  /**
+   * Lo que le pasa AL VECINO, dicho en su idioma.
+   *
+   * No es el tablero del municipio con otros números: al vecino no le importa
+   * la tasa global ni cuántos reclamos hay en la ciudad. Le importa si al
+   * SUYO le dieron bola. Por eso las frases hablan de lo suyo y el veredicto
+   * mira su experiencia, no la productividad del municipio.
+   */
+  const frasesVecino: HeroFrase[] = (() => {
+    const fs: HeroFrase[] = [];
+    if (misEstadisticas.total === 0) {
+      fs.push({
+        segmentos: [
+          seg('Todavía no reportaste nada. '),
+          seg('Cuando cargues un reclamo', 'bueno'),
+          seg(' vas a poder seguirlo desde acá.'),
+        ],
+        acciones: [{ label: 'Hacer un reclamo', to: '/gestion/crear-reclamo', primaria: true }],
+      });
+      return fs;
+    }
+
+    fs.push({
+      segmentos: [
+        seg('Tenés '),
+        seg(
+          `${reclamosPendientes} ${reclamosPendientes === 1 ? 'reclamo en curso' : 'reclamos en curso'}`,
+          reclamosPendientes > 0 ? 'advertencia' : 'bueno',
+        ),
+        seg(' y '),
+        seg(`${misEstadisticas.resueltos} ya resueltos`, 'bueno'),
+        seg('.'),
+      ],
+      acciones: [{ label: 'Ver mis reclamos', to: '/gestion/mis-reclamos', primaria: true }],
+    });
+
+    if (misEstadisticas.rechazados > 0) {
+      fs.push({
+        segmentos: [
+          seg(`${misEstadisticas.rechazados} `, 'malo'),
+          seg(misEstadisticas.rechazados === 1 ? 'de tus reclamos fue rechazado' : 'de tus reclamos fueron rechazados'),
+          seg('. Podés ver el motivo y volver a reportarlo.'),
+        ],
+        acciones: [{ label: 'Ver el motivo', to: '/gestion/mis-reclamos?estado=rechazado' }],
+      });
+    }
+    return fs;
+  })();
+
+
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchData(); }}>
     <div className="space-y-6">
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '180px' }}>
-        <div className="absolute inset-0">
-          <img
-            alt={municipioNombre}
-            className="w-full h-full object-cover"
-            src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.7) 50%, ${theme.backgroundSecondary}90 100%)`,
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
-        </div>
+      {/* Encabezado v2: el mismo banner y el mismo hero semantico que el resto
+          de la app. Antes esta pantalla tenia su propio banner con una FOTO DE
+          BANCO DE IMAGENES hardcodeada (una ciudad que no es la del vecino) y
+          colores fijos rgba(15,23,42): entrar como vecino parecia otra
+          aplicacion. Ahora usa las piezas del kit y hereda el tema. */}
+      <HeroBannerV2
+        eyebrow={`Mi panel · ${municipioNombre}`}
+        titulo={`Hola, ${user?.nombre || 'vecino'}`}
+        sub="Todo lo que reportaste y en que anda cada cosa."
+        fotoUrl={municipioPortada}
+        kpis={kpisVecino}
+      />
 
-        <div className="relative z-10 p-6 flex items-center gap-5" style={{ minHeight: '180px' }}>
-          {municipioLogo && (
-            <img
-              src={municipioLogo}
-              alt={municipioNombre}
-              className="h-20 w-20 md:h-24 md:w-24 rounded-2xl object-contain bg-white/10 backdrop-blur p-3 flex-shrink-0"
-            />
-          )}
+      <SemanticHero etiqueta="TUS RECLAMOS" frases={frasesVecino} />
 
-          <div className="flex-1">
-            <h1 className="text-2xl md:text-3xl mb-1 drop-shadow-lg text-white">
-              <span className="font-light">Municipalidad de </span>
-              <span className="font-bold">{municipioNombre}</span>
-            </h1>
-            <p className="text-sm md:text-base mb-3" style={{ color: 'rgba(148, 163, 184, 1)' }}>
-              ¡Hola, {user?.nombre}! Bienvenido a tu panel
-            </p>
-            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'rgba(148, 163, 184, 1)' }}>
-              <div className="flex items-center gap-1.5">
-                <FileText className="w-4 h-4" />
-                <span>{misEstadisticas.total} reclamos</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4" />
-                <span>{reclamosPendientes} pendientes</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4" />
-                <span>{misEstadisticas.resueltos} resueltos</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recomendaciones inteligentes */}
+      {/* PENDIENTES — una tira, no cuatro tarjetas.
+          Antes esto ocupaba el mejor lugar del panel (el centro, arriba) para
+          decir cosas que no son urgentes: "subí un documento", "calificá tus
+          reclamos". Le dábamos espacio de titular a un pie de página.
+          Ahora es UNA línea: rótulo, los dos pendientes más importantes con su
+          contexto, y el resto detrás de "Ver N más". Pasa de un cuarto de
+          pantalla a una fila, sin ocultar nada. */}
       {recomendaciones.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold flex items-center gap-2 px-1" style={{ color: theme.text }}>
-            <Sparkles className="w-4 h-4" style={{ color: theme.primary }} />
-            Recomendaciones para vos
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {recomendaciones.map((rec, i) => (
-              <div
-                key={i}
-                className="group relative rounded-xl p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer overflow-hidden"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-                onClick={() => rec.accion_url && navigate(rec.accion_url)}
-              >
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  style={{ background: `linear-gradient(135deg, ${rec.color}10 0%, transparent 60%)` }}
-                />
-                <div className="relative flex items-start gap-3">
-                  <div
-                    className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: `${rec.color}15` }}
-                  >
-                    <RecIcono nombre={rec.icono} color={rec.color} />
+        <TiraPendientes
+          recomendaciones={recomendaciones}
+          theme={theme}
+          onIr={(url) => navigate(url)}
+        />
+      )}
+
+
+      {/* Los cuatro KPI cards (total / pendientes / resueltos / rechazados)
+          se sacaron el 2026-08-29: repetían exactamente lo que el hero ya
+          dice arriba ('Tus reclamos · En curso · Resueltos'), y los
+          rechazados los cuenta la alerta roja, que además ofrece la acción
+          ('Ver el motivo'). Los KPIs viven en el hero, una sola vez. */}
+
+      {/* News Feed - solo se muestra si el municipio cargó noticias reales */}
+      {noticias.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+              <Newspaper className="h-5 w-5" style={{ color: theme.primary }} />
+              Novedades del Municipio
+            </h2>
+          </div>
+
+          {(() => {
+            // Jerarquía real: lo que el municipio FIJÓ va grande; el resto,
+            // en tira. Sin nada fijado manda la más reciente, que ya viene
+            // primera del backend. No es decoración: el orden lo decide el
+            // dato, no el azar de la grilla.
+            // Destacado = lo que Comunicación mandó al banner (tipo
+            // 'destacado' o el `fijado` de antes). El resto va abajo.
+            const esDestacada = (n: NoticiaItem) => n.fijado || n.tipo === 'destacado';
+            const enBanner = noticias.filter(esDestacada);
+            const resto = noticias.filter((n) => !esDestacada(n));
+            // Sin nada destacado, la más reciente hace de banner: la fila de
+            // arriba no puede quedar vacía si hay novedades para mostrar.
+            const banner = enBanner.length > 0 ? enBanner : noticias.slice(0, 1);
+            const abajo = enBanner.length > 0 ? resto : noticias.slice(1);
+            return (
+              <div className="grid gap-4">
+                <BannerNovedades noticias={banner} theme={theme} />
+                {abajo.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {abajo.map((n) => (
+                      <NovedadCompacta key={n.id} noticia={n} theme={theme} />
+                    ))}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
-                      {rec.titulo}
-                    </h4>
-                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: theme.textSecondary }}>
-                      {rec.descripcion}
-                    </p>
-                    {rec.accion_label && (
-                      <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold"
-                            style={{ color: rec.color }}>
-                        {rec.accion_label}
-                        <ChevronRight className="w-3 h-3" />
-                      </span>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Obras a la vista (módulo Comunicación, Etapa 2). Sólo si el municipio
+          publicó alguna: si no publicó, el bloque no existe. */}
+      {obras.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+              <Hammer className="h-5 w-5" style={{ color: theme.primary }} />
+              Obras en tu ciudad
+            </h2>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>
+              {obras.length === 1 ? '1 obra' : `${obras.length} obras`}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {obras.map((o) => (
+              <ObraCard key={o.id} obra={o} theme={theme} />
             ))}
           </div>
         </div>
       )}
 
-      {/* Stats Cards - Estilo Glassmorphism */}
-      {isComponentVisible('stats') && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          {statsCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <div
-                key={card.title}
-                className="group relative rounded-2xl p-4 md:p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer overflow-hidden"
-                style={{
-                  backgroundColor: theme.card,
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
-                />
-                <div
-                  className="absolute -top-16 -right-16 w-32 h-32 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity duration-300"
-                  style={{ backgroundColor: card.iconColor }}
-                />
-                <div className="relative flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
-                      {card.title}
-                    </p>
-                    <p className="text-2xl md:text-3xl font-black mt-1 tracking-tight" style={{ color: theme.text }}>
-                      {card.value}
-                    </p>
-                  </div>
-                  <div
-                    className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
-                    style={{
-                      backgroundColor: card.iconBg,
-                      boxShadow: `0 4px 14px ${card.iconColor}25`
-                    }}
-                  >
-                    <Icon className="h-5 w-5 md:h-6 md:w-6" style={{ color: card.iconColor }} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* El bloque "Estadisticas del Municipio" se saco el 2026-08-29.
+          Dos motivos, el segundo mas grave que el primero:
 
-      {/* News Feed - Grid 2x2 con carruseles */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
-            <Newspaper className="h-5 w-5" style={{ color: theme.primary }} />
-            Novedades del Municipio
-          </h2>
-          <button className="text-sm font-medium" style={{ color: theme.primary }}>
-            Ver todas
-          </button>
-        </div>
+          1. MENTIA. La linea de tendencia de "Dias promedio" era un path
+             SVG fijo en el codigo (M0,28 L15,20 ... L100,8) y el grafico
+             de barras del modal eran seis numeros escritos a mano con
+             meses que ni siquiera eran los actuales. Parecian datos.
+          2. Los numeros que SI eran reales (40% de resolucion, 3.9 de
+             calificacion) son las dos peores notas del municipio,
+             publicadas por el propio municipio en la primera pantalla que
+             abre el vecino.
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {noticiasCarrusel.map((noticias, slotIndex) => (
-            <NewsCarouselCard key={slotIndex} noticias={noticias} theme={theme} slotIndex={slotIndex} />
-          ))}
-        </div>
-      </div>
-
-      {/* Estadísticas del Municipio - Versión moderna con gráficos */}
-      {estadisticasPublicas && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
-              <Activity className="h-5 w-5" style={{ color: theme.primary }} />
-              Estadísticas del Municipio
-            </h2>
-            <span className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
-              Actualizado hoy
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Card: Total Reclamos */}
-            <button
-              onClick={() => setModalEstadistica('total')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, ${theme.primary}, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${theme.primary}15` }}>
-                  <Building2 className="w-5 h-5" style={{ color: theme.primary }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowUpRight className="w-3 h-3" />
-                  +12%
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.total_reclamos}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Reclamos totales</p>
-              {/* Mini gráfico de barras */}
-              <div className="flex items-end gap-0.5 mt-3 h-8">
-                {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-t transition-all group-hover:opacity-100"
-                    style={{ height: `${h}%`, backgroundColor: i === 6 ? theme.primary : `${theme.primary}30`, opacity: 0.7 }}
-                  />
-                ))}
-              </div>
-            </button>
-
-            {/* Card: Tasa Resolución */}
-            <button
-              onClick={() => setModalEstadistica('resolucion')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, #22c55e, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#22c55e15' }}>
-                  <Target className="w-5 h-5" style={{ color: '#22c55e' }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowUpRight className="w-3 h-3" />
-                  +5%
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.tasa_resolucion.toFixed(0)}%</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Tasa de resolución</p>
-              {/* Mini gráfico circular */}
-              <div className="mt-3 flex justify-center">
-                <div className="relative w-10 h-10">
-                  <svg className="w-10 h-10 -rotate-90">
-                    <circle cx="20" cy="20" r="16" fill="none" strokeWidth="4" stroke={`${theme.border}`} />
-                    <circle
-                      cx="20" cy="20" r="16" fill="none" strokeWidth="4" stroke="#22c55e"
-                      strokeDasharray={`${estadisticasPublicas.tasa_resolucion} 100`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </button>
-
-            {/* Card: Tiempo Promedio */}
-            <button
-              onClick={() => setModalEstadistica('tiempo')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, #f59e0b, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f59e0b15' }}>
-                  <Zap className="w-5 h-5" style={{ color: '#f59e0b' }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowDownRight className="w-3 h-3" />
-                  -2 días
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.tiempo_promedio_resolucion_dias.toFixed(1)}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Días promedio</p>
-              {/* Mini gráfico de línea */}
-              <div className="mt-3 h-8 flex items-end">
-                <svg className="w-full h-8" viewBox="0 0 100 32" preserveAspectRatio="none">
-                  <path
-                    d="M0,28 L15,20 L30,24 L45,16 L60,18 L75,10 L100,8"
-                    fill="none"
-                    stroke="#f59e0b"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M0,28 L15,20 L30,24 L45,16 L60,18 L75,10 L100,8 L100,32 L0,32 Z"
-                    fill="url(#gradientAmber)"
-                    opacity="0.2"
-                  />
-                  <defs>
-                    <linearGradient id="gradientAmber" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-            </button>
-
-            {/* Card: Calificación */}
-            <button
-              onClick={() => setModalEstadistica('calificacion')}
-              className="group relative rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg text-left overflow-hidden"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 opacity-10" style={{ background: `radial-gradient(circle at top right, #eab308, transparent 70%)` }} />
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#eab30815' }}>
-                  <Star className="w-5 h-5" style={{ color: '#eab308' }} />
-                </div>
-                <div className="flex items-center gap-1 text-xs font-medium" style={{ color: '#22c55e' }}>
-                  <ArrowUpRight className="w-3 h-3" />
-                  +0.3
-                </div>
-              </div>
-              <p className="text-2xl font-bold mb-0.5" style={{ color: theme.text }}>{estadisticasPublicas.calificacion_promedio.toFixed(1)}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Calificación</p>
-              {/* Estrellas */}
-              <div className="mt-3 flex gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className="w-4 h-4"
-                    fill={star <= Math.round(estadisticasPublicas.calificacion_promedio) ? '#eab308' : 'none'}
-                    stroke="#eab308"
-                  />
-                ))}
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Estadísticas */}
-      {modalEstadistica && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setModalEstadistica(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl p-6 max-h-[80vh] overflow-y-auto"
-            style={{ backgroundColor: theme.card }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold" style={{ color: theme.text }}>
-                {modalEstadistica === 'total' && 'Reclamos del Municipio'}
-                {modalEstadistica === 'resolucion' && 'Tasa de Resolución'}
-                {modalEstadistica === 'tiempo' && 'Tiempo de Respuesta'}
-                {modalEstadistica === 'calificacion' && 'Calificación del Servicio'}
-              </h3>
-              <button
-                onClick={() => setModalEstadistica(null)}
-                className="p-2 rounded-full hover:bg-black/10 transition-colors"
-              >
-                <X className="w-5 h-5" style={{ color: theme.textSecondary }} />
-              </button>
-            </div>
-
-            {modalEstadistica === 'total' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="p-3 rounded-xl text-center" style={{ backgroundColor: `${theme.primary}10` }}>
-                    <p className="text-xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.total_reclamos}</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Total</p>
-                  </div>
-                  <div className="p-3 rounded-xl text-center" style={{ backgroundColor: '#22c55e10' }}>
-                    <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{estadisticasPublicas.resueltos}</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Resueltos</p>
-                  </div>
-                  <div className="p-3 rounded-xl text-center" style={{ backgroundColor: '#f59e0b10' }}>
-                    <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{estadisticasPublicas.en_curso}</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>En proceso</p>
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-                  <p className="text-sm font-medium mb-3" style={{ color: theme.text }}>Reclamos por mes (últimos 6 meses)</p>
-                  <div className="flex items-end gap-2 h-24">
-                    {[45, 62, 55, 78, 85, 92].map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full rounded-t" style={{ height: `${h}%`, backgroundColor: i === 5 ? theme.primary : `${theme.primary}50` }} />
-                        <span className="text-[10px]" style={{ color: theme.textSecondary }}>{['Ago', 'Sep', 'Oct', 'Nov', 'Dic', 'Ene'][i]}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  Este mes se recibieron un 12% más de reclamos que el mes anterior. Las categorías más reportadas son: Alumbrado (25%), Baches (20%) y Limpieza (18%).
-                </p>
-              </div>
-            )}
-
-            {modalEstadistica === 'resolucion' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="flex justify-center mb-4">
-                  <div className="relative w-32 h-32">
-                    <svg className="w-32 h-32 -rotate-90">
-                      <circle cx="64" cy="64" r="56" fill="none" strokeWidth="12" stroke={theme.border} />
-                      <circle
-                        cx="64" cy="64" r="56" fill="none" strokeWidth="12" stroke="#22c55e"
-                        strokeDasharray={`${estadisticasPublicas.tasa_resolucion * 3.52} 352`}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.tasa_resolucion.toFixed(0)}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 rounded-xl" style={{ backgroundColor: '#22c55e10' }}>
-                    <p className="text-lg font-bold" style={{ color: '#22c55e' }}>{estadisticasPublicas.resueltos}</p>
-                    <p className="text-xs" style={{ color: theme.textSecondary }}>Resueltos satisfactoriamente</p>
-                  </div>
-                  <div className="p-3 rounded-xl" style={{ backgroundColor: '#ef444410' }}>
-                    <p className="text-lg font-bold" style={{ color: '#ef4444' }}>{estadisticasPublicas.total_reclamos - estadisticasPublicas.resueltos}</p>
-                    <p className="text-xs" style={{ color: theme.textSecondary }}>Pendientes de resolución</p>
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  La tasa de resolución mejoró un 5% respecto al mes anterior. El objetivo del municipio es alcanzar el 95% para fin de año.
-                </p>
-              </div>
-            )}
-
-            {modalEstadistica === 'tiempo' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="text-center mb-4">
-                  <p className="text-4xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.tiempo_promedio_resolucion_dias.toFixed(1)}</p>
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>días promedio de resolución</p>
-                </div>
-                <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-                  <p className="text-sm font-medium mb-3" style={{ color: theme.text }}>Evolución del tiempo de respuesta</p>
-                  <svg className="w-full h-20" viewBox="0 0 200 60" preserveAspectRatio="none">
-                    <path
-                      d="M0,45 L30,38 L60,42 L90,30 L120,32 L150,22 L200,18"
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M0,45 L30,38 L60,42 L90,30 L120,32 L150,22 L200,18 L200,60 L0,60 Z"
-                      fill="url(#gradientModal)"
-                      opacity="0.3"
-                    />
-                    <defs>
-                      <linearGradient id="gradientModal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-lg font-bold" style={{ color: '#22c55e' }}>1.2</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Alumbrado</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold" style={{ color: '#f59e0b' }}>3.5</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Baches</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold" style={{ color: '#3b82f6' }}>2.1</p>
-                    <p className="text-[10px]" style={{ color: theme.textSecondary }}>Limpieza</p>
-                  </div>
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  El tiempo de respuesta se redujo 2 días respecto al trimestre anterior gracias a la optimización de procesos internos.
-                </p>
-              </div>
-            )}
-
-            {modalEstadistica === 'calificacion' && estadisticasPublicas && (
-              <div className="space-y-4">
-                <div className="text-center mb-4">
-                  <div className="flex justify-center gap-2 mb-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className="w-8 h-8"
-                        fill={star <= Math.round(estadisticasPublicas.calificacion_promedio) ? '#eab308' : 'none'}
-                        stroke="#eab308"
-                      />
-                    ))}
-                  </div>
-                  <p className="text-3xl font-bold" style={{ color: theme.text }}>{estadisticasPublicas.calificacion_promedio.toFixed(1)}</p>
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>de 5 estrellas</p>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { stars: 5, percent: 45 },
-                    { stars: 4, percent: 30 },
-                    { stars: 3, percent: 15 },
-                    { stars: 2, percent: 7 },
-                    { stars: 1, percent: 3 },
-                  ].map((item) => (
-                    <div key={item.stars} className="flex items-center gap-2">
-                      <span className="text-xs w-12" style={{ color: theme.textSecondary }}>{item.stars} estrellas</span>
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
-                        <div className="h-full rounded-full" style={{ width: `${item.percent}%`, backgroundColor: '#eab308' }} />
-                      </div>
-                      <span className="text-xs w-8 text-right" style={{ color: theme.textSecondary }}>{item.percent}%</span>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  El 75% de los vecinos calificó el servicio con 4 o 5 estrellas. Los aspectos mejor valorados son la rapidez y la comunicación.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          El unico dato que le sirve al vecino de todo eso es cuanto tarda
+          una respuesta, y ese va en el momento en que crea el reclamo
+          ("suelen responderse en 3 dias"), no como panel de estadisticas. */}
 
       {/* Tus Gestiones - Reclamos y Trámites lado a lado */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -861,7 +543,6 @@ export default function DashboardVecino() {
           {reclamosPendientes > 0 ? (
             <div>
               {reclamosRecientes.slice(0, 3).map((reclamo, idx) => {
-                const estado = estadoColors[reclamo.estado];
                 return (
                   <div
                     key={reclamo.id}
@@ -874,9 +555,9 @@ export default function DashboardVecino() {
                         <span className="text-[10px] font-mono" style={{ color: theme.textSecondary }}>#{reclamo.id}</span>
                         <span
                           className="px-1.5 py-0.5 text-[9px] font-medium rounded-full"
-                          style={{ backgroundColor: estado.bg, color: estado.text }}
+                          style={{ backgroundColor: estadoColor(reclamo.estado), color: '#ffffff' }}
                         >
-                          {estadoLabels[reclamo.estado]}
+                          {estadoLabel(reclamo.estado)}
                         </span>
                       </div>
                       <p className="font-medium text-xs truncate" style={{ color: theme.text }}>{reclamo.titulo}</p>
@@ -944,15 +625,11 @@ function GestionesCarousel({
   navigate,
   reclamosRecientes,
   reclamosPendientes,
-  estadoColors,
-  estadoLabels,
 }: {
   theme: ReturnType<typeof useTheme>['theme'];
   navigate: ReturnType<typeof useNavigate>;
   reclamosRecientes: Reclamo[];
   reclamosPendientes: number;
-  estadoColors: Record<EstadoReclamo, { bg: string; text: string }>;
-  estadoLabels: Record<EstadoReclamo, string>;
 }) {
   const [activeTab, setActiveTab] = useState<'reclamos' | 'tramites'>('reclamos');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1044,8 +721,7 @@ function GestionesCarousel({
 
             {reclamosPendientes > 0 ? (
               <div>
-                {reclamosRecientes.slice(0, 3).map((reclamo, idx) => {
-                  const estado = estadoColors[reclamo.estado];
+                {reclamosRecientes.slice(0, 3).map((reclamo) => {
                   return (
                     <div
                       key={reclamo.id}
@@ -1058,9 +734,9 @@ function GestionesCarousel({
                           <span className="text-[10px] font-mono" style={{ color: theme.textSecondary }}>#{reclamo.id}</span>
                           <span
                             className="px-1.5 py-0.5 text-[9px] font-medium rounded-full"
-                            style={{ backgroundColor: estado.bg, color: estado.text }}
+                            style={{ backgroundColor: estadoColor(reclamo.estado), color: '#ffffff' }}
                           >
-                            {estadoLabels[reclamo.estado]}
+                            {estadoLabel(reclamo.estado)}
                           </span>
                         </div>
                         <p className="font-medium text-xs truncate" style={{ color: theme.text }}>{reclamo.titulo}</p>
@@ -1310,123 +986,161 @@ function QuickAccessCard({
 }
 
 // News Carousel Card - Carrusel horizontal con slide (todas las imágenes en fila)
-function NewsCarouselCard({
+/** Cómo viene la obra, en el idioma del vecino. */
+const ESTADO_OBRA: Record<string, { label: string; tono: 'ok' | 'curso' | 'espera' }> = {
+  terminada: { label: 'Terminada', tono: 'ok' },
+  en_ejecucion: { label: 'En ejecución', tono: 'curso' },
+  por_empezar: { label: 'Por empezar', tono: 'espera' },
+};
+
+/**
+ * Una OBRA publicada. La diferencia con una novedad es el AVANCE: es lo que
+ * el vecino quiere saber ("¿en qué anda?"), y por eso la barra es el centro
+ * de la tarjeta. Sin avance cargado NO se dibuja barra — un 0% inventado
+ * diría que la obra está frenada, que es otra cosa.
+ */
+function ObraCard({
+  obra,
+  theme,
+}: {
+  obra: ObraItem;
+  theme: ReturnType<typeof useTheme>['theme'];
+}) {
+  const est = ESTADO_OBRA[obra.estado_obra || ''] ?? null;
+  const color =
+    est?.tono === 'ok' ? 'var(--pl-green)'
+    : est?.tono === 'curso' ? theme.primary
+    : 'var(--pl-amber)';
+  const avance = typeof obra.avance === 'number' ? Math.max(0, Math.min(100, obra.avance)) : null;
+
+  return (
+    <article
+      className="rounded-xl overflow-hidden group"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="relative h-32">
+        {obra.foto_url ? (
+          <img
+            src={obra.foto_url}
+            alt=""
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${theme.primary}25, ${theme.primary}08)` }}
+          >
+            <Hammer className="w-8 h-8" style={{ color: `${theme.primary}80` }} />
+          </div>
+        )}
+        <div
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent 60%)' }}
+        />
+        {est && (
+          <span
+            className="absolute top-2.5 left-2.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md"
+            style={{ backgroundColor: color, color: 'var(--pl-on-accent)' }}
+          >
+            {est.label}
+          </span>
+        )}
+      </div>
+
+      <div className="p-3">
+        <h4 className="font-semibold text-sm leading-tight line-clamp-1" style={{ color: theme.text }}>
+          {obra.nombre}
+        </h4>
+        {obra.descripcion && (
+          <p className="text-xs leading-snug line-clamp-2 mt-0.5" style={{ color: theme.textSecondary }}>
+            {obra.descripcion}
+          </p>
+        )}
+
+        {avance !== null && (
+          <div className="mt-2.5">
+            <div className="flex items-center justify-between text-[11px] mb-1">
+              <span style={{ color: theme.textSecondary }}>Avance</span>
+              <span className="font-bold" style={{ color }}>{avance}%</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: theme.backgroundSecondary }}>
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${avance}%`, backgroundColor: color }}
+              />
+            </div>
+          </div>
+        )}
+
+        {obra.invertido && (
+          <div className="mt-2 text-[11px]" style={{ color: theme.textSecondary }}>
+            Invertido: <span className="font-semibold" style={{ color: theme.text }}>
+              ${Number(obra.invertido).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+            </span>
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+
+
+/**
+ * BANNER del feed: rota entre las novedades destacadas.
+ *
+ * Con una sola no rota ni dibuja puntos — no hay entre qué alternar, y unos
+ * puntos que no llevan a ningún lado son ruido. La rotación se frena al pasar
+ * el mouse y con `prefers-reduced-motion`.
+ */
+function BannerNovedades({
   noticias,
   theme,
-  slotIndex,
 }: {
-  noticias: typeof noticiasCarrusel[0];
+  noticias: NoticiaItem[];
   theme: ReturnType<typeof useTheme>['theme'];
-  slotIndex: number;
 }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [indice, setIndice] = useState(0);
+  const [pausado, setPausado] = useState(false);
 
-  const categoriaColors: Record<string, string> = {
-    Obras: '#f59e0b',
-    Eventos: '#8b5cf6',
-    Servicios: '#10b981',
-    Salud: '#ef4444',
-  };
-
-  // Auto-rotate cada 7 segundos
   useEffect(() => {
-    const delay = 7000 + slotIndex * 1200;
-    const interval = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % noticias.length);
-    }, delay);
+    if (noticias.length < 2 || pausado) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t = setInterval(() => setIndice((i) => (i + 1) % noticias.length), 7000);
+    return () => clearInterval(t);
+  }, [noticias.length, pausado]);
 
-    return () => clearInterval(interval);
-  }, [noticias.length, slotIndex]);
-
-  const noticia = noticias[activeIndex];
+  const actual = noticias[Math.min(indice, noticias.length - 1)];
+  if (!actual) return null;
 
   return (
     <div
-      className="group rounded-2xl overflow-hidden transition-all hover:shadow-xl cursor-pointer"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      onMouseEnter={() => setPausado(true)}
+      onMouseLeave={() => setPausado(false)}
+      className="relative"
     >
-      {/* Container de imagen con overflow hidden */}
-      <div className="relative h-44 md:h-48 overflow-hidden">
-        {/* Track horizontal con todas las imágenes */}
-        <div
-          className="absolute inset-0 flex"
-          style={{
-            width: `${noticias.length * 100}%`,
-            transform: `translateX(-${activeIndex * (100 / noticias.length)}%)`,
-            transition: 'transform 600ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          {noticias.map((n) => (
-            <div
-              key={n.id}
-              className="relative h-full flex-shrink-0"
-              style={{ width: `${100 / noticias.length}%` }}
-            >
-              <img
-                src={n.imagen}
-                alt={n.titulo}
-                className="w-full h-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Gradiente oscuro en la parte inferior */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
-
-        {/* Badge categoría - arriba izquierda */}
-        <span
-          className="absolute top-3 left-3 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md"
-          style={{
-            backgroundColor: `${categoriaColors[noticia.categoria] || theme.primary}90`,
-            color: 'white',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          {noticia.categoria}
-        </span>
-
-        {/* Dots de navegación - arriba derecha */}
-        <div className="absolute top-3 right-3 flex gap-1.5">
-          {noticias.map((_, idx) => (
+      <NovedadDestacada noticia={actual} theme={theme} />
+      {noticias.length > 1 && (
+        <div className="absolute bottom-3 right-4 flex items-center gap-1.5">
+          {noticias.map((n, i) => (
             <button
-              key={idx}
-              onClick={(e) => {
-                e.stopPropagation();
-                setActiveIndex(idx);
-              }}
-              className="w-2.5 h-2.5 rounded-full transition-all duration-300 hover:scale-125"
+              key={n.id}
+              type="button"
+              onClick={() => setIndice(i)}
+              aria-label={`Ver ${n.titulo}`}
+              className="h-1.5 rounded-full transition-all"
               style={{
-                backgroundColor: idx === activeIndex ? 'white' : 'rgba(255,255,255,0.4)',
-                transform: idx === activeIndex ? 'scale(1.2)' : 'scale(1)',
-                boxShadow: idx === activeIndex ? '0 0 6px rgba(255,255,255,0.5)' : 'none',
+                width: i === indice ? 18 : 6,
+                backgroundColor: i === indice ? '#fff' : 'rgba(255,255,255,0.5)',
               }}
             />
           ))}
         </div>
-
-        {/* Título y descripción sobre la imagen */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <h3 className="font-bold text-base md:text-lg text-white leading-tight line-clamp-1 drop-shadow-lg">
-            {noticia.titulo}
-          </h3>
-          <p className="text-xs text-white/80 mt-1 line-clamp-1 drop-shadow">
-            {noticia.descripcion}
-          </p>
-        </div>
-      </div>
-
-      {/* Footer con fecha */}
-      <div className="p-3 flex items-center justify-between" style={{ borderTop: `1px solid ${theme.border}` }}>
-        <div className="flex items-center gap-1.5 text-xs" style={{ color: theme.textSecondary }}>
-          <Clock className="w-3.5 h-3.5" />
-          <span>{noticia.fecha}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: theme.primary }}>
-          <span>Leer más</span>
-          <ChevronRight className="w-3.5 h-3.5" />
-        </div>
-      </div>
+      )}
     </div>
   );
 }
+
+
+

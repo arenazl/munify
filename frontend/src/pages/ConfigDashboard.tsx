@@ -136,7 +136,7 @@ export default function ConfigDashboard() {
               onClick={handleSave}
               disabled={saving || !hasChanges}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-50 text-sm"
-              style={{ backgroundColor: theme.primary, color: '#fff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -158,7 +158,7 @@ export default function ConfigDashboard() {
           }`}
           style={{
             backgroundColor: activeTab === 'vecino' ? theme.primary : theme.card,
-            color: activeTab === 'vecino' ? '#fff' : theme.text,
+            color: activeTab === 'vecino' ? 'var(--pl-on-accent)' : theme.text,
             border: `1px solid ${activeTab === 'vecino' ? theme.primary : theme.border}`,
           }}
         >
@@ -172,7 +172,7 @@ export default function ConfigDashboard() {
           }`}
           style={{
             backgroundColor: activeTab === 'supervisor' ? theme.primary : theme.card,
-            color: activeTab === 'supervisor' ? '#fff' : theme.text,
+            color: activeTab === 'supervisor' ? 'var(--pl-on-accent)' : theme.text,
             border: `1px solid ${activeTab === 'supervisor' ? theme.primary : theme.border}`,
           }}
         >

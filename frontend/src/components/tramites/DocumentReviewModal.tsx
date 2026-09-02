@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../../lib/api';
+import { urlAdjunto } from '../../lib/adjuntos';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ChecklistDocumentoItem } from '../../types';
 
@@ -92,7 +93,7 @@ export function DocumentReviewModal({ open, onClose, solicitudId, items, onChang
           <button
             onClick={onClose}
             className="mt-4 px-4 py-2 rounded-lg text-sm font-medium"
-            style={{ backgroundColor: theme.primary, color: '#fff' }}
+            style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
           >
             Cerrar
           </button>
@@ -202,7 +203,7 @@ export function DocumentReviewModal({ open, onClose, solicitudId, items, onChang
         )}
         {current?.documento_url && !isVisual && (
           <a
-            href={current.documento_url}
+            href={urlAdjunto(current.documento_url)}
             target="_blank"
             rel="noopener noreferrer"
             className="w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90"

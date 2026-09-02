@@ -1,0 +1,76 @@
+/* ============================================================
+   BalanceBar — "¿sacamos más de lo que entra?" en una barra.
+   El riel es lo que ENTRÓ; el relleno, lo que se CERRÓ. El color
+   del relleno es el veredicto (acento / ámbar / rojo).
+   Todo sobre tokens --pl-*: cero colores fijos.
+   ============================================================ */
+
+.bb {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bb-riel {
+  height: 26px;
+  border-radius: var(--pl-radius-sm);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+
+.bb-fill {
+  height: 100%;
+  border-radius: var(--pl-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  min-width: 3px;
+  transition: width var(--pl-dur-panel, 260ms) var(--pl-ease);
+}
+
+.bb-fill--bueno { background: var(--pl-green); }
+.bb-fill--advertencia { background: var(--pl-amber-strong); }
+.bb-fill--malo { background: var(--pl-red); }
+
+.bb-fill-num {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /* Va SOBRE el relleno saturado, no sobre la superficie de la tarjeta. */
+  color: var(--pl-on-accent, #fff);
+}
+
+.bb-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+
+.bb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.bb-chip {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.bb-chip--bueno { background: var(--pl-green); }
+.bb-chip--advertencia { background: var(--pl-amber-strong); }
+.bb-chip--malo { background: var(--pl-red); }
+.bb-chip--riel { background: var(--pl-track); border: 1px solid var(--pl-border); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-fill { transition: none; }
+}

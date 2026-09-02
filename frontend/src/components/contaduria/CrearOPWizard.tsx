@@ -15,6 +15,7 @@ import {
   Paperclip, Upload, ExternalLink, Loader2, Percent,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { urlAdjunto } from '../../lib/adjuntos';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { MoneyInput } from '../ui/MoneyInput';
@@ -183,7 +184,7 @@ export function CrearOPWizard({ open, onClose, onSuccess }: Props) {
                 className="px-4 py-3 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-95"
                 style={{
                   backgroundColor: active ? theme.primary : theme.card,
-                  color: active ? '#fff' : theme.text,
+                  color: active ? 'var(--pl-on-accent)' : theme.text,
                   border: `1.5px solid ${active ? theme.primary : theme.border}`,
                 }}
               >
@@ -374,7 +375,7 @@ export function CrearOPWizard({ open, onClose, onSuccess }: Props) {
             {facturaUrl ? (
               <div className="flex items-center gap-1.5">
                 <a
-                  href={facturaUrl}
+                  href={urlAdjunto(facturaUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold truncate"

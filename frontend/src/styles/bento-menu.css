@@ -1,0 +1,207 @@
+/* ============================================================
+   BentoMenu — menú de acciones en mosaico asimétrico.
+
+   La jerarquía la hace el TAMAÑO del bloque, no un color: la
+   acción de todos los días ocupa el doble y ancla la vista; lo
+   secundario cae a bloques chicos; lo que sólo navega va en
+   tiras al pie. En una grilla pareja, con ocho tarjetas iguales,
+   encontrar una es leerlas todas.
+
+   Todo sobre tokens --pl-*: cero colores fijos, así cada marca
+   lo hereda en el suyo.
+   ============================================================ */
+
+.bm {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  align-items: stretch;
+}
+
+.bm-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px;
+  border-radius: var(--pl-radius-lg);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-2);
+  color: var(--pl-text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--pl-font-sans);
+  transition:
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    transform var(--pl-dur-ui) var(--pl-ease);
+}
+.bm-item:hover {
+  border-color: var(--pl-green);
+  transform: translateY(-1px);
+}
+.bm-item:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 2px;
+}
+
+/* ---------- banner: ancho, bajo, con tratamiento de portada ----------
+   La acción principal ocupa el ANCHO, no el alto. Antes era un bloque
+   vertical que abarcaba dos filas y le sobraba la mitad: el contenido
+   entraba arriba y quedaban dos tercios de verde vacío. Como banner mide
+   lo que su contenido necesita, se lee de un vistazo y deja lugar para
+   un dato al costado. */
+.bm-item--banner {
+  grid-column: 1 / -1;
+  position: relative;
+  overflow: hidden;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
+  background: var(--pl-hero-gradient);
+  border-color: transparent;
+  color: var(--pl-on-brand);
+}
+.bm-item--banner:hover { border-color: transparent; }
+
+/* Textura de portada: la misma idea del banner del tablero — una veladura
+   diagonal que le da cuerpo sin necesitar una foto. Si el municipio tiene
+   portada propia se pinta abajo con --bm-portada. */
+.bm-item--banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    var(--bm-portada, none),
+    linear-gradient(112deg, color-mix(in srgb, #fff 14%, transparent) 0%, transparent 46%),
+    radial-gradient(120% 150% at 100% 0%, color-mix(in srgb, #000 22%, transparent) 0%, transparent 60%);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.85;
+}
+.bm-item--banner > * { position: relative; }
+
+.bm-item--banner .bm-titulo { font-size: 16px; }
+.bm-item--banner .bm-detalle { color: color-mix(in srgb, var(--pl-on-brand) 82%, transparent); }
+.bm-item--banner .bm-icono {
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  border-radius: var(--pl-radius-md);
+  background: color-mix(in srgb, var(--pl-on-brand) 18%, transparent);
+  color: var(--pl-on-brand);
+}
+
+/* ---------- destacada: alta, sobre el acento ---------- */
+.bm-item--destacada {
+  grid-row: span 2;
+  justify-content: space-between;
+  background: var(--pl-hero-gradient);
+  border-color: transparent;
+  color: var(--pl-on-brand);
+  min-height: 116px;
+}
+.bm-item--destacada:hover { border-color: transparent; }
+.bm-item--destacada .bm-titulo { font-size: 17px; }
+.bm-item--destacada .bm-detalle { color: color-mix(in srgb, var(--pl-on-brand) 80%, transparent); }
+.bm-item--destacada .bm-icono { color: var(--pl-on-brand); }
+
+/* ---------- ancha: tira de ancho completo ---------- */
+.bm-item--ancha {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+}
+
+.bm-icono {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--pl-green);
+}
+.bm-item--ancha .bm-icono { width: 18px; height: 18px; }
+
+.bm-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bm-titulo {
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  /* Se lee entero: un título cortado no sirve para elegir. */
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.bm-detalle {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* El dato que trae la acción: es lo que hace que el menú informe algo
+   con sólo abrirlo, en vez de ser una lista de etiquetas mudas. */
+.bm-dato {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: none;
+  margin-left: auto;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+.bm-dato b {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-green-700);
+}
+.bm-item--destacada .bm-dato,
+.bm-item--destacada .bm-dato b,
+.bm-item--banner .bm-dato,
+.bm-item--banner .bm-dato b { color: var(--pl-on-brand); }
+
+/* En el banner el dato va a la derecha, alineado con el titulo. */
+.bm-item--banner .bm-dato {
+  margin-left: auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  text-align: right;
+}
+.bm-item--banner .bm-dato b { font-size: 20px; line-height: 1.1; }
+.bm-item--banner .bm-dato-sub {
+  white-space: normal;
+  font-size: var(--pl-fs-micro);
+  color: color-mix(in srgb, var(--pl-on-brand) 78%, transparent);
+  max-width: 11ch;
+  line-height: 1.2;
+}
+.bm-dato-sub { white-space: nowrap; }
+
+/* En bloques verticales el dato va debajo, no al costado. */
+.bm-item--chica .bm-dato,
+.bm-item--destacada .bm-dato { margin-left: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-item { transition: none; }
+  .bm-item:hover { transform: none; }
+}
+
+/* En pantallas muy angostas el mosaico se endereza: con menos de ~300 px
+   dos columnas dejan títulos de una palabra por renglón. */
+@media (max-width: 340px) {
+  .bm { grid-template-columns: 1fr; }
+  .bm-item--destacada { grid-row: auto; min-height: 0; }
+}

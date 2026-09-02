@@ -26,3 +26,8 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# E2E (Playwright): artefactos y sesiones locales
+e2e/.auth/
+e2e/.artifacts/
+e2e/.report/

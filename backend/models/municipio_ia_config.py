@@ -32,10 +32,10 @@ class MunicipioIaConfig(Base):
     # apagar el panel de un listado sin tocar el resto de la IA del municipio.
     reclamos = Column(Boolean, default=True, nullable=False)
     tramites = Column(Boolean, default=True, nullable=False)
-    # Proveedor (hoy solo 'gemini'; se deja por extensibilidad).
-    provider = Column(String(30), default="gemini", nullable=False)
-    # Modelo concreto (ej: gemini-2.5-flash, gemini-1.5-flash, gemini-1.5-pro).
-    modelo = Column(String(60), default="gemini-2.5-flash", nullable=False)
+    # Proveedor (hoy solo 'groq'; se deja por extensibilidad).
+    provider = Column(String(30), default="groq", nullable=False)
+    # Modelo concreto de Groq (ej: openai/gpt-oss-120b, openai/gpt-oss-20b).
+    modelo = Column(String(60), default="openai/gpt-oss-120b", nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

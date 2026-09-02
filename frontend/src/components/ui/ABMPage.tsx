@@ -1,4 +1,26 @@
+/**
+ * @deprecated ABM VIEJO. No recibe pantallas nuevas.
+ * ---------------------------------------------------------------------------
+ * Sigue vivo SÓLO para mantener las pantallas que ya estaban construidas sobre
+ * él (la lista exacta está en `eslint.config.js`, que además impide que crezca:
+ * cualquier archivo fuera de esa lista que lo importe rompe el lint).
+ *
+ * Una pantalla nueva se arma con el kit `components/abmv2`: `SemanticAbmPage`
+ * como composición completa, o sus piezas sueltas —PageHeader, ListToolbar,
+ * FilterBar, DataTable, SideModal, CardGrid—, que se usan de a una o todas
+ * juntas.
+ *
+ * La razón de fondo no es estética: el kit se PROYECTA solo a mobile. Su
+ * DataTable tiene dos renderers —columnas en ancho, fichas en angosto, elegido
+ * por el ancho del contenedor— alimentados por `RolesSemanticos`. Este control
+ * no: apila columnas y por eso las pantallas que lo usan se ven mal en el
+ * teléfono. Migrar una pantalla es, casi siempre, escribir su mapa de roles.
+ *
+ * Ver: CLAUDE.md regla 6.bis · components/abmv2/README.md ·
+ *      APP_GUIDE/components/v2/abmv2/PROYECCION-MOBILE.md
+ */
 import { ReactNode, useState, useEffect } from 'react';
+import { useEmbed } from '../abmv2/useEmbed';
 import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -256,6 +278,14 @@ interface ABMPageProps {
      * fila de tabla. Si no se pasa, ABMPage cae en `children` (compat).
      */
     renderItem?: (item: any, indexInGroup: number) => ReactNode;
+    /**
+     * Layout de los items en la vista CARDS:
+     *  - 'grid' (default): grilla multi-columna, para tarjetas verticales (ej. Reclamos).
+     *  - 'list': una sola columna full-width, para cards que son FILAS horizontales
+     *    (ej. Pagos/Gastos: avatar | concepto | monto). En grid se apretaban a 1/3
+     *    y truncaban el texto; en list ocupan todo el ancho como corresponde.
+     */
+    itemLayout?: 'grid' | 'list';
   };
 
   // Panel lateral derecho (solo desktop, lg+). Si se pasa, el grid de cards
@@ -340,6 +370,15 @@ export function ABMPage({
   defaultViewMode,
   stickyHeader = true,
 }: ABMPageProps) {
+  // Embebida en el panel de Configuración: sin cabecera propia (el contenedor
+  // ya puso el título) y publicando su total para el contador del riel.
+  const { embedded, slotId, reportarTotal } = useEmbed();
+  const totalReportable = pagination?.totalItems;
+  useEffect(() => {
+    if (slotId && reportarTotal && typeof totalReportable === 'number') {
+      reportarTotal(slotId, totalReportable);
+    }
+  }, [slotId, reportarTotal, totalReportable]);
   // Combinar filters con extraFilters para compatibilidad
   const allFilters = filters || extraFilters;
   const { theme } = useTheme();
@@ -357,7 +396,10 @@ export function ABMPage({
         return saved;
       }
     }
-    return defaultViewMode || (guidedView ? 'guided' : (tableView ? 'table' : 'cards'));
+    // Default global (pedido del dueño): TODOS los ABM abren en TABLA cuando la
+    // pantalla tiene tableView. Sin tabla, cae a guiada o cards. La preferencia
+    // guardada (viewStorageKey) igual manda si el usuario ya eligió otra vista.
+    return defaultViewMode || (tableView ? 'table' : (guidedView ? 'guided' : 'cards'));
   })();
   const [viewMode, setViewModeState] = useState<ViewMode>(resolvedDefaultViewMode);
   const setViewMode = (m: ViewMode) => {
@@ -571,7 +613,7 @@ export function ABMPage({
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
           {/* BackLink + Icono + Título - se oculta cuando el search está enfocado en mobile */}
           <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
-            {backLink && (
+            {backLink && !embedded && (
               <Link
                 to={backLink}
                 className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
@@ -592,9 +634,11 @@ export function ABMPage({
                 <span style={{ color: theme.primary }}>{icon}</span>
               </div>
             )}
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
-              {title}
-            </h1>
+            {!embedded && (
+              <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
+                {title}
+              </h1>
+            )}
           </div>
 
           {/* Separador vertical - se oculta en mobile cuando search enfocado */}
@@ -634,7 +678,7 @@ export function ABMPage({
               className="sm:hidden p-2 rounded-lg transition-all active:scale-95 flex-shrink-0"
               style={{
                 backgroundColor: theme.primary,
-                color: '#ffffff',
+                color: 'var(--pl-on-accent)',
               }}
             >
               <Plus className="h-5 w-5" />
@@ -650,7 +694,7 @@ export function ABMPage({
               <button
                 onClick={() => setViewMode('cards')}
                 className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'cards' ? 'text-white' : ''}`}
-                style={{ color: viewMode === 'cards' ? '#ffffff' : theme.textSecondary }}
+                style={{ color: viewMode === 'cards' ? 'var(--pl-on-accent)' : theme.textSecondary }}
                 title="Vista tarjetas"
               >
                 {viewMode === 'cards' && (
@@ -667,7 +711,7 @@ export function ABMPage({
                 <button
                   onClick={() => setViewMode('table')}
                   className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'table' ? 'text-white' : ''}`}
-                  style={{ color: viewMode === 'table' ? '#ffffff' : theme.textSecondary }}
+                  style={{ color: viewMode === 'table' ? 'var(--pl-on-accent)' : theme.textSecondary }}
                   title="Vista tabla"
                 >
                   {viewMode === 'table' && (
@@ -894,9 +938,13 @@ export function ABMPage({
                         </div>
                         <div
                           className={
-                            sidePanel
-                              ? 'grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5'
-                              : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5'
+                            groupBy.itemLayout === 'list'
+                              // Filas full-width (una sola columna). Para cards
+                              // horizontales tipo Pagos, que en grid quedaban angostas.
+                              ? 'grid grid-cols-1 gap-3'
+                              : sidePanel
+                                ? 'grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5'
+                                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5'
                           }
                         >
                           {g.items.map((it, i) => groupBy.renderItem!(it, i))}
@@ -1214,7 +1262,7 @@ export function ABMSheetFooter({ onCancel, onSave, saving = false, saveLabel = '
         onClick={onSave}
         disabled={saving}
         className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
-        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
       >
         {/* Shimmer effect */}
         <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -2309,7 +2357,7 @@ function ViewToggleHint({ hasGuided, hasTable }: { hasGuided: boolean; hasTable:
       <button
         onClick={dismiss}
         className="text-xs px-2 py-1 rounded font-semibold hover:bg-opacity-80 transition-colors flex-shrink-0"
-        style={{ backgroundColor: theme.primary, color: '#fff' }}
+        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
       >
         Entendido
       </button>

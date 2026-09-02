@@ -127,7 +127,10 @@ async def update_asignacion_cuadrilla(
         select(EmpleadoCuadrilla).options(
             selectinload(EmpleadoCuadrilla.empleado),
             selectinload(EmpleadoCuadrilla.cuadrilla)
-        ).where(EmpleadoCuadrilla.id == asignacion_id)
+        ).join(Empleado).where(
+            EmpleadoCuadrilla.id == asignacion_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     asignacion = result.scalar_one_or_none()
     if not asignacion:
@@ -150,7 +153,10 @@ async def desasignar_empleado_cuadrilla(
 ):
     """Desactiva una asignacion empleado-cuadrilla."""
     result = await db.execute(
-        select(EmpleadoCuadrilla).where(EmpleadoCuadrilla.id == asignacion_id)
+        select(EmpleadoCuadrilla).join(Empleado).where(
+            EmpleadoCuadrilla.id == asignacion_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     asignacion = result.scalar_one_or_none()
     if not asignacion:
@@ -237,7 +243,10 @@ async def update_ausencia(
         select(EmpleadoAusencia).options(
             selectinload(EmpleadoAusencia.empleado),
             selectinload(EmpleadoAusencia.aprobado_por)
-        ).where(EmpleadoAusencia.id == ausencia_id)
+        ).join(Empleado).where(
+            EmpleadoAusencia.id == ausencia_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     ausencia = result.scalar_one_or_none()
     if not ausencia:
@@ -266,7 +275,10 @@ async def delete_ausencia(
 ):
     """Elimina una ausencia."""
     result = await db.execute(
-        select(EmpleadoAusencia).where(EmpleadoAusencia.id == ausencia_id)
+        select(EmpleadoAusencia).join(Empleado).where(
+            EmpleadoAusencia.id == ausencia_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     ausencia = result.scalar_one_or_none()
     if not ausencia:
@@ -351,7 +363,10 @@ async def update_horario(
     result = await db.execute(
         select(EmpleadoHorario).options(
             selectinload(EmpleadoHorario.empleado)
-        ).where(EmpleadoHorario.id == horario_id)
+        ).join(Empleado).where(
+            EmpleadoHorario.id == horario_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     horario = result.scalar_one_or_none()
     if not horario:
@@ -380,7 +395,10 @@ async def delete_horario(
 ):
     """Elimina un horario."""
     result = await db.execute(
-        select(EmpleadoHorario).where(EmpleadoHorario.id == horario_id)
+        select(EmpleadoHorario).join(Empleado).where(
+            EmpleadoHorario.id == horario_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     horario = result.scalar_one_or_none()
     if not horario:
@@ -467,6 +485,16 @@ async def create_metrica(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Registra metricas de un periodo."""
+    # Verificar que el empleado existe y es del municipio
+    result = await db.execute(
+        select(Empleado).where(
+            Empleado.id == data.empleado_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
     metrica = EmpleadoMetrica(**data.model_dump())
     db.add(metrica)
     await db.commit()
@@ -552,7 +580,10 @@ async def update_capacitacion(
     result = await db.execute(
         select(EmpleadoCapacitacion).options(
             selectinload(EmpleadoCapacitacion.empleado)
-        ).where(EmpleadoCapacitacion.id == capacitacion_id)
+        ).join(Empleado).where(
+            EmpleadoCapacitacion.id == capacitacion_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     capacitacion = result.scalar_one_or_none()
     if not capacitacion:
@@ -575,7 +606,10 @@ async def delete_capacitacion(
 ):
     """Elimina una capacitacion."""
     result = await db.execute(
-        select(EmpleadoCapacitacion).where(EmpleadoCapacitacion.id == capacitacion_id)
+        select(EmpleadoCapacitacion).join(Empleado).where(
+            EmpleadoCapacitacion.id == capacitacion_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
     )
     capacitacion = result.scalar_one_or_none()
     if not capacitacion:
@@ -598,6 +632,16 @@ async def get_companeros_cuadrilla(
     Obtiene los IDs de todos los companeros de cuadrilla de un empleado.
     Util para filtrar reclamos en el tablero.
     """
+    # Verificar que el empleado existe y es del municipio del caller
+    result = await db.execute(
+        select(Empleado).where(
+            Empleado.id == empleado_id,
+            Empleado.municipio_id == current_user.municipio_id
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
     # Obtener cuadrillas donde participa el empleado
     result = await db.execute(
         select(EmpleadoCuadrilla.cuadrilla_id).where(

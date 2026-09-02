@@ -7,7 +7,7 @@
 ## Auth y base
 
 - Mismo canal que el resto: header **`X-SalesBot-Key: <key>`** (la que ya usás).
-- Base: `https://munify-api-vmpxsxe7ra-rj.a.run.app`
+- Base: `https://munify-api-vmpxsxe7ra-rj.a.run.app` **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app]**
 - **Tenant-scoped:** el `municipio_id` va SIEMPRE en el path. El backend valida que
   el `tramite_id` pertenezca a ese municipio y resuelve solo la dependencia que
   atiende ese trámite. No se puede cruzar municipios.

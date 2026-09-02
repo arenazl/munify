@@ -19,6 +19,10 @@ class Municipio(Base):
     descripcion = Column(Text, nullable=True)
 
     # Ubicacion geografica
+    # ISO-3166 alpha-2. Lo consume el autocomplete de direcciones para no
+    # buscar en el pais equivocado: con 'ar' fijo, en Asuncion no devolvia
+    # NADA y el vecino no podia cargar la direccion de su reclamo.
+    pais = Column(String(2), nullable=False, default="AR", server_default="AR")
     latitud = Column(Float, nullable=False)  # Centro del municipio
     longitud = Column(Float, nullable=False)
     radio_km = Column(Float, default=10.0)  # Radio aproximado de cobertura en km
@@ -70,6 +74,28 @@ class Municipio(Base):
     #            acceso es por la URL directa /<codigo> con email + contraseña.
     # Los munis creados por el endpoint demo arrancan en True (default).
     es_demo = Column(Boolean, default=True, nullable=False)
+
+    # Demo PROTEGIDA por PIN: la botonera de perfiles se muestra igual, pero
+    # el quick-login pide una clave numérica. El PIN no se guarda acá: ES la
+    # password real de los usuarios demo del muni (el gate lo hace /auth/login
+    # contra el hash, no la UI). Este flag solo le dice al frontend que
+    # pregunte en vez de usar demo123.
+    demo_protegido = Column(Boolean, default=False, nullable=False, server_default="0")
+
+    # LLAVE DE ACCESO de la demo. Se genera al crearla y viaja UNA sola vez,
+    # en la respuesta del alta: el que la genero se lo guarda y puede pasarle
+    # el link a quien quiera. Sin esta llave la demo se VE en la vitrina de
+    # /demo pero no se entra — la grilla es prueba social, no una puerta.
+    # Motivo (dueño, 2026-09-02): las demos ajenas pueden tener datos cargados
+    # por otra persona y nadie tiene por que entrar ahi.
+    demo_token = Column(String(64), nullable=True, index=True)
+
+    # Demo DE MUESTRA: la unica que se entra sin llave. Es la vitrina que el
+    # visitante toca antes de generar la suya ("Probar la plataforma", con
+    # datos ya cargados). Se marca a mano sobre las demos propias — las que
+    # genera un visitante nacen SIEMPRE en False. Tampoco se pueden borrar
+    # desde la UI publica.
+    demo_publica = Column(Boolean, default=False, nullable=False, server_default="0")
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

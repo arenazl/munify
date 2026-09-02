@@ -2,6 +2,16 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
+import ReclamoLegacyRedirect from './components/ReclamoLegacyRedirect';
+import { BRAND, ACCESOS_DE_MARCA, rutaDeAcceso } from './brands';
+
+// Mono-tenant (BRAND.municipioCodigo presente): el "home" de la marca es el
+// acceso directo a SU municipio (login con botonera), nunca el generador de
+// demos ni la grilla de Munify. El ruteo cerrado se deriva de esa propiedad
+// semántica del brand, no de un flag "soy white-label".
+// La ruta puede no ser `/<codigo>`: una marca con `rutaAcceso` entra por la
+// suya (`/py/asuncion`) para no pisarse con otra marca del mismo municipio.
+const BRAND_HOME = BRAND.municipioCodigo ? (rutaDeAcceso(BRAND) as string) : '/login';
 
 // Pages
 import Landing from './pages/Landing';
@@ -21,13 +31,11 @@ import Mapa from './pages/Mapa';
 import Tablero from './pages/Tablero';
 import Empleados from './pages/Empleados';
 import Usuarios from './pages/Usuarios';
-import Categorias from './pages/Categorias';
 import CategoriasReclamoConfig from './pages/CategoriasReclamoConfig';
 import CategoriasTramiteConfig from './pages/CategoriasTramiteConfig';
 import TramitesConfig from './pages/TramitesConfig';
 import ProveedoresPago from './pages/ProveedoresPago';
 import Zonas from './pages/Zonas';
-import Configuracion from './pages/Configuracion';
 import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamoPage from './pages/NuevoReclamoPage';
@@ -44,6 +52,7 @@ import Mostrador from './pages/Mostrador';
 import SidebarConfig from './pages/SidebarConfig';
 import ModulosMunicipio from './pages/admin/ModulosMunicipio';
 import ConfiguracionIA from './pages/ConfiguracionIA';
+import ConsumoIA from './pages/ConsumoIA';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -55,22 +64,28 @@ import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
 import Onboarding from './pages/Onboarding';
 import MunicipioHome from './pages/MunicipioHome';
+import Configuracion from './pages/Configuracion/Configuracion';
+
 import CapturaMovil from './pages/CapturaMovil';
 import CapturaMovilFake from './pages/CapturaMovilFake';
 import GestionCuadrillas from './pages/GestionCuadrillas';
 import OrdenesTrabajo from './pages/OrdenesTrabajo';
 import Inventario from './pages/Inventario';
 import InventarioCategoriasConfig from './pages/InventarioCategoriasConfig';
-import OTTiposTrabajoConfig from './pages/OTTiposTrabajoConfig';
+import InventarioMovimientos from './pages/InventarioMovimientos';
+import InventarioDepositosConfig from './pages/InventarioDepositosConfig';
+import InventarioOrdenesCompra from './pages/InventarioOrdenesCompra';
+import POITiposConfig from './pages/POITiposConfig';
 import CatalogoTramites from './pages/CatalogoTramites';
 import GestionAusencias from './pages/GestionAusencias';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import AuditLogs from './pages/admin/AuditLogs';
+import SeedLogs from './pages/SeedLogs';
 import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
 import Demo from './pages/Demo';
-import DemoReady from './pages/DemoReady';
+import DemoListo from './pages/DemoListo';
 import PresentacionMunify from './pages/PresentacionMunify';
 import MunicipioAcceso from './pages/MunicipioAcceso';
 import DependenciasConfig from './pages/DependenciasConfig';
@@ -84,11 +99,15 @@ import TesoreriaContactos from './pages/TesoreriaContactos';
 import TesoreriaMapa from './pages/TesoreriaMapa';
 import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
 import TesoreriaProyectos from './pages/TesoreriaProyectos';
-import TesoreriaAgenda from './pages/TesoreriaAgenda';
+import PagosProgramados from './pages/PagosProgramados';
 import TesoreriaCuracionBartolo from './pages/TesoreriaCuracionBartolo';
 import ConfiguracionTesoreria from './pages/ConfiguracionTesoreria';
 import OrdenesPago from './pages/OrdenesPago';
 import TesoreriaCajas from './pages/TesoreriaCajas';
+import Avisos from './pages/Avisos';
+import Flota from './pages/Flota';
+import Presentismo from './pages/Presentismo';
+import Reservas from './pages/Reservas';
 import TesoreriaConciliacion from './pages/TesoreriaConciliacion';
 import SueldosEmpleados from './pages/SueldosEmpleados';
 import ReportesContaduria from './pages/ReportesContaduria';
@@ -120,7 +139,7 @@ import {
 
 export const router = createBrowserRouter([
   // === DEMOS DE DISEÑO ===
-  { path: '/demos', element: <DemosIndex /> },
+  { path: '/demos', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemosIndex /> },
   { path: '/demos/glassmorphism', element: <DemoGlassmorphism /> },
   { path: '/demos/neubrutalism', element: <DemoNeubrutalism /> },
   { path: '/demos/minimal', element: <DemoMinimal /> },
@@ -128,9 +147,9 @@ export const router = createBrowserRouter([
   { path: '/demos/cyberpunk', element: <DemoCyberpunk /> },
 
   // === REELS DE PROMOCIÓN (marketing) ===
-  { path: '/reels', element: <ReelsStudio /> },
-  { path: '/reels/videos', element: <ReelsVideos /> },  // galería de finales (voz+música+b-roll)
-  { path: '/voz', element: <VoiceStudio /> },
+  { path: '/reels', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <ReelsStudio /> },
+  { path: '/reels/videos', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <ReelsVideos /> },  // galería de finales (voz+música+b-roll)
+  { path: '/voz', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <VoiceStudio /> },
 
   // === APP MOBILE PARA CIUDADANOS ===
   // /app ahora redirige a /home (página responsiva unificada)
@@ -159,11 +178,13 @@ export const router = createBrowserRouter([
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
-  { path: '/demo', element: <Demo /> },
-  { path: '/demo/listo', element: <DemoReady /> },
+  { path: '/demo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Demo /> },
+  { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
   // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
-  { path: '/presentacion', element: <PresentacionMunify /> },
-  { path: '/bienvenido', element: <Landing /> },
+  { path: '/presentacion', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <PresentacionMunify /> },
+  // Marca mono-tenant: /bienvenido (selector de municipios de Munify) NUNCA se
+  // muestra — logout y deep-links caen en el acceso cerrado de la marca.
+  { path: '/bienvenido', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   // Handoff de captura móvil (DNI + selfie con Didit en el celu del operador)
@@ -185,7 +206,8 @@ export const router = createBrowserRouter([
   { path: '/onboarding', element: <Onboarding /> },  // Wizard post-registro
 
   // === RUTA RAÍZ - Redirección inteligente ===
-  { path: '/', element: <RootRedirect /> },
+  { path: '/', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <RootRedirect /> },
+
 
   // === RUTAS PROTEGIDAS (Panel de Gestión) ===
   {
@@ -228,6 +250,11 @@ export const router = createBrowserRouter([
       { path: 'ordenes-trabajo', element: <ProtectedRoute roles={['admin', 'supervisor', 'empleado']}><OrdenesTrabajo /></ProtectedRoute> },
       // Inventario (activos + consumibles; se cruza con las OT)
       { path: 'inventario', element: <ProtectedRoute roles={['admin', 'supervisor']}><Inventario /></ProtectedRoute> },
+      // El LIBRO del deposito: entradas, salidas, ajustes y lo que se llevo
+      // cada OT. Esto es la operacion; el inventario de arriba es el catalogo.
+      { path: 'inventario/movimientos', element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioMovimientos /></ProtectedRoute> },
+      // La reposicion: al recibirla, el stock entra por la puerta del libro.
+      { path: 'inventario/compras', element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioOrdenesCompra /></ProtectedRoute> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor', 'empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)
@@ -242,9 +269,16 @@ export const router = createBrowserRouter([
       { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
       { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
       { path: 'tesoreria/proyectos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyectos /></ProtectedRoute> },
-      { path: 'tesoreria/agenda', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaAgenda /></ProtectedRoute> },
+      { path: 'tesoreria/pagos-programados', element: <ProtectedRoute roles={['admin', 'supervisor']}><PagosProgramados /></ProtectedRoute> },
+      // La ruta vieja ('agenda') queda redirigiendo: hay deep-links guardados y
+      // los CTA de los hints apuntaban ahí.
+      { path: 'tesoreria/agenda', element: <Navigate to="/gestion/tesoreria/pagos-programados" replace /> },
       { path: 'contaduria/ordenes-pago', element: <ProtectedRoute roles={['admin', 'supervisor']}><OrdenesPago /></ProtectedRoute> },
       { path: 'tesoreria/cajas', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaCajas /></ProtectedRoute> },
+      { path: 'presentismo', element: <Presentismo /> },
+      { path: 'reservas', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reservas /></ProtectedRoute> },
+      { path: 'flota', element: <ProtectedRoute roles={['admin', 'supervisor']}><Flota /></ProtectedRoute> },
+      { path: 'avisos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Avisos /></ProtectedRoute> },
       { path: 'tesoreria/conciliacion', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaConciliacion /></ProtectedRoute> },
       { path: 'sueldos/empleados', element: <ProtectedRoute roles={['admin', 'supervisor']}><SueldosEmpleados /></ProtectedRoute> },
       { path: 'contaduria/reportes', element: <ProtectedRoute roles={['admin', 'supervisor']}><ReportesContaduria /></ProtectedRoute> },
@@ -274,8 +308,10 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute roles={['admin', 'supervisor']}><Usuarios /></ProtectedRoute>
       },
       {
+        // Legacy: la pantalla vieja de categorías (Categorias.tsx) quedó sin
+        // links. Redirige al ABM per-municipio de categorías de reclamo.
         path: 'categorias',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><Categorias /></ProtectedRoute>
+        element: <Navigate to="/gestion/categorias-reclamo" replace />
       },
       {
         path: 'zonas',
@@ -303,8 +339,14 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioCategoriasConfig /></ProtectedRoute>
       },
       {
-        path: 'tipos-trabajo',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><OTTiposTrabajoConfig /></ProtectedRoute>
+        // Donde esta guardada cada cosa. Vienen tres del template y el
+        // municipio los edita, como las categorias.
+        path: 'depositos',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioDepositosConfig /></ProtectedRoute>
+      },
+      {
+        path: 'poi-tipos',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><POITiposConfig /></ProtectedRoute>
       },
       // ABM de trámites per-municipio
       {
@@ -326,6 +368,13 @@ export const router = createBrowserRouter([
       {
         path: 'admin/audit-logs',
         element: <ProtectedRoute roles={['admin']}><AuditLogs /></ProtectedRoute>
+      },
+      {
+        // Bitácora de la semilla de demos. Mismo gate que el resto del área de
+        // super admin: rol admin + `isSuperAdmin` en el sidebar; el backend
+        // vuelve a exigir admin SIN municipio_id (require_super_admin).
+        path: 'admin/seed-logs',
+        element: <ProtectedRoute roles={['admin']}><SeedLogs /></ProtectedRoute>
       },
       {
         path: 'admin/suscripciones',
@@ -395,6 +444,11 @@ export const router = createBrowserRouter([
         path: 'configuracion-ia',
         element: <ProtectedRoute roles={['admin']}><ConfiguracionIA /></ProtectedRoute>
       },
+      // Consumo de IA: tokens, latencia y llamadas que no devolvieron nada
+      {
+        path: 'admin/consumo-ia',
+        element: <ProtectedRoute roles={['admin']}><ConsumoIA /></ProtectedRoute>
+      },
       // Ajustes -> Configuración (compat: ambas rutas viejas redirigen).
       {
         path: 'ajustes',
@@ -435,10 +489,26 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Acceso directo por código de municipio: /<codigo> -> login del muni.
-  // Va al final: las rutas estáticas de arriba tienen prioridad de match.
+  // Accesos de marca con ruta propia (/py/asuncion -> muni 'asuncion' con la
+  // marca Munify). Van ANTES del comodín de un tramo y llevan el código
+  // adentro, porque el path ya no lo dice.
+  ...ACCESOS_DE_MARCA.map(({ ruta, codigo }) => ({
+    path: ruta,
+    element: <MunicipioAcceso codigo={codigo} />,
+  })),
+
+  // Acceso directo por código de municipio: /<codigo> redirige a
+  // /<codigo>/login. Va al final: las rutas estáticas tienen prioridad.
   { path: '/:codigo', element: <MunicipioAcceso /> },
 
-  // Catch-all: redirigir a demo si no está autenticado
-  { path: '*', element: <Navigate to="/demo" replace /> },
+  // El login del tenant CON el municipio en la URL (/merlo/login): el muni no
+  // puede desaparecer de la barra al pasar del acceso al login (pedido del
+  // dueño, 2026-08-25). El login se renderiza en el lugar, sin navegar.
+  { path: '/:codigo/login', element: <MunicipioAcceso enLogin /> },
+
+  // Links historicos: /reclamos/:id -> /gestion/reclamos/:id (sanea push/WhatsApp viejos)
+  { path: '/reclamos/:id', element: <ReclamoLegacyRedirect /> },
+
+  // Catch-all: redirigir a demo si no está autenticado (mono-tenant: al acceso de su muni)
+  { path: '*', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demo'} replace /> },
 ]);

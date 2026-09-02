@@ -21,9 +21,14 @@ from .ia_config import router as ia_config_router
 from .turnos import router as turnos_router
 from .turnos_tramite import router as turnos_tramite_router
 from .calificaciones import router as calificaciones_router
-from .escalado import router as escalado_router
+# F0: escalado apagado (cross-tenant + IntegrityError). Revive o se borra en F5. Ver docs/reclamos/02.
+# from .escalado import router as escalado_router
 from .emails import router as emails_router
 from .portal_publico import router as portal_publico_router
+from .calls import router as calls_router
+from .calls_ia import router as calls_ia_router
+from .ia_uso import router as ia_uso_router
+from .calls_push import router as calls_push_router
 from .municipios import router as municipios_router
 from .imagenes import router as imagenes_router
 from .gamificacion import router as gamificacion_router
@@ -42,6 +47,7 @@ from .geocoding import router as geocoding_router
 from .agenda_config import router as agenda_config_router
 from .tarjetas import router as tarjetas_router
 from .admin_audit import router as admin_audit_router
+from .admin_seed_logs import router as admin_seed_logs_router
 from .tasas import router as tasas_router
 from .pagos import router as pagos_router
 from .pagos_contaduria import router as pagos_contaduria_router
@@ -56,6 +62,9 @@ from .modulos import router as modulos_router
 from .contactos import router as contactos_router
 from .gastos import router as gastos_router
 from .proyectos import router as proyectos_router
+from .flota import router as flota_router
+from .presentismo import router as presentismo_router
+from .reservas import router as reservas_router
 from .cotizacion import router as cotizacion_router
 from .tesoreria_catalogo import router as tesoreria_catalogo_router
 from .tesoreria_conceptos import router as tesoreria_conceptos_router
@@ -67,11 +76,12 @@ from .tesoreria_conciliacion import router as tesoreria_conciliacion_router
 from .tesoreria_conceptos_liquidacion import router as tesoreria_conceptos_liquidacion_router
 from .ordenes_pago import router as ordenes_pago_router
 from .ordenes_trabajo import router as ordenes_trabajo_router
-from .ot_tipos_trabajo import router as ot_tipos_trabajo_router
+from .poi import router as poi_router
 from .inventario import router as inventario_router
 from .contaduria_retenciones import router as contaduria_retenciones_router
 from .tesoreria_parajes import router as tesoreria_parajes_router
 from .tesoreria_import import router as tesoreria_import_router
+from .admin_ops import router as admin_ops_router
 
 api_router = APIRouter()
 
@@ -101,9 +111,14 @@ api_router.include_router(turnos_tramite_router)  # prefix definido en el router
 api_router.include_router(agenda_config_router, tags=["Agenda"])  # rutas con path completo (/agenda-config, /agenda-excepciones)
 api_router.include_router(tarjetas_router, tags=["Tarjetas"])  # ABM tarjetas de credito (/tarjetas)
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["Calificaciones"])
-api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
+# F0: escalado apagado (cross-tenant + IntegrityError). Revive o se borra en F5. Ver docs/reclamos/02.
+# api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
 api_router.include_router(emails_router, prefix="/emails", tags=["Emails"])
 api_router.include_router(portal_publico_router, prefix="/publico", tags=["Portal Público"])
+api_router.include_router(calls_router, prefix="/public/calls", tags=["Calls"])
+api_router.include_router(calls_ia_router, prefix="/public/calls", tags=["Calls IA"])
+api_router.include_router(ia_uso_router, tags=["IA Uso"])
+api_router.include_router(calls_push_router, prefix="/public/calls", tags=["Calls Push"])
 api_router.include_router(imagenes_router, tags=["Imágenes"])
 api_router.include_router(gamificacion_router, prefix="/gamificacion", tags=["Gamificación"])
 api_router.include_router(reportes_router, prefix="/reportes", tags=["Reportes"])
@@ -113,13 +128,14 @@ api_router.include_router(tramites_sugeridos_router, prefix="/tramites-sugeridos
 api_router.include_router(push_router, tags=["Push Notifications"])
 api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
 api_router.include_router(ordenes_trabajo_router, prefix="/ordenes-trabajo", tags=["Ordenes de Trabajo"])
-api_router.include_router(ot_tipos_trabajo_router, prefix="/ot-tipos-trabajo", tags=["Ordenes de Trabajo - Tipos"])
+api_router.include_router(poi_router, prefix="/poi", tags=["Puntos de Interes (F6 B)"])
 api_router.include_router(inventario_router, prefix="/inventario", tags=["Inventario"])
 api_router.include_router(planificacion_router, prefix="/planificacion", tags=["Planificación"])
 api_router.include_router(dependencias_router, tags=["Dependencias"])  # Ya tiene prefix /dependencias
 api_router.include_router(validacion_identidad_router)  # Ya tiene prefix /validacion-identidad
 api_router.include_router(geocoding_router, prefix="/geocoding", tags=["Geocoding"])
 api_router.include_router(admin_audit_router, tags=["Admin Audit"])  # ya tiene prefix /admin
+api_router.include_router(admin_seed_logs_router, tags=["Admin Seed Logs"])  # ya tiene prefix /admin
 api_router.include_router(tasas_router, tags=["Tasas"])  # ya tiene prefix /tasas
 api_router.include_router(pagos_router, tags=["Pagos"])  # ya tiene prefix /pagos
 api_router.include_router(pagos_contaduria_router, tags=["Pagos - Contaduria"])  # prefix /pagos/contaduria
@@ -135,6 +151,9 @@ api_router.include_router(modulos_router, prefix="/modulos", tags=["Modulos"])
 api_router.include_router(contactos_router, prefix="/tesoreria/contactos", tags=["Tesoreria - Contactos"])
 api_router.include_router(gastos_router, prefix="/tesoreria/gastos", tags=["Tesoreria - Gastos"])
 api_router.include_router(proyectos_router, prefix="/tesoreria/proyectos", tags=["Tesoreria - Proyectos"])
+api_router.include_router(flota_router, prefix="/flota", tags=["Recursos - Flota"])
+api_router.include_router(presentismo_router, prefix="/presentismo", tags=["Recursos - Presentismo"])
+api_router.include_router(reservas_router, prefix="/reservas", tags=["Recursos - Reservas"])
 api_router.include_router(cotizacion_router, prefix="/cotizacion", tags=["Cotizacion USD"])
 api_router.include_router(tesoreria_catalogo_router, prefix="/tesoreria", tags=["Tesoreria - Catalogos"])
 api_router.include_router(tesoreria_conceptos_router, prefix="/tesoreria", tags=["Tesoreria - Conceptos ABM"])
@@ -149,6 +168,9 @@ api_router.include_router(ordenes_pago_router, prefix="/contaduria/ordenes-pago"
 api_router.include_router(contaduria_retenciones_router, prefix="/contaduria/retenciones", tags=["Contaduria - Retenciones"])
 api_router.include_router(tesoreria_parajes_router, prefix="/tesoreria/parajes", tags=["Tesoreria - Parajes"])
 api_router.include_router(tesoreria_import_router, prefix="/tesoreria/import", tags=["Tesoreria - Importadores"])
+
+# Admin Ops — circuito de operaciones de datos por HTTP (migraciones/diagnosticos). Ver api/admin_ops.py.
+api_router.include_router(admin_ops_router)  # ya tiene prefix /admin
 
 # WebSockets
 from .ws import router as ws_router

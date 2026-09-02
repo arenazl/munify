@@ -1,75 +1,64 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Search, GripVertical, Columns3, Filter } from 'lucide-react';
-import { reclamosApi } from '../lib/api';
-import { Reclamo, EstadoReclamo } from '../types';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { ArrowRight, BarChart3, CalendarDays, Clock, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
-import { DateRangePicker } from '../components/ui/DateRangePicker';
+import { reclamosApi, ordenesTrabajoApi } from '../lib/api';
+import { TableroItem, TableroPayload, EstadoReclamo } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
+import { resolverUmbrales } from '../lib/veredictos';
 
-interface Columna {
-  id: EstadoReclamo;
-  titulo: string;
-  color: string;
-  headerClass: string;
-  cardClass: string;
-  badgeClass: string;
-}
+/**
+ * TABLERO — kanban de reclamos, estándar v2 (canvas "Tablero.dc.html").
+ *
+ * Lectura de la pantalla: fila de título compacta → frase-veredicto (qué está
+ * pasando) → cuatro columnas. Tres son colas de trabajo con drag & drop
+ * (Sin tomar / En curso / Pospuestos); la cuarta (Cerrados) NO es una cola:
+ * es el RESUMEN de lo que ya se terminó, así el tablero no invita a "cerrar
+ * arrastrando" sin dejar resolución.
+ *
+ * COLOR: las columnas NO son 1:1 con estados (Cerrados agrupa finalizado +
+ * resuelto + rechazado), así que el color de columna sale de los tokens
+ * SEMÁNTICOS del sistema (--pl-red / --pl-amber / --pl-green / grises) y no de
+ * `estadoColors` — ese SSoT pinta la CARA de un estado suelto (pills, cards del
+ * vecino), que es otra pregunta. Cero hex nuevo acá.
+ *
+ * DATOS: un solo GET /reclamos/tablero. Antes eran seis GET /reclamos
+ * encadenados de 100 filas (~875 kB, ~10 s medidos) que bajaban el reclamo
+ * COMPLETO — documentos, creador, barrio — para pintar ocho campos, y que de
+ * paso saturaban el vCPU del backend y hacían lento al resto de la pantalla.
+ * El período se filtra en SQL, no en el navegador, y los cerrados vienen como
+ * resumen agregado porque esa columna no es una cola: no se le suelta nada.
+ */
 
-const columnas: Columna[] = [
-  {
-    id: 'recibido',
-    titulo: 'Recibidos',
-    color: '#3b82f6',
-    headerClass: 'column-header-blue',
-    cardClass: 'card-gradient-blue',
-    badgeClass: 'badge-gradient-blue',
-  },
-  {
-    id: 'en_curso',
-    titulo: 'En Curso',
-    color: '#f59e0b',
-    headerClass: 'column-header-orange',
-    cardClass: 'card-gradient-orange',
-    badgeClass: 'badge-gradient-orange',
-  },
-  {
-    id: 'pospuesto',
-    titulo: 'Pospuestos',
-    color: '#8b5cf6',
-    headerClass: 'column-header-purple',
-    cardClass: 'card-gradient-purple',
-    badgeClass: 'badge-gradient-purple',
-  },
-  {
-    id: 'finalizado',
-    titulo: 'Finalizados',
-    color: '#22c55e',
-    headerClass: 'column-header-green',
-    cardClass: 'card-gradient-green',
-    badgeClass: 'badge-gradient-green',
-  },
-  {
-    id: 'rechazado',
-    titulo: 'Rechazados',
-    color: '#ef4444',
-    headerClass: 'column-header-red',
-    cardClass: 'card-gradient-red',
-    badgeClass: 'badge-gradient-red',
-  },
-];
+// ---------------------------------------------------------------------------
+// Estados: agrupaciones canónicas (las mismas que usa la lista de Reclamos)
+// ---------------------------------------------------------------------------
 
-// Transiciones permitidas entre estados (debe estar alineado con backend/api/reclamos.py)
+const ESTADOS_SIN_TOMAR: EstadoReclamo[] = ['recibido', 'nuevo', 'asignado'];
+const ESTADOS_EN_CURSO: EstadoReclamo[] = ['en_curso', 'en_proceso', 'pendiente_confirmacion'];
+const ESTADOS_POSPUESTO: EstadoReclamo[] = ['pospuesto'];
+
+const enGrupo = (r: TableroItem, grupo: EstadoReclamo[]) => grupo.includes(r.estado);
+
+/**
+ * Transiciones permitidas — ESPEJO de `TRANSICIONES_VALIDAS` de
+ * backend/api/reclamos.py (incluidos los estados legacy). Si el backend suma
+ * una arista, se agrega acá; un estado no mapeado no tiene transiciones
+ * (bloquea en vez de romper).
+ */
 const TRANSICIONES: Record<string, EstadoReclamo[]> = {
-  nuevo: ['recibido', 'rechazado'],
   recibido: ['en_curso', 'rechazado'],
-  en_curso: ['finalizado', 'pospuesto', 'rechazado'],
-  pospuesto: ['en_curso', 'finalizado', 'rechazado'],
-  finalizado: [],
-  rechazado: [],
+  en_curso: ['finalizado', 'pospuesto', 'rechazado', 'pendiente_confirmacion', 'recibido'],
+  finalizado: ['en_curso', 'recibido'],
+  pospuesto: ['en_curso', 'finalizado', 'rechazado', 'recibido'],
+  rechazado: ['recibido'],
+  nuevo: ['recibido', 'asignado', 'rechazado'],
+  asignado: ['recibido', 'en_curso', 'rechazado'],
+  en_proceso: ['finalizado', 'pospuesto', 'rechazado', 'pendiente_confirmacion', 'recibido'],
+  pendiente_confirmacion: ['finalizado', 'en_curso', 'recibido'],
+  resuelto: ['en_curso', 'recibido'],
 };
 
 const puedeTransicionar = (from: EstadoReclamo | null, to: EstadoReclamo): boolean => {
@@ -78,413 +67,756 @@ const puedeTransicionar = (from: EstadoReclamo | null, to: EstadoReclamo): boole
   return (TRANSICIONES[from] || []).includes(to);
 };
 
-// Función helper para obtener fecha en formato YYYY-MM-DD
-const getDateString = (date: Date) => {
-  return date.toISOString().split('T')[0];
+// ---------------------------------------------------------------------------
+// Tonos de columna (tokens semánticos, cero hex)
+// ---------------------------------------------------------------------------
+
+type Tono = 'rojo' | 'ambar' | 'gris' | 'verde';
+
+const TONO_TEXTO: Record<Tono, string> = {
+  rojo: 'var(--pl-red-700)',
+  ambar: 'var(--pl-amber-700)',
+  gris: 'var(--pl-text-3)',
+  verde: 'var(--pl-green-700)',
 };
 
-// Función para obtener fecha de hace N días
-const getDaysAgoDate = (days: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return getDateString(date);
+const TONO_DOT: Record<Tono, string> = {
+  rojo: 'var(--pl-red)',
+  ambar: 'var(--pl-amber)',
+  gris: 'var(--pl-border-strong)',
+  verde: 'var(--pl-green)',
+};
+
+// ---------------------------------------------------------------------------
+// Helpers de tiempo
+// ---------------------------------------------------------------------------
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+const ms = (iso?: string | null): number | null => {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? null : t;
+};
+
+/** Días enteros transcurridos desde `iso` hasta ahora (0 = hoy). */
+const diasDesde = (iso?: string | null): number | null => {
+  const t = ms(iso);
+  if (t == null) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / DIA_MS));
+};
+
+/** Último movimiento conocido del reclamo (lo que la lista tiene). */
+const ultimoMovimiento = (r: TableroItem): string | null | undefined => r.updated_at || r.created_at;
+
+const esHoy = (iso?: string | null): boolean => {
+  const t = ms(iso);
+  if (t == null) return false;
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0, 0, 0, 0);
+  return t >= inicioHoy.getTime();
+};
+
+/** Nota de antigüedad de una tarjeta: texto + tono. */
+const notaAntiguedad = (dias: number | null, sufijo: string, umbral: { advertencia: number; malo: number }) => {
+  if (dias == null) return { texto: sufijo, tono: 'gris' as Tono };
+  const texto = dias === 0 ? `hoy · ${sufijo}` : `${dias} d ${sufijo}`;
+  const tono: Tono = dias >= umbral.malo ? 'rojo' : dias >= umbral.advertencia ? 'ambar' : 'gris';
+  return { texto, tono };
+};
+
+/**
+ * Cabecera de columna: punto del tono + título + conteo del MISMO tono + sub
+ * gris a la derecha. Vive fuera del componente para no remontarse en cada
+ * render (y en cada frame del drag).
+ */
+function CabeceraColumna({
+  tono,
+  titulo,
+  conteo,
+  sub,
+}: {
+  tono: Tono;
+  titulo: string;
+  conteo: number;
+  sub: string;
+}) {
+  return (
+    <div
+      className="flex items-center gap-2"
+      style={{ padding: '12px 14px 10px', borderBottom: '1px solid var(--pl-border)' }}
+    >
+      <span className="rounded-full flex-shrink-0" style={{ width: 7, height: 7, backgroundColor: TONO_DOT[tono] }} />
+      <span
+        className="text-[13px] font-bold"
+        style={{ fontFamily: 'var(--pl-font-display)', color: 'var(--pl-text)', letterSpacing: '-0.02em' }}
+      >
+        {titulo}
+      </span>
+      <span
+        className="text-[13px] font-bold tabular-nums"
+        style={{ fontFamily: 'var(--pl-font-display)', color: TONO_TEXTO[tono] }}
+      >
+        {conteo}
+      </span>
+      {sub && (
+        <span className="ml-auto text-[11px] truncate" style={{ color: 'var(--pl-text-faint)' }}>
+          {sub}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Contenido de una tarjeta: título, lugar, fila de nota + área, y pie opcional. */
+function TarjetaReclamo({
+  reclamo,
+  nota,
+  notaTono,
+  pie,
+}: {
+  reclamo: TableroItem;
+  nota: string;
+  notaTono: Tono;
+  pie?: React.ReactNode;
+}) {
+  const area = reclamo.dependencia || reclamo.categoria || 'Sin área';
+  return (
+    <>
+      <Link
+        to={`/gestion/reclamos/${reclamo.id}`}
+        className="block text-[13px] font-semibold hover:underline"
+        style={{ color: 'var(--pl-text)', lineHeight: 1.35 }}
+      >
+        {reclamo.titulo}
+      </Link>
+      <div className="text-[11.5px] mt-0.5 truncate" style={{ color: 'var(--pl-text-3)' }}>
+        {reclamo.direccion || 'Sin dirección'}
+      </div>
+      <div className="flex items-center gap-1.5 mt-1.5 min-w-0">
+        <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: TONO_TEXTO[notaTono] }}>
+          {nota}
+        </span>
+        <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--pl-text-faint)' }}>
+          ·
+        </span>
+        <span className="text-[11px] truncate" style={{ color: 'var(--pl-text-3)' }}>
+          {area}
+        </span>
+      </div>
+      {pie}
+    </>
+  );
+}
+
+const iniciales = (nombre: string): string =>
+  nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('') || '?';
+
+// ---------------------------------------------------------------------------
+// Responsable de campo (vive en la OT, no en la fila del listado)
+// ---------------------------------------------------------------------------
+
+interface OtLite {
+  empleado_nombre?: string | null;
+  cuadrilla_nombre?: string | null;
+  reclamos?: { id: number }[];
+}
+
+type MapaResponsables = Record<number, string>;
+
+/** Etiqueta de responsable: primero la OT (empleado / cuadrilla), si no la dependencia. */
+const responsableDe = (r: TableroItem, mapa: MapaResponsables): string | null =>
+  mapa[r.id] || r.dependencia || null;
+
+// ---------------------------------------------------------------------------
+// Período
+// ---------------------------------------------------------------------------
+
+const PERIODOS: { value: string; label: string; frase: string }[] = [
+  { value: '7', label: 'Últimos 7 días', frase: 'en los últimos 7 días' },
+  { value: '30', label: 'Últimos 30 días', frase: 'en los últimos 30 días' },
+  { value: '90', label: 'Últimos 90 días', frase: 'en los últimos 90 días' },
+  { value: '0', label: 'Todo el histórico', frase: 'en todo el histórico' },
+];
+
+const CERRADOS_VACIO: TableroPayload['cerrados'] = {
+  finalizados: 0,
+  rechazados: 0,
+  promedio_dias: null,
+  ultimos: [],
 };
 
 export default function Tablero() {
-  const [reclamos, setReclamos] = useState<Reclamo[]>([]);
+  const [abiertos, setAbiertos] = useState<TableroItem[]>([]);
+  const [cerrados, setCerrados] = useState<TableroPayload['cerrados']>(CERRADOS_VACIO);
+  const [truncado, setTruncado] = useState(false);
+  const [responsables, setResponsables] = useState<MapaResponsables>({});
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [fechaDesde, setFechaDesde] = useState(() => getDaysAgoDate(2));
-  const [fechaHasta, setFechaHasta] = useState(() => getDateString(new Date()));
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [activeColumnIndex, setActiveColumnIndex] = useState(0);
-  const [draggingFrom, setDraggingFrom] = useState<EstadoReclamo | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [periodo, setPeriodo] = useState('30');
+  const [arrastrando, setArrastrando] = useState<TableroItem | null>(null);
   const { user } = useAuth();
-  const { theme } = useTheme();
+  const navigate = useNavigate();
+
+  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
+  const umbrales = useMemo(() => resolverUmbrales(), []);
+
+  // El período viaja al backend: filtrar en SQL es lo que evita bajar el
+  // histórico entero para descartarlo en el navegador.
+  useEffect(() => {
+    let vigente = true;
+    reclamosApi
+      .getTablero({ dias: parseInt(periodo, 10) || 0 })
+      .then((res) => {
+        if (!vigente) return; // respuesta de un período que el usuario ya cambió
+        setAbiertos(res.data.abiertos || []);
+        setCerrados(res.data.cerrados || CERRADOS_VACIO);
+        setTruncado(Boolean(res.data.truncado));
+      })
+      .catch((error) => {
+        if (!vigente) return;
+        console.error('Error cargando el tablero:', error);
+        toast.error('Error al cargar el tablero');
+      })
+      .finally(() => {
+        if (vigente) setLoading(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [periodo]);
 
   useEffect(() => {
-    fetchReclamos();
+    // El responsable de campo (empleado/cuadrilla) NO viaja en la fila del
+    // listado: vive en la orden de trabajo. Se pide aparte y, si falla o el
+    // muni no usa OTs formales, la tarjeta cae a la dependencia asignada.
+    ordenesTrabajoApi
+      .list({ vigentes: true, limit: 200 })
+      .then((res) => {
+        const mapa: MapaResponsables = {};
+        ((res.data as OtLite[]) || []).forEach((ot) => {
+          const partes = [ot.empleado_nombre, ot.cuadrilla_nombre].filter(Boolean) as string[];
+          if (partes.length === 0) return;
+          const etiqueta = partes.join(' · ');
+          (ot.reclamos || []).forEach((r) => {
+            if (!mapa[r.id]) mapa[r.id] = etiqueta;
+          });
+        });
+        setResponsables(mapa);
+      })
+      .catch(() => setResponsables({}));
   }, []);
 
-  const fetchReclamos = async () => {
-    try {
-      const response = await reclamosApi.getAll();
-      setReclamos(response.data);
-    } catch (error) {
-      console.error('Error cargando reclamos:', error);
-      toast.error('Error al cargar reclamos');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ---- Filtrado (solo hallazgo: el período ya vino filtrado del backend) ---
 
-  const handleDragStart = (start: { source: { droppableId: string } }) => {
-    setDraggingFrom(start.source.droppableId as EstadoReclamo);
+  const visibles = useMemo(() => {
+    const term = busqueda.trim().toLowerCase();
+    if (!term) return abiertos;
+    const soloNum = term.replace(/\D/g, '');
+
+    return abiertos.filter((r) => {
+      if (soloNum && String(r.id).includes(soloNum)) return true;
+      return (
+        (r.direccion || '').toLowerCase().includes(term) ||
+        (r.vecino || '').toLowerCase().includes(term) ||
+        (r.titulo || '').toLowerCase().includes(term) ||
+        (r.categoria || '').toLowerCase().includes(term) ||
+        (r.dependencia || '').toLowerCase().includes(term)
+      );
+    });
+  }, [abiertos, busqueda]);
+
+  const sinTomar = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_SIN_TOMAR)), [visibles]);
+  const enCurso = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_EN_CURSO)), [visibles]);
+  const pospuestos = useMemo(() => visibles.filter((r) => enGrupo(r, ESTADOS_POSPUESTO)), [visibles]);
+
+  const totalCerrados = cerrados.finalizados + cerrados.rechazados;
+
+  /** Trabado = en curso y sin novedades hace más de N días (umbral del sistema). */
+  const esTrabado = useCallback(
+    (r: TableroItem) => (diasDesde(ultimoMovimiento(r)) ?? 0) >= umbrales.diasSinActividad.advertencia,
+    [umbrales],
+  );
+
+  const trabados = useMemo(() => enCurso.filter(esTrabado).length, [enCurso, esTrabado]);
+
+  // ---- Subtítulos de columna (datos reales) -------------------------------
+
+  const entraronHoy = useMemo(() => sinTomar.filter((r) => esHoy(r.created_at)).length, [sinTomar]);
+
+  const enCursoConResponsable = useMemo(
+    () => enCurso.filter((r) => responsableDe(r, responsables) !== null).length,
+    [enCurso, responsables],
+  );
+
+  const pospuestoMasViejo = useMemo(() => {
+    const dias = pospuestos.map((r) => diasDesde(ultimoMovimiento(r)) ?? 0);
+    return dias.length ? Math.max(...dias) : 0;
+  }, [pospuestos]);
+
+  // El resumen de cerrados (conteos, promedio de cierre y los últimos cuatro)
+  // se calcula en SQL: es una agregación sobre TODO el período, no sobre las
+  // filas que alcanzó a bajar el navegador.
+
+  const fraseperiodo = PERIODOS.find((p) => p.value === periodo)?.frase || '';
+
+  // ---- Drag & drop --------------------------------------------------------
+
+  const handleDragStart = (start: { draggableId: string }) => {
+    const r = abiertos.find((x) => x.id === parseInt(start.draggableId, 10)) || null;
+    setArrastrando(r);
   };
 
   const handleDragEnd = async (result: DropResult) => {
-    const { source, destination, draggableId } = result;
-    setDraggingFrom(null);
-
+    const { destination, draggableId } = result;
+    setArrastrando(null);
     if (!destination) return;
-    if (source.droppableId === destination.droppableId) return;
 
-    const reclamoId = parseInt(draggableId);
+    const reclamoId = parseInt(draggableId, 10);
+    const reclamo = abiertos.find((r) => r.id === reclamoId);
+    if (!reclamo) return;
+
     const nuevoEstado = destination.droppableId as EstadoReclamo;
-    const estadoAnterior = source.droppableId as EstadoReclamo;
+    const estadoAnterior = reclamo.estado;
+    if (estadoAnterior === nuevoEstado) return;
 
-    // Validar transición localmente antes de pegarle al backend
+    // La transición se valida contra el estado REAL del reclamo, no contra el
+    // id de la columna: una columna agrupa varios estados (recibido/nuevo/
+    // asignado) y sus transiciones válidas no son las mismas.
     if (!puedeTransicionar(estadoAnterior, nuevoEstado)) {
       toast.error(`No se puede pasar de "${estadoAnterior}" a "${nuevoEstado}"`);
       return;
     }
 
-    // Actualizar estado local optimistamente
-    setReclamos(prev =>
-      prev.map(r =>
-        r.id === reclamoId ? { ...r, estado: nuevoEstado } : r
-      )
-    );
+    setAbiertos((prev) => prev.map((r) => (r.id === reclamoId ? { ...r, estado: nuevoEstado } : r)));
 
     try {
       await reclamosApi.cambiarEstado(reclamoId, nuevoEstado);
-      toast.success(`Reclamo movido a "${columnas.find(c => c.id === nuevoEstado)?.titulo}"`);
-    } catch (error: any) {
-      // Revertir en caso de error
-      setReclamos(prev =>
-        prev.map(r =>
-          r.id === reclamoId ? { ...r, estado: estadoAnterior } : r
-        )
-      );
+      toast.success('Estado actualizado');
+    } catch (error: unknown) {
+      setAbiertos((prev) => prev.map((r) => (r.id === reclamoId ? { ...r, estado: estadoAnterior } : r)));
       console.error('Error al cambiar estado:', error);
-      const detalle = error?.response?.data?.detail || 'Error al cambiar el estado del reclamo';
+      const detalle =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Error al cambiar el estado del reclamo';
       toast.error(detalle);
     }
   };
 
-  const getReclamosPorEstado = (estado: EstadoReclamo) => {
-    return reclamos
-      .filter(r => r.estado === estado)
-      .filter(r => {
-        // Filtro por fecha
-        const fechaReclamo = new Date(r.created_at).toISOString().split('T')[0];
-        if (fechaDesde && fechaReclamo < fechaDesde) return false;
-        if (fechaHasta && fechaReclamo > fechaHasta) return false;
-        return true;
-      })
-      .filter(r => {
-        if (searchTerm === '') return true;
-        const term = searchTerm.toLowerCase();
-        const dependenciaNombre = r.dependencia_asignada
-          ? r.dependencia_asignada.nombre?.toLowerCase() || ''
-          : '';
-        return (
-          r.titulo.toLowerCase().includes(term) ||
-          r.direccion?.toLowerCase().includes(term) ||
-          r.categoria?.nombre?.toLowerCase().includes(term) ||
-          dependenciaNombre.includes(term)
-        );
-      });
-  };
+  const dropBloqueado = (destino: EstadoReclamo) =>
+    !canDrag || (arrastrando !== null && !puedeTransicionar(arrastrando.estado, destino));
 
-  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
+  // ---- Contexto del encabezado -------------------------------------------
+
+  const municipio = (localStorage.getItem('municipio_nombre') || '')
+    .replace('Municipalidad de ', '')
+    .replace('Municipio de ', '')
+    .trim();
+  const ambito = user?.dependencia?.nombre || 'todas las dependencias';
+  const chipContexto = municipio ? `${municipio} · ${ambito}` : ambito;
+
+  const opcionesPeriodo: SelectOption[] = PERIODOS.map((p) => ({
+    value: p.value,
+    label: p.label,
+    icon: <CalendarDays className="h-3.5 w-3.5" style={{ color: 'var(--pl-green-700)' }} />,
+  }));
+
+  // ---- Piezas visuales ----------------------------------------------------
+
+  const cuerpoColumna = (isDraggingOver: boolean): React.CSSProperties => ({
+    padding: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    minHeight: 96,
+    backgroundColor: isDraggingOver ? 'color-mix(in srgb, var(--pl-green) 6%, transparent)' : 'transparent',
+    transition: 'background-color var(--pl-dur-ui) var(--pl-ease)',
+    borderRadius: '0 0 var(--pl-radius-lg) var(--pl-radius-lg)',
+  });
+
+  const estiloTarjeta = (tono: Tono, trabado: boolean, isDragging: boolean): React.CSSProperties => ({
+    padding: '11px 12px',
+    borderRadius: 'var(--pl-radius-md)',
+    border: `1px solid ${trabado ? 'color-mix(in srgb, var(--pl-amber) 32%, var(--pl-border))' : 'var(--pl-border)'}`,
+    borderLeft: `3px solid ${TONO_DOT[tono]}`,
+    backgroundColor: trabado
+      ? 'color-mix(in srgb, var(--pl-amber) 8%, var(--pl-surface))'
+      : 'var(--pl-surface)',
+    opacity: isDragging ? 0.45 : 1,
+    cursor: canDrag ? 'grab' : 'default',
+  });
+
+  const columnaShell: React.CSSProperties = {
+    backgroundColor: 'var(--pl-surface)',
+    border: '1px solid var(--pl-border)',
+    borderRadius: 'var(--pl-radius-lg)',
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: theme.primary }}></div>
+        <div
+          className="animate-spin rounded-full h-10 w-10 border-b-2"
+          style={{ borderColor: 'var(--pl-green)' }}
+        />
       </div>
     );
   }
 
-  // Componente de filtros de columnas para mobile (va en filterPanel)
-  const mobileColumnFilters = (
-    <>
-      {/* Filtros de fecha expandibles en mobile */}
-      {showMobileFilters && (
-        <div className="flex items-center gap-2 mb-2">
-          <DateRangePicker
-            className="flex-1"
-            value={{ desde: fechaDesde, hasta: fechaHasta }}
-            onChange={(r) => { setFechaDesde(r.desde); setFechaHasta(r.hasta); }}
-            placeholder="Rango de fechas"
-            allowClear
-          />
-        </div>
-      )}
-
-      {/* Tabs/Pills para navegar entre columnas - Mobile (5 botones que entran en pantalla) */}
-      <div className="grid grid-cols-5 gap-1 md:hidden">
-        {columnas.map((col, index) => {
-          const count = getReclamosPorEstado(col.id).length;
-          const isActive = activeColumnIndex === index;
-          // Títulos cortos para mobile
-          const tituloCorto = col.id === 'recibido' ? 'Recib.' :
-                              col.id === 'en_curso' ? 'Curso' :
-                              col.id === 'pospuesto' ? 'Posp.' :
-                              col.id === 'finalizado' ? 'Final.' : 'Rech.';
-          return (
-            <button
-              key={col.id}
-              onClick={() => setActiveColumnIndex(index)}
-              className="flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all"
-              style={{
-                backgroundColor: isActive ? col.color : theme.card,
-                color: isActive ? '#fff' : theme.textSecondary,
-                border: `1px solid ${isActive ? col.color : theme.border}`,
-                boxShadow: isActive ? `0 2px 8px ${col.color}40` : 'none',
-              }}
-            >
-              <span className="font-bold text-sm">{count}</span>
-              <span className="text-[10px] opacity-80">{tituloCorto}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Instrucciones de drag & drop - solo desktop */}
-      {canDrag && (
-        <p className="text-sm mt-2 px-1 hidden md:block" style={{ color: theme.textSecondary }}>
-          Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
-        </p>
-      )}
-    </>
-  );
-
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Header Sticky con componente reutilizable */}
-      <StickyPageHeader filterPanel={mobileColumnFilters}>
-        <PageTitleIcon icon={<Columns3 className="h-4 w-4" />} />
-        <PageTitle>Tablero</PageTitle>
-        <HeaderSeparator />
+    <div className="flex flex-col gap-3">
+      {/* ---------- Fila de título ---------- */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <span
+          className="relative grid place-items-center flex-shrink-0"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 11,
+            backgroundColor: 'var(--pl-green-100)',
+            color: 'var(--pl-green-700)',
+          }}
+        >
+          <BarChart3 className="h-4 w-4" />
+          <span className="rs-latido" />
+        </span>
 
-        {/* Filtros de fecha - Desktop */}
-        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <DateRangePicker
-            value={{ desde: fechaDesde, hasta: fechaHasta }}
-            onChange={(r) => { setFechaDesde(r.desde); setFechaHasta(r.hasta); }}
-            placeholder="Rango de fechas"
-            allowClear
-          />
+        <h1
+          className="text-[20px] font-bold flex-shrink-0"
+          style={{ fontFamily: 'var(--pl-font-display)', color: 'var(--pl-text)', letterSpacing: '-0.025em' }}
+        >
+          Tablero
+        </h1>
+
+        <span
+          className="text-[11.5px] font-semibold px-2.5 py-1 truncate max-w-[280px] flex-shrink-0"
+          style={{
+            backgroundColor: 'var(--pl-green-100)',
+            color: 'var(--pl-green-700)',
+            borderRadius: 'var(--pl-radius-pill)',
+          }}
+          title={chipContexto}
+        >
+          {chipContexto}
+        </span>
+
+        <div className="w-[152px] flex-shrink-0">
+          <ModernSelect value={periodo} onChange={setPeriodo} options={opcionesPeriodo} variant="v2" />
         </div>
 
-        <HeaderSeparator />
-
-        {/* Buscador - Desktop */}
-        <div className="hidden md:block relative flex-1 min-w-[150px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
+        <div className="relative flex-1 min-w-[160px]">
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none"
+            style={{ color: 'var(--pl-text-faint)' }}
+          />
           <input
             type="text"
-            placeholder="Buscar..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por dirección, vecino o número…"
+            className="w-full h-8 pl-8 pr-3 text-[12.5px] outline-none"
             style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
+              backgroundColor: 'var(--pl-surface-2)',
+              border: '1px solid var(--pl-border)',
+              borderRadius: 'var(--pl-radius-md)',
+              color: 'var(--pl-text)',
             }}
           />
         </div>
 
-        {/* Mobile: Buscador compacto y botón de filtros */}
-        <div className="flex md:hidden items-center gap-2 flex-1">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                border: `1px solid ${theme.border}`,
-                color: theme.text,
-              }}
-            />
-          </div>
+        <Link
+          to="/gestion/reclamos"
+          className="text-[12px] font-semibold whitespace-nowrap flex-shrink-0 hover:underline"
+          style={{ color: 'var(--pl-green-700)' }}
+        >
+          Ver como lista
+        </Link>
+      </div>
 
-          {/* Botón de filtros */}
-          <button
-            onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="p-2 rounded-lg flex-shrink-0 transition-all"
-            style={{
-              backgroundColor: (fechaDesde || fechaHasta) ? theme.primary : theme.backgroundSecondary,
-              color: (fechaDesde || fechaHasta) ? '#fff' : theme.textSecondary,
-              border: `1px solid ${(fechaDesde || fechaHasta) ? theme.primary : theme.border}`,
-            }}
-          >
-            <Filter className="w-4 h-4" />
-          </button>
-        </div>
-      </StickyPageHeader>
+      {/* ---------- Frase-veredicto ---------- */}
+      <p
+        className="text-[17px] font-semibold"
+        style={{
+          fontFamily: 'var(--pl-font-display)',
+          letterSpacing: '-0.02em',
+          maxWidth: '92ch',
+          lineHeight: 1.4,
+        }}
+      >
+        {visibles.length === 0 && totalCerrados === 0 ? (
+          <span style={{ color: 'var(--pl-text-2)' }}>
+            No hay reclamos {fraseperiodo}. Cambiá el período o la búsqueda para ver más.
+          </span>
+        ) : (
+          <>
+            <span style={{ color: sinTomar.length > 0 ? 'var(--pl-red-700)' : 'var(--pl-green-700)' }}>
+              {sinTomar.length === 1
+                ? '1 reclamo entró y nadie lo tomó'
+                : `${sinTomar.length} reclamos entraron y nadie los tomó`}
+            </span>
+            <span style={{ color: 'var(--pl-text-2)' }}>; hay </span>
+            <span style={{ color: enCurso.length > 0 ? 'var(--pl-amber-700)' : 'var(--pl-green-700)' }}>
+              {enCurso.length} en curso
+            </span>
+            {trabados > 0 && (
+              <span style={{ color: 'var(--pl-amber-700)' }}>
+                {`, ${trabados} ${trabados === 1 ? 'trabado' : 'trabados'}`}
+              </span>
+            )}
+            <span style={{ color: 'var(--pl-text-2)' }}>
+              {canDrag ? '. Arrastrá una tarjeta para cambiarle el estado.' : '.'}
+            </span>
+            {/* Si la cola excede el tope del endpoint, se dice — un tablero que
+                recorta en silencio hace tomar decisiones sobre datos parciales. */}
+            {truncado && (
+              <span style={{ color: 'var(--pl-amber-700)' }}>
+                {' '}La cola es muy larga: se muestran las tarjetas más recientes.
+              </span>
+            )}
+          </>
+        )}
+      </p>
 
-      {/* Tablero Kanban */}
+      {/* ---------- Grilla ---------- */}
       <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        {/* En móvil: solo columna activa. En desktop: grid de 5 columnas */}
-        <div className="md:grid md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3 lg:gap-4">
-          {columnas.map((col, colIndex) => (
-            <Droppable
-              droppableId={col.id}
-              key={col.id}
-              isDropDisabled={!canDrag || (draggingFrom !== null && !puedeTransicionar(draggingFrom, col.id))}
-            >
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(0,0.85fr)] gap-3 items-start">
+          {/* ===== Sin tomar ===== */}
+          <section style={columnaShell}>
+            <CabeceraColumna
+              tono="rojo"
+              titulo="Sin tomar"
+              conteo={sinTomar.length}
+              sub={entraronHoy > 0 ? `${entraronHoy} entraron hoy` : 'nadie los abrió todavía'}
+            />
+            <Droppable droppableId="recibido" isDropDisabled={dropBloqueado('recibido')}>
               {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`rounded-xl overflow-hidden min-h-[300px] md:min-h-[400px] transition-all duration-300 ${colIndex !== activeColumnIndex ? 'hidden md:block' : ''}`}
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: snapshot.isDraggingOver
-                      ? `2px dashed ${col.color}`
-                      : `1px solid ${theme.border}`,
-                    boxShadow: snapshot.isDraggingOver
-                      ? `0 0 20px ${col.color}30`
-                      : '0 4px 12px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  {/* Header de columna con gradiente */}
-                  <div className={`${col.headerClass} px-4 py-3 flex items-center justify-between`}>
-                    <h2 className="font-semibold text-white flex items-center gap-2 text-base">
-                      <span className="w-2 h-2 rounded-full bg-white/50"></span>
-                      <span className="truncate">{col.titulo}</span>
-                    </h2>
-                    <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-white">
-                      {getReclamosPorEstado(col.id).length}
-                    </span>
-                  </div>
-
-                  {/* Lista de reclamos */}
-                  <div className="p-3 md:p-4 space-y-3 overflow-y-auto">
-                    {getReclamosPorEstado(col.id).map((reclamo, index) => (
-                      <Draggable
-                        key={reclamo.id}
-                        draggableId={String(reclamo.id)}
-                        index={index}
-                        isDragDisabled={!canDrag}
-                      >
-                        {(provided, snapshot) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} style={cuerpoColumna(snapshot.isDraggingOver)}>
+                  {sinTomar.map((r, index) => {
+                    const nota = notaAntiguedad(diasDesde(r.created_at), 'sin tomar', umbrales.diasSinActividad);
+                    return (
+                      <Draggable key={r.id} draggableId={String(r.id)} index={index} isDragDisabled={!canDrag}>
+                        {(dp, ds) => (
                           <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className={`${col.cardClass} rounded-lg p-4 ${!snapshot.isDragging ? 'hover-lift' : ''} ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                            style={{
-                              ...provided.draggableProps.style,
-                              boxShadow: snapshot.isDragging
-                                ? `0 20px 40px rgba(0,0,0,0.3), 0 0 30px ${col.color}50`
-                                : '0 2px 8px rgba(0,0,0,0.1)',
-                              opacity: snapshot.isDragging ? 0.95 : 1,
-                            }}
+                            ref={dp.innerRef}
+                            {...dp.draggableProps}
+                            {...dp.dragHandleProps}
+                            style={{ ...dp.draggableProps.style, ...estiloTarjeta('rojo', false, ds.isDragging) }}
                           >
-                            <div className="flex items-start gap-3">
-                              {/* Handle de drag con icono colorido - solo en desktop */}
-                              {canDrag && (
-                                <div
-                                  className="mt-1 p-1 rounded hidden md:block"
-                                  style={{
-                                    background: `linear-gradient(135deg, ${col.color}30, ${col.color}10)`,
-                                    color: col.color
-                                  }}
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </div>
-                              )}
-
-                              <div className="flex-1 min-w-0">
-                                <Link
-                                  to={`/gestion/reclamos/${reclamo.id}`}
-                                  className="font-semibold hover:underline line-clamp-2 transition-colors text-sm md:text-base"
-                                  style={{ color: theme.text }}
-                                  onClick={(e) => snapshot.isDragging && e.preventDefault()}
-                                >
-                                  {reclamo.titulo}
-                                </Link>
-                                <p
-                                  className="text-xs md:text-sm mt-1 flex items-start gap-1"
-                                  style={{ color: theme.textSecondary }}
-                                >
-                                  <span className="inline-block w-1 h-1 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: col.color }}></span>
-                                  <span className="line-clamp-2">{reclamo.direccion}</span>
-                                </p>
-
-                                <div className="mt-3 pt-2 border-t space-y-2" style={{ borderColor: `${col.color}20` }}>
-                                  {/* Fecha */}
-                                  <span className="text-xs font-medium block" style={{ color: theme.textSecondary }}>
-                                    {new Date(reclamo.created_at).toLocaleDateString('es-AR', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                      year: 'numeric'
-                                    })}
-                                  </span>
-                                  {/* Si tiene dependencia asignada mostrar su nombre, sino la categoría */}
-                                  {reclamo.dependencia_asignada ? (
-                                    <span
-                                      className="text-xs px-2.5 py-1.5 rounded-md block w-full font-medium text-center leading-tight line-clamp-2"
-                                      style={{
-                                        border: `1px solid ${reclamo.dependencia_asignada.color || col.color}`,
-                                        color: reclamo.dependencia_asignada.color || col.color,
-                                        backgroundColor: `${reclamo.dependencia_asignada.color || col.color}10`,
-                                      }}
-                                      title={reclamo.dependencia_asignada.nombre}
-                                    >
-                                      {reclamo.dependencia_asignada.nombre}
-                                    </span>
-                                  ) : (
-                                    <span
-                                      className="text-xs px-2.5 py-1.5 rounded-md block w-full font-medium text-center leading-tight line-clamp-2"
-                                      style={{
-                                        border: `1px solid ${reclamo.categoria?.color || '#6b7280'}`,
-                                        color: reclamo.categoria?.color || '#6b7280',
-                                        backgroundColor: `${reclamo.categoria?.color || '#6b7280'}10`,
-                                      }}
-                                      title={reclamo.categoria?.nombre}
-                                    >
-                                      {reclamo.categoria?.nombre}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
+                            <TarjetaReclamo reclamo={r} nota={nota.texto} notaTono={nota.tono} />
                           </div>
                         )}
                       </Draggable>
-                    ))}
+                    );
+                  })}
+                  {provided.placeholder}
+                  <Link
+                    to="/gestion/reclamos?filtrar_estado=recibido"
+                    className="flex items-center justify-center text-[12px] font-semibold"
+                    style={{
+                      height: 38,
+                      border: '1px dashed var(--pl-border-strong)',
+                      borderRadius: 'var(--pl-radius-md)',
+                      color: 'var(--pl-text-2)',
+                    }}
+                  >
+                    Ver la cola completa
+                  </Link>
+                </div>
+              )}
+            </Droppable>
+          </section>
 
-                    {provided.placeholder}
-
-                    {getReclamosPorEstado(col.id).length === 0 && (
+          {/* ===== En curso ===== */}
+          <section style={columnaShell}>
+            <CabeceraColumna
+              tono="ambar"
+              titulo="En curso"
+              conteo={enCurso.length}
+              sub={`${enCursoConResponsable} con responsable · ${enCurso.length - enCursoConResponsable} sin asignar`}
+            />
+            <Droppable droppableId="en_curso" isDropDisabled={dropBloqueado('en_curso')}>
+              {(provided, snapshot) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} style={cuerpoColumna(snapshot.isDraggingOver)}>
+                  {enCurso.map((r, index) => {
+                    const trabado = esTrabado(r);
+                    const nota = notaAntiguedad(
+                      diasDesde(ultimoMovimiento(r)),
+                      'sin novedades',
+                      umbrales.diasSinActividad,
+                    );
+                    const responsable = responsableDe(r, responsables);
+                    const pie = (
                       <div
-                        className="text-center py-12 rounded-lg border-2 border-dashed transition-all"
-                        style={{
-                          borderColor: `${col.color}40`,
-                          color: theme.textSecondary,
-                          background: `linear-gradient(135deg, ${col.color}05, ${col.color}10)`,
-                        }}
+                        className="flex items-center gap-1.5 mt-2 pt-2 min-w-0"
+                        style={{ borderTop: '1px solid var(--pl-border)' }}
                       >
-                        <div
-                          className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                          style={{ background: `linear-gradient(135deg, ${col.color}20, ${col.color}10)` }}
-                        >
-                          <span style={{ color: col.color }}>📋</span>
-                        </div>
-                        <p className="text-sm font-medium">Sin reclamos</p>
-                        {canDrag && (
-                          <p className="text-xs mt-1 opacity-70 hidden md:block">Arrastra aquí para mover</p>
+                        {responsable ? (
+                          <>
+                            <span
+                              className="grid place-items-center rounded-full flex-shrink-0 text-[9.5px] font-bold"
+                              style={{
+                                width: 22,
+                                height: 22,
+                                backgroundColor: 'var(--pl-green-100)',
+                                color: 'var(--pl-green-700)',
+                              }}
+                            >
+                              {iniciales(responsable)}
+                            </span>
+                            <span className="text-[11.5px] truncate" style={{ color: 'var(--pl-text-2)' }} title={responsable}>
+                              {responsable}
+                            </span>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/gestion/reclamos?abrir=${r.id}`)}
+                            className="inline-flex items-center gap-1 hover:gap-2 transition-all text-[11.5px] font-semibold"
+                            style={{ color: 'var(--pl-amber-700)' }}
+                          >
+                            Asignar cuadrilla
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
                         )}
                       </div>
-                    )}
+                    );
+                    return (
+                      <Draggable key={r.id} draggableId={String(r.id)} index={index} isDragDisabled={!canDrag}>
+                        {(dp, ds) => (
+                          <div
+                            ref={dp.innerRef}
+                            {...dp.draggableProps}
+                            {...dp.dragHandleProps}
+                            style={{ ...dp.draggableProps.style, ...estiloTarjeta('ambar', trabado, ds.isDragging) }}
+                          >
+                            <TarjetaReclamo reclamo={r} nota={nota.texto} notaTono={nota.tono} pie={pie} />
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </section>
+
+          {/* ===== Pospuestos ===== */}
+          <section style={columnaShell}>
+            <CabeceraColumna
+              tono="gris"
+              titulo="Pospuestos"
+              conteo={pospuestos.length}
+              sub={pospuestos.length > 0 ? `el más viejo, ${pospuestoMasViejo} d` : ''}
+            />
+            <Droppable droppableId="pospuesto" isDropDisabled={dropBloqueado('pospuesto')}>
+              {(provided, snapshot) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} style={cuerpoColumna(snapshot.isDraggingOver)}>
+                  {pospuestos.map((r, index) => {
+                    const nota = notaAntiguedad(
+                      diasDesde(ultimoMovimiento(r)),
+                      'en pausa',
+                      umbrales.diasSinActividad,
+                    );
+                    return (
+                      <Draggable key={r.id} draggableId={String(r.id)} index={index} isDragDisabled={!canDrag}>
+                        {(dp, ds) => (
+                          <div
+                            ref={dp.innerRef}
+                            {...dp.draggableProps}
+                            {...dp.dragHandleProps}
+                            style={{ ...dp.draggableProps.style, ...estiloTarjeta('gris', false, ds.isDragging) }}
+                          >
+                            <TarjetaReclamo reclamo={r} nota={nota.texto} notaTono="gris" />
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
+                  <div
+                    className="grid place-items-center text-center"
+                    style={{
+                      padding: 22,
+                      border: `1px dashed ${snapshot.isDraggingOver ? 'var(--pl-green)' : 'var(--pl-border-strong)'}`,
+                      borderRadius: 'var(--pl-radius-md)',
+                      transition: 'border-color var(--pl-dur-ui) var(--pl-ease)',
+                    }}
+                  >
+                    <Clock className="h-4 w-4" style={{ color: 'var(--pl-text-faint)' }} />
+                    <div className="text-[12px] font-semibold mt-1.5" style={{ color: 'var(--pl-text-2)' }}>
+                      {pospuestos.length === 0 ? 'Nada postergado' : 'Podés sumar más'}
+                    </div>
+                    <div className="text-[11px] mt-0.5" style={{ color: 'var(--pl-text-faint)' }}>
+                      Soltá acá lo que depende de un tercero
+                    </div>
                   </div>
                 </div>
               )}
             </Droppable>
-          ))}
+          </section>
+
+          {/* ===== Cerrados (resumen, NO es una cola) ===== */}
+          <section style={{ ...columnaShell, backgroundColor: 'var(--pl-surface-2)' }}>
+            <CabeceraColumna tono="verde" titulo="Cerrados" conteo={totalCerrados} sub={fraseperiodo} />
+            <div className="p-3 flex flex-col gap-3">
+              <p className="text-[12px]" style={{ color: 'var(--pl-text-2)', lineHeight: 1.5 }}>
+                {`${cerrados.finalizados} ${cerrados.finalizados === 1 ? 'finalizado' : 'finalizados'} y ${cerrados.rechazados} ${cerrados.rechazados === 1 ? 'rechazado' : 'rechazados'} ${fraseperiodo}.`}
+                {cerrados.promedio_dias != null && ` Promedio de cierre: ${cerrados.promedio_dias} días.`}
+              </p>
+
+              {cerrados.ultimos.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {cerrados.ultimos.map((cerrado) => (
+                    <div key={cerrado.id} className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="rounded-full flex-shrink-0"
+                        style={{
+                          width: 6,
+                          height: 6,
+                          backgroundColor:
+                            cerrado.estado === 'rechazado' ? 'var(--pl-red)' : 'var(--pl-green)',
+                        }}
+                      />
+                      <Link
+                        to={`/gestion/reclamos/${cerrado.id}`}
+                        className="text-[11.5px] truncate hover:underline"
+                        style={{ color: 'var(--pl-text-2)' }}
+                        title={cerrado.titulo}
+                      >
+                        {cerrado.titulo}
+                      </Link>
+                      {cerrado.dias != null && (
+                        <span
+                          className="ml-auto text-[11px] tabular-nums flex-shrink-0"
+                          style={{ color: 'var(--pl-text-faint)' }}
+                        >
+                          {cerrado.dias} d
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cerrados.finalizados > 0 && (
+                <Link
+                  to="/gestion/reclamos?filtrar_estado=finalizado"
+                  className="text-[11.5px] font-semibold hover:underline"
+                  style={{ color: 'var(--pl-green-700)' }}
+                >
+                  {`Ver los ${cerrados.finalizados} finalizados`}
+                </Link>
+              )}
+            </div>
+          </section>
         </div>
       </DragDropContext>
-
     </div>
   );
 }

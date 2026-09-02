@@ -13,6 +13,42 @@
 
 }
 
+/* ============================================================
+   VIEWPORT DE PWA — estándar de base-compartida/11-FIX-VIEWPORT-PWA.md.
+   Va en el shell, UNA vez, y lo hereda toda la app.
+
+   Sin esto la app "baila" en el teléfono: se arrastra en horizontal con el
+   dedo, hace rubber-band contra los bordes y cualquier elemento que se pase
+   de ancho (una tabla, un chip largo, un botón) abre scroll lateral en TODA
+   la página en vez de scrollear dentro de su caja.
+   ============================================================ */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  /* `clip`, NO `hidden`: poner `overflow-x: hidden` obliga al navegador a
+     convertir el otro eje en `auto` (regla del spec), y eso convierte a
+     body/#root en contenedores de scroll anidados. En desktop no se nota,
+     pero en iOS el gesto táctil se queda atrapado en el contenedor de
+     adentro y la pantalla NO scrollea. `clip` recorta el desborde
+     horizontal sin crear ningún contenedor de scroll. */
+  overflow-x: clip;
+  /* corta el rubber-band y el pull-to-refresh, que en una PWA se sienten
+     como que la app se despega de la pantalla */
+  overscroll-behavior: none;
+}
+
+/* Safe areas del dispositivo, disponibles para todo el shell. Valen 0 en
+   Android/desktop, así que quien las use debe combinarlas con un mínimo
+   (`max(var(--safe-top), 12px)`). Requieren el `viewport-fit=cover` del
+   index.html. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -24,6 +60,22 @@ body {
 #root {
   min-height: 100vh;
   width: 100%;
+  max-width: 100%;
+  /* Sin overflow acá: el recorte horizontal ya lo hace html/body con `clip`.
+     Un overflow en #root lo volvía contenedor de scroll y se comía el gesto
+     vertical en el teléfono. */
+}
+
+/* iOS hace auto-zoom al enfocar un input de menos de 16px, y ese zoom no
+   vuelve solo: la pantalla queda corrida y el layout parece roto. En mobile
+   ningún control de texto baja de 16px. Desktop no tiene el problema y
+   conserva sus tamaños. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* Clases utilitarias para usar el tema */

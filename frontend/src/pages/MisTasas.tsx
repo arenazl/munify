@@ -319,7 +319,7 @@ function DeudaRow({
             className="mt-1 text-xs font-semibold px-3 py-1 rounded-lg transition-all hover:scale-105 active:scale-95"
             style={{
               background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
-              color: '#fff',
+              color: 'var(--pl-on-accent)',
             }}
           >
             Pagar

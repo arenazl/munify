@@ -12,6 +12,7 @@ Endpoints:
   GET    /tesoreria/proyectos/{id}            detalle + resumen + gastos
   PUT    /tesoreria/proyectos/{id}            update
   DELETE /tesoreria/proyectos/{id}            soft delete
+  GET    /tesoreria/proyectos/publicas         OBRAS del vecino (sin token)
 """
 from typing import List, Optional
 from decimal import Decimal
@@ -24,7 +25,7 @@ from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import Proyecto, GastoProyecto, User, RolUsuario
 from schemas.tesoreria import (
-    ProyectoCreate, ProyectoUpdate, ProyectoResponse, ProyectoResumen,
+    ObraPublica, ProyectoCreate, ProyectoUpdate, ProyectoResponse, ProyectoResumen,
 )
 
 router = APIRouter()
@@ -107,6 +108,64 @@ async def create_proyecto(
     resp = ProyectoResponse.model_validate(proyecto)
     resp.resumen = ProyectoResumen(total_imputado=Decimal(0), cantidad_gastos=0, porcentaje_presupuesto=None)
     return resp
+
+
+@router.get("/publicas", response_model=List[ObraPublica])
+async def obras_publicas(
+    municipio_id: int = Query(..., description="Municipio del vecino"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Las obras que el municipio decidio MOSTRAR al vecino (sin login).
+
+    Modulo Comunicacion, Etapa 2. Tres reglas que hacen a lo que sale a la
+    calle:
+      - solo `publico=True` y `activo=True`: publicar es un acto deliberado;
+      - el monto viaja SOLO si el muni prendio `mostrar_monto`, y es lo
+        REALMENTE imputado (la suma de gastos), no el presupuesto: decir
+        "esta obra sale X" cuando X es una estimacion es prometer un numero;
+      - primero lo que esta en ejecucion, que es lo que el vecino ve en la
+        calle; despues lo terminado; al final lo que todavia no arranco.
+
+    Va ANTES de /{proyecto_id} en el archivo: si no, FastAPI intenta leer
+    "publicas" como un id y devuelve 422.
+    """
+    r = await db.execute(
+        select(Proyecto)
+        .where(
+            Proyecto.municipio_id == municipio_id,
+            Proyecto.publico == True,   # noqa: E712
+            Proyecto.activo == True,    # noqa: E712
+        )
+    )
+    obras = r.scalars().all()
+    if not obras:
+        return []
+
+    # Lo invertido sale de las imputaciones reales, en UNA query para todas.
+    ids_con_monto = [o.id for o in obras if o.mostrar_monto]
+    invertido: dict[int, Decimal] = {}
+    if ids_con_monto:
+        r2 = await db.execute(
+            select(GastoProyecto.proyecto_id, func.coalesce(func.sum(GastoProyecto.monto_asignado), 0))
+            .where(GastoProyecto.proyecto_id.in_(ids_con_monto))
+            .group_by(GastoProyecto.proyecto_id)
+        )
+        invertido = {pid: total for pid, total in r2.all()}
+
+    orden = {"en_ejecucion": 0, "terminada": 1, "por_empezar": 2}
+    # Se ordena por lo PUBLICADO: el real no sale de la casa.
+    obras.sort(key=lambda o: (orden.get(o.estado_obra or "", 3), -(o.avance_publicado or 0)))
+
+    return [
+        ObraPublica(
+            id=o.id, nombre=o.nombre, descripcion=o.descripcion,
+            estado_obra=o.estado_obra, avance=o.avance_publicado, foto_url=o.foto_url,
+            latitud=o.latitud, longitud=o.longitud,
+            fecha_inicio=o.fecha_inicio, fecha_fin=o.fecha_fin,
+            invertido=invertido.get(o.id) if o.mostrar_monto else None,
+        )
+        for o in obras
+    ]
 
 
 @router.get("/{proyecto_id}", response_model=ProyectoResponse)

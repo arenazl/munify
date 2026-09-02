@@ -98,7 +98,10 @@ async def _stats(db: AsyncSession, municipio_id: int, detalle: bool = False) -> 
         stats["tasa_resolucion_pct"] = round(resueltos / total * 100) if total else 0
         cats = (await db.execute(
             select(CategoriaReclamo.nombre)
-            .where(CategoriaReclamo.municipio_id == municipio_id)
+            .where(
+                CategoriaReclamo.municipio_id == municipio_id,
+                CategoriaReclamo.interna == False,  # noqa: E712
+            )
             .order_by(CategoriaReclamo.nombre)
             .limit(8)
         )).scalars().all()
@@ -294,11 +297,15 @@ async def listar_categorias_muni(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Categorias de reclamo del municipio."""
+    """Categorias de reclamo del municipio (las que se le ofrecen al vecino:
+    excluye las `interna=True`, que clasifican trabajo interno del municipio)."""
     verify_salesbot_key(request)
     rows = (await db.execute(
         select(CategoriaReclamo)
-        .where(CategoriaReclamo.municipio_id == municipio_id)
+        .where(
+            CategoriaReclamo.municipio_id == municipio_id,
+            CategoriaReclamo.interna == False,  # noqa: E712
+        )
         .order_by(CategoriaReclamo.nombre)
     )).scalars().all()
     return [{"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion} for c in rows]
@@ -621,10 +628,13 @@ async def crear_reclamo_bot(
     if len(desc) < 5:
         raise HTTPException(400, "La descripcion del reclamo es muy corta")
 
+    # Solo categorías del vecino: las internas (trabajo del municipio) no pueden
+    # ser destino de la clasificación ni del fallback `sorted(cat_ids)[0]`.
     cats = (await db.execute(
         select(CategoriaReclamo).where(
             CategoriaReclamo.municipio_id == municipio_id,
             CategoriaReclamo.activo == True,  # noqa: E712
+            CategoriaReclamo.interna == False,  # noqa: E712
         )
     )).scalars().all()
     if not cats:
@@ -635,7 +645,8 @@ async def crear_reclamo_bot(
 
     # Clasificacion: IA si el muni la tiene habilitada, sino keywords local (gratis).
     cfg = await get_ia_config(db, municipio_id)
-    resultado = await clasificar_reclamo(desc, categorias, usar_ia=cfg.habilitada, modelo=cfg.modelo)
+    resultado = await clasificar_reclamo(desc, categorias, usar_ia=cfg.habilitada,
+                                         modelo=cfg.modelo, municipio_id=municipio_id)
     sugerencias = resultado.get("sugerencias") or []
     # La IA puede devolver un id que no es del muni, o [] si el texto no es un
     # reclamo claro -> validamos contra cat_ids y caemos a la primera categoria

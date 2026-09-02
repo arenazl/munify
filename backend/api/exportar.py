@@ -17,6 +17,7 @@ from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.zona import Zona
 from models.empleado import Empleado
 from models.enums import EstadoReclamo
+from services.prioridad import set_prioridad_ot
 
 router = APIRouter()
 
@@ -79,6 +80,10 @@ async def exportar_reclamos_csv(
     result = await db.execute(query)
     reclamos = result.scalars().all()
 
+    # Prioridad canónica = la de la OT (F6). Inyecta .prioridad_ot en cada reclamo
+    # (value del enum baja/media/alta/urgente, None si no tiene OT viva).
+    await set_prioridad_ot(db, reclamos)
+
     # Crear CSV
     output = BytesIO()
 
@@ -125,7 +130,7 @@ async def exportar_reclamos_csv(
             r.titulo,
             r.descripcion[:200] if r.descripcion else '',
             r.estado.value if r.estado else '',
-            r.prioridad,
+            r.prioridad_ot or '',
             r.categoria.nombre if r.categoria else '',
             r.zona.nombre if r.zona else '',
             r.direccion,

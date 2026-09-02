@@ -119,6 +119,31 @@ CALLES = [
 
 INFRACCIONES = ["vacaciones", "licencia_medica", "tramite_personal", "capacitacion"]
 
+# Prioridad de la OT implícita de cada reclamo (F6 · OT universal — la
+# prioridad real vive en la OT, no en `reclamos.prioridad` legacy). Variedad
+# deliberada con buen peso en alta/urgente para poblar "Empecemos por lo
+# urgente" en la vista guiada. Agnóstico: no depende del municipio.
+PRIORIDAD_OT_VALUES = ["baja", "media", "alta", "urgente"]
+PRIORIDAD_OT_PESOS = [20, 35, 30, 15]
+
+# Estado de la OT implícita = espejo del estado del reclamo (mismo mapeo que
+# `_ESPEJO_ESTADO_OT` en api/ordenes_trabajo.py, agregando 'recibido'/'pospuesto'
+# que ahí no aplican por ser el estado inicial/uno sin mapeo de espejo).
+_OT_ESTADO_SEED = {
+    "recibido": "pendiente",
+    "en_curso": "en_curso",
+    "pospuesto": "bloqueada",
+    "finalizado": "completada",
+    "rechazado": "cancelada",
+}
+
+# Prioridad de Solicitud (Trámites) — escala legacy 1-5 (1=urgente..5=baja,
+# ver `backend/models/tramite.py`). Variedad deliberada, con peso en 1/2 para
+# que "Empecemos por lo urgente" tenga datos reales en la vista guiada de
+# Trámites (antes el rango era fijo 2-4 y nunca tocaba el valor 1=urgente).
+PRIORIDAD_TRAMITE_VALUES = [1, 2, 3, 4, 5]
+PRIORIDAD_TRAMITE_PESOS = [15, 20, 35, 20, 10]
+
 ASUNTOS_TRAMITE = [
     "Habilitación de comercio nuevo",
     "Renovación de habilitación comercial",
@@ -220,6 +245,15 @@ async def fetch_existing(conn, municipio_id: int) -> dict:
         "SELECT codigo, nombre, latitud, longitud FROM municipios WHERE id = :m"
     ), {"m": municipio_id})
     out["muni"] = r.first()
+
+    # Usuario admin/supervisor (creador_id de las OTs demo — F6 OT universal;
+    # NO es el vecino que creó el reclamo, es "quién generó la orden de trabajo").
+    r = await conn.execute(text(
+        "SELECT id FROM usuarios WHERE municipio_id = :m AND rol IN ('admin', 'supervisor') "
+        "ORDER BY id LIMIT 1"
+    ), {"m": municipio_id})
+    row = r.first()
+    out["admin_user_id"] = row[0] if row else None
 
     return out
 
@@ -468,6 +502,15 @@ async def seed_reclamos(conn, municipio_id: int, empleado_ids: list[int],
         "DELETE FROM notificaciones WHERE reclamo_id IN "
         "(SELECT id FROM reclamos WHERE municipio_id = :m)"
     ), {"m": municipio_id})
+    # OTs implícitas (F6 · OT universal) de la corrida anterior — la prioridad
+    # real de cada reclamo vive acá, no en `reclamos.prioridad` (legacy).
+    await conn.execute(text(
+        "DELETE FROM orden_trabajo_reclamos WHERE reclamo_id IN "
+        "(SELECT id FROM reclamos WHERE municipio_id = :m)"
+    ), {"m": municipio_id})
+    await conn.execute(text(
+        "DELETE FROM ordenes_trabajo WHERE municipio_id = :m"
+    ), {"m": municipio_id})
     await conn.execute(text(
         "DELETE FROM reclamos WHERE municipio_id = :m"
     ), {"m": municipio_id})
@@ -495,6 +538,8 @@ async def seed_reclamos(conn, municipio_id: int, empleado_ids: list[int],
     ]
 
     reclamo_ids = []
+    ot_seq_by_year: dict[int, int] = {}  # correlativo OT-<año>-NNNN por año (F6)
+    admin_user_id = ctx.get("admin_user_id")
     for mes_atras in range(12):
         n_reclamos = random.randint(13, 22)
         for _ in range(n_reclamos):
@@ -577,6 +622,46 @@ async def seed_reclamos(conn, municipio_id: int, empleado_ids: list[int],
             rec_id = r_ins.lastrowid
             reclamo_ids.append(rec_id)
 
+            # OT implícita (F6 · OT universal): la prioridad real del reclamo
+            # vive acá — `reclamos.prioridad` de arriba es legacy y ya no se
+            # lee. Prioridad variada (20% baja / 35% media / 30% alta /
+            # 15% urgente) para poblar "Empecemos por lo urgente" en la vista
+            # guiada. creador_id de la OT = un admin/supervisor del muni (quién
+            # "generó" la orden), no el vecino que hizo el reclamo.
+            ot_creador_id = admin_user_id or creador
+            if ot_creador_id:
+                ot_estado = _OT_ESTADO_SEED.get(estado, "pendiente")
+                if ot_estado == "pendiente" and empleado_id:
+                    ot_estado = "asignada"
+                prioridad_ot_val = random.choices(PRIORIDAD_OT_VALUES, weights=PRIORIDAD_OT_PESOS)[0]
+                anio_ot = created_at.year
+                ot_seq_by_year[anio_ot] = ot_seq_by_year.get(anio_ot, 0) + 1
+                numero_ot = f"OT-{anio_ot}-{ot_seq_by_year[anio_ot]:04d}"
+                fecha_completada_ot = fecha_resolucion if ot_estado == "completada" else None
+                ot_ins = await conn.execute(text(
+                    "INSERT INTO ordenes_trabajo (municipio_id, numero, estado, origen, "
+                    "titulo, descripcion, prioridad, empleado_id, creador_id, "
+                    "fecha_completada, created_at, updated_at) "
+                    "VALUES (:m, :num, :est, 'implicita', :tit, :desc, :pr, :emp, :cr, "
+                    ":fcompl, :ts, :ts)"
+                ), {
+                    "m": municipio_id,
+                    "num": numero_ot,
+                    "est": ot_estado,
+                    "tit": titulo,
+                    "desc": descripcion,
+                    "pr": prioridad_ot_val,
+                    "emp": empleado_id,
+                    "cr": ot_creador_id,
+                    "fcompl": fecha_completada_ot,
+                    "ts": created_at,
+                })
+                ot_id = ot_ins.lastrowid
+                await conn.execute(text(
+                    "INSERT INTO orden_trabajo_reclamos (orden_trabajo_id, reclamo_id, created_at) "
+                    "VALUES (:o, :r, :ts)"
+                ), {"o": ot_id, "r": rec_id, "ts": created_at})
+
             # Historial: creación -> recibido -> en_curso -> finalizado (según estado)
             await conn.execute(text(
                 "INSERT INTO historial_reclamos (reclamo_id, usuario_id, accion, "
@@ -641,7 +726,9 @@ async def seed_reclamos(conn, municipio_id: int, empleado_ids: list[int],
                     except Exception:
                         pass  # Ignorar duplicado
 
-    print(f"      -> {len(reclamo_ids)} reclamos creados con historial + calificaciones")
+    total_ot = sum(ot_seq_by_year.values())
+    print(f"      -> {len(reclamo_ids)} reclamos creados con historial + calificaciones "
+          f"({total_ot} OTs implícitas con prioridad variada)")
     return reclamo_ids
 
 
@@ -713,7 +800,7 @@ async def seed_solicitudes(conn, municipio_id: int, ctx: dict, todos_vecinos: li
                 "se": vrow[3],
                 "st": vrow[4],
                 "dep": dep_id,
-                "pr": random.randint(2, 4),
+                "pr": random.choices(PRIORIDAD_TRAMITE_VALUES, weights=PRIORIDAD_TRAMITE_PESOS)[0],
                 "ts": created_at,
             })
             sol_id = r_ins.lastrowid

@@ -1,0 +1,572 @@
+/* ============================================================
+   Configuración — el chrome de la pantalla (hero, tabs, riel)
+
+   CERO colores literales. Todo sale de tokens --pl-*: los estáticos de
+   pl-tokens.css y los de color que computa ThemeContext desde el tema
+   activo. Así el panel sigue los tres ejes del estándar —claro/oscuro,
+   los 6 fondos y el acento— sin tocar una línea de acá.
+
+   Antes esto era ~47 hex fijos entre los tres componentes, con
+   `background: '#F1F4F2'` a la cabeza: con la app en oscuro el panel
+   quedaba claro, y la pantalla de Apariencia no podía demostrarse a sí
+   misma. Un hex fijo no rompe una combinación: rompe las doce.
+   ============================================================ */
+
+.config-wrapper {
+  background: var(--pl-bg);
+  font-family: var(--pl-font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  color: var(--pl-text);
+}
+
+.config-wrapper a {
+  color: var(--pl-green-700);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.config-wrapper a:hover { text-decoration: underline; }
+
+/* --- Encabezado de la pantalla ------------------------------------ */
+
+.config-hero {
+  background: var(--pl-bg);
+  padding: 24px 20px 0;
+}
+
+.config-hero-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  row-gap: 14px;
+}
+
+.config-hero-texto { flex: 1 1 420px; min-width: 0; }
+
+.config-eyebrow {
+  display: block;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  color: var(--pl-text-muted);
+}
+
+.config-titulo {
+  margin: 8px 0 0;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-hero);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: var(--pl-tracking-hero);
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+
+.config-bajada {
+  margin: 10px 0 0;
+  font-size: var(--pl-fs-body);
+  line-height: 1.55;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+  max-width: 76ch;
+}
+
+/* Buscador de ajustes. Es un botón: abre el buscador, no escribe acá. */
+.config-buscar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  min-width: 240px;
+  flex: 0 0 auto;
+  margin-top: 22px;
+  cursor: pointer;
+  color: var(--pl-text-faint);
+  font: inherit;
+  font-size: var(--pl-fs-body-sm);
+  text-align: left;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+
+.config-buscar:hover { border-color: var(--pl-border-strong); }
+
+.config-buscar-texto {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.config-buscar-atajo {
+  margin-left: auto;
+  font-size: var(--pl-fs-micro);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-sm);
+  padding: 1px 4px;
+  flex: 0 0 auto;
+}
+
+/* Abierto: el mismo cuadro, ahora con input y la lista colgando debajo.
+   Se mantiene la caja para que no salte el layout al abrirlo. */
+.config-buscar--abierto {
+  position: relative;
+  cursor: text;
+  border-color: var(--pl-border-strong);
+  color: var(--pl-text);
+}
+
+.config-buscar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--pl-text);
+  font: inherit;
+  /* 16px reales en táctil: por debajo, iOS hace zoom al enfocar. */
+  font-size: max(var(--pl-fs-input), 16px);
+}
+
+.config-buscar-input::placeholder { color: var(--pl-text-faint); }
+
+.config-buscar-cerrar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+}
+
+.config-buscar-cerrar:hover { background: var(--pl-surface-hover); }
+
+.config-buscar-lista {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-float);
+}
+
+.config-buscar-lista button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.config-buscar-lista button:hover { background: var(--pl-surface-hover); }
+
+.config-buscar-ajuste {
+  font-size: var(--pl-fs-body);
+  font-weight: 500;
+  color: var(--pl-text);
+}
+
+/* El grupo va al lado porque "Contactos" existe en más de un lugar: sin él
+   no sabés a cuál estás saltando. */
+.config-buscar-grupo {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+.config-buscar-vacio {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-float);
+}
+
+/* --- Tabs de grupo (fila superior) -------------------------------- */
+
+.config-maintabs {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  padding: 20px 20px 0;
+  background: var(--pl-bg);
+  border-bottom: 1px solid var(--pl-border);
+}
+
+.config-maintabs-pista { position: relative; }
+
+.config-maintabs-scroll {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pl-border-strong) transparent;
+}
+
+.config-maintab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  color: var(--pl-text-muted);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+
+.config-maintab:hover { background: var(--pl-surface-hover); }
+
+.config-maintab--activo {
+  border-bottom-color: var(--pl-text);
+  color: var(--pl-text);
+}
+
+.config-maintab--activo:hover { background: transparent; }
+
+.config-maintab-label { font-size: var(--pl-fs-body); font-weight: 500; }
+.config-maintab--activo .config-maintab-label { font-weight: 600; }
+
+.config-maintab-n {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+
+.config-maintab--activo .config-maintab-n { color: var(--pl-text); }
+
+/* Degradé que avisa que la fila sigue. Se arma sobre el token del fondo:
+   con un hex fijo, en oscuro se veía una mancha clara sobre el borde. */
+.config-maintabs-fade {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 6px;
+  width: 36px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, var(--pl-bg) 70%);
+}
+
+/* --- Riel lateral (subpantallas del grupo) ------------------------ */
+
+.config-riel {
+  position: sticky;
+  top: 74px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.config-riel-titulo {
+  display: block;
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: var(--pl-text-faint);
+  padding: 0 10px 8px;
+}
+
+.config-riel-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+
+.config-riel-item:hover { background: var(--pl-surface-hover); }
+
+.config-riel-item--activo,
+.config-riel-item--activo:hover { background: var(--pl-surface-3); }
+
+.config-riel-label {
+  font-size: var(--pl-fs-body);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--pl-text-2);
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.config-riel-item--activo .config-riel-label {
+  font-weight: 600;
+  color: var(--pl-text);
+}
+
+.config-riel-n {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  font-feature-settings: 'tnum';
+}
+
+.config-riel-item--activo .config-riel-n { color: var(--pl-text); }
+
+/* --- Cuerpo -------------------------------------------------------- */
+
+/* El riel es NAVEGACIÓN, no contenido: se lleva lo mínimo y todo lo que sobra
+   va al panel. Con 236px fijos + gap, en pantallas medianas la tabla del panel
+   perdía la última columna. `clamp` lo deja encogerse hasta 168px antes de que
+   el contenido empiece a sufrir, y no lo deja pasar de 212px por más ancho que
+   haya — un riel de tres ítems no gana nada siendo más ancho. */
+.config-cuerpo {
+  display: grid;
+  grid-template-columns: clamp(168px, 15vw, 212px) minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 20px 40px;
+  align-items: start;
+}
+
+/* El riel se apila arriba cuando no hay ancho para las dos columnas. */
+@media (max-width: 980px) {
+  .config-cuerpo { grid-template-columns: minmax(0, 1fr); }
+  .config-riel {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .config-riel-titulo { width: 100%; padding-bottom: 4px; }
+  .config-riel-item { width: auto; }
+}
+
+/* `min-width: 0` es lo que permite que un hijo de grid se achique por debajo de
+   su contenido. Sin eso una tabla ancha empuja la columna y desborda la página
+   entera en vez de scrollear adentro suyo. */
+.config-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Nada del panel puede sacar scroll horizontal a la página: si una tabla no
+   entra, scrollea dentro de su propia tarjeta. */
+.config-panel :is(table, .av2-tabla, [class*='overflow']) {
+  max-width: 100%;
+}
+
+@keyframes latido {
+  0% { opacity: .5; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.35); }
+}
+
+@keyframes entrarPanel {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.entrar-panel {
+  animation: entrarPanel 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+
+/* ==========================================================================
+   Apariencia — la matriz de temas
+   ==========================================================================
+   Seis temas puestos en grilla en vez de en fila. La posición hace la mitad del
+   trabajo: la fila dice claro u oscuro, la columna si ese gris es plano,
+   tostado o azulado. Antes eran seis muestras seguidas y había que abrir dos
+   para descubrir en qué se diferenciaban.
+
+   Las columnas se estrechan pero la matriz NO se rompe en pantallas chicas: si
+   colapsara a una lista volvería a ser lo mismo que se quiso arreglar. La
+   columna de etiquetas se achica y los nombres siguen entrando. */
+.ap-matriz {
+  display: grid;
+  grid-template-columns: 74px repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.ap-matriz-col,
+.ap-matriz-fila {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+}
+
+.ap-matriz-fila {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--pl-text-2);
+}
+
+.ap-tema {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  cursor: pointer;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  transition: border-color var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.ap-tema:hover {
+  border-color: var(--pl-green-200);
+}
+
+.ap-tema-muestra {
+  display: flex;
+  height: 62px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+/* El rail ocupa el 30% de la muestra, la misma proporción que en la app: es lo
+   que hace reconocible la miniatura de un vistazo. */
+.ap-tema-barra {
+  width: 30%;
+  height: 100%;
+}
+
+.ap-tema-lineas {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ap-tema-linea {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+}
+.ap-tema-linea--acento {
+  height: 4px;
+  width: 76%;
+}
+
+.ap-tema-pie {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px 1px;
+}
+
+.ap-tema-nombre {
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-tema-pie svg {
+  margin-left: auto;
+  flex: 0 0 13px;
+}
+
+@media (max-width: 560px) {
+  .ap-matriz {
+    grid-template-columns: 46px repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .ap-tema-muestra { height: 48px; }
+  .ap-matriz-col { font-size: 9px; letter-spacing: 0.06em; }
+  .ap-matriz-fila { font-size: 10.5px; }
+}
+
+
+/* --- Acentos: la paleta cerrada ------------------------------------
+   Ocho cuadrados con su nombre debajo. Antes eran círculos sueltos y había que
+   pasar el mouse por cada uno para saber cuál era; el nombre al lado del color
+   evita esa adivinanza y de paso deja claro que la lista TERMINA ahí --- no es
+   una muestra de un selector más grande. */
+.ap-acentos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ap-acento {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  transition: background var(--pl-dur-ui, 160ms) var(--pl-ease, ease),
+              border-color var(--pl-dur-ui, 160ms) var(--pl-ease, ease);
+}
+.ap-acento:hover { background: var(--pl-surface-2); }
+.ap-acento--activo {
+  border-color: var(--pl-border-strong);
+  background: var(--pl-surface-2);
+}
+
+.ap-acento-muestra {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.ap-acento-nombre {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-text-2);
+  white-space: nowrap;
+}
+.ap-acento--activo .ap-acento-nombre { color: var(--pl-text); }

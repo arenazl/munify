@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes, Printer } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes, Printer, OctagonAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage, ABMTable } from '../components/ui/ABMPage';
+import { ABMSheetFooter, ABMInput, ABMTextarea } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
-import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi, otTiposTrabajoApi } from '../lib/api';
-import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels } from '../lib/enums/ordenTrabajo';
+import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
+import type { ColumnSpec, RowAction, StatusTab, SelectSpec } from '../components/abmv2/types';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
+import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi, categoriasReclamoApi } from '../lib/api';
+import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels, OT_MOTIVO_BLOQUEO_OPTIONS, type MotivoBloqueoOT } from '../lib/enums/ordenTrabajo';
 import { naturalezaColors, naturalezaIcons } from '../lib/enums/inventario';
 import { prioridadLabels, prioridadColor, prioridadIcons, PRIORIDAD_OPTIONS } from '../lib/enums/prioridadOT';
+import { getEstadoInfo } from '../lib/estadoConfig';
 import { imprimirOrdenTrabajo } from '../lib/printOrdenTrabajo';
-import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario, OTTipoTrabajo, PrioridadOT } from '../types';
+import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario, CategoriaReclamo, PrioridadOT } from '../types';
 
 // Recurso de inventario en el form de la OT (activo reservado o consumible planeado).
 type RecursoForm = {
@@ -36,7 +40,7 @@ type FormState = {
   titulo: string;
   descripcion: string;
   prioridad: PrioridadOT;
-  tipo_trabajo_id: string;
+  categoria_id: string;
   cuadrilla_id: string;
   empleado_id: string;
   fecha_programada: string;
@@ -47,7 +51,7 @@ type FormState = {
 };
 
 const FORM_VACIO: FormState = {
-  titulo: '', descripcion: '', prioridad: 'media', tipo_trabajo_id: '',
+  titulo: '', descripcion: '', prioridad: 'media', categoria_id: '',
   cuadrilla_id: '', empleado_id: '',
   fecha_programada: '', horas_estimadas: '', materiales: [], recursos: [], reclamo_ids: [],
 };
@@ -56,6 +60,7 @@ export default function OrdenesTrabajo() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [ordenes, setOrdenes] = useState<OrdenTrabajo[]>([]);
   const [todasOrdenes, setTodasOrdenes] = useState<OrdenTrabajo[]>([]); // sin filtro de estado, solo para contar las píldoras
@@ -71,15 +76,26 @@ export default function OrdenesTrabajo() {
   // Cierre / cancelación
   const [notasCierre, setNotasCierre] = useState('');
   const [horasReales, setHorasReales] = useState('');
+  const [finalizarReclamos, setFinalizarReclamos] = useState(false); // D4: opt-in al completar
   const [confirmCancelar, setConfirmCancelar] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState('');
+  // T6: consumo real por consumible al completar (keyed por OTRecurso.id).
+  const [consumosReales, setConsumosReales] = useState<Record<number, number>>({});
+  // T6: bloqueo en campo (frenar la OT — estado no final).
+  const [confirmBloquear, setConfirmBloquear] = useState(false);
+  const [motivoBloqueoTipo, setMotivoBloqueoTipo] = useState<MotivoBloqueoOT>('falta_material');
+  const [motivoBloqueoNota, setMotivoBloqueoNota] = useState('');
+  const [bloqueando, setBloqueando] = useState(false);
 
   // Catálogos para el form
   const [cuadrillas, setCuadrillas] = useState<CuadrillaMini[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [reclamosActivos, setReclamosActivos] = useState<Reclamo[]>([]);
   const [itemsDisponibles, setItemsDisponibles] = useState<InventarioItem[]>([]);
-  const [tiposTrabajo, setTiposTrabajo] = useState<OTTipoTrabajo[]>([]);
+  // Categorías de Reclamo: clasifican la OT. Incluye las `interna: true`
+  // (Preventivo, Mantenimiento, Obra) — acá SÍ se ofrecen, a diferencia del
+  // alta de reclamo del vecino.
+  const [categorias, setCategorias] = useState<CategoriaReclamo[]>([]);
   // Nuevo material (form inline)
   const [nuevoMaterial, setNuevoMaterial] = useState('');
 
@@ -136,11 +152,11 @@ export default function OrdenesTrabajo() {
         const iRes = await inventarioApi.listItems({ solo_disponibles: true, limit: 300 });
         setItemsDisponibles(iRes.data || []);
       } catch { /* inventario no activo: sin recursos */ }
-      // Tipos de trabajo (para el selector del formato)
+      // Categorías de Reclamo (para el selector de clasificación de la OT)
       try {
-        const tRes = await otTiposTrabajoApi.list({ activo: true });
-        setTiposTrabajo(tRes.data || []);
-      } catch { /* sin tipos: el selector queda vacío */ }
+        const catRes = await categoriasReclamoApi.getAll(true);
+        setCategorias(catRes.data || []);
+      } catch { /* sin categorías: el selector queda vacío */ }
     })();
   }, [esGestor]);
 
@@ -152,6 +168,10 @@ export default function OrdenesTrabajo() {
     });
     setNotasCierre('');
     setHorasReales('');
+    setFinalizarReclamos(false);
+    setConsumosReales({});
+    setMotivoBloqueoTipo('falta_material');
+    setMotivoBloqueoNota('');
     setSheetOpen(true);
   }, []);
 
@@ -167,13 +187,25 @@ export default function OrdenesTrabajo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Deep-link ?abrir=N → abre el detalle de una OT (la vuelta desde el Sheet de Reclamos)
+  useEffect(() => {
+    const oid = searchParams.get('abrir');
+    if (!oid) return;
+    ordenesTrabajoApi.get(parseInt(oid, 10))
+      .then(res => { if (res.data) abrirDetalle(res.data); })
+      .catch(() => toast.error('No se pudo abrir la orden de trabajo'));
+    searchParams.delete('abrir');
+    setSearchParams(searchParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const abrirDetalle = (ot: OrdenTrabajo) => {
     setSelected(ot);
     setForm({
       titulo: ot.titulo,
       descripcion: ot.descripcion || '',
       prioridad: ot.prioridad || 'media',
-      tipo_trabajo_id: ot.tipo_trabajo_id ? String(ot.tipo_trabajo_id) : '',
+      categoria_id: ot.categoria_id ? String(ot.categoria_id) : '',
       cuadrilla_id: ot.cuadrilla_id ? String(ot.cuadrilla_id) : '',
       empleado_id: ot.empleado_id ? String(ot.empleado_id) : '',
       fecha_programada: ot.fecha_programada || '',
@@ -190,6 +222,15 @@ export default function OrdenesTrabajo() {
     });
     setNotasCierre('');
     setHorasReales('');
+    setFinalizarReclamos(false);
+    // T6: precargar el consumo real de cada consumible con la cantidad planeada.
+    const consumosInit: Record<number, number> = {};
+    (ot.recursos || []).forEach(r => {
+      if (r.tipo === 'consumo') consumosInit[r.id] = r.cantidad ?? 1;
+    });
+    setConsumosReales(consumosInit);
+    setMotivoBloqueoTipo('falta_material');
+    setMotivoBloqueoNota('');
     setSheetOpen(true);
   };
 
@@ -197,7 +238,7 @@ export default function OrdenesTrabajo() {
     titulo: form.titulo.trim(),
     descripcion: form.descripcion.trim() || null,
     prioridad: form.prioridad,
-    tipo_trabajo_id: form.tipo_trabajo_id ? Number(form.tipo_trabajo_id) : null,
+    categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
     cuadrilla_id: form.cuadrilla_id ? Number(form.cuadrilla_id) : null,
     empleado_id: form.empleado_id ? Number(form.empleado_id) : null,
     fecha_programada: form.fecha_programada || null,
@@ -244,13 +285,30 @@ export default function OrdenesTrabajo() {
     }
   };
 
+  // Consumibles de la OT seleccionada (para editar el consumo REAL al completar).
+  const consumiblesOT = useMemo(
+    () => (selected?.recursos || []).filter(r => r.tipo === 'consumo'),
+    [selected],
+  );
+
+  const setConsumoReal = (recursoId: number, cantidad: number) =>
+    setConsumosReales(prev => ({ ...prev, [recursoId]: cantidad }));
+
   const completar = async () => {
     if (!selected) return;
     if (!notasCierre.trim()) { toast.error('Contá qué se hizo (notas de cierre)'); return; }
     try {
+      // T6: mandar la cantidad REAL usada de cada consumible. Si no se editó,
+      // viaja la planeada (mismo default). El backend descuenta ese valor.
+      const consumos_reales = consumiblesOT.map(r => ({
+        recurso_id: r.id,
+        cantidad_real: consumosReales[r.id] ?? r.cantidad ?? 1,
+      }));
       await ordenesTrabajoApi.completar(selected.id, {
         notas_cierre: notasCierre.trim(),
         horas_reales: horasReales ? Number(horasReales) : undefined,
+        finalizar_reclamos: finalizarReclamos,
+        consumos_reales: consumos_reales.length ? consumos_reales : undefined,
       });
       toast.success('Orden completada');
       setSheetOpen(false);
@@ -258,6 +316,27 @@ export default function OrdenesTrabajo() {
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(detail || 'No se pudo completar');
+    }
+  };
+
+  const bloquear = async () => {
+    if (!selected) return;
+    try {
+      setBloqueando(true);
+      await ordenesTrabajoApi.bloquear(selected.id, {
+        motivo_tipo: motivoBloqueoTipo,
+        motivo: motivoBloqueoNota.trim() || undefined,
+      });
+      toast.success('Orden bloqueada');
+      setConfirmBloquear(false);
+      setMotivoBloqueoNota('');
+      setSheetOpen(false);
+      await fetchOrdenes();
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'No se pudo bloquear');
+    } finally {
+      setBloqueando(false);
     }
   };
 
@@ -285,10 +364,10 @@ export default function OrdenesTrabajo() {
     ...empleados.map(e => ({ value: String(e.id), label: `${e.nombre} ${e.apellido || ''}`.trim() })),
   ]), [empleados]);
 
-  const tipoTrabajoOptions: SelectOption[] = useMemo(() => ([
+  const categoriaOptions: SelectOption[] = useMemo(() => ([
     { value: '', label: 'Sin clasificar' },
-    ...tiposTrabajo.map(t => ({ value: String(t.id), label: t.nombre })),
-  ]), [tiposTrabajo]);
+    ...categorias.map(c => ({ value: String(c.id), label: c.nombre })),
+  ]), [categorias]);
 
   const reclamoOptions: SelectOption[] = useMemo(() =>
     reclamosActivos
@@ -302,6 +381,12 @@ export default function OrdenesTrabajo() {
     const enSelected = selected?.reclamos.find(r => r.id === id);
     return enSelected ? `#${id} · ${enSelected.titulo}` : `#${id}`;
   };
+
+  // Estado del reclamo vinculado (para pintar el badge en el chip). Puede venir
+  // del catálogo de activos o de los reclamos que trae la OTs seleccionada.
+  const reclamoEstado = (id: number): string | undefined =>
+    reclamosActivos.find(r => r.id === id)?.estado ||
+    selected?.reclamos.find(r => r.id === id)?.estado;
 
   // --- Recursos de inventario ---
   const mostrarRecursos = itemsDisponibles.length > 0 || form.recursos.length > 0;
@@ -334,52 +419,158 @@ export default function OrdenesTrabajo() {
 
   const quitarRecurso = (itemId: number) =>
     setForm(f => ({ ...f, recursos: f.recursos.filter(r => r.item_id !== itemId) }));
-
   const setCantidadRecurso = (itemId: number, cantidad: number) =>
     setForm(f => ({ ...f, recursos: f.recursos.map(r => r.item_id === itemId ? { ...r, cantidad } : r) }));
 
   const esEditable = !selected || (selected.estado !== 'completada' && selected.estado !== 'cancelada');
   const inputStyle = { backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` };
 
-  const otTableColumns = [
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    const total = todasOrdenes.length;
+    if (total === 0) {
+      return [{
+        segmentos: [seg('No hay órdenes de trabajo registradas todavía.')],
+      }];
+    }
+    const enCurso = conteosEstado['en_curso'] || 0;
+    const asignadas = (conteosEstado['asignada'] || 0) + (conteosEstado['pendiente'] || 0);
+    const bloqueadas = conteosEstado['bloqueada'] || 0;
+
+    const activas = enCurso + asignadas;
+
+    return [{
+      segmentos: [
+        seg('Hay '),
+        seg(`${activas} ${activas === 1 ? 'orden activa' : 'órdenes activas'}`, activas > 0 ? 'bueno' : undefined),
+        seg(`: ${enCurso} en ejecución y ${asignadas} pendientes de inicio`),
+        ...(bloqueadas > 0
+          ? [seg(`, con ${bloqueadas} ${bloqueadas === 1 ? 'bloqueada' : 'bloqueadas'} en campo`, 'malo')]
+          : []),
+        seg('.'),
+      ],
+    }];
+  }, [todasOrdenes.length, conteosEstado]);
+
+  const heroKpis = useMemo<HeroKpi[]>(() => {
+    const total = todasOrdenes.length;
+    const enCurso = conteosEstado['en_curso'] || 0;
+    const porIniciar = (conteosEstado['asignada'] || 0) + (conteosEstado['pendiente'] || 0);
+    const bloqueadas = conteosEstado['bloqueada'] || 0;
+    const completadas = conteosEstado['completada'] || 0;
+
+    return [
+      {
+        etiqueta: 'Total órdenes',
+        valor: total,
+        sub: 'registradas',
+      },
+      {
+        etiqueta: 'En curso',
+        valor: enCurso,
+        sub: total > 0 ? `${Math.round((enCurso / total) * 100)}% del total` : '0%',
+        veredicto: enCurso > 0 ? 'bueno' : undefined,
+      },
+      {
+        etiqueta: 'Por iniciar',
+        valor: porIniciar,
+        sub: 'pendientes / asignadas',
+      },
+      {
+        etiqueta: 'Bloqueadas',
+        valor: bloqueadas,
+        sub: bloqueadas > 0 ? 'atención requerida' : 'sin bloqueos',
+        veredicto: bloqueadas > 0 ? 'malo' : undefined,
+      },
+      {
+        etiqueta: 'Completadas',
+        valor: completadas,
+        sub: total > 0 ? `${Math.round((completadas / total) * 100)}% finalizadas` : '0%',
+        veredicto: 'bueno',
+      },
+    ];
+  }, [todasOrdenes.length, conteosEstado]);
+
+  const statusTabs = useMemo<StatusTab[]>(() => {
+    const estados: EstadoOrdenTrabajo[] = ['pendiente', 'asignada', 'en_curso', 'bloqueada', 'completada', 'cancelada'];
+    return [
+      { id: '', label: 'Todas', count: todasOrdenes.length },
+      ...estados.map((e) => ({
+        id: e,
+        label: otEstadoLabel(e),
+        count: conteosEstado[e] || 0,
+        color: otEstadoColor(e),
+      })),
+    ];
+  }, [todasOrdenes.length, conteosEstado]);
+
+  const columnas = useMemo<ColumnSpec<OrdenTrabajo>[]>(() => [
     {
-      key: 'numero',
-      header: 'Número',
-      sortValue: (ot: OrdenTrabajo) => ot.numero,
-      render: (ot: OrdenTrabajo) => (
-        <span className="font-mono text-xs" style={{ color: theme.textSecondary }}>{ot.numero}</span>
+      id: 'numero',
+      header: 'ORDEN',
+      width: '120px',
+      cell: (ot: OrdenTrabajo) => (
+        <span
+          className="font-mono text-xs font-bold px-2 py-0.5 rounded"
+          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+        >
+          {ot.numero}
+        </span>
       ),
     },
     {
-      key: 'titulo',
-      header: 'Título',
-      width: '260px',
-      sortValue: (ot: OrdenTrabajo) => ot.titulo,
-      render: (ot: OrdenTrabajo) => (
-        <span className="text-sm font-medium truncate block" style={{ color: theme.text }}>{ot.titulo}</span>
-      ),
-    },
-    {
-      key: 'responsable',
-      header: 'Responsable',
-      sortValue: (ot: OrdenTrabajo) => ot.cuadrilla_nombre || ot.empleado_nombre || '',
-      render: (ot: OrdenTrabajo) => (
-        <div className="flex items-center gap-1.5 text-xs" style={{ color: theme.textSecondary }}>
-          {ot.cuadrilla_nombre && <><Users className="h-3.5 w-3.5" />{ot.cuadrilla_nombre}</>}
-          {ot.empleado_nombre && <><UserIcon className="h-3.5 w-3.5" />{ot.empleado_nombre}</>}
-          {!ot.cuadrilla_nombre && !ot.empleado_nombre && '—'}
+      id: 'titulo',
+      header: 'TÍTULO Y CATEGORÍA',
+      width: 'minmax(240px, 2.5fr)',
+      cell: (ot: OrdenTrabajo) => (
+        <div>
+          <div className="font-semibold text-sm" style={{ color: theme.text }}>
+            {ot.titulo}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 text-xs" style={{ color: theme.textSecondary }}>
+            {ot.categoria_nombre && (
+              <span className="font-medium" style={{ color: theme.primary }}>
+                {ot.categoria_nombre}
+              </span>
+            )}
+            <span>· {ot.reclamos.length} reclamo{ot.reclamos.length === 1 ? '' : 's'}</span>
+          </div>
         </div>
       ),
     },
     {
-      key: 'prioridad',
-      header: 'Prioridad',
-      sortValue: (ot: OrdenTrabajo) => ot.prioridad || '',
-      render: (ot: OrdenTrabajo) => {
+      id: 'responsable',
+      header: 'ASIGNACIÓN',
+      width: 'minmax(180px, 1.5fr)',
+      cell: (ot: OrdenTrabajo) => (
+        <div className="text-xs">
+          {ot.cuadrilla_nombre ? (
+            <div className="flex items-center gap-1 font-medium" style={{ color: theme.text }}>
+              <Users className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+              {ot.cuadrilla_nombre}
+            </div>
+          ) : ot.empleado_nombre ? (
+            <div className="flex items-center gap-1 font-medium" style={{ color: theme.text }}>
+              <UserIcon className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+              {ot.empleado_nombre}
+            </div>
+          ) : (
+            <span style={{ color: theme.textSecondary }}>Sin asignar</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'prioridad',
+      header: 'PRIORIDAD',
+      width: '120px',
+      cell: (ot: OrdenTrabajo) => {
         const color = prioridadColor(ot.prioridad);
         const PIcon = prioridadIcons[ot.prioridad as PrioridadOT];
         return (
-          <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full w-fit" style={{ backgroundColor: `${color}20`, color }}>
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
+            style={{ backgroundColor: `${color}20`, color }}
+          >
             {PIcon && <PIcon className="h-3 w-3" />}
             {prioridadLabels[ot.prioridad as PrioridadOT] || ot.prioridad}
           </span>
@@ -387,142 +578,90 @@ export default function OrdenesTrabajo() {
       },
     },
     {
-      key: 'reclamos',
-      header: 'Reclamos',
-      sortValue: (ot: OrdenTrabajo) => ot.reclamos.length,
-      render: (ot: OrdenTrabajo) => (
-        <span className="flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
-          <ClipboardList className="h-3.5 w-3.5" />{ot.reclamos.length}
-        </span>
-      ),
-    },
-    {
-      key: 'fecha_programada',
-      header: 'Programada',
-      sortValue: (ot: OrdenTrabajo) => ot.fecha_programada || '',
-      render: (ot: OrdenTrabajo) => ot.fecha_programada ? (
-        <span className="text-xs" style={{ color: theme.textSecondary }}>
-          {new Date(`${ot.fecha_programada}T00:00:00`).toLocaleDateString('es-AR')}
-        </span>
-      ) : <span className="text-xs" style={{ color: theme.textSecondary }}>—</span>,
-    },
-    {
-      key: 'estado',
-      header: 'Estado',
-      sortValue: (ot: OrdenTrabajo) => ot.estado,
-      render: (ot: OrdenTrabajo) => {
+      id: 'estado',
+      header: 'ESTADO',
+      width: '140px',
+      cell: (ot: OrdenTrabajo) => {
         const color = otEstadoColor(ot.estado);
         const EstadoIcon = otEstadoIcons[ot.estado as EstadoOrdenTrabajo] || Hammer;
         return (
-          <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full w-fit" style={{ backgroundColor: `${color}20`, color }}>
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
+            style={{ backgroundColor: `${color}20`, color }}
+          >
             <EstadoIcon className="h-3 w-3" />
             {otEstadoLabel(ot.estado)}
           </span>
         );
       },
     },
-  ];
+    {
+      id: 'fecha_programada',
+      header: 'PROGRAMADA',
+      width: '130px',
+      cell: (ot: OrdenTrabajo) => (
+        <span className="text-xs" style={{ color: theme.textSecondary }}>
+          {ot.fecha_programada
+            ? new Date(`${ot.fecha_programada}T00:00:00`).toLocaleDateString('es-AR')
+            : '—'}
+        </span>
+      ),
+    },
+  ], [theme]);
+
+  const accionesFila = useMemo<RowAction<OrdenTrabajo>[]>(() => [
+    {
+      id: 'imprimir',
+      label: 'Imprimir PDF',
+      icon: Printer,
+      onClick: (ot: OrdenTrabajo) => imprimirOrdenTrabajo(ot, muniNombre),
+    },
+    {
+      id: 'ver',
+      label: 'Ver detalle',
+      icon: ClipboardList,
+      onClick: (ot: OrdenTrabajo) => abrirDetalle(ot),
+    },
+  ], [muniNombre]);
 
   return (
     <>
-      <ABMPage
-        title="Órdenes de trabajo"
-        icon={<Hammer className="h-5 w-5" />}
-        searchPlaceholder="Buscar por número o título..."
-        searchValue={search}
+      <SemanticAbmPage<OrdenTrabajo>
+        moduleKey="ordenes_trabajo"
+        hero={{
+          etiqueta: 'GESTIÓN DE CAMPO · ÓRDENES DE TRABAJO',
+          frases: heroFrases,
+          kpis: heroKpis,
+        }}
+        eyebrow="Órdenes"
+        title="Planificación y seguimiento del trabajo de campo"
+        description="Asignación de cuadrillas y operarios, consumo de recursos del inventario y vinculación directa con los reclamos del municipio."
+        searchPlaceholder="Buscar por número, título o cuadrilla…"
+        views={['table']}
+        activeView="table"
+        onViewChange={() => {}}
+        selects={[]}
+        primaryAction={esGestor ? {
+          label: 'Nueva orden',
+          onClick: () => abrirNueva(),
+        } : undefined}
+        statusTabs={statusTabs}
+        activeStatus={filtroEstado}
+        onStatusChange={(id) => setFiltroEstado(id)}
+        search={search}
         onSearchChange={setSearch}
         loading={loading}
-        isEmpty={ordenes.length === 0}
-        emptyMessage="No hay órdenes de trabajo. Creá la primera desde un reclamo o desde acá."
-        buttonLabel="Nueva orden"
-        buttonIcon={<Plus className="h-4 w-4 mr-1.5" />}
-        onAdd={esGestor ? () => abrirNueva() : undefined}
-        defaultViewMode="table"
-        viewStorageKey="ordenes_trabajo_view"
-        toolbar={{
-          statusPills: {
-            value: filtroEstado,
-            onChange: (v: string) => setFiltroEstado(v),
-            items: (Object.keys(otEstadoLabels) as EstadoOrdenTrabajo[]).map(estado => ({
-              key: estado,
-              label: otEstadoLabels[estado],
-              icon: otEstadoIcons[estado],
-              color: otEstadoColor(estado),
-              count: conteosEstado[estado] || 0,
-            })),
-          },
-          layout: 'left',
+        kind="plain"
+        columns={columnas}
+        rows={ordenes}
+        rowActions={accionesFila}
+        rowKey={(ot) => ot.id}
+        onRowClick={abrirDetalle}
+        emptyMessage="No se encontraron órdenes de trabajo. Podés crear la primera desde acá o directamente desde un reclamo."
+        footer={{
+          showing: `Mostrando ${ordenes.length} de ${todasOrdenes.length}`,
         }}
-        tableView={
-          <ABMTable
-            data={ordenes}
-            columns={otTableColumns}
-            keyExtractor={(ot: OrdenTrabajo) => ot.id}
-            onRowClick={(ot: OrdenTrabajo) => abrirDetalle(ot)}
-            defaultSortKey="numero"
-            defaultSortDirection="desc"
-          />
-        }
-      >
-        {ordenes.map(ot => {
-          const color = otEstadoColor(ot.estado);
-          const EstadoIcon = otEstadoIcons[ot.estado as EstadoOrdenTrabajo] || Hammer;
-          return (
-            <div
-              key={ot.id}
-              onClick={() => abrirDetalle(ot)}
-              className="rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.01]"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${color}` }}
-            >
-              <div className="flex items-start justify-between mb-3 gap-2">
-                <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
-                  {ot.numero}
-                </span>
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {(() => {
-                    const pColor = prioridadColor(ot.prioridad);
-                    const PIcon = prioridadIcons[ot.prioridad as PrioridadOT];
-                    return (
-                      <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${pColor}20`, color: pColor }}>
-                        {PIcon && <PIcon className="h-3 w-3" />}
-                        {prioridadLabels[ot.prioridad as PrioridadOT] || ot.prioridad}
-                      </span>
-                    );
-                  })()}
-                  <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${color}20`, color }}>
-                    <EstadoIcon className="h-3 w-3" />
-                    {otEstadoLabel(ot.estado)}
-                  </span>
-                </div>
-              </div>
-              {ot.tipo_trabajo_nombre && (
-                <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full mb-1.5" style={{ backgroundColor: `${ot.tipo_trabajo_color || theme.primary}15`, color: ot.tipo_trabajo_color || theme.primary }}>
-                  {ot.tipo_trabajo_nombre}
-                </span>
-              )}
-              <h3 className="font-bold mb-1 line-clamp-2" style={{ color: theme.text }}>{ot.titulo}</h3>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs" style={{ color: theme.textSecondary }}>
-                {ot.cuadrilla_nombre && (
-                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />{ot.cuadrilla_nombre}</span>
-                )}
-                {ot.empleado_nombre && (
-                  <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" />{ot.empleado_nombre}</span>
-                )}
-                {ot.fecha_programada && (
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(`${ot.fecha_programada}T00:00:00`).toLocaleDateString('es-AR')}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <ClipboardList className="h-3 w-3" />
-                  {ot.reclamos.length} reclamo{ot.reclamos.length === 1 ? '' : 's'}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </ABMPage>
+      />
 
       <Sheet
         open={sheetOpen}
@@ -588,6 +727,20 @@ export default function OrdenesTrabajo() {
               <p className="text-sm" style={{ color: theme.text }}>{selected.motivo_cancelacion}</p>
             </div>
           )}
+          {/* T6: OT frenada en campo (estado no final). El motivo viaja en motivo_cancelacion. */}
+          {selected && selected.estado === 'bloqueada' && (
+            <div className="rounded-xl p-3" style={{ backgroundColor: `${otEstadoColor('bloqueada')}15`, border: `1px solid ${otEstadoColor('bloqueada')}40` }}>
+              <p className="text-xs font-semibold uppercase mb-1 flex items-center gap-1.5" style={{ color: otEstadoColor('bloqueada') }}>
+                <OctagonAlert className="h-3.5 w-3.5" /> Orden bloqueada
+              </p>
+              {selected.motivo_cancelacion && (
+                <p className="text-sm" style={{ color: theme.text }}>{selected.motivo_cancelacion}</p>
+              )}
+              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                El trabajo está frenado. Cuando se resuelva, completá la orden desde abajo.
+              </p>
+            </div>
+          )}
 
           <div>
             <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Título</p>
@@ -625,11 +778,11 @@ export default function OrdenesTrabajo() {
               />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Tipo de trabajo</p>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Categoría</p>
               <ModernSelect
-                value={form.tipo_trabajo_id}
-                onChange={(v) => setForm({ ...form, tipo_trabajo_id: v })}
-                options={tipoTrabajoOptions}
+                value={form.categoria_id}
+                onChange={(v) => setForm({ ...form, categoria_id: v })}
+                options={categoriaOptions}
                 disabled={!esGestor || !esEditable}
                 searchable
               />
@@ -688,20 +841,42 @@ export default function OrdenesTrabajo() {
             <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Reclamos vinculados</p>
             {form.reclamo_ids.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {form.reclamo_ids.map(id => (
-                  <span
-                    key={id}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
-                    style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-                  >
-                    {reclamoLabel(id)}
-                    {esGestor && esEditable && (
-                      <button onClick={() => setForm({ ...form, reclamo_ids: form.reclamo_ids.filter(r => r !== id) })}>
-                        <X className="h-3 w-3" />
+                {form.reclamo_ids.map(id => {
+                  const est = reclamoEstado(id);
+                  const estInfo = est ? getEstadoInfo(est) : null;
+                  return (
+                    <span
+                      key={id}
+                      className="flex items-center gap-1.5 text-xs pl-2 pr-2 py-1 rounded-lg"
+                      style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/gestion/reclamos?abrir=${id}`)}
+                        className="flex items-center gap-1.5 hover:underline"
+                        title="Ver reclamo"
+                      >
+                        <span>{reclamoLabel(id)}</span>
+                        {estInfo && (
+                          <span
+                            className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ backgroundColor: estInfo.bg, color: estInfo.color }}
+                          >
+                            {estInfo.label}
+                          </span>
+                        )}
                       </button>
-                    )}
-                  </span>
-                ))}
+                      {esGestor && esEditable && (
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, reclamo_ids: form.reclamo_ids.filter(r => r !== id) })}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             )}
             {esGestor && esEditable && (
@@ -810,8 +985,8 @@ export default function OrdenesTrabajo() {
             )}
           </div>
 
-          {/* Completar (asignada / en_curso) */}
-          {selected && (selected.estado === 'asignada' || selected.estado === 'en_curso') && (
+          {/* Completar (asignada / en_curso / bloqueada — T6: se puede cerrar tras destrabar) */}
+          {selected && (selected.estado === 'asignada' || selected.estado === 'en_curso' || selected.estado === 'bloqueada') && (
             <div className="rounded-xl p-3 space-y-2" style={{ border: `1px dashed ${otEstadoColor('completada')}60` }}>
               <p className="text-xs font-semibold uppercase" style={{ color: otEstadoColor('completada') }}>Completar orden</p>
               <textarea
@@ -822,6 +997,34 @@ export default function OrdenesTrabajo() {
                 className="w-full px-3 py-2 rounded-lg text-sm resize-none"
                 style={inputStyle}
               />
+              {/* T6: consumo REAL usado por consumible (editable por el empleado). */}
+              {consumiblesOT.length > 0 && (
+                <div className="rounded-lg p-2" style={{ backgroundColor: theme.backgroundSecondary }}>
+                  <p className="text-[11px] font-semibold uppercase mb-1.5 flex items-center gap-1.5" style={{ color: theme.textSecondary }}>
+                    <Boxes className="h-3.5 w-3.5" /> Consumo real usado
+                  </p>
+                  <div className="space-y-1.5">
+                    {consumiblesOT.map(r => (
+                      <div key={r.id} className="flex items-center gap-2">
+                        <span className="text-sm flex-1 truncate" style={{ color: theme.text }}>{r.item_nombre || `#${r.item_id}`}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          value={consumosReales[r.id] ?? r.cantidad ?? 1}
+                          onChange={e => setConsumoReal(r.id, Number(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 rounded text-sm text-right"
+                          style={inputStyle}
+                        />
+                        <span className="text-[11px] w-10" style={{ color: theme.textSecondary }}>{r.unidad || 'u'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
+                    Ajustá lo que realmente se usó: se descuenta esa cantidad del stock al completar.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -842,10 +1045,38 @@ export default function OrdenesTrabajo() {
                   Completar
                 </button>
               </div>
+              {selected.reclamos.length > 0 && (
+                <label className="flex items-center gap-2 cursor-pointer text-sm select-none" style={{ color: theme.text }}>
+                  <input
+                    type="checkbox"
+                    checked={finalizarReclamos}
+                    onChange={e => setFinalizarReclamos(e.target.checked)}
+                    className="h-4 w-4 rounded"
+                    style={{ accentColor: otEstadoColor('completada') }}
+                  />
+                  <span>
+                    Finalizar también {selected.reclamos.length === 1 ? 'el reclamo vinculado' : `los ${selected.reclamos.length} reclamos vinculados`}
+                  </span>
+                </label>
+              )}
               <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-                Completar la orden no cierra los reclamos: cada reclamo mantiene su circuito de resolución y confirmación.
+                {finalizarReclamos
+                  ? 'Los reclamos vinculados quedarán finalizados y se le avisará a cada vecino para calificar.'
+                  : 'Por defecto, completar la orden no cierra los reclamos: cada reclamo mantiene su circuito de resolución y confirmación.'}
               </p>
             </div>
+          )}
+
+          {/* T6: bloquear en campo — frenar la OT sin cerrarla (falta material, clima, etc.).
+              Operable por el responsable de la OT; el backend valida quién puede. */}
+          {selected && (selected.estado === 'asignada' || selected.estado === 'en_curso') && (
+            <button
+              onClick={() => setConfirmBloquear(true)}
+              className="w-full py-2.5 rounded-lg font-medium flex items-center justify-center gap-1.5"
+              style={{ color: otEstadoColor('bloqueada'), border: `1px solid ${otEstadoColor('bloqueada')}60` }}
+            >
+              <OctagonAlert className="h-4 w-4" /> No puedo terminar — bloquear
+            </button>
           )}
         </div>
       </Sheet>
@@ -870,6 +1101,45 @@ export default function OrdenesTrabajo() {
         confirmText="Cancelar OT"
         cancelText="Volver"
         variant="danger"
+      />
+
+      {/* T6: bloquear OT en campo — elegir motivo + nota opcional. */}
+      <ConfirmModal
+        isOpen={confirmBloquear}
+        onClose={() => setConfirmBloquear(false)}
+        onConfirm={bloquear}
+        title="Bloquear orden de trabajo"
+        icon={<OctagonAlert className="h-8 w-8" />}
+        message={
+          <div className="space-y-3 text-left">
+            <p style={{ color: theme.textSecondary }}>
+              La orden queda frenada (no es un cierre). Se avisa a los supervisores. Después podés completarla o cancelarla.
+            </p>
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Motivo</p>
+              <ModernSelect
+                value={motivoBloqueoTipo}
+                onChange={(v) => setMotivoBloqueoTipo(v as MotivoBloqueoOT)}
+                options={OT_MOTIVO_BLOQUEO_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+              />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Nota (opcional)</p>
+              <textarea
+                value={motivoBloqueoNota}
+                onChange={e => setMotivoBloqueoNota(e.target.value)}
+                rows={2}
+                placeholder="Detalle de por qué se frenó..."
+                className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+        }
+        confirmText="Bloquear"
+        cancelText="Volver"
+        variant="warning"
+        loading={bloqueando}
       />
     </>
   );

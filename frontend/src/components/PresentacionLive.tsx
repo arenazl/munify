@@ -13,7 +13,8 @@
 //  - las animaciones de entrada son clases CSS, no inline.
 //
 // Datos: hardcodeados (pitch fijo, igual en cualquier muni). El acento
-// de color sale del theme del municipio (theme.primary).
+// de color y la marca (nombre + logo) salen de la config del brand activo
+// (BRAND.primary / BRAND.name / BrandMark), no del theme del municipio.
 // ============================================================
 import { useEffect, useMemo, useState, memo, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -23,13 +24,14 @@ import {
   Wallet, Camera, Trophy, ShieldCheck, Smartphone, Layers,
   Zap, Cpu, MapPin, BarChart3, Settings2, Globe,
 } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
 import {
-  MunifyMark, MockupDashboard, MockupReclamos, MockupMapaCalor,
+  MockupDashboard, MockupReclamos, MockupMapaCalor,
   MockupTramite, MockupTesoreria, MockupCajas, MockupConciliacion,
   MockupSueldos, MockupCaptura, MockupSeguimiento, MockupWhatsApp,
   MockupLogros,
 } from './reels/ReelMockups';
+import { BRAND } from '../brands';
+import { BrandMark } from '../brands/BrandMark';
 
 const SLIDE_DURATION_MS = 11000;
 const BG = '#0E1830';  // ink navy de marca
@@ -157,7 +159,7 @@ function HeroSlide({ isMobile, accent }: SlideCtx) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: `0 22px 60px -16px ${accent}88`,
       }}>
-        <MunifyMark size={isMobile ? 52 : 72} />
+        <BrandMark size={isMobile ? 52 : 72} onDark />
       </div>
       <h1 style={{ fontSize: isMobile ? 40 : 'clamp(56px, 8vw, 96px)', fontWeight: 900, color: '#fff', lineHeight: 1.02, margin: 0, letterSpacing: '-0.01em', fontFamily: FONT_DISPLAY }}>
         Una sola plataforma<br />para <span style={{ color: accent }}>todo el municipio</span>
@@ -254,14 +256,14 @@ function CierreSlide({ isMobile, accent }: SlideCtx) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 18 : 28, maxWidth: 820, margin: '0 auto' }}>
       <div style={{ width: isMobile ? 80 : 104, height: isMobile ? 80 : 104, borderRadius: 24, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 22px 60px -16px ${accent}88` }}>
-        <MunifyMark size={isMobile ? 46 : 60} />
+        <BrandMark size={isMobile ? 46 : 60} onDark />
       </div>
       <h2 style={{ fontSize: isMobile ? 34 : 'clamp(44px, 6vw, 72px)', fontWeight: 900, color: '#fff', lineHeight: 1.05, margin: 0, fontFamily: FONT_DISPLAY }}>
         Tu municipio, <span style={{ color: accent }}>en una sola app</span>
       </h2>
       <p style={{ fontSize: isMobile ? 16 : 20, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5, margin: 0 }}>
         Reclamos, tramites y finanzas conectados. App gratis para el vecino, validacion oficial,
-        implementacion en semanas. <span style={{ color: '#fff', fontWeight: 700 }}>Munify.</span>
+        implementacion en semanas. <span style={{ color: '#fff', fontWeight: 700 }}>{BRAND.name}.</span>
       </p>
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
         {[['3', 'modulos integrados'], ['1-2', 'semanas de implementacion'], ['$0', 'para el vecino']].map(([n, l]) => (
@@ -280,7 +282,7 @@ function CierreSlide({ isMobile, accent }: SlideCtx) {
 // ============================================================
 function buildSlides(): Slide[] {
   return [
-    { key: 'hero', title: 'Munify', subtitle: 'Recorrido del producto', icon: <Sparkles />, color: '#f5a623', Component: HeroSlide },
+    { key: 'hero', title: BRAND.name, subtitle: 'Recorrido del producto', icon: <Sparkles />, color: '#f5a623', Component: HeroSlide },
     { key: 'enfoque', title: 'El enfoque', subtitle: 'Vecino + municipio, conectados', icon: <Globe />, color: '#3b82f6', Component: EnfoqueSlide },
 
     { key: 'm-dashboard', title: 'Dashboard', subtitle: 'La foto del municipio en vivo', icon: <LayoutDashboard />, color: '#f5a623', Component: makeModuleSlide({
@@ -387,8 +389,8 @@ function buildSlides(): Slide[] {
       </div>
     ) },
 
-    { key: 'ventajas', title: 'Por que Munify', subtitle: 'Las ventajas, en claro', icon: <Trophy />, color: '#f5a623', Component: VentajasSlide },
-    { key: 'cierre', title: 'Munify', subtitle: 'Gracias', icon: <Sparkles />, color: '#f5a623', Component: CierreSlide },
+    { key: 'ventajas', title: `Por que ${BRAND.name}`, subtitle: 'Las ventajas, en claro', icon: <Trophy />, color: '#f5a623', Component: VentajasSlide },
+    { key: 'cierre', title: BRAND.name, subtitle: 'Gracias', icon: <Sparkles />, color: '#f5a623', Component: CierreSlide },
   ];
 }
 
@@ -401,18 +403,19 @@ const SlideContentMemo = memo(function SlideContentMemo({ Comp, ctx }: { Comp: (
 // Componente principal
 // ============================================================
 export default function PresentacionLive({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { theme } = useTheme();
   const isMobile = useIsMobile();
   const slides = useMemo(() => buildSlides(), []);
   const [current, setCurrent] = useState(0);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  // Acentos de MARCA Munify (azul del logo), no del theme del muni:
-  // el recorrido vende Munify, y la marca es el logo + su azul.
-  void theme;
-  const accent = '#5B9BFF';
-  const accent2 = '#4070C0';
+  // Acento de MARCA (color primario del brand activo), no el theme del muni: el
+  // recorrido vende el producto y va con la identidad de la marca. Un único
+  // tono derivado de BRAND.primary — antes había dos azules Munify hardcodeados;
+  // se colapsan a la primary del brand para que la marca quede coherente en todo
+  // el recorrido (Munify → azul, marcas white-label → su color).
+  const accent = BRAND.primary;
+  const accent2 = BRAND.primary;
 
   // reset al abrir + tipografia de marca on-demand
   useEffect(() => {
@@ -472,8 +475,8 @@ export default function PresentacionLive({ open, onClose }: { open: boolean; onC
 
       {/* header */}
       <header style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: 12, padding: isMobile ? '12px 16px' : '16px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <MunifyMark size={26} />
-        <span style={{ fontWeight: 700, fontSize: 16, fontFamily: FONT_DISPLAY }}>Munify</span>
+        <BrandMark size={26} onDark />
+        <span style={{ fontWeight: 700, fontSize: 16, fontFamily: FONT_DISPLAY }}>{BRAND.name}</span>
         <span style={{ marginLeft: 6, fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Recorrido del producto</span>
         <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>{current + 1} / {slides.length}</span>
         <button onClick={onClose} aria-label="Cerrar" style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}>

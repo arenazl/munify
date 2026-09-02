@@ -23,6 +23,13 @@ export interface InboxSeccion {
   colapsable?: boolean;
   /** Si la sección tiene una acción global (ej: "Marcar todo como leído"). */
   accion?: { label: string; onClick: () => void };
+  /**
+   * Fuerza una densidad fija para esta sección, sin importar la cantidad de
+   * items (ignora `densityForCount`). Caso de uso: "Empecemos por lo
+   * urgente" siempre en cards grandes, aunque haya 30 urgentes — la
+   * densidad automática de las demás secciones no se toca.
+   */
+  forceDensity?: InboxCardDensity;
 }
 
 interface InboxLayoutProps {
@@ -75,7 +82,9 @@ function gridClassForDensity(d: InboxCardDensity): string {
  *   - Empty states cariñosos cuando una sección no tiene items.
  *
  * Cada sección adapta automáticamente la densidad de sus cards al cantidad
- * de items: pocas → cards grandes; muchas → mini-cards o sub-tabla.
+ * de items: pocas → cards grandes; muchas → mini-cards o sub-tabla. Una
+ * sección puede optar afuera de ese cálculo con `forceDensity` (ej: "Empecemos
+ * por lo urgente" siempre en cards grandes, sin importar la cantidad).
  */
 export function InboxLayout({
   saludoNombre,
@@ -238,7 +247,7 @@ function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: num
     ? (seccion.count ?? 0)
     : seccion.items.length;
   const isEmpty = itemCount === 0;
-  const density = densityForCount(itemCount);
+  const density = seccion.forceDensity ?? densityForCount(itemCount);
   const items = typeof seccion.items === 'function'
     ? seccion.items(density)
     : seccion.items;

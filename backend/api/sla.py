@@ -13,8 +13,25 @@ from models.sla import SLAConfig, SLAViolacion
 from models.reclamo import Reclamo
 from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.enums import EstadoReclamo
+from services.prioridad import prioridad_ot_map
 
 router = APIRouter()
+
+# F6 · prioridad única (docs/reclamos/08 §2.1): el matching de SLA se hace por la
+# prioridad de la OT del reclamo, NO por el campo legacy reclamos.prioridad (deprecado).
+# Las sla_configs existentes guardan `prioridad` como INT 1-5 (ver SLA.tsx getPrioridadLabel:
+# 1=Baja, 2=Media, 3=Alta, 4=Urgente, 5=Crítica). El enum PrioridadOT tiene 4 niveles que
+# calzan 1:1 con los primeros cuatro — es el mapeo más simple que NO rompe configs actuales.
+# (Un config con prioridad=5/Crítica simplemente no matchea por nivel y cae al fallback por
+#  categoría/general de get_sla_for_reclamo, exactamente igual que hoy.)
+_NIVEL_SLA_POR_PRIORIDAD_OT: dict[str, int] = {
+    "baja": 1,
+    "media": 2,
+    "alta": 3,
+    "urgente": 4,
+}
+# Reclamo sin OT viva (transición F6): la UI cae a 'media' → nivel 2.
+_NIVEL_SLA_DEFAULT = 2
 
 
 # Schemas
@@ -202,8 +219,31 @@ async def delete_sla_config(
     return {"message": "Configuración eliminada"}
 
 
-async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: int, municipio_id: int) -> dict:
-    """Obtener configuración de SLA aplicable a un reclamo"""
+async def get_sla_for_reclamo(
+    db: AsyncSession,
+    categoria_id: int,
+    prioridad: int,
+    municipio_id: int,
+    cache: Optional[dict] = None,
+) -> dict:
+    """
+    Obtener configuración de SLA aplicable a un reclamo.
+
+    `cache` es un dict que vive lo que dura UNA request. Sin él, esta función
+    se llamaba una vez por reclamo y hace hasta 3 queries (específica ->
+    por categoría -> general del municipio): con 244 reclamos y la base en
+    otro continente eso daba 33 segundos, y como el navegador sólo abre 6
+    conexiones por host, el endpoint se comía una en TODAS las pantallas y
+    las demás requests morían con "Network Error".
+
+    La configuración depende sólo de (municipio, categoría, prioridad), y de
+    esas combinaciones hay pocas: memoizarla baja de 244 llamadas a las que
+    realmente son distintas.
+    """
+    clave = (municipio_id, categoria_id, prioridad)
+    if cache is not None and clave in cache:
+        return cache[clave]
+
     # Multi-tenant: filtrar por municipio_id
     # Buscar SLA específico para categoría y prioridad
     result = await db.execute(
@@ -243,18 +283,24 @@ async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: in
         config = result.scalar_one_or_none()
 
     if config:
-        return {
+        valores = {
             "tiempo_respuesta": config.tiempo_respuesta,
             "tiempo_resolucion": config.tiempo_resolucion,
             "tiempo_alerta_amarilla": config.tiempo_alerta_amarilla
         }
+    else:
+        # Valores por defecto si no hay configuración
+        valores = {
+            "tiempo_respuesta": 24,
+            "tiempo_resolucion": 72,
+            "tiempo_alerta_amarilla": 48
+        }
 
-    # Valores por defecto si no hay configuración
-    return {
-        "tiempo_respuesta": 24,
-        "tiempo_resolucion": 72,
-        "tiempo_alerta_amarilla": 48
-    }
+    # El default también se cachea: si esta categoría no tiene SLA, las otras
+    # 40 filas de la misma categoría tampoco lo van a tener.
+    if cache is not None:
+        cache[clave] = valores
+    return valores
 
 
 @router.get("/estado-reclamos", response_model=List[SLAEstadoReclamo])
@@ -279,11 +325,27 @@ async def get_sla_estado_reclamos(
     result = await db.execute(query)
     reclamos = result.scalars().all()
 
+    # F6 · prioridad única: la prioridad efectiva se lee de la OT del reclamo (un solo
+    # query, sin N+1). Los reclamos sin OT viva no aparecen en el mapa → nivel default.
+    prioridad_ot_por_reclamo = await prioridad_ot_map(
+        db, [r.id for r in reclamos],
+        municipio_ids={r.municipio_id for r in reclamos},
+    )
+
     estados_sla = []
     ahora = datetime.utcnow()
 
+    # Una sola config por (categoría, prioridad) para todo el lote, en vez de
+    # una consulta por reclamo. Ver la nota en `get_sla_for_reclamo`.
+    cache_sla: dict = {}
+
     for r in reclamos:
-        sla_config = await get_sla_for_reclamo(db, r.categoria_id, r.prioridad, current_user.municipio_id)
+        nivel_prioridad = _NIVEL_SLA_POR_PRIORIDAD_OT.get(
+            prioridad_ot_por_reclamo.get(r.id), _NIVEL_SLA_DEFAULT
+        )
+        sla_config = await get_sla_for_reclamo(
+            db, r.categoria_id, nivel_prioridad, current_user.municipio_id, cache=cache_sla
+        )
 
         tiempo_transcurrido = (ahora - r.created_at.replace(tzinfo=None)).total_seconds() / 3600
 
@@ -319,7 +381,7 @@ async def get_sla_estado_reclamos(
             reclamo_id=r.id,
             titulo=r.titulo,
             categoria=r.categoria.nombre,
-            prioridad=r.prioridad,
+            prioridad=nivel_prioridad,
             estado=r.estado.value,
             created_at=r.created_at,
             tiempo_transcurrido_horas=round(tiempo_transcurrido, 1),
@@ -363,7 +425,8 @@ async def get_sla_resumen(
         select(Reclamo)
         .where(
             Reclamo.municipio_id == current_user.municipio_id,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            # Cierre canónico 'finalizado' + 'resuelto' (legacy) para el tiempo promedio.
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
             Reclamo.fecha_resolucion >= hace_30_dias
         )
     )

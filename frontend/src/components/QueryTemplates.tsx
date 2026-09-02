@@ -284,7 +284,7 @@ export default function QueryTemplates({ onExecute, loading }: QueryTemplatesPro
           className={`px-3 py-1 rounded-full text-xs transition-all ${!filterCategoria ? 'font-semibold' : ''}`}
           style={{
             backgroundColor: !filterCategoria ? theme.primary : theme.backgroundSecondary,
-            color: !filterCategoria ? '#fff' : theme.textSecondary,
+            color: !filterCategoria ? 'var(--pl-on-accent)' : theme.textSecondary,
           }}
         >
           Todos
@@ -296,7 +296,7 @@ export default function QueryTemplates({ onExecute, loading }: QueryTemplatesPro
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs transition-all ${filterCategoria === cat.id ? 'font-semibold' : ''}`}
             style={{
               backgroundColor: filterCategoria === cat.id ? theme.primary : theme.backgroundSecondary,
-              color: filterCategoria === cat.id ? '#fff' : theme.textSecondary,
+              color: filterCategoria === cat.id ? 'var(--pl-on-accent)' : theme.textSecondary,
             }}
           >
             {cat.icono}

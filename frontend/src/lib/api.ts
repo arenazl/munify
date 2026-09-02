@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { TableroPayload } from '../types';
 
 const getApiUrl = () => {
   // Si hay URL completa configurada, usarla (override explícito).
@@ -7,15 +8,13 @@ const getApiUrl = () => {
     return envUrl;
   }
 
-  // Dev local (vite): apuntar al backend en localhost por puerto configurable.
-  const host = window.location.hostname || 'localhost';
-  if (host === 'localhost' || host === '127.0.0.1') {
-    const port = import.meta.env.VITE_API_PORT || '8000';
-    return `http://${host}:${port}/api`;
-  }
-
-  // Prod: same-origin. Netlify proxea /api/* al backend (ver netlify.toml).
-  // Sin URL absoluta en el bundle → sin secrets scanning y sin CORS.
+  // SIEMPRE same-origin, en todos los ambientes (framework-first):
+  //  - Netlify proxea /api/* al backend del ambiente (gen-redirects).
+  //  - Dev local (vite): el proxy de vite.config.ts manda /api al backend QA
+  //    real ("siempre contra la base de qa" — regla del dueño 2026-07-31).
+  //  - ¿Backend local? SOLO con override explícito VITE_API_URL completo.
+  // Antes acá se adivinaba http://localhost:{VITE_API_PORT}/api y sin backend
+  // local TODO daba ERR_CONNECTION_REFUSED en dev.
   return '/api';
 };
 
@@ -308,6 +307,11 @@ export const authApi = {
 // Reclamos
 export const reclamosApi = {
   getAll: (params?: Record<string, string | number>) => api.get('/reclamos', { params }),
+  // Payload del kanban en UNA lectura (tarjetas livianas + resumen de cerrados
+  // agregado en SQL). No usar getAll paginado para el tablero: son 6 requests
+  // encadenados y ~875 kB para pintar ocho campos por tarjeta.
+  getTablero: (params?: { dias?: number }) =>
+    api.get<TableroPayload>('/reclamos/tablero', { params }),
   getMisReclamos: (params?: { skip?: number; limit?: number }) => api.get('/reclamos/mis-reclamos', { params }),
   getMisEstadisticas: () => api.get('/reclamos/mis-estadisticas'),
   getRevisionIA: (force = false) => api.get('/reclamos/revision-ia', { params: { force } }),
@@ -463,6 +467,20 @@ export const zonasApi = {
   create: (data: Record<string, unknown>) => api.post('/zonas', data).then(res => { invalidateCache('/zonas'); return res; }),
   update: (id: number, data: Record<string, unknown>) => api.put(`/zonas/${id}`, data).then(res => { invalidateCache('/zonas'); return res; }),
   delete: (id: number) => api.delete(`/zonas/${id}`).then(res => { invalidateCache('/zonas'); return res; }),
+  // Contornos para DIBUJAR el mapa: los barrios con su poligono y a que
+  // distrito pertenecen. El poligono ya viene como [[lat, lng], ...], que es
+  // el orden que espera Leaflet.
+  regionesMapa: () => api.get<{
+    distritos: Array<{
+      id: number; nombre: string; barrios: number;
+      /** Contorno oficial del distrito, ya en [lat, lng]. */
+      poligono: [number, number][] | null;
+    }>;
+    barrios: Array<{
+      id: number; nombre: string; zona_id: number | null;
+      zona_nombre: string | null; poligono: [number, number][];
+    }>;
+  }>('/zonas/regiones-mapa'),
 };
 
 // Dependencias (nuevo modelo desacoplado)
@@ -585,7 +603,7 @@ export const usersApi = {
   delete: (id: number) => api.delete(`/users/${id}`),
   // Perfil propio
   getMyProfile: () => api.get('/users/me'),
-  updateMyProfile: (data: { nombre?: string; apellido?: string; telefono?: string; dni?: string; direccion?: string }) =>
+  updateMyProfile: (data: { nombre?: string; apellido?: string; telefono?: string; dni?: string; direccion?: string; zona_id?: number | null }) =>
     api.put('/users/me', data),
   // Cambio de email con validación
   requestEmailChange: (nuevoEmail: string) =>
@@ -609,6 +627,10 @@ export const dashboardApi = {
     api.get('/dashboard/stats', { params: depParam(dependenciaId) }),
   getTramitesStats: (dependenciaId?: number) =>
     api.get('/dashboard/tramites-stats', { params: depParam(dependenciaId) }),
+  /** El circuito de trámites en un request: cuellos (quién tiene la pelota),
+   *  presentismo del turnero y tiempos por tipo de trámite. */
+  getTramitesCircuito: (dependenciaId?: number) =>
+    api.get('/dashboard/tramites-circuito', { params: depParam(dependenciaId) }),
   getMisStats: () => api.get('/dashboard/mis-stats'),
   getEmpleadoStats: () => api.get('/dashboard/empleado-stats'),
   getPorCategoria: (dependenciaId?: number) =>
@@ -630,6 +652,9 @@ export const dashboardApi = {
   getConteoEstados: (dependencia_id?: number) =>
     api.get('/dashboard/conteo-estados', { params: dependencia_id ? { dependencia_id } : {} }),
   getConteoDependencias: () => api.get('/dashboard/conteo-dependencias'),
+  /** Historia (total) y actividad de 30 días por dominio. Ordena la pantalla
+   *  del tablero, así que NO se filtra por dependencia. */
+  getActividad: () => api.get('/dashboard/actividad'),
 };
 
 // Notificaciones
@@ -658,6 +683,14 @@ export const configuracionApi = {
 // Municipios
 export const municipiosApi = {
   getAll: () => api.get('/municipios'),
+  // Herramienta del demostrador: anonimiza los vecinos con ese DNI en TODOS
+  // los municipios demo para poder re-registrarse con el QR (el guard de
+  // es_demo vive en el backend; un tenant productivo jamás se toca).
+  liberarDniDemo: (dni: string) =>
+    api.post<{ liberados: number; municipios: string[]; dni: string }>(
+      '/municipios/demo/liberar-dni',
+      { dni },
+    ),
   // Resumen real por muni para la vista Suscripciones del superadmin
   adminResumen: () => api.get('/municipios/admin/resumen'),
   getPublic: () => api.get('/municipios/public'),
@@ -693,20 +726,36 @@ export const municipiosApi = {
   // Endpoint público para crear municipio de demo desde la landing comercial.
   // Arma todo el seed mínimo (categorías + dep General + 2 users demo) y
   // devuelve la URL de redirección a la landing del muni nuevo.
-  crearDemo: (nombre: string, geo?: { lat: number; lng: number; provincia?: string }) =>
+  // `pais` NO es opcional de hecho: decide en qué país se busca el POLÍGONO
+  // oficial de la ciudad (`municipios_catalogo`) y, con él, los barrios y
+  // calles reales (services/geo_ciudad.py). Sin mandarlo, el backend asume
+  // "AR" y una demo de Asunción o Valparaíso busca su contorno entre los
+  // municipios argentinos → se queda sin geografía.
+  crearDemo: (nombre: string, geo?: { lat: number; lng: number; provincia?: string; pais?: string }) =>
     api.post<{
       id: number;
       nombre: string;
       codigo: string;
       redirect_path: string;
+      // LA LLAVE de la demo, y esta es la unica vez que el backend la manda:
+      // la grilla publica no la devuelve nunca. Se guarda en el navegador del
+      // que creo la demo (utils/demoAcceso) y con ella se arma el link.
+      demo_token?: string;
     }>('/municipios/crear-demo', { nombre, ...(geo || {}) }),
-  // Autocomplete del catálogo OFICIAL de municipios argentinos (tabla local
-  // municipios_argentina, cargada una vez desde georef — sin API externa en runtime).
-  buscarArgentina: (q: string) =>
-    api.get<Array<{ id: string; nombre: string; provincia: string; lat: number; lng: number }>>(
-      '/municipios/argentina', { params: { q } },
-    ),
-  eliminarDemo: (codigo: string) => api.delete(`/municipios/demo/${codigo}`),
+  // Autocomplete del catálogo OFICIAL de municipios (tabla local
+  // municipios_catalogo, cargada una vez — sin API externa en runtime).
+  // Busca por nombre Y por alias: quien crea la demo escribe el nombre que
+  // conoce ("Campo 9"), no el de la ley.
+  buscarCatalogo: (q: string, pais: string) =>
+    api.get<Array<{
+      id: string; nombre: string; provincia: string;
+      lat: number; lng: number; pais: string; alias: string[];
+    }>>('/municipios/catalogo', { params: { q, pais } }),
+  // Borrar pide la MISMA llave que entrar: hasta el 2026-09-02 este delete era
+  // publico y sin credencial (hard delete con cascade), o sea que cualquiera
+  // borraba la demo de cualquiera.
+  eliminarDemo: (codigo: string, token?: string) =>
+    api.delete(`/municipios/demo/${codigo}`, { params: token ? { t: token } : {} }),
   update: (id: number, data: object) => api.put(`/municipios/${id}`, data),
   delete: (id: number) => api.delete(`/municipios/${id}`),
   // Barrios (se cargan automáticamente)
@@ -739,6 +788,70 @@ export const auditApi = {
   setDebugMode: (enabled: boolean) =>
     api.put<{ enabled: boolean }>('/admin/settings/debug_mode', { enabled }),
   consolaResumen: () => api.get<ConsolaResumen>('/admin/consola/resumen'),
+};
+
+/* ============================================================
+ * Bitácora de la SEMILLA de demos (solo super admin).
+ * Contrato: backend/api/admin_seed_logs.py. El listado NO trae `pasos`
+ * (una demo grande son ~20 pasos con sus counts); el detalle sí.
+ * ============================================================ */
+
+/** Una etapa del pipeline de la semilla. `detalle` es libre: cada paso guarda
+ *  lo que produjo (counts, y cuando aplica los NOMBRES reales). */
+export interface SeedLogPaso {
+  nombre: string;
+  estado: 'ok' | 'degradado' | 'fallo' | string;
+  duracion_ms: number;
+  /** Por qué degradó o falló. Obligatorio del lado del backend para degradar. */
+  motivo?: string;
+  detalle?: Record<string, unknown>;
+}
+
+/** Lo que se lee SIN abrir el detalle (services/seed_log.py → resumen()). */
+export interface SeedLogResumen {
+  pasos_total: number;
+  pasos_ok: number;
+  pasos_degradados: number;
+  pasos_fallidos: number;
+  /** Los nombres REALES: es lo único que delata si la demo habla de la ciudad
+   *  del cliente o de zonas genéricas. */
+  zonas: string[];
+  barrios: string[];
+  calles_ejemplo: string[];
+  degradaciones: { paso: string; motivo?: string | null }[];
+}
+
+export interface SeedLogItem {
+  id: number;
+  created_at: string | null;
+  /** Nullable a propósito: el log sobrevive al borrado de la demo. */
+  municipio_id: number | null;
+  municipio_nombre: string;
+  codigo: string | null;
+  pais: string | null;
+  provincia: string | null;
+  /** 'endpoint' (pantalla /demo) o 'script'. */
+  origen: string;
+  estado: 'ok' | 'degradado' | 'fallo' | string;
+  duracion_ms: number;
+  resumen: SeedLogResumen | null;
+  error_message: string | null;
+}
+
+export interface SeedLogDetalle extends SeedLogItem {
+  pasos: SeedLogPaso[] | null;
+}
+
+export const seedLogsApi = {
+  list: (params: {
+    estado?: string;
+    municipio_id?: number;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) =>
+    api.get<{ total: number; items: SeedLogItem[] }>('/admin/seed-logs', { params }),
+  detail: (id: number) => api.get<SeedLogDetalle>(`/admin/seed-logs/${id}`),
 };
 
 // Proveedores de pago (GIRE, MercadoPago, MODO)
@@ -1250,6 +1363,41 @@ export const iaConfigApi = {
   adminModelos: () => api.get<string[]>('/admin/ia-config/modelos'),
 };
 
+export interface FilaUsoIA {
+  clave: string;
+  llamadas: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
+  tokens_por_llamada: number;
+  latencia_media_ms: number;
+  vacias: number;
+  errores: number;
+  fallbacks: number;
+}
+
+export interface ResumenUsoIA {
+  desde: string;
+  hasta: string;
+  llamadas: number;
+  tokens: number;
+  tokens_por_llamada: number;
+  latencia_media_ms: number;
+  /** % de llamadas que no devolvieron nada (la firma del bug de gpt-oss). */
+  tasa_vacias: number;
+  /** % en que la app resolvió sin IA y el usuario no se enteró. */
+  tasa_fallback: number;
+  cuota_requests_restante: number | null;
+  cuota_tokens_restante: number | null;
+  por_feature: FilaUsoIA[];
+  por_modelo: FilaUsoIA[];
+}
+
+export const iaUsoApi = {
+  resumen: (dias = 7, municipioId?: number) =>
+    api.get<ResumenUsoIA>('/admin/ia-uso/resumen', { params: { dias, municipio_id: municipioId } }),
+};
+
 export const whatsappApi = {
   // Configuración
   getConfig: () => api.get('/whatsapp/config'),
@@ -1410,18 +1558,42 @@ export const ordenesTrabajoApi = {
   update: (id: number, data: Record<string, unknown>) => api.put(`/ordenes-trabajo/${id}`, data),
   asignar: (id: number, data: Record<string, unknown>) => api.post(`/ordenes-trabajo/${id}/asignar`, data),
   iniciar: (id: number) => api.post(`/ordenes-trabajo/${id}/iniciar`),
-  completar: (id: number, data: { notas_cierre: string; horas_reales?: number }) =>
-    api.post(`/ordenes-trabajo/${id}/completar`, data),
+  completar: (id: number, data: {
+    notas_cierre: string;
+    horas_reales?: number;
+    finalizar_reclamos?: boolean;
+    consumos_reales?: { recurso_id: number; cantidad_real: number }[];
+  }) => api.post(`/ordenes-trabajo/${id}/completar`, data),
+  // T6: el empleado en campo marca la OT como BLOQUEADA (frenada, estado no final).
+  bloquear: (id: number, data: { motivo_tipo: string; motivo?: string }) =>
+    api.post(`/ordenes-trabajo/${id}/bloquear`, data),
   cancelar: (id: number, motivo: string) => api.post(`/ordenes-trabajo/${id}/cancelar`, { motivo }),
 };
 
-// Tipos de trabajo de OT (catálogo configurable — template)
-export const otTiposTrabajoApi = {
-  list: (params?: Record<string, string | number | boolean>) =>
-    api.get('/ot-tipos-trabajo', { params }),
-  create: (data: Record<string, unknown>) => api.post('/ot-tipos-trabajo', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/ot-tipos-trabajo/${id}`, data),
-  delete: (id: number) => api.delete(`/ot-tipos-trabajo/${id}`),
+// Puntos de Interés (POI) — F6. Tipos (catálogo) + puntos (mapa) + consolidación.
+// Endpoints con prefijo /poi (OJO: /poi/tipos y /poi/puntos, NO /poi-tipos).
+export const poiApi = {
+  // ----- Tipos (catálogo; ABM en Configuración) -----
+  listTipos: (params?: { activo?: boolean }) =>
+    api.get('/poi/tipos', { params }),
+  createTipo: (data: Record<string, unknown>) => api.post('/poi/tipos', data),
+  updateTipo: (id: number, data: Record<string, unknown>) =>
+    api.put(`/poi/tipos/${id}`, data),
+  deleteTipo: (id: number) => api.delete(`/poi/tipos/${id}`),
+
+  // ----- Puntos (se gestionan en el mapa) -----
+  listPuntos: (params?: { activo?: boolean }) =>
+    api.get('/poi/puntos', { params }),
+  createPunto: (data: Record<string, unknown>) => api.post('/poi/puntos', data),
+  updatePunto: (id: number, data: Record<string, unknown>) =>
+    api.put(`/poi/puntos/${id}`, data),
+  deletePunto: (id: number) => api.delete(`/poi/puntos/${id}`),
+
+  // ----- Zona: reclamos + consolidación en OT + recálculo batch -----
+  reclamosEnZona: (id: number) => api.get(`/poi/puntos/${id}/reclamos-en-zona`),
+  consolidar: (id: number, reclamoIds?: number[]) =>
+    api.post(`/poi/puntos/${id}/consolidar`, { reclamo_ids: reclamoIds ?? null }),
+  recalcular: () => api.post('/poi/puntos/recalcular'),
 };
 
 // Inventario — categorías (template) + ítems (activos/consumibles)
@@ -1442,6 +1614,33 @@ export const inventarioApi = {
   updateItem: (id: number, data: Record<string, unknown>) =>
     api.put(`/inventario/items/${id}`, data),
   deleteItem: (id: number) => api.delete(`/inventario/items/${id}`),
+  // Depósitos: dónde está guardada cada cosa.
+  listDepositos: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/depositos', { params }),
+  createDeposito: (data: Record<string, unknown>) =>
+    api.post('/inventario/depositos', data),
+  updateDeposito: (id: number, data: Record<string, unknown>) =>
+    api.put(`/inventario/depositos/${id}`, data),
+  deleteDeposito: (id: number) => api.delete(`/inventario/depositos/${id}`),
+  // Movimientos: el libro del depósito. `createMovimiento` sólo acepta
+  // entrada/salida/ajuste — los de OT los escribe el cierre de la orden.
+  listMovimientos: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/movimientos', { params }),
+  createMovimiento: (data: Record<string, unknown>) =>
+    api.post('/inventario/movimientos', data),
+  historialItem: (id: number, params?: Record<string, string | number>) =>
+    api.get(`/inventario/items/${id}/movimientos`, { params }),
+  // Órdenes de compra: al recibirlas entra el stock.
+  listOrdenesCompra: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/ordenes-compra', { params }),
+  createOrdenCompra: (data: Record<string, unknown>) =>
+    api.post('/inventario/ordenes-compra', data),
+  updateOrdenCompra: (id: number, data: Record<string, unknown>) =>
+    api.put(`/inventario/ordenes-compra/${id}`, data),
+  recibirOrdenCompra: (id: number, data: Record<string, unknown>) =>
+    api.post(`/inventario/ordenes-compra/${id}/recibir`, data),
+  cancelarOrdenCompra: (id: number) =>
+    api.delete(`/inventario/ordenes-compra/${id}`),
 };
 
 export const tramitesApi = {
@@ -1786,6 +1985,45 @@ export const operadorApi = {
       verificado_at: string | null;
     }>>('/operador/vecinos/buscar', { params: dni ? { dni } : { q } }),
 
+  // Alta manual de vecino (sin biometria): sirve para reclamos/turnos.
+  // Solo el nombre es obligatorio (para reclamos no se exige DNI).
+  // Para tramites el vecino debe validar RENAPER (gate en backend).
+  altaManualVecino: (data: {
+    dni?: string;
+    nombre: string;
+    apellido?: string;
+    telefono?: string;
+    email?: string;
+  }) =>
+    api.post<{
+      user_id: number;
+      dni: string;
+      nombre: string | null;
+      apellido: string | null;
+      email: string | null;
+      telefono: string | null;
+      direccion: string | null;
+      nivel_verificacion: number;
+      kyc_modo: string | null;
+      verificado_at: string | null;
+    }>('/operador/vecinos', data),
+
+  // Vecino-sistema "Anonimo" del muni: para cargar reclamos sin identificar
+  // a nadie. Idempotente (singleton por muni). Tramites jamas anonimos.
+  vecinoAnonimo: () =>
+    api.post<{
+      user_id: number;
+      dni: string;
+      nombre: string | null;
+      apellido: string | null;
+      email: string | null;
+      telefono: string | null;
+      direccion: string | null;
+      nivel_verificacion: number;
+      kyc_modo: string | null;
+      verificado_at: string | null;
+    }>('/operador/vecinos/anonimo'),
+
   // Biometria presencial via Didit
   kycIniciar: (municipioId: number, callbackUrl?: string) =>
     api.post<{ session_id: string; url: string }>('/operador/kyc/iniciar', {
@@ -1956,27 +2194,44 @@ export const calificacionesApi = {
     api.get('/calificaciones/estadisticas', { params }),
   getRankingEmpleados: (dias?: number) =>
     api.get('/calificaciones/ranking-empleados', { params: { dias } }),
+  // Últimas reseñas con autor/categoría (widget "La voz del vecino")
+  getUltimas: (params?: { limit?: number; dias?: number }) =>
+    api.get('/calificaciones/ultimas', { params }),
 
   // Públicas (para link de WhatsApp)
-  getInfoPublica: (reclamoId: number) =>
-    api.get(`/calificaciones/calificar/${reclamoId}`),
-  calificarPublica: (reclamoId: number, data: { puntuacion: number; comentario?: string }) =>
-    api.post(`/calificaciones/calificar/${reclamoId}`, data),
+  getInfoPublica: (reclamoId: number, token?: string) =>
+    api.get(`/calificaciones/calificar/${reclamoId}${token ? `?t=${encodeURIComponent(token)}` : ''}`),
+  calificarPublica: (reclamoId: number, data: { puntuacion: number; comentario?: string }, token?: string) =>
+    api.post(`/calificaciones/calificar/${reclamoId}${token ? `?t=${encodeURIComponent(token)}` : ''}`, data),
 };
 
 // Noticias
+/** Avisos al vecino (módulo Comunicación). La tabla se llama `noticias`.
+ *
+ *  El municipio sale del token en TODO lo de gestión: antes viajaba como
+ *  query param y el cliente podía publicar en otro tenant. El único que lleva
+ *  `municipio_id` es el feed público, que se consulta sin sesión. */
 export const noticiasApi = {
-  getAll: (params?: { municipio_id?: number; solo_activas?: boolean; skip?: number; limit?: number }) => {
-    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
-    return api.get('/noticias', { params: { ...params, municipio_id: municipioId } });
-  },
-  getOne: (id: number) => api.get(`/noticias/${id}`),
-  create: (data: Record<string, unknown>, municipioId?: number) => {
+  publico: (municipioId?: number) => {
     const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.post('/noticias', data, { params: { municipio_id: mId } });
+    return api.get('/noticias/publico', { params: { municipio_id: mId } });
   },
-  update: (id: number, data: Record<string, unknown>) => api.put(`/noticias/${id}`, data),
+  getAll: () => api.get('/noticias'),
+  create: (data: Record<string, unknown>) => api.post('/noticias', data),
+  update: (id: number, data: Record<string, unknown>) => api.patch(`/noticias/${id}`, data),
   delete: (id: number) => api.delete(`/noticias/${id}`),
+  /** Sube la foto de la publicación y devuelve su URL ya alojada.
+   *  El que carga esto tiene la foto en el celular, no una URL. */
+  subirImagen: (archivo: File) => {
+    const fd = new FormData();
+    fd.append('file', archivo);
+    return api.post<{ url: string }>('/noticias/imagen', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  /** Push + campana a los vecinos del muni. Idempotente: si ya se avisó,
+   *  devuelve `ya_enviado` y no vuelve a mandar. */
+  enviar: (id: number) => api.post<{ enviados: number; ya_enviado: boolean }>(`/noticias/${id}/enviar`),
 };
 
 // Gestion de Empleados (cuadrillas, ausencias, horarios, metricas, capacitaciones)
@@ -2130,6 +2385,17 @@ export const gastosApi = {
     concepto?: string;
   }) => api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
   reportes: () => api.get('/tesoreria/gastos/stats/reportes'),
+  /** Serie DIARIA y contigua de gasto (los días sin movimiento vienen en 0).
+   *  La consume el tablero financiero del Dashboard: la curva, el promedio
+   *  por día y el día más caro salen de acá, no de traerse los gastos. */
+  serie: (dias = 90) =>
+    api.get<{ fecha: string; monto: number }[]>('/tesoreria/gastos/serie', { params: { dias } }),
+  /** Desde cuándo el muni carga gastos a mano (las importaciones en ráfaga
+   *  quedan afuera). `desde` null = sin señal. */
+  inicioOperativo: () =>
+    api.get<{ desde: string | null; importaciones: { dia: string; filas: number; fechas: string[] }[] }>(
+      '/tesoreria/gastos/inicio-operativo',
+    ),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -2365,6 +2631,34 @@ export const parajesApi = {
   delete: (id: number) => api.delete(`/tesoreria/parajes/${id}`),
 };
 
+/** Flota municipal (módulo Recursos). El vehículo es un activo de inventario;
+ *  acá viven su consumo y sus cargas de combustible. */
+/** Presentismo (módulo Recursos). El empleado ficha; el gestor mira el mes. */
+export const presentismoApi = {
+  fichar: (coords: { lat?: number; lng?: number }) => api.post('/presentismo/fichar', coords),
+  miJornada: () => api.get('/presentismo/mi-jornada'),
+  mes: (mes?: string) => api.get('/presentismo/mes', { params: mes ? { mes } : undefined }),
+};
+
+/** Reservas (módulo Recursos): lo que el municipio presta al vecino. */
+export const reservasApi = {
+  list: () => api.get('/reservas'),
+  disponibles: (municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.get('/reservas/disponibles', { params: { municipio_id: mId } });
+  },
+  crear: (data: Record<string, unknown>) => api.post('/reservas', data),
+  aprobar: (id: number) => api.post(`/reservas/${id}/aprobar`),
+  rechazar: (id: number, motivo: string) => api.post(`/reservas/${id}/rechazar`, { motivo }),
+  cancelar: (id: number) => api.post(`/reservas/${id}/cancelar`),
+};
+
+export const flotaApi = {
+  vehiculos: () => api.get('/flota/vehiculos'),
+  cargas: (itemId: number) => api.get(`/flota/vehiculos/${itemId}/cargas`),
+  registrarCarga: (data: Record<string, unknown>) => api.post('/flota/cargas', data),
+};
+
 export const proyectosApi = {
   list: (params?: { estado?: string; activo?: boolean; search?: string; include_resumen?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/proyectos', { params }),
@@ -2373,6 +2667,12 @@ export const proyectosApi = {
   update: (id: number, data: Record<string, unknown>) =>
     api.put(`/tesoreria/proyectos/${id}`, data),
   delete: (id: number) => api.delete(`/tesoreria/proyectos/${id}`),
+  /** Obras que el municipio decidió mostrarle al vecino. Público, sin token:
+   *  lo consume la home del vecino y el mapa. */
+  publicas: (municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.get('/tesoreria/proyectos/publicas', { params: { municipio_id: mId } });
+  },
 };
 
 export const tesoreriaCatalogoApi = {

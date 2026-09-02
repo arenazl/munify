@@ -18,14 +18,24 @@ class Reclamo(Base):
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=False)
 
-    # Estado y prioridad
-    estado = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), default=EstadoReclamo.NUEVO, nullable=False, index=True)
-    prioridad = Column(Integer, default=3)  # 1-5, donde 1 es más urgente
+    # Estado (default RECIBIDO — F3 · creación unificada; ya no NUEVO).
+    estado = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), default=EstadoReclamo.RECIBIDO, nullable=False, index=True)
+
+    # DEPRECADO (F6): la prioridad efectiva se lee de la OT (services/prioridad.py →
+    # ReclamoResponse.prioridad_ot). El schema de la API ya NO la expone. La columna
+    # se MANTIENE (no se dropea todavía) porque aún la leen chat/portal_publico/turnos/
+    # vecino/escalado — el DROP físico es un release posterior, cuando esos 5 migren.
+    prioridad = Column(Integer, default=3)
 
     # Ubicación del reclamo (donde está el problema)
     direccion = Column(String(255), nullable=False)
     latitud = Column(Float, nullable=True)
     longitud = Column(Float, nullable=True)
+    # De dónde salió la coordenada: direccion | gps | geocodificada | ip |
+    # municipio. Los dos últimos son APROXIMADOS y la analítica fina
+    # (heatmap, focos) los excluye. NULL = legacy (previo a la regla, se
+    # trata como preciso). Ver services/ubicacion_reclamo.py.
+    ubicacion_origen = Column(String(15), nullable=True)
     referencia = Column(String(255), nullable=True)  # "Frente a la plaza", etc.
 
     # Categoría del reclamo (per-municipio)
@@ -39,6 +49,11 @@ class Reclamo(Base):
     # Barrio detectado automáticamente desde la dirección
     barrio_id = Column(Integer, ForeignKey("barrios.id"), nullable=True, index=True)
     barrio = relationship("Barrio")
+
+    # Punto de interés en cuya zona (radio) cae el reclamo (F6 · Etapa B).
+    # Desnormalizado: "está dentro de la zona de {POI}". Lo setea el matching
+    # por haversine al crear/editar. SET NULL si se borra el POI.
+    poi_id = Column(Integer, ForeignKey("puntos_interes.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Usuario que creó el reclamo
     creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)

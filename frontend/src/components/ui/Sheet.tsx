@@ -28,9 +28,14 @@ interface SheetProps {
   footer?: ReactNode;
   stickyFooter?: ReactNode; // Footer que siempre está fijo abajo
   stickyHeader?: ReactNode; // Header adicional que queda sticky debajo del título
+  /** Header COMPLETO propio del caller (desktop): reemplaza la fila estándar
+   *  título+X — el caller se hace cargo de su propio cierre/acciones.
+   *  Mobile sigue usando MobilePageHeader con title/description. Aditivo:
+   *  sin esta prop, el Sheet se comporta exactamente igual que siempre. */
+  customHeader?: ReactNode;
 }
 
-export function Sheet({ open, onClose, title, description, children, footer, stickyFooter, stickyHeader }: SheetProps) {
+export function Sheet({ open, onClose, title, description, children, footer, stickyFooter, stickyHeader, customHeader }: SheetProps) {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const topOffset = isMobile ? TOPBAR_MOBILE_HEIGHT : 0;
@@ -39,6 +44,10 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
   useEffect(() => {
     if (open) {
+      // Patrón de montaje ANIMADO (montar → doble rAF → animar): el setState
+      // dentro del efecto es deliberado; sin él no hay frame inicial desde el
+      // que transicionar. No convertir a estado derivado.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShouldRender(true);
       // Pequeño delay para que el DOM se renderice antes de animar
       requestAnimationFrame(() => {
@@ -107,7 +116,9 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           maxWidth: '32rem', // max-w-lg
           display: 'flex',
           flexDirection: 'column',
-          background: theme.cardAccentBg || theme.card,
+          // Modo PLANO (customHeader): panel blanco liso, como el diseño de
+          // los sheets v2 — sin el lavado de acento del theme.
+          background: customHeader ? theme.card : (theme.cardAccentBg || theme.card),
           transform: isVisible
             ? 'translateX(0) scale(1)'
             : 'translateX(100%) scale(0.95)',
@@ -118,20 +129,23 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        {/* Línea de acento animada */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: '4px',
-            background: `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-            transform: isVisible ? 'scaleY(1)' : 'scaleY(0)',
-            transformOrigin: 'top',
-            transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        />
+        {/* Línea de acento animada — el modo plano (customHeader) no la lleva:
+            el diseño v2 es un panel blanco sin cinta lateral. */}
+        {!customHeader && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: '4px',
+              background: `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+              transform: isVisible ? 'scaleY(1)' : 'scaleY(0)',
+              transformOrigin: 'top',
+              transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          />
+        )}
 
         {/* Header estandar: en mobile usa MobilePageHeader (← volver + titulo),
            en desktop mantiene el X a la derecha. */}
@@ -146,6 +160,8 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         >
           {isMobile ? (
             <MobilePageHeader title={title} subtitle={description} onBack={onClose} />
+          ) : customHeader ? (
+            customHeader
           ) : (
             <div
               className="flex items-center justify-between px-5 py-3"
@@ -194,9 +210,10 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           </div>
         )}
 
-        {/* Content con scroll interno */}
+        {/* Content con scroll interno. Modo plano: 20px laterales y sin
+            padding vertical — las secciones traen su propio ritmo. */}
         <div
-          className="px-4 py-2"
+          className={customHeader ? 'px-5' : 'px-4 py-2'}
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -214,15 +231,15 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         {/* Footer - pegado al fondo del panel */}
         {(footer || stickyFooter) && (
           <div
-            className="px-4 py-2"
+            className={customHeader ? 'px-5 pt-3 pb-4' : 'px-4 py-2'}
             style={{
               borderTop: `1px solid ${theme.border}`,
-              backgroundColor: `${theme.background}cc`,
+              backgroundColor: customHeader ? theme.card : `${theme.background}cc`,
               transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
               opacity: isVisible ? 1 : 0,
               transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
               transitionDelay: isVisible ? '200ms' : '0ms',
-              boxShadow: `0 -4px 20px rgba(0, 0, 0, 0.1)`,
+              boxShadow: customHeader ? 'none' : `0 -4px 20px rgba(0, 0, 0, 0.1)`,
               flexShrink: 0,
             }}
           >

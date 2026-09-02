@@ -1,0 +1,52 @@
+/* Munify — brand tokens reales (crema + navy + serif italic) */
+:root {
+  /* Surfaces */
+  --cream: #F1EAD8;
+  --cream-2: #EADFC5;
+  --cream-3: #E2D5B5;
+  --cream-soft: #F7F2E5;
+  --white: #FFFFFF;
+
+  /* Ink */
+  --ink: #0E1830;        /* near-black navy, primary text / buttons */
+  --ink-2: #1A2647;      /* navy accent for body display */
+  --ink-3: #2A2B26;      /* warm dark */
+  --ink-soft: #5C5848;   /* warm gray text */
+  --ink-mute: #7E7866;   /* muted */
+  --ink-faint: #ADA48A;  /* faint */
+
+  /* Brand logo colors — sampled from official mark */
+  --logo-navy: #103070;    /* outer hexagonal M */
+  --logo-azure: #4070C0;   /* inner diagonal accent */
+
+  /* Accents */
+  --accent: #C8A24E;     /* warm gold (sparingly) */
+  --new: #0E1830;        /* "NUEVO" badge bg */
+
+  /* Borders */
+  --line: rgba(14, 24, 48, 0.10);
+  --line-2: rgba(14, 24, 48, 0.18);
+
+  /* Type */
+  --display: 'Fraunces', 'Cardo', 'Cormorant Garamond', Georgia, serif;
+  --sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  --display-settings: "opsz" 144, "SOFT" 100;
+}
+
+.display {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  font-variation-settings: var(--display-settings);
+}
+.display-roman {
+  font-family: var(--display);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  font-variation-settings: var(--display-settings);
+}
+.sans { font-family: var(--sans); }
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }

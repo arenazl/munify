@@ -1,0 +1,68 @@
+# Contrato de config de nube munify -> Infra. Value-free (solo nombres/refs).
+schema: 1
+app: { id: munify, repo: arenazl/munify, gcp_project: munify-api, region: us-east4 }
+
+backend:
+  runtime: cloudrun
+  source_dir: backend
+  health_path: /health
+  secrets:                      # SOLO NOMBRES (valores en Secret Manager, los pone Infra)
+    - DATABASE_URL
+    - SECRET_KEY
+    - ADMIN_OPS_KEY
+
+frontend:
+  host: cloudflare_pages          # migrado de Netlify el 2026-08 (base-compartida/20-REPARTO-SECRETOS-Y-PLATAFORMA.md)
+  source_dir: frontend
+  backend_binding:
+    mode: proxy_same_origin
+    build_input: BACKEND_ORIGIN       # env del site, por ambiente; la setea Infra
+    generator: frontend/scripts/gen-redirects.mjs
+    fail_closed: true
+
+environments:
+  prod:
+    branch: master
+    backend_service: munify-api
+    backend_origin: https://munify-api-1060106389361.us-east4.run.app
+    pages_project: munify                     # Cloudflare Pages, munify-a9k.pages.dev -> app.munify.com.ar
+    ambiente_marker: prod
+    ambiente_db_esperado: munify_prod         # base NUEVA de prod (2026-09-01); la anterior se archiva
+  qa:
+    branch: qa
+    backend_service: munify-api-qa
+    backend_origin: https://munify-api-qa-vmpxsxe7ra-uk.a.run.app
+    pages_project: munify-qa                  # Cloudflare Pages -> qa-app.munify.com.ar
+    ambiente_marker: qa
+    ambiente_db_esperado: sugerenciasmun-qa   # QA renacio el 2026-09-02 como copia de munify_prod
+    secret_overrides: { DATABASE_URL: DATABASE_URL_QA, SECRET_KEY: SECRET_KEY_QA }
+
+per_env_suffix: _QA
+
+# Datos que consume el gate 15-verify (ambiente qa):
+verify:
+  front_url: https://qa-app.munify.com.ar
+  own_backend_host: munify-api-qa-vmpxsxe7ra-uk.a.run.app
+  forbidden_host: munify-api-1060106389361
+  # Sin estas tres, el check de binding no puede leer el BACKEND_ORIGIN del front y el gate da
+  # rojo por falta de dato, no por riesgo real. Van como params 6/7/8 a 15-VERIFY-AISLAMIENTO.sh.
+  verify_health_path: /api/municipios/public
+  verify_site: munify-qa
+  verify_plataforma: cloudflare_pages
+# La tabla marcador _ambiente (la crea/lee el modulo /admin/ops) tiene 2 campos que Infra siembra por
+# ambiente: entorno (= ambiente_marker) y db_name_esperado (= ambiente_db_esperado). El guardarraiz del
+# modulo aborta cualquier op que muta si el marcador no coincide con el nombre real de la DB.
+
+# Tablas que Infra PUEDE refrescar prod->qa (bulk SQL one-way, target siempre *-qa). Operatoria RECURRENTE
+# (traer datos reales a qa para probar lotes). NO incluir tablas que aun no existen en prod (ej. poi_tipos,
+# puntos_interes) — esas se llenan con seed, no con refresh.
+# Formato por tabla: { table, tenant } donde `tenant` es el WHERE para el modo "bajame municipio X" (:muni lo
+# reemplaza Infra; en modo bulk se ignora). Verificado contra los modelos: reclamos/ordenes_trabajo/
+# tesoreria_cajas tienen municipio_id propio; reclamo_personas es hija de reclamos (sin municipio_id) -> subquery.
+data_refresh:
+  - { table: reclamos,         tenant: "municipio_id = :muni" }
+  - { table: reclamo_personas, tenant: "reclamo_id IN (SELECT id FROM reclamos WHERE municipio_id = :muni)" }
+  - { table: ordenes_trabajo,  tenant: "municipio_id = :muni" }
+  - { table: tesoreria_cajas,  tenant: "municipio_id = :muni" }
+# Sacadas tesoreria_contactos / tesoreria_gastos: Infra midio que NO existen en prod (16-refresh dry-run,
+# MSG-20260706-0450) -> no hay nada que traer; en qa se llenan por seed.

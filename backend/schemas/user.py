@@ -49,6 +49,9 @@ class UserProfileUpdate(BaseModel):
     telefono: Optional[str] = None
     dni: Optional[str] = None
     direccion: Optional[str] = None
+    # La zona la elige el vecino de una lista: la direccion es texto libre y
+    # no permite segmentar los avisos ("recoleccion en la zona norte").
+    zona_id: Optional[int] = None
 
 class UserResponse(BaseModel):
     id: int
@@ -59,6 +62,7 @@ class UserResponse(BaseModel):
     telefono: Optional[str]
     dni: Optional[str]
     direccion: Optional[str]
+    zona_id: Optional[int] = None
     es_anonimo: bool
     rol: RolUsuario
     activo: bool

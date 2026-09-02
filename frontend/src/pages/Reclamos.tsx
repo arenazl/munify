@@ -1,128 +1,274 @@
-import { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList, ThumbsDown } from 'lucide-react';
+import { MapPin, Calendar, CheckCircle, XCircle, Clock, Eye, User, FileCheck, AlertTriangle, AlertCircle, Building2, Camera, Sparkles, Loader2, Wrench, ExternalLink, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star, RotateCcw, ChevronLeft, ChevronRight, X, Check, MoveRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, dashboardApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi, calificacionesApi, poiApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
-import type { KpiSpec } from '../components/ui/KpiCard';
-import PageHint from '../components/ui/PageHint';
+import { ABMTextarea, ABMInfoPanel, ABMCollapsible } from '../components/ui/ABMPage';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroAccion, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 import { Sheet } from '../components/ui/Sheet';
-import { StatusPill } from '../components/ui/StatusPill';
+// Suite del estándar SemanticAbmPage (rediseño v2). Composición manual de las
+// piezas (PageHeader/ListToolbar/FilterBar/DataTable) porque el orquestador
+// todavía no soporta las vistas alternativas (cards/guiada) de esta página —
+// ver dudas del piloto. El contrato de props ES el del estándar, incluido el
+// ORDEN v2.2: cabecera → hero → (toolbar + filtros como una sola tarjeta).
+import { PageHeader } from '../components/abmv2/PageHeader';
+import { ListToolbar } from '../components/abmv2/ListToolbar';
+import { FilterBar } from '../components/abmv2/FilterBar';
+import { DataTable, EntityCell, ChipEstado } from '../components/abmv2/DataTable';
+import type { ColumnSpec, RolesSemanticos, RowAction, StatusTab, TableGroup, ViewKind } from '../components/abmv2/types';
+import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { useIaReclamos } from '../hooks/useIaHabilitada';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
-import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
-import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
-import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
-import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
+import { ReclamoCard, estadoColors, DynamicIcon } from '../components/ui/ReclamoCard';
+import { FilaLista, type FilaListaItem } from '../components/ui/FilaLista';
+import { useEsAngosto } from '../hooks/useEsAngosto';
+import { haceCuanto, tonoDeEstado } from '../lib/filaLista-helpers';
+// estadoLabels (flat) viene del SSoT canónico (lib/enums/reclamo). estadoColors se sigue
+// tomando del adaptador {bg,text} de ReclamoCard: el Sheet del monolito accede a `.bg`
+// (el SSoT expone color plano vía estadoColor(); no reescribimos la lógica del monolito acá).
+import { estadoLabels } from '../lib/enums/reclamo';
+import { CANAL_OPTIONS, canalColors, canalLabel } from '../lib/enums/canal';
+import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
+import { prioridadColor, prioridadLabel, prioridadIcon, PRIORIDAD_OPTIONS, prioridadRankOf, prioridadSeverityColor } from '../lib/enums/prioridad';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
-import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType, OrdenTrabajo } from '../types';
+import type { SugerenciaAsignacion } from '../components/reclamos/CandidatosAsignacion';
+import type { Reclamo, Empleado, Categoria, OrdenTrabajo, PoiConsolidarResponse } from '../types';
 
-// Helper para generar URL de imagen local basada en el nombre de la categoría
-const getCategoryImageUrl = (nombre: string): string | null => {
-  // Convertir nombre a filename seguro (igual que en el backend)
-  const safeName = nombre.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Quitar acentos
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[-\s]+/g, '_')
-    .trim();
-
-  return `${API_BASE_URL}/static/images/categorias/${safeName}.jpeg`;
+// Fecha de vencimiento estimada de un reclamo = created_at + tiempo_estimado_dias
+// (o el SLA de la categoría, fallback 30 días). Compartida entre el cálculo de
+// "zona urgente" del inbox, el orden de "Empecemos por lo urgente" y el render
+// de cada card — antes vivía duplicada en 2 lugares distintos del inbox.
+const getFechaVenceReclamoMs = (r: Reclamo): number | null => {
+  const dias = r.tiempo_estimado_dias
+    ?? (r.categoria as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
+    ?? 30;
+  return r.created_at
+    ? new Date(r.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+    : null;
 };
 
-// Función para obtener el icono del estado
-const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
-  switch (estado) {
-    case 'nuevo': return <Sparkles className="h-3 w-3" />;
-    case 'recibido': return <CheckCircle2 className="h-3 w-3" />;
-    case 'asignado': return <UserPlus className="h-3 w-3" />;
-    case 'en_curso': return <Play className="h-3 w-3" />;
-    case 'resuelto': return <CheckCircle className="h-3 w-3" />;
-    case 'finalizado': return <CheckCircle className="h-3 w-3" />;
-    case 'pospuesto': return <Clock className="h-3 w-3" />;
-    case 'rechazado': return <XCircle className="h-3 w-3" />;
-    default: return null;
-  }
+// --- Vencimiento y asignación, para los KPIs y las acciones del hero ---
+// Un reclamo cerrado (finalizado/resuelto/rechazado) ya no vence ni necesita
+// dependencia: TODAS las métricas de abajo miran sólo los ABIERTOS, igual que
+// las secciones de la vista guiada.
+const CERRADOS = new Set(['finalizado', 'resuelto', 'rechazado']);
+const estaAbierto = (r: Reclamo) => !CERRADOS.has((r.estado || '').toLowerCase());
+
+/** Vence DENTRO del día de hoy (misma fecha estimada que usa la frase del hero). */
+const venceHoy = (r: Reclamo): boolean => {
+  if (!estaAbierto(r)) return false;
+  const ms = getFechaVenceReclamoMs(r);
+  if (ms == null) return false;
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0, 0, 0, 0);
+  const finHoy = inicioHoy.getTime() + 24 * 60 * 60 * 1000;
+  return ms >= inicioHoy.getTime() && ms < finHoy;
 };
 
-// Iconos por categoría
-const categoryIcons: Record<string, React.ReactNode> = {
-  'alumbrado': <Zap className="h-5 w-5" />,
-  'bache': <Construction className="h-5 w-5" />,
-  'calle': <Construction className="h-5 w-5" />,
-  'agua': <Droplets className="h-5 w-5" />,
-  'cloaca': <Droplets className="h-5 w-5" />,
-  'desague': <Droplets className="h-5 w-5" />,
-  'arbolado': <TreeDeciduous className="h-5 w-5" />,
-  'espacio': <Leaf className="h-5 w-5" />,
-  'verde': <Leaf className="h-5 w-5" />,
-  'basura': <Trash2 className="h-5 w-5" />,
-  'residuo': <Recycle className="h-5 w-5" />,
-  'recolec': <Recycle className="h-5 w-5" />,
-  'limpieza': <Brush className="h-5 w-5" />,
-  'transito': <Car className="h-5 w-5" />,
-  'señal': <Signpost className="h-5 w-5" />,
-  'plaga': <Bug className="h-5 w-5" />,
-  'edificio': <Building2 className="h-5 w-5" />,
-  'semaforo': <TrafficCone className="h-5 w-5" />,
-  'inundacion': <CloudRain className="h-5 w-5" />,
-  'ruido': <Volume2 className="h-5 w-5" />,
-  'animal': <Dog className="h-5 w-5" />,
-  'obra': <Construction className="h-5 w-5" />,
-  'terreno': <Fence className="h-5 w-5" />,
-  'usurpacion': <Home className="h-5 w-5" />,
-  'vandalismo': <PaintBucket className="h-5 w-5" />,
-  'vereda': <Footprints className="h-5 w-5" />,
-  'default': <AlertTriangle className="h-5 w-5" />,
+/** Ya venció (antes del comienzo de hoy). */
+const yaVencio = (r: Reclamo): boolean => {
+  if (!estaAbierto(r)) return false;
+  const ms = getFechaVenceReclamoMs(r);
+  if (ms == null) return false;
+  const inicioHoy = new Date();
+  inicioHoy.setHours(0, 0, 0, 0);
+  return ms < inicioHoy.getTime();
 };
+
+/** Sin dependencia asignada = nadie se hizo cargo todavía. Es el dato de
+ *  responsable que la LISTA tiene (la cuadrilla/empleado vive en la OT y no
+ *  viaja en la fila del listado). */
+const sinDependencia = (r: Reclamo): boolean =>
+  estaAbierto(r) && !(r.dependencia_asignada as { id?: number } | undefined)?.id;
+
+/** Agrupaciones de estado del hero — LAS MISMAS que suman los KPIs desde los
+ *  conteos del backend, para que el detalle del subtexto hable del mismo
+ *  conjunto que el número que tiene arriba. */
+/** Estados aceptados por el deep-link `?filtrar_estado=` (= ids de `tabsEstado`). */
+const ESTADOS_DEEP_LINK = ['recibido', 'en_curso', 'finalizado', 'pospuesto', 'rechazado'];
+
+const ESTADOS_RECIBIDO = new Set(['recibido', 'nuevo', 'asignado']);
+const ESTADOS_EN_CURSO = new Set(['en_curso', 'en_proceso', 'pendiente_confirmacion']);
+
+/**
+ * Focos del hero: grupos de trabajo a los que sus acciones acotan la lista.
+ * Cada uno tiene su predicado (el mismo que cuenta el KPI) y su etiqueta para
+ * el resumen de la barra de filtros. Agregar un foco = agregar una entrada.
+ */
+type FocoHero = 'vencen-hoy' | 'vencidos' | 'sin-dependencia' | null;
+const FOCOS: Record<Exclude<FocoHero, null>, { test: (r: Reclamo) => boolean; resumen: string }> = {
+  'vencen-hoy': { test: venceHoy, resumen: 'vencen hoy' },
+  vencidos: { test: yaVencio, resumen: 'ya vencidos' },
+  'sin-dependencia': { test: sinDependencia, resumen: 'sin dependencia' },
+};
+
+// Calificación que dejó el vecino tras el cierre del reclamo (T5-F1).
+// El dato ya vive en BD; ninguna pantalla del muni lo mostraba.
+interface CalificacionVecinoData {
+  id: number;
+  puntuacion: number;
+  comentario?: string | null;
+  created_at?: string;
+}
+
+// Panel de "la voz del vecino": estrellas + comentario. Solo tokens de tema
+// (sin hex nuevo): estrella llena = primary, vacía = border.
+function CalificacionVecinoPanel({ calificacion }: { calificacion: CalificacionVecinoData }) {
+  const { theme } = useTheme();
+  return (
+    <ABMInfoPanel
+      title="Calificación del vecino"
+      icon={<Star className="h-4 w-4" />}
+      variant="success"
+    >
+      <div className="flex items-center gap-1 mb-2">
+        {[1, 2, 3, 4, 5].map((n) => {
+          const activa = n <= calificacion.puntuacion;
+          return (
+            <Star
+              key={n}
+              className="h-5 w-5"
+              style={{
+                color: activa ? theme.primary : theme.border,
+                fill: activa ? theme.primary : 'none',
+              }}
+            />
+          );
+        })}
+        <span className="text-sm font-semibold ml-1.5" style={{ color: theme.text }}>
+          {calificacion.puntuacion}/5
+        </span>
+      </div>
+      {calificacion.comentario?.trim() ? (
+        <p className="text-sm leading-relaxed" style={{ color: theme.text }}>
+          &ldquo;{calificacion.comentario}&rdquo;
+        </p>
+      ) : (
+        <p className="text-sm italic" style={{ color: theme.textSecondary }}>
+          El vecino no dejó comentario.
+        </p>
+      )}
+    </ABMInfoPanel>
+  );
+}
 
 const DEFAULT_CATEGORY_COLOR = '#64748b'; // Color por defecto - los colores reales vienen de la DB
 
-function getCategoryIcon(nombre: string): React.ReactNode {
-  const key = nombre.toLowerCase();
-  for (const [k, icon] of Object.entries(categoryIcons)) {
-    if (key.includes(k)) return icon;
-  }
-  return categoryIcons.default;
-}
 
-// Placeholders dinámicos según categoría
-const categoryPlaceholders: Record<string, { titulo: string; descripcion: string }> = {
-  'alumbrado': { titulo: 'Ej: Luminaria apagada en esquina', descripcion: 'Ej: La luminaria frente a mi casa lleva 3 días sin funcionar. Es el poste #1234.' },
-  'bache': { titulo: 'Ej: Bache peligroso en calle principal', descripcion: 'Ej: Hay un bache profundo de aprox. 50cm que ya dañó varios autos.' },
-  'agua': { titulo: 'Ej: Pérdida de agua en vereda', descripcion: 'Ej: Hay agua saliendo de una cañería rota hace 2 días, se está formando un charco grande.' },
-  'cloaca': { titulo: 'Ej: Desborde de cloaca en esquina', descripcion: 'Ej: La cloaca está desbordando y hay mal olor. Sucede cada vez que llueve.' },
-  'arbolado': { titulo: 'Ej: Árbol a punto de caer', descripcion: 'Ej: Un árbol grande está inclinado hacia la calle y sus ramas rozan los cables de luz.' },
-  'espacio': { titulo: 'Ej: Plaza con juegos rotos', descripcion: 'Ej: Los juegos infantiles de la plaza están oxidados y hay partes sueltas, es peligroso.' },
-  'basura': { titulo: 'Ej: Contenedor desbordando hace días', descripcion: 'Ej: El contenedor de la cuadra no se vacía hace una semana y hay basura en la vereda.' },
-  'limpieza': { titulo: 'Ej: Calle sin barrer hace semanas', descripcion: 'Ej: La cuadra está llena de hojas y residuos, no pasa la barredora hace mucho.' },
-  'transito': { titulo: 'Ej: Semáforo no funciona', descripcion: 'Ej: El semáforo de la intersección está apagado, hay mucha confusión vehicular.' },
-  'señal': { titulo: 'Ej: Cartel de PARE caído', descripcion: 'Ej: El cartel de señalización está tirado en la vereda, los autos no frenan.' },
-  'plaga': { titulo: 'Ej: Roedores en terreno baldío', descripcion: 'Ej: Hay ratas saliendo de un terreno abandonado, se las ve a toda hora.' },
-  'semaforo': { titulo: 'Ej: Semáforo mal sincronizado', descripcion: 'Ej: El semáforo peatonal da muy poco tiempo para cruzar, es peligroso para ancianos.' },
-  'vereda': { titulo: 'Ej: Vereda rota y peligrosa', descripcion: 'Ej: Las baldosas están levantadas por raíces, ya hubo gente que se cayó.' },
-  'mobiliario': { titulo: 'Ej: Banco de plaza destruido', descripcion: 'Ej: Los bancos de la plaza tienen las maderas rotas, no se puede sentar nadie.' },
-  'ruido': { titulo: 'Ej: Local con música alta de noche', descripcion: 'Ej: Un bar pone música muy fuerte después de las 23hs, no nos deja dormir.' },
-  'default': { titulo: 'Ej: Describí brevemente el problema', descripcion: 'Ej: Explica qué sucede, desde cuándo, y cualquier detalle relevante.' }
+// Resuelve el icono lucide de una categoría a partir de su campo `icono` (nombre
+// del icono en la DB, mismo criterio que DynamicIcon de ReclamoCard) para poder
+// pasarlo a EntityCell del estándar, que espera un componente LucideIcon.
+// Fallback: AlertTriangle (igual que las cards del inbox).
+const iconoDeCategoria = (icono?: string | null): LucideIcon => {
+  if (icono) {
+    const Icono = (LucideIcons as unknown as Record<string, LucideIcon | undefined>)[icono];
+    if (Icono) return Icono;
+  }
+  return AlertTriangle;
 };
 
-function getCategoryPlaceholders(nombre: string) {
-  const key = nombre.toLowerCase();
-  for (const [k, p] of Object.entries(categoryPlaceholders)) {
-    if (key.includes(k)) return p;
-  }
-  return categoryPlaceholders.default;
-}
-
+// Columnas del DataTable del estándar SemanticAbmPage (kind='plain').
+// Espejo de design/handoff-v2/references/reclamos-lista.dc.html:
+// # · RECLAMO · VECINO/DEPENDENCIA · UBICACIÓN · ESTADO · CREADO · VENCE (+ ACCIONES).
+// Los colores de categoría/dependencia vienen de DATOS (runtime) — permitidos
+// por la regla polimórfica; el resto sale de las clases av2-* con tokens.
+const columnasTabla: ColumnSpec<Reclamo>[] = [
+  {
+    id: 'id',
+    header: '#',
+    width: '58px',
+    kind: 'text',
+    cell: (r) => <span className="av2-tabla-texto av2-tnum">#{r.id}</span>,
+  },
+  {
+    id: 'reclamo',
+    header: 'RECLAMO',
+    width: 'minmax(220px, 2fr)',
+    kind: 'entity',
+    cell: (r) => {
+      const catColor = r.categoria?.color || DEFAULT_CATEGORY_COLOR;
+      return (
+        <EntityCell
+          icon={iconoDeCategoria(r.categoria?.icono)}
+          tileColor={catColor}
+          title={r.titulo || r.categoria?.nombre || 'Reclamo'}
+          subtitle={r.categoria?.nombre}
+          dotColor={catColor}
+        />
+      );
+    },
+  },
+  {
+    id: 'vecino',
+    header: 'VECINO / DEPENDENCIA',
+    width: 'minmax(150px, 1.25fr)',
+    kind: 'entity',
+    cell: (r) => {
+      // Tolera el shape legacy anidado ({ dependencia: { nombre } }) además del tipado plano.
+      const dep = r.dependencia_asignada as
+        | { nombre?: string; color?: string; dependencia?: { nombre?: string; color?: string } }
+        | undefined;
+      const depNombre = dep?.dependencia?.nombre || dep?.nombre;
+      const depColor = dep?.color || dep?.dependencia?.color;
+      const nombre = r.creador
+        ? `${r.creador.nombre} ${r.creador.apellido}`.trim()
+        : r.es_anonimo ? 'Anónimo' : '—';
+      return (
+        <EntityCell icon={User} tileColor={depColor} title={nombre} subtitle={depNombre} dotColor={depColor} />
+      );
+    },
+  },
+  { id: 'direccion', header: 'UBICACIÓN', width: 'minmax(130px, 1fr)', kind: 'text' },
+  { id: 'estado', header: 'ESTADO', width: 'minmax(88px, 110px)', kind: 'chip' },
+  {
+    id: 'creado',
+    header: 'CREADO',
+    width: 'minmax(66px, 80px)',
+    kind: 'date',
+    cell: (r) => {
+      const d = new Date(r.created_at);
+      return (
+        <span className="av2-tabla-fecha av2-tnum">
+          {`${d.getDate()}/${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`}
+        </span>
+      );
+    },
+  },
+  {
+    id: 'vence',
+    header: 'VENCE',
+    width: 'minmax(70px, 96px)',
+    kind: 'chip',
+    cell: (r) => {
+      if (!r.fecha_programada) return <span className="av2-tabla-texto">—</span>;
+      const diffDias = Math.ceil((new Date(r.fecha_programada).getTime() - Date.now()) / 86400000);
+      const vencido = diffDias < 0;
+      const porVencer = !vencido && diffDias <= 3;
+      const diasAbs = Math.abs(diffDias);
+      let texto: string;
+      if (diffDias === 0) texto = 'Hoy';
+      else if (diasAbs < 30) texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
+      else {
+        const meses = Math.floor(diasAbs / 30);
+        texto = `${vencido ? '-' : ''}${meses} ${meses > 1 ? 'meses' : 'mes'}`;
+      }
+      return <ChipEstado label={texto} tone={vencido ? 'red' : porVencer ? 'amber' : 'green'} />;
+    },
+  },
+  { id: 'acciones', header: 'ACCIONES', width: 'minmax(76px, 0.5fr)', kind: 'actions', align: 'right' },
+];
 
 type SheetMode = 'closed' | 'view';
 
@@ -131,18 +277,146 @@ interface ReclamosProps {
   soloMiArea?: boolean;
 }
 
+/**
+ * Arma las secciones de la vista guiada (Inbox) de una lista de reclamos.
+ * Fuera del componente porque no depende de nada suyo: recibe la lista y
+ * devuelve los grupos. Se llama dos veces (lista visible y base sin foco).
+ * Mismo patrón que GestionTramites.tsx.
+ */
+function armarInbox(lista: Reclamo[]) {
+  const ahora = Date.now();
+  const dia = 24 * 60 * 60 * 1000;
+
+  const conFeedback: Reclamo[] = []; // vecino dijo "sigue el problema"
+  const urgentes: Reclamo[] = [];
+  const fosiles: Reclamo[] = [];   // vencidos hace > 30 días — para limpiar
+  const nuevos: Reclamo[] = [];
+  const enCurso: Reclamo[] = [];
+  const esperando: Reclamo[] = [];
+
+  for (const r of lista) {
+    const estado = (r.estado || '').toLowerCase();
+
+    // Capa 0: feedback negativo del vecino. MAXIMA PRIORIDAD: aparecen
+    // aunque el reclamo este "finalizado", porque el vecino dice que el
+    // problema sigue y la dependencia tiene que retomarlo.
+    if (r.confirmado_vecino === false) {
+      conFeedback.push(r);
+      continue;
+    }
+
+    // Excluir cerrados de la vista guiada (los con feedback ya quedaron
+    // arriba; estos son cierres limpios sin disputa).
+    if (estado === 'finalizado' || estado === 'rechazado' || estado === 'resuelto') continue;
+
+    // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
+    // (si no tiene, usar el SLA de la categoría; fallback 30 días).
+    const fechaVence = getFechaVenceReclamoMs(r);
+    const diffMs = fechaVence ? fechaVence - ahora : null;
+
+    // Capa 1: fósil — venció hace más de 30 días, sin importar el estado.
+    if (diffMs != null && diffMs < -30 * dia) {
+      fosiles.push(r);
+      continue;
+    }
+
+    // Capa 2: el ESTADO manda sobre la urgencia. Si el reclamo ya esta
+    // en curso o pospuesto, vive en su seccion correspondiente aunque
+    // sea urgente — la urgencia ya esta atendida (alguien lo esta
+    // trabajando o lo postergo concientemente).
+    if (estado === 'pospuesto') {
+      esperando.push(r);
+      continue;
+    }
+    if (estado === 'en_curso') {
+      enCurso.push(r);
+      continue;
+    }
+
+    // Capa 3: urgente real — solo entre los que aun no fueron tomados
+    // (recibido / nuevo / asignado / legacy). Prioridad de la OT alta/urgente
+    // (F6: la prioridad canónica vive en la OT, no en el campo legacy) OR
+    // vence entre -7 y +3 dias.
+    const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
+    const esUrgente = r.prioridad_ot === 'alta' || r.prioridad_ot === 'urgente' || enZonaUrgente;
+    if (esUrgente) {
+      urgentes.push(r);
+      continue;
+    }
+
+    // Resto: nuevos sin tomar
+    nuevos.push(r);
+  }
+
+  // Orden de "Empecemos por lo urgente": prioridad_ot desc (urgente > alta >
+  // media > baja) y, a igual prioridad, por fecha de vencimiento asc (mismo
+  // criterio que ya se usaba arriba para detectar la zona urgente).
+  urgentes.sort((a, b) => {
+    const porPrioridad = prioridadRankOf(b.prioridad_ot) - prioridadRankOf(a.prioridad_ot);
+    if (porPrioridad !== 0) return porPrioridad;
+    const vA = getFechaVenceReclamoMs(a) ?? Infinity;
+    const vB = getFechaVenceReclamoMs(b) ?? Infinity;
+    return vA - vB;
+  });
+
+  return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
+}
+
+
+/**
+ * Un reclamo, dicho como una fila de listado.
+ *
+ * Se muestra SOLO lo que hace falta para decidir si abrirlo: que es, de quien
+ * y hace cuanto. El numero pasa a la meta en letra chica —sigue estando para
+ * quien lo busca— y deja de ser lo mas grande de la tarjeta, que era el caso.
+ */
+function aFilaReclamo(r: Reclamo, onClick: () => void): FilaListaItem {
+  const vecino = r.creador ? `${r.creador.nombre} ${r.creador.apellido}`.trim() : null;
+  const area = r.dependencia_asignada?.nombre || r.categoria?.nombre || null;
+  return {
+    id: r.id,
+    titulo: r.titulo,
+    meta: [vecino, area, `#${r.id}`],
+    estado: { label: estadoLabels[r.estado] || r.estado, tono: tonoDeEstado(r.estado) },
+    hace: haceCuanto(r.created_at),
+    onClick,
+  };
+}
+
+/**
+ * ROLES SEMÁNTICOS de Reclamos — la declaración que consume el renderer de
+ * fichas del control cuando el contenedor es angosto.
+ *
+ * No dibuja nada: dice qué papel cumple cada campo del reclamo. El control se
+ * encarga del layout. Agregar una entidad nueva al sistema es escribir un mapa
+ * como este; no se escribe UI de celular.
+ */
+const ROLES_RECLAMO: RolesSemanticos<Reclamo> = {
+  identity: (r) => `#${r.id}`,
+  taxonomy: (r) =>
+    r.categoria ? { label: r.categoria.nombre, color: r.categoria.color || undefined } : null,
+  headline: (r) => r.titulo,
+  // Quién lo pidió y qué área lo tiene: las dos cosas que ubican al registro.
+  actor: (r) => {
+    const vecino = r.creador ? `${r.creador.nombre} ${r.creador.apellido}`.trim() : null;
+    const area = r.dependencia_asignada?.nombre || null;
+    return [vecino, area].filter(Boolean).join(' · ') || null;
+  },
+  context: (r) => r.direccion || r.zona?.nombre || null,
+  state: (r) => ({ label: estadoLabels[r.estado] || r.estado, tono: tonoDeEstado(r.estado) }),
+  elapsed: (r) => haceCuanto(r.created_at),
+};
+
 export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }: ReclamosProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [dependenciasDisponibles, setDependenciasDisponibles] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [zonas, setZonas] = useState<Zona[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -152,8 +426,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
   const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
-  const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
+  // Foco del hero: acota la lista al grupo que la frase acaba de nombrar
+  // ("los que vencen hoy", "los que no tienen dependencia"). Es un filtro
+  // CLIENTE sobre lo ya cargado — no toca los params del fetch. Se prende y
+  // se apaga desde las acciones del hero y se anuncia en el resumen de la
+  // barra de filtros para que nunca quede un filtro invisible aplicado.
+  const [foco, setFoco] = useState<FocoHero>(null);
 
   // Dashboard IA operativo: urgentes + recomendaciones (LLM) + secciones (SQL).
   const [dashboardIA, setDashboardIA] = useState<DashboardIAData | null>(null);
@@ -165,64 +444,28 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // (la grilla ocupa el 100% del ancho). La IA funcional —auto-asignación,
   // clasificación— es independiente de este flag y sigue operando.
   const iaOn = useIaReclamos();
+  // Pantalla de telefono: la vista de tarjetas se dibuja como filas (ver el
+  // render de `cards`). Es un cambio de ARBOL, no de estilo, asi que no
+  // alcanza con una media query de CSS.
+  const esAngosto = useEsAngosto();
 
-  // Vista guiada (Inbox) vs vista grilla clásica.
-  // Misma lógica que GestionTramites: clasifica reclamos en secciones por
-  // urgencia/estado y los muestra con InboxLayout. Persiste en localStorage.
-  const [vistaInbox, setVistaInbox] = useState<boolean>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('reclamos_vista_inbox') : null;
-    if (saved !== null) return saved === '1';
-    return false; // Por default, vista clásica (los usuarios actuales ya la conocen)
+  // Vista del listado (segmented del ListToolbar estándar): tabla / tarjetas /
+  // guiada (Inbox). Persiste en localStorage con la MISMA key que usaba ABMPage
+  // ('reclamos_view') para respetar la elección previa de cada usuario.
+  const [activeView, setActiveView] = useState<ViewKind>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('reclamos_view') : null;
+    return saved === 'cards' || saved === 'guided' || saved === 'table' ? saved : 'table';
   });
+  const cambiarVista = (v: ViewKind) => {
+    setActiveView(v);
+    if (typeof window !== 'undefined') localStorage.setItem('reclamos_view', v);
+  };
 
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
-  // Paginación client-side adicional (50 items por página)
-  const [pageClient, setPageClient] = useState(1);
-  const [pageSizeClient, setPageSizeClient] = useState(50);
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
 
-  // Chips de categorías: limitadas a 2 renglones dinámicos.
-  //
-  // Estrategia de detección de overflow:
-  //   1. Medimos el alto que tendría cada chip individualmente (un chip solo
-  //      en una fila) → esa es la altura de 1 renglón.
-  //   2. Medimos el alto total del contenido sin límite.
-  //   3. Si el total > 2 renglones → hay overflow, mostrar botón "Ver todas".
-  //
-  // Importante: la medición se hace en un div oculto con el MISMO ancho que
-  // el contenedor real, para que flex-wrap calcule igual. No dependemos de
-  // max-h porque eso oculta información que necesitamos para medir.
-  const catsWrapRef = useRef<HTMLDivElement>(null);   // contenedor visible
-  const catsMeasureRef = useRef<HTMLDivElement>(null); // clon invisible para medir
-  const [catsChipsOverflow, setCatsChipsOverflow] = useState(false);
-  const [catsChipsExpanded, setCatsChipsExpanded] = useState(false);
-  const [chipLineHeight, setChipLineHeight] = useState(32);
-
-  useLayoutEffect(() => {
-    const measureEl = catsMeasureRef.current;
-    if (!measureEl || categorias.length === 0) return;
-
-    const check = () => {
-      // Altura real del primer chip (incluye padding/border/line-height)
-      const firstChip = measureEl.querySelector('button') as HTMLElement | null;
-      const lineH = firstChip?.offsetHeight ?? 28;
-      setChipLineHeight(lineH);
-
-      // scrollHeight del clon = alto total de todas las chips envueltas
-      const total = measureEl.scrollHeight;
-      // Un renglón = alto del chip. Dos renglones = 2 * alto + gap (4px).
-      const twoLinesHeight = lineH * 2 + 4;
-      setCatsChipsOverflow(total > twoLinesHeight + 2);
-    };
-
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(measureEl);
-    if (catsWrapRef.current) ro.observe(catsWrapRef.current);
-    return () => ro.disconnect();
-  }, [categorias]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
   const [conteosDependencias, setConteosDependencias] = useState<Record<number, number>>({});
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -232,20 +475,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
   // Wizard states
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
-  // Estado para paso de descripción inicial
-  const [descripcionInput, setDescripcionInput] = useState('');
-  const [clasificando, setClasificando] = useState(false);
-  const [categoriaSugerida, setCategoriaSugerida] = useState<{categoria: Categoria; confianza: number} | null>(null);
 
   // Sheet states (solo para ver detalle)
   const [sheetMode, setSheetMode] = useState<SheetMode>('closed');
   const [selectedReclamo, setSelectedReclamo] = useState<Reclamo | null>(null);
-  const [historial, setHistorial] = useState<HistorialReclamo[]>([]);
-  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  // Calificación del vecino para el reclamo abierto en el Sheet (T5-F1)
+  const [calificacion, setCalificacion] = useState<CalificacionVecinoData | null>(null);
 
   // Estado para el ConfirmModal reutilizable (reemplaza window.confirm/prompt)
   const [confirmModal, setConfirmModal] = useState<{
@@ -261,24 +497,6 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   } | null>(null);
   const closeConfirmModal = () => setConfirmModal(prev => prev ? { ...prev, isOpen: false } : null);
 
-  // Form state for create
-  const [formData, setFormData] = useState({
-    titulo: '',
-    descripcion: '',
-    direccion: '',
-    referencia: '',
-    categoria_id: '',
-    zona_id: '',
-    latitud: null as number | null,
-    longitud: null as number | null,
-    // Datos de contacto
-    nombre_contacto: '',
-    telefono_contacto: '',
-    email_contacto: '',
-    recibir_notificaciones: true,
-  });
-
-
   // Action states for view
   const [dependenciaSeleccionada, setDependenciaSeleccionada] = useState<string>('');
   const [empleadoSeleccionadoId, setEmpleadoSeleccionadoId] = useState<string>('');
@@ -286,7 +504,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // Asignación polimórfica (cuadrilla o empleado) + vínculo guiado a Orden de Trabajo
   const [cuadrillasDisponibles, setCuadrillasDisponibles] = useState<{ id: number; nombre: string; apellido?: string | null }[]>([]);
   const [moduloOTActivo, setModuloOTActivo] = useState(false);
+  // Módulo Puntos de Interés (opt-in) — habilita el banner de "consolidar en OT
+  // de zona" cuando el reclamo abierto cae en la zona de un POI (F6 · Etapa B).
+  const [moduloPOIActivo, setModuloPOIActivo] = useState(false);
+  const [consolidandoPOI, setConsolidandoPOI] = useState(false);
   const [otsVigentesDependencia, setOtsVigentesDependencia] = useState<OrdenTrabajo[]>([]);
+  // OTs que YA tienen vinculado el reclamo abierto (la VUELTA: reclamo → OT).
+  const [otsDelReclamo, setOtsDelReclamo] = useState<OrdenTrabajo[]>([]);
   const [otSeleccionadaId, setOtSeleccionadaId] = useState<string>('');
   const [vinculandoOT, setVinculandoOT] = useState(false);
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
@@ -300,42 +524,18 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
   const [disponibilidad, setDisponibilidad] = useState<{
     fecha: string;
-    bloques_ocupados: { reclamo_id: number; titulo: string; hora_inicio: string; hora_fin: string }[];
+    bloques_ocupados: { inicio: string; fin: string; titulo: string }[];
     proximo_disponible: string;
     hora_fin_jornada: string;
     dia_lleno: boolean;
   } | null>(null);
 
-  // Sugerencias de asignación automática
-  const [sugerencias, setSugerencias] = useState<{
-    empleado_id: number;
-    empleado_nombre: string;
-    categoria_principal: string | null;
-    zona: string | null;
-    score: number;
-    score_porcentaje: number;
-    detalles: {
-      categoria_match: boolean;
-      zona_match: boolean;
-      carga_trabajo: number;
-      disponibilidad_horas: number;
-      proximo_disponible: string | null;
-    };
-    razon_principal: string;
-  }[]>([]);
+  // Sugerencias de asignación automática (backend F4: score real con carga+ausencia)
+  const [sugerencias, setSugerencias] = useState<SugerenciaAsignacion[]>([]);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
-  const [sugerenciasColapsadas, setSugerenciasColapsadas] = useState(false);
+  // Preview de disponibilidad del candidato elegido en el widget (F4). Estado
+  // propio para NO pisar `disponibilidad` (que usa el flujo de aceptar reclamo).
 
-  // Búsqueda de usuarios para datos de contacto
-  const [userSearchResults, setUserSearchResults] = useState<UserType[]>([]);
-  const [allUsers, setAllUsers] = useState<UserType[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [searchingUsers, setSearchingUsers] = useState(false);
-  const [showUserResults, setShowUserResults] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
-
-  // Estado para reclamo anónimo
-  const [esAnonimo, setEsAnonimo] = useState(false);
 
   // Opciones de duración
   const duracionOptions = [
@@ -372,46 +572,18 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [descripcionRechazo, setDescripcionRechazo] = useState('');
 
 
-  // AI Chat states
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
 
-  // AI Panel debounce state - mostrar sugerencias 3 segundos después de escribir descripción
-  const [showAISuggestions, setShowAISuggestions] = useState(false);
-  const [aiSuggestionsLoading, setAISuggestionsLoading] = useState(false);
-  const [contextualAiResponse, setContextualAiResponse] = useState('');
-  const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Address autocomplete states
-  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchingAddress, setSearchingAddress] = useState(false);
-  const addressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Municipalidad data for distance calculation
-  const [municipioData, setMunicipioData] = useState<{
-    nombre_municipio?: string;
-    direccion_municipio?: string;
-    latitud_municipio?: string;
-    longitud_municipio?: string;
-    telefono_contacto?: string;
-  } | null>(null);
-  const [distanciaAlMunicipio, setDistanciaAlMunicipio] = useState<number | null>(null);
 
   // Estado para conteos de reclamos similares (por reclamo_id)
-  const [similaresCounts, setSimilaresCounts] = useState<Record<number, number>>({});
-
-  // Derivados de estado (deben estar antes de los useEffect que los usan)
-  const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
-  const selectedZona = zonas.find(z => z.id === Number(formData.zona_id));
+  // Solo lectura: el fetch de conteos similares quedó apagado (bloque
+  // comentado que se borró en la limpieza 2026-08-02); el default {} hace
+  // que las cards muestren 0 sin romper.
+  const [similaresCounts] = useState<Record<number, number>>({});
 
   // Cargar datos del municipio y conteos UNA SOLA VEZ al montar
   useEffect(() => {
     // PRIORIDAD 1: los reclamos (lo que el user quiere ver primero)
     fetchReclamos(true);
-
-    fetchMunicipioData();
 
     // Cargar conteos UNA SOLA VEZ (GROUP BY optimizado) - solo para admin/supervisor
     if (!soloMisTrabajos) {
@@ -421,19 +593,19 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         dashboardApi.getConteoDependencias(),
       ]).then(([estadosRes, categoriasRes, dependenciasRes]) => {
         const estadosMap: Record<string, number> = {};
-        estadosRes.data.forEach((item: any) => {
+        estadosRes.data.forEach((item: { estado: string; cantidad: number }) => {
           estadosMap[item.estado] = item.cantidad;
         });
         setConteosEstados(estadosMap);
 
         const categoriasMap: Record<number, number> = {};
-        categoriasRes.data.forEach((item: any) => {
+        categoriasRes.data.forEach((item: { categoria_id: number; cantidad: number }) => {
           categoriasMap[item.categoria_id] = item.cantidad;
         });
         setConteosCategorias(categoriasMap);
 
         const dependenciasMap: Record<number, number> = {};
-        dependenciasRes.data.forEach((item: any) => {
+        dependenciasRes.data.forEach((item: { dependencia_id: number; cantidad: number }) => {
           dependenciasMap[item.dependencia_id] = item.cantidad;
         });
         setConteosDependencias(dependenciasMap);
@@ -442,15 +614,12 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       });
     }
 
-    // Cargar datos básicos (categorías, zonas) UNA SOLA VEZ
-    Promise.all([
-      categoriasApi.getAll(true),
-      zonasApi.getAll(true),
-    ]).then(([categoriasRes, zonasRes]) => {
+    // Cargar categorías UNA SOLA VEZ. Las zonas dejaron de pedirse: solo las
+    // consumía el wizard viejo — era una llamada API por visita a la página.
+    categoriasApi.getAll(true).then((categoriasRes) => {
       setCategorias(categoriasRes.data);
-      setZonas(zonasRes.data);
     }).catch(error => {
-      console.error('Error cargando categorías/zonas:', error.response?.status, error.response?.data || error.message);
+      console.error('Error cargando categorías:', error.response?.status, error.response?.data || error.message);
     });
 
     // Cargar empleados por separado (solo admin/supervisor tienen acceso)
@@ -476,12 +645,18 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         setCuadrillasDisponibles(res.data || []);
       }).catch(() => setCuadrillasDisponibles([]));
 
-      // Módulo Órdenes de Trabajo — opt-in por municipio, igual que en el sidebar.
+      // Módulos opt-in por municipio (igual que en el sidebar): Órdenes de
+      // Trabajo y Puntos de Interés. Ambos se leen de la misma consulta.
       modulosApi.list().then((res) => {
         const rows = (res.data || []) as Array<{ modulo: string; activo: boolean }>;
         setModuloOTActivo(rows.some(m => m.modulo === 'ordenes_trabajo' && m.activo));
-      }).catch(() => setModuloOTActivo(false));
+        setModuloPOIActivo(rows.some(m => m.modulo === 'poi' && m.activo));
+      }).catch(() => { setModuloOTActivo(false); setModuloPOIActivo(false); });
     }
+    // fetchReclamos queda fuera a propósito: no está memoizada (cambia de
+    // identidad en cada render) y este efecto es de montaje/cambio de bandeja;
+    // incluirla dispararía un loop de refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soloMisTrabajos]);
 
   // Dashboard IA — carga al montar (solo admin/supervisor).
@@ -651,13 +826,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         dashboardApi.getConteoCategorias({ dependencia_id: filtroDependencia || undefined }),
       ]).then(([estadosRes, categoriasRes]) => {
         const estadosMap: Record<string, number> = {};
-        estadosRes.data.forEach((item: any) => {
+        estadosRes.data.forEach((item: { estado: string; cantidad: number }) => {
           estadosMap[item.estado] = item.cantidad;
         });
         setConteosEstados(estadosMap);
 
         const categoriasMap: Record<number, number> = {};
-        categoriasRes.data.forEach((item: any) => {
+        categoriasRes.data.forEach((item: { categoria_id: number; cantidad: number }) => {
           categoriasMap[item.categoria_id] = item.cantidad;
         });
         setConteosCategorias(categoriasMap);
@@ -728,331 +903,75 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     }
 
     if (categoriaEncontrada) {
-      setFormData(prev => ({ ...prev, categoria_id: String(categoriaEncontrada!.id) }));
-      setWizardStep(2); // Saltar al paso de ubicación (después de describir y categoría)
+      // El wizard nuevo (CrearReclamoWizard) no acepta preset de categoría —
+      // se elige adentro. El deep-link conserva lo esencial: abrir el alta.
       setWizardOpen(true);
       setSearchParams({}); // Limpiar URL
     }
   }, [searchParams, categorias, setSearchParams]);
 
-  // Calcular distancia cuando cambian las coordenadas
+  /**
+   * Deep-link ?filtrar_categoria=NOMBRE → deja la lista FILTRADA por esa
+   * categoría.
+   *
+   * Ojo con el vecino de arriba: `?categoria=NOMBRE` abre el wizard para
+   * CREAR uno de esa categoría (lo usa el chat). Son cosas opuestas y el
+   * nombre se presta a confusión, así que este va con verbo: `filtrar_`.
+   */
   useEffect(() => {
-    if (formData.latitud && formData.longitud && municipioData?.latitud_municipio && municipioData?.longitud_municipio) {
-      const dist = calcularDistancia(
-        formData.latitud,
-        formData.longitud,
-        parseFloat(municipioData.latitud_municipio),
-        parseFloat(municipioData.longitud_municipio)
-      );
-      setDistanciaAlMunicipio(dist);
-    } else {
-      setDistanciaAlMunicipio(null);
-    }
-  }, [formData.latitud, formData.longitud, municipioData]);
+    if (categorias.length === 0) return;
+    const nombre = searchParams.get('filtrar_categoria');
+    if (!nombre) return;
+    const buscada = decodeURIComponent(nombre).toLowerCase();
+    const cat = categorias.find((c) => c.nombre.toLowerCase() === buscada);
+    if (cat) setFiltroCategoria(cat.id);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, categorias, setSearchParams]);
 
-  // Función para calcular distancia usando fórmula de Haversine
-  const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Radio de la Tierra en km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  // Cargar datos de la Municipalidad (multi-tenant)
-  const fetchMunicipioData = async () => {
-    try {
-      const municipioId = localStorage.getItem('municipio_id');
-      const url = municipioId
-        ? `${API_URL}/configuracion/publica/municipio?municipio_id=${municipioId}`
-        : `${API_URL}/configuracion/publica/municipio`;
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setMunicipioData(data);
-      }
-    } catch (error) {
-      console.error('Error cargando datos del municipio:', error);
-    }
-  };
-
-  // Reset AI response when category changes
+  /**
+   * Deep-link ?filtrar_estado=ESTADO → deja la lista FILTRADA por ese estado.
+   * Mismo criterio que `filtrar_categoria` (verbo adelante). Los valores son
+   * los ids de `tabsEstado` ('recibido' | 'en_curso' | 'finalizado' |
+   * 'pospuesto' | 'rechazado'); cualquier otro se ignora.
+   *
+   * Lo usa el Tablero para que "Ver la cola completa" (sin tomar) y "Ver los N
+   * finalizados" (cerrados) caigan en la lista ya acotada a lo que el usuario
+   * venía mirando, en vez de tirarlo al listado entero.
+   */
   useEffect(() => {
-    setAiResponse('');
-    setAiQuestion('');
-  }, [formData.categoria_id]);
+    const estado = searchParams.get('filtrar_estado');
+    if (!estado) return;
+    if (ESTADOS_DEEP_LINK.includes(estado)) setFiltroEstado(estado);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
-  // Debounce para mostrar sugerencias de IA - 3 segundos después de escribir
+  // Deep-link ?abrir=N → abre el Sheet del reclamo (la vuelta desde una OT: los
+  // chips de reclamo en OrdenesTrabajo navegan acá con ?abrir={id}).
   useEffect(() => {
-    // Solo aplicar debounce si estamos en el paso de detalles (paso 3)
-    if (wizardStep !== 3) {
-      setShowAISuggestions(false);
-      setAISuggestionsLoading(false);
-      setContextualAiResponse('');
-      return;
+    const abrirId = searchParams.get('abrir');
+    if (!abrirId) return;
+    const id = parseInt(abrirId, 10);
+    const enLista = reclamos.find(r => r.id === id);
+    if (enLista) {
+      openViewSheet(enLista);
+      setSearchParams({}, { replace: true });
+    } else if (reclamos.length > 0) {
+      // No está en la página actual: lo traemos puntualmente.
+      reclamosApi.getOne(id)
+        .then(res => openViewSheet(res.data))
+        .catch(() => toast.error('No se pudo abrir el reclamo'));
+      setSearchParams({}, { replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, reclamos]);
 
-    // Si no hay descripción o categoría, ocultar sugerencias
-    if (!formData.descripcion.trim() || !selectedCategoria) {
-      setShowAISuggestions(false);
-      setAISuggestionsLoading(false);
-      setContextualAiResponse('');
-      if (aiDebounceRef.current) {
-        clearTimeout(aiDebounceRef.current);
-      }
-      return;
-    }
 
-    const texto = formData.descripcion.trim();
-    const palabras = texto.split(/\s+/).filter(p => p.length > 0);
 
-    // Solo activar con 3+ palabras
-    if (palabras.length < 3) {
-      setShowAISuggestions(false);
-      setAISuggestionsLoading(false);
-      setContextualAiResponse('');
-      return;
-    }
 
-    // Limpiar timeout anterior
-    if (aiDebounceRef.current) {
-      clearTimeout(aiDebounceRef.current);
-    }
 
-    // Mostrar loading mientras espera
-    setShowAISuggestions(false);
-    setAISuggestionsLoading(true);
 
-    // Esperar 3 segundos antes de llamar a la IA
-    aiDebounceRef.current = setTimeout(async () => {
-      try {
-        const contexto: Record<string, unknown> = {
-          categoria: selectedCategoria.nombre,
-          descripcion_usuario: texto,
-          titulo: formData.titulo || '',
-          direccion: formData.direccion || '',
-        };
 
-        const response = await chatApi.askDynamic(
-          `Vecino reporta problema en categoría "${selectedCategoria.nombre}".
-Descripción: "${texto}"
-${formData.direccion ? `Ubicación: ${formData.direccion}` : ''}
 
-Respondé como empleado municipal dando info útil:
-- Qué área se encarga de este tipo de reclamos
-- Tiempo estimado de resolución típico
-- Si necesita algún dato adicional para procesar mejor el reclamo
-- Un tip útil relacionado
-
-Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
-          contexto,
-          'reclamo_contextual'
-        );
-
-        setContextualAiResponse(response.response || response.message || '');
-        setShowAISuggestions(true);
-      } catch (error) {
-        console.error('Error llamando a IA:', error);
-        setContextualAiResponse('');
-        setShowAISuggestions(true); // Mostrar fallback estático si falla
-      } finally {
-        setAISuggestionsLoading(false);
-      }
-    }, 3000);
-
-    return () => {
-      if (aiDebounceRef.current) {
-        clearTimeout(aiDebounceRef.current);
-      }
-    };
-  }, [formData.descripcion, formData.titulo, formData.direccion, wizardStep, selectedCategoria]);
-
-  const askAI = async () => {
-    if (!aiQuestion.trim() || !selectedCategoria) return;
-
-    setAiLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/chat/categoria`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          categoria: selectedCategoria.nombre,
-          pregunta: aiQuestion
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAiResponse(data.response);
-      } else {
-        setAiResponse('No pude procesar tu pregunta. Intentá de nuevo.');
-      }
-    } catch (error) {
-      setAiResponse('Error al conectar con el asistente. Verificá que el servidor esté corriendo.');
-    } finally {
-      setAiLoading(false);
-      setAiQuestion('');
-    }
-  };
-
-  const handleAiKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      askAI();
-    }
-  };
-
-  // Cargar conteos de reclamos similares para los reclamos visibles
-  // NOTA: Deshabilitado temporalmente porque el endpoint no existe en el backend
-  // useEffect(() => {
-  //   const loadSimilaresCounts = async () => {
-  //     if (reclamos.length === 0) return;
-  //
-  //     // Solo cargar para reclamos que no tienen conteo aún
-  //     const reclamosToFetch = reclamos.filter(r => similaresCounts[r.id] === undefined);
-  //     if (reclamosToFetch.length === 0) return;
-  //
-  //     // Cargar en paralelo (máximo 10 a la vez para no saturar)
-  //     const batch = reclamosToFetch.slice(0, 10);
-  //     const results = await Promise.all(
-  //       batch.map(async (r) => {
-  //         try {
-  //           const res = await reclamosApi.getCantidadSimilares(r.id);
-  //           return { id: r.id, count: res.data.cantidad || 0 };
-  //         } catch {
-  //           return { id: r.id, count: 0 };
-  //         }
-  //       })
-  //     );
-  //
-  //     // Actualizar estado con los nuevos conteos
-  //     setSimilaresCounts(prev => {
-  //       const newCounts = { ...prev };
-  //       results.forEach(r => {
-  //         newCounts[r.id] = r.count;
-  //       });
-  //       return newCounts;
-  //     });
-  //   };
-  //
-  //   loadSimilaresCounts();
-  // }, [reclamos]);
-
-  // Address autocomplete with Nominatim (OpenStreetMap - free)
-  const searchAddress = async (query: string) => {
-    if (query.length < 3) {
-      setAddressSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    setSearchingAddress(true);
-    try {
-      // Usar el nombre del municipio para filtrar la búsqueda, o Buenos Aires por defecto
-      const locationFilter = municipioData?.nombre_municipio
-        ? `${municipioData.nombre_municipio}, Buenos Aires, Argentina`
-        : 'Buenos Aires, Argentina';
-
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, ${encodeURIComponent(locationFilter)}&limit=5&addressdetails=1`,
-        {
-          headers: {
-            'Accept-Language': 'es',
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setAddressSuggestions(data);
-        setShowSuggestions(data.length > 0);
-      }
-    } catch (error) {
-      console.error('Error buscando dirección:', error);
-    } finally {
-      setSearchingAddress(false);
-    }
-  };
-
-  const handleAddressChange = (value: string) => {
-    setFormData({ ...formData, direccion: value });
-
-    // Debounce search
-    if (addressTimeoutRef.current) {
-      clearTimeout(addressTimeoutRef.current);
-    }
-
-    addressTimeoutRef.current = setTimeout(() => {
-      searchAddress(value);
-    }, 400);
-  };
-
-  const selectAddress = (suggestion: { display_name: string; lat: string; lon: string }) => {
-    // Extraer número de calle del input del usuario (si existe)
-    const userInput = formData.direccion.trim();
-
-    // Buscar patrones como "cochabamba 150" o "av. mitre 1234"
-    // El número debe estar entre palabras (nombre calle + número + localidad opcional)
-    const numberMatch = userInput.match(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ.\s]+?\s+(\d{1,5})(?:\s|$)/i);
-    const streetNumber = numberMatch ? numberMatch[1] : '';
-
-    // Simplificar el nombre de la dirección de la sugerencia
-    const parts = suggestion.display_name.split(',').map(p => p.trim());
-
-    // La primera parte es el nombre de la calle (puede incluir número de Nominatim)
-    let streetName = parts[0];
-    // Si la calle de Nominatim tiene número, quitarlo para usar el del usuario
-    if (streetNumber) {
-      streetName = streetName.replace(/\s+\d+$/, '').trim();
-    }
-
-    // Filtrar partes que no queremos
-    const locationParts = parts.slice(1).filter(part => {
-      // Excluir códigos postales (4-5 dígitos solos)
-      if (/^\d{4,5}$/.test(part)) return false;
-      // Excluir "Argentina"
-      if (part.toLowerCase() === 'argentina') return false;
-      // Excluir provincias comunes
-      if (/^(buenos aires|provincia de buenos aires|caba)$/i.test(part)) return false;
-      return true;
-    });
-
-    // Tomar las primeras 2 partes de ubicación (localidad, partido)
-    const locality = locationParts.slice(0, 2).join(', ');
-
-    // Construir dirección final: "Calle 123, Localidad, Partido" o "Calle, Localidad, Partido"
-    const finalAddress = streetNumber
-      ? `${streetName} ${streetNumber}, ${locality}`
-      : `${streetName}, ${locality}`;
-
-    // Buscar zona/barrio que coincida con la dirección
-    const addressLower = suggestion.display_name.toLowerCase();
-    let matchedZonaId = '';
-
-    for (const zona of zonas) {
-      const zonaNombre = zona.nombre.toLowerCase();
-      if (addressLower.includes(zonaNombre)) {
-        matchedZonaId = String(zona.id);
-        break;
-      }
-    }
-
-    setFormData({
-      ...formData,
-      direccion: finalAddress,
-      latitud: parseFloat(suggestion.lat),
-      longitud: parseFloat(suggestion.lon),
-      zona_id: matchedZonaId || formData.zona_id
-    });
-    setShowSuggestions(false);
-    setAddressSuggestions([]);
-  };
-
-  // Función simplificada: SOLO carga reclamos con paginación
   const fetchReclamos = async (resetPage = false) => {
     try {
       const currentPage = resetPage ? 1 : page;
@@ -1121,173 +1040,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      setFilterLoading(null); // Clear filter loading state
     }
   };
 
-  // Cargar usuarios para búsqueda
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const response = await usersApi.getAll();
-      console.log('[fetchUsers] Response:', response.data?.length, 'usuarios');
-      // Filtrar solo vecinos activos
-      const vecinos = response.data.filter((u: UserType) => u.rol === 'vecino' && u.activo);
-      console.log('[fetchUsers] Vecinos activos:', vecinos.length);
-      setAllUsers(vecinos);
-    } catch (error) {
-      console.error('[fetchUsers] Error cargando usuarios:', error);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  // Buscar usuarios por nombre, apellido, DNI o teléfono
-  const handleUserSearch = (query: string) => {
-    console.log('[handleUserSearch] Query:', query, 'allUsers:', allUsers.length);
-    if (query.length < 2) {
-      setUserSearchResults([]);
-      setShowUserResults(false);
-      setSearchingUsers(false);
-      return;
-    }
-    setSearchingUsers(true);
-    // Simular pequeño delay para mostrar el spinner
-    setTimeout(() => {
-      const queryLower = query.toLowerCase();
-      const results = allUsers.filter(u =>
-        u.nombre.toLowerCase().includes(queryLower) ||
-        u.apellido.toLowerCase().includes(queryLower) ||
-        `${u.nombre} ${u.apellido}`.toLowerCase().includes(queryLower) ||
-        (u.dni && u.dni.toLowerCase().includes(queryLower)) ||
-        (u.telefono && u.telefono.includes(query))
-      ).slice(0, 10);
-      console.log('[handleUserSearch] Results:', results.length);
-      setUserSearchResults(results);
-      setShowUserResults(results.length > 0);
-      setSearchingUsers(false);
-    }, 300);
-  };
-
-  // Seleccionar usuario y cargar datos
-  const selectUser = (user: UserType) => {
-    setSelectedUser(user);
-    setFormData({
-      ...formData,
-      nombre_contacto: `${user.nombre} ${user.apellido}`,
-      telefono_contacto: user.telefono || '',
-      email_contacto: user.email || '',
-    });
-    setShowUserResults(false);
-    toast.success(`Datos de ${user.nombre} cargados`);
-  };
-
-  // Limpiar selección de usuario
-  const clearUserSelection = () => {
-    setSelectedUser(null);
-    setFormData({
-      ...formData,
-      nombre_contacto: '',
-      telefono_contacto: '',
-      email_contacto: '',
-    });
-  };
-
-  const openWizard = () => {
-    setFormData({
-      titulo: '',
-      descripcion: '',
-      direccion: '',
-      referencia: '',
-      categoria_id: '',
-      zona_id: '',
-      latitud: null,
-      longitud: null,
-      nombre_contacto: '',
-      telefono_contacto: '',
-      email_contacto: '',
-      recibir_notificaciones: true,
-    });
-    setSelectedFiles([]);
-    setPreviewUrls([]);
-    setWizardStep(0);
-    setSelectedUser(null);
-    setUserSearchResults([]);
-    setDescripcionInput('');
-    setCategoriaSugerida(null);
-    setClasificando(false);
-    setWizardOpen(true);
-    // Cargar usuarios si no están cargados
-    if (allUsers.length === 0) {
-      fetchUsers();
-    }
-  };
-
-  const closeWizard = () => {
-    setWizardOpen(false);
-    setWizardStep(0);
-    setEsAnonimo(false);
-    setDescripcionInput('');
-    setCategoriaSugerida(null);
-  };
-
-  // Clasificar descripción con IA
-  const handleDescripcionSubmit = async () => {
-    if (!descripcionInput.trim() || clasificando) return;
-
-    setClasificando(true);
-    try {
-      const municipioId = user?.municipio_id || 1;
-      const resultado = await clasificacionApi.clasificar(descripcionInput.trim(), municipioId);
-
-      if (resultado.sugerencias && resultado.sugerencias.length > 0) {
-        const mejorSugerencia = resultado.sugerencias[0];
-        const cat = categorias.find(c => c.id === mejorSugerencia.categoria_id);
-
-        if (cat) {
-          const confianza = mejorSugerencia.confianza || mejorSugerencia.score || 0;
-          setCategoriaSugerida({ categoria: cat, confianza });
-          setFormData(prev => ({
-            ...prev,
-            descripcion: descripcionInput.trim(),
-            titulo: `Problema de ${cat.nombre.toLowerCase()}`,
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Error clasificando:', error);
-    } finally {
-      setClasificando(false);
-    }
-  };
-
-  // Aceptar categoría sugerida
-  const aceptarCategoriaSugerida = () => {
-    if (categoriaSugerida) {
-      setFormData(prev => ({ ...prev, categoria_id: String(categoriaSugerida.categoria.id) }));
-      setWizardStep(2); // Ir directamente a ubicación (saltando categoría ya que está seleccionada)
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 5) {
-      toast.error('Máximo 5 archivos permitidos');
-      return;
-    }
-    const newFiles = [...selectedFiles, ...files].slice(0, 5);
-    setSelectedFiles(newFiles);
-    const urls = newFiles.map(file => URL.createObjectURL(file));
-    setPreviewUrls(urls);
-  };
-
-  const removeFile = (index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    const newUrls = previewUrls.filter((_, i) => i !== index);
-    URL.revokeObjectURL(previewUrls[index]);
-    setSelectedFiles(newFiles);
-    setPreviewUrls(newUrls);
-  };
+  // El wizard nuevo (CrearReclamoWizard) maneja su propio estado interno:
+  // al monolito solo le queda abrirlo y cerrarlo.
+  const openWizard = () => setWizardOpen(true);
+  const closeWizard = () => setWizardOpen(false);
 
   const openViewSheet = async (reclamo: Reclamo) => {
     setSelectedReclamo(reclamo);
@@ -1298,27 +1057,34 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setMotivoRechazo('');
     setDescripcionRechazo('');
     setSugerencias([]);
-    setSugerenciasColapsadas(false);
     setSheetMode('view');
 
-    // Cargar historial
-    setLoadingHistorial(true);
-    try {
-      const res = await reclamosApi.getHistorial(reclamo.id);
-      setHistorial(res.data);
-    } catch (error) {
-      console.error('Error cargando historial:', error);
-    } finally {
-      setLoadingHistorial(false);
+    // El historial ya no se precarga acá: el Sheet no lo muestra (vive en la
+    // página de detalle /gestion/reclamos/:id) — era una llamada API tirada
+    // a la basura en CADA apertura del sheet.
+
+    // Si el reclamo está cerrado, traer la calificación que dejó el vecino (T5-F1).
+    // 404 = todavía no calificó → dejamos null y no mostramos el panel.
+    const estadoCierre = (reclamo.estado || '').toLowerCase();
+    setCalificacion(null);
+    if (estadoCierre === 'finalizado' || estadoCierre === 'resuelto') {
+      try {
+        const res = await calificacionesApi.getReclamo(reclamo.id);
+        setCalificacion(res.data);
+      } catch {
+        setCalificacion(null);
+      }
     }
 
-    // Si el reclamo es nuevo, cargar sugerencias de asignación
-    if (reclamo.estado === 'nuevo') {
+    // Candidatos sugeridos (F4): cargar para admin/supervisor en cualquier estado
+    // asignable que el endpoint acepta (nuevo/recibido/en_curso/asignado). El
+    // widget de asignación vive en recibido/en_curso, no solo en 'nuevo'.
+    const esGestor = user?.rol === 'admin' || user?.rol === 'supervisor';
+    const estadosSugerencia = ['nuevo', 'recibido', 'en_curso', 'asignado'];
+    if (esGestor && estadosSugerencia.includes(reclamo.estado)) {
       setLoadingSugerencias(true);
       try {
-        console.log('[DEBUG] Cargando sugerencias para reclamo:', reclamo.id);
         const res = await reclamosApi.getSugerenciaAsignacion(reclamo.id);
-        console.log('[DEBUG] Sugerencias recibidas:', res.data);
         setSugerencias(res.data.sugerencias || []);
       } catch (error) {
         console.error('Error cargando sugerencias:', error);
@@ -1331,7 +1097,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const closeSheet = () => {
     setSheetMode('closed');
     setSelectedReclamo(null);
-    setHistorial([]);
+    setCalificacion(null);
     // Reset asignación states
     setDependenciaSeleccionada('');
     setEmpleadoSeleccionadoId('');
@@ -1339,47 +1105,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setHoraInicio('09:00');
     setDuracion('1');
     setDisponibilidad(null);
+    setSugerencias([]);
     setComentarioAsignacion('');
     setFotoCierre(null);
-  };
-
-  const handleCreate = async () => {
-    setSaving(true);
-    try {
-      const payload = {
-        titulo: formData.titulo,
-        descripcion: formData.descripcion,
-        direccion: formData.direccion,
-        referencia: formData.referencia || null,
-        categoria_id: Number(formData.categoria_id),
-        zona_id: formData.zona_id ? Number(formData.zona_id) : null,
-        latitud: formData.latitud,
-        longitud: formData.longitud,
-        // Datos de contacto del ciudadano
-        nombre_contacto: formData.nombre_contacto || null,
-        telefono_contacto: formData.telefono_contacto || null,
-        email_contacto: formData.email_contacto || null,
-        recibir_notificaciones: formData.recibir_notificaciones,
-      };
-      const response = await reclamosApi.create(payload);
-      const reclamoId = response.data.id;
-
-      // Upload files if any
-      if (selectedFiles.length > 0) {
-        for (const file of selectedFiles) {
-          await reclamosApi.upload(reclamoId, file, 'creacion');
-        }
-      }
-
-      toast.success('Reclamo creado correctamente');
-      fetchReclamos();
-      closeWizard();
-    } catch (error) {
-      toast.error('Error al crear el reclamo');
-      console.error('Error:', error);
-    } finally {
-      setSaving(false);
-    }
   };
 
   // Recibir reclamo que ya está asignado a mi dependencia
@@ -1431,24 +1159,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleAutoAsignar = async () => {
-    if (!selectedReclamo) return;
-    setAsignandoEmpleado(true);
-    try {
-      const res = await reclamosApi.autoAsignar(selectedReclamo.id);
-      toast.success(`Asignado a ${res.data.empleado_nombre}`, {
-        description: res.data.razon,
-      });
-      setEmpleadoSeleccionadoId(String(res.data.empleado_id));
-      fetchReclamos();
-    } catch (err) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      toast.error(e.response?.data?.detail || 'No se pudo auto-asignar');
-    } finally {
-      setAsignandoEmpleado(false);
-    }
-  };
-
   // OTs vigentes (pendiente/asignada/en_curso) de la dependencia del reclamo
   // abierto — datasource del combo "Orden de trabajo" del bloque de asignación.
   useEffect(() => {
@@ -1461,6 +1171,38 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       .then(res => setOtsVigentesDependencia(res.data || []))
       .catch(() => setOtsVigentesDependencia([]));
   }, [selectedReclamo?.id, selectedReclamo?.dependencia_asignada?.id, moduloOTActivo]);
+
+  // Órdenes de trabajo YA vinculadas al reclamo abierto (la vuelta reclamo → OT).
+  // Endpoint dedicado (porReclamo) — solo si el módulo está activo.
+  useEffect(() => {
+    if (!moduloOTActivo || !selectedReclamo?.id) {
+      setOtsDelReclamo([]);
+      return;
+    }
+    ordenesTrabajoApi.porReclamo(selectedReclamo.id)
+      .then(res => setOtsDelReclamo(res.data || []))
+      .catch(() => setOtsDelReclamo([]));
+  }, [selectedReclamo?.id, moduloOTActivo]);
+
+  // Cambiar la prioridad del reclamo (F6·A5). La prioridad canónica vive en la
+  // OT, así que el editor escribe en la OT del reclamo y refresca el badge.
+  const handleCambiarPrioridadOT = async (otId: number, prioridad: string) => {
+    if (!selectedReclamo) return;
+    const reclamoId = selectedReclamo.id;
+    try {
+      await ordenesTrabajoApi.update(otId, { prioridad });
+      const [otRes, recRes] = await Promise.all([
+        ordenesTrabajoApi.porReclamo(reclamoId),
+        reclamosApi.getOne(reclamoId),
+      ]);
+      setOtsDelReclamo(otRes.data || []);
+      setSelectedReclamo(recRes.data);
+      fetchReclamos(true);
+      toast.success('Prioridad actualizada');
+    } catch {
+      toast.error('No se pudo actualizar la prioridad');
+    }
+  };
 
   const handleAsignarEmpleadoManual = async (empleadoId: string) => {
     if (!selectedReclamo) return;
@@ -1498,6 +1240,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setEmpleadoSeleccionadoId(valor);
     setOtSeleccionadaId('');
   };
+
 
   const handleVincularOT = async (otValor: string) => {
     if (!selectedReclamo || !empleadoSeleccionadoId) return;
@@ -1542,10 +1285,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleReasignar = () => {
     if (!selectedReclamo) return;
     const reclamoId = selectedReclamo.id;
+    const pierdeResolucion = selectedReclamo.estado === 'finalizado' || selectedReclamo.estado === 'resuelto';
+    const message = pierdeResolucion
+      ? 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Ojo: se borrará la resolución cargada (el vecino deja de verla). Contanos el motivo (queda en historial).'
+      : 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Contanos el motivo (queda en historial).';
     setConfirmModal({
       isOpen: true,
       title: 'Reasignar reclamo',
-      message: 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Contanos el motivo (queda en historial).',
+      message,
       confirmText: 'Reasignar',
       variant: 'warning',
       promptLabel: 'Motivo de la reasignación',
@@ -1708,20 +1455,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  // Auto-cargar fecha y disponibilidad cuando se selecciona un empleado
-  const handleEmpleadoChange = async (empleadoId: string) => {
-    setDependenciaSeleccionada(empleadoId);
-    if (empleadoId) {
-      // Usar fecha de hoy como punto de partida y buscar el próximo día disponible
-      const hoy = new Date().toISOString().split('T')[0];
-      setFechaProgramada(hoy);
-      await fetchDisponibilidad(empleadoId, hoy, true); // buscar siguiente si está lleno
-    } else {
-      setFechaProgramada('');
-      setDisponibilidad(null);
-    }
-  };
-
   const handleIniciar = async () => {
     if (!selectedReclamo) return;
 
@@ -1731,20 +1464,18 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       return;
     }
 
-    // Actualización optimista: actualizar UI inmediatamente
-    const reclamoActualizado = { ...selectedReclamo, estado: 'en_curso' as const };
-    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
-    closeSheet();
-    toast.success('Reclamo en proceso');
-
     setSaving(true);
     try {
-      await reclamosApi.iniciar(selectedReclamo.id, descripcionInicio.trim());
-      // Refrescar en background para sincronizar datos completos
+      // PATCH cambiarEstado: permite rol empleado y valida la transición recibido->en_curso
+      // (el POST /iniciar era admin/supervisor-only -> 403 para el empleado).
+      await reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', descripcionInicio.trim());
+      // Confirmado por el backend: recién ahora actualizamos UI, cerramos y avisamos.
+      const reclamoActualizado = { ...selectedReclamo, estado: 'en_curso' as const };
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
       fetchReclamos();
+      closeSheet();
+      toast.success('Reclamo en proceso');
     } catch (error) {
-      // Revertir cambio optimista si falla
-      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al poner en proceso');
       console.error('Error:', error);
     } finally {
@@ -1762,29 +1493,31 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       });
     }
 
-    // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'finalizado' as const, resolucion };
-    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
-    closeSheet();
-    toast.success('Reclamo finalizado');
-
     setSaving(true);
     const evidencia = fotoCierre;
+    // Un empleado no finaliza directo: el backend deja el reclamo en
+    // pendiente_confirmacion (queda a la espera del supervisor).
+    const esEmpleado = user?.rol === 'empleado';
     try {
       await reclamosApi.resolver(selectedReclamo.id, { resolucion });
+      // Confirmado por el backend: recién ahora actualizamos UI, cerramos y avisamos.
+      const nuevoEstado = esEmpleado ? 'pendiente_confirmacion' : 'finalizado';
+      const reclamoActualizado = { ...selectedReclamo, estado: nuevoEstado as typeof selectedReclamo.estado, resolucion };
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
       // Evidencia de cierre: foto del trabajo terminado (etapa 'resolucion')
       if (evidencia) {
         try {
           await reclamosApi.upload(selectedReclamo.id, evidencia, 'resolucion');
           toast.success('Foto de cierre adjuntada');
         } catch {
-          toast.error('El reclamo se finalizó pero la foto de cierre no se pudo subir');
+          toast.error('El trabajo se registró pero la foto de cierre no se pudo subir');
         }
       }
       setFotoCierre(null);
       fetchReclamos();
+      closeSheet();
+      toast.success(esEmpleado ? 'Enviado al supervisor para confirmar' : 'Reclamo finalizado');
     } catch (error) {
-      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al finalizar reclamo');
       console.error('Error:', error);
     } finally {
@@ -1795,21 +1528,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleRechazar = async () => {
     if (!selectedReclamo || !motivoRechazo) return;
 
-    // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
-    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
-    closeSheet();
-    toast.success('Reclamo rechazado');
-
     setSaving(true);
     try {
       await reclamosApi.rechazar(selectedReclamo.id, {
         motivo: motivoRechazo,
         descripcion: descripcionRechazo || undefined
       });
+      // Confirmado por el backend: recién ahora actualizamos UI, cerramos y avisamos.
+      const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
       fetchReclamos();
+      closeSheet();
+      toast.success('Reclamo rechazado');
     } catch (error) {
-      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al rechazar reclamo');
       console.error('Error:', error);
     } finally {
@@ -1845,8 +1576,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  // Filtro local - siempre filtra cuando hay búsqueda
-  const filteredReclamos = reclamos.filter(r => {
+  // Filtro local - siempre filtra cuando hay búsqueda.
+  // `reclamosBuscados` es la BASE de la pantalla (búsqueda + orden). El foco
+  // del hero se aplica DESPUÉS (ver `filteredReclamos`), para que los KPIs y
+  // la frase del hero —que miran esta base— no se muevan cuando el usuario
+  // aplica el foco que el propio hero le ofreció.
+  const reclamosBuscados = useMemo(() => reclamos.filter(r => {
     // Si no hay búsqueda, mostrar todos
     if (!search || !search.trim()) return true;
 
@@ -1897,1375 +1632,206 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       const fechaB = new Date(b.updated_at || b.created_at).getTime();
       return fechaB - fechaA;
     }
-  });
+  }), [reclamos, search, ordenamiento]);
 
-  const paginatedReclamos = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(filteredReclamos.length / pageSizeClient));
-    if (pageClient > totalPages) return filteredReclamos.slice(0, pageSizeClient);
-    return filteredReclamos.slice((pageClient - 1) * pageSizeClient, pageClient * pageSizeClient);
-  }, [filteredReclamos, pageClient, pageSizeClient]);
-
-  useEffect(() => {
-    setPageClient(1);
-  }, [filteredReclamos.length]);
-
-  // Wizard Step 0: Describir problema
-  const wizardStep0 = (
-    <div className="space-y-4">
-      <p className="text-sm" style={{ color: theme.textSecondary }}>
-        Describí el problema y te sugeriremos la categoría más adecuada:
-      </p>
-
-      {/* Input de descripción */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={descripcionInput}
-          onChange={(e) => setDescripcionInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleDescripcionSubmit()}
-          placeholder="Ej: Hay un bache grande en la esquina..."
-          disabled={clasificando}
-          className="flex-1 px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-          style={{
-            backgroundColor: theme.backgroundSecondary,
-            color: theme.text,
-            border: `1px solid ${theme.border}`,
-          }}
-        />
-        <button
-          onClick={handleDescripcionSubmit}
-          disabled={!descripcionInput.trim() || clasificando}
-          className="px-4 py-3 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-          style={{ backgroundColor: theme.primary, color: 'white' }}
-        >
-          {clasificando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-        </button>
-      </div>
-
-      {/* Sugerencia de categoría */}
-      {categoriaSugerida && !clasificando && (() => {
-        const sugColor = categoriaSugerida.categoria.color || DEFAULT_CATEGORY_COLOR;
-        return (
-        <div
-          className="p-4 rounded-xl flex items-center justify-between"
-          style={{
-            backgroundColor: `${sugColor}15`,
-            border: `2px solid ${sugColor}`,
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{
-                backgroundColor: sugColor,
-                color: 'white',
-              }}
-            >
-              {getCategoryIcon(categoriaSugerida.categoria.nombre)}
-            </div>
-            <div>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Categoría sugerida</p>
-              <p className="font-semibold" style={{ color: theme.text }}>
-                {categoriaSugerida.categoria.nombre}
-              </p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                {categoriaSugerida.confianza >= 80 ? 'Alta confianza' : categoriaSugerida.confianza >= 60 ? 'Confianza media' : 'Baja confianza'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={aceptarCategoriaSugerida}
-            className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 active:scale-95"
-            style={{ backgroundColor: theme.primary, color: 'white' }}
-          >
-            Confirmar
-          </button>
-        </div>
-        );
-      })()}
-
-      {/* Tip */}
-      <p className="text-xs text-center" style={{ color: theme.textSecondary }}>
-        Tip: Describí el problema con detalle para obtener una mejor sugerencia
-      </p>
-    </div>
+  // Lista que consume TODA la pantalla (tabla, tarjetas, vista guiada, pie):
+  // la base + el foco del hero si está activo.
+  const filteredReclamos = useMemo(
+    () => (foco ? reclamosBuscados.filter(FOCOS[foco].test) : reclamosBuscados),
+    [reclamosBuscados, foco],
   );
 
-  // Wizard Step 1: Categoría
-  const wizardStep1 = (
-    <div className="space-y-3">
-      <p className="text-sm" style={{ color: theme.textSecondary }}>
-        Selecciona el tipo de problema que deseas reportar:
-      </p>
-      <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-3">
-        {categorias.map((cat) => {
-          const isSelected = formData.categoria_id === String(cat.id);
-          const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => { setFormData({ ...formData, categoria_id: String(cat.id) }); setTimeout(() => setWizardStep(2), 300); }}
-              className={`relative p-3 rounded-xl border-2 transition-all duration-300 hover:scale-105 active:scale-95 ${isSelected ? 'border-current' : 'border-transparent'}`}
-              style={{
-                backgroundColor: isSelected ? `${catColor}20` : theme.backgroundSecondary,
-                borderColor: isSelected ? catColor : theme.border,
-                color: theme.text,
-              }}
-            >
-              <div
-                className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center transition-all duration-300"
-                style={{
-                  backgroundColor: isSelected ? catColor : `${catColor}30`,
-                  color: isSelected ? 'white' : catColor,
-                  transform: isSelected ? 'scale(1.1)' : 'scale(1)',
-                  boxShadow: isSelected ? `0 4px 14px ${catColor}40` : 'none',
-                }}
-              >
-                {getCategoryIcon(cat.nombre)}
-              </div>
-              <span className="text-xs font-medium block leading-tight">{cat.nombre}</span>
-              {isSelected && (
-                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: catColor }}>
-                  <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  // Métricas de vencimiento y de asignación para el hero. Se calculan sobre la
+  // BASE (sin foco) y sólo sobre lo que el cliente tiene cargado: por eso los
+  // subtextos con detalle recién se muestran cuando ya no queda nada por
+  // paginar (`!hasMore`), para no dar por global un número de una página.
+  const metricasHero = useMemo(() => {
+    let vencenHoy = 0, vencidos = 0, sinDep = 0, recibidosSinDep = 0, enCursoConDep = 0;
+    for (const r of reclamosBuscados) {
+      if (venceHoy(r)) vencenHoy++;
+      if (yaVencio(r)) vencidos++;
+      if (!estaAbierto(r)) continue;
+      const estado = (r.estado || '').toLowerCase();
+      const huerfano = sinDependencia(r);
+      if (huerfano) sinDep++;
+      if (ESTADOS_RECIBIDO.has(estado) && huerfano) recibidosSinDep++;
+      if (ESTADOS_EN_CURSO.has(estado) && !huerfano) enCursoConDep++;
+    }
+    return { vencenHoy, vencidos, sinDep, recibidosSinDep, enCursoConDep, universoCompleto: !hasMore };
+  }, [reclamosBuscados, hasMore]);
 
-  // Wizard Step 2: Ubicación
-  const wizardStep2 = (
-    <div className="space-y-4">
-      <div className="relative">
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-          Dirección <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            value={formData.direccion}
-            onChange={(e) => handleAddressChange(e.target.value)}
-            onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            placeholder="Ej: Av. San Martín 1234"
-            className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-          />
-          {searchingAddress && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: theme.primary, borderTopColor: 'transparent' }} />
-            </div>
-          )}
-        </div>
-        {/* Dropdown de sugerencias */}
-        {showSuggestions && addressSuggestions.length > 0 && (
-          <div
-            className="absolute z-50 w-full mt-1 rounded-xl shadow-lg overflow-hidden"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            {addressSuggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => selectAddress(suggestion)}
-                className="w-full px-4 py-3 text-left text-sm hover:bg-opacity-50 transition-colors flex items-start gap-2"
-                style={{ color: theme.text }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = `${theme.primary}15`}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-                <span className="line-clamp-2">{suggestion.display_name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>Zona/Barrio</label>
-        <select
-          value={formData.zona_id}
-          onChange={(e) => setFormData({ ...formData, zona_id: e.target.value })}
-          className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-        >
-          <option value="">Seleccionar zona</option>
-          {zonas.map((zona) => (
-            <option key={zona.id} value={zona.id}>{zona.nombre}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>Ubicación en el mapa</label>
-        <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>Haz clic en el mapa para marcar la ubicación exacta</p>
-        <MapPicker
-          value={formData.latitud && formData.longitud ? { lat: formData.latitud, lng: formData.longitud } : null}
-          onChange={(coords) => setFormData({ ...formData, latitud: coords.lat, longitud: coords.lng })}
-          height="200px"
-        />
-      </div>
 
-      {/* Mostrar distancia a la Municipalidad */}
-      {distanciaAlMunicipio !== null && municipioData && (
-        <div
-          className="rounded-xl p-4 flex items-center gap-3"
-          style={{
-            backgroundColor: `${theme.primary}10`,
-            border: `1px solid ${theme.primary}30`,
-          }}
-        >
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <Building2 className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm" style={{ color: theme.text }}>
-              Distancia a {municipioData.nombre_municipio || 'la Municipalidad'}
-            </p>
-            <p className="text-lg font-bold" style={{ color: theme.primary }}>
-              {distanciaAlMunicipio < 1
-                ? `${Math.round(distanciaAlMunicipio * 1000)} metros`
-                : `${distanciaAlMunicipio.toFixed(2)} km`}
-            </p>
-            {municipioData.telefono_contacto && (
-              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                Tel: {municipioData.telefono_contacto}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>Referencia (opcional)</label>
-        <input
-          type="text"
-          value={formData.referencia}
-          onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
-          placeholder="Ej: Frente a la plaza, cerca del hospital"
-          className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-        />
-      </div>
-    </div>
-  );
-
-  // Wizard Step 3: Detalles
-  const wizardStep3 = (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-          Título del reclamo <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={formData.titulo}
-          onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-          placeholder={selectedCategoria ? getCategoryPlaceholders(selectedCategoria.nombre).titulo : 'Ej: Describí brevemente el problema'}
-          className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-          Descripción detallada <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          value={formData.descripcion}
-          onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-          placeholder={selectedCategoria ? getCategoryPlaceholders(selectedCategoria.nombre).descripcion : 'Ej: Explica qué sucede, desde cuándo, y cualquier detalle relevante.'}
-          rows={4}
-          className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all resize-none"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>Fotos (opcional)</label>
-        <p className="text-xs mb-3" style={{ color: theme.textSecondary }}>Agrega hasta 5 fotos del problema</p>
-        <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
-        <div className="flex flex-wrap gap-3">
-          {previewUrls.map((url, index) => (
-            <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group" style={{ border: `1px solid ${theme.border}` }}>
-              <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
-              <button type="button" onClick={() => removeFile(index)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <X className="h-5 w-5 text-white" />
-              </button>
-            </div>
-          ))}
-          {selectedFiles.length < 5 && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-20 h-20 rounded-xl flex flex-col items-center justify-center gap-1 transition-all hover:scale-105 active:scale-95"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `2px dashed ${theme.border}`, color: theme.textSecondary }}
-            >
-              <Camera className="h-5 w-5" />
-              <span className="text-xs">Agregar</span>
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Wizard Step 4: Resumen
-  const wizardStep4 = (
-    <div className="space-y-4">
-      <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-5 w-5" style={{ color: theme.primary }} />
-          <span className="font-medium" style={{ color: theme.primary }}>Resumen del reclamo</span>
-        </div>
-        <p className="text-sm" style={{ color: theme.textSecondary }}>Revisa los datos antes de enviar</p>
-      </div>
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: selectedCategoria ? (selectedCategoria.color || DEFAULT_CATEGORY_COLOR) : theme.border, color: 'white' }}>
-            {selectedCategoria ? getCategoryIcon(selectedCategoria.nombre) : <FolderOpen className="h-5 w-5" />}
-          </div>
-          <div>
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Categoría</span>
-            <p className="font-medium" style={{ color: theme.text }}>{selectedCategoria?.nombre || 'No seleccionada'}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#10b981', color: 'white' }}>
-            <MapPin className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Ubicación</span>
-            <p className="font-medium" style={{ color: theme.text }}>{formData.direccion || 'No especificada'}</p>
-            {selectedZona && <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedZona.nombre}</p>}
-          </div>
-        </div>
-        <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#6366f1', color: 'white' }}>
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-xs" style={{ color: theme.textSecondary }}>Detalles</span>
-              <p className="font-medium" style={{ color: theme.text }}>{formData.titulo || 'Sin título'}</p>
-            </div>
-          </div>
-          {formData.descripcion && (
-            <p className="text-sm" style={{ color: theme.textSecondary, marginLeft: '52px' }}>
-              {formData.descripcion.slice(0, 150)}{formData.descripcion.length > 150 && '...'}
-            </p>
-          )}
-        </div>
-        {selectedFiles.length > 0 && (
-          <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f59e0b', color: 'white' }}>
-                <Camera className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="text-xs" style={{ color: theme.textSecondary }}>Fotos adjuntas</span>
-                <p className="font-medium" style={{ color: theme.text }}>{selectedFiles.length} {selectedFiles.length === 1 ? 'archivo' : 'archivos'}</p>
-              </div>
-            </div>
-            <div className="flex gap-2" style={{ marginLeft: '52px' }}>
-              {previewUrls.map((url, index) => (
-                <div key={index} className="w-12 h-12 rounded-lg overflow-hidden" style={{ border: `1px solid ${theme.border}` }}>
-                  <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Datos de contacto */}
-        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: esAnonimo ? theme.primary : '#25D366', color: 'white' }}>
-            {esAnonimo ? <ShieldCheck className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
-          </div>
-          <div className="flex-1">
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Contacto</span>
-            {esAnonimo ? (
-              <>
-                <p className="font-medium" style={{ color: theme.text }}>Reclamo anónimo</p>
-                <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>Sin datos de contacto</p>
-              </>
-            ) : (
-              <>
-                <p className="font-medium" style={{ color: theme.text }}>{formData.nombre_contacto || 'No especificado'}</p>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                    <MessageCircle className="h-3 w-3" />
-                    {formData.telefono_contacto || 'Sin WhatsApp'}
-                  </span>
-                  {formData.email_contacto && (
-                    <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                      <Mail className="h-3 w-3" />
-                      {formData.email_contacto}
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          {!esAnonimo && formData.recibir_notificaciones && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ backgroundColor: '#25D36620', color: '#25D366' }}>
-              <Bell className="h-3 w-3" />
-              Notificaciones
-            </div>
-          )}
-          {esAnonimo && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
-              <ShieldCheck className="h-3 w-3" />
-              Anónimo
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Wizard Step 5: Datos de contacto
-  const wizardStepContacto = (
-    <div className="space-y-4">
-      {/* Toggle entre anónimo y con datos */}
-      <div className="space-y-3">
-        {/* Opción Anónimo */}
-        <button
-          type="button"
-          onClick={() => {
-            setEsAnonimo(true);
-            setFormData({
-              ...formData,
-              nombre_contacto: '',
-              telefono_contacto: '',
-              email_contacto: '',
-              recibir_notificaciones: false,
-            });
-            setSelectedUser(null);
-          }}
-          className="w-full p-4 rounded-xl text-left transition-all"
-          style={{
-            backgroundColor: esAnonimo ? `${theme.primary}15` : theme.backgroundSecondary,
-            border: `2px solid ${esAnonimo ? theme.primary : theme.border}`,
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
-              style={{ borderColor: esAnonimo ? theme.primary : theme.border }}
-            >
-              {esAnonimo && (
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" style={{ color: theme.primary }} />
-                <span className="font-medium" style={{ color: theme.text }}>Reclamo anónimo</span>
-              </div>
-              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                No se requieren datos personales. El reclamo se registra sin identificar al vecino.
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Opción Con datos */}
-        <button
-          type="button"
-          onClick={() => setEsAnonimo(false)}
-          className="w-full p-4 rounded-xl text-left transition-all"
-          style={{
-            backgroundColor: !esAnonimo ? `${theme.primary}15` : theme.backgroundSecondary,
-            border: `2px solid ${!esAnonimo ? theme.primary : theme.border}`,
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
-              style={{ borderColor: !esAnonimo ? theme.primary : theme.border }}
-            >
-              {!esAnonimo && (
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4" style={{ color: theme.primary }} />
-                <span className="font-medium" style={{ color: theme.text }}>Con datos de contacto</span>
-              </div>
-              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                Proporciona tus datos para recibir actualizaciones sobre el estado del reclamo.
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      {/* Formulario de contacto - solo si NO es anónimo */}
-      {!esAnonimo && (
-        <>
-          <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <div className="flex items-center gap-2 mb-2">
-              <MessageCircle className="h-5 w-5" style={{ color: theme.primary }} />
-              <span className="font-medium" style={{ color: theme.primary }}>Datos de contacto para seguimiento</span>
-            </div>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Ingresa tus datos para recibir actualizaciones sobre el estado de tu reclamo por WhatsApp.
-            </p>
-          </div>
-
-          {/* Nombre completo con búsqueda integrada */}
-          <div className="relative">
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-          Nombre completo <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          {selectedUser ? (
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.primary }} />
-          ) : (
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
-          )}
-          <input
-            type="text"
-            value={formData.nombre_contacto}
-            onChange={(e) => {
-              setFormData({ ...formData, nombre_contacto: e.target.value });
-              handleUserSearch(e.target.value);
-            }}
-            onFocus={() => {
-              if (formData.nombre_contacto.length >= 2 && !selectedUser) {
-                handleUserSearch(formData.nombre_contacto);
-              }
-            }}
-            placeholder="Buscar por nombre, DNI o teléfono..."
-            className="w-full pl-11 pr-10 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              color: theme.text,
-              border: `1px solid ${selectedUser ? theme.primary : theme.border}`
-            }}
-          />
-          {(loadingUsers || searchingUsers) && (
-            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin" style={{ color: theme.textSecondary }} />
-          )}
-          {selectedUser && !loadingUsers && !searchingUsers && (
-            <button
-              type="button"
-              onClick={clearUserSelection}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-red-500/20 transition-colors"
-              title="Limpiar selección"
-            >
-              <X className="h-4 w-4 text-red-500" />
-            </button>
-          )}
-        </div>
-        {selectedUser ? (
-          <p className="text-xs mt-1" style={{ color: theme.primary }}>
-            Usuario encontrado - datos cargados automáticamente
-          </p>
-        ) : (
-          <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-            Buscá por nombre, apellido, DNI o teléfono
-          </p>
-        )}
-
-        {/* Resultados de búsqueda */}
-        {showUserResults && userSearchResults.length > 0 && !selectedUser && (
-          <div
-            className="absolute z-50 w-full mt-1 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            {userSearchResults.map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() => selectUser(user)}
-                className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:opacity-90"
-                style={{ color: theme.text }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.backgroundSecondary}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
-                  <User className="h-4 w-4" style={{ color: theme.primary }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{user.nombre} {user.apellido}</p>
-                  <p className="text-xs truncate" style={{ color: theme.textSecondary }}>
-                    {user.dni && <span>DNI: {user.dni}</span>}
-                    {user.dni && user.telefono && <span> • </span>}
-                    {user.telefono && <span>{user.telefono}</span>}
-                    {(user.dni || user.telefono) && user.email && <span> • </span>}
-                    {user.email && <span>{user.email}</span>}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-          WhatsApp <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
-          <input
-            type="tel"
-            value={formData.telefono_contacto}
-            onChange={(e) => setFormData({ ...formData, telefono_contacto: e.target.value })}
-            placeholder="Ej: 11 1234-5678"
-            className="w-full pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-          />
-        </div>
-        <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-          Recibirás notificaciones cuando tu reclamo cambie de estado
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-          Email (opcional)
-        </label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
-          <input
-            type="email"
-            value={formData.email_contacto}
-            onChange={(e) => setFormData({ ...formData, email_contacto: e.target.value })}
-            placeholder="Ej: juan@email.com"
-            className="w-full pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-          />
-        </div>
-      </div>
-
-      <div
-        className="p-4 rounded-xl cursor-pointer transition-all"
-        style={{
-          backgroundColor: formData.recibir_notificaciones ? `${theme.primary}10` : theme.backgroundSecondary,
-          border: `1px solid ${formData.recibir_notificaciones ? theme.primary : theme.border}`,
-        }}
-        onClick={() => setFormData({ ...formData, recibir_notificaciones: !formData.recibir_notificaciones })}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {formData.recibir_notificaciones ? (
-              <Bell className="h-5 w-5" style={{ color: theme.primary }} />
-            ) : (
-              <BellOff className="h-5 w-5" style={{ color: theme.textSecondary }} />
-            )}
-            <div>
-              <p className="font-medium" style={{ color: theme.text }}>
-                Recibir notificaciones por WhatsApp
-              </p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Te avisaremos cuando el reclamo sea asignado, esté en proceso o se resuelva
-              </p>
-            </div>
-          </div>
-          <div
-            className="w-12 h-6 rounded-full p-1 transition-all"
-            style={{
-              backgroundColor: formData.recibir_notificaciones ? theme.primary : theme.border,
-            }}
-          >
-            <div
-              className="w-4 h-4 rounded-full bg-white transition-transform"
-              style={{
-                transform: formData.recibir_notificaciones ? 'translateX(24px)' : 'translateX(0)',
-              }}
-            />
-          </div>
-        </div>
-      </div>
-        </>
-      )}
-
-      {/* Mensaje de confirmación para reclamo anónimo */}
-      {esAnonimo && (
-        <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-          <div className="flex items-center gap-2 mb-2">
-            <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
-            <span className="font-medium" style={{ color: theme.primary }}>Reclamo anónimo</span>
-          </div>
-          <p className="text-sm" style={{ color: theme.textSecondary }}>
-            Tu reclamo será registrado sin datos de contacto. No podrás recibir actualizaciones sobre el estado del mismo, pero igualmente será atendido por el municipio.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-
-  // Descripciones de categorías para el asistente IA
-  const categoryDescriptions: Record<string, { title: string; examples: string[]; tip: string }> = {
-    'alumbrado': {
-      title: 'Alumbrado Público',
-      examples: ['Luminarias quemadas o parpadeantes', 'Postes de luz dañados o inclinados', 'Cables colgando', 'Zonas oscuras sin iluminación'],
-      tip: 'Indica el número de poste si es visible'
-    },
-    'bache': {
-      title: 'Baches y Calles',
-      examples: ['Baches en calzada', 'Hundimientos en el asfalto', 'Calles en mal estado', 'Roturas por obras'],
-      tip: 'Una foto del bache ayuda a evaluar la urgencia'
-    },
-    'agua': {
-      title: 'Agua y Cloacas',
-      examples: ['Pérdidas de agua en vía pública', 'Falta de presión de agua', 'Desborde de cloacas', 'Tapas de registro rotas'],
-      tip: 'Si hay olor fuerte, mencionalo en la descripción'
-    },
-    'cloaca': {
-      title: 'Cloacas y Desagües',
-      examples: ['Desborde de cloacas', 'Malos olores', 'Tapas rotas o faltantes', 'Obstrucciones'],
-      tip: 'Indicá si el problema es recurrente'
-    },
-    'arbolado': {
-      title: 'Arbolado Urbano',
-      examples: ['Árboles caídos o a punto de caer', 'Ramas que obstaculizan', 'Raíces que levantan veredas', 'Poda necesaria'],
-      tip: 'Si hay riesgo de caída, indicalo como urgente'
-    },
-    'espacio': {
-      title: 'Espacios Verdes',
-      examples: ['Plazas descuidadas', 'Pasto muy alto', 'Juegos rotos', 'Bancos dañados', 'Falta de riego'],
-      tip: 'Especificá qué área de la plaza está afectada'
-    },
-    'basura': {
-      title: 'Residuos',
-      examples: ['Basura acumulada', 'Contenedores llenos', 'Microbasurales', 'Residuos voluminosos abandonados'],
-      tip: 'Si son residuos peligrosos, mencionalo'
-    },
-    'limpieza': {
-      title: 'Limpieza',
-      examples: ['Calles sucias', 'Grafitis', 'Desechos en vía pública', 'Necesidad de barrido'],
-      tip: 'Indicá si es un problema recurrente'
-    },
-    'transito': {
-      title: 'Tránsito',
-      examples: ['Semáforos fallando', 'Señales caídas o vandalizadas', 'Problemas de estacionamiento', 'Calles mal señalizadas'],
-      tip: 'Si afecta el flujo vehicular, indicá los horarios'
-    },
-    'señal': {
-      title: 'Señalización',
-      examples: ['Carteles rotos o caídos', 'Señales ilegibles', 'Falta de señalización', 'Nombres de calles borrosos'],
-      tip: 'Describí qué tipo de señal falta o está dañada'
-    },
-    'plaga': {
-      title: 'Plagas',
-      examples: ['Roedores en vía pública', 'Mosquitos en exceso', 'Nidos de insectos peligrosos', 'Animales muertos'],
-      tip: 'Si hay riesgo sanitario, se prioriza la atención'
-    },
-    'semaforo': {
-      title: 'Semáforos',
-      examples: ['Semáforo apagado', 'Tiempos desincronizados', 'Luces quemadas', 'Semáforo peatonal fallando'],
-      tip: 'Indicá la intersección exacta'
-    },
-    'vereda': {
-      title: 'Veredas',
-      examples: ['Veredas rotas', 'Baldosas sueltas', 'Desniveles peligrosos', 'Obstáculos para discapacitados'],
-      tip: 'Si hay riesgo de caída, mencionalo'
-    },
-    'mobiliario': {
-      title: 'Mobiliario Urbano',
-      examples: ['Bancos rotos', 'Cestos de basura dañados', 'Bebederos sin funcionar', 'Paradas de colectivo vandalizadas'],
-      tip: 'Especificá qué elemento está dañado'
-    },
-    'ruido': {
-      title: 'Ruidos Molestos',
-      examples: ['Fiestas o eventos ruidosos', 'Obras fuera de horario', 'Locales con música alta', 'Alarmas que suenan constantemente'],
-      tip: 'Indicá los horarios en que ocurre'
-    },
-    'default': {
-      title: 'Otros Reclamos',
-      examples: ['Cualquier problema no listado', 'Situaciones especiales', 'Consultas generales'],
-      tip: 'Describí el problema con el mayor detalle posible'
+  // Consolidar este reclamo en LA orden de trabajo de zona de su POI (F6 · Etapa
+  // B). El endpoint es idempotente: crea la OT consolidada del POI si no existe,
+  // o reusa la vigente, y vincula el reclamo. Refrescamos para que el reclamo
+  // muestre su nueva prioridad/OT.
+  const handleConsolidarPOI = async () => {
+    if (!selectedReclamo?.poi || consolidandoPOI) return;
+    setConsolidandoPOI(true);
+    try {
+      const res = await poiApi.consolidar(selectedReclamo.poi.id, [selectedReclamo.id]);
+      const ot = res.data as PoiConsolidarResponse;
+      toast.success(
+        ot.creada
+          ? `Orden de trabajo ${ot.numero} creada para la zona de ${selectedReclamo.poi.nombre}`
+          : `Reclamo sumado a la orden ${ot.numero} de la zona de ${selectedReclamo.poi.nombre}`,
+        { description: `${ot.reclamos_count} reclamo${ot.reclamos_count === 1 ? '' : 's'} en la zona` }
+      );
+      await fetchReclamos(true);
+    } catch {
+      toast.error('No se pudo consolidar el reclamo en la orden de zona');
+    } finally {
+      setConsolidandoPOI(false);
     }
   };
-
-
-
-  // Función para obtener descripción de categoría
-  const getCategoryDescription = (nombre: string) => {
-    const key = nombre.toLowerCase();
-    for (const [k, desc] of Object.entries(categoryDescriptions)) {
-      if (key.includes(k)) return desc;
-    }
-    return categoryDescriptions.default;
-  };
-
-  // AI Panel para el wizard
-  const wizardAIPanel = (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
-          <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
-        </div>
-        <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente IA</span>
-      </div>
-      <div className="flex-1 space-y-3 overflow-y-auto">
-        {/* Contenido dinámico según el paso */}
-
-        {/* Paso 0: Describir - info general */}
-        {wizardStep === 0 && (
-          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-            <div className="flex items-start gap-2">
-              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-              <p style={{ color: theme.textSecondary }}>
-                Describí el problema con detalle y te sugeriremos la categoría más adecuada automáticamente.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Paso 1: Categoría */}
-        {wizardStep === 1 && selectedCategoria ? (() => {
-          const selColor = selectedCategoria.color || DEFAULT_CATEGORY_COLOR;
-          return (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg" style={{ backgroundColor: `${selColor}15`, border: `1px solid ${selColor}30` }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: selColor, color: 'white' }}>
-                  {getCategoryIcon(selectedCategoria.nombre)}
-                </div>
-                <span className="font-medium text-sm" style={{ color: theme.text }}>
-                  {getCategoryDescription(selectedCategoria.nombre).title}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-              <p className="font-medium mb-2" style={{ color: theme.text }}>Ejemplos de reclamos:</p>
-              <ul className="space-y-1">
-                {getCategoryDescription(selectedCategoria.nombre).examples.map((example, i) => (
-                  <li key={i} className="flex items-start gap-2" style={{ color: theme.textSecondary }}>
-                    <span style={{ color: selColor }}>•</span>
-                    {example}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-              <div className="flex items-start gap-2">
-                <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }} />
-                <p style={{ color: theme.textSecondary }}>
-                  <span className="font-medium" style={{ color: theme.text }}>Tip: </span>
-                  {getCategoryDescription(selectedCategoria.nombre).tip}
-                </p>
-              </div>
-            </div>
-          </div>
-          );
-        })() : wizardStep === 1 ? (
-          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-            <div className="flex items-start gap-2">
-              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-              <p style={{ color: theme.textSecondary }}>
-                Selecciona la categoría que mejor describa tu problema. Esto nos ayuda a asignarlo al equipo correcto.
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Paso 2: Ubicación */}
-        {wizardStep === 2 && (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-                <p style={{ color: theme.textSecondary }}>
-                  Escribe la dirección y selecciona del autocompletado. Luego ajusta el punto en el mapa si es necesario.
-                </p>
-              </div>
-            </div>
-            {formData.direccion && (
-              <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-4 w-4" style={{ color: '#22c55e' }} />
-                  <span className="font-medium" style={{ color: theme.text }}>Ubicación detectada</span>
-                </div>
-                <p style={{ color: theme.textSecondary }}>{formData.direccion}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Paso 3: Detalles - Panel con sugerencias basadas en categoría */}
-        {wizardStep === 3 && selectedCategoria && (
-          <div className="space-y-3">
-            {/* Estado inicial: esperando que escriba descripción */}
-            {!formData.descripcion.trim() && !aiSuggestionsLoading && (
-              <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-                  <p style={{ color: theme.textSecondary }}>
-                    Escribí una descripción del problema y te daré sugerencias personalizadas.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Estado: analizando (debounce loading) */}
-            {aiSuggestionsLoading && (
-              <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-                <div className="flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
-                  <div>
-                    <span className="font-medium text-sm" style={{ color: theme.text }}>Analizando descripción...</span>
-                    <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                      Preparando sugerencias personalizadas
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Sugerencias de IA mostradas después del debounce */}
-            {showAISuggestions && formData.descripcion.trim() && (
-              <>
-                {/* Respuesta de IA contextual */}
-                {contextualAiResponse ? (
-                  <div className="p-4 rounded-lg" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98130' }}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Sparkles className="h-4 w-4" style={{ color: '#10b981' }} />
-                      <span className="text-xs font-medium" style={{ color: '#10b981' }}>Asistente Municipal</span>
-                    </div>
-                    <p className="text-sm leading-relaxed" style={{ color: theme.text }}>
-                      {contextualAiResponse}
-                    </p>
-                  </div>
-                ) : (
-                  /* Mensaje si la IA no está disponible */
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                      <span className="text-sm" style={{ color: theme.textSecondary }}>Recomendaciones no disponibles</span>
-                    </div>
-                  </div>
-                )}
-
-                {formData.titulo && formData.descripcion && (
-                  <div className="p-3 rounded-lg" style={{ backgroundColor: '#22c55e15', border: '1px solid #22c55e30' }}>
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" style={{ color: '#22c55e' }} />
-                      <span className="font-medium text-sm" style={{ color: '#22c55e' }}>Reclamo bien detallado</span>
-                    </div>
-                    <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                      Los reclamos con buena descripción se resuelven hasta 40% más rápido.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Paso 4: Contacto */}
-        {wizardStep === 4 && (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: '#25D36610', border: '1px solid #25D36630' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <MessageCircle className="h-4 w-4" style={{ color: '#25D366' }} />
-                <span className="font-medium" style={{ color: '#25D366' }}>WhatsApp</span>
-              </div>
-              <p style={{ color: theme.textSecondary }}>
-                Te notificaremos automáticamente cuando:
-              </p>
-              <ul className="mt-2 space-y-1 text-xs" style={{ color: theme.textSecondary }}>
-                <li>• Se asigne un empleado a tu reclamo</li>
-                <li>• El trabajo esté en proceso</li>
-                <li>• Tu reclamo sea resuelto</li>
-              </ul>
-            </div>
-
-            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-              <div className="flex items-start gap-2">
-                <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }} />
-                <p style={{ color: theme.textSecondary }}>
-                  Usa el formato <strong style={{ color: theme.text }}>11 1234-5678</strong> para tu número de WhatsApp (código de área + número).
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Paso 5: Resumen */}
-        {wizardStep === 5 && (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="h-4 w-4" style={{ color: theme.primary }} />
-                <span className="font-medium text-sm" style={{ color: theme.text }}>Casi listo</span>
-              </div>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Revisa que toda la información sea correcta y presiona "Enviar Reclamo".
-              </p>
-            </div>
-
-            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
-              <p className="font-medium mb-2" style={{ color: theme.text }}>¿Qué sigue?</p>
-              <ol className="space-y-2 text-xs" style={{ color: theme.textSecondary }}>
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0">1</span>
-                  Tu reclamo será registrado
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0">2</span>
-                  Se asignará al equipo correspondiente
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0">3</span>
-                  Recibirás notificaciones del avance
-                </li>
-              </ol>
-            </div>
-          </div>
-        )}
-
-        {/* Respuesta de la IA */}
-        {aiResponse && (
-          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <div className="flex items-start gap-2">
-              <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-              <p style={{ color: theme.text }}>{aiResponse}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Input para preguntar */}
-      <div className="mt-4 p-3 rounded-lg flex items-center gap-2" style={{ backgroundColor: theme.card }}>
-        <input
-          type="text"
-          value={aiQuestion}
-          onChange={(e) => setAiQuestion(e.target.value)}
-          onKeyPress={handleAiKeyPress}
-          placeholder="Hacé una pregunta..."
-          disabled={aiLoading}
-          className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
-          style={{ color: theme.text }}
-        />
-        <button
-          onClick={askAI}
-          disabled={!aiQuestion.trim() || aiLoading}
-          className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-          style={{ backgroundColor: theme.primary, color: 'white' }}
-        >
-          {aiLoading ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Send className="h-3 w-3" />
-          )}
-        </button>
-      </div>
-    </div>
-  );
-
-  const wizardSteps = [
-    { id: 'describir', title: 'Describir', description: 'Contanos el problema', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: !!descripcionInput.trim() },
-    { id: 'categoria', title: 'Categoría', description: 'Selecciona el tipo de problema', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: !!formData.categoria_id },
-    { id: 'ubicacion', title: 'Ubicación', description: 'Indica dónde está el problema', icon: <MapPin className="h-5 w-5" />, content: wizardStep2, isValid: !!formData.direccion },
-    { id: 'detalles', title: 'Detalles', description: 'Agregá más información', icon: <FileText className="h-5 w-5" />, content: wizardStep3, isValid: !!formData.titulo && !!formData.descripcion },
-    { id: 'contacto', title: 'Contacto', description: 'Tus datos para seguimiento', icon: <Phone className="h-5 w-5" />, content: wizardStepContacto, isValid: esAnonimo || (!!formData.nombre_contacto && !!formData.telefono_contacto) },
-    { id: 'resumen', title: 'Confirmar', description: 'Revisa y envía', icon: <CheckCircle2 className="h-5 w-5" />, content: wizardStep4, isValid: true },
-  ];
-
-  // Columnas para la vista de tabla
-  const tableColumns = [
-    {
-      key: 'id',
-      header: '#',
-      sortValue: (r: Reclamo) => r.id,
-      render: (r: Reclamo) => (
-        <span className="font-mono text-xs" style={{ color: theme.textSecondary }}>#{r.id}</span>
-      ),
-    },
-    {
-      key: 'titulo',
-      header: 'Título',
-      width: '280px',
-      sortValue: (r: Reclamo) => r.titulo,
-      render: (r: Reclamo) => {
-        const catColor = r.categoria.color || DEFAULT_CATEGORY_COLOR;
-        return (
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: catColor + '20', color: catColor }}
-          >
-            {getCategoryIcon(r.categoria.nombre)}
-          </div>
-          <div className="min-w-0">
-            <span className="text-sm font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
-            <span
-              className="text-[11px]"
-              style={{ color: catColor }}
-            >
-              {r.categoria.nombre}
-            </span>
-          </div>
-        </div>
-        );
-      },
-    },
-    {
-      key: 'vecino',
-      header: 'Vecino',
-      sortValue: (r: Reclamo) => `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`,
-      render: (r: Reclamo) => {
-        const dep = r.dependencia_asignada as any;
-        const depNombre = dep?.dependencia?.nombre || dep?.nombre;
-        const depColor = dep?.color || dep?.dependencia?.color || theme.primary;
-        const nombre = r.creador ? `${r.creador.nombre} ${r.creador.apellido}` : r.es_anonimo ? 'Anónimo' : '-';
-        return (
-          <div className="flex items-start gap-2 min-w-0">
-            <span
-              className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
-              style={{ backgroundColor: `${depColor}20` }}
-            >
-              <User className="h-3.5 w-3.5" style={{ color: depColor }} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-xs truncate font-medium" style={{ color: theme.text }} title={nombre}>
-                {nombre}
-              </div>
-              {depNombre && (
-                <div className="text-[10px] truncate" style={{ color: depColor }} title={depNombre}>
-                  {depNombre}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'direccion',
-      header: 'Ubicación',
-      sortValue: (r: Reclamo) => r.direccion,
-      render: (r: Reclamo) => (
-        <div className="flex items-center gap-2 max-w-[200px]" title={r.direccion}>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
-            <MapPin className="h-3.5 w-3.5" style={{ color: theme.primary }} />
-          </div>
-          <span className="truncate text-sm" style={{ color: theme.text }}>{r.direccion}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'estado',
-      header: 'Estado',
-      sortValue: (r: Reclamo) => r.estado,
-      render: (r: Reclamo) => {
-        const color = estadoColors[r.estado]?.bg || '#6366f1';
-        return <StatusPill label={estadoLabels[r.estado]} color={color} />;
-      },
-    },
-    {
-      key: 'creacion',
-      header: 'Creación',
-      sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
-      render: (r: Reclamo) => {
-        const d = new Date(r.created_at);
-        const yy = String(d.getFullYear()).slice(-2);
-        return (
-          <span className="text-[11px]" style={{ color: theme.textSecondary }}>
-            {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'modificacion',
-      header: 'Modificación',
-      sortValue: (r: Reclamo) => new Date(r.updated_at || r.created_at).getTime(),
-      render: (r: Reclamo) => {
-        const iso = r.updated_at || r.created_at;
-        const d = new Date(iso);
-        const yy = String(d.getFullYear()).slice(-2);
-        return (
-          <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
-            {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'vencimiento',
-      header: 'Vence',
-      sortValue: (r: Reclamo) => r.fecha_programada ? new Date(r.fecha_programada).getTime() : Infinity,
-      render: (r: Reclamo) => {
-        if (!r.fecha_programada) return null;
-        const fechaProg = new Date(r.fecha_programada);
-        const ahora = new Date();
-        const diffMs = fechaProg.getTime() - ahora.getTime();
-        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-        const vencido = diffDias < 0;
-        const porVencer = !vencido && diffDias <= 3;
-        const color = vencido ? '#ef4444' : porVencer ? '#f59e0b' : '#10b981';
-        const bg = vencido ? '#ef444420' : porVencer ? '#f59e0b20' : '#10b98120';
-
-        const diasAbs = Math.abs(diffDias);
-        let texto: string;
-        if (diffDias === 0) {
-          texto = 'Hoy';
-        } else if (diasAbs < 30) {
-          texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
-        } else {
-          const meses = Math.floor(diasAbs / 30);
-          texto = vencido ? `-${meses} ${meses > 1 ? 'meses' : 'mes'}` : `${meses} ${meses > 1 ? 'meses' : 'mes'}`;
-        }
-
-        return (
-          <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap"
-            style={{ color, backgroundColor: bg }}
-          >
-            {texto}
-          </span>
-        );
-      },
-    },
-    {
-      key: 'actividad',
-      header: '',
-      sortable: false,
-      className: 'text-center',
-      render: (r: Reclamo) => {
-        const tieneActividadReciente = r.updated_at &&
-          new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000;
-        if (!tieneActividadReciente) return null;
-        const vecinoRechazo = r.confirmado_vecino === false;
-        const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
-        return (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); openViewSheet(r); }}
-            className="w-5 h-5 rounded-md inline-flex items-center justify-center mx-auto transition-transform hover:scale-110"
-            style={{
-              backgroundColor: `${bg}18`,
-              border: `1px solid ${bg}40`,
-            }}
-            title={vecinoRechazo
-              ? 'El vecino marcó que el problema NO se solucionó · click para ver notas'
-              : 'Actividad reciente · click para ver notas'}
-          >
-            <MessageCircle className="h-3 w-3" style={{ color: bg }} />
-          </button>
-        );
-      },
-    },
-  ];
 
   // Renderizar contenido del Sheet de ver
   const renderViewContent = () => {
     if (!selectedReclamo) return null;
+    // Banner POI (F6 · Etapa B): visible solo si el módulo Puntos de Interés está
+    // activo, el reclamo cae en la zona de un POI y el usuario puede consolidar
+    // (admin/supervisor — lo mismo que exige el endpoint). Copy para funcionario.
+    const poiZona = selectedReclamo.poi;
+    const puedeConsolidar = user?.rol === 'admin' || user?.rol === 'supervisor';
+    const showPoiBanner = moduloPOIActivo && !!poiZona && puedeConsolidar;
 
     return (
       <div className="space-y-2">
-        {/* Zona si existe */}
-        {selectedReclamo.zona && (
-          <ABMField
-            label="Zona"
-            value={selectedReclamo.zona.nombre}
-            icon={<MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          />
-        )}
-
-        <ABMField
-          label="Dirección"
-          value={selectedReclamo.referencia ? `${selectedReclamo.direccion} (Ref: ${selectedReclamo.referencia})` : selectedReclamo.direccion}
-          icon={<MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          fullWidth
-        />
-
-        {/* Descripción en su propio panel colapsable */}
-        <ABMCollapsible
-          title="Descripción del Reclamo"
-          icon={<FileText className="h-4 w-4" />}
-          defaultOpen={true}
-        >
-          <p className="text-sm leading-relaxed" style={{ color: theme.text }}>
-            {selectedReclamo.descripcion}
-          </p>
-        </ABMCollapsible>
-
-        {/* Datos del vecino — colapsado por default. El supervisor rara
-            vez necesita los datos personales para avanzar el reclamo;
-            cuando los necesita (llamarlo, mandarle mail) los expande. */}
-        <ABMCollapsible
-          title={`Datos del Vecino · ${selectedReclamo.creador.nombre} ${selectedReclamo.creador.apellido}`}
-          icon={<User className="h-4 w-4" />}
-          defaultOpen={false}
-        >
-          <ABMField
-            label="Email"
-            value={selectedReclamo.creador.email}
-            icon={<Mail className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          />
-          {selectedReclamo.creador.telefono && (
-            <ABMField
-              label="Teléfono"
-              value={selectedReclamo.creador.telefono}
-              icon={<Phone className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-            />
-          )}
-        </ABMCollapsible>
-
-        {/* Dependencia asignada */}
-        {selectedReclamo.dependencia_asignada?.nombre && (
-          <ABMInfoPanel
-            title="Asignado a"
-            icon={
-              <div
-                className="w-6 h-6 rounded flex items-center justify-center"
-                style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
+        {/* Banner POI: el reclamo cae en la zona de un Punto de Interés → ofrecer
+            consolidarlo en LA orden de trabajo de esa zona. Mismo estilo que los
+            demás banners de ayuda (deriva de theme.primary, sin hex inline). */}
+        {showPoiBanner && poiZona && (
+          <div className="rs-banner">
+            <span className="rs-banner-icono">
+              <span className="rs-latido" />
+              <MapPin className="h-4 w-4" />
+            </span>
+            <span className="rs-banner-cuerpo">
+              <span className="rs-banner-texto">
+                <strong>
+                  Está en la zona de {poiZona.nombre}
+                  {poiZona.tipo_nombre ? ` · ${poiZona.tipo_nombre}` : ''}.
+                </strong>{' '}
+                Podés agrupar este reclamo con los demás de la zona en una sola orden: se atienden juntos y no se pierde ninguno.
+              </span>
+              <button
+                type="button"
+                className="rs-banner-accion"
+                onClick={handleConsolidarPOI}
+                disabled={consolidandoPOI}
               >
-                <DynamicIcon
-                  name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
-                  className="h-3.5 w-3.5"
-                  style={{ color: '#ffffff' }}
-                />
-              </div>
-            }
-            variant="info"
-          >
-            <ABMField
-              label="Dependencia"
-              value={selectedReclamo.dependencia_asignada.nombre}
-              icon={
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
-                >
-                  <DynamicIcon
-                    name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
-                    className="h-3 w-3"
-                    style={{ color: '#ffffff' }}
-                  />
-                </div>
-              }
-            />
-            {/* Mostrar tiempo estimado si ya fue recibido */}
-            {selectedReclamo.estado === 'recibido' && selectedReclamo.fecha_estimada_resolucion && (
-              <ABMField
-                label="Resolución estimada"
-                value={new Date(selectedReclamo.fecha_estimada_resolucion).toLocaleString('es-AR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-                icon={<Clock className="h-4 w-4" style={{ color: theme.primary }} />}
-              />
-            )}
-          </ABMInfoPanel>
+                {consolidandoPOI ? 'Consolidando…' : 'Consolidar en OT de zona'}
+                {consolidandoPOI
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <MoveRight className="h-3.5 w-3.5" />}
+              </button>
+            </span>
+          </div>
         )}
+
+        {/* Qué dice el vecino — la descripción manda; las fotos, abajo. */}
+        <div className="rs-seccion">
+          <span className="rs-seccion-titulo">Qué dice el vecino</span>
+          <p className="rs-parrafo">"{selectedReclamo.descripcion}"</p>
+          {(selectedReclamo.imagenes?.length ?? 0) > 0 && (
+            <div className="rs-fotos">
+              {selectedReclamo.imagenes!.slice(0, 2).map((img, i) => (
+                <a key={i} href={img} target="_blank" rel="noreferrer" className="rs-foto" title="Ver foto">
+                  <img src={img} alt={`Foto ${i + 1} del reclamo`} loading="lazy" />
+                </a>
+              ))}
+              {selectedReclamo.imagenes!.length > 2 && (
+                <a
+                  href={selectedReclamo.imagenes![2]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rs-foto rs-foto--mas"
+                  title="Ver más fotos"
+                >
+                  +{selectedReclamo.imagenes!.length - 2}
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* DÓNDE / QUIÉN LO REPORTÓ — dos columnas, datos reales. */}
+        <div className="rs-grid2">
+          <span className="min-w-0">
+            <span className="rs-mini-eyebrow">Dónde</span>
+            <span className="rs-dato">{selectedReclamo.direccion}</span>
+            {(selectedReclamo.zona || selectedReclamo.referencia) && (
+              <span className="rs-dato-sub">
+                {[selectedReclamo.zona?.nombre, selectedReclamo.referencia ? `Ref: ${selectedReclamo.referencia}` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            )}
+            <button
+              type="button"
+              className="rs-mini-link"
+              onClick={() => { closeSheet(); navigate('/gestion/mapa'); }}
+            >
+              Ver en el mapa
+            </button>
+          </span>
+          <span className="min-w-0">
+            <span className="rs-mini-eyebrow">Quién lo reportó</span>
+            <span className="rs-persona">
+              <span className="rs-avatar">
+                {`${selectedReclamo.creador.nombre?.[0] ?? ''}${selectedReclamo.creador.apellido?.[0] ?? ''}`.toUpperCase() || '?'}
+              </span>
+              <span className="rs-persona-datos">
+                <span className="rs-persona-nombre">
+                  {selectedReclamo.creador.nombre} {selectedReclamo.creador.apellido}
+                </span>
+                <span className="rs-dato-sub">
+                  {selectedReclamo.creador.telefono || selectedReclamo.creador.email}
+                </span>
+              </span>
+            </span>
+          </span>
+        </div>
+
+        {/* Por dónde pasó — entrada por canal → responsable actual. */}
+        <div className="rs-seccion">
+          <div className="rs-seccion-cab">
+            <span className="rs-seccion-titulo">Por dónde pasó</span>
+          </div>
+          <div className="mt-3">
+            <div className="rs-tl">
+              <span className="rs-tl-col">
+                <span className="rs-tl-dot" />
+                <span className="rs-tl-linea" />
+              </span>
+              <span className="rs-tl-txt">
+                Ingresó por {(canalLabel(selectedReclamo.canal) || selectedReclamo.canal || 'web').toLowerCase()}
+                <span className="rs-tl-sub">
+                  {new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {new Date(selectedReclamo.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </span>
+            </div>
+            <div className="rs-tl">
+              <span className="rs-tl-col">
+                <span className={`rs-tl-dot${selectedReclamo.dependencia_asignada ? ' rs-tl-dot--actual' : ''}`}>
+                  {selectedReclamo.dependencia_asignada && <span className="rs-latido" />}
+                </span>
+              </span>
+              <span className={`rs-tl-txt${selectedReclamo.dependencia_asignada ? ' rs-tl-txt--actual' : ''}`}>
+                {selectedReclamo.dependencia_asignada?.nombre || 'Sin dependencia asignada todavía'}
+                <span className="rs-tl-sub">
+                  {selectedReclamo.dependencia_asignada
+                    ? (selectedReclamo.estado === 'recibido' && selectedReclamo.fecha_estimada_resolucion
+                        ? `Responsable actual · resolución estimada ${new Date(selectedReclamo.fecha_estimada_resolucion).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`
+                        : 'Responsable actual')
+                    : 'Se asigna desde el selector de acá abajo'}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Asignar responsable — polimórfico (cuadrilla o empleado) + vínculo guiado
             a Orden de Trabajo. Una cuadrilla no tiene campo directo en Reclamo, así
@@ -3293,6 +1859,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               })),
             ];
             const tipoResp = empleadoSeleccionadoId.split(':')[0];
+            const haySugerencias = sugerencias.length > 0;
+            const hayAlgo = hayCandidatos || haySugerencias || loadingSugerencias;
             const otOptions = [
               ...(tipoResp === 'empleado' ? [{ value: '', label: 'Asignación simple (sin orden de trabajo)' }] : []),
               ...otsVigentesDependencia.map(ot => ({
@@ -3301,40 +1869,88 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               })),
               { value: '__nueva__', label: '+ Nueva orden de trabajo' },
             ];
+            // Diseño "Reclamo Detalle": los DOS mejores candidatos van como
+            // tarjetas-radio; el resto de los sugeridos (con su puntaje) y la
+            // lista completa viven en el combo "O elegir otro".
+            const tarjetas = sugerencias.slice(0, 2);
+            const idsSugeridos = new Set(sugerencias.map((s) => `empleado:${s.empleado_id}`));
+            const opcionesAsignar = [
+              ...sugerencias.slice(2).map((s) => ({
+                value: `empleado:${s.empleado_id}`,
+                label: s.empleado_nombre,
+                description: `${s.score} pts · ${s.detalles?.ausente ? 'Ausente hoy' : 'Disponible'}${s.razon_principal ? ` · ${s.razon_principal}` : ''}`,
+              })),
+              ...responsableOptions.filter((o) => !idsSugeridos.has(o.value)),
+            ];
             return (
-              <ABMCollapsible
-                key={`resp-${selectedReclamo.id}-${hayCandidatos ? 'o' : 'c'}`}
-                title={hayCandidatos ? 'Asignar trabajo (opcional)' : 'Asignar trabajo — sin candidatos'}
-                icon={<UserPlus className="h-4 w-4" />}
-                defaultOpen={hayCandidatos}
+              <div
+                key={`resp-${selectedReclamo.id}-${hayAlgo ? 'o' : 'c'}`}
+                className="rs-seccion rs-seccion--ultima"
               >
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleAutoAsignar}
-                    disabled={asignandoEmpleado || empleadosDependencia.length === 0}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
-                    style={{
-                      backgroundColor: `${theme.primary}15`,
-                      color: theme.primary,
-                      border: `1px solid ${theme.primary}40`,
-                    }}
-                    title="Asigna el empleado con mejor match (especialidad + zona + carga)"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {asignandoEmpleado ? 'Asignando…' : 'Auto-asignar'}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <ModernSelect
-                      value={empleadoSeleccionadoId}
-                      onChange={handleAsignarResponsable}
-                      options={responsableOptions}
-                      placeholder={hayCandidatos ? (hayCuadrillas ? 'Seleccionar cuadrilla o empleado…' : 'Seleccionar empleado…') : 'Sin cuadrillas ni empleados asignables'}
-                      disabled={asignandoEmpleado || !hayCandidatos}
-                      searchable
-                    />
-                  </div>
+                <div className="rs-seccion-cab">
+                  <span className="rs-seccion-titulo">Quién lo va a hacer</span>
+                  <span className="rs-seccion-hint">
+                    {hayAlgo
+                      ? 'falta esto para pasarlo a en curso'
+                      : 'sin candidatos cargados — podés avanzar igual'}
+                  </span>
                 </div>
-                {!hayCandidatos && (
+                {/* Los DOS mejores candidatos como tarjetas-radio, calcadas del
+                    diseño; elegir acá dispara el MISMO flujo polimórfico que el
+                    combo (handleAsignarResponsable). */}
+                {tarjetas.map((s, i) => {
+                  const valor = `empleado:${s.empleado_id}`;
+                  const activo = empleadoSeleccionadoId === valor;
+                  const carga = s.detalles?.carga_trabajo ?? 0;
+                  const estadoDerecha = s.detalles?.ausente
+                    ? { texto: 'Ausente hoy', ok: false }
+                    : i === 0 || carga === 0
+                      ? { texto: 'Disponible hoy', ok: true }
+                      : { texto: `${carga} trabajo${carga === 1 ? '' : 's'} abiertos`, ok: false };
+                  return (
+                    <label key={s.empleado_id} className={`rs-cand${activo ? ' rs-cand--activo' : ''}`}>
+                      <input
+                        type="radio"
+                        name={`rs-asignado-${selectedReclamo.id}`}
+                        className="rs-cand-radio"
+                        checked={activo}
+                        disabled={asignandoEmpleado}
+                        onChange={() => handleAsignarResponsable(valor)}
+                      />
+                      <span className="rs-cand-cuerpo">
+                        <span className="rs-cand-fila">
+                          <span className="rs-cand-nombre">{s.empleado_nombre}</span>
+                          <span className={`rs-cand-estado${estadoDerecha.ok ? ' rs-cand-estado--ok' : ''}`}>
+                            {estadoDerecha.texto}
+                          </span>
+                        </span>
+                        {s.razon_principal && <span className="rs-cand-razon">{s.razon_principal}</span>}
+                      </span>
+                    </label>
+                  );
+                })}
+                {loadingSugerencias && (
+                  <span className="rs-dato-sub">Buscando candidatos sugeridos…</span>
+                )}
+
+                {/* "O elegir otro": el resto de sugeridos (con puntaje) + la
+                    lista completa de cuadrillas y empleados, en UN combo. */}
+                {(opcionesAsignar.length > 0 || hayCandidatos) && (
+                  <div className="rs-asignar">
+                    <div className="rs-asignar-combo">
+                      <ModernSelect
+                        variant="v2"
+                        value={tarjetas.some((s) => `empleado:${s.empleado_id}` === empleadoSeleccionadoId) ? '' : empleadoSeleccionadoId}
+                        onChange={handleAsignarResponsable}
+                        options={opcionesAsignar}
+                        placeholder={hayCuadrillas ? 'O elegir otro · cuadrilla o empleado…' : 'O elegir otro empleado…'}
+                        disabled={asignandoEmpleado}
+                        searchable
+                      />
+                    </div>
+                  </div>
+                )}
+                {!hayAlgo && (
                   <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
                     Esta dependencia no tiene cuadrillas ni empleados cargados para la categoría del reclamo. La asignación es opcional — podés avanzar sin ella.
                   </p>
@@ -3359,9 +1975,82 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     </p>
                   </div>
                 )}
-              </ABMCollapsible>
+              </div>
             );
           })()}
+
+        {/* Órdenes de trabajo YA vinculadas (la vuelta reclamo → OT). Solo si el
+            módulo está activo y el reclamo tiene alguna OT. Read-only + link. */}
+        {moduloOTActivo && otsDelReclamo.length > 0 && (
+          <ABMInfoPanel
+            title={otsDelReclamo.length === 1 ? 'Orden de trabajo' : 'Órdenes de trabajo'}
+            icon={<Wrench className="h-4 w-4" />}
+            variant="default"
+          >
+            <div className="space-y-2">
+              {otsDelReclamo.map((ot) => {
+                const responsable = ot.cuadrilla_nombre || ot.empleado_nombre || 'Sin responsable';
+                return (
+                  <button
+                    key={ot.id}
+                    type="button"
+                    onClick={() => navigate(`/gestion/ordenes-trabajo?abrir=${ot.id}`)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors hover:opacity-80"
+                    style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+                  >
+                    <span className="font-mono text-sm font-semibold" style={{ color: theme.text }}>
+                      {ot.numero}
+                    </span>
+                    <span
+                      className="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ backgroundColor: `${otEstadoColor(ot.estado)}20`, color: otEstadoColor(ot.estado) }}
+                    >
+                      {otEstadoLabel(ot.estado)}
+                    </span>
+                    <span className="text-xs flex-1 truncate" style={{ color: theme.textSecondary }}>
+                      {responsable}
+                    </span>
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" style={{ color: theme.textSecondary }} />
+                  </button>
+                );
+              })}
+            </div>
+          </ABMInfoPanel>
+        )}
+
+        {/* Editor de prioridad (F6·A5). La prioridad canónica vive en la OT, así
+            que el cambio escribe en la OT del reclamo. Editable solo por gestor y
+            cuando el reclamo tiene UNA sola OT viva (implícita 1:1); con varias OTs
+            (consolidación de zona) el destino sería ambiguo → queda solo el badge
+            del header. Sin OT viva no hay dónde escribir → idem. */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (() => {
+          const otsEditables = otsDelReclamo.filter(
+            (ot) => ot.estado !== 'completada' && ot.estado !== 'cancelada',
+          );
+          if (otsEditables.length !== 1) return null;
+          const ot = otsEditables[0];
+          const PrioIcon = prioridadIcon(ot.prioridad);
+          const prioridadOptions = PRIORIDAD_OPTIONS.map((o) => ({
+            ...o,
+            color: prioridadColor(o.value),
+          }));
+          return (
+            <ABMInfoPanel
+              title="Prioridad del trabajo"
+              icon={<PrioIcon className="h-4 w-4" />}
+              variant="default"
+            >
+              <ModernSelect
+                value={ot.prioridad || 'media'}
+                onChange={(v) => handleCambiarPrioridadOT(ot.id, v)}
+                options={prioridadOptions}
+              />
+              <p className="text-[11px] mt-2" style={{ color: theme.textSecondary }}>
+                Urgente es un escalón manual del supervisor.
+              </p>
+            </ABMInfoPanel>
+          );
+        })()}
 
         {/* Tiempo estimado de resolución - Solo para aceptar reclamos nuevos */}
         {selectedReclamo.estado === 'nuevo' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (
@@ -3471,18 +2160,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
-        {/* Rechazo */}
+        {/* Calificación del vecino (T5-F1) — solo si el vecino ya calificó el cierre */}
+        {calificacion && <CalificacionVecinoPanel calificacion={calificacion} />}
+
+        {/* Motivo de rechazo — sección plana con el título en rojo, mismo
+            lenguaje que el resto del sheet (nada de panel verde). */}
         {selectedReclamo.motivo_rechazo && (
-          <ABMInfoPanel
-            title="Motivo de Rechazo"
-            icon={<XCircle className="h-4 w-4" />}
-            variant="danger"
-          >
-            <p className="text-sm font-medium mb-1">{selectedReclamo.motivo_rechazo}</p>
+          <div className="rs-seccion">
+            <span className="rs-seccion-titulo rs-seccion-titulo--malo">Motivo de rechazo</span>
+            <p className="rs-parrafo rs-parrafo--destacado">{selectedReclamo.motivo_rechazo}</p>
             {selectedReclamo.descripcion_rechazo && (
-              <p className="text-sm opacity-90">{selectedReclamo.descripcion_rechazo}</p>
+              <p className="rs-parrafo">{selectedReclamo.descripcion_rechazo}</p>
             )}
-          </ABMInfoPanel>
+          </div>
         )}
 
         {/* Acciones según estado */}
@@ -3512,12 +2202,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   onChange={(value) => setDependenciaSeleccionada(value || '')}
                   placeholder={selectedReclamo.dependencia_asignada ? "Seleccionar otra dependencia..." : "Seleccionar dependencia..."}
                   searchable={dependenciasDisponibles.length > 5}
-                  onOpen={() => setSugerenciasColapsadas(true)}
-                  onClose={(selectedValue) => {
-                    if (selectedValue === null && !dependenciaSeleccionada) {
-                      setSugerenciasColapsadas(false);
-                    }
-                  }}
                   options={dependenciasDisponibles.map(dep => ({
                     value: String(dep.id),
                     label: dep.dependencia?.nombre || dep.nombre || `Dependencia #${dep.id}`,
@@ -3704,7 +2388,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                           </p>
                           {disponibilidad.bloques_ocupados.map((bloque, idx) => (
                             <div key={idx} className="text-xs pl-5 py-0.5" style={{ color: theme.textSecondary }}>
-                              • {bloque.hora_inicio.slice(0, 5)} - {bloque.hora_fin.slice(0, 5)}: {bloque.titulo}
+                              • {bloque.inicio.slice(0, 5)} - {bloque.fin.slice(0, 5)}: {bloque.titulo}
                             </div>
                           ))}
                         </div>
@@ -3867,86 +2551,100 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     );
   };
 
-  // Renderizar sticky header para el Sheet (estado + categoría + botón historial)
-  const renderSheetStickyHeader = () => {
-    if (!selectedReclamo) return null;
-
-    const categoryColor = selectedReclamo.categoria.color || DEFAULT_CATEGORY_COLOR;
-    const estadoColor = estadoColors[selectedReclamo.estado]?.bg || '#6366f1';
-
+  // Header propio del Sheet — implementación del diseño "Reclamo Detalle"
+  // (canvas Claude Design): eyebrow + navegación entre los reclamos de la
+  // lista visible + acciones, título display y la fila de meta
+  // (estado · categoría · prioridad · canal · antigüedad).
+  const renderSheetHeader = () => {
+    if (!selectedReclamo) return undefined;
+    const idx = filteredReclamos.findIndex((r) => r.id === selectedReclamo.id);
+    const total = filteredReclamos.length;
+    const irA = (i: number) => {
+      const destino = filteredReclamos[i];
+      if (destino) openViewSheet(destino);
+    };
+    const estadoColor = estadoColors[selectedReclamo.estado]?.bg || theme.primary;
+    const prio = selectedReclamo.prioridad_ot || 'media';
+    const disconforme = selectedReclamo.confirmado_vecino === false;
     return (
-      <div className="flex items-center gap-2">
-        {/* Estado */}
-        <span
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full"
-          style={{
-            backgroundColor: estadoColor,
-            color: '#ffffff'
-          }}
-        >
-          {getEstadoIcon(selectedReclamo.estado)}
-          {estadoLabels[selectedReclamo.estado]}
-        </span>
-        {/* Categoría */}
-        <span
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
-          style={{
-            backgroundColor: `${categoryColor}15`,
-            color: categoryColor,
-            border: `1px solid ${categoryColor}40`
-          }}
-        >
-          {getCategoryIcon(selectedReclamo.categoria.nombre)}
-          {selectedReclamo.categoria.nombre}
-        </span>
-        {/* Canal de ingreso (omnicanalidad) */}
-        {selectedReclamo.canal && (() => {
-          const CanalIcon = canalIcon(selectedReclamo.canal);
-          const cColor = canalColor(selectedReclamo.canal);
-          return (
-            <span
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
-              style={{ backgroundColor: `${cColor}15`, color: cColor, border: `1px solid ${cColor}40` }}
-              title={`Ingresó por ${canalLabel(selectedReclamo.canal)}`}
-            >
-              {CanalIcon && <CanalIcon className="h-3.5 w-3.5" />}
-              {canalLabel(selectedReclamo.canal)}
-            </span>
-          );
-        })()}
-        {/* Historial — con badge inline rojo si el vecino rechazó la resolución */}
-        <button
-          onClick={() => {
-            closeSheet();
-            navigate(`/gestion/reclamos/${selectedReclamo.id}`);
-          }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
-          style={{
-            backgroundColor: selectedReclamo.confirmado_vecino === false ? '#ef444415' : theme.backgroundSecondary,
-            color: selectedReclamo.confirmado_vecino === false ? '#ef4444' : theme.primary,
-            border: `1px solid ${selectedReclamo.confirmado_vecino === false ? '#ef444460' : theme.border}`,
-          }}
-          title={selectedReclamo.confirmado_vecino === false
-            ? 'El vecino marcó que el problema persiste — ver historial'
-            : 'Ver historial completo'}
-        >
-          <Clock className="h-3.5 w-3.5" />
-          Historial
-          {selectedReclamo.confirmado_vecino === false && (
-            <span
-              className="inline-flex items-center justify-center w-4 h-4 rounded-full font-bold animate-pulse"
-              style={{
-                backgroundColor: '#ef4444',
-                color: '#ffffff',
-                fontSize: '9px',
-                lineHeight: 1,
-                boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.35)',
-              }}
-            >
-              !
+      <div className="rs-head">
+        <div className="rs-head-fila">
+          <span className="rs-eyebrow">Reclamo #{selectedReclamo.id}</span>
+          {idx >= 0 && total > 1 && (
+            <span className="rs-nav">
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Anterior"
+                disabled={idx <= 0}
+                onClick={() => irA(idx - 1)}
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+              <span className="rs-nav-pos">{idx + 1} de {total} en la lista</span>
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Siguiente"
+                disabled={idx >= total - 1}
+                onClick={() => irA(idx + 1)}
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
             </span>
           )}
-        </button>
+          <span className="rs-head-icos">
+            <button
+              type="button"
+              className="rs-ico-btn"
+              title={disconforme
+                ? 'El vecino marcó que el problema persiste — ver historial'
+                : 'Ver historial completo'}
+              onClick={() => { closeSheet(); navigate(`/gestion/reclamos/${selectedReclamo.id}`); }}
+            >
+              <Clock className="h-4 w-4" />
+              {disconforme && <span className="rs-ico-alerta" />}
+            </button>
+            <button type="button" className="rs-ico-btn" title="Cerrar" aria-label="Cerrar" onClick={closeSheet}>
+              <X className="h-4 w-4" />
+            </button>
+          </span>
+        </div>
+
+        <h2 className="rs-titulo">
+          {selectedReclamo.titulo || selectedReclamo.categoria?.nombre || 'Reclamo'}
+        </h2>
+
+        <div className="rs-meta">
+          <span className="rs-estado" style={{ backgroundColor: `${estadoColor}1c`, color: estadoColor }}>
+            <span className="rs-estado-dot" style={{ backgroundColor: estadoColor }} />
+            {estadoLabels[selectedReclamo.estado] || selectedReclamo.estado}
+          </span>
+          <span className="rs-meta-sep">·</span>
+          <button
+            type="button"
+            className="rs-meta-cat"
+            title="Filtrar la lista por esta categoría"
+            onClick={() => { setFiltroCategoria(selectedReclamo.categoria.id); closeSheet(); }}
+          >
+            {selectedReclamo.categoria.nombre}
+          </button>
+          <span className="rs-meta-sep">·</span>
+          <span>Prioridad {prioridadLabel(prio).toLowerCase()}</span>
+          {selectedReclamo.canal && (
+            <>
+              <span className="rs-meta-sep">·</span>
+              <span>Entró por {(canalLabel(selectedReclamo.canal) || selectedReclamo.canal).toLowerCase()}</span>
+            </>
+          )}
+          <span className="rs-meta-sep">·</span>
+          <span>
+            {(() => {
+              const t = haceCuanto(selectedReclamo.created_at);
+              return !t || t === 'recién' ? t : `hace ${t}`;
+            })()}
+          </span>
+        </div>
       </div>
     );
   };
@@ -3971,14 +2669,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <textarea
             value={descripcionInicio}
             onChange={(e) => setDescripcionInicio(e.target.value)}
-            placeholder={descripcionInicio.trim() ? 'Descripción del trabajo a realizar...' : 'Descripción del trabajo a realizar (obligatorio para cambiar de estado)...'}
+            placeholder="Qué se va a hacer — queda en el historial y lo ve el vecino"
             rows={2}
-            className="w-full px-3 py-1.5 rounded-xl text-sm resize-none transition-colors"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${descripcionInicio.trim() ? theme.primary : '#f59e0b80'}`,
-              color: theme.text,
-            }}
+            className={`rs-pie-nota${descripcionInicio.trim() ? '' : ' rs-pie-nota--pendiente'}`}
           />
         )}
 
@@ -3989,26 +2682,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleRecibir}
               disabled={saving || !descripcionInicio.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
-              style={{
-                backgroundColor: descripcionInicio.trim() ? '#16a34a' : theme.border,
-                color: descripcionInicio.trim() ? '#ffffff' : theme.textSecondary,
-                boxShadow: descripcionInicio.trim() ? '0 4px 14px rgba(22, 163, 74, 0.4)' : 'none'
-              }}
+              className="rs-cta flex-1 justify-center"
             >
+              <Check className="h-4 w-4" />
               {saving ? 'Recibiendo...' : 'Recibir'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="rs-btn rs-btn--peligro"
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
@@ -4018,26 +2704,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleAsignar}
               disabled={saving || !dependenciaSeleccionada || !descripcionInicio.trim() || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
-              style={{
-                backgroundColor: (dependenciaSeleccionada && descripcionInicio.trim()) ? theme.primary : theme.border,
-                color: (dependenciaSeleccionada && descripcionInicio.trim()) ? '#ffffff' : theme.textSecondary,
-                boxShadow: (dependenciaSeleccionada && descripcionInicio.trim()) ? `0 4px 14px ${theme.primary}40` : 'none'
-              }}
+              className="rs-cta flex-1 justify-center"
             >
+              <Check className="h-4 w-4" />
               {saving ? 'Asignando...' : selectedReclamo.dependencia_asignada ? 'Reasignar' : 'Asignar'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="rs-btn rs-btn--peligro"
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
@@ -4047,26 +2726,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleIniciar}
               disabled={saving || !descripcionInicio.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-              style={{
-                backgroundColor: descripcionInicio.trim() ? `${estadoColors.en_curso.bg}20` : 'transparent',
-                border: `2px solid ${descripcionInicio.trim() ? estadoColors.en_curso.bg : theme.border}`,
-                color: descripcionInicio.trim() ? estadoColors.en_curso.bg : theme.textSecondary,
-              }}
+              className="rs-cta flex-1 justify-center"
             >
-              {saving ? 'Procesando...' : 'En Curso'}
+              <Check className="h-4 w-4" />
+              {saving ? 'Procesando...' : 'Pasar a en curso'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="rs-btn rs-btn--peligro"
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
@@ -4075,12 +2747,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <>
             {/* Foto de cierre: evidencia del trabajo terminado (opcional) */}
             <label
-              className="px-3 py-2.5 rounded-xl font-medium cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5"
-              style={{
-                backgroundColor: fotoCierre ? `${estadoColors.finalizado.bg}20` : theme.backgroundSecondary,
-                border: `2px dashed ${fotoCierre ? estadoColors.finalizado.bg : theme.border}`,
-                color: fotoCierre ? estadoColors.finalizado.bg : theme.textSecondary,
-              }}
+              className="rs-btn cursor-pointer"
               title={fotoCierre ? `Foto de cierre: ${fotoCierre.name}` : 'Adjuntar foto del trabajo terminado (opcional)'}
             >
               <Camera className="h-4 w-4" />
@@ -4096,26 +2763,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleFinalizar}
               disabled={saving || !resolucion}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: `${estadoColors.finalizado.bg}20`,
-                border: `2px solid ${estadoColors.finalizado.bg}`,
-                color: estadoColors.finalizado.bg,
-              }}
+              className="rs-cta flex-1 justify-center"
             >
+              <Check className="h-4 w-4" />
               {saving ? 'Finalizando...' : 'Finalizar'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="rs-btn rs-btn--peligro"
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
         {canFinalizar && tipoFinalizacion === 'pospuesto' && (
@@ -4123,64 +2783,60 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handlePosponer}
               disabled={saving || !motivoNoFinalizado}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: `${estadoColors.pospuesto.bg}20`,
-                border: `2px solid ${estadoColors.pospuesto.bg}`,
-                color: estadoColors.pospuesto.bg
-              }}
+              className="rs-cta flex-1 justify-center"
             >
               {saving ? 'Posponiendo...' : 'Posponer'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="rs-btn rs-btn--peligro"
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
-        {/* Estados finales - solo info */}
-        {(['resuelto', 'finalizado', 'rechazado'].includes(selectedReclamo.estado)) && (
-          <div
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
-            style={{
-              backgroundColor: selectedReclamo.estado === 'rechazado' ? `${estadoColors.rechazado.bg}20` : `${estadoColors.finalizado.bg}20`,
-              color: selectedReclamo.estado === 'rechazado' ? estadoColors.rechazado.bg : estadoColors.finalizado.bg,
-              border: `2px solid ${selectedReclamo.estado === 'rechazado' ? estadoColors.rechazado.bg : estadoColors.finalizado.bg}`
-            }}
-          >
-            {selectedReclamo.estado === 'rechazado' ? '✗ Rechazado' : '✓ Finalizado'}
-          </div>
-        )}
+        {/* Estados finales — banda informativa, no disfrazada de botón. El
+            color viene del estado (valor runtime), la piel es del kit. */}
+        {(['resuelto', 'finalizado', 'rechazado'].includes(selectedReclamo.estado)) && (() => {
+          const esRechazo = selectedReclamo.estado === 'rechazado';
+          const c = esRechazo ? estadoColors.rechazado.bg : estadoColors.finalizado.bg;
+          const IconoFinal = esRechazo ? XCircle : CheckCircle;
+          return (
+            <>
+              <div className="av2-sheet-final" style={{ backgroundColor: `${c}14`, color: c }}>
+                <IconoFinal className="h-4 w-4" />
+                {esRechazo ? 'Rechazado' : 'Finalizado'}
+              </div>
+              {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
+                <button
+                  type="button"
+                  onClick={handleReasignar}
+                  className="rs-btn"
+                  title="Devuelve el reclamo a Recibido y libera al empleado para que otro lo pueda tomar"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Reasignar
+                </button>
+              )}
+            </>
+          );
+        })()}
 
         {/* Estado pospuesto - puede retomar */}
         {selectedReclamo.estado === 'pospuesto' && (
           <div className="flex gap-2">
             <button
               onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(true); closeSheet(); toast.success('Reclamo retomado'); })}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.en_curso.bg}20`,
-                border: `2px solid ${estadoColors.en_curso.bg}`,
-                color: estadoColors.en_curso.bg
-              }}
+              className="rs-cta flex-1 justify-center"
             >
               Retomar
             </button>
             <div
-              className="px-4 py-2.5 rounded-xl font-medium text-center"
-              style={{
-                backgroundColor: `${estadoColors.pospuesto.bg}20`,
-                border: `2px solid ${estadoColors.pospuesto.bg}`,
-                color: estadoColors.pospuesto.bg
-              }}
+              className="av2-sheet-final av2-sheet-final--chip"
+              style={{ backgroundColor: `${estadoColors.pospuesto.bg}14`, color: estadoColors.pospuesto.bg }}
             >
               Pospuesto
             </div>
@@ -4191,26 +2847,20 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Feedback negativo del vecino — bloque visible con 2 acciones */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') &&
          selectedReclamo.confirmado_vecino === false && (
-          <div
-            className="rounded-xl p-4 space-y-3"
-            style={{
-              backgroundColor: '#ef444412',
-              border: '1.5px solid #ef444460',
-            }}
-          >
+          <div className="av2-sheet-alerta">
             <div className="flex items-start gap-2">
-              <span className="text-xl flex-shrink-0">⚠️</span>
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--pl-red)' }} />
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm" style={{ color: '#991b1b' }}>
+                <p className="font-bold text-sm" style={{ color: 'var(--pl-red-700)' }}>
                   El vecino indica que el problema persiste
                 </p>
                 {selectedReclamo.comentario_confirmacion_vecino && (
-                  <p className="text-sm mt-1 italic" style={{ color: '#b91c1c' }}>
+                  <p className="text-sm mt-1 italic" style={{ color: 'var(--pl-red-700)' }}>
                     «{selectedReclamo.comentario_confirmacion_vecino}»
                   </p>
                 )}
                 {selectedReclamo.fecha_confirmacion_vecino && (
-                  <p className="text-xs mt-1 opacity-80" style={{ color: '#ef4444' }}>
+                  <p className="text-xs mt-1 opacity-80" style={{ color: 'var(--pl-red-700)' }}>
                     {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleString('es-AR', {
                       day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
                     })}
@@ -4221,44 +2871,31 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleReabrirPorFeedback}
-                className="px-3 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-[1.02] active:scale-95"
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#ffffff',
-                  boxShadow: '0 4px 12px #ef444440',
-                }}
+                className="av2-btn-peligro av2-btn-peligro--solido justify-center"
                 title="Devuelve el reclamo a En Curso para retrabajar"
               >
-                🔄 Reabrir caso
+                <RotateCcw className="h-4 w-4" />
+                Reabrir caso
               </button>
               <button
                 onClick={handleDescartarFeedback}
-                className="px-3 py-2 rounded-lg font-medium text-sm transition-all hover:scale-[1.02] active:scale-95"
-                style={{
-                  backgroundColor: 'transparent',
-                  border: '1.5px solid #ef444460',
-                  color: '#ef4444',
-                }}
+                className="av2-btn-peligro justify-center"
                 title="Marca el feedback como revisado y deja el caso finalizado"
               >
-                ✓ Descartar comentario
+                <CheckCircle className="h-4 w-4" />
+                Descartar comentario
               </button>
             </div>
           </div>
         )}
 
-        {/* Botón Reasignar — disponible en cualquier estado posterior a "recibido"
-            para devolver el reclamo y que otro empleado lo pueda tomar */}
+        {/* Botón Reasignar — en curso/pospuesto va acá (ancho completo);
+            en estados finales va INLINE junto a la banda, arriba. */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') &&
-         ['en_curso', 'pospuesto', 'finalizado', 'rechazado', 'resuelto'].includes(selectedReclamo.estado) && (
+         ['en_curso', 'pospuesto'].includes(selectedReclamo.estado) && (
           <button
             onClick={handleReasignar}
-            className="w-full px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
-            style={{
-              backgroundColor: `${theme.primary}10`,
-              border: `1.5px dashed ${theme.primary}60`,
-              color: theme.primary,
-            }}
+            className="rs-btn w-full justify-center"
             title="Devuelve el reclamo a Recibido y libera al empleado para que otro lo pueda tomar"
           >
             <Sparkles className="h-4 w-4" />
@@ -4271,93 +2908,102 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   // ============================================================
   // INBOX (vista guiada) — secciones por urgencia/estado
-  // Mismo patrón que GestionTramites.tsx (líneas 1452-1632).
+  // `inboxData` mira la lista QUE SE VE (con el foco del hero aplicado);
+  // `inboxBase` mira la base sin foco y es la que alimenta la frase del hero,
+  // para que el hero siga contando el universo del módulo aunque el usuario
+  // haya acotado la lista con una de sus propias acciones. Sin foco, ambas
+  // son el mismo objeto (no se recalcula nada).
   // ============================================================
-  const inboxData = useMemo(() => {
-    const ahora = Date.now();
-    const dia = 24 * 60 * 60 * 1000;
+  const inboxData = useMemo(() => armarInbox(filteredReclamos), [filteredReclamos]);
+  const inboxBase = useMemo(
+    () => (foco ? armarInbox(reclamosBuscados) : inboxData),
+    [foco, reclamosBuscados, inboxData],
+  );
 
-    const conFeedback: Reclamo[] = []; // vecino dijo "sigue el problema"
-    const urgentes: Reclamo[] = [];
-    const fosiles: Reclamo[] = [];   // vencidos hace > 30 días — para limpiar
-    const nuevos: Reclamo[] = [];
-    const enCurso: Reclamo[] = [];
-    const esperando: Reclamo[] = [];
 
-    for (const r of filteredReclamos) {
-      const estado = (r.estado || '').toLowerCase();
+  // Hero semántico (rediseño v2): frases dinámicas armadas SOLO con datos ya
+  // cargados en la pantalla (inboxData). Sin datos → sin frases → no renderiza.
+  // Acciones del hero: OPERAN SOBRE ESTA PANTALLA (acotan la lista al grupo
+  // que la frase acaba de nombrar), no mandan a otra pantalla. El conteo real
+  // va en el label y un grupo vacío NO se ofrece — nunca "ver los 0 que…".
+  // Con el foco puesto, la primera acción es sacarlo, así el filtro siempre
+  // tiene su salida a la vista. No hay tercera acción de exportar: esta
+  // pantalla no tiene exportación (un botón muerto sería peor que nada).
+  const accionesHero = useMemo<HeroAccion[]>(() => {
+    const { vencenHoy, vencidos, sinDep } = metricasHero;
+    // Candidatas en orden de urgencia. Cada una lleva SU conteo real en el
+    // label y se cae sola si el grupo está vacío.
+    const candidatas: { foco: Exclude<FocoHero, null>; n: number; label: string }[] = [
+      { foco: 'vencen-hoy', n: vencenHoy, label: `Ver los ${vencenHoy} que vencen hoy` },
+      { foco: 'vencidos', n: vencidos, label: `Ver los ${vencidos} ya vencidos` },
+      { foco: 'sin-dependencia', n: sinDep, label: `Ver los ${sinDep} sin dependencia` },
+    ];
+    const disponibles = candidatas
+      .filter((c) => c.n > 0 && c.foco !== foco)
+      .map<HeroAccion>((c) => ({ label: c.label, onClick: () => setFoco(c.foco) }));
 
-      // Capa 0: feedback negativo del vecino. MAXIMA PRIORIDAD: aparecen
-      // aunque el reclamo este "finalizado", porque el vecino dice que el
-      // problema sigue y la dependencia tiene que retomarlo.
-      if (r.confirmado_vecino === false) {
-        conFeedback.push(r);
-        continue;
-      }
-
-      // Excluir cerrados de la vista guiada (los con feedback ya quedaron
-      // arriba; estos son cierres limpios sin disputa).
-      if (estado === 'finalizado' || estado === 'rechazado' || estado === 'resuelto') continue;
-
-      // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
-      // (si no tiene, usar el SLA de la categoría; fallback 30 días).
-      const dias = r.tiempo_estimado_dias
-        ?? (r.categoria as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
-        ?? 30;
-      const fechaVence = r.created_at
-        ? new Date(r.created_at).getTime() + dias * dia
-        : null;
-      const diffMs = fechaVence ? fechaVence - ahora : null;
-
-      // Capa 1: fósil — venció hace más de 30 días, sin importar el estado.
-      if (diffMs != null && diffMs < -30 * dia) {
-        fosiles.push(r);
-        continue;
-      }
-
-      // Capa 2: el ESTADO manda sobre la urgencia. Si el reclamo ya esta
-      // en curso o pospuesto, vive en su seccion correspondiente aunque
-      // sea urgente — la urgencia ya esta atendida (alguien lo esta
-      // trabajando o lo postergo concientemente).
-      if (estado === 'pospuesto') {
-        esperando.push(r);
-        continue;
-      }
-      if (estado === 'en_curso') {
-        enCurso.push(r);
-        continue;
-      }
-
-      // Capa 3: urgente real — solo entre los que aun no fueron tomados
-      // (recibido / nuevo / asignado / legacy). Prioridad manual = 1 OR
-      // vence entre -7 y +3 dias.
-      const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
-      const esUrgente = r.prioridad === 1 || enZonaUrgente;
-      if (esUrgente) {
-        urgentes.push(r);
-        continue;
-      }
-
-      // Resto: nuevos sin tomar
-      nuevos.push(r);
+    if (foco) {
+      // Con el foco puesto, sacarlo es la acción primaria: el filtro siempre
+      // tiene su salida a la vista, arriba de todo.
+      return [
+        { label: 'Quitar el foco y ver todos', onClick: () => setFoco(null), primaria: true },
+        ...disponibles.slice(0, 2),
+      ];
     }
-    return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
-  }, [filteredReclamos]);
+    return disponibles.slice(0, 3).map((a, i) => (i === 0 ? { ...a, primaria: true } : a));
+  }, [metricasHero, foco]);
+
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    // La guarda mira la BASE, no la lista con foco: si el foco deja 0
+    // resultados el hero tiene que seguir en pantalla, porque ahí está la
+    // única salida ("Quitar el foco y ver todos").
+    if (loading || reclamosBuscados.length === 0) return [];
+    const u = resolverUmbrales();
+    const { urgentes, conFeedback, enCurso, nuevos, fosiles } = inboxBase;
+    return [
+      {
+        segmentos: [
+          seg('Hay '),
+          seg(`${urgentes.length} por vencer`, veredictoMasEsPeor(urgentes.length, u.vencidos)),
+          seg(' y '),
+          seg(
+            `${conFeedback.length} disputado${conFeedback.length === 1 ? '' : 's'}`,
+            veredictoMasEsPeor(conFeedback.length, u.vencidos),
+          ),
+          seg(' por vecinos; '),
+          seg(`${enCurso.length} en curso`, 'bueno'),
+          seg('.'),
+        ],
+        acciones: accionesHero,
+      },
+      {
+        segmentos: [
+          seg('Tenés '),
+          seg(
+            `${nuevos.length} recién llegado${nuevos.length === 1 ? '' : 's'}`,
+            veredictoMasEsPeor(nuevos.length, u.sinAsignar),
+          ),
+          seg(' sin tomar y '),
+          seg(
+            `${fosiles.length} fósil${fosiles.length === 1 ? '' : 'es'} de más de 30 días`,
+            veredictoMasEsPeor(fosiles.length, u.vencidos),
+          ),
+          seg(' para depurar.'),
+        ],
+        acciones: accionesHero,
+      },
+    ];
+  }, [loading, reclamosBuscados.length, inboxBase, accionesHero]);
 
   const renderInboxCard = (
     r: Reclamo,
-    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string },
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string; mostrarPrioridad?: boolean },
   ) => {
     const cat = r.categoria;
     const color = cat?.color || DEFAULT_CATEGORY_COLOR;
     const ahora = Date.now();
     const dia = 24 * 60 * 60 * 1000;
-    const dias = r.tiempo_estimado_dias
-      ?? (cat as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
-      ?? 30;
-    const fechaVence = r.created_at
-      ? new Date(r.created_at).getTime() + dias * dia
-      : null;
+    const fechaVence = getFechaVenceReclamoMs(r);
     const venceMs = fechaVence ? fechaVence - ahora : null;
     let tiempoLabel: string | undefined;
     if (venceMs != null) {
@@ -4380,10 +3026,25 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
     const badges: Array<{ label: string; color: string }> = [];
     const estado = (r.estado || '').toLowerCase();
+    // D2 (F1): cierre disputado por el vecino — pill textual además del icono.
+    if (r.confirmado_vecino === false) badges.push({ label: 'Disputado', color: '#ef4444' });
     if (estado === 'pospuesto') badges.push({ label: 'Pospuesto', color: '#8b5cf6' });
     const solicitanteNombre = r.es_anonimo
       ? 'Anónimo'
       : ([r.creador?.nombre, r.creador?.apellido].filter(Boolean).join(' ').trim() || undefined);
+    // Badge de prioridad (icono outline + color semáforo) — solo en la sección
+    // "Empecemos por lo urgente", que es la que pidió mostrar la prioridad.
+    const prioridadBadge = opts?.mostrarPrioridad
+      ? (() => {
+          const p = r.prioridad_ot || 'media';
+          const PrioIcon = prioridadIcon(p);
+          return {
+            icon: <PrioIcon className="w-3 h-3" />,
+            color: prioridadSeverityColor(p),
+            label: prioridadLabel(p),
+          };
+        })()
+      : undefined;
     return (
       <InboxCard
         numero={`#${r.id}`}
@@ -4396,6 +3057,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         sectionColor={opts?.sectionColor}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
+        prioridadBadge={prioridadBadge}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
         onClick={() => openViewSheet(r)}
         urgente={opts?.urgente}
@@ -4404,10 +3066,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     );
   };
 
-  // Siempre devolver el InboxLayout (no depender de vistaInbox). ABMPage
-  // controla cuando mostrarlo via su viewMode. Si lo condicionamos aca,
-  // al togglear el boton guiado desaparece del toggle de ABMPage y la
-  // vista clasica queda en blanco al volver (bug del ciclo clasica->guiada->clasica).
+  // Vista guiada (Inbox): se muestra cuando activeView === 'guided' en el
+  // segmented del ListToolbar estándar. El JSX se arma siempre (es barato:
+  // solo se monta cuando la rama guiada lo renderiza).
   const inboxView = (
     <InboxLayout
       saludoNombre={user?.nombre || ''}
@@ -4449,7 +3110,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
           count: inboxData.urgentes.length,
-          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#ef4444' })),
+          // Siempre cards grandes, sin importar la cantidad (30 urgentes = 30
+          // cards grandes) — ya vienen ordenados por prioridad_ot en inboxData.
+          forceDensity: 'large',
+          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#ef4444', mostrarPrioridad: true })),
         },
         {
           id: 'nuevos',
@@ -4498,210 +3162,380 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     />
   );
 
-  // KPIs arriba del ABMPage (mismo patrón que Tesorería/Trámites).
-  // Lee de conteosEstados que ya carga la pagina por filtro.
-  const kpisSpec: KpiSpec[] = useMemo(() => {
+  // Total global según los conteos del backend (misma aritmética que tenían
+  // los KPIs viejos). Alimenta el chip del ListToolbar, el tab "Todos" y el
+  // pie de la tabla.
+  const totalConteos = useMemo(
+    () => Object.values(conteosEstados).reduce((a, b) => a + (b || 0), 0),
+    [conteosEstados],
+  );
+
+  // Stat strip DEL HERO (estándar SemanticAbmPage: los números viven en el
+  // hero, nada de tarjetas de KPI sueltas arriba). Mismos números que los
+  // KpiCards viejos; solo la celda que exige acción se colorea (disputados).
+  const heroKpis = useMemo<HeroKpi[]>(() => {
     const c = conteosEstados;
     const recibidos = (c['recibido'] || 0) + (c['nuevo'] || 0) + (c['asignado'] || 0);
     const enCurso = (c['en_curso'] || 0) + (c['en_proceso'] || 0) + (c['pendiente_confirmacion'] || 0);
     const finalizados = (c['finalizado'] || 0) + (c['resuelto'] || 0);
-    const total = Object.values(c).reduce((a, b) => a + (b || 0), 0);
-    const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+    const pct = (n: number) => (totalConteos > 0 ? Math.round((n / totalConteos) * 100) : 0);
+    // D2 (F1): cierres disputados por el vecino ("sigue el problema"). Viene del
+    // conteo del backend (pseudo-estado 'disputados') para contar el TOTAL real,
+    // no solo la pagina cargada en el cliente.
+    const disputados = c['disputados'] || 0;
+    // Detalle de los subtextos: sólo cuando el cliente ya cargó TODO el
+    // universo, porque `metricasHero` mira lo cargado y el % viene de los
+    // conteos globales del backend — mezclarlos con media página mentiría.
+    const { vencenHoy, vencidos, recibidosSinDep, enCursoConDep, universoCompleto } = metricasHero;
+    const conDetalle = (porcentaje: number, detalle: string) =>
+      universoCompleto ? `${porcentaje}% · ${detalle}` : `${porcentaje}% del total`;
     return [
       {
-        label: 'Total Reclamos',
-        value: total.toLocaleString('es-AR'),
-        icon: FileText,
-        color: theme.primary,
-        footnote: `${reclamos.length} en pantalla`,
-        highlighted: true,
+        etiqueta: 'TOTAL',
+        valor: totalConteos.toLocaleString('es-AR'),
+        sub: `${reclamos.length} en pantalla`,
+      },
+      ...(disputados > 0
+        ? [{
+            etiqueta: 'DISPUTADOS',
+            valor: disputados.toLocaleString('es-AR'),
+            sub: 'el vecino dice que sigue',
+            veredicto: 'malo' as const,
+          }]
+        : []),
+      {
+        etiqueta: 'RECIBIDOS',
+        valor: recibidos.toLocaleString('es-AR'),
+        sub: conDetalle(
+          pct(recibidos),
+          recibidosSinDep > 0 ? `${recibidosSinDep} sin dependencia` : 'todos con dependencia',
+        ),
       },
       {
-        label: 'Recibidos',
-        value: recibidos.toLocaleString('es-AR'),
-        icon: Inbox,
-        color: '#3b82f6',
-        footnote: `${pct(recibidos).toFixed(1)}% del total`,
-        pct: pct(recibidos),
+        etiqueta: 'EN CURSO',
+        valor: enCurso.toLocaleString('es-AR'),
+        sub: conDetalle(pct(enCurso), `${enCursoConDep} con dependencia`),
       },
       {
-        label: 'En Curso',
-        value: enCurso.toLocaleString('es-AR'),
-        icon: PlayCircle,
-        color: '#f59e0b',
-        footnote: `${pct(enCurso).toFixed(1)}% del total`,
-        pct: pct(enCurso),
+        etiqueta: 'FINALIZADOS',
+        valor: finalizados.toLocaleString('es-AR'),
+        // Sin promedio de estrellas: la calificación del vecino se pide por
+        // reclamo al abrir el detalle (calificacionesApi.getReclamo), el
+        // listado no la trae — no hay con qué calcular el promedio acá.
+        sub: `${pct(finalizados)}% del total`,
       },
       {
-        label: 'Finalizados',
-        value: finalizados.toLocaleString('es-AR'),
-        icon: CheckCircle,
-        color: '#22c55e',
-        footnote: `${pct(finalizados).toFixed(1)}% del total`,
-        pct: pct(finalizados),
+        etiqueta: 'VENCEN HOY',
+        valor: vencenHoy.toLocaleString('es-AR'),
+        sub: vencidos > 0
+          ? `y ${vencidos} ya vencido${vencidos === 1 ? '' : 's'}`
+          : 'sin vencidos arrastrados',
+        // El número en ámbar sólo cuando efectivamente hay algo venciendo hoy.
+        ...(vencenHoy > 0 ? { veredicto: 'advertencia' as const } : {}),
       },
     ];
-  }, [conteosEstados, reclamos.length, theme.primary]);
+  }, [conteosEstados, totalConteos, reclamos.length, metricasHero]);
+
+  // Grupos por fecha para el DataTable del estándar (la página agrupa y
+  // formatea; el DataTable solo pinta). El criterio replica la tabla vieja:
+  // 'reciente' → orden y agrupado por fecha de creación (desc);
+  // 'programado' → por fecha programada (asc), los sin fecha al final.
+  const gruposTabla = useMemo<TableGroup<Reclamo>[]>(() => {
+    const filas = [...filteredReclamos].sort((a, b) => {
+      if (ordenamiento === 'programado') {
+        const va = a.fecha_programada ? new Date(a.fecha_programada).getTime() : Infinity;
+        const vb = b.fecha_programada ? new Date(b.fecha_programada).getTime() : Infinity;
+        return va - vb;
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    const grupos: TableGroup<Reclamo>[] = [];
+    let actual: TableGroup<Reclamo> | null = null;
+    for (const r of filas) {
+      const iso = ordenamiento === 'programado' ? r.fecha_programada : r.created_at;
+      const d = iso ? new Date(iso) : null;
+      const key = d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : 'sin-fecha';
+      if (!actual || actual.key !== key) {
+        actual = {
+          key,
+          badge: d
+            ? {
+                top: String(d.getDate()),
+                bottom: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').toUpperCase(),
+              }
+            : undefined,
+          label: '',
+          rows: [],
+        };
+        grupos.push(actual);
+      }
+      actual.rows.push(r);
+    }
+    for (const g of grupos) {
+      const n = g.rows.length;
+      const base = `${n} reclamo${n === 1 ? '' : 's'}`;
+      g.label = g.key === 'sin-fecha' ? `Sin fecha programada · ${base}` : base;
+    }
+    return grupos;
+  }, [filteredReclamos, ordenamiento]);
+
+  // --- Specs del shell estándar (piloto SemanticAbmPage) ---
+  const puedeCrear = !soloMisTrabajos && !soloMiArea;
+  // Cabecera de módulo (estándar v2.2): eyebrow = el módulo, H1 = lo que el
+  // usuario viene a resolver, bajada = de dónde salen las filas y cómo se
+  // agrupan. Un copy por modo de la pantalla (general / dependencia / mis
+  // trabajos): los tres listan lo mismo pero NO son el mismo trabajo.
+  const cabecera = soloMiArea
+    ? {
+        eyebrow: 'Reclamos del área',
+        title: 'Lo que le derivaron a tu dependencia y qué falta resolver',
+        description:
+          'Sólo los reclamos derivados a tu dependencia, con su categoría, su responsable y su estado. La tabla los agrupa por día de ingreso.',
+      }
+    : soloMisTrabajos
+      ? {
+          eyebrow: 'Mis trabajos',
+          title: 'Los reclamos que tenés asignados y cómo vienen de plazo',
+          description:
+            'Sólo los reclamos asignados a vos. Abrí cualquiera para ver el detalle, cargar el avance y cerrarlo.',
+        }
+      : {
+          eyebrow: 'Reclamos',
+          title: 'Todo lo que el vecino pidió y qué falta resolver',
+          description:
+            'Reclamos que entran por la app, WhatsApp, la web y la ventanilla, con su categoría, su dependencia y su estado. La tabla los agrupa por día de ingreso.',
+        };
+  const mensajeVacio = debouncedSearch
+    ? `No se encontraron reclamos para "${debouncedSearch}"`
+    : 'No se encontraron reclamos';
+
+  // Opciones de los selects de la FilterBar. Los `color` extra viajan al
+  // ModernSelect interno (los soporta en runtime, mismos datos que antes).
+  const opcionesCategoria = [
+    { value: '', label: 'Todas' },
+    ...categorias
+      .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
+      .map(cat => ({
+        value: String(cat.id),
+        label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
+        color: cat.color || DEFAULT_CATEGORY_COLOR,
+      })),
+  ];
+  const opcionesDependencia = [
+    { value: '', label: 'Todas' },
+    ...dependenciasDisponibles
+      .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
+      .map(dep => ({
+        value: String(dep.id),
+        label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
+        color: dep.color || DEFAULT_CATEGORY_COLOR,
+      })),
+  ];
+  const opcionesCanal = [
+    { value: '', label: 'Todos' },
+    ...CANAL_OPTIONS.map(c => ({ value: c.value, label: c.label, color: canalColors[c.value] })),
+  ];
+  const mostrarSelectDependencia = (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea;
+
+  // Segmented de estados con conteos reales (mismas agrupaciones que las
+  // status pills viejas + tab "Todos"). count 0 ⇒ la FilterBar lo apaga.
+  const tabsEstado: StatusTab[] = [
+    { id: '', label: 'Todos', count: totalConteos },
+    { id: 'recibido', label: 'Recibidos', count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
+    { id: 'en_curso', label: 'En curso', count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
+    { id: 'finalizado', label: 'Finalizados', count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
+    { id: 'pospuesto', label: 'Pospuestos', count: conteosEstados['pospuesto'] || 0 },
+    { id: 'rechazado', label: 'Rechazados', count: conteosEstados['rechazado'] || 0 },
+  ];
+
+  const accionesFila: RowAction<Reclamo>[] = [
+    { id: 'ver', label: 'Ver', icon: Eye, onClick: (r) => openViewSheet(r) },
+  ];
+
+  // Panel IA (se preserva del layout anterior: columna sticky a la derecha).
+  const panelIA = iaOn && !soloMisTrabajos ? (
+    <DashboardIAPanel
+      data={dashboardIA}
+      loading={dashboardIALoading}
+      title="Reclamos · IA"
+      onCollapsedChange={setIaCollapsed}
+      onTipClick={(tip) => {
+        const firstId = tip.items?.[0];
+        if (firstId) {
+          const target = reclamos.find(r => r.id === firstId);
+          if (target) openViewSheet(target);
+        }
+      }}
+    />
+  ) : null;
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
-      <PageHint pageId="reclamos-list" />
+      <div className="av2-page" data-module="reclamos">
+        {/* 1. Cabecera de módulo: eyebrow + H1 + bajada. Va ARRIBA DE TODO
+            (v2.2): antes el título del módulo vivía dentro de la toolbar y
+            terminaba abajo del hero, pegado al buscador. */}
+        <PageHeader
+          eyebrow={cabecera.eyebrow}
+          title={cabecera.title}
+          description={cabecera.description}
+        />
 
-      <ABMPage
-        title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
-        buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
-        onAdd={soloMisTrabajos || soloMiArea || false ? undefined : openWizard}
-        kpis={kpisSpec}
-        searchPlaceholder="Buscar reclamos..."
-        searchValue={search}
-        onSearchChange={setSearch}
-        loading={loading}
-        isEmpty={filteredReclamos.length === 0 && !vistaInbox}
-        emptyMessage={debouncedSearch ? `No se encontraron reclamos para "${debouncedSearch}"` : "No se encontraron reclamos"}
-        defaultViewMode="table"
-        viewStorageKey="reclamos_view"
-        onViewModeChange={(m) => setVistaInbox(m === 'guided')}
-        sheetOpen={false}
-        sheetTitle=""
-        sheetDescription=""
-        onSheetClose={() => {}}
-        extraFilters={undefined}
-        sidePanel={iaOn && !soloMisTrabajos ? (
-          <DashboardIAPanel
-            data={dashboardIA}
-            loading={dashboardIALoading}
-            title="Reclamos · IA"
-            onCollapsedChange={setIaCollapsed}
-            onTipClick={(tip) => {
-              const firstId = tip.items?.[0];
-              if (firstId) {
-                const target = reclamos.find(r => r.id === firstId);
-                if (target) openViewSheet(target);
-              }
+        {/* 2. ModuleHero = SemanticHero con la stat strip ADENTRO (estándar:
+            los números viven en el hero, sin tarjetas de KPI sueltas). */}
+        <div className="av2-hero-wrap">
+          <SemanticHero etiqueta="RECLAMOS · AHORA" frases={heroFrases} kpis={heroKpis} className="av2-hero" />
+        </div>
+
+        {/* 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. */}
+        <div className="av2-controles">
+          {/* Toolbar: buscador + vistas + orden + único CTA primario (sin H1) */}
+          <ListToolbar
+            searchPlaceholder="Buscar por código, dirección o vecino…"
+            search={search}
+            onSearchChange={setSearch}
+            views={['table', 'cards', 'guided']}
+            activeView={activeView}
+            onViewChange={cambiarVista}
+            secondaryAction={{
+              label: ordenamiento === 'reciente' ? 'Más recientes' : 'Por vencer',
+              icon: ordenamiento === 'reciente' ? ArrowUpDown : Calendar,
+              onClick: () => setOrdenamiento(ordenamiento === 'reciente' ? 'programado' : 'reciente'),
             }}
+            primaryAction={puedeCrear
+              ? { label: 'Nuevo reclamo', onClick: openWizard }
+              : {
+                  label: 'Nuevo reclamo',
+                  disabled: true,
+                  disabledReason: 'La carga de reclamos se hace desde la pantalla general de Reclamos',
+                }}
           />
-        ) : undefined}
-        sidePanelWidth={iaOn && !soloMisTrabajos ? (iaCollapsed ? 44 : 280) : 0}
-        stickyHeader={true}
-        toolbar={{
-          combos: [
-            {
-              key: 'categoria',
-              placeholder: 'Categorías',
-              value: filtroCategoria === null ? '' : String(filtroCategoria),
-              onChange: (v) => {
-                setFilterLoading(v ? `cat-${v}` : 'cat-all');
-                setFiltroCategoria(v ? parseInt(v, 10) : null);
+
+          {/* Filtros: selects + segmented de estados con conteos reales.
+              Sin PeriodControl: este listado no filtra por período (trae todo
+              paginado del server); agregarlo cambiaría la lógica de datos. */}
+          <FilterBar
+            selects={[
+              {
+                id: 'categoria',
+                label: 'Categoría',
+                value: filtroCategoria === null ? '' : String(filtroCategoria),
+                options: opcionesCategoria,
+                onChange: (v) => setFiltroCategoria(v ? parseInt(v, 10) : null),
               },
-              options: categorias
-                .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
-                .map(cat => ({
-                  value: String(cat.id),
-                  label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
-                  color: cat.color || DEFAULT_CATEGORY_COLOR,
-                })),
-              searchable: true,
-            },
-            {
-              key: 'dependencia',
-              placeholder: 'Dependencias',
-              value: filtroDependencia === null ? '' : String(filtroDependencia),
-              onChange: (v) => {
-                setFilterLoading(v ? `dep-${v}` : 'dep-all');
-                setFiltroDependencia(v ? parseInt(v, 10) : null);
+              ...(mostrarSelectDependencia
+                ? [{
+                    id: 'dependencia',
+                    label: 'Dependencia',
+                    value: filtroDependencia === null ? '' : String(filtroDependencia),
+                    options: opcionesDependencia,
+                    onChange: (v: string) => setFiltroDependencia(v ? parseInt(v, 10) : null),
+                  }]
+                : []),
+              {
+                id: 'canal',
+                label: 'Canal',
+                value: filtroCanal === null ? '' : filtroCanal,
+                options: opcionesCanal,
+                onChange: (v) => setFiltroCanal(v || null),
               },
-              options: dependenciasDisponibles
-                .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
-                .map(dep => ({
-                  value: String(dep.id),
-                  label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
-                  color: dep.color || '#6366f1',
-                })),
-              searchable: true,
-              visible: (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea,
-            },
-            {
-              key: 'canal',
-              placeholder: 'Canales',
-              value: filtroCanal === null ? '' : filtroCanal,
-              onChange: (v) => {
-                setFilterLoading(v ? `canal-${v}` : 'canal-all');
-                setFiltroCanal(v || null);
-              },
-              options: CANAL_OPTIONS.map(c => ({
-                value: c.value,
-                label: c.label,
-                color: canalColors[c.value],
-              })),
-            },
-          ],
-          statusPills: {
-            value: filtroEstado,
-            onChange: (v) => { setFilterLoading(`estado-${v}`); setFiltroEstado(v); },
-            items: [
-              { key: 'recibido', label: 'Recibidos', icon: Inbox, color: estadoColors.recibido.bg, count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
-              { key: 'en_curso', label: 'En curso', icon: Play, color: estadoColors.en_curso.bg, count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
-              { key: 'finalizado', label: 'Finalizados', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
-              { key: 'pospuesto', label: 'Pospuestos', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
-              { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
-            ],
-          },
-          actions: [
-            { key: 'reciente', label: 'Más recientes', icon: ArrowUpDown, active: ordenamiento === 'reciente', onClick: () => setOrdenamiento('reciente') },
-            { key: 'programado', label: 'Por vencer', icon: Calendar, active: ordenamiento === 'programado', onClick: () => setOrdenamiento('programado') },
-          ],
-          layout: 'left',
-        }}
-        pagination={{
-          page: pageClient,
-          pageSize: pageSizeClient,
-          totalItems: filteredReclamos.length,
-          onPageChange: setPageClient,
-          onPageSizeChange: (s) => { setPageSizeClient(s); setPageClient(1); },
-        }}
-        guidedView={inboxView}
-        tableView={
-          <ABMTable
-            key={`table-${ordenamiento}`}
-            data={paginatedReclamos}
-            columns={tableColumns}
-            keyExtractor={(r) => r.id}
-            onRowClick={(r) => openViewSheet(r)}
-            defaultSortKey={ordenamiento === 'programado' ? 'fecha_programada' : 'creacion'}
-            defaultSortDirection={ordenamiento === 'programado' ? 'asc' : 'desc'}
-            defaultGroupByDateKey="created_at"
-            defaultGroupBySortKeys={['created_at', 'creacion', 'fecha', 'fecha_programada']}
-            defaultGroupByItemLabel={{ singular: 'reclamo', plural: 'reclamos' }}
+            ]}
+            /* En vista tabla las tabs viven ARRIBA de la tarjeta de la tabla
+               (diseño canvas); en tarjetas/guiada siguen acá como segmented. */
+            statusTabs={activeView === 'table' ? [] : tabsEstado}
+            activeStatus={filtroEstado}
+            onStatusChange={(id) => setFiltroEstado(id)}
+            /* Un foco puesto desde el hero NUNCA queda invisible: se anuncia
+               acá, y se saca desde la acción del propio hero (arriba de todo). */
+            filterSummary={
+              foco
+                ? `Foco: ${FOCOS[foco].resumen} · ${filteredReclamos.length} de ${reclamosBuscados.length}`
+                : undefined
+            }
           />
-        }
-        sheetContent={null}
-      >
-        {loading ? (
-          // Mostrar skeletons mientras carga
-          Array.from({ length: 6 }).map((_, i) => (
-            <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
-          ))
-        ) : (
-          paginatedReclamos.map((r, index) => {
-            const isVisible = animationDone || visibleCards.has(r.id);
-            return (
-              <ReclamoCard
-                key={r.id}
-                reclamo={r}
-                onClick={() => openViewSheet(r)}
-                showCreador={true}
-                similaresCount={similaresCounts[r.id] || 0}
-                isVisible={isVisible}
-                animationDelay={index * 50}
+        </div>
+
+        {/* 5. Cuerpo por vista (tabla estándar / tarjetas / guiada) + panel IA */}
+        <div className={panelIA ? 'lg:flex lg:gap-4' : undefined}>
+          <div className={panelIA ? 'flex-1 min-w-0' : undefined}>
+            {loading ? (
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
+                ))}
+              </div>
+            ) : activeView === 'guided' ? (
+              <div className="mt-3">{inboxView}</div>
+            ) : activeView === 'cards' && !esAngosto ? (
+              /* La grilla de tarjetas es una preferencia de ESCRITORIO: en
+                 angosto deja menos de dos ítems por pantalla. Ahí cae al
+                 control, que se proyecta solo a fichas (ver abajo).
+                 La lista a mano que había acá se fue: el renderer mobile ya no
+                 es un parche de esta página, es el otro dibujo del control
+                 —mismos datos, mismos filtros, mismas acciones— declarado con
+                 ROLES_RECLAMO. Ver docs/design-sync/abm-mobile/GUIA.md. */
+              filteredReclamos.length === 0 ? (
+                <section className="av2-tabla">
+                  <div className="av2-tabla-vacia">{mensajeVacio}</div>
+                </section>
+              ) : (
+                (
+                  <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                    {filteredReclamos.map((r, index) => (
+                      <ReclamoCard
+                        key={r.id}
+                        reclamo={r}
+                        onClick={() => openViewSheet(r)}
+                        showCreador={true}
+                        similaresCount={similaresCounts[r.id] || 0}
+                        isVisible={animationDone || visibleCards.has(r.id)}
+                        animationDelay={index * 50}
+                      />
+                    ))}
+                  </div>
+                )
+              )
+            ) : (
+              <DataTable<Reclamo>
+                kind="plain"
+                columns={columnasTabla}
+                roles={ROLES_RECLAMO}
+                groupBy="date"
+                groups={gruposTabla}
+                rows={[]}
+                rowKey={(r) => r.id}
+                rowActions={accionesFila}
+                onRowClick={(r) => openViewSheet(r)}
+                statusTabs={tabsEstado}
+                activeStatus={filtroEstado}
+                onStatusChange={(id) => setFiltroEstado(id)}
+                footer={{
+                  showing: `Mostrando ${filteredReclamos.length.toLocaleString('es-AR')} de ${totalConteos.toLocaleString('es-AR')}`,
+                  action: hasMore
+                    ? {
+                        label: loadingMore ? 'Cargando…' : 'Cargar más',
+                        onClick: () => setPage((p) => p + 1),
+                        disabled: loadingMore,
+                        disabledReason: 'Ya se está cargando la página siguiente',
+                      }
+                    : undefined,
+                }}
               />
-            );
-          })
-        )}
-      </ABMPage>
+            )}
+          </div>
+          {panelIA && (
+            <aside
+              className={`hidden lg:block flex-shrink-0 self-start lg:sticky lg:top-[168px] mt-3 ${iaCollapsed ? 'w-11' : 'w-[280px]'}`}
+            >
+              {panelIA}
+            </aside>
+          )}
+        </div>
+      </div>
 
       {/* Sentinel para infinite scroll + spinner de carga.
-          Solo en vista clásica — en vista Inbox la lista no se pagina igual. */}
-      {!vistaInbox && (
+          Solo en vistas tabla/tarjetas — en la guiada la lista no se pagina igual. */}
+      {activeView !== 'guided' && (
         <div ref={observerTarget} className="py-4">
           {loadingMore && (
             <div className="flex items-center justify-center gap-2">
@@ -4723,9 +3557,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       <Sheet
         open={sheetMode === 'view'}
         onClose={closeSheet}
-        title={`Reclamo #${selectedReclamo?.id || ''} · ${selectedReclamo ? new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : ''}`}
+        title={`Reclamo #${selectedReclamo?.id || ''}`}
         description={selectedReclamo?.titulo}
-        stickyHeader={renderSheetStickyHeader()}
+        customHeader={renderSheetHeader()}
         stickyFooter={renderSheetFooter()}
       >
         {renderViewContent()}

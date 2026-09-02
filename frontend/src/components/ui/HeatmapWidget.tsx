@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { X, Maximize2, ZoomIn, ZoomOut, Home } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM, claseBasemap } from '../../lib/basemaps';
 
 // Declarar el tipo para leaflet.heat
 declare module 'leaflet' {
@@ -57,6 +58,36 @@ const CHACABUCO_BOUNDS = {
   minLng: -60.60,  // Oeste de Chacabuco
   maxLng: -60.35,  // Este de Chacabuco
 };
+
+/**
+ * Sigue al foco elegido desde afuera.
+ *
+ * Cuando el que usa el widget controla el encuadre (`center` + `zoom`), el
+ * mapa tiene que MOVERSE cada vez que ese centro cambia. Sin esto, el widget
+ * sólo miraba `center` al montarse y el mapa quedaba clavado mientras el pie
+ * iba nombrando otra esquina: el texto contaba una cosa y el mapa mostraba
+ * otra. Se usa flyTo para que el salto se vea como un recorrido y no como un
+ * corte seco.
+ */
+function SeguirCentro({
+  center,
+  zoom,
+  onReady,
+}: { center: [number, number]; zoom: number; onReady?: () => void }) {
+  const map = useMap();
+  const [lat, lng] = center;
+
+  useEffect(() => {
+    map.invalidateSize();
+    map.flyTo([lat, lng], zoom, { duration: 1.1 });
+    // El aviso de "ya está" también sale por acá: si no, con encuadre
+    // controlado el mapa se quedaba con el velo de carga puesto para siempre.
+    const t = setTimeout(() => onReady?.(), 250);
+    return () => clearTimeout(t);
+  }, [map, lat, lng, zoom, onReady]);
+
+  return null;
+}
 
 // Componente para ajustar el zoom a los datos
 function FitBoundsToData({ data, onReady }: { data: HeatmapPoint[]; onReady?: () => void }) {
@@ -159,69 +190,68 @@ function HeatLayer({ data }: { data: HeatmapPoint[] }) {
   useEffect(() => {
     if (!data || data.length === 0) return;
 
-    // Esperar a que el mapa tenga tamaño válido
-    const mapSize = map.getSize();
-    if (!mapSize || mapSize.x === 0 || mapSize.y === 0) {
-      // Reintentar después de un pequeño delay
-      const timer = setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-
-    // Remover capa anterior si existe
-    if (heatLayerRef.current) {
-      map.removeLayer(heatLayerRef.current);
-    }
-
-    // Filtrar puntos válidos (coordenadas en Argentina aproximadamente)
-    const validData = data.filter(
-      (p) => p.lat < -30 && p.lat > -56 && p.lng < -53 && p.lng > -74
-    );
-
-    if (validData.length === 0) {
-      console.warn('No hay puntos válidos en Argentina');
-      return;
-    }
-
-    // Convertir datos al formato de leaflet.heat: [lat, lng, intensidad]
-    const heatData: [number, number, number][] = validData.map((point) => [
-      point.lat,
-      point.lng,
-      point.intensidad || 1,
-    ]);
-
-    // Crear capa de calor con gradiente personalizado
-    try {
-      const heat = L.heatLayer(heatData, {
-        radius: 28,
-        blur: 22,
-        maxZoom: 17,
-        max: 3,
-        minOpacity: 0.55,
-        gradient: {
-          0.0:  '#1e3a8a',  // azul profundo (frío)
-          0.15: '#3b82f6',  // azul
-          0.3:  '#06b6d4',  // cian
-          0.45: '#22c55e',  // verde
-          0.6:  '#eab308',  // amarillo
-          0.75: '#f97316',  // naranja
-          0.9:  '#ef4444',  // rojo
-          1.0:  '#ec4899',  // magenta (pico caliente)
-        },
-      });
-
-      heat.addTo(map);
-      heatLayerRef.current = heat;
-    } catch (error) {
-      console.warn('Error creando capa de calor:', error);
-    }
-
-    return () => {
+    // Crea (o recrea) la capa de calor. Se invoca directo si el mapa ya tiene
+    // tamaño, o DESPUÉS de invalidateSize si arrancó en 0. Antes se hacía
+    // invalidateSize y se retornaba SIN crear el heat, y como invalidateSize no
+    // cambia las deps del effect, el heat no se pintaba nunca (mapa vacío).
+    const createHeat = () => {
       if (heatLayerRef.current) {
         map.removeLayer(heatLayerRef.current);
+        heatLayerRef.current = null;
+      }
+      // Filtro de coords plausibles de Sudamérica (incluye Paraguay: lat > -18).
+      const validData = data.filter(
+        (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      );
+      if (validData.length === 0) return;
+      const heatData: [number, number, number][] = validData.map((point) => [
+        point.lat,
+        point.lng,
+        point.intensidad || 1,
+      ]);
+      try {
+        const heat = L.heatLayer(heatData, {
+          radius: 32,
+          blur: 20,
+          maxZoom: 17,
+          max: 1.5,
+          minOpacity: 0.55,
+          gradient: {
+            0.0:  '#1e3a8a',
+            0.15: '#3b82f6',
+            0.3:  '#06b6d4',
+            0.45: '#22c55e',
+            0.6:  '#eab308',
+            0.75: '#f97316',
+            0.9:  '#ef4444',
+            1.0:  '#ec4899',
+          },
+        });
+        heat.addTo(map);
+        heatLayerRef.current = heat;
+      } catch (error) {
+        console.warn('Error creando capa de calor:', error);
       }
     };
+
+    const cleanup = () => {
+      if (heatLayerRef.current) {
+        map.removeLayer(heatLayerRef.current);
+        heatLayerRef.current = null;
+      }
+    };
+
+    const mapSize = map.getSize();
+    if (!mapSize || mapSize.x === 0 || mapSize.y === 0) {
+      const timer = setTimeout(() => {
+        map.invalidateSize();
+        createHeat();
+      }, 150);
+      return () => { clearTimeout(timer); cleanup(); };
+    }
+
+    createHeat();
+    return cleanup;
   }, [data, map]);
 
   return null;
@@ -233,7 +263,7 @@ function CategoryMarkers({ data }: { data: HeatmapPoint[] }) {
   const limitedData = useMemo(() => {
     // Filtrar solo puntos en Argentina
     const validData = data.filter(
-      (p) => p.lat < -30 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
     );
     if (validData.length <= 200) return validData;
     // Tomar muestra distribuida
@@ -346,13 +376,9 @@ function getCategoryKey(categoria: string): string {
   return 'otros';
 }
 
-// URLs de tiles para tema claro y oscuro
-const TILE_URLS = {
-  // Voyager: claro con detalle (calles, nombres, color suave).
-  // dark_all: base negra con calles/labels visibles, ideal para realzar el heatmap.
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-};
+// Un solo tile server (OSM) para los dos temas: el gris y el modo oscuro
+// salen de un filtro CSS sobre la capa de tiles. Ver lib/basemaps.ts.
+const TILE_URLS = { light: BASEMAP, dark: BASEMAP };
 
 export default function HeatmapWidget({
   data,
@@ -377,6 +403,15 @@ export default function HeatmapWidget({
     return lum < 0.5;
   })();
   const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
+
+  // Leaflet dibuja sobre canvas y necesita un color concreto, así que se lee
+  // del MISMO token que usa el CSS. Nada de hex fijo: cada marca marca su
+  // foco en su propio color.
+  const acentoMapa = useMemo(() => {
+    if (typeof window === 'undefined') return theme.primary;
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--pl-green').trim();
+    return v || theme.primary;
+  }, [theme.primary]);
 
   const [isExpanded, setIsExpanded] = useState(false);
   // Estado de filtros - todas las categorías activas por defecto
@@ -448,7 +483,7 @@ export default function HeatmapWidget({
   // Filtrar puntos válidos de Argentina
   const validData = useMemo(() => {
     return data.filter(
-      (p) => p.lat < -30 && p.lat > -56 && p.lng < -53 && p.lng > -74
+      (p) => p.lat < -18 && p.lat > -56 && p.lng < -53 && p.lng > -74
     );
   }, [data]);
 
@@ -550,13 +585,20 @@ export default function HeatmapWidget({
     );
   }
 
-  // Renderizar mapa - la key con mapVersion fuerza unmount/remount completo
+  // Renderizar mapa - la key con mapVersion fuerza unmount/remount completo.
+  // El filtro claro/oscuro va en el WRAPPER: react-leaflet congela className
+  // tras el montaje y el cambio de tema en vivo dejaba el filtro viejo.
   const renderMap = (isFullscreen: boolean) => (
     <div
       key={`map-${mapVersion}-${isFullscreen ? 'full' : 'widget'}`}
+      className={claseBasemap(isDarkTheme)}
       style={{ height: '100%', width: '100%' }}
     >
       <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
+        zoomSnap={1}
         center={mapCenter}
         zoom={isFullscreen ? 14 : 13}
         style={{ height: '100%', width: '100%' }}
@@ -565,10 +607,32 @@ export default function HeatmapWidget({
       >
         <TileLayer
           url={tileUrl}
-          attribution='&copy; OSM &copy; CARTO'
+          attribution={BASEMAP_ATTR}
         />
         <InvalidateOnResize />
-        <FitBoundsToData data={filteredData} onReady={handleMapReady} />
+        {/* Con encuadre CONTROLADO desde afuera el auto-fit no corre: pisaba
+            el foco con el centroide de todos los puntos. */}
+        {center ? (
+          <>
+            <SeguirCentro center={center} zoom={zoom} onReady={handleMapReady} />
+            {/* SEÑALAR, no sólo centrar: sin una marca el usuario ve el mapa
+                moverse pero no sabe cuál de todo lo que hay es la esquina que
+                el pie está nombrando. Dos anillos: uno amplio y tenue que
+                acota la zona, y el punto exacto encima. */}
+            <CircleMarker
+              center={center}
+              radius={26}
+              pathOptions={{ color: acentoMapa, weight: 2, opacity: 0.55, fillColor: acentoMapa, fillOpacity: 0.10 }}
+            />
+            <CircleMarker
+              center={center}
+              radius={7}
+              pathOptions={{ color: '#ffffff', weight: 2.5, fillColor: acentoMapa, fillOpacity: 1 }}
+            />
+          </>
+        ) : (
+          <FitBoundsToData data={filteredData} onReady={handleMapReady} />
+        )}
         <HeatLayer data={filteredData} />
         {showMarkers && <CategoryMarkers data={filteredData} />}
         {isFullscreen && <ZoomControls />}

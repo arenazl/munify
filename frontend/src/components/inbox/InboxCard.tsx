@@ -31,6 +31,13 @@ interface InboxCardProps {
   icono?: ReactNode;
   /** Badges adicionales arriba a la derecha (urgencia, pago, etc). */
   badges?: Array<{ label: string; color: string }>;
+  /**
+   * Indicador de prioridad (icono + color + label), agnóstico de dominio —
+   * el caller lo arma desde su propio SSoT de prioridad (ej.
+   * `lib/enums/prioridad.ts`: `prioridadIcon`/`prioridadSeverityColor`/
+   * `prioridadLabel`). El icono ya viene coloreado por el caller.
+   */
+  prioridadBadge?: { icon: ReactNode; color: string; label: string };
   /** Texto del CTA principal. Default: "Abrir". */
   ctaLabel?: string;
   /** Acción principal (click en la card o en el botón). */
@@ -58,6 +65,7 @@ export function InboxCard({
   sectionColor,
   icono,
   badges,
+  prioridadBadge,
   ctaLabel = 'Abrir',
   onClick,
   urgente,
@@ -120,6 +128,16 @@ export function InboxCard({
           >
             <UserIcon className="w-3 h-3" />
             <span className="truncate">{solicitante}</span>
+          </span>
+        )}
+        {prioridadBadge && (
+          <span
+            className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: `${prioridadBadge.color}20`, color: prioridadBadge.color }}
+            title={`Prioridad ${prioridadBadge.label}`}
+          >
+            {prioridadBadge.icon}
+            {prioridadBadge.label}
           </span>
         )}
         {badges && badges.length > 0 && (
@@ -207,6 +225,16 @@ export function InboxCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap text-[10px]">
+          {prioridadBadge && (
+            <span
+              className="inline-flex items-center gap-1 font-semibold px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: `${prioridadBadge.color}20`, color: prioridadBadge.color }}
+              title={`Prioridad ${prioridadBadge.label}`}
+            >
+              {prioridadBadge.icon}
+              {prioridadBadge.label}
+            </span>
+          )}
           {solicitante && (
             <span
               className="inline-flex items-center gap-0.5 truncate max-w-[110px]"
@@ -315,6 +343,20 @@ export function InboxCard({
 
       {/* Meta-info: vecino + vencimiento + creación + badges */}
       <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px]" style={{ color: theme.textSecondary }}>
+        {prioridadBadge && (
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+            style={{
+              backgroundColor: `${prioridadBadge.color}18`,
+              color: prioridadBadge.color,
+              border: `1px solid ${prioridadBadge.color}40`,
+            }}
+            title={`Prioridad ${prioridadBadge.label}`}
+          >
+            {prioridadBadge.icon}
+            {prioridadBadge.label}
+          </span>
+        )}
         {solicitante && (
           <span className="inline-flex items-center gap-1 min-w-0">
             <UserIcon className="w-3 h-3 flex-shrink-0" />

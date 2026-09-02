@@ -7,7 +7,9 @@ import {
   ABMPage, ABMBadge, ABMSheetFooter, ABMInput,
   ABMSelect, ABMTable, ABMTableAction, ABMCardActions
 } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor } from '../lib/veredictos';
 
 interface Cuadrilla {
   id: number;
@@ -161,6 +163,48 @@ export default function GestionCuadrillas() {
     setPage(1);
   }, [filteredAsignaciones.length]);
 
+  // Frases del hero semántico (solo con datos ya cargados)
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    if (loading || cuadrillas.length === 0) return [];
+    const u = resolverUmbrales();
+    const frases: HeroFrase[] = [];
+
+    const empleadosAsignados = new Set(asignaciones.map((a) => a.empleado_id)).size;
+    const sinIntegrantes = cuadrillas.filter(
+      (c) => !asignaciones.some((a) => a.cuadrilla_id === c.id),
+    ).length;
+
+    frases.push({
+      segmentos: [
+        seg('Hay '),
+        seg(
+          `${cuadrillas.length} cuadrilla${cuadrillas.length !== 1 ? 's' : ''} activa${cuadrillas.length !== 1 ? 's' : ''}`,
+          sinIntegrantes === 0 ? 'bueno' : undefined,
+        ),
+        seg(' con '),
+        seg(`${empleadosAsignados} empleado${empleadosAsignados !== 1 ? 's' : ''} asignado${empleadosAsignados !== 1 ? 's' : ''}`),
+        seg('.'),
+      ],
+      acciones: [{ label: 'Personal', to: '/gestion/empleados' }],
+    });
+
+    if (sinIntegrantes > 0) {
+      frases.push({
+        segmentos: [
+          seg('Quedan '),
+          seg(
+            `${sinIntegrantes} cuadrilla${sinIntegrantes !== 1 ? 's' : ''} sin integrantes`,
+            veredictoMasEsPeor(sinIntegrantes, u.sinAsignar),
+          ),
+          seg(' — asignales personal para poder despacharles trabajo.'),
+        ],
+        acciones: [{ label: 'Personal', to: '/gestion/empleados', primaria: true }],
+      });
+    }
+
+    return frases;
+  }, [loading, cuadrillas, asignaciones]);
+
   // Agrupar por cuadrilla para la vista cards
   const asignacionesPorCuadrilla = cuadrillas.map(c => ({
     cuadrilla: c,
@@ -211,7 +255,7 @@ export default function GestionCuadrillas() {
 
   return (
     <>
-      <PageHint pageId="cuadrillas" />
+      <SemanticHero etiqueta="CUADRILLAS · EQUIPOS" frases={heroFrases} />
       <ABMPage
       title="Cuadrillas"
       icon={<Users className="h-5 w-5" />}

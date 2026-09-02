@@ -11,15 +11,10 @@ import {
   Inbox,
   CreditCard,
   PauseCircle,
-  Play,
   Eye,
   User,
-  Phone,
-  Mail,
-  MapPin,
   Send,
   Loader2,
-  Hash,
   CalendarDays,
   Sparkles,
   UserPlus,
@@ -29,10 +24,13 @@ import {
   Copy,
   ArrowUpDown,
   Calendar,
-  FileSearch,
   PlayCircle,
   LayoutList,
   LayoutGrid,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi, categoriasTramiteApi, dependenciasApi, pagosApi } from '../lib/api';
@@ -42,18 +40,32 @@ import { Sheet } from '../components/ui/Sheet';
 import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
-import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
-import type { KpiSpec } from '../components/ui/KpiCard';
+// Suite del estándar SemanticAbmPage (rediseño v2). Composición manual de las
+// piezas (PageHeader/ListToolbar/FilterBar/DataTable), igual que Reclamos.tsx:
+// el orquestador todavía no soporta las vistas alternativas (cards/guiada) de
+// esta pantalla. El contrato de props ES el del estándar, incluido el ORDEN
+// v2.2: cabecera → hero → (toolbar + filtros como una sola tarjeta) → tabla.
+import { PageHeader } from '../components/abmv2/PageHeader';
+import { ListToolbar } from '../components/abmv2/ListToolbar';
+import { FilterBar } from '../components/abmv2/FilterBar';
+import { DataTable, EntityCell, ChipEstado } from '../components/abmv2/DataTable';
+import { toneDeEstado as toneChipDeEstado } from '../components/abmv2/estadoTonos';
+import type { ColumnSpec, RowAction, StatusTab, TableGroup, ViewKind } from '../components/abmv2/types';
+import { FilaLista, type FilaListaItem } from '../components/ui/FilaLista';
+import { useEsAngosto } from '../hooks/useEsAngosto';
+import { haceCuanto, tonoDeEstado } from '../lib/filaLista-helpers';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { useIaTramites } from '../hooks/useIaHabilitada';
-import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase, type HeroKpi } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor, veredictoTasa } from '../lib/veredictos';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
+import { prioridadIcon, prioridadLabel, prioridadSeverityColor, prioridadRankOf, prioridadOTFromNumero } from '../lib/enums/prioridad';
 import type { Solicitud, Tramite, CategoriaTramite, Empleado, EmpleadoDisponibilidad, TipoEmpleado } from '../types';
 import {
   getEstadoInfo,
@@ -69,6 +81,18 @@ import React from 'react';
 const getEstadoConfig = getEstadoInfo;
 const normalizeEstado = normalizarEstado;
 const estadoTransiciones = TRANSICIONES;
+
+// Fecha de vencimiento estimada de un trámite = created_at + tiempo_estimado_dias
+// del trámite (fallback 15 días). Compartida entre el cálculo de "zona urgente"
+// del inbox, el orden de "Empecemos por lo urgente" y el render de cada card —
+// antes vivía duplicada en 2 lugares distintos del inbox (mismo patrón que
+// `getFechaVenceReclamoMs` en Reclamos.tsx).
+const getFechaVenceTramiteMs = (t: Solicitud): number | null => {
+  const dias = t.tramite?.tiempo_estimado_dias || 15;
+  return t.created_at
+    ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+    : null;
+};
 
 interface HistorialItem {
   id: number;
@@ -103,8 +127,155 @@ interface GestionTramitesProps {
   soloMiArea?: boolean;
 }
 
+
+/**
+ * Una solicitud de tramite, dicha como una fila de listado.
+ *
+ * Mismo criterio que en reclamos: que es, de quien y hace cuanto. El nombre
+ * del tramite aparecia DOS VECES en la tarjeta vieja (en un chip y otra vez
+ * en el titulo); aca va una sola.
+ */
+function aFilaTramite(t: Solicitud, onClick: () => void): FilaListaItem {
+  const vecino =
+    `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim() || null;
+  const area = t.tramite?.categoria_tramite?.nombre || t.tramite?.nombre || null;
+  return {
+    id: t.id,
+    titulo: t.tramite?.nombre || t.asunto || 'Tramite',
+    meta: [vecino, area, `#${t.id}`],
+    estado: { label: getEstadoConfig(t.estado).label, tono: tonoDeEstado(t.estado) },
+    hace: haceCuanto(t.created_at),
+    onClick,
+  };
+}
+
+/** Fecha de vencimiento estimada de una solicitud (created_at + los días
+ *  estimados del trámite). Sin días estimados no hay vencimiento que mostrar.
+ *  Módulo-scope: no depende de nada del componente y la usan las columnas. */
+function calcularVencimiento(t: Solicitud): Date | null {
+  const tiempoEstimado = t.tramite?.tiempo_estimado_dias || 0;
+  if (!tiempoEstimado) return null;
+  const fechaVencimiento = new Date(t.created_at);
+  fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
+  return fechaVencimiento;
+}
+
+/** Fecha corta d/m/aa — mismo formato que la tabla de Reclamos. */
+const fechaCorta = (iso: string): string => {
+  const d = new Date(iso);
+  return `${d.getDate()}/${d.getMonth() + 1}/${String(d.getFullYear()).slice(-2)}`;
+};
+
+// Columnas del DataTable del estándar SemanticAbmPage (kind='plain'), espejo
+// de las de Reclamos.tsx con los datos de trámites:
+// # · TRÁMITE · SOLICITANTE · ESTADO · CREADO · VENCE (+ ACCIONES).
+// Los colores de categoría/dependencia vienen de DATOS (runtime) — permitidos
+// por la regla polimórfica; el resto sale de las clases av2-* con tokens.
+const columnasTabla: ColumnSpec<Solicitud>[] = [
+  {
+    id: 'id',
+    header: '#',
+    width: '58px',
+    kind: 'text',
+    cell: (t) => <span className="av2-tabla-texto av2-tnum">#{t.id}</span>,
+  },
+  {
+    id: 'tramite',
+    header: 'TRÁMITE',
+    width: 'minmax(220px, 2fr)',
+    kind: 'entity',
+    cell: (t) => {
+      const tipo = t.tramite?.categoria_tramite;
+      // Sin color en datos, EntityCell cae al tile neutro por tokens.
+      const tipoColor = tipo?.color || undefined;
+      return (
+        <EntityCell
+          icon={
+            <DynamicIcon
+              name={t.tramite?.icono || tipo?.icono || 'FileText'}
+              className="h-4 w-4"
+              fallback={<FileText className="h-4 w-4" />}
+            />
+          }
+          tileColor={tipoColor}
+          title={t.tramite?.nombre || t.asunto || 'Trámite'}
+          subtitle={tipo?.nombre}
+          dotColor={tipoColor}
+        />
+      );
+    },
+  },
+  {
+    id: 'solicitante',
+    header: 'SOLICITANTE',
+    width: 'minmax(150px, 1.25fr)',
+    kind: 'entity',
+    cell: (t) => {
+      // Tolera el shape legacy anidado ({ dependencia: { nombre } }) además del plano.
+      const dep = t.dependencia_asignada as
+        | { nombre?: string; color?: string; dependencia?: { nombre?: string; color?: string } }
+        | undefined;
+      const depNombre = dep?.dependencia?.nombre || dep?.nombre;
+      const depColor = dep?.color || dep?.dependencia?.color;
+      const nombre =
+        `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim() || '—';
+      return (
+        <EntityCell icon={User} tileColor={depColor} title={nombre} subtitle={depNombre} dotColor={depColor} />
+      );
+    },
+  },
+  {
+    id: 'estado',
+    header: 'ESTADO',
+    width: 'minmax(88px, 110px)',
+    kind: 'chip',
+    // Label por el SSoT de estados (lib/estadoConfig) y tono por el SSoT de
+    // chips del estándar, sobre la key CANÓNICA — así los estados legacy de
+    // trámites (iniciado, en_revision…) pintan igual que en el resto de la app.
+    cell: (t) => (
+      <ChipEstado
+        label={getEstadoConfig(t.estado).label}
+        tone={toneChipDeEstado(normalizeEstado(t.estado))}
+      />
+    ),
+  },
+  {
+    id: 'creado',
+    header: 'CREADO',
+    width: 'minmax(66px, 80px)',
+    kind: 'date',
+    cell: (t) => <span className="av2-tabla-fecha av2-tnum">{fechaCorta(t.created_at)}</span>,
+  },
+  {
+    id: 'vence',
+    header: 'VENCE',
+    width: 'minmax(70px, 96px)',
+    kind: 'chip',
+    cell: (t) => {
+      const venc = calcularVencimiento(t);
+      if (!venc) return <span className="av2-tabla-texto">—</span>;
+      const diffDias = Math.ceil((venc.getTime() - Date.now()) / 86400000);
+      const vencido = diffDias < 0;
+      const porVencer = !vencido && diffDias <= 3;
+      const diasAbs = Math.abs(diffDias);
+      let texto: string;
+      if (diffDias === 0) texto = 'Hoy';
+      else if (diasAbs < 30) texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
+      else {
+        const meses = Math.floor(diasAbs / 30);
+        texto = `${vencido ? '-' : ''}${meses} ${meses > 1 ? 'meses' : 'mes'}`;
+      }
+      return <ChipEstado label={texto} tone={vencido ? 'red' : porVencer ? 'amber' : 'green'} />;
+    },
+  },
+  { id: 'acciones', header: 'ACCIONES', width: 'minmax(76px, 0.5fr)', kind: 'actions', align: 'right' },
+];
+
 export default function GestionTramites({ soloMiArea = false }: GestionTramitesProps) {
   const { theme } = useTheme();
+  // Pantalla de telefono: las tarjetas se dibujan como filas (misma pieza que
+  // Reclamos). Es un cambio de ARBOL, no de estilo.
+  const esAngosto = useEsAngosto();
   const { user, municipioActual } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -116,14 +287,24 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Vista guiada (Inbox) vs vista grilla clásica.
-  // Default Inbox para supervisor de dependencia (lo guía por urgencia/nuevos/
-  // en curso), grilla para admin/supervisor general que necesita filtrar.
-  const [vistaInbox, setVistaInbox] = useState<boolean>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('tramites_vista_inbox') : null;
-    if (saved !== null) return saved === '1';
-    return true; // Por default, todos arrancan en vista guiada
+  // Vista del listado (segmented del ListToolbar estándar): tabla / tarjetas /
+  // guiada (Inbox). Persiste en localStorage con la MISMA key que usaba ABMPage
+  // ('tramites_view') para respetar la elección previa de cada usuario.
+  const [activeView, setActiveView] = useState<ViewKind>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('tramites_view') : null;
+    return saved === 'cards' || saved === 'guided' || saved === 'table' ? saved : 'table';
   });
+  // La vista guiada trae TODO de un saque (el algoritmo de densidad del Inbox
+  // necesita el universo) y no pagina: varios lugares preguntan por eso.
+  const vistaInbox = activeView === 'guided';
+  const cambiarVista = (v: ViewKind) => {
+    setActiveView(v);
+    if (typeof window !== 'undefined') localStorage.setItem('tramites_view', v);
+    // El limit del fetch cambia según la vista (guiada=500, resto=30): se
+    // recarga pasando la vista NUEVA explícita — leerla del state daría el
+    // valor viejo (el re-render todavía no ocurrió).
+    loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite, v === 'guided');
+  };
 
   // Filtros visuales estilo Reclamos
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
@@ -132,21 +313,13 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [dependenciasOpts, setDependenciasOpts] = useState<Array<{ id: number; nombre: string; color?: string }>>([]);
   const [filtroTramite, setFiltroTramite] = useState<number | null>(null); // Filtro por servicio específico
   const [filtroEstado, setFiltroEstado] = useState<string>('');
-  const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'por_vencer'>('reciente');
   const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
-  const [conteosLoaded, setConteosLoaded] = useState(false);
-  // Paginación client-side (50 items por página)
+  // Ventana visible del listado: se agranda de a PAGE_SIZE con "Cargar más"
+  // del pie de la tabla (mismo patrón que Reclamos).
+  const PAGE_SIZE = 50;
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-
-  // Click dropdown para tramites (header)
-  const [hoveredTramiteHeader, setHoveredTramiteHeader] = useState(false);
-  const [dropdownFading, setDropdownFading] = useState(false);
-  const [loadingTramiteFilter, setLoadingTramiteFilter] = useState<number | null>(null); // ID del servicio que está cargando
-  const tramiteDropdownRef = useRef<HTMLDivElement | null>(null);
-  const tramiteDropdownMenuRef = useRef<HTMLDivElement | null>(null);
 
 
   // Sheet para ver/editar trámite
@@ -329,12 +502,20 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   };
 
   // Cargar trámites con filtros (resetea la lista)
-  const loadTramites = async (tipo?: number | null, estado?: string, search?: string, tramiteId?: number | null) => {
+  const loadTramites = async (
+    tipo?: number | null,
+    estado?: string,
+    search?: string,
+    tramiteId?: number | null,
+    vistaGuiada?: boolean,
+  ) => {
     try {
       // En vista guiada (inbox) traemos todos los pendientes de un saque
       // para que el algoritmo de densidad agrupe bien. En vista clásica
-      // mantenemos paginación tradicional.
-      const limitEfectivo = vistaInbox ? 500 : LIMIT;
+      // mantenemos paginación tradicional. `vistaGuiada` explícito para el
+      // cambio de vista (el state todavía tiene el valor viejo en ese click).
+      const guiada = vistaGuiada !== undefined ? vistaGuiada : vistaInbox;
+      const limitEfectivo = guiada ? 500 : LIMIT;
       const params: Record<string, unknown> = {
         limit: limitEfectivo,
         skip: 0,
@@ -356,11 +537,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       const res = await tramitesApi.getGestionSolicitudes(params as any);
       setTramites(res.data);
       setSkip(limitEfectivo);
-      setHasMore(!vistaInbox && res.data.length >= LIMIT);
+      setHasMore(!guiada && res.data.length >= LIMIT);
     } catch (error) {
       console.error('[GestionTramites] Error cargando trámites:', error);
-    } finally {
-      setFilterLoading(null); // Clear filter loading state
     }
   };
 
@@ -423,27 +602,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     };
   }, [hasMore, loadingMore, loading, loadMoreTramites]);
 
-  // Cerrar dropdown de trámites al hacer clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const clickedInsideHeader = tramiteDropdownRef.current?.contains(target);
-      const clickedInsideMenu = tramiteDropdownMenuRef.current?.contains(target);
-
-      if (!clickedInsideHeader && !clickedInsideMenu) {
-        setHoveredTramiteHeader(false);
-      }
-    };
-
-    if (hoveredTramiteHeader) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [hoveredTramiteHeader]);
-
   const loadConteos = async () => {
     try {
       const [categoriasRes, estadosRes] = await Promise.all([
@@ -455,10 +613,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       // la pantalla (que todavía habla de "tipos" internamente).
       setConteosTipos(categoriasRes.data);
       setConteosEstados(estadosRes.data);
-      setConteosLoaded(true);
     } catch (error) {
       console.error('Error cargando conteos:', error);
-      setConteosLoaded(true);
     }
   };
 
@@ -715,23 +871,104 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const handlePosponer = () => handleDirectStateChange('pospuesto', 'Trámite pospuesto');
 
   // Renderizar footer con botones grandes dockeados (grid 2 col, hasta 2 filas)
+  // Header propio del Sheet — mismo lenguaje que el detalle de Reclamos
+  // (diseño "Reclamo Detalle" del canvas): eyebrow + copiar + navegación
+  // entre los trámites de la lista visible, título display y fila de meta.
+  const renderTramiteHeader = () => {
+    if (!selectedTramite) return undefined;
+    const idx = filteredTramites.findIndex((t) => t.id === selectedTramite.id);
+    const total = filteredTramites.length;
+    const irA = (i: number) => {
+      const destino = filteredTramites[i];
+      if (destino) openTramite(destino);
+    };
+    const cfg = getEstadoConfig(selectedTramite.estado);
+    const tipo =
+      selectedTramite.tramite?.categoria_tramite?.nombre ||
+      selectedTramite.tramite?.nombre ||
+      'Sin tipo';
+    const t = haceCuanto(selectedTramite.created_at);
+    const antiguedad = !t || t === 'recién' ? t : `hace ${t}`;
+    return (
+      <div className="rs-head">
+        <div className="rs-head-fila">
+          <span className="rs-eyebrow">Trámite {selectedTramite.numero_tramite}</span>
+          <button
+            type="button"
+            className="rs-nav-btn"
+            title="Copiar número"
+            aria-label="Copiar número"
+            onClick={() => {
+              navigator.clipboard.writeText(selectedTramite.numero_tramite);
+              toast.success('Número copiado');
+            }}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+          {idx >= 0 && total > 1 && (
+            <span className="rs-nav">
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Anterior"
+                disabled={idx <= 0}
+                onClick={() => irA(idx - 1)}
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+              <span className="rs-nav-pos">{idx + 1} de {total} en la lista</span>
+              <button
+                type="button"
+                className="rs-nav-btn"
+                aria-label="Siguiente"
+                disabled={idx >= total - 1}
+                onClick={() => irA(idx + 1)}
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          <span className="rs-head-icos">
+            <button type="button" className="rs-ico-btn" title="Cerrar" aria-label="Cerrar" onClick={closeSheet}>
+              <X className="h-4 w-4" />
+            </button>
+          </span>
+        </div>
+
+        <h2 className="rs-titulo">{selectedTramite.asunto}</h2>
+
+        <div className="rs-meta">
+          <span className="rs-estado" style={{ backgroundColor: cfg.bg, color: cfg.color }}>
+            <span className="rs-estado-dot" style={{ backgroundColor: cfg.color }} />
+            {cfg.label}
+          </span>
+          <span className="rs-meta-sep">·</span>
+          <span style={{ fontWeight: 600, color: 'var(--pl-text)' }}>{tipo}</span>
+          {antiguedad && (
+            <>
+              <span className="rs-meta-sep">·</span>
+              <span>{antiguedad}</span>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderTramiteFooter = () => {
     if (!selectedTramite) return null;
 
     const estadoActual = normalizeEstado(selectedTramite.estado);
 
-    // Estados finales - solo info
+    // Estados finales - banda informativa plana (mismo lenguaje que Reclamos)
     if (estadoActual === 'rechazado' || estadoActual === 'finalizado') {
+      const esFinal = estadoActual === 'finalizado';
+      const c = esFinal ? '#059669' : '#ef4444';
+      const IconoFinal = esFinal ? CheckCircle2 : XCircle;
       return (
-        <div
-          className="w-full px-4 py-3 rounded-xl font-semibold text-center"
-          style={{
-            backgroundColor: estadoActual === 'finalizado' ? '#05966920' : '#ef444420',
-            color: estadoActual === 'finalizado' ? '#059669' : '#ef4444',
-            border: `1px solid ${estadoActual === 'finalizado' ? '#05966950' : '#ef444450'}`
-          }}
-        >
-          {estadoActual === 'finalizado' ? '✓ Trámite Finalizado' : '✗ Trámite Rechazado'}
+        <div className="av2-sheet-final" style={{ backgroundColor: `${c}14`, color: c }}>
+          <IconoFinal className="h-4 w-4" />
+          {esFinal ? 'Trámite finalizado' : 'Trámite rechazado'}
         </div>
       );
     }
@@ -746,7 +983,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           className="w-full px-4 py-3 rounded-xl flex items-start gap-2"
           style={{ backgroundColor: '#f59e0b15', color: '#f59e0b', border: '1px solid #f59e0b50' }}
         >
-          <span className="text-lg">💳</span>
+          <CreditCard className="h-5 w-5 flex-shrink-0" />
           <div>
             <p className="font-semibold">Listo para entregar — falta pago</p>
             <p className="text-xs opacity-90 mt-0.5">
@@ -793,21 +1030,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             key={a.id}
             onClick={a.handler}
             disabled={saving}
-            className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${a.fullRow ? 'col-span-2' : ''}`}
-            style={
+            className={`${
               a.variant === 'solid'
-                ? {
-                    backgroundColor: a.color,
-                    color: '#ffffff',
-                    boxShadow: `0 4px 14px ${a.color}40`,
-                  }
-                : {
-                    backgroundColor: `${a.color}15`,
-                    border: `1.5px solid ${a.color}60`,
-                    color: a.color,
-                  }
-            }
+                ? 'rs-cta'
+                : a.id === 'rechazado'
+                  ? 'rs-btn rs-btn--peligro'
+                  : 'rs-btn'
+            } w-full justify-center ${a.fullRow ? 'col-span-2' : ''}`}
           >
+            {a.variant === 'solid' && <Check className="h-4 w-4" />}
             {isThisLoading ? a.loadingLabel : a.label}
           </button>
           );
@@ -816,17 +1047,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     );
   };
 
-  // Función para calcular fecha de vencimiento
-  const calcularVencimiento = (t: Solicitud) => {
-    const tiempoEstimado = t.tramite?.tiempo_estimado_dias || 0;
-    if (!tiempoEstimado) return null;
-    const fechaCreacion = new Date(t.created_at);
-    const fechaVencimiento = new Date(fechaCreacion);
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
-    return fechaVencimiento;
-  };
-
-  // Agrupar servicios por tipo para el dropdown del header
+  // Agrupar servicios por tipo (alimenta el combo "Trámite" de la barra de filtros)
   const serviciosPorTipo = useMemo(() => {
     const grouped: Record<number, { tipo: CategoriaTramite; servicios: Tramite[] }> = {};
     servicios.forEach(s => {
@@ -861,25 +1082,62 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  const paginatedTramites = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(filteredTramites.length / pageSize));
-    if (page > totalPages) return filteredTramites.slice(0, pageSize);
-    return filteredTramites.slice((page - 1) * pageSize, page * pageSize);
-  }, [filteredTramites, page, pageSize]);
+  // Ventana visible: las primeras `page * PAGE_SIZE` filas de lo filtrado. El
+  // pie de la tabla la agranda ("Cargar más") y, cuando se agotó lo cargado,
+  // pide la página siguiente al server — mismo comportamiento que Reclamos.
+  const visibleTramites = useMemo(
+    () => filteredTramites.slice(0, page * PAGE_SIZE),
+    [filteredTramites, page, PAGE_SIZE],
+  );
+  const hayMasLocal = visibleTramites.length < filteredTramites.length;
 
+  // La ventana vuelve al principio cuando cambia lo que se está mirando
+  // (filtros o búsqueda), NO cuando la lista crece: si dependiera del largo,
+  // cada "Cargar más" del server la colapsaría de nuevo a la primera página.
   useEffect(() => {
     setPage(1);
-  }, [filteredTramites.length]);
+  }, [filtroTipo, filtroEstado, filtroTramite, filtroDependencia, searchTerm]);
 
-  // Render de cards (children de ABMPage)
-  const renderCards = () => {
-    if (loading) {
-      return Array.from({ length: 6 }).map((_, i) => (
-        <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
-      ));
+  // Grupos por día para el DataTable del estándar (la página agrupa y formatea;
+  // el DataTable solo pinta). Criterio espejo de Reclamos: 'reciente' → agrupa
+  // por día de creación; 'por_vencer' → por día de vencimiento estimado, con
+  // los que no tienen tiempo estimado al final. Las filas ya vienen ordenadas
+  // por `filteredTramites` con el mismo criterio.
+  const gruposTabla = useMemo<TableGroup<Solicitud>[]>(() => {
+    const grupos: TableGroup<Solicitud>[] = [];
+    let actual: TableGroup<Solicitud> | null = null;
+    for (const t of visibleTramites) {
+      const fecha = ordenamiento === 'por_vencer' ? calcularVencimiento(t) : new Date(t.created_at);
+      const d = fecha && !Number.isNaN(fecha.getTime()) ? fecha : null;
+      const key = d ? `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` : 'sin-fecha';
+      if (!actual || actual.key !== key) {
+        actual = {
+          key,
+          badge: d
+            ? {
+                top: String(d.getDate()),
+                bottom: d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '').toUpperCase(),
+              }
+            : undefined,
+          label: '',
+          rows: [],
+        };
+        grupos.push(actual);
+      }
+      actual.rows.push(t);
     }
+    for (const g of grupos) {
+      const n = g.rows.length;
+      const base = `${n} trámite${n === 1 ? '' : 's'}`;
+      g.label = g.key === 'sin-fecha' ? `Sin vencimiento estimado · ${base}` : base;
+    }
+    return grupos;
+  }, [visibleTramites, ordenamiento]);
 
-    return paginatedTramites.map((t) => {
+  // Render de las tarjetas de la vista 'cards' (escritorio). El estado de carga
+  // y la lista de teléfono los resuelve el cuerpo de la página, no esta función.
+  const renderCards = () => {
+    return visibleTramites.map((t) => {
       const config = getEstadoConfig(t.estado);
       const IconEstado = config.icon;
       const tipoTramite = t.tramite?.categoria_tramite;
@@ -1024,433 +1282,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     });
   };
 
-  // Secondary filters — patron canonico: todos los controles PEGADOS a la
-  // IZQUIERDA, una sola fila (regla APP_GUIDE).
-  const renderSecondaryFilters = () => (
-    <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-start">
-      {/* Combos taxonomicos: Tipo + Dependencia */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-[180px]">
-          <ModernSelect
-            value={filtroTipo === null ? '' : String(filtroTipo)}
-            onChange={(v) => {
-              setFilterLoading(v ? `tipo-${v}` : 'tipo-all');
-              setFiltroTipo(v ? parseInt(v, 10) : null);
-            }}
-            options={[
-              { value: '', label: 'Categorías' },
-              ...tipos.filter(t => t.activo).map(tipo => {
-                const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
-                return {
-                  value: String(tipo.id),
-                  label: `${tipo.nombre} (${conteo})`,
-                  color: tipo.color || theme.primary,
-                };
-              }),
-            ]}
-            placeholder="Categorías"
-            searchable
-          />
-        </div>
-        {/* Dependencia — admin o supervisor, oculto si modo dependencia (soloMiArea) */}
-        {(user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea && (
-          <div className="min-w-[180px]">
-            <ModernSelect
-              value={filtroDependencia === null ? '' : String(filtroDependencia)}
-              onChange={(v) => setFiltroDependencia(v ? parseInt(v, 10) : null)}
-              options={[
-                { value: '', label: 'Dependencias' },
-                ...dependenciasOpts.map(d => ({
-                  value: String(d.id),
-                  label: d.nombre,
-                  color: d.color || '#6366f1',
-                })),
-              ]}
-              placeholder="Dependencias"
-              searchable
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Estados — status pills a la derecha */}
-      <div className="flex gap-1 items-center">
-        {/* Boton "Todos" outlined */}
-        <button
-          onClick={() => {
-            setFilterLoading('estado-all');
-            setFiltroEstado('');
-          }}
-          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
-          style={{
-            background: 'transparent',
-            border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
-          }}
-        >
-          <Eye className={`h-3 w-3 ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
-          <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
-            Todos
-          </span>
-          <span className={`text-[9px] font-bold ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
-            {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
-          </span>
-        </button>
-
-        {/* Pills de estado — 6 estados (= 6, se quedan como pills) */}
-        {loading && !conteosLoaded ? (
-          <FilterRowSkeleton count={6} height={26} widths={[55, 65, 60, 70, 55, 65]} />
-        ) : (
-          [
-            { key: 'recibido', label: 'Recib.', icon: Inbox, color: '#3b82f6', count: (conteosEstados['recibido'] || 0) + (conteosEstados['iniciado'] || 0) + (conteosEstados['INICIADO'] || 0) },
-            { key: 'pendiente_pago', label: 'Pago', icon: CreditCard, color: '#f59e0b', count: conteosEstados['pendiente_pago'] || 0 },
-            { key: 'en_curso', label: 'Curso', icon: Play, color: '#0ea5e9', count: conteosEstados['en_curso'] || 0 },
-            { key: 'finalizado', label: 'Final.', icon: CheckCircle2, color: '#10b981', count: conteosEstados['finalizado'] || 0 },
-            { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: '#6b7280', count: conteosEstados['pospuesto'] || 0 },
-            { key: 'rechazado', label: 'Rech.', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
-          ].map((estado) => {
-            const Icon = estado.icon;
-            const isActive = filtroEstado === estado.key;
-            const isLoadingThis = filterLoading === `estado-${estado.key}`;
-            return (
-              <button
-                key={estado.key}
-                onClick={() => {
-                  setFilterLoading(`estado-${estado.key}`);
-                  setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
-                }}
-                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
-                style={{
-                  background: isActive ? estado.color : `${estado.color}15`,
-                  border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
-                }}
-              >
-                <Icon className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }} />
-                <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }}>
-                  {estado.label}
-                </span>
-                <span
-                  className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse' : ''}`}
-                  style={{ color: isActive ? '#ffffff' : estado.color }}
-                >
-                  {estado.count}
-                </span>
-              </button>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-
-
-  // Table view
-  const renderTableView = () => {
-    const allColumns: ABMTableColumn<Solicitud>[] = [
-        {
-          key: 'numero_tramite',
-          header: 'ID',
-          sortValue: (t) => t.numero_tramite,
-          render: (t) => (
-            <span className="font-mono text-xs font-medium" style={{ color: theme.primary }}>
-              #{(t.numero_tramite || '').slice(-4) || '—'}
-            </span>
-          ),
-        },
-        {
-          key: 'tramite',
-          sortable: false, // Deshabilitar sorting para esta columna (tiene dropdown custom)
-          header: (
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <div
-                className="flex items-center gap-1 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setHoveredTramiteHeader(!hoveredTramiteHeader);
-                }}
-                ref={tramiteDropdownRef}
-              >
-                <span>Trámite</span>
-                {serviciosPorTipo.length === 0 ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <ChevronDown className={`h-3 w-3 transition-transform ${hoveredTramiteHeader ? 'rotate-180' : ''}`} />
-                )}
-                {filtroTramite && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFiltroTramite(null);
-                    }}
-                    className="ml-1 p-0.5 rounded hover:bg-white/10 transition-colors"
-                    title="Quitar filtro"
-                  >
-                    <XCircle className="h-3 w-3" style={{ color: theme.primary }} />
-                  </button>
-                )}
-              </div>
-
-              {/* Dropdown con todos los servicios agrupados por tipo */}
-              {hoveredTramiteHeader && serviciosPorTipo.length > 0 && (
-                <div
-                  ref={tramiteDropdownMenuRef}
-                  className={`fixed z-[9999] min-w-[280px] max-w-[350px] rounded-2xl shadow-xl transition-opacity duration-500 ${dropdownFading ? 'opacity-0' : 'opacity-100'}`}
-                  style={{
-                    backgroundColor: theme.card,
-                    border: `1px solid ${theme.border}`,
-                    top: 'auto',
-                    marginTop: '4px',
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="p-2 border-b flex items-center justify-between rounded-t-2xl" style={{ borderColor: theme.border, backgroundColor: theme.card }}>
-                    <p className="text-[10px] font-medium uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                      Filtrar por trámite
-                    </p>
-                    {filtroTramite && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFiltroTramite(null);
-                          setHoveredTramiteHeader(false);
-                        }}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] hover:bg-red-500/20 transition-colors"
-                        style={{ color: '#ef4444' }}
-                      >
-                        <XCircle className="h-3 w-3" />
-                        Limpiar
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-[300px] overflow-y-auto rounded-b-2xl" style={{ backgroundColor: theme.card }}>
-                    {serviciosPorTipo.map(({ tipo, servicios: serviciosDelTipo }) => (
-                      <div key={tipo.id}>
-                        <div
-                          className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide sticky top-0 z-10 shadow-sm"
-                          style={{
-                            backgroundColor: theme.backgroundSecondary,
-                            color: tipo.color || theme.textSecondary,
-                            borderBottom: `1px solid ${theme.border}`,
-                          }}
-                        >
-                          {tipo.nombre}
-                        </div>
-                        {serviciosDelTipo.map((servicio) => {
-                          const isSelected = filtroTramite === servicio.id;
-                          const isLoading = loadingTramiteFilter === servicio.id;
-                          return (
-                            <button
-                              key={servicio.id}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (dropdownFading || loadingTramiteFilter !== null) return;
-
-                                const newValue = isSelected ? null : servicio.id;
-                                console.log('[GestionTramites] Seleccionado servicio:', servicio.id, servicio.nombre, 'newValue:', newValue);
-
-                                // Mostrar spinner en el elemento seleccionado
-                                setLoadingTramiteFilter(servicio.id);
-                                setFiltroTramite(newValue);
-
-                                // Esperar a que carguen los datos
-                                await loadTramites(filtroTipo, filtroEstado, searchTerm, newValue);
-
-                                // Datos cargados - hacer fadeout y cerrar
-                                setLoadingTramiteFilter(null);
-                                setDropdownFading(true);
-                                setTimeout(() => {
-                                  setHoveredTramiteHeader(false);
-                                  setDropdownFading(false);
-                                }, 400);
-                              }}
-                              disabled={dropdownFading || (loadingTramiteFilter !== null && loadingTramiteFilter !== servicio.id)}
-                              className="w-full px-3 py-2 text-left flex items-center gap-2 transition-all hover:brightness-95"
-                              style={{
-                                backgroundColor: isSelected ? `${theme.primary}15` : theme.card,
-                                borderBottom: `1px solid ${theme.border}`,
-                                opacity: (loadingTramiteFilter !== null && loadingTramiteFilter !== servicio.id) ? 0.5 : 1,
-                              }}
-                            >
-                              {isLoading ? (
-                                <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin" style={{ color: theme.primary }} />
-                              ) : (
-                                <DynamicIcon
-                                  name={servicio.icono || 'FileText'}
-                                  className="h-3.5 w-3.5 flex-shrink-0"
-                                  style={{ color: isSelected ? theme.primary : tipo.color || theme.text }}
-                                  fallback={<FileText className="h-3.5 w-3.5" style={{ color: isSelected ? theme.primary : tipo.color || theme.text }} />}
-                                />
-                              )}
-                              <span
-                                className="text-xs truncate"
-                                style={{ color: isSelected ? theme.primary : theme.text }}
-                              >
-                                {servicio.nombre}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ),
-          sortValue: (t) => t.tramite?.nombre || '',
-          render: (t) => {
-            const tipoTramite = t.tramite?.categoria_tramite;
-            const tipoColor = tipoTramite?.color || theme.primary;
-            return (
-              <div className="flex items-center gap-2.5 min-w-0">
-                {/* Icon tile: cuadrado pastel con icono del color de la categoria */}
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${tipoColor}18` }}
-                >
-                  <DynamicIcon
-                    name={t.tramite?.icono || tipoTramite?.icono || 'FileText'}
-                    className="h-4 w-4"
-                    style={{ color: tipoColor }}
-                    fallback={<FileText className="h-4 w-4" style={{ color: tipoColor }} />}
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold truncate leading-tight" style={{ color: theme.text }}>
-                    {t.tramite?.nombre || '—'}
-                  </div>
-                  {tipoTramite?.nombre && (
-                    <div className="text-[10px] truncate leading-tight mt-0.5" style={{ color: tipoColor }}>
-                      {tipoTramite.nombre}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          },
-        },
-        {
-          key: 'solicitante',
-          header: 'Solicitante',
-          sortValue: (t) => `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim(),
-          render: (t) => {
-            const dep = t.dependencia_asignada as any;
-            const depNombre = dep?.dependencia?.nombre || dep?.nombre;
-            const depColor = dep?.color || dep?.dependencia?.color || theme.primary;
-            return (
-              <div className="flex items-start gap-2 min-w-0">
-                <span
-                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
-                  style={{ backgroundColor: `${depColor}20` }}
-                >
-                  <User className="h-3.5 w-3.5" style={{ color: depColor }} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs truncate font-medium" style={{ color: theme.text }} title={`${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim()}>
-                    {t.nombre_solicitante} {t.apellido_solicitante}
-                  </div>
-                  {depNombre && (
-                    <div className="text-[10px] truncate" style={{ color: depColor }} title={depNombre}>
-                      {depNombre}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          },
-        },
-        {
-          key: 'estado',
-          header: 'Estado',
-          sortValue: (t) => getEstadoConfig(t.estado).label,
-          render: (t) => {
-            const config = getEstadoConfig(t.estado);
-            return <StatusPill label={config.label} color={config.color} />;
-          },
-        },
-        {
-          key: 'created_at',
-          header: 'Creación',
-          sortValue: (t) => new Date(t.created_at).getTime(),
-          render: (t) => {
-            const d = new Date(t.created_at);
-            const yy = String(d.getFullYear()).slice(-2);
-            return (
-              <span className="text-[11px]" style={{ color: theme.textSecondary }}>
-                {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
-              </span>
-            );
-          },
-        },
-        {
-          key: 'updated_at',
-          header: 'Modificación',
-          sortValue: (t) => new Date(t.updated_at || t.created_at).getTime(),
-          render: (t) => {
-            const iso = t.updated_at || t.created_at;
-            const d = new Date(iso);
-            const yy = String(d.getFullYear()).slice(-2);
-            return (
-              <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
-                {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
-              </span>
-            );
-          },
-        },
-        {
-          key: 'por_vencer',
-          header: 'Vence',
-          sortValue: (t) => {
-            const venc = calcularVencimiento(t);
-            return venc ? venc.getTime() : Infinity; // Sin vencimiento va al final
-          },
-          render: (t) => {
-            const venc = calcularVencimiento(t);
-            if (!venc) return <span className="text-[10px]" style={{ color: theme.textSecondary }}>—</span>;
-            const hoy = new Date();
-            const dias = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-            const vencido = dias < 0;
-            const porVencer = !vencido && dias <= 3;
-            const color = vencido ? '#ef4444' : porVencer ? '#f59e0b' : '#10b981';
-            const bg = vencido ? '#ef444420' : porVencer ? '#f59e0b20' : '#10b98120';
-            // Formato legible
-            const diasAbs = Math.abs(dias);
-            let texto: string;
-            if (dias === 0) {
-              texto = 'Hoy';
-            } else if (diasAbs < 30) {
-              texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
-            } else {
-              const meses = Math.floor(diasAbs / 30);
-              texto = vencido ? `-${meses} ${meses > 1 ? 'meses' : 'mes'}` : `${meses} ${meses > 1 ? 'meses' : 'mes'}`;
-            }
-            return (
-              <span
-                className="text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color, backgroundColor: bg }}
-              >
-                {texto}
-              </span>
-            );
-          },
-        },
-    ];
-    const columns = allColumns;
-    return (
-      <ABMTable<Solicitud>
-        key={`table-${ordenamiento}`}
-        data={paginatedTramites}
-        columns={columns}
-        keyExtractor={(t) => t.id}
-        onRowClick={(t) => openTramite(t)}
-        defaultSortKey={ordenamiento === 'por_vencer' ? 'por_vencer' : 'fecha'}
-        defaultSortDirection={ordenamiento === 'por_vencer' ? 'asc' : 'desc'}
-        defaultGroupByDateKey="created_at"
-        defaultGroupBySortKeys={['created_at', 'fecha', 'por_vencer']}
-        defaultGroupByItemLabel={{ singular: 'trámite', plural: 'trámites' }}
-      />
-    );
-  };
-
   // ============================================================
   // INBOX (vista guiada) — secciones por urgencia/estado
   // ============================================================
@@ -1470,10 +1301,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       if (estado === 'finalizado' || estado === 'rechazado') continue;
 
       // Vencimiento estimado = created_at + tiempo_estimado_dias del trámite
-      const dias = t.tramite?.tiempo_estimado_dias || 15;
-      const fechaVence = t.created_at
-        ? new Date(t.created_at).getTime() + dias * dia
-        : null;
+      const fechaVence = getFechaVenceTramiteMs(t);
       const diffMs = fechaVence ? fechaVence - ahora : null;
 
       // Capa 1: fósil — venció hace más de 30 días. Se manda a "Para limpiar"
@@ -1507,20 +1335,31 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       // Resto: nuevos sin tomar
       nuevos.push(t);
     }
+
+    // Orden de "Empecemos por lo urgente": mismo criterio que Reclamos —
+    // prioridad desc (urgente > alta > media > baja, mapeando la escala legacy
+    // 1-5 de Trámites al enum canónico) y, a igual prioridad, por fecha de
+    // vencimiento asc.
+    urgentes.sort((a, b) => {
+      const porPrioridad = prioridadRankOf(prioridadOTFromNumero(b.prioridad))
+        - prioridadRankOf(prioridadOTFromNumero(a.prioridad));
+      if (porPrioridad !== 0) return porPrioridad;
+      const vA = getFechaVenceTramiteMs(a) ?? Infinity;
+      const vB = getFechaVenceTramiteMs(b) ?? Infinity;
+      return vA - vB;
+    });
+
     return { urgentes, fosiles, nuevos, enCurso, esperando };
   }, [tramites]);
 
   const renderInboxCard = (
     t: Solicitud,
-    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string },
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string; mostrarPrioridad?: boolean },
   ) => {
     const cat = t.tramite?.categoria_tramite;
     const color = cat?.color || theme.primary;
     const ahora = Date.now();
-    const dias = t.tramite?.tiempo_estimado_dias || 15;
-    const fechaVence = t.created_at
-      ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
-      : null;
+    const fechaVence = getFechaVenceTramiteMs(t);
     const venceMs = fechaVence ? fechaVence - ahora : null;
     let tiempoLabel: string | undefined;
     if (venceMs != null) {
@@ -1547,6 +1386,20 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     if (estado === 'pospuesto') badges.push({ label: 'Pospuesto', color: '#8b5cf6' });
     const solicitanteNombre = [t.nombre_solicitante, t.apellido_solicitante]
       .filter(Boolean).join(' ').trim() || undefined;
+    // Badge de prioridad (icono outline + color semáforo) — solo en la sección
+    // "Empecemos por lo urgente". Mismo SSoT que Reclamos (lib/enums/prioridad),
+    // mapeando la escala legacy 1-5 de Trámites al enum canónico.
+    const prioridadBadge = opts?.mostrarPrioridad
+      ? (() => {
+          const p = prioridadOTFromNumero(t.prioridad);
+          const PrioIcon = prioridadIcon(p);
+          return {
+            icon: <PrioIcon className="w-3 h-3" />,
+            color: prioridadSeverityColor(p),
+            label: prioridadLabel(p),
+          };
+        })()
+      : undefined;
     return (
       <InboxCard
         numero={t.numero_tramite || `#${t.id}`}
@@ -1559,6 +1412,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         sectionColor={opts?.sectionColor}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
+        prioridadBadge={prioridadBadge}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
         onClick={() => openTramite(t)}
         urgente={opts?.urgente}
@@ -1567,9 +1421,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     );
   };
 
-  // Siempre devolver el InboxLayout (no depender de vistaInbox). ABMPage
-  // controla cuando mostrarlo via su viewMode. Si lo condicionamos aca,
-  // al togglear el boton guiado desaparece del toggle de ABMPage.
+  // El InboxLayout se arma siempre; el cuerpo de la página decide cuándo
+  // montarlo (vista 'guided' del segmented del ListToolbar).
   const inboxView = (
     <InboxLayout
       saludoNombre={user?.nombre || ''}
@@ -1595,7 +1448,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
           count: inboxData.urgentes.length,
-          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density, sectionColor: '#ef4444' })),
+          // Siempre cards grandes, sin importar la cantidad — mismo tratamiento
+          // que Reclamos.tsx. Ya vienen ordenados por prioridad en inboxData.
+          forceDensity: 'large',
+          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density, sectionColor: '#ef4444', mostrarPrioridad: true })),
         },
         {
           id: 'nuevos',
@@ -1644,161 +1500,357 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     />
   );
 
-  // Toggle de vista (botón en headerActions)
-  const toggleVista = () => {
-    const nuevo = !vistaInbox;
-    setVistaInbox(nuevo);
-    try { localStorage.setItem('tramites_vista_inbox', nuevo ? '1' : '0'); } catch { /* ignore */ }
-    // El limit cambia según la vista (inbox=500, clásica=30) — recargar.
-    setTimeout(() => loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite), 0);
-  };
+  // KPIs del módulo: viven ADENTRO del hero (strip del SemanticHero, como
+  // Reclamos). Los KpiCards sueltos murieron — regla del dueño: cero KPIs
+  // sueltos, todas las pantallas con las mismas piezas del kit.
+  const heroKpis: HeroKpi[] = useMemo(() => {
+    if (!resumen) return [];
+    const u = resolverUmbrales();
+    const porEstado = resumen.por_estado || {};
+    const total = resumen.total || 0;
+    const recibidos = (porEstado['recibido'] || 0) + (porEstado['iniciado'] || 0);
+    const enPago = porEstado['pendiente_pago'] || 0;
+    const enCurso = porEstado['en_curso'] || 0;
+    const finalizados = porEstado['finalizado'] || 0;
+    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+    // Estándar del hero: SIEMPRE 5 KPIs, los más importantes primero, y el
+    // VALOR pintado por veredicto (el componente es dumb: el padre decide).
+    return [
+      { etiqueta: 'TOTAL', valor: total.toLocaleString('es-AR'), sub: `${resumen.hoy || 0} hoy` },
+      { etiqueta: 'RECIBIDOS', valor: recibidos.toLocaleString('es-AR'), sub: 'sin atender', veredicto: veredictoMasEsPeor(recibidos, u.sinAsignar) },
+      { etiqueta: 'EN PAGO', valor: enPago.toLocaleString('es-AR'), sub: 'esperando el pago', veredicto: enPago > 0 ? 'advertencia' : undefined },
+      { etiqueta: 'EN CURSO', valor: enCurso.toLocaleString('es-AR'), sub: `${pct(enCurso)}% del total` },
+      { etiqueta: 'FINALIZADOS', valor: finalizados.toLocaleString('es-AR'), sub: `${pct(finalizados)}% del total`, veredicto: 'bueno' },
+    ];
+  }, [resumen]);
 
-  // KPIs arriba del ABMPage (mismo patrón que Tesorería).
-  // Lee de resumen.por_estado que viene del backend en loadData().
-  const kpisSpec: KpiSpec[] = useMemo(() => {
-    const porEstado = resumen?.por_estado || {};
-    const total = resumen?.total || 0;
+  // Hero semántico (reemplaza el hint estático): frases con datos REALES de
+  // `resumen`. Si el resumen todavía no cargó, no se genera ninguna frase y
+  // el componente no renderiza. Veredictos SOLO vía lib/veredictos.ts.
+  const heroFrases: HeroFrase[] = useMemo(() => {
+    if (!resumen) return [];
+    const u = resolverUmbrales();
+    const porEstado = resumen.por_estado || {};
     const recibidos = porEstado['recibido'] || 0;
     const enCurso = porEstado['en_curso'] || 0;
     const finalizados = porEstado['finalizado'] || 0;
-    const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-    return [
-      {
-        label: 'Total Trámites',
-        value: total.toLocaleString('es-AR'),
-        icon: FileText,
-        color: theme.primary,
-        footnote: `${resumen?.hoy || 0} hoy`,
-        highlighted: true,
-      },
-      {
-        label: 'Recibidos',
-        value: recibidos.toLocaleString('es-AR'),
-        icon: Inbox,
-        color: '#3b82f6',
-        footnote: `${pct(recibidos).toFixed(1)}% del total`,
-        pct: pct(recibidos),
-      },
-      {
-        label: 'En Curso',
-        value: enCurso.toLocaleString('es-AR'),
-        icon: PlayCircle,
-        color: '#f59e0b',
-        footnote: `${pct(enCurso).toFixed(1)}% del total`,
-        pct: pct(enCurso),
-      },
-      {
-        label: 'Finalizados',
-        value: finalizados.toLocaleString('es-AR'),
-        icon: CheckCircle2,
-        color: '#22c55e',
-        footnote: `${pct(finalizados).toFixed(1)}% del total`,
-        pct: pct(finalizados),
-      },
-    ];
-  }, [resumen, theme.primary]);
+    const frases: HeroFrase[] = [];
+
+    // Mismo criterio que el tablero de reclamos: el titular es el UNIVERSO de
+    // solicitudes, no el día. Un día sin ingresos dejaba "Hoy entraron 0
+    // solicitudes", que además de sonar mal mide lo que menos importa.
+    frases.push({
+      segmentos: [
+        seg('Tenemos '),
+        seg(`${resumen.total.toLocaleString('es-AR')} ${resumen.total === 1 ? 'solicitud' : 'solicitudes'}`),
+        seg('; hay '),
+        seg(
+          `${recibidos.toLocaleString('es-AR')} recibidas sin atender`,
+          veredictoMasEsPeor(recibidos, u.sinAsignar),
+        ),
+        seg(' y '),
+        seg(`${enCurso.toLocaleString('es-AR')} en curso`, 'bueno'),
+        // El punto va PEGADO al segmento anterior y la coda arranca con el
+        // espacio: al partirse el renglón en mobile, si no, quedaba un "."
+        // solitario abriendo la línea siguiente.
+        seg('. '),
+        seg(
+          resumen.hoy > 0
+            ? `Hoy entraron ${resumen.hoy.toLocaleString('es-AR')} ${resumen.hoy === 1 ? 'nueva' : 'nuevas'}.`
+            : 'Hoy todavía no entró ninguna nueva.',
+          resumen.hoy > 0 ? 'bueno' : undefined,
+        ),
+      ],
+      acciones: [
+        { label: 'Mostrador', to: '/gestion/mostrador', primaria: true },
+        { label: 'Agenda', to: '/gestion/agenda-turnos' },
+      ],
+    });
+
+    if (resumen.total > 0) {
+      const pctFinalizados = (finalizados / resumen.total) * 100;
+      frases.push({
+        segmentos: [
+          seg('Se finalizaron '),
+          seg(
+            `${finalizados.toLocaleString('es-AR')} de ${resumen.total.toLocaleString('es-AR')} solicitudes (${pctFinalizados.toFixed(0)}%)`,
+            veredictoTasa(pctFinalizados, u.tasaResolucion),
+          ),
+          seg('.'),
+        ],
+        // Estándar del hero: TODA frase lleva al menos una acción abajo —
+        // sin botones el pie del banner queda como un hueco.
+        acciones: [
+          { label: 'Ver finalizados', onClick: () => setFiltroEstado('finalizado'), primaria: true },
+          { label: 'Mostrador', to: '/gestion/mostrador' },
+        ],
+      });
+    }
+
+    return frases;
+  }, [resumen]);
+
+  // --- Specs del shell estándar (piloto SemanticAbmPage) ---
+  // Cabecera de módulo (v2.2): eyebrow = el módulo, H1 = lo que el usuario
+  // viene a resolver, bajada = de dónde salen las filas y cómo se agrupan.
+  // Un copy por modo de la pantalla (general / dependencia): las dos listan lo
+  // mismo pero NO son el mismo trabajo.
+  const cabecera = soloMiArea
+    ? {
+        eyebrow: 'Trámites del área',
+        title: 'Lo que le derivaron a tu dependencia y qué falta despachar',
+        description:
+          'Sólo las solicitudes derivadas a tu dependencia, con su categoría, su solicitante y su estado. La tabla las agrupa por día de ingreso.',
+      }
+    : {
+        eyebrow: 'Trámites',
+        title: 'Todo lo que el vecino vino a gestionar y qué falta despachar',
+        description:
+          'Solicitudes que entran por la app, el mostrador y la web, con su categoría, su dependencia y su estado. La tabla las agrupa por día de ingreso.',
+      };
+
+  const mensajeVacio = searchTerm.trim()
+    ? `No se encontraron trámites para "${searchTerm.trim()}"`
+    : 'No hay trámites que coincidan con los filtros aplicados';
+
+  // Opciones de los selects de la FilterBar. El `color` extra viaja al
+  // ModernSelect interno (lo soporta en runtime, mismos datos que antes).
+  const opcionesCategoria = [
+    { value: '', label: 'Todas' },
+    ...tipos
+      .filter((t) => t.activo)
+      .map((tipo) => ({
+        value: String(tipo.id),
+        label: `${tipo.nombre} (${conteosTipos.find((c) => c.id === tipo.id)?.cantidad || 0})`,
+        color: tipo.color || theme.primary,
+      })),
+  ];
+  // Trámite (el servicio puntual): antes vivía en un dropdown propio colgado
+  // del encabezado de la columna TRÁMITE de la tabla vieja. Los encabezados de
+  // la tabla del estándar son texto, así que el filtro se mudó acá — mismo
+  // filtro, misma llamada al backend, ahora con el control del kit.
+  const opcionesTramite = [
+    { value: '', label: 'Todos' },
+    ...serviciosPorTipo.flatMap(({ tipo, servicios: delTipo }) =>
+      delTipo.map((s) => ({
+        value: String(s.id),
+        label: s.nombre,
+        color: tipo.color || theme.primary,
+      })),
+    ),
+  ];
+  const opcionesDependencia = [
+    { value: '', label: 'Todas' },
+    ...dependenciasOpts.map((d) => ({ value: String(d.id), label: d.nombre, color: d.color })),
+  ];
+  const mostrarSelectDependencia =
+    (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea;
+
+  // Segmented/tabs de estados con conteos reales (mismas agrupaciones que las
+  // status pills viejas + tab "Todos"). count 0 ⇒ la tab se apaga sola.
+  const totalConteos = Object.values(conteosEstados).reduce((a, b) => a + b, 0);
+  const tabsEstado: StatusTab[] = [
+    { id: '', label: 'Todos', count: totalConteos },
+    {
+      id: 'recibido',
+      label: 'Recibidos',
+      count:
+        (conteosEstados['recibido'] || 0) +
+        (conteosEstados['iniciado'] || 0) +
+        (conteosEstados['INICIADO'] || 0),
+    },
+    { id: 'pendiente_pago', label: 'Pago', count: conteosEstados['pendiente_pago'] || 0 },
+    { id: 'en_curso', label: 'En curso', count: conteosEstados['en_curso'] || 0 },
+    { id: 'finalizado', label: 'Finalizados', count: conteosEstados['finalizado'] || 0 },
+    { id: 'pospuesto', label: 'Pospuestos', count: conteosEstados['pospuesto'] || 0 },
+    { id: 'rechazado', label: 'Rechazados', count: conteosEstados['rechazado'] || 0 },
+  ];
+
+  const accionesFila: RowAction<Solicitud>[] = [
+    { id: 'ver', label: 'Ver', icon: Eye, onClick: (t) => openTramite(t) },
+  ];
+
+  // "Cargar más" del pie: primero agranda la ventana sobre lo ya cargado y,
+  // cuando se agotó, pide la página siguiente al server (infinite scroll).
+  const cargarMas = () => {
+    if (hayMasLocal) {
+      setPage((p) => p + 1);
+      return;
+    }
+    if (hasMore && !loadingMore) loadMoreTramites();
+  };
+
+  // Panel IA (se preserva del layout anterior: columna sticky a la derecha).
+  const panelIA =
+    iaOn && !soloMiArea ? (
+      <DashboardIAPanel
+        data={dashboardIA}
+        loading={dashboardIALoading}
+        title="Trámites · IA"
+        onCollapsedChange={setIaCollapsed}
+        onTipClick={(tip) => {
+          const firstId = tip.items?.[0];
+          if (firstId) {
+            const target = tramites.find((t) => t.id === firstId);
+            if (target) openTramite(target);
+          }
+        }}
+      />
+    ) : null;
 
   return (
     <PullToRefresh onRefresh={async () => { await loadData(); }}>
-      <PageHint pageId="tramites-list" />
-      <ABMPage
-        title="Trámites"
-        buttonLabel="Nuevo Trámite"
-        onAdd={() => setWizardOpen(true)}
-        kpis={kpisSpec}
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar trámites..."
-        loading={loading}
-        isEmpty={filteredTramites.length === 0 && !vistaInbox}
-        emptyMessage="No hay trámites"
-        pagination={{
-          page,
-          pageSize,
-          totalItems: filteredTramites.length,
-          onPageChange: setPage,
-          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
-        }}
-        defaultViewMode="table"
-        viewStorageKey="tramites_view"
-        guidedView={inboxView}
-        onViewModeChange={(m) => setVistaInbox(m === 'guided')}
-        stickyHeader={true}
-        toolbar={{
-          combos: [
-            {
-              key: 'tipo',
-              placeholder: 'Categorías',
-              value: filtroTipo === null ? '' : String(filtroTipo),
-              onChange: (v) => {
-                setFilterLoading(v ? `tipo-${v}` : 'tipo-all');
-                setFiltroTipo(v ? parseInt(v, 10) : null);
-              },
-              options: tipos.filter(t => t.activo).map(tipo => {
-                const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
-                return {
-                  value: String(tipo.id),
-                  label: `${tipo.nombre} (${conteo})`,
-                  color: tipo.color || theme.primary,
-                };
-              }),
-              searchable: true,
-            },
-            {
-              key: 'dependencia',
-              placeholder: 'Dependencias',
-              value: filtroDependencia === null ? '' : String(filtroDependencia),
-              onChange: (v) => setFiltroDependencia(v ? parseInt(v, 10) : null),
-              options: dependenciasOpts.map(d => ({
-                value: String(d.id),
-                label: d.nombre,
-                color: d.color || '#6366f1',
-              })),
-              searchable: true,
-              visible: (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea,
-            },
-          ],
-          statusPills: {
-            value: filtroEstado,
-            onChange: (v) => { setFilterLoading(`estado-${v}`); setFiltroEstado(v); },
-            items: [
-              { key: 'recibido', label: 'Recibidos', icon: Inbox, color: '#3b82f6', count: (conteosEstados['recibido'] || 0) + (conteosEstados['iniciado'] || 0) + (conteosEstados['INICIADO'] || 0) },
-              { key: 'pendiente_pago', label: 'Pago', icon: CreditCard, color: '#f59e0b', count: conteosEstados['pendiente_pago'] || 0 },
-              { key: 'en_curso', label: 'En curso', icon: Play, color: '#0ea5e9', count: conteosEstados['en_curso'] || 0 },
-              { key: 'finalizado', label: 'Finalizados', icon: CheckCircle2, color: '#10b981', count: conteosEstados['finalizado'] || 0 },
-              { key: 'pospuesto', label: 'Pospuestos', icon: PauseCircle, color: '#6b7280', count: conteosEstados['pospuesto'] || 0 },
-              { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
-            ],
-          },
-          actions: [
-            { key: 'reciente', label: 'Más recientes', icon: ArrowUpDown, active: ordenamiento === 'reciente', onClick: () => setOrdenamiento('reciente') },
-            { key: 'por_vencer', label: 'Por vencer', icon: Calendar, active: ordenamiento === 'por_vencer', onClick: () => setOrdenamiento('por_vencer') },
-          ],
-          layout: 'left',
-        }}
-        tableView={renderTableView()}
-        sidePanel={iaOn && !soloMiArea ? (
-          <DashboardIAPanel
-            data={dashboardIA}
-            loading={dashboardIALoading}
-            title="Trámites · IA"
-            onCollapsedChange={setIaCollapsed}
-            onTipClick={(tip) => {
-              const firstId = tip.items?.[0];
-              if (firstId) {
-                const target = tramites.find(t => t.id === firstId);
-                if (target) openTramite(target);
-              }
-            }}
+      <div className="av2-page" data-module="tramites">
+        {/* 1. Cabecera de módulo: eyebrow + H1 + bajada. Va ARRIBA DE TODO
+            (v2.2): antes el título del módulo vivía dentro de la toolbar y
+            terminaba abajo del hero, pegado al buscador. */}
+        <PageHeader
+          eyebrow={cabecera.eyebrow}
+          title={cabecera.title}
+          description={cabecera.description}
+        />
+
+        {/* 2. ModuleHero = SemanticHero con la stat strip ADENTRO (estándar:
+            los números viven en el hero, sin tarjetas de KPI sueltas). */}
+        <div className="av2-hero-wrap">
+          <SemanticHero
+            etiqueta="TRÁMITES · HOY"
+            frases={heroFrases}
+            kpis={heroKpis}
+            className="av2-hero"
           />
-        ) : undefined}
-        sidePanelWidth={iaOn && !soloMiArea ? (iaCollapsed ? 44 : 280) : 0}
-        sheetOpen={false}
-        sheetTitle=""
-        onSheetClose={() => {}}
-      >
-        {renderCards()}
-      </ABMPage>
+        </div>
+
+        {/* 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. */}
+        <div className="av2-controles">
+          {/* Toolbar: buscador + vistas + orden + único CTA primario (sin H1) */}
+          <ListToolbar
+            searchPlaceholder="Buscar por número, asunto o solicitante…"
+            search={searchTerm}
+            onSearchChange={setSearchTerm}
+            views={['table', 'cards', 'guided']}
+            activeView={activeView}
+            onViewChange={cambiarVista}
+            secondaryAction={{
+              label: ordenamiento === 'reciente' ? 'Más recientes' : 'Por vencer',
+              icon: ordenamiento === 'reciente' ? ArrowUpDown : Calendar,
+              onClick: () =>
+                setOrdenamiento(ordenamiento === 'reciente' ? 'por_vencer' : 'reciente'),
+            }}
+            primaryAction={{ label: 'Nuevo trámite', onClick: () => setWizardOpen(true) }}
+          />
+
+          {/* Filtros: selects + tabs de estado con conteos reales.
+              Sin PeriodControl: este listado no filtra por período (trae todo
+              paginado del server); agregarlo cambiaría la lógica de datos. */}
+          <FilterBar
+            selects={[
+              {
+                id: 'categoria',
+                label: 'Categoría',
+                value: filtroTipo === null ? '' : String(filtroTipo),
+                options: opcionesCategoria,
+                onChange: (v) => setFiltroTipo(v ? parseInt(v, 10) : null),
+              },
+              {
+                id: 'tramite',
+                label: 'Trámite',
+                value: filtroTramite === null ? '' : String(filtroTramite),
+                options: opcionesTramite,
+                onChange: (v) => setFiltroTramite(v ? parseInt(v, 10) : null),
+              },
+              ...(mostrarSelectDependencia
+                ? [{
+                    id: 'dependencia',
+                    label: 'Dependencia',
+                    value: filtroDependencia === null ? '' : String(filtroDependencia),
+                    options: opcionesDependencia,
+                    onChange: (v: string) => setFiltroDependencia(v ? parseInt(v, 10) : null),
+                  }]
+                : []),
+            ]}
+            /* En vista tabla las tabs viven ARRIBA de la tarjeta de la tabla
+               (diseño canvas); en tarjetas/guiada siguen acá como segmented. */
+            statusTabs={activeView === 'table' ? [] : tabsEstado}
+            activeStatus={filtroEstado}
+            onStatusChange={(id) => setFiltroEstado(id)}
+          />
+        </div>
+
+        {/* 5. Cuerpo por vista (tabla estándar / tarjetas / guiada) + panel IA */}
+        <div className={panelIA ? 'lg:flex lg:gap-4' : undefined}>
+          <div className={panelIA ? 'flex-1 min-w-0' : undefined}>
+            {loading ? (
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
+                ))}
+              </div>
+            ) : activeView === 'guided' ? (
+              <div className="mt-3">{inboxView}</div>
+            ) : esAngosto ? (
+              /* En un telefono no hay tabla ni grilla que sirvan: la tabla
+                 obliga a scrollear de costado y la tarjeta grande deja menos
+                 de dos items por pantalla. La vista elegida (tabla/tarjetas)
+                 es una preferencia de ESCRITORIO; en angosto siempre manda la
+                 lista, que muestra lo necesario para decidir si abrir. */
+              visibleTramites.length === 0 ? (
+                <section className="av2-tabla">
+                  <div className="av2-tabla-vacia">{mensajeVacio}</div>
+                </section>
+              ) : (
+                <FilaLista
+                  ariaLabel="Trámites"
+                  items={visibleTramites.map((t) => aFilaTramite(t, () => openTramite(t)))}
+                />
+              )
+            ) : activeView === 'cards' ? (
+              visibleTramites.length === 0 ? (
+                <section className="av2-tabla">
+                  <div className="av2-tabla-vacia">{mensajeVacio}</div>
+                </section>
+              ) : (
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
+                  {renderCards()}
+                </div>
+              )
+            ) : (
+              <DataTable<Solicitud>
+                kind="plain"
+                columns={columnasTabla}
+                groupBy="date"
+                groups={gruposTabla}
+                rows={[]}
+                rowKey={(t) => t.id}
+                rowActions={accionesFila}
+                onRowClick={(t) => openTramite(t)}
+                statusTabs={tabsEstado}
+                activeStatus={filtroEstado}
+                onStatusChange={(id) => setFiltroEstado(id)}
+                emptyMessage={mensajeVacio}
+                footer={{
+                  showing: `Mostrando ${visibleTramites.length.toLocaleString('es-AR')} de ${filteredTramites.length.toLocaleString('es-AR')}`,
+                  action: hayMasLocal || hasMore
+                    ? {
+                        label: loadingMore ? 'Cargando…' : 'Cargar más',
+                        onClick: cargarMas,
+                        disabled: loadingMore,
+                        disabledReason: 'Ya se está cargando la página siguiente',
+                      }
+                    : undefined,
+                }}
+              />
+            )}
+          </div>
+          {panelIA && (
+            <aside
+              className={`hidden lg:block flex-shrink-0 self-start lg:sticky lg:top-[168px] mt-3 ${iaCollapsed ? 'w-11' : 'w-[280px]'}`}
+            >
+              {panelIA}
+            </aside>
+          )}
+        </div>
+      </div>
 
       {/* Sentinel para infinite scroll + spinner de carga.
           Solo en vista clásica — en vista Inbox la lista no se pagina. */}
@@ -1821,172 +1873,66 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       )}
 
       {/* Sheet de detalle */}
-      <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite" stickyFooter={renderTramiteFooter()}>
+      <Sheet
+        open={sheetOpen}
+        onClose={closeSheet}
+        title={`Trámite ${selectedTramite?.numero_tramite || ''}`}
+        description={selectedTramite?.asunto}
+        customHeader={renderTramiteHeader()}
+        stickyFooter={renderTramiteFooter()}
+      >
         {selectedTramite && (
           <div className="space-y-3">
-            {/* Número y estado */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className="font-mono text-lg font-bold px-3 py-1 rounded"
-                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.primary }}
-                >
-                  {selectedTramite.numero_tramite}
-                </span>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedTramite.numero_tramite);
-                    toast.success('Número copiado');
-                  }}
-                  className="p-1.5 rounded hover:bg-black/5"
-                >
-                  <Copy className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                </button>
+            {/* Qué pide el vecino — el asunto vive en el título del header. */}
+            {selectedTramite.descripcion && (
+              <div className="rs-seccion">
+                <span className="rs-seccion-titulo">Qué pide el vecino</span>
+                <p className="rs-parrafo">"{selectedTramite.descripcion}"</p>
               </div>
-              {(() => {
-                const cfg = getEstadoConfig(selectedTramite.estado);
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium"
-                    style={{ backgroundColor: cfg.bg, color: cfg.color }}
-                  >
-                    {React.createElement(cfg.icon, { className: 'h-4 w-4' })}
-                    {cfg.label}
+            )}
+
+            {/* QUIÉN LO PIDE / DÓNDE — dos columnas, datos reales. */}
+            <div className="rs-grid2">
+              <span className="min-w-0">
+                <span className="rs-mini-eyebrow">Quién lo pide</span>
+                <span className="rs-persona">
+                  <span className="rs-avatar">
+                    {`${selectedTramite.nombre_solicitante?.[0] ?? ''}${selectedTramite.apellido_solicitante?.[0] ?? ''}`.toUpperCase() || '?'}
                   </span>
-                );
-              })()}
-            </div>
-
-            {/* Tipo de trámite */}
-            {(() => {
-              const tipoDetalle = selectedTramite.tramite?.categoria_tramite;
-              const colorDetalle = tipoDetalle?.color || theme.primary;
-              return (
-                <div
-                  className="p-3 rounded-xl"
-                  style={{
-                    backgroundColor: `${colorDetalle}10`,
-                    border: `1px solid ${colorDetalle}30`
-                  }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${colorDetalle}20` }}
-                    >
-                      <DynamicIcon
-                        name={tipoDetalle?.icono || 'FileText'}
-                        className="h-5 w-5"
-                        style={{ color: colorDetalle }}
-                        fallback={<FileText className="h-5 w-5" style={{ color: colorDetalle }} />}
-                      />
-                    </div>
-                    <div className="leading-tight">
-                      <p className="font-medium" style={{ color: theme.text }}>
-                        {tipoDetalle?.nombre || selectedTramite.tramite?.nombre || 'Sin tipo'}
-                      </p>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>
-                        Tipo de trámite
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Asunto y descripción */}
-            <div>
-              <h3 className="text-xs font-medium mb-1 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                Asunto
-              </h3>
-              <p className="font-medium" style={{ color: theme.text }}>
-                {selectedTramite.asunto}
-              </p>
-              {selectedTramite.descripcion && (
-                <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-                  {selectedTramite.descripcion}
-                </p>
-              )}
-            </div>
-
-            {/* Datos del solicitante */}
-            <div
-              className="px-3 py-2.5 rounded-xl"
-              style={{ backgroundColor: theme.backgroundSecondary }}
-            >
-              <h3 className="text-sm font-medium mb-2" style={{ color: theme.text }}>
-                Datos del Solicitante
-              </h3>
-              <div className="space-y-1.5">
-                {(selectedTramite.nombre_solicitante || selectedTramite.apellido_solicitante) && (
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <span className="text-sm" style={{ color: theme.text }}>
+                  <span className="rs-persona-datos">
+                    <span className="rs-persona-nombre">
                       {selectedTramite.nombre_solicitante} {selectedTramite.apellido_solicitante}
                     </span>
-                  </div>
-                )}
-                {selectedTramite.dni_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <Hash className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <span className="text-sm" style={{ color: theme.text }}>
-                      DNI: {selectedTramite.dni_solicitante}
-                    </span>
-                  </div>
-                )}
-                {selectedTramite.email_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <a
-                      href={`mailto:${selectedTramite.email_solicitante}`}
-                      className="text-sm hover:underline"
-                      style={{ color: theme.primary }}
-                    >
-                      {selectedTramite.email_solicitante}
-                    </a>
-                  </div>
-                )}
+                    {selectedTramite.dni_solicitante && (
+                      <span className="rs-dato-sub">DNI {selectedTramite.dni_solicitante}</span>
+                    )}
+                  </span>
+                </span>
                 {selectedTramite.telefono_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <a
-                      href={`tel:${selectedTramite.telefono_solicitante}`}
-                      className="text-sm hover:underline"
-                      style={{ color: theme.primary }}
-                    >
-                      {selectedTramite.telefono_solicitante}
-                    </a>
-                  </div>
+                  <a className="rs-mini-link" href={`tel:${selectedTramite.telefono_solicitante}`}>
+                    {selectedTramite.telefono_solicitante}
+                  </a>
                 )}
-                {selectedTramite.direccion_solicitante && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                    <span className="text-sm" style={{ color: theme.text }}>
-                      {selectedTramite.direccion_solicitante}
-                    </span>
-                  </div>
+              </span>
+              <span className="min-w-0">
+                <span className="rs-mini-eyebrow">Dónde</span>
+                <span className="rs-dato">
+                  {selectedTramite.direccion_solicitante || 'Sin dirección cargada'}
+                </span>
+                {selectedTramite.email_solicitante && (
+                  <a className="rs-mini-link" href={`mailto:${selectedTramite.email_solicitante}`}>
+                    {selectedTramite.email_solicitante}
+                  </a>
                 )}
-              </div>
+              </span>
             </div>
 
-            {/* Checklist de verificación de documentos requeridos */}
-            <div className="px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium" style={{ color: theme.text }}>
-                  Verificación de documentos
-                </h3>
+            {/* Documentos — checklist real, con la acción como link de sección. */}
+            <div className="rs-seccion">
+              <div className="rs-seccion-cab">
+                <span className="rs-seccion-titulo">Documentos</span>
                 {user?.rol !== 'vecino' && (checklistData?.total_obligatorios_subidos ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setReviewOpen(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
-                      color: '#fff',
-                      boxShadow: `0 4px 10px ${theme.primary}40`,
-                    }}
-                  >
-                    <FileSearch className="h-4 w-4" />
+                  <button type="button" className="rs-seccion-link" onClick={() => setReviewOpen(true)}>
                     Revisar docs
                   </button>
                 )}
@@ -2030,7 +1976,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                         className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
                         style={{
                           background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                          color: '#ffffff',
+                          color: 'var(--pl-on-accent)',
                         }}
                       >
                         {loadingSugerencia ? (
@@ -2254,7 +2200,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                             background: empleadoSeleccionado
                               ? `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`
                               : theme.backgroundSecondary,
-                            color: empleadoSeleccionado ? '#ffffff' : theme.textSecondary,
+                            color: empleadoSeleccionado ? 'var(--pl-on-accent)' : theme.textSecondary,
                           }}
                         >
                           {asignando ? (
@@ -2297,7 +2243,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     <div className="flex items-center gap-2 mb-3 p-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
-                        style={{ backgroundColor: theme.primary, color: '#fff' }}
+                        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                       >
                         {resp.nombre?.[0]}{resp.apellido?.[0]}
                       </div>
@@ -2349,7 +2295,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                       background: responsableId
                         ? `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`
                         : theme.card,
-                      color: responsableId ? '#ffffff' : theme.textSecondary,
+                      color: responsableId ? 'var(--pl-on-accent)' : theme.textSecondary,
                       border: responsableId ? 'none' : `1px solid ${theme.border}`,
                     }}
                   >

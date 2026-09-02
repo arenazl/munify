@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Star, CheckCircle, XCircle, AlertCircle, Loader2, MessageSquare, Send } from 'lucide-react';
 import { calificacionesApi } from '../lib/api';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ interface ReclamoInfo {
 
 export default function CalificarReclamo() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('t') || undefined;
   const [reclamo, setReclamo] = useState<ReclamoInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function CalificarReclamo() {
   useEffect(() => {
     const fetchReclamo = async () => {
       try {
-        const response = await calificacionesApi.getInfoPublica(Number(id));
+        const response = await calificacionesApi.getInfoPublica(Number(id), token);
         setReclamo(response.data);
 
         if (response.data.ya_calificado) {
@@ -49,7 +51,7 @@ export default function CalificarReclamo() {
     };
 
     fetchReclamo();
-  }, [id]);
+  }, [id, token]);
 
   const handleEnviar = async () => {
     if (puntuacion === 0) {
@@ -62,7 +64,7 @@ export default function CalificarReclamo() {
       await calificacionesApi.calificarPublica(Number(id), {
         puntuacion,
         comentario: comentario.trim() || undefined
-      });
+      }, token);
 
       setEnviado(true);
       toast.success('¡Gracias por tu calificación!');

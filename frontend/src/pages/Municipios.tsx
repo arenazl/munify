@@ -9,6 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 interface Municipio {
   id: number;
@@ -35,6 +36,10 @@ export default function Municipios() {
   const { user } = useAuth();
 
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
+
+  // Publica el total para el contador del riel de Configuración.
+
+  useReportarTotal(municipios.length);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -375,7 +380,7 @@ export default function Municipios() {
                           className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
                           style={{
                             backgroundColor: theme.primary,
-                            color: 'white',
+                            color: 'var(--pl-on-accent)',
                             opacity: generatingDirecciones === municipio.id ? 0.7 : 1
                           }}
                         >

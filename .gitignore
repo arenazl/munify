@@ -31,6 +31,9 @@ env/
 .env
 .env.local
 .env.*.local
+# Copias de .env con fecha (backend/.env.bak-1802 y compañia): son el
+# .env con las credenciales adentro, y sin esta linea no las tapa nada.
+.env.bak*
 
 # IDE
 .idea/
@@ -88,3 +91,38 @@ scripts/gsc-credentials.json
 
 # Cloud Run env file (no secrets but no need to track)
 backend/env.yaml
+
+# Backups de migraciones/curación con datos reales (PII) — NUNCA commitear
+backend/scripts/_backup_*.json
+
+# Material de trabajo pesado (videos, capturas, planillas) — no es código de la app
+par-limpio/
+reels/
+sofi/
+*.zip
+
+# Diseño: los paquetes versionados viven en docs/design/paquetes/.
+# _media/ son los binarios pesados (mp4, zip, capturas exportadas) — fuera de git.
+docs/design/_media/
+
+# Scripts descartables: verificación con Playwright, respaldos y análisis ad-hoc
+frontend/_*.mjs
+frontend/_*.cjs
+frontend/check_imports.py
+backend/_old_*.py
+backend/backend/
+backend/scripts/_*.py
+
+# Dumps de planillas de clientes: datos personales (nombres, sueldos, situacion laboral)
+docs/clientes/**/_*.txt
+
+# Dumps de GeoNames para el batch del catalogo de municipios. NO se versionan:
+# son 6 MB que se rebajan con un comando (ver scripts/cargar_catalogo_latam.py).
+# Lo que si se versiona es el resultado, scripts/datos/catalogo_latam.json.
+backend/scripts/datos/geonames/*.zip
+backend/scripts/datos/geonames/*.txt
+# GeoJSON de limites administrativos (geoBoundaries). Tampoco se versionan:
+# entre 3 y 164 MB por pais. Lo que queda es el contorno recortado, en la base.
+backend/scripts/datos/contornos/
+docs/geo/
+docs/*.geojson

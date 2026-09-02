@@ -1,5 +1,11 @@
 """Migración: formato de OT (Fase 3).
 
+>>> HISTÓRICA — NO CORRER. Superada por
+>>> scripts/migrate_ot_categoria_unificada.py, que elimina `ot_tipos_trabajo` y
+>>> `ordenes_trabajo.tipo_trabajo_id`: la OT clasifica con las categorías de
+>>> reclamo del municipio. Correr este script después de la unificación
+>>> RECREARÍA el catálogo duplicado que se dio de baja.
+
 ADITIVA:
   - tabla nueva `ot_tipos_trabajo` (catálogo configurable por muni).
   - columnas nuevas en `ordenes_trabajo`: `prioridad`, `tipo_trabajo_id`.

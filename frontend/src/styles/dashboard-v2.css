@@ -1,0 +1,1119 @@
+/* ============================================================
+   dashboard-v2.css — página Dashboard (rediseño v2, Claude Design)
+
+   POLIMÓRFICO: cero colores fijos. Todo sale de tokens --pl-*
+   (estáticos en pl-tokens.css; los de color los computa
+   ThemeContext desde el theme activo). Prohibido hex inline;
+   estilos inline solo para valores runtime (anchos de barras,
+   colores de series/estados que vienen de datos).
+
+   Referencias: design/handoff-v2/references/dashboard-claro.dc.html
+   y dashboard-oscuro.dc.html. Prefijo de clases: dv2-.
+   Lo importan Dashboard.tsx y sus subcomponentes
+   (components/dashboard/HeroBannerV2, SectionTitleV2).
+
+   Índice:
+     [PAGE]     contenedor de la página
+     [HERO]     banner del muni (gradiente/foto + strip de KPIs)
+     [SECCION]  título de sección (icono + label + hairline + link)
+     [FILTRAR]  barra de filtro por dependencia (pills)
+     [CARD]     card base v2 + títulos + pie
+     [KPI]      cards de indicadores (filas Reclamos/Trámites)
+     [GRIDS]    grillas de la página + responsive
+     [COLA]     widgets operativos (Urgentes/Sin asignar/Hoy/Resueltos)
+     [DONUT]    donut "Por estado" + leyenda
+     [BARRAS]   bloque nombre + % + barra (las listas puras: BarList del kit)
+     [TABS]     segmented control del panel de métricas
+     [ITEMS]    items de listas (recurrentes/similares)
+     [TOOLTIP]  tooltip de recharts
+     [SKEL]     skeletons de carga
+   ============================================================ */
+
+/* ============================================================
+   [PAGE]
+   ============================================================ */
+.dv2-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ============================================================
+   [HERO] — banner: gradiente del acento o foto del muni + veils.
+   Texto siempre en --pl-on-brand (contrasta con el acento en
+   cualquier theme). Strip de stats integrado abajo.
+   ============================================================ */
+.dv2-hero {
+  position: relative;
+  border-radius: var(--pl-radius-xl);
+  overflow: hidden;
+  background: var(--pl-hero-gradient);
+  box-shadow: var(--pl-shadow-card);
+}
+
+.dv2-hero-media { position: absolute; inset: 0; }
+.dv2-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.85) brightness(1.02);
+}
+.dv2-hero-veil { position: absolute; inset: 0; background: var(--pl-hero-veil); pointer-events: none; }
+.dv2-hero-fade { position: absolute; inset: 0; background: var(--pl-hero-fade); pointer-events: none; }
+
+.dv2-hero-top {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  padding: 26px 28px 0;
+}
+
+.dv2-hero-info { flex: 1; min-width: 0; }
+
+.dv2-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--pl-on-brand) 72%, transparent);
+}
+.dv2-hero-eyebrow-icono { width: 13px; height: 13px; flex: 0 0 13px; }
+
+.dv2-hero-titulo {
+  margin: 10px 0 6px;
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: var(--pl-fs-hero);
+  line-height: 1.05;
+  letter-spacing: var(--pl-tracking-hero);
+  color: var(--pl-on-brand);
+}
+
+.dv2-hero-sub {
+  margin: 0;
+  font-size: 14.5px;
+  color: color-mix(in srgb, var(--pl-on-brand) 82%, transparent);
+  max-width: 46ch;
+}
+
+.dv2-hero-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.dv2-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--pl-radius-lg);
+  background: var(--pl-on-brand);
+  color: var(--pl-accent-ink);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.dv2-hero-btn:hover { background: color-mix(in srgb, var(--pl-on-brand) 96%, var(--pl-green)); }
+.dv2-hero-btn-icono { width: 16px; height: 16px; flex: 0 0 16px; }
+
+.dv2-hero-btn--outline {
+  background: var(--pl-hero-scrim);
+  color: var(--pl-on-brand);
+  border: 1px solid color-mix(in srgb, var(--pl-on-brand) 60%, transparent);
+  box-shadow: none;
+}
+.dv2-hero-btn--outline:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--pl-on-brand) 22%, transparent);
+}
+
+.dv2-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-on-brand);
+  flex: 0 0 7px;
+  animation: dv2PulseDot 2s var(--pl-ease) infinite;
+}
+@keyframes dv2PulseDot {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pl-on-brand) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Strip de stats integrado al pie del hero */
+.dv2-hero-strip {
+  position: relative;
+  margin-top: 22px;
+  padding: 14px 28px 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--pl-hero-strip);
+  border-top: 1px solid color-mix(in srgb, var(--pl-on-brand) 16%, transparent);
+}
+
+.dv2-hero-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 20px;
+  border-left: 1px solid color-mix(in srgb, var(--pl-on-brand) 18%, transparent);
+}
+.dv2-hero-kpi:first-child { padding-left: 0; border-left: 0; }
+
+.dv2-hero-kpi-etiqueta {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--pl-on-brand) 66%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv2-hero-kpi-valor {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--pl-on-brand);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+.dv2-hero-kpi-valor--amber {
+  color: var(--pl-amber-onbrand);
+}
+
+/* ============================================================
+   [SECCION] — icono acento + label + hairline + link/caption
+   ============================================================ */
+.dv2-seccion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 -2px;
+  min-width: 0;
+}
+.dv2-seccion-icono { width: 16px; height: 16px; flex: 0 0 16px; color: var(--pl-green); }
+.dv2-seccion-label { font-size: var(--pl-fs-body-sm); font-weight: 600; color: var(--pl-text); white-space: nowrap; }
+.dv2-seccion-hairline { flex: 1; height: 1px; background: var(--pl-border); min-width: 20px; }
+.dv2-seccion-caption { font-size: var(--pl-fs-caption); color: var(--pl-text-faint); white-space: nowrap; }
+.dv2-seccion-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dv2-seccion-link:hover { text-decoration: underline; }
+
+/* Matiz azul (ej: sección Trámites, como la referencia) */
+.dv2-seccion--blue .dv2-seccion-icono { color: var(--pl-blue); }
+
+/* ============================================================
+   [FILTRAR] — la barra de filtros ya NO vive acá: es el componente
+   del KIT `AdaptiveFilter` (components/ui/AdaptiveFilter.tsx +
+   styles/adaptive-filter.css). Una sola implementación: no
+   reimplementar píldoras de filtro en esta hoja.
+   ============================================================ */
+
+/* Spinner chico de recarga (lo usa el esqueleto de carga del tablero). */
+.dv2-spin {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: var(--pl-radius-pill);
+  border: 2px solid var(--pl-green-200);
+  border-top-color: var(--pl-green);
+  animation: dv2Spin 0.8s linear infinite;
+}
+@keyframes dv2Spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   [CARD] — card base v2
+   ============================================================ */
+.dv2-card {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 18px;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--pl-shadow-card);
+}
+
+.dv2-card-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv2-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+/* Head que va DEBAJO del segmented control (los tabs ya aportan 16px) */
+.dv2-card-head--bajo-tabs { margin-bottom: 14px; }
+/* Head cuyo contenido trae su propia separación (ej: el área del chart) */
+.dv2-card-head--pegado { margin-bottom: 0; }
+.dv2-card-head--icono { align-items: center; }
+.dv2-card-head-icono { width: 16px; height: 16px; flex: 0 0 16px; color: var(--pl-green); align-self: center; }
+.dv2-card-caption { font-size: var(--pl-fs-caption); color: var(--pl-text-faint); white-space: nowrap; }
+.dv2-card-caption--auto { margin-left: auto; }
+
+.dv2-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--pl-border);
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-faint);
+}
+.dv2-card-foot-valor { font-weight: 600; color: var(--pl-text-2); font-feature-settings: 'tnum'; }
+.dv2-card-foot-valor--malo { color: var(--pl-red-700); }
+.dv2-card-foot-valor--advertencia { color: var(--pl-amber-700); }
+.dv2-card-foot-valor--bueno { color: var(--pl-green-700); }
+.dv2-card-foot .dv2-auto { margin-left: auto; }
+.dv2-card-foot-link {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dv2-card-foot-link:hover { text-decoration: underline; }
+
+/* Link al pie de una card SIN hairline (va pegado al fondo, como la referencia) */
+.dv2-card-link {
+  margin-top: auto;
+  padding-top: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dv2-card-link:hover { text-decoration: underline; }
+
+/* ============================================================
+   [KPI] — cards de indicadores (filas Reclamos / Trámites):
+   eyebrow + número display + sparkline + delta veredictado.
+   El COLOR de la serie del sparkline es runtime (lo pasa la
+   página desde los tokens computados); el resto sale de --pl-*.
+   ============================================================ */
+.dv2-kpi-card {
+  padding: 16px;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Rótulo con su icono. El rótulo NO va en versalitas grises: en la referencia
+   es texto de verdad, en la tipografía de display y del color del texto — lo
+   que se lee primero es qué mide la tarjeta, no el número suelto. */
+.dv2-kpi-cab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  position: relative;
+}
+
+.dv2-kpi-eyebrow {
+  font-family: var(--pl-font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--pl-text);
+  /* El rotulo se lee ENTERO: si no entra en una linea, baja a dos. Cortar
+     "Resolucion prome..." deja al usuario adivinando de que es el numero. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.dv2-kpi-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--pl-green-100);
+  color: var(--pl-green);
+  flex: 0 0 30px;
+}
+.dv2-kpi-icono > svg { width: 16px; height: 16px; stroke-width: 1.9; }
+
+/* Anillo que late: dice que el número es de ahora y no una foto vieja. */
+.dv2-kpi-latido {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  border: 1.5px solid var(--pl-green);
+  opacity: 0;
+  animation: dv2-latido 3.6s var(--pl-ease-suave, cubic-bezier(0.2, 0.8, 0.2, 1)) infinite;
+}
+
+/* El mismo icono en grande, apenas visible, flotando. Le da carácter a una
+   fila que si no son cuatro cajas blancas iguales. */
+.dv2-kpi-marca {
+  position: absolute;
+  right: -12px;
+  top: -12px;
+  opacity: 0.05;
+  pointer-events: none;
+  color: var(--pl-green);
+  animation: dv2-flotar 7s var(--pl-ease-suave, cubic-bezier(0.2, 0.8, 0.2, 1)) infinite;
+}
+.dv2-kpi-marca > svg { width: 104px; height: 104px; stroke-width: 1.4; }
+
+@keyframes dv2-latido {
+  0% { opacity: 0.5; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes dv2-flotar {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+/* Quien pidió menos movimiento no ve ninguna de las dos. */
+@media (prefers-reduced-motion: reduce) {
+  .dv2-kpi-latido, .dv2-kpi-marca { animation: none; }
+}
+
+.dv2-kpi-fila {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dv2-kpi-valor {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+.dv2-kpi-valor--atenuado { color: var(--pl-text-disabled); }
+/* Veredicto del número: hay KPIs que se juzgan solos ("108 pagos vencidos"),
+   sin comparación contra un período previo que justifique la flecha del delta. */
+.dv2-kpi-valor--bueno { color: var(--pl-green-700); }
+.dv2-kpi-valor--advertencia { color: var(--pl-amber-700); }
+.dv2-kpi-valor--malo { color: var(--pl-red-700); }
+
+.dv2-kpi-valor-bloque { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dv2-kpi-unidad { font-size: 12px; font-weight: 600; color: var(--pl-text-3); }
+
+.dv2-kpi-spark { flex: 0 1 76px; min-width: 48px; max-width: 100%; height: 28px; }
+/* Sin serie: línea punteada neutra (jamás datos inventados) */
+.dv2-kpi-spark--plana { display: flex; align-items: center; }
+.dv2-kpi-spark--plana::before {
+  content: '';
+  width: 100%;
+  border-top: 2px dashed var(--pl-border-strong);
+}
+
+.dv2-kpi-pie { display: flex; align-items: center; gap: 7px; min-width: 0; }
+
+.dv2-kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  font-feature-settings: 'tnum';
+}
+.dv2-kpi-delta--bueno { color: var(--pl-green-700); }
+.dv2-kpi-delta--advertencia { color: var(--pl-amber-700); }
+.dv2-kpi-delta--malo { color: var(--pl-red-700); }
+.dv2-kpi-delta-icono { width: 12px; height: 12px; flex: 0 0 12px; }
+
+.dv2-kpi-sub {
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+  /* Igual que el rotulo: "mas que el me..." no dice nada. Que baje de linea. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+/* ============================================================
+   [GRIDS]
+   ============================================================ */
+.dv2-grid-kpi {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+/* Cinco KPIs (el estándar del hero semántico). No es `repeat(5, 1fr)` fijo:
+   en 5 columnas cada tarjeta baja de 200px y el número display se parte, así
+   que la fila decide sola cuántas entran — el auto-fit hace 5 / 3 / 2 / 1
+   según el ancho REAL del contenedor, sin media queries.
+   Va con las DOS clases a propósito: el media query de 1100px fuerza dos
+   columnas para `.dv2-grid-kpi`, y con una sola clase (misma especificidad,
+   más abajo en el archivo) le ganaría al auto-fit. */
+.dv2-grid-kpi.dv2-grid-kpi--5 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.dv2-grid-cola {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.dv2-grid-principal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.dv2-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* ============================================================
+   [COLA] — widgets operativos. Tono por modificador; el número,
+   el punto y los items toman el matiz semántico del token.
+   ============================================================ */
+.dv2-cola-card { gap: 10px; }
+
+.dv2-cola-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dv2-cola-dot { width: 7px; height: 7px; border-radius: var(--pl-radius-pill); flex: 0 0 7px; }
+.dv2-cola-label {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dv2-cola-num {
+  margin-left: auto;
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
+  font-feature-settings: 'tnum';
+}
+.dv2-cola-num--cero { color: var(--pl-text-disabled) !important; }
+
+.dv2-cola-sub { font-size: var(--pl-fs-caption); color: var(--pl-text-faint); margin-top: -4px; }
+
+.dv2-cola-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 148px;
+  scrollbar-width: none;
+}
+.dv2-cola-lista::-webkit-scrollbar { display: none; }
+
+.dv2-cola-item {
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  min-width: 0;
+  transition: filter var(--pl-dur-ui) var(--pl-ease);
+}
+.dv2-cola-item:hover { filter: brightness(0.97); }
+/* El título del reclamo es texto libre del vecino: no se puede abreviar por
+   diccionario como los nombres de dependencia, así que se le dan DOS líneas
+   antes de recortar. Con una sola quedaban cortados casi todos ("Vereda rota
+   en Tablad…"). El texto completo va en el `title` del item. */
+.dv2-cola-item-titulo {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.dv2-cola-item-meta { font-size: var(--pl-fs-micro); color: var(--pl-text-faint); margin-top: 2px; }
+
+.dv2-cola-vacio {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12px 0;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-3);
+}
+
+.dv2-cola-link {
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  text-align: left;
+  font-family: var(--pl-font-sans);
+}
+.dv2-cola-link:hover { text-decoration: underline; }
+
+/* Tonos */
+.dv2-cola-card--red  .dv2-cola-dot  { background: var(--pl-red); }
+.dv2-cola-card--red  .dv2-cola-num  { color: var(--pl-red-700); }
+.dv2-cola-card--red  .dv2-cola-item { background: var(--pl-red-100); }
+.dv2-cola-card--red  .dv2-cola-link { color: var(--pl-red-700); }
+
+.dv2-cola-card--amber .dv2-cola-dot  { background: var(--pl-amber-strong); }
+.dv2-cola-card--amber .dv2-cola-num  { color: var(--pl-amber-700); }
+.dv2-cola-card--amber .dv2-cola-item { background: var(--pl-amber-100); }
+.dv2-cola-card--amber .dv2-cola-link { color: var(--pl-amber-700); }
+
+.dv2-cola-card--blue .dv2-cola-dot  { background: var(--pl-blue); }
+.dv2-cola-card--blue .dv2-cola-num  { color: var(--pl-blue-700); }
+.dv2-cola-card--blue .dv2-cola-item { background: var(--pl-blue-100); }
+.dv2-cola-card--blue .dv2-cola-link { color: var(--pl-blue-700); }
+
+.dv2-cola-card--green .dv2-cola-dot  { background: var(--pl-green); }
+.dv2-cola-card--green .dv2-cola-num  { color: var(--pl-green-700); }
+.dv2-cola-card--green .dv2-cola-item { background: var(--pl-green-100); }
+.dv2-cola-card--green .dv2-cola-link { color: var(--pl-green-700); }
+
+/* ============================================================
+   [DONUT] — "Por estado" + leyenda
+   ============================================================ */
+.dv2-donut-wrap { position: relative; height: 190px; margin: 10px 0 6px; }
+.dv2-donut-centro {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+.dv2-donut-total {
+  display: block;
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+}
+.dv2-donut-sub { display: block; font-size: 10.5px; color: var(--pl-text-faint); margin-top: 3px; }
+
+.dv2-leyenda { display: flex; flex-direction: column; gap: 8px; }
+.dv2-leyenda-fila { display: flex; align-items: center; gap: 9px; font-size: var(--pl-fs-body-sm); min-width: 0; }
+.dv2-leyenda-dot { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 9px; }
+.dv2-leyenda-label {
+  color: var(--pl-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.dv2-leyenda-valor { margin-left: auto; font-weight: 600; color: var(--pl-text); font-feature-settings: 'tnum'; }
+.dv2-leyenda-pct { color: var(--pl-text-faint); width: 34px; text-align: right; font-feature-settings: 'tnum'; }
+
+/* ============================================================
+   [BARRAS] — bloque nombre + % + fracción con la barra debajo.
+   Las listas de barras "puras" (label / track / valor) viven en el
+   componente del KIT `BarList` (components/ui/BarList.tsx +
+   styles/bar-list.css): NO reimplementar acá.
+   ============================================================ */
+.dv2-barras { display: flex; flex-direction: column; gap: 12px; }
+
+.dv2-barra-track {
+  height: 9px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  position: relative;
+  overflow: hidden;
+}
+.dv2-barra-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--pl-radius-pill);
+  transition: width 400ms var(--pl-ease);
+}
+.dv2-barra-fill--d1 { background: var(--pl-data-1); }
+.dv2-barra-fill--d2 { background: var(--pl-data-2); }
+.dv2-barra-fill--d3 { background: var(--pl-data-3); }
+.dv2-barra-fill--d4 { background: var(--pl-data-4); }
+.dv2-barra-fill--d5 { background: var(--pl-data-5); }
+
+/* Encabezado propio (nombre + % + x/y) con la barra debajo */
+.dv2-barra-bloque { min-width: 0; }
+.dv2-barra-bloque-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; min-width: 0; }
+.dv2-barra-bloque-nombre {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.dv2-barra-bloque-pct { margin-left: auto; font-size: var(--pl-fs-body-sm); font-weight: 600; font-feature-settings: 'tnum'; }
+.dv2-barra-bloque-frac { font-size: var(--pl-fs-caption); color: var(--pl-text-faint); font-feature-settings: 'tnum'; }
+
+/* ============================================================
+   [TABS] — segmented control del panel de métricas
+   ============================================================ */
+.dv2-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--pl-surface-2);
+  border-radius: var(--pl-radius-md);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+/* Tabs de texto (sin icono), como la referencia */
+.dv2-tab {
+  flex: 1;
+  display: block;
+  text-align: center;
+  padding: 7px 4px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  font-family: var(--pl-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), color var(--pl-dur-ui) var(--pl-ease);
+  min-width: 0;
+}
+.dv2-tab:hover { background: var(--pl-surface-hover); }
+.dv2-tab--activa {
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-card);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+
+/* ============================================================
+   [ITEMS] — listas de recurrentes / similares
+   ============================================================ */
+.dv2-items { display: flex; flex-direction: column; gap: 6px; }
+
+.dv2-item {
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  cursor: pointer;
+  min-width: 0;
+  transition: filter var(--pl-dur-ui) var(--pl-ease);
+}
+.dv2-item:hover { filter: brightness(0.97); }
+.dv2-item--amber { background: var(--pl-amber-100); border-color: transparent; }
+
+.dv2-item-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.dv2-item-titulo {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.dv2-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  margin-top: 2px;
+  min-width: 0;
+}
+.dv2-item-meta-icono { width: 12px; height: 12px; flex: 0 0 12px; }
+.dv2-item-meta-trunc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+.dv2-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+  border-radius: var(--pl-radius-pill);
+  padding: 1px 8px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  font-feature-settings: 'tnum';
+}
+.dv2-badge--amber { background: var(--pl-amber-100); color: var(--pl-amber-700); }
+.dv2-badge--red { background: var(--pl-red-100); color: var(--pl-red-700); }
+.dv2-badge-icono { width: 11px; height: 11px; flex: 0 0 11px; }
+
+.dv2-chip-cat {
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-green-700);
+  background: var(--pl-green-100);
+  border-radius: var(--pl-radius-sm);
+  padding: 1px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.dv2-chip-dias {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 700;
+  border-radius: var(--pl-radius-sm);
+  padding: 2px 8px;
+  font-feature-settings: 'tnum';
+  white-space: nowrap;
+}
+.dv2-chip-dias--bueno { background: var(--pl-green-100); color: var(--pl-green-700); }
+.dv2-chip-dias--advertencia { background: var(--pl-amber-100); color: var(--pl-amber-700); }
+.dv2-chip-dias--malo { background: var(--pl-red-100); color: var(--pl-red-700); }
+
+.dv2-vacio { font-size: var(--pl-fs-body-sm); color: var(--pl-text-3); }
+.dv2-bloque { margin-bottom: 16px; }
+.dv2-subtitulo {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.dv2-subtitulo-icono { width: 14px; height: 14px; flex: 0 0 14px; color: var(--pl-amber-strong); }
+
+.dv2-chart-area { height: 224px; min-width: 0; }
+.dv2-chart-area--panel { height: 180px; }
+/* Área que crece con la card (la altura la marca la card vecina de la grilla) */
+.dv2-chart-area--flex {
+  flex: 1;
+  height: auto;
+  min-height: 176px;
+  margin-top: 14px;
+}
+
+/* Leyenda inline del head de un chart: [—] serie A  [—] serie B */
+.dv2-chart-leyenda {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+}
+.dv2-chart-leyenda-marca { width: 14px; height: 2px; border-radius: 2px; flex: 0 0 14px; }
+.dv2-chart-leyenda-marca--acento { background: var(--pl-green); }
+.dv2-chart-leyenda-marca--neutra { background: var(--pl-data-5); margin-left: 6px; }
+
+/* Eje X propio: 4 marcas de tiempo bajo el chart (recharts no dibuja el eje) */
+.dv2-chart-fechas {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  font-size: 10.5px;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   [TOOLTIP] — recharts
+   ============================================================ */
+.dv2-tooltip {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  padding: 10px 12px;
+  box-shadow: var(--pl-shadow-float);
+}
+.dv2-tooltip-titulo { margin: 0 0 4px; font-size: var(--pl-fs-body-sm); font-weight: 600; color: var(--pl-text); }
+.dv2-tooltip-fila { margin: 0; font-size: var(--pl-fs-body-sm); }
+
+/* ============================================================
+   [SKEL] — skeletons de carga
+   ============================================================ */
+.dv2-skel {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  animation: dv2SkelPulse 1.6s var(--pl-ease) infinite;
+}
+.dv2-skel-hero { height: 220px; border-radius: var(--pl-radius-xl); }
+.dv2-skel-card { height: 150px; }
+.dv2-skel-cargando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 0;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+  color: var(--pl-text-3);
+}
+@keyframes dv2SkelPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 1100px) {
+  .dv2-grid-principal { grid-template-columns: 1fr; }
+  .dv2-grid-cola { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Los KPI son chicos: quedan de a 2 hasta mobile inclusive */
+  .dv2-grid-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1024px) {
+  .dv2-grid-2 { grid-template-columns: 1fr; }
+  /* En mobile el modo TV / recorrido se abre desde el menú "Más" */
+  .dv2-hero-acciones { display: none; }
+}
+
+/* La etiqueta corta solo aparece cuando la larga ya no entra (ver el media
+   query de celular). En pantalla ancha manda la larga. */
+.dv2-kpi-corta { display: none; }
+
+@media (max-width: 640px) {
+  .dv2-page { gap: 10px; }
+  .dv2-grid-cola { grid-template-columns: 1fr; }
+
+  /* ---------------------------------------------------------------
+     El banner en celular.
+     Antes se comía un tercio de la pantalla: título grande, y los
+     cuatro KPIs cayendo a 2x2, lo que duplicaba el alto y empujaba el
+     hero semántico —lo único que dice qué hacer hoy— abajo del pliegue.
+     Ahora: título más contenido, los cuatro números en UNA fila, y un
+     velo de verdad para que el texto se lea sobre la foto.
+     --------------------------------------------------------------- */
+  .dv2-hero-top { padding: 14px 14px 0; }
+  .dv2-hero-titulo { font-size: 21px; }
+  .dv2-hero-sub { font-size: 12px; }
+
+  /* Velo REAL: sobre la portada el texto tiene que leerse siempre, así
+     que se refuerza con una capa propia derivada del acento (nada de
+     negro plano, que apaga la marca). */
+  .dv2-hero-veil {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--pl-green) 42%, #04120a 58%) 0%,
+        color-mix(in srgb, var(--pl-green) 22%, #04120a 78%) 100%
+      );
+    opacity: 0.92;
+  }
+
+  .dv2-hero-strip {
+    /* Una sola fila de cuatro: es lo que hace que el banner deje de
+       ocupar el doble. Las etiquetas se abrevian para entrar. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 0;
+    padding: 10px 12px 12px;
+  }
+  .dv2-hero-kpi { padding-left: 8px; }
+  .dv2-hero-kpi:first-child { padding-left: 0; }
+  .dv2-hero-kpi-etiqueta { font-size: 8.5px; letter-spacing: 0.04em; }
+  .dv2-hero-kpi-valor { font-size: 17px; }
+
+  /* Se cambia el texto por su abreviatura, no se lo corta con ellipsis. */
+  .dv2-kpi-larga { display: none; }
+  .dv2-kpi-corta { display: inline; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv2-pulse-dot, .dv2-spin, .dv2-skel { animation: none; }
+  .dv2-barra-fill { transition: none; }
+}
+
+/* Frase que remata el ranking de Concentración: el dato con su consecuencia
+   ("14 esquinas concentran 76 reclamos: 1 de cada 10"), no una descripción de
+   lo que hace el widget. */
+.dv2-concentracion-frase {
+  margin: 12px 0 4px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.45;
+  color: var(--pl-text-3);
+}
+.dv2-concentracion-frase strong {
+  font-weight: 700;
+  color: var(--pl-text);
+}
+
+/* ============================================================
+   [ACCESO] — tarjeta de acceso rápido (tablero del área).
+   Antes estas tarjetas traían un color fijo por ítem (violeta,
+   azul, naranja) que no tenía nada que ver con la marca. El
+   matiz sale del acento y la distinción la hace el ícono.
+   ============================================================ */
+.dv2-acceso {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease), transform var(--pl-dur-ui) var(--pl-ease);
+}
+.dv2-acceso:hover {
+  border-color: var(--pl-green);
+  transform: translateY(-1px);
+}
+.dv2-acceso-icono {
+  width: 18px;
+  height: 18px;
+  color: var(--pl-green);
+  margin-bottom: 6px;
+}
+.dv2-acceso-titulo {
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  color: var(--pl-text);
+}
+.dv2-acceso-sub {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  /* Se lee entero: "252 p..." no le sirve a nadie. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+/* El mismo patrón de lavado que el hero, en su versión sutil: las tarjetas
+   del tablero comparten la familia visual sin pelearle la atención al hero.
+   Definido UNA vez en pl-tokens.css ([LAVADO DE ACENTO]). */
+.dv2-card {
+  position: relative;
+  isolation: isolate;
+}
+.dv2-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--pl-lavado-acento-sutil);
+}
+
+/* ============================================================
+   La fila de analítica: el mapa se lleva DOS TERCIOS.
+
+   Era `1fr 2fr 1fr` (donut · mapa · top categorías) y con eso el
+   mapa —la pieza que más se mira y la que más vende— quedaba en
+   la mitad del ancho, mientras "Top categorías" ocupaba una
+   columna angosta donde sus barras no se comparan entre sí.
+
+   Ahora la fila es de dos columnas (donut + mapa a 2/3) y Top
+   categorías baja a una tira de ancho completo con las barras en
+   tres columnas: son diez categorías, y en una columna angosta
+   sólo entraban cinco.
+   ============================================================ */
+@media (min-width: 1100px) {
+  .dv2-grid-principal {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
+/* Mapa y tendencia, mitad y mitad — las dos piezas grandes de la pantalla.
+   Con `auto-fit` la fila se parte sola: dos columnas mientras cada una tenga
+   sus 420px, una sola cuando no. Sin media query: lo decide el contenedor,
+   así el bloque sirve igual dentro de una pantalla angosta. */
+.dv2-grid-2--mapa {
+  /* `min(420px, 100%)`: el minimo de columna JAMAS supera el contenedor. Con
+     `minmax(420px, ...)` a secas, en un telefono (~390px) la columna media
+     420px, desbordaba el viewport y la tarjeta del mapa salia cortada (ademas
+     de habilitar movimiento horizontal de toda la pagina). */
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  /* Las dos tarjetas terminan a la MISMA altura. Con `start` cada una tomaba
+     su alto natural y quedaban desparejas, que es lo que se nota primero en
+     una fila de dos. La que sobra estira su contenido, no deja hueco. */
+  align-items: stretch;
+}
+/* El mapa se come el alto sobrante para llegar al piso de la fila. */
+.dv2-grid-2--mapa > .dv2-card { display: flex; flex-direction: column; }
+.dv2-grid-2--mapa .fr { flex: 1; min-height: 0; }
+.dv2-grid-2--mapa .fr-mapa { flex: 1; min-height: 0; }
+
+/* Las barras de Top categorías se reparten en columnas SEGÚN EL ANCHO, con
+   flex: cada bloque pide 260px y el sobrante se reparte entre los que entran.
+   Sin media queries — el propio contenedor decide: en escritorio entran tres,
+   en una tablet dos, en un teléfono una. Diez categorías en una sola columna
+   obligan a cortar en cinco y esconder el resto detrás de un "otras 5". */
+.dv2-card--barras-anchas .dv2-barras {
+  display: flex;
+  /* EXPLÍCITO y no se saca: la regla base de .dv2-barras es `column`, y sin
+     este reset el `flex: 1 1 260px` de abajo se aplica al ALTO — cada barra
+     reserva 260px verticales y quedan separadas por huecos enormes. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  /* Cada bloque mide lo que mide su contenido. Sin esto, flex los ESTIRA a
+     lo alto para llenar la tarjeta y quedan barras separadas por cientos de
+     píxeles de vacío. */
+  align-items: flex-start;
+  align-content: flex-start;
+}
+.dv2-card--barras-anchas .dv2-barra-bloque {
+  flex: 1 1 260px;
+  min-width: 0;
+}

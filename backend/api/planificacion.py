@@ -3,7 +3,7 @@ API de Planificación Semanal - Calendario visual para supervisores
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func, case
 from sqlalchemy.orm import selectinload
 from datetime import datetime, date, timedelta
 from typing import List, Optional
@@ -13,9 +13,12 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.reclamo import Reclamo
 from models.empleado import Empleado
+from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
 from models.municipio_dependencia import MunicipioDependencia
 from models.user import User
-from models.enums import RolUsuario, EstadoReclamo
+from models.historial import HistorialReclamo
+from models.enums import RolUsuario, EstadoReclamo, PrioridadOT, EstadoOrdenTrabajo
+from services.push_service import notificar_asignacion_empleado
 
 router = APIRouter()
 
@@ -77,20 +80,6 @@ class TareaReclamo(BaseModel):
     fecha_programada: Optional[str] = None
     hora_inicio: Optional[str] = None
     hora_fin: Optional[str] = None
-    empleado_id: Optional[int] = None
-    prioridad: Optional[int] = None
-
-    class Config:
-        from_attributes = True
-
-
-class TareaTramite(BaseModel):
-    tipo: str = "tramite"
-    id: int
-    numero_tramite: str
-    tramite_nombre: Optional[str] = None
-    estado: str
-    fecha_asignacion: Optional[str] = None
     empleado_id: Optional[int] = None
 
     class Config:
@@ -251,7 +240,6 @@ async def get_planificacion_semanal(
             hora_inicio=r.hora_inicio.strftime("%H:%M") if r.hora_inicio else None,
             hora_fin=r.hora_fin.strftime("%H:%M") if r.hora_fin else None,
             empleado_id=r.empleado_id,
-            prioridad=r.prioridad
         )
         for r in reclamos
     ]
@@ -308,6 +296,48 @@ async def get_planificacion_semanal(
         EstadoReclamo.NUEVO,      # legacy
         EstadoReclamo.ASIGNADO,   # legacy
     ]
+    # Orden por prioridad de la OT (F6 · prioridad única): la prioridad canónica del
+    # trabajo vive en la OT (enum baja<media<alta<urgente), NO en el legacy
+    # Reclamo.prioridad (Integer deprecado, con doble semántica contradictoria — ver
+    # docs/reclamos/08-fase-6-poi-prioridad-unica.md §2.1). Ordenar por ese campo legacy
+    # ponía los MENOS urgentes primero (bug vivo). Se ordena por la severidad de la OT
+    # más prioritaria del reclamo (subquery sobre el pivot, max, OTs no canceladas) y
+    # luego por antigüedad. Estos reclamos del pool normalmente NO tienen OT aún (están
+    # sin asignar) → sin OT viva se los trata como 'media' (rank 2) vía coalesce, de modo
+    # que la prioridad manual de una eventual OT alta/urgente sube al tope y el resto
+    # queda ordenado por created_at asc como antes.
+    _ot_rank = case(
+        (OrdenTrabajo.prioridad == PrioridadOT.URGENTE, 4),
+        (OrdenTrabajo.prioridad == PrioridadOT.ALTA, 3),
+        (OrdenTrabajo.prioridad == PrioridadOT.MEDIA, 2),
+        (OrdenTrabajo.prioridad == PrioridadOT.BAJA, 1),
+        else_=2,  # media por defecto ante un valor inesperado
+    )
+    ot_rank_subq = (
+        select(func.max(_ot_rank))
+        .select_from(OrdenTrabajoReclamo)
+        .join(OrdenTrabajo, OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id)
+        .where(OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .where(OrdenTrabajo.estado != EstadoOrdenTrabajo.CANCELADA)
+        .correlate(Reclamo)
+        .scalar_subquery()
+    )
+    prioridad_orden = func.coalesce(ot_rank_subq, 2)  # sin OT viva -> 'media'
+    # F4: excluir del pool los reclamos YA cubiertos por una OT VIGENTE (de
+    # cuadrilla o individual). Antes, un reclamo canalizado por una OT figuraba
+    # "Sin asignar" e invitaba a doble asignación — la planificación era ciega a
+    # las OTs. Con F6-A toda asignación crea OT, así que esto es clave.
+    from sqlalchemy import exists as _exists
+    tiene_ot_vigente = (
+        _exists()
+        .where(OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .where(OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id)
+        .where(OrdenTrabajo.estado.in_([
+            EstadoOrdenTrabajo.PENDIENTE,
+            EstadoOrdenTrabajo.ASIGNADA,
+            EstadoOrdenTrabajo.EN_CURSO,
+        ]))
+    )
     query_sin_asignar = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
@@ -315,8 +345,9 @@ async def get_planificacion_semanal(
             Reclamo.municipio_id == municipio_id,
             Reclamo.estado.in_(estados_activos_sin_asignar),
             Reclamo.empleado_id.is_(None),
+            ~tiene_ot_vigente,
         )
-        .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
+        .order_by(prioridad_orden.desc(), Reclamo.created_at.asc())
         .limit(30)
     )
 
@@ -339,7 +370,6 @@ async def get_planificacion_semanal(
             hora_inicio=None,
             hora_fin=None,
             empleado_id=None,
-            prioridad=r.prioridad
         )
         for r in sin_asignar
     ]
@@ -381,6 +411,9 @@ async def desasignar_reclamo(
     reclamo.fecha_programada = None
     reclamo.hora_inicio = None
     reclamo.hora_fin = None
+    # OT universal (F6): al quitar la asignación, cancelar la OT implícita.
+    from api.ordenes_trabajo import cancelar_ot_implicita
+    await cancelar_ot_implicita(db, reclamo)
     await db.commit()
 
     return {"success": True, "message": "Asignación quitada"}
@@ -427,28 +460,67 @@ async def asignar_fecha_reclamo(
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
 
+    # F4: validar con datos reales. Estado no asignable BLOQUEA; ausencia y
+    # exceso de capacidad WARNEAN (no bloquean — el supervisor decide).
+    from services.asignacion import validar_asignacion
+    try:
+        fecha_d = datetime.strptime(fecha_programada, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido (YYYY-MM-DD)")
+    validacion = await validar_asignacion(db, empleado_id, municipio_id, fecha_d, reclamo.estado)
+    if not validacion["ok"]:
+        raise HTTPException(status_code=400, detail=validacion["warnings"][0])
+
     # Actualizar reclamo
     try:
         reclamo.empleado_id = empleado_id
-        reclamo.fecha_programada = datetime.strptime(fecha_programada, "%Y-%m-%d").date()
+        reclamo.fecha_programada = fecha_d
 
         if hora_inicio:
             reclamo.hora_inicio = datetime.strptime(hora_inicio, "%H:%M").time()
         if hora_fin:
             reclamo.hora_fin = datetime.strptime(hora_fin, "%H:%M").time()
 
-        # Si estaba en estado "nuevo", pasarlo a "asignado"
+        # F4: NO escribir el estado legacy ASIGNADO. Si venía del legacy NUEVO,
+        # migrarlo al estado canónico RECIBIDO (circuito recibido→en_curso→…).
         if reclamo.estado == EstadoReclamo.NUEVO:
-            reclamo.estado = EstadoReclamo.ASIGNADO
+            reclamo.estado = EstadoReclamo.RECIBIDO
+
+        # Miga en el historial (mismo criterio que la asignación directa de reclamos)
+        nombre_empleado = f"{empleado.nombre} {empleado.apellido or ''}".strip()
+        db.add(HistorialReclamo(
+            reclamo_id=reclamo.id,
+            usuario_id=current_user.id,
+            accion="asignado_empleado",
+            comentario=f"Asignado a {nombre_empleado} para el {fecha_programada} (desde planificación)",
+        ))
+
+        # OT universal (F6): espejar la asignación en una OT implícita 1:1.
+        from api.ordenes_trabajo import upsert_ot_implicita
+        await upsert_ot_implicita(db, reclamo, empleado_id, current_user.id)
 
         await db.commit()
+
+        # Notificar al/los usuario(s) vinculados al empleado (push).
+        result_users = await db.execute(
+            select(User).where(
+                User.empleado_id == empleado_id,
+                User.activo == True
+            )
+        )
+        for empleado_user in result_users.scalars().all():
+            try:
+                await notificar_asignacion_empleado(db, empleado_user.id, reclamo)
+            except Exception as ex:
+                print(f"Error notificando asignación a usuario {empleado_user.id}: {ex}")
 
         return {
             "success": True,
             "message": "Reclamo asignado correctamente",
             "reclamo_id": reclamo_id,
             "empleado_id": empleado_id,
-            "fecha_programada": fecha_programada
+            "fecha_programada": fecha_programada,
+            "warnings": validacion["warnings"],
         }
 
     except ValueError as e:

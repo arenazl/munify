@@ -1,434 +1,225 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+/**
+ * MiArea — el tablero de una SECRETARÍA o DIRECCIÓN (rol supervisor).
+ *
+ * Es el dashboard del admin pero acotado a un área: mismas piezas, mismo
+ * idioma, los datos de su dependencia. Antes esta pantalla había quedado con
+ * la interfaz vieja —tarjetas con colores fijos, textos cortados, un banner
+ * con foto genérica— mientras el circuito del admin ya estaba en el v2, así
+ * que entrar como secretaría parecía otra aplicación.
+ *
+ * Estructura del estándar v2:
+ *   1. HeroBannerV2  — de quién es el tablero, con sus números al pie.
+ *   2. SemanticHero  — la frase que dice QUÉ HACER HOY, con los números
+ *                      coloreados por veredicto y las acciones de cada frase.
+ *   3. Accesos       — a dónde ir, con los tonos del tema (no una paleta ajena).
+ *
+ * Todo el color sale del theme activo: ninguna marca ni municipio necesita su
+ * propio hardcodeo.
+ */
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardList, FileCheck, Map, BarChart3, Compass } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import {
-  ClipboardList, FileCheck, Clock, CheckCircle, AlertCircle,
-  ArrowRight, ArrowUpRight, Activity, Inbox, Timer,
-  ChevronRight, Sparkles, Map, BarChart3
-} from 'lucide-react';
 import { dashboardApi } from '../lib/api';
+import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
+import { SectionTitleV2 } from '../components/dashboard/SectionTitleV2';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoTasa, veredictoMasEsPeor } from '../lib/veredictos';
+import { ChartSkeleton } from '../components/ui/Skeleton';
 
-interface EstadisticasDependencia {
-  reclamos: {
-    total: number;
-    nuevos: number;
-    en_curso: number;
-    resueltos: number;
-    pendientes: number;
-  };
-  tramites: {
-    total: number;
-    iniciados: number;
-    en_curso: number;
-    finalizados: number;
-    pendientes: number;
-  };
+interface StatsArea {
+  total: number;
+  nuevos: number;
+  enCurso: number;
+  resueltos: number;
+  pendientes: number;
 }
+
+const VACIO: StatsArea = { total: 0, nuevos: 0, enCurso: 0, resueltos: 0, pendientes: 0 };
+
+/** Estados que NO cuentan como abiertos (mismo criterio que el dashboard). */
+const CERRADOS = new Set(['finalizado', 'rechazado', 'resuelto']);
 
 export default function MiArea() {
   const { user } = useAuth();
-  const { theme } = useTheme();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<EstadisticasDependencia | null>(null);
+  const [reclamos, setReclamos] = useState<StatsArea>(VACIO);
+  const [tramites, setTramites] = useState<StatsArea | null>(null);
 
   useEffect(() => {
-    const loadStats = async () => {
+    const cargar = async () => {
       if (!user?.dependencia) return;
-
+      setLoading(true);
       try {
-        setLoading(true);
-        // El backend filtra automáticamente por la dependencia del usuario logueado
-        const conteoResponse = await dashboardApi.getConteoEstados();
-        const conteoData = conteoResponse.data as Array<{ estado: string; cantidad: number }>;
+        // El backend ya filtra por la dependencia del usuario logueado.
+        const [conteoRes, tramRes] = await Promise.all([
+          dashboardApi.getConteoEstados(),
+          // Antes los trámites del área estaban FIJOS EN CERO en el código, así
+          // que la pantalla mostraba "0 pendientes" para siempre. Ahora se piden.
+          dashboardApi.getTramitesStats().catch(() => null),
+        ]);
 
-        const reclamosStats = {
-          total: 0,
-          nuevos: 0,
-          en_curso: 0,
-          resueltos: 0,
-          pendientes: 0,
-        };
-
-        // Procesar conteos por estado
-        conteoData.forEach((item) => {
-          reclamosStats.total += item.cantidad;
-          if (item.estado === 'nuevo') reclamosStats.nuevos = item.cantidad;
-          if (item.estado === 'en_curso') reclamosStats.en_curso = item.cantidad;
-          if (item.estado === 'resuelto') reclamosStats.resueltos = item.cantidad;
+        const conteo = (conteoRes.data || []) as Array<{ estado: string; cantidad: number }>;
+        const r = { ...VACIO };
+        conteo.forEach(({ estado, cantidad }) => {
+          r.total += cantidad;
+          if (estado === 'nuevo' || estado === 'recibido') r.nuevos += cantidad;
+          if (estado === 'en_curso') r.enCurso += cantidad;
+          if (CERRADOS.has(estado) && estado !== 'rechazado') r.resueltos += cantidad;
         });
-        reclamosStats.pendientes = reclamosStats.total - reclamosStats.resueltos;
+        r.pendientes = r.total - r.resueltos;
+        setReclamos(r);
 
-        setStats({
-          reclamos: reclamosStats,
-          tramites: {
-            total: 0,
-            iniciados: 0,
-            en_curso: 0,
-            finalizados: 0,
-            pendientes: 0,
-          },
-        });
+        const t = tramRes?.data;
+        if (t?.por_estado) {
+          const porEstado = t.por_estado as Record<string, number>;
+          const abiertos = Object.entries(porEstado).reduce(
+            (acc, [estado, n]) => (CERRADOS.has(estado) ? acc : acc + n), 0);
+          const cerrados = Object.entries(porEstado).reduce(
+            (acc, [estado, n]) => (estado === 'finalizado' ? acc + n : acc), 0);
+          setTramites({
+            total: t.total ?? 0,
+            nuevos: t.hoy ?? 0,
+            enCurso: abiertos,
+            resueltos: cerrados,
+            pendientes: abiertos,
+          });
+        }
       } catch (error) {
-        console.error('Error cargando estadísticas:', error);
+        console.error('Error cargando el tablero del área:', error);
       } finally {
         setLoading(false);
       }
     };
-
-    loadStats();
+    cargar();
   }, [user?.dependencia]);
+
+  const tasa = reclamos.total > 0 ? Math.round((reclamos.resueltos / reclamos.total) * 100) : 0;
+
+  /** Las frases del área, con sus números veredictados. */
+  const frases = useMemo<HeroFrase[]>(() => {
+    const u = resolverUmbrales();
+    const lista: HeroFrase[] = [];
+
+    if (reclamos.total > 0) {
+      lista.push({
+        segmentos: [
+          seg('El área tiene '),
+          seg(
+            `${reclamos.pendientes} ${reclamos.pendientes === 1 ? 'reclamo abierto' : 'reclamos abiertos'}`,
+            veredictoMasEsPeor(reclamos.pendientes, u.sinAsignar),
+          ),
+          seg(', de los cuales '),
+          seg(`${reclamos.enCurso} ya están en curso`, reclamos.enCurso > 0 ? 'bueno' : undefined),
+          seg('.'),
+        ],
+        acciones: [
+          { label: 'Ver los reclamos', to: '/gestion/reclamos-area', primaria: true },
+          { label: 'Ver en el mapa', to: '/gestion/mapa' },
+        ],
+      });
+
+      lista.push({
+        segmentos: [
+          seg('Resolvieron el '),
+          seg(`${tasa}%`, veredictoTasa(tasa, u.tasaResolucion)),
+          seg(' de lo que les llegó: '),
+          seg(`${reclamos.resueltos} cerrados`, 'bueno'),
+          seg(` sobre ${reclamos.total}.`),
+        ],
+        acciones: [{ label: 'Ver el rendimiento', to: '/gestion/estadisticas-area', primaria: true }],
+      });
+    }
+
+    if (tramites && tramites.total > 0) {
+      lista.push({
+        segmentos: [
+          seg('En trámites hay '),
+          seg(
+            `${tramites.pendientes} en curso`,
+            veredictoMasEsPeor(tramites.pendientes, u.sinAsignar),
+          ),
+          seg(` sobre ${tramites.total} del área.`),
+        ],
+        acciones: [{ label: 'Ver los trámites', to: '/gestion/tramites-area', primaria: true }],
+      });
+    }
+
+    return lista;
+  }, [reclamos, tramites, tasa]);
+
+  /** Los números al pie del banner. Cortos, porque en celular van en una fila. */
+  const kpis = useMemo<HeroStripKpi[]>(() => {
+    const base: HeroStripKpi[] = [
+      { etiqueta: 'Reclamos abiertos', etiquetaCorta: 'Abiertos', valor: reclamos.pendientes },
+      { etiqueta: 'En curso', etiquetaCorta: 'En curso', valor: reclamos.enCurso },
+      { etiqueta: 'Resueltos', etiquetaCorta: 'Resueltos', valor: reclamos.resueltos },
+      { etiqueta: 'Tasa de resolución', etiquetaCorta: 'Tasa', valor: `${tasa}%`, amber: tasa < 60 },
+    ];
+    // El bloque de trámites sólo aparece si el área tiene trámites: mostrar
+    // una tarjeta en cero sería decir que no funcionan cuando ni siquiera
+    // manejan trámites.
+    if (tramites && tramites.total > 0) {
+      base.push({ etiqueta: 'Trámites del área', etiquetaCorta: 'Trámites', valor: tramites.total });
+    }
+    return base;
+  }, [reclamos, tasa, tramites]);
 
   if (!user?.dependencia) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <p style={{ color: theme.textSecondary }}>No tienes una dependencia asignada.</p>
+      <div className="dv2-page">
+        <p className="dv2-vacio">Todavía no tenés un área asignada. Pedíselo al administrador del municipio.</p>
       </div>
     );
   }
 
-  const dependenciaColor = user.dependencia.color || theme.primary;
-  const tasaResolucion = stats?.reclamos.total ? Math.round((stats.reclamos.resueltos / stats.reclamos.total) * 100) : 0;
-
-  // Skeleton loading
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ backgroundColor: theme.backgroundSecondary }} />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <div className="lg:col-span-2 h-48 rounded-2xl animate-pulse" style={{ backgroundColor: theme.backgroundSecondary }} />
-          <div className="h-48 rounded-2xl animate-pulse" style={{ backgroundColor: theme.backgroundSecondary }} />
-        </div>
+      <div className="dv2-page">
+        <ChartSkeleton />
       </div>
     );
   }
 
+  const accesos = [
+    { titulo: 'Reclamos', sub: `${reclamos.pendientes} sin cerrar`, icono: ClipboardList, to: '/gestion/reclamos-area' },
+    ...(tramites && tramites.total > 0
+      ? [{ titulo: 'Trámites', sub: `${tramites.pendientes} en curso`, icono: FileCheck, to: '/gestion/tramites-area' }]
+      : []),
+    { titulo: 'Mapa', sub: 'Dónde se concentran', icono: Map, to: '/gestion/mapa' },
+    { titulo: 'Rendimiento', sub: 'Cómo viene el área', icono: BarChart3, to: '/gestion/estadisticas-area' },
+  ];
+
   return (
-    <div className="space-y-4">
-      {/* Stats Row - Compacto */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MiniStatCard
-          label="Pendientes"
-          value={stats?.reclamos.pendientes || 0}
-          icon={<Inbox className="h-4 w-4" />}
-          color="#f59e0b"
-          theme={theme}
-          trend={stats?.reclamos.nuevos ? `+${stats.reclamos.nuevos} nuevos` : undefined}
-        />
-        <MiniStatCard
-          label="En Proceso"
-          value={stats?.reclamos.en_curso || 0}
-          icon={<Timer className="h-4 w-4" />}
-          color="#3b82f6"
-          theme={theme}
-        />
-        <MiniStatCard
-          label="Resueltos"
-          value={stats?.reclamos.resueltos || 0}
-          icon={<CheckCircle className="h-4 w-4" />}
-          color="#22c55e"
-          theme={theme}
-          trend={tasaResolucion > 0 ? `${tasaResolucion}% tasa` : undefined}
-        />
-        <MiniStatCard
-          label="Total"
-          value={stats?.reclamos.total || 0}
-          icon={<Activity className="h-4 w-4" />}
-          color={dependenciaColor}
-          theme={theme}
-        />
-      </div>
+    <div className="dv2-page">
+      <HeroBannerV2
+        eyebrow="Mi área · vista del equipo"
+        titulo={user.dependencia.nombre}
+        sub="Todo lo que le llegó a tu área, en un solo tablero."
+        kpis={kpis}
+      />
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Acciones Rápidas - Card Principal */}
-        <div
-          className="lg:col-span-2 p-5 rounded-2xl"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold" style={{ color: theme.text }}>Acciones Rápidas</h2>
-            <Sparkles className="h-4 w-4" style={{ color: theme.textSecondary }} />
-          </div>
+      <SemanticHero etiqueta={`HOY EN ${user.dependencia.nombre.toUpperCase()}`} frases={frases} />
 
-          <div className="grid grid-cols-2 gap-3">
-            <QuickActionCard
-              to="/gestion/reclamos-area"
-              icon={<ClipboardList className="h-5 w-5" />}
-              title="Reclamos"
-              subtitle={`${stats?.reclamos.pendientes || 0} pendientes`}
-              color={dependenciaColor}
-              theme={theme}
-            />
-            <QuickActionCard
-              to="/gestion/tramites-area"
-              icon={<FileCheck className="h-5 w-5" />}
-              title="Trámites"
-              subtitle={`${stats?.tramites.pendientes || 0} pendientes`}
-              color="#8b5cf6"
-              theme={theme}
-            />
-            <QuickActionCard
-              to="/gestion/mapa"
-              icon={<Map className="h-5 w-5" />}
-              title="Mapa"
-              subtitle="Ver ubicaciones"
-              color="#3b82f6"
-              theme={theme}
-            />
-            <QuickActionCard
-              to="/gestion/estadisticas-area"
-              icon={<BarChart3 className="h-5 w-5" />}
-              title="Estadísticas"
-              subtitle="Rendimiento"
-              color="#22c55e"
-              theme={theme}
-            />
-          </div>
-        </div>
-
-        {/* Panel de Estado */}
-        <div
-          className="p-5 rounded-2xl"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold" style={{ color: theme.text }}>Estado del Área</h2>
-            <Activity className="h-4 w-4" style={{ color: theme.textSecondary }} />
-          </div>
-
-          <div className="space-y-3">
-            {/* Barra de progreso visual */}
-            <div>
-              <div className="flex justify-between text-xs mb-1.5">
-                <span style={{ color: theme.textSecondary }}>Tasa de resolución</span>
-                <span className="font-semibold" style={{ color: dependenciaColor }}>{tasaResolucion}%</span>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${dependenciaColor}20` }}>
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${Math.max(tasaResolucion, 5)}%`,
-                    backgroundColor: dependenciaColor,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Mini stats */}
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>Nuevos</span>
-                </div>
-                <span className="text-xl font-bold" style={{ color: theme.text }}>{stats?.reclamos.nuevos || 0}</span>
-              </div>
-              <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-                <div className="flex items-center gap-2 mb-1">
-                  <Clock className="h-3.5 w-3.5 text-blue-500" />
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>Proceso</span>
-                </div>
-                <span className="text-xl font-bold" style={{ color: theme.text }}>{stats?.reclamos.en_curso || 0}</span>
-              </div>
-            </div>
-
-            {/* Link a ver todos */}
-            <Link
-              to="/gestion/reclamos-area"
-              className="flex items-center justify-between p-3 rounded-xl transition-all hover:scale-[1.02]"
-              style={{ backgroundColor: `${dependenciaColor}10` }}
+      <SectionTitleV2 icon={Compass} label="Accesos" />
+      <div className="dv2-grid-kpi">
+        {accesos.map((a) => {
+          const Icono = a.icono;
+          return (
+            <button
+              key={a.to}
+              type="button"
+              className="dv2-card dv2-acceso"
+              onClick={() => navigate(a.to)}
             >
-              <span className="text-sm font-medium" style={{ color: dependenciaColor }}>Ver todos los reclamos</span>
-              <ArrowRight className="h-4 w-4" style={{ color: dependenciaColor }} />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Trámites Section - Compacto */}
-      <div
-        className="p-5 rounded-2xl"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <FileCheck className="h-5 w-5" style={{ color: '#8b5cf6' }} />
-            <h2 className="font-semibold" style={{ color: theme.text }}>Trámites del Área</h2>
-          </div>
-          <Link
-            to="/gestion/tramites-area"
-            className="text-xs flex items-center gap-1 hover:underline"
-            style={{ color: theme.textSecondary }}
-          >
-            Ver todos <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <TramiteStatCard
-            label="Total"
-            value={stats?.tramites.total || 0}
-            icon={<FileCheck className="h-4 w-4" />}
-            color="#8b5cf6"
-            theme={theme}
-          />
-          <TramiteStatCard
-            label="Iniciados"
-            value={stats?.tramites.iniciados || 0}
-            icon={<AlertCircle className="h-4 w-4" />}
-            color="#f59e0b"
-            theme={theme}
-          />
-          <TramiteStatCard
-            label="En Proceso"
-            value={stats?.tramites.en_curso || 0}
-            icon={<Clock className="h-4 w-4" />}
-            color="#3b82f6"
-            theme={theme}
-          />
-          <TramiteStatCard
-            label="Finalizados"
-            value={stats?.tramites.finalizados || 0}
-            icon={<CheckCircle className="h-4 w-4" />}
-            color="#22c55e"
-            theme={theme}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Mini Stat Card - Ultra compacto
-interface MiniStatCardProps {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  color: string;
-  theme: any;
-  trend?: string;
-}
-
-function MiniStatCard({ label, value, icon, color, theme, trend }: MiniStatCardProps) {
-  return (
-    <div
-      className="p-4 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-transform"
-      style={{
-        backgroundColor: theme.card,
-        border: `1px solid ${theme.border}`,
-      }}
-    >
-      {/* Glow effect */}
-      <div
-        className="absolute -top-4 -right-4 w-16 h-16 rounded-full blur-2xl opacity-30 group-hover:opacity-50 transition-opacity"
-        style={{ backgroundColor: color }}
-      />
-
-      <div className="relative">
-        <div className="flex items-center justify-between mb-2">
-          <div
-            className="p-1.5 rounded-lg"
-            style={{ backgroundColor: `${color}15`, color }}
-          >
-            {icon}
-          </div>
-          {trend && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${color}15`, color }}>
-              {trend}
-            </span>
-          )}
-        </div>
-        <p className="text-2xl font-bold" style={{ color: theme.text }}>{value}</p>
-        <p className="text-xs" style={{ color: theme.textSecondary }}>{label}</p>
-      </div>
-    </div>
-  );
-}
-
-// Quick Action Card
-interface QuickActionCardProps {
-  to: string;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  color: string;
-  theme: any;
-}
-
-function QuickActionCard({ to, icon, title, subtitle, color, theme }: QuickActionCardProps) {
-  return (
-    <Link
-      to={to}
-      className="group p-4 rounded-xl flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] h-[72px]"
-      style={{
-        backgroundColor: theme.backgroundSecondary,
-        border: `1px solid transparent`,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = `${color}50`;
-        e.currentTarget.style.backgroundColor = `${color}08`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'transparent';
-        e.currentTarget.style.backgroundColor = theme.backgroundSecondary;
-      }}
-    >
-      <div
-        className="p-2.5 rounded-xl transition-transform group-hover:scale-110"
-        style={{ backgroundColor: `${color}15`, color }}
-      >
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm" style={{ color: theme.text }}>{title}</p>
-        <p className="text-xs truncate" style={{ color: theme.textSecondary }}>{subtitle}</p>
-      </div>
-      <ArrowUpRight
-        className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0"
-        style={{ color: theme.textSecondary }}
-      />
-    </Link>
-  );
-}
-
-// Tramite Stat Card - Minimal
-interface TramiteStatCardProps {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  color: string;
-  theme: any;
-}
-
-function TramiteStatCard({ label, value, icon, color, theme }: TramiteStatCardProps) {
-  return (
-    <div
-      className="p-3 rounded-xl flex items-center gap-3"
-      style={{ backgroundColor: theme.backgroundSecondary }}
-    >
-      <div
-        className="p-2 rounded-lg"
-        style={{ backgroundColor: `${color}15`, color }}
-      >
-        {icon}
-      </div>
-      <div>
-        <p className="text-lg font-bold" style={{ color: theme.text }}>{value}</p>
-        <p className="text-xs" style={{ color: theme.textSecondary }}>{label}</p>
+              <Icono className="dv2-acceso-icono" aria-hidden="true" />
+              <span className="dv2-acceso-titulo">{a.titulo}</span>
+              <span className="dv2-acceso-sub">{a.sub}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

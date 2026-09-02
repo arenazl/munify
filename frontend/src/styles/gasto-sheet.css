@@ -1,0 +1,264 @@
+/* ============================================================
+   Sheet de detalle de Gasto — implementación de
+   "Gasto Detalle.dc.html" (canvas Claude Design, 2026-08-02).
+   Prefijo gs-. 100% tokens --pl-* (polimórfico: themes y marcas).
+
+   Sólo define las piezas que el sheet de gastos agrega sobre el
+   vocabulario común de sheets (`rs-*` en reclamo-sheet.css, que
+   main.tsx ya importa global): header, secciones, grilla de datos,
+   persona, pie y botones se reusan de ahí — no se duplican.
+   ============================================================ */
+
+/* ---------- Monto en el header ---------- */
+
+.gs-monto-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.gs-monto {
+  font-family: var(--pl-font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-hero);
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+}
+
+.gs-monto-sub {
+  font-size: 12.5px;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+
+/* ---------- Progreso del gasto (barras) ----------
+   Un paso por hito con dato REAL: registrado, cuotas y pago.
+   Sin pasos "autorizado"/"conciliado": el modelo `gastos` no los
+   tiene y no se inventan. */
+
+.gs-pasos {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 6px;
+  padding: 14px 0 2px;
+}
+
+.gs-paso {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gs-paso-barra {
+  height: 4px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  position: relative;
+  overflow: hidden;
+}
+
+.gs-paso-barra--ok { background: var(--pl-green); }
+
+/* Relleno proporcional (cuotas pagadas / total). El ancho va inline
+   porque es un valor de runtime. */
+.gs-paso-relleno {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-amber-strong);
+}
+
+.gs-paso-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-paso-label--ok { color: var(--pl-green-700); }
+.gs-paso-label--curso { color: var(--pl-amber-strong); }
+
+.gs-paso-sub {
+  font-size: 10.5px;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Grilla del resumen ---------- */
+
+.gs-resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin-top: 12px;
+}
+
+.gs-campo-label {
+  display: block;
+  font-size: 11px;
+  color: var(--pl-text-faint);
+  margin-bottom: 2px;
+}
+
+.gs-campo-valor {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Cuotas ---------- */
+
+.gs-cuotas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.gs-cuota {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  background: var(--pl-surface);
+}
+
+.gs-cuota--pagada {
+  background: color-mix(in srgb, var(--pl-green) 6%, var(--pl-surface));
+  border-color: var(--pl-green-200);
+}
+.gs-cuota--vencida {
+  background: color-mix(in srgb, var(--pl-red) 6%, var(--pl-surface));
+  border-color: color-mix(in srgb, var(--pl-red) 30%, var(--pl-surface));
+}
+
+.gs-cuota-num {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--pl-surface-2);
+  color: var(--pl-text-3);
+  font-family: var(--pl-font-display);
+  font-size: 14px;
+  font-weight: 700;
+}
+.gs-cuota--pagada .gs-cuota-num {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+.gs-cuota--vencida .gs-cuota-num {
+  background: var(--pl-red-100);
+  color: var(--pl-red-700);
+}
+
+.gs-cuota-cuerpo { flex: 1; min-width: 0; }
+
+.gs-cuota-fila {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.gs-cuota-estado {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pl-text-3);
+}
+.gs-cuota-estado--pagada { color: var(--pl-green-700); }
+.gs-cuota-estado--vencida { color: var(--pl-red-700); }
+
+.gs-cuota-vence {
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+}
+
+.gs-cuota-monto {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+}
+
+/* ---------- Comprobantes ---------- */
+
+.gs-adjuntos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.gs-adjunto {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pl-text);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.gs-adjunto:hover { background: var(--pl-surface-hover); }
+
+.gs-adjunto-meta {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--pl-text-faint);
+}
+
+.gs-vacio {
+  font-size: 12.5px;
+  color: var(--pl-text-faint);
+  margin-top: 10px;
+}
+
+/* ---------- Pie: CTA de pago ----------
+   `min-width: max-content` + `nowrap`: el botón nunca se comprime por debajo
+   de su texto — si falta espacio, es la fila la que baja de línea (rs-pie-fila
+   ya es flex-wrap). Sin esto el label caía en dos renglones dentro de un botón
+   de alto fijo. */
+
+.gs-cta-pago {
+  flex: 1 1 auto;
+  min-width: max-content;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+/* ---------- Observaciones ---------- */
+
+.gs-obs-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}

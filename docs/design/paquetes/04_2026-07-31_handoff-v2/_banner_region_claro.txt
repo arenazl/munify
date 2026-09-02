@@ -1,0 +1,98 @@
+nter; font-size: 11px; font-weight: 600;">RG</span>
+          <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 0px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; line-height: 1.2;">Rocío Giménez</span>
+            <span style="font-size: 10.5px; color: #7A8783; line-height: 1.2;">Supervisora de área</span>
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <section style="position: relative; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, #00B37E 0%, #007A55 100%); box-shadow: 0 1px 2px rgba(13,20,18,0.04), 0 2px 6px rgba(13,20,18,0.04);">
+
+      <sc-if value="{{ conFoto }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0;">
+          <div style="position: absolute; inset: 0; filter: saturate(0.85) brightness(1.02);">
+            <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&amp;w=2070" alt="Ciudad" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+          </div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(96deg, rgba(0,60,42,0.90) 0%, rgba(0,72,50,0.62) 42%, rgba(0,120,84,0.18) 78%, rgba(0,140,98,0.06) 100%); pointer-events: none;"></div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,50,36,0.28) 0%, rgba(0,50,36,0) 30%, rgba(0,50,36,0.42) 100%); pointer-events: none;"></div>
+          <a href="https://unsplash.com" target="_blank" rel="noreferrer" style="position: absolute; right: 10px; top: 10px; font-size: 9.5px; color: rgba(255,255,255,0.55); letter-spacing: 0.04em;">Unsplash</a>
+        </div>
+      </sc-if>
+
+      <div style="position: relative; display: flex; align-items: flex-start; gap: 32px; padding: 26px 28px 0;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.11em; color: rgba(255,255,255,0.72);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+            MUNICIPALIDAD · VISTA CONSOLIDADA
+          </div>
+          <h1 style="margin: 10px 0 6px; font-family: Sora, sans-serif; font-weight: 700; font-size: 38px; line-height: 1.05; letter-spacing: -0.025em; color: #FFFFFF;">Asunción, Dpto. Central</h1>
+          <p style="margin: 0; font-size: 14.5px; color: rgba(255,255,255,0.82); max-width: 46ch;">Todas las dependencias en un solo tablero, actualizado hace 4 minutos.</p>
+
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; flex: 0 0 auto;">
+          <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border: 0; border-radius: 12px; background: #FFFFFF; color: #00794F; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(6,32,24,0.18);" style-hover="background: #F2FBF7;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></svg>
+            Conocé Paraguay Limpio
+          </button>
+          <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border: 1px solid rgba(255,255,255,0.6); border-radius: 12px; background: rgba(0,45,32,0.5); color: #FFFFFF; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer;" style-hover="background: rgba(255,255,255,0.22);">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #FFFFFF; animation: pulseDot 2s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            Pulso del día
+          </button>
+        </div>
+      </div>
+
+      <div style="position: relative; margin: 22px 0 0; padding: 14px 28px 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: linear-gradient(180deg, rgba(0,45,32,0.62) 0%, rgba(0,45,32,0.82) 100%); border-top: 1px solid rgba(255,255,255,0.16);">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">RECLAMOS ABIERTOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">49</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">TRÁMITES ACTIVOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">10</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">RESOLUCIÓN PROMEDIO</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">19,4 d</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">EN RIESGO DE SLA</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #FFD66B; font-feature-settings: 'tnum';">3</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="margin: 16px 0 0; padding: 18px 20px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-left: 3px solid #00B37E; border-radius: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7A8783;">{{ moduloEtiqueta }}</span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+          <sc-for list="{{ puntos }}" as="p" hint-placeholder-count="3">
+            <span onClick="{{ p.ir }}" style="width: 7px; height: 7px; border-radius: 999px; background: {{ p.color }}; cursor: pointer;"></span>
+          </sc-for>
+          <span onClick="{{ anterior }}" style="width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(13,20,18,0.10); display: grid; place-items: center; cursor: pointer; margin-left: 4px;" style-hover="background: #F4F7F6;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg></span>
+          <span onClick="{{ siguiente }}" style="width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(13,20,18,0.10); display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
+        </div>
+      </div>
+      <p style="margin: 8px 0 10px; font-family: Sora, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; color: #0D1412; text-wrap: pretty;">
+        <sc-for list="{{ frase }}" as="t" hint-placeholder-count="4"><span style="color: {{ t.color }};">{{ t.texto }}</span></sc-for>
+      </p>
+      <div style="display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap;">
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #E7F6F0; border: 1px solid #C9EBDD; font-size: 12.5px; font-weight: 600; color: #00794F;">{{ accionA }}</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.07); font-size: 12.5px; font-weight: 600; color: #5B6764;">{{ accionB }}</a>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 10px 14px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7v6l-4 2v-8z" /></svg>
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #7A8783;">FILTRAR</span>
+      <div style="display: flex; gap: 6px; margin-left: 4px;">
+        <span style="font-size: 12.5px; font-weight: 600; color: #00794F; background: #E7F6F0; border: 1px solid #C9EBDD; border-radius: 999px; padding: 5px 12px;">Todas las dependencias</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #5B6764; background: #F6F8F7; border: 1px solid rgba(13,20,18,0.07); border-radius: 999px; padding: 5px 12px;">Últimos 30 días</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #5B6764; background: #F6F8F7; border: 1px solid rgba(13,20,18,0.07); border-radius: 999px; padding: 5px 12px;">Todos los estados</span>
+      </div>
+    </div>
+
+    <div style="margin: 26px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H

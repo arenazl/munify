@@ -1,0 +1,81 @@
+/**
+ * ordenes-pago-v2 — clases propias de la pantalla Órdenes de pago.
+ *
+ * Sólo lo que el kit no cubre: celdas de DOS RENGLONES (el diseño pide
+ * número sobre fecha, monto sobre neto, chip sobre nota) y la fila que
+ * aparea la cabecera con el botón de tutorial. Todo sobre tokens --pl-*,
+ * cero colores fijos — la pantalla se ve igual en cualquier preset/marca.
+ *
+ * Vive acá y no en abmv2.css a propósito: es la única pantalla que las usa,
+ * y tocar el CSS compartido mientras otras pantallas migran en paralelo
+ * arriesga pisar trabajo ajeno. Si otra pantalla del estándar termina
+ * necesitando el mismo apilado, ahí sí se promueve a abmv2.css como pieza
+ * del kit (no se copia).
+ */
+
+/* Celda de dos renglones: dato principal arriba, contexto abajo. */
+.op-celda2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* Variante para la columna de dinero, que va alineada a la derecha. */
+.op-celda2--der {
+  align-items: flex-end;
+  text-align: right;
+}
+
+/* Renglón de contexto (fecha de emisión, caja, neto, etapa contable). */
+.op-nota {
+  font-size: var(--pl-fs-micro);
+  line-height: 1.3;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* La misma nota cuando avisa de algo que ya venció: el diseño la pide en
+   rojo. Es la única señal de urgencia de la fila, así que además va en
+   semibold — el color solo no alcanza para quien no distingue rojos. */
+.op-nota--alerta {
+  color: var(--pl-red-700);
+  font-weight: 600;
+}
+
+/* El beneficiario abre su cuenta corriente: es un botón, pero tiene que
+   verse como la celda de al lado. Reset del chrome nativo y subrayado sólo
+   al pasar por encima, para que se note que es clickeable. */
+.op-link-cta {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.op-link-cta:hover .av2-entidad-titulo,
+.op-link-cta:focus-visible .av2-entidad-titulo {
+  text-decoration: underline;
+}
+
+/* Cabecera de página + botón de tutorial en la misma línea. El botón no
+   encoge nunca; el bloque de texto se queda con todo el resto. */
+.op-encabezado {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pl-space-4);
+}
+
+.op-encabezado > :first-child {
+  min-width: 0;
+}

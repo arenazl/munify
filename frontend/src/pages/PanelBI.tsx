@@ -681,7 +681,7 @@ export default function PanelBI() {
           className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
           style={{
             background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-            color: '#ffffff',
+            color: 'var(--pl-on-accent)',
             boxShadow: `0 4px 14px ${theme.primary}40`,
           }}
         >

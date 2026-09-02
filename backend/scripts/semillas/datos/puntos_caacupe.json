@@ -1,0 +1,140 @@
+{
+ "municipio": "Caacupe",
+ "pedidos": 10,
+ "resueltos": 10,
+ "llamadas_nominatim": 36,
+ "areas": [
+  {
+   "nombre": "Caacupe",
+   "puntos_del_anillo": 1836
+  }
+ ],
+ "nucleo_urbano": [
+  -25.3856888,
+  -57.140477
+ ],
+ "puntos": [
+  {
+   "lat": -25.382549,
+   "lon": -57.134962,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Mariscal José Félix Estigarribia",
+   "calle": "Mariscal José Félix Estigarribia",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.386135,
+   "lon": -57.122267,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Ruta Nacional Mariscal Estigarribia",
+   "calle": "Ruta Nacional Mariscal Estigarribia",
+   "altura": null,
+   "barrio": null,
+   "ciudad": null,
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.376237,
+   "lon": -57.145991,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Calle A",
+   "calle": "Calle A",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.37789,
+   "lon": -57.13976,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Pedro T. Avero",
+   "calle": "Pedro T. Avero",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.383218,
+   "lon": -57.142872,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Intendente Ortiz",
+   "calle": "Intendente Ortiz",
+   "altura": null,
+   "barrio": "Ybu",
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.373077,
+   "lon": -57.130341,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Circunvalación de Caacupé",
+   "calle": "Circunvalación de Caacupé",
+   "altura": null,
+   "barrio": null,
+   "ciudad": null,
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.38173,
+   "lon": -57.140545,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Asunción",
+   "calle": "Asunción",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.410708,
+   "lon": -57.120003,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Juan E. O´leary",
+   "calle": "Juan E. O´leary",
+   "altura": null,
+   "barrio": "Barrio Daniel Escurra",
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.349677,
+   "lon": -57.129156,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Ruta Caacupé - Tobatí",
+   "calle": "Ruta Caacupé - Tobatí",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -25.391289,
+   "lon": -57.14681,
+   "zona_nombre": "Caacupe",
+   "zona_id": null,
+   "direccion": "Teniente Godo",
+   "calle": "Teniente Godo",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Caacupé",
+   "fuente": "nominatim"
+  }
+ ],
+ "fuente": "OpenStreetMap / Nominatim -- ODbL",
+ "fuente_area": "INFONA (division oficial de Paraguay)"
+}

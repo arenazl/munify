@@ -16,6 +16,7 @@ import {
   History,
   Camera,
   X as XIcon,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { triggerNotificationPostCreation } from '../NotificationActivationSheet';
@@ -26,6 +27,7 @@ import { DynamicIcon } from '../ui/DynamicIcon';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import {
   reclamosApi,
+  publicoApi,
   categoriasReclamoApi,
   clasificacionApi,
   usersApi,
@@ -83,15 +85,6 @@ const EMPTY_FORM: ReclamoForm = {
   telefono_solicitante: '',
 };
 
-const PRIORIDAD_LABELS: Record<number, string> = {
-  1: 'Urgente',
-  2: 'Alta',
-  3: 'Normal',
-  4: 'Baja',
-  5: 'Muy baja',
-};
-
-
 /**
  * Wizard de creación de reclamo para vecino logueado.
  *
@@ -127,6 +120,11 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   const kycVerificado = user?.rol === 'vecino' && (user?.nivel_verificacion ?? 0) >= 2;
 
   const [categorias, setCategorias] = useState<CategoriaReclamo[]>([]);
+  /** Cuántos días tarda el municipio en responder, y sobre cuántos reclamos
+   *  está medido. Se muestra en el paso final para bajarle la ansiedad al
+   *  vecino: la pregunta que se hace al mandar un reclamo es "¿esto lo va a
+   *  leer alguien?". `null` = todavía no hay con qué responderla. */
+  const [respuestaTipica, setRespuestaTipica] = useState<{ dias: number; sobre: number } | null>(null);
 
   const [form, setForm] = useState<ReclamoForm>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
@@ -153,6 +151,22 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   const dniSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dniUltimoBuscado = useRef<string>('');
 
+  // ============ Ubicación invisible ============
+  // Regla del dueño: todo reclamo con coordenadas, SIN frenar el flujo. Al
+  // abrir el wizard se pide la geolocalización en silencio: si el permiso ya
+  // está dado no se nota nada; si el vecino la niega, acá no pasa nada — el
+  // backend resuelve solo (geocodifica lo tipeado o aproxima por IP). Estas
+  // coords se usan únicamente cuando NO se eligió sugerencia del autocomplete.
+  const gpsRef = useRef<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!open || !('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { gpsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
+      () => { /* denegado o sin señal: la cadena sigue server-side */ },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  }, [open]);
+
   // ============ Cargar datos al abrir ============
 
   useEffect(() => {
@@ -164,7 +178,11 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       try {
         const catsRes = await categoriasReclamoApi.getAll(true);
         if (!cancelled) {
-          setCategorias(catsRes.data || []);
+          // Defensa en profundidad: las categorías `interna: true` (Preventivo,
+          // Mantenimiento, Obra) clasifican trabajo de campo (OT) pero no se
+          // le ofrecen al vecino al crear un reclamo. El backend ya filtra;
+          // igual filtramos acá por si algún caller pasa `interna` sin querer.
+          setCategorias((catsRes.data || []).filter((c: CategoriaReclamo) => !c.interna));
         }
       } catch (err) {
         console.error('Error cargando datos del wizard', err);
@@ -435,12 +453,23 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
 
     setSaving(true);
     try {
+      // Cadena silenciosa de ubicación: sugerencia elegida (precisa, apunta
+      // al problema) → GPS del dispositivo (donde está el vecino) → nada, y
+      // el backend termina la cadena (geocodifica lo tipeado / IP). El
+      // origen viaja para que la analítica sepa cuánto vale cada punto.
+      // OJO modo empleado: la ventanilla carga a nombre de un tercero — el
+      // GPS del mostrador NO es la ubicación del problema, no se manda.
+      const gps = !isEmpleado ? gpsRef.current : null;
+      const ubicacion = form.latitud != null && form.longitud != null
+        ? { latitud: form.latitud, longitud: form.longitud, ubicacion_origen: 'direccion' }
+        : gps
+          ? { latitud: gps.lat, longitud: gps.lng, ubicacion_origen: 'gps' }
+          : {};
       const payload: Record<string, unknown> = {
         titulo: form.titulo.trim(),
         descripcion: form.descripcion.trim(),
         direccion: form.direccion.trim(),
-        latitud: form.latitud ?? undefined,
-        longitud: form.longitud ?? undefined,
+        ...ubicacion,
         referencia: form.referencia.trim() || undefined,
         categoria_id: form.categoria_id,
         prioridad: 3,
@@ -505,7 +534,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 rounded-xl text-sm"
             style={{
-              backgroundColor: theme.backgroundSecondary,
+              backgroundColor: theme.card,
               border: `1px solid ${theme.border}`,
               color: theme.text,
             }}
@@ -779,7 +808,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
           value={form.referencia}
           onChange={e => setForm({ ...form, referencia: e.target.value })}
           className="w-full px-3 py-2 rounded-xl text-sm"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
         />
         <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>
           Ayudanos a ubicar el problema si la dirección no es precisa.
@@ -818,7 +847,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
           value={form.titulo}
           onChange={e => setForm({ ...form, titulo: e.target.value })}
           className="w-full px-3 py-2 rounded-xl text-sm"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
           placeholder="Resumen corto del problema"
         />
         <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>
@@ -837,7 +866,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
           value={form.descripcion}
           onChange={e => setForm({ ...form, descripcion: e.target.value })}
           className="w-full px-3 py-2 rounded-xl text-sm resize-none"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
         />
         <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>
           Mínimo 10 caracteres ({form.descripcion.length})
@@ -961,8 +990,46 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   // Step 4: Confirmación
   // ============================================================
 
+  useEffect(() => {
+    if (!open) return;
+    publicoApi.getEstadisticas(user?.municipio_id)
+      .then((r) => {
+        const d = r.data as { tiempo_promedio_resolucion_dias?: number; resueltos?: number } | null;
+        // Con menos de tres resueltos el promedio es anécdota, no promedio; y
+        // un municipio que arranca tendría 0 días, que sería una promesa
+        // falsa. En los dos casos no se muestra nada.
+        if (d && (d.resueltos ?? 0) >= 3 && (d.tiempo_promedio_resolucion_dias ?? 0) > 0) {
+          setRespuestaTipica({ dias: d.tiempo_promedio_resolucion_dias!, sobre: d.resueltos! });
+        } else {
+          setRespuestaTipica(null);
+        }
+      })
+      .catch(() => setRespuestaTipica(null));
+  }, [open, user?.municipio_id]);
+
   const step4Content = (
     <div className="space-y-4">
+      {respuestaTipica && (
+        <div
+          className="p-3 rounded-xl flex items-start gap-2.5"
+          style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+        >
+          <Clock className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
+          <div className="text-xs" style={{ color: theme.text }}>
+            <p className="font-semibold">
+              Los reclamos suelen responderse en {
+                respuestaTipica.dias < 1
+                  ? 'menos de un día'
+                  : `${Math.round(respuestaTipica.dias)} ${Math.round(respuestaTipica.dias) === 1 ? 'día' : 'días'}`
+              }
+            </p>
+            <p className="mt-0.5" style={{ color: theme.textSecondary }}>
+              Medido sobre los {respuestaTipica.sobre} reclamos que el municipio ya resolvió. Te vamos a avisar cada vez que el tuyo cambie de estado.
+            </p>
+          </div>
+        </div>
+      )}
+
       {categoriaSeleccionada && (
         <div
           className="p-4 rounded-xl"
@@ -1191,7 +1258,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               onChange={e => setForm({ ...form, email_solicitante: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-sm"
               style={{
-                backgroundColor: theme.backgroundSecondary,
+                backgroundColor: theme.card,
                 border: `1px solid ${emailPropioColision ? '#ef4444' : theme.border}`,
                 color: theme.text,
               }}
@@ -1207,7 +1274,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               value={form.telefono_solicitante}
               onChange={e => setForm({ ...form, telefono_solicitante: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
             />
           </div>
         </div>

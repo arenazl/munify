@@ -1,0 +1,632 @@
+# -*- coding: utf-8 -*-
+"""La geografia REAL de la ciudad elegida, para que la semilla hable de ELLA.
+
+EL PROBLEMA QUE CIERRA
+----------------------
+La demo de Lujan salia con zonas "Centro / Norte / Sur / Este / Periferia" y
+barrios "Villa Norte / Los Alamos". Puntos cardinales inventados, no la ciudad
+del intendente que mira la pantalla. Pasaba porque la geografia real venia de un
+JSON precalculado a mano (`geo_demo.puntos_para_semilla`) y, sin ese archivo, la
+semilla caia a una lista generica hardcodeada.
+
+Aca la cadena se dispara SOLA al elegir la ciudad, con TRES piezas y nada mas:
+
+    1. poligono  <- tabla `municipios_catalogo` (ya esta en la base: 2.682 de
+                    5.122 municipios de 6 paises lo tienen cargado por batch).
+    2. barrios y calles  <- UNA consulta a Overpass, cacheada en disco.
+    3. puntos  <- features REALES de esa consulta, filtradas por
+                  punto-en-poligono contra el contorno del paso 1.
+
+No hay servicio nuevo, ni cola, ni proceso aparte: son dos lecturas y un POST.
+
+POR QUE LOS PUNTOS SON FEATURES REALES Y NO COORDENADAS AL AZAR
+---------------------------------------------------------------
+La idea original era sortear coordenadas dentro del poligono y despues
+preguntarle a Nominatim que hay ahi (reverse geocoding). Funciona, pero cuesta
+un pedido por segundo --- 60 puntos son 66 segundos, imposible dentro del alta ---
+y la mitad de los sorteos cae en el campo y hay que descartarlos.
+
+Dando vuelta el orden sale gratis y sale MEJOR: Overpass ya nos devuelve, en la
+misma respuesta, nodos con `addr:street` + `addr:housenumber` (direcciones
+completas y reales) y calles con nombre. Cada uno de esos elementos YA es un
+punto de la ciudad con su direccion; solo hay que verificar que caiga dentro del
+poligono. La prueba de punto-en-poligono sigue siendo la misma
+(`geo_demo.dentro`, ray casting sobre el anillo COMPLETO, nunca el bounding
+box), pero en vez de usarla para aceptar un sorteo se usa para filtrar features.
+Resultado: cero chinches en el rio, cero calles inventadas, cero espera.
+
+LA JERARQUIA SALE DE OSM, NO DE UNA SUPOSICION
+----------------------------------------------
+    zonas    <- places `city|town|village|hamlet`  (las LOCALIDADES del partido)
+    barrios  <- places `suburb|neighbourhood|quarter`
+
+En Lujan eso da zonas = Lujan, Olivera, Open Door, Torres, Carlos Keen,
+Jauregui, Cortinez, Pueblo Nuevo, Lezica y Torrezuri --- exactamente las
+localidades del partido --- y 60 barrios reales colgando de ellas. Si la ciudad
+no tiene localidades (el caso de una ciudad sola, sin pueblos alrededor), los
+barrios pasan a ser tambien las zonas: la division que exista, no una inventada.
+
+DEGRADACION HONESTA (regla 11: dato real o NULL, jamas un plausible)
+--------------------------------------------------------------------
+    hay places            -> zonas y barrios reales
+    no hay places, si calles -> las zonas se llaman como las calles PRINCIPALES
+                                reales de la ciudad, y no hay barrios
+    no hay nada           -> el municipio queda SIN zonas y SIN barrios, y el
+                             llamador se entera por `degradacion` para decirlo
+
+Lo que NO existe mas es el reparto generico Centro/Norte/Sur: mentia sobre la
+ciudad del cliente, que es justo lo que esta demo tiene que vender.
+
+DETERMINISTA A PROPOSITO
+------------------------
+Todo el sorteo va con `random.Random(slug(nombre_municipio))`. La demo de la
+misma ciudad sale SIEMPRE igual: mismos barrios, mismas calles, mismas
+coordenadas. Si un vendedor la muestra dos veces, no se le mueve abajo de los
+pies.
+
+EL CACHE ES OPTIMIZACION, NO REQUISITO
+--------------------------------------
+Si el JSON de la ciudad existe, se usa y no se toca la red. Si no existe, se
+consulta EN VIVO y se guarda para la proxima. Nunca mas "sin cache -> genericos".
+
+FUENTE / LICENCIA
+-----------------
+  https://overpass-api.de/api/interpreter -- ODbL, (c) OpenStreetMap contributors
+"""
+from __future__ import annotations
+
+import json
+import math
+import random
+import re
+from pathlib import Path
+from typing import Any, Optional
+
+from services.geo_demo import CACHE_DIR, _norm, _slug, dentro
+
+MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
+UA = "Munify/1.0 (semilla de demos municipales; https://munify.com.ar)"
+
+# Overpass tarda ~12 s para un partido como Lujan (2.481 calles + 70 places).
+# El timeout es generoso PERO acotado: el alta de la demo no puede colgarse
+# esperando a un servicio publico. Si vence, se degrada y la demo se crea igual.
+TIMEOUT_SEG = 75.0
+# Un reintento y nada mas, contra el segundo mirror. Overpass devuelve 429/504
+# seguido; insistir mas solo alarga el alta sin cambiar el resultado.
+INTENTOS = 2
+
+# El filtro `poly:` de Overpass recibe el contorno como texto. Los poligonos del
+# catalogo llegan hasta ~400 vertices y mandarlos enteros hace la consulta lenta
+# sin ganar nada: es un PREFILTRO. El recorte fino lo hace `dentro()` en Python
+# contra el anillo COMPLETO, asi que simplificar aca no deja entrar nada de
+# afuera del municipio.
+VERTICES_FILTRO = 80
+
+# Topes de la respuesta. Overpass corta por cantidad de elementos, no por bytes.
+TOPE_GEO = 4000      # places + calles
+TOPE_DIRECCIONES = 2000
+
+# Cuantas zonas y barrios se cargan como maximo. Un partido grande tiene 60
+# barrios en OSM y un selector con 60 items no se usa; se toman los mas cercanos
+# al centro de la ciudad, que son los que el intendente nombra.
+MAX_ZONAS = 12
+# 40 y no 30: con 30, Lujan cortaba en 5 km y se quedaba afuera Ameghino, que es
+# uno de los barrios que el dueño nombro como prueba de que la demo habla de SU
+# ciudad. El corte es por cercania al centro, asi que subirlo suma barrios de
+# verdad --- todos salen de OSM --- sin ensuciar con nada inventado.
+MAX_BARRIOS = 40
+
+# Distancia maxima para adjudicarle un barrio a un punto. Mas lejos que esto el
+# punto no es "de" ese barrio y se deja sin barrio, que es la verdad.
+MAX_KM_BARRIO = 3.0
+
+PLACES_ZONA = ("city", "town", "village", "hamlet")
+PLACES_BARRIO = ("suburb", "neighbourhood", "quarter")
+
+
+class OsmNoDisponible(RuntimeError):
+    """Overpass no contesto. El llamador degrada; nunca inventa."""
+
+
+# ==========================================================================
+# Utilidades
+# ==========================================================================
+
+def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Distancia aproximada en km entre (lat, lon). Equirectangular alcanza:
+    se usa para comparar candidatos dentro de una misma ciudad, no para navegar.
+    """
+    dlat = (a[0] - b[0]) * 111.0
+    dlon = (a[1] - b[1]) * 111.0 * math.cos(math.radians((a[0] + b[0]) / 2))
+    return math.hypot(dlat, dlon)
+
+
+# En Lujan el `name` de OSM viene como "1013 - Avenida Maria Unzue de Alvear":
+# el numero de nomenclatura municipal pegado adelante. Mostrarlo asi delata que
+# el dato salio crudo de un dump. Se saca SOLO cuando hay separador " - ", asi
+# "12 de Octubre" o "9 de Julio" quedan intactas.
+_PREFIJO_NOMENCLATURA = re.compile(r"^\s*\d+\s*(?:bis)?\s+-\s+(?=\S)", re.IGNORECASE)
+
+
+def _limpiar_calle(nombre: str) -> str:
+    return _PREFIJO_NOMENCLATURA.sub("", nombre or "").strip()
+
+
+def _simplificar(anillo: list, maximo: int = VERTICES_FILTRO) -> list:
+    """Decima el anillo dejando `maximo` vertices repartidos parejo."""
+    if len(anillo) <= maximo:
+        return anillo
+    paso = len(anillo) / maximo
+    return [anillo[int(i * paso)] for i in range(maximo)]
+
+
+def ruta_cache(nombre_municipio: str) -> Path:
+    return CACHE_DIR / f"osmgeo_{_slug(nombre_municipio)}.json"
+
+
+# ==========================================================================
+# 1. El poligono: de la base, no de la red
+# ==========================================================================
+
+async def poligono_del_catalogo(db, nombre: str, pais: str,
+                                provincia: Optional[str] = None,
+                                lat: Optional[float] = None,
+                                lon: Optional[float] = None) -> Optional[list]:
+    """Contorno oficial del municipio desde `municipios_catalogo`.
+
+    Se busca por nombre + pais (+ provincia si vino, que es lo que desambigua
+    los homonimos: hay dos 'Lujan' en Argentina y seis 'San Martin'). Si el
+    nombre no matchea --- el alta pudo normalizar tildes o el usuario escribio un
+    alias --- se cae a la fila mas CERCANA a las coordenadas con las que se creo
+    el municipio, que vinieron de este mismo catalogo y por lo tanto coinciden.
+    """
+    from sqlalchemy import text
+
+    filas = (await db.execute(text(
+        "SELECT nombre, provincia, lat, lng, poligono FROM municipios_catalogo "
+        "WHERE pais = :p AND poligono IS NOT NULL AND "
+        "(nombre = :n OR alias LIKE :al)"),
+        {"p": (pais or "AR").upper(), "n": nombre, "al": f"%{nombre}%"})).fetchall()
+
+    if filas and provincia:
+        exactas = [f for f in filas if (f[1] or "") == provincia]
+        filas = exactas or filas
+
+    if not filas and lat is not None and lon is not None:
+        # Ultimo recurso dentro de la BASE (todavia sin salir a la red): la fila
+        # del catalogo cuyo centro esta a menos de ~5 km del centro del muni.
+        filas = (await db.execute(text(
+            "SELECT nombre, provincia, lat, lng, poligono FROM municipios_catalogo "
+            "WHERE pais = :p AND poligono IS NOT NULL "
+            "AND ABS(lat - :la) < 0.06 AND ABS(lng - :lo) < 0.06 "
+            "ORDER BY ABS(lat - :la) + ABS(lng - :lo) LIMIT 1"),
+            {"p": (pais or "AR").upper(), "la": lat, "lo": lon})).fetchall()
+
+    if not filas:
+        return None
+    if len(filas) > 1 and lat is not None and lon is not None:
+        filas = sorted(filas, key=lambda f: _km((lat, lon), (float(f[2]), float(f[3]))))
+    try:
+        anillo = json.loads(filas[0][4])
+    except (ValueError, TypeError):
+        return None
+    return anillo if isinstance(anillo, list) and len(anillo) >= 3 else None
+
+
+async def zonas_del_catalogo(db, anillo: list) -> list[dict]:
+    """Las localidades del municipio, con su contorno, desde `catalogo_zonas`.
+
+    Es el padron: georef dice que localidades tiene cada municipio y el contorno
+    ya viene resuelto y validado. Overpass sigue haciendo falta para las CALLES
+    --- las direcciones reales de los reclamos de la demo --- pero para las zonas
+    no: pedirselas devolvia nodos, o sea puntos sin area, y encima dependia de
+    que el servicio estuviera arriba. Un municipio nacia con los nombres de sus
+    localidades y sin una sola division dibujada en el mapa.
+
+    Se busca por GEOMETRIA --- la localidad cuyo centro cae dentro del contorno
+    del municipio --- y no por el nombre del municipio: el nombre ya se resolvio
+    un paso antes, al conseguir ese contorno, y repetir la busqueda por texto
+    reabre el problema de los homonimos.
+    """
+    from sqlalchemy import text
+
+    xs = [p[0] for p in anillo]
+    ys = [p[1] for p in anillo]
+    filas = (await db.execute(text(
+        "SELECT nombre, lat, lng, poligono FROM catalogo_zonas "
+        "WHERE lat BETWEEN :y0 AND :y1 AND lng BETWEEN :x0 AND :x1"),
+        {"x0": min(xs), "x1": max(xs), "y0": min(ys), "y1": max(ys)})).fetchall()
+
+    zonas = []
+    for nombre, la, ln, poly in filas:
+        if la is None or ln is None:
+            continue
+        if not _dentro((float(ln), float(la)), anillo):
+            continue
+        zonas.append({"nombre": nombre, "lat": float(la), "lon": float(ln),
+                      "poligono": poly})
+    return zonas
+
+
+def _dentro(pt, anillo) -> bool:
+    x, y = pt
+    dentro = False
+    n = len(anillo)
+    for i in range(n):
+        x1, y1 = anillo[i][:2]
+        x2, y2 = anillo[(i + 1) % n][:2]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            dentro = not dentro
+    return dentro
+
+
+# ==========================================================================
+# 2. Barrios y calles: UNA consulta a Overpass, cacheada
+# ==========================================================================
+
+def _consulta(anillo: list) -> str:
+    """La consulta Overpass. UNA sola, con dos salidas acotadas.
+
+    Dos `out` en vez de uno porque los topes de Overpass son por salida: con un
+    unico `out ... 4000` las direcciones de una ciudad grande se comerian el
+    cupo y no quedarian calles. Separadas, cada conjunto tiene su tope propio.
+
+    El filtro `poly:` toma el contorno en 'lat lon lat lon ...'.
+    """
+    p = " ".join(f"{c[1]:.5f} {c[0]:.5f}" for c in _simplificar(anillo))
+    return f"""[out:json][timeout:120];
+(
+  node(poly:"{p}")["place"~"^(city|town|village|hamlet|suburb|neighbourhood|quarter)$"]["name"];
+  way(poly:"{p}")["place"~"^(suburb|neighbourhood|quarter)$"]["name"];
+  relation(poly:"{p}")["place"~"^(suburb|neighbourhood|quarter)$"]["name"];
+  way(poly:"{p}")["highway"~"^(primary|secondary|tertiary|residential)$"]["name"];
+)->.geo;
+.geo out tags center {TOPE_GEO};
+node(poly:"{p}")["addr:housenumber"]["addr:street"]->.dir;
+.dir out tags center {TOPE_DIRECCIONES};"""
+
+
+async def _pedir(query: str) -> dict:
+    import httpx
+
+    ultimo = ""
+    for i in range(INTENTOS):
+        mirror = MIRRORS[i % len(MIRRORS)]
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT_SEG,
+                                         headers={"User-Agent": UA}) as cli:
+                r = await cli.post(mirror, data={"data": query})
+                r.raise_for_status()
+                return r.json()
+        except Exception as e:  # noqa: BLE001 -- se reintenta con el otro mirror
+            ultimo = f"{type(e).__name__}: {str(e)[:120]}"
+    raise OsmNoDisponible(ultimo or "sin respuesta")
+
+
+def _parsear(cruda: dict, anillo: list) -> dict:
+    """De la respuesta de Overpass a places / calles / direcciones, ya filtrados
+    por punto-en-poligono contra el anillo COMPLETO."""
+    places: list[dict] = []
+    calles: dict[str, dict] = {}
+    direcciones: list[dict] = []
+
+    for el in cruda.get("elements", []):
+        tags = el.get("tags") or {}
+        c = el.get("center") or el
+        lat, lon = c.get("lat"), c.get("lon")
+        if lat is None or lon is None:
+            continue
+        if not dentro((lon, lat), anillo):
+            continue  # el filtro `poly:` va sobre el contorno simplificado
+        if tags.get("place"):
+            places.append({"nombre": tags["name"], "tipo": tags["place"],
+                           "lat": round(lat, 6), "lon": round(lon, 6)})
+        elif tags.get("highway"):
+            nombre = _limpiar_calle(tags.get("name", ""))
+            if not nombre:
+                continue
+            # Una calle son muchos `way`. Se guarda un tramo por nombre y se
+            # cuenta el resto: la cantidad de tramos es el mejor proxy gratis de
+            # "que tan principal es" para la degradacion por calles.
+            reg = calles.setdefault(nombre, {"nombre": nombre, "lat": round(lat, 6),
+                                             "lon": round(lon, 6),
+                                             "tipo": tags["highway"], "tramos": 0})
+            reg["tramos"] += 1
+        elif tags.get("addr:street"):
+            calle = _limpiar_calle(tags["addr:street"])
+            altura = (tags.get("addr:housenumber") or "").strip()
+            if not calle or not altura:
+                continue
+            direcciones.append({"calle": calle, "altura": altura,
+                                "lat": round(lat, 6), "lon": round(lon, 6)})
+
+    return {"places": places, "calles": list(calles.values()),
+            "direcciones": direcciones}
+
+
+async def osm_de_ciudad(nombre_municipio: str, anillo: list,
+                        refrescar: bool = False) -> dict:
+    """Places, calles y direcciones reales del municipio. Cache primero."""
+    ruta = ruta_cache(nombre_municipio)
+    if ruta.exists() and not refrescar:
+        try:
+            datos = json.loads(ruta.read_text(encoding="utf-8"))
+            datos["cacheado"] = True
+            return datos
+        except (ValueError, OSError):
+            pass  # cache corrupto: se vuelve a pedir
+
+    datos = _parsear(await _pedir(_consulta(anillo)), anillo)
+    datos.update({"municipio": nombre_municipio, "cacheado": False,
+                  "fuente": "OpenStreetMap (Overpass API) -- ODbL"})
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass  # sin disco de escritura la demo se crea igual, solo sin cache
+    return datos
+
+
+# ==========================================================================
+# 3. De lo real a lo que la semilla necesita
+# ==========================================================================
+
+def _cerca(punto: tuple[float, float], candidatos: list[dict],
+           max_km: Optional[float] = None) -> Optional[dict]:
+    if not candidatos:
+        return None
+    mejor = min(candidatos, key=lambda c: _km(punto, (c["lat"], c["lon"])))
+    if max_km is not None and _km(punto, (mejor["lat"], mejor["lon"])) > max_km:
+        return None
+    return mejor
+
+
+def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
+          centro: Optional[tuple[float, float]] = None,
+          max_zonas: int = MAX_ZONAS,
+          max_barrios: int = MAX_BARRIOS) -> dict:
+    """Zonas, barrios y puntos listos para la semilla. Todo determinista.
+
+    `cantidad_puntos` es un PARAMETRO a proposito: cuando la semilla suba de 13
+    a 50 reclamos no hay que tocar nada aca, y el consumidor ademas recorre la
+    lista con modulo, asi que pedir de menos degrada la variedad pero nunca
+    rompe.
+    """
+    rnd = random.Random(_slug(nombre_municipio))
+    places = osm.get("places") or []
+    calles = osm.get("calles") or []
+    direcciones = osm.get("direcciones") or []
+
+    gruesas = [p for p in places if p["tipo"] in PLACES_ZONA]
+    finas = [p for p in places if p["tipo"] in PLACES_BARRIO]
+    # Ciudad sin localidades alrededor: si el unico place "grueso" es la ciudad
+    # misma, una zona unica que abarca el 100% de los casos no divide nada
+    # (Villa Carlos Paz: un solo `town` y 59 barrios --- salia UNA zona con los
+    # 50 reclamos adentro). La division real son sus barrios, y esos pasan a
+    # ser las zonas; si tampoco hay barrios, se cae mas abajo a las calles
+    # principales. En un partido (Lujan, Merlo) hay varias localidades y este
+    # caso no toca nada.
+    if len(gruesas) <= 1:
+        if finas:
+            gruesas = finas
+            finas = []
+        else:
+            gruesas = []
+
+    degradacion: Optional[str] = None
+    if not gruesas and calles:
+        # Sin ninguna division en OSM, las zonas toman el nombre de las calles
+        # mas principales de la ciudad. Siguen siendo nombres REALES que el
+        # intendente reconoce; lo que no se hace es llamarlas Norte/Sur.
+        orden = {"primary": 0, "secondary": 1, "tertiary": 2, "residential": 3}
+        top = sorted(calles, key=lambda c: (orden.get(c["tipo"], 9), -c["tramos"]))[:max_zonas]
+        gruesas = [{"nombre": c["nombre"], "tipo": "calle",
+                    "lat": c["lat"], "lon": c["lon"]} for c in top]
+        degradacion = "sin_barrios_en_osm_zonas_por_calles_principales"
+    elif not gruesas:
+        degradacion = "sin_geografia_en_osm"
+
+    # DESDE DONDE SE MIDE "CERCA DEL CENTRO". El punto del catalogo es el
+    # centroide del PARTIDO, no el del casco urbano: en Lujan cae 4 km al oeste
+    # de la ciudad y con el, ordenando por cercania, Ameghino quedaba 52° de 60 y
+    # afuera del corte, mientras entraban barrios del otro extremo. El place
+    # `town` que devuelve OSM con el nombre del municipio SI es el centro de la
+    # ciudad, y ahi Ameghino sube al puesto 37 y entra --- junto con Zapiola,
+    # Juan XXIII, Universidad y Villa del Parque.
+    objetivo = _norm(nombre_municipio)
+    propio = next((p for p in places
+                   if p["tipo"] in PLACES_ZONA and _norm(p["nombre"]) == objetivo), None)
+    centro_ciudad = (propio["lat"], propio["lon"]) if propio else centro
+
+    def _recortar(items: list[dict], tope: int) -> list[dict]:
+        if len(items) <= tope or not centro_ciudad:
+            return items[:tope]
+        return sorted(items,
+                      key=lambda p: _km(centro_ciudad, (p["lat"], p["lon"])))[:tope]
+
+    zonas = _recortar(gruesas, max_zonas)
+    barrios = _recortar(finas, max_barrios)
+
+    # --- los puntos ---
+    # Cada candidato YA es un elemento real de OSM dentro del poligono. Se
+    # prefieren las direcciones completas (calle + altura REALES de OSM); las
+    # calles sin altura entran despues para dar cobertura a los barrios donde
+    # OSM no tiene numeracion cargada.
+    #
+    # NO se le pega una altura inventada a la calle: una direccion que parece
+    # precisa y no lo es es exactamente lo que la regla 11 prohibe. Sin numero,
+    # la direccion queda con la calle sola.
+    pool: dict[str, dict] = {}
+    for d in direcciones:
+        pool.setdefault(d["calle"], {
+            "lat": d["lat"], "lon": d["lon"], "calle": d["calle"],
+            "altura": d["altura"], "direccion": f"{d['calle']} {d['altura']}",
+            "fuente": "osm_addr"})
+    for c in calles:
+        pool.setdefault(c["nombre"], {
+            "lat": c["lat"], "lon": c["lon"], "calle": c["nombre"],
+            "altura": None, "direccion": c["nombre"], "fuente": "osm_highway"})
+
+    # DOS CON ALTURA, UNA SIN, y asi. No es capricho: en Lujan OSM tiene 2.000
+    # nodos con numero de puerta pero repartidos en solo 79 calles, todas del
+    # casco. Barajando todo junto los primeros puntos salian casi sin altura
+    # ("Entre Rios" a secas); poniendo las direcciones completas adelante, TODOS
+    # los reclamos caian en el centro y las localidades del partido quedaban sin
+    # un solo caso. Intercalado se queda con las dos cosas: la mayoria de las
+    # direcciones completas, y reclamos repartidos por toda la ciudad.
+    #
+    # Una calle repetida en dos reclamos se lee como dato sintetico, asi que el
+    # pool ya viene deduplicado por nombre de calle.
+    con_altura = [p for p in pool.values() if p["altura"]]
+    sin_altura = [p for p in pool.values() if not p["altura"]]
+    rnd.shuffle(con_altura)
+    rnd.shuffle(sin_altura)
+    candidatos: list[dict] = []
+    ia = ib = 0
+    while ia < len(con_altura) or ib < len(sin_altura):
+        for _ in range(2):
+            if ia < len(con_altura):
+                candidatos.append(con_altura[ia])
+                ia += 1
+        if ib < len(sin_altura):
+            candidatos.append(sin_altura[ib])
+            ib += 1
+
+    puntos = []
+    for p in candidatos[:cantidad_puntos]:
+        zona = _cerca((p["lat"], p["lon"]), zonas)
+        barrio = _cerca((p["lat"], p["lon"]), barrios, MAX_KM_BARRIO)
+        puntos.append({**p,
+                       "zona_nombre": zona["nombre"] if zona else None,
+                       "barrio": barrio["nombre"] if barrio else None})
+
+    return {
+        "zonas": zonas,
+        "barrios": barrios,
+        "puntos": puntos,
+        "degradacion": degradacion,
+        "con_altura_real": sum(1 for p in puntos if p["altura"]),
+        "calles_disponibles": len(calles),
+        "direcciones_disponibles": len(direcciones),
+        "places_disponibles": len(places),
+    }
+
+
+# ==========================================================================
+# La puerta de entrada: una llamada y la ciudad queda resuelta
+# ==========================================================================
+
+async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
+                    provincia: Optional[str] = None,
+                    lat: Optional[float] = None, lon: Optional[float] = None,
+                    log: Any = None) -> dict:
+    """Toda la geografia de la ciudad, o la degradacion explicada.
+
+    Nunca levanta: si algo falla devuelve zonas/barrios/puntos vacios y el
+    motivo en `degradacion`. Crear la demo no puede romperse porque OSM
+    devolvio un 504 --- pero tampoco puede disimularlo, asi que el motivo viaja
+    hasta la respuesta del alta y hasta el log de seeding.
+    """
+    vacio = {"zonas": [], "barrios": [], "puntos": [], "poligono": None,
+             "fuente_poligono": None, "degradacion": "sin_geografia_en_osm"}
+
+    def _paso(nombre_paso: str):
+        # El log es opcional: los scripts y los tests llaman sin el.
+        class _Nulo:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def ok(self, **k):
+                pass
+
+            def degradado(self, motivo, **k):
+                pass
+
+            def fallo(self, motivo, **k):
+                pass
+        return log.paso(nombre_paso) if log is not None else _Nulo()
+
+    # --- poligono ---
+    with _paso("geo:poligono") as pz:
+        anillo = await poligono_del_catalogo(db, nombre, pais, provincia, lat, lon)
+        if anillo:
+            pz.ok(vertices=len(anillo), fuente="municipios_catalogo")
+        else:
+            pz.degradado("el municipio no tiene contorno cargado en municipios_catalogo",
+                         fuente=None)
+    if not anillo:
+        return {**vacio, "degradacion": "sin_poligono_en_catalogo"}
+
+    # --- zonas: del PADRON, no de la red ---
+    # Estan en la base, con el contorno ya resuelto y validado. Overpass las
+    # devolvia como nodos --- puntos sin area --- y ademas hay que estar
+    # esperando que conteste.
+    with _paso("geo:zonas") as pzz:
+        zonas_padron = await zonas_del_catalogo(db, anillo)
+        if zonas_padron:
+            pzz.ok(zonas=len(zonas_padron),
+                   con_contorno=sum(1 for z in zonas_padron if z["poligono"]),
+                   fuente="catalogo_zonas")
+        else:
+            pzz.degradado("el municipio no tiene localidades en catalogo_zonas",
+                          fuente=None)
+
+    # --- barrios y calles ---
+    with _paso("geo:osm") as po:
+        try:
+            osm = await osm_de_ciudad(nombre, anillo)
+            po.ok(cacheado=osm.get("cacheado"),
+                  places=len(osm.get("places") or []),
+                  calles=len(osm.get("calles") or []),
+                  direcciones=len(osm.get("direcciones") or []))
+        except OsmNoDisponible as e:
+            # Sin Overpass no hay calles, pero las zonas ya no dependen de el:
+            # la demo nace con sus localidades dibujadas igual.
+            po.fallo(f"Overpass no respondio: {e}")
+            return {**vacio, "zonas": zonas_padron, "poligono": anillo,
+                    "fuente_poligono": "municipios_catalogo",
+                    "degradacion": f"overpass_no_disponible: {e}"}
+
+    # --- zonas, barrios y puntos ---
+    with _paso("geo:puntos") as pp:
+        centro = (lat, lon) if lat is not None and lon is not None else None
+        armado = armar(nombre, osm, cantidad_puntos, centro=centro)
+        detalle = {
+            "zonas": len(armado["zonas"]),
+            "barrios": len(armado["barrios"]),
+            "puntos": len(armado["puntos"]),
+            "puntos_con_altura_real": armado["con_altura_real"],
+            "nombres_zonas": [z["nombre"] for z in armado["zonas"]],
+            "nombres_barrios": [b["nombre"] for b in armado["barrios"]][:15],
+            "calles_ejemplo": [p["direccion"] for p in armado["puntos"][:8]],
+        }
+        if armado["degradacion"]:
+            pp.degradado(armado["degradacion"], **detalle)
+        else:
+            pp.ok(**detalle)
+
+    # QUIEN MANDA depende de que clase de municipio es, y esto ya estaba resuelto
+    # aguas arriba: en un PARTIDO (Moron, La Matanza) la division son sus
+    # localidades, y ahi el padron gana porque las trae con contorno. En una
+    # CIUDAD --- una sola localidad, que es ella misma --- la division real son
+    # sus barrios, y `armar()` ya los promueve a zonas; imponer el padron ahi
+    # devolveria UNA zona que abarca el 100% de los reclamos y no divide nada,
+    # que es exactamente el bug que arreglo el fix de Villa Carlos Paz.
+    #
+    # Sin barrios en OSM queda la unica localidad del padron, que al menos trae
+    # su contorno: peor es no dibujar nada.
+    if len(zonas_padron) > 1:
+        zonas, fuente_zonas = zonas_padron, "catalogo_zonas"
+    elif armado["zonas"]:
+        zonas, fuente_zonas = armado["zonas"], "osm_barrios_de_la_ciudad"
+    else:
+        zonas, fuente_zonas = zonas_padron, "catalogo_zonas"
+    return {**armado, "zonas": zonas, "poligono": anillo,
+            "fuente_poligono": "municipios_catalogo",
+            "fuente_zonas": fuente_zonas}

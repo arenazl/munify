@@ -117,7 +117,7 @@ export function PeriodNavigator({
                   className="px-2.5 h-[34px] text-[12px] font-semibold transition-all"
                   style={{
                     backgroundColor: activo ? theme.primary : theme.backgroundSecondary,
-                    color: activo ? '#fff' : theme.textSecondary,
+                    color: activo ? theme.primaryText : theme.textSecondary,
                   }}
                   type="button"
                 >
@@ -183,7 +183,7 @@ export function PeriodNavigator({
           className="inline-flex items-center justify-center h-[34px] w-[34px] rounded-lg transition-all hover:brightness-110"
           style={{
             backgroundColor: modoTodos ? theme.primary : theme.backgroundSecondary,
-            color: modoTodos ? '#fff' : theme.textSecondary,
+            color: modoTodos ? theme.primaryText : theme.textSecondary,
             border: `1px solid ${modoTodos ? theme.primary : theme.border}`,
           }}
           title={modoTodos ? (todosLabelActivo || 'Ver todos los períodos') : (todosLabel || 'Ver todos')}

@@ -4,15 +4,16 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, AlertTriangle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp
+  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp, Star, Wrench
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, whatsappApi } from '../lib/api';
+import { reclamosApi, whatsappApi, calificacionesApi, modulosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { DynamicIcon } from '../components/ui/ReclamoCard';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
+import { estadoColor, estadoLabel, estadoLabels, estadoIcons } from '../lib/enums/reclamo';
 import type { Reclamo, HistorialReclamo, EstadoReclamo } from '../types';
 
 interface WhatsAppLog {
@@ -30,6 +31,14 @@ interface TimelineEvent {
   type: 'historial' | 'whatsapp';
   created_at: string;
   data: HistorialReclamo | WhatsAppLog;
+}
+
+// Calificación que dejó el vecino tras el cierre del reclamo (T5-F1)
+interface CalificacionVecinoData {
+  id: number;
+  puntuacion: number;
+  comentario?: string | null;
+  created_at?: string;
 }
 
 const tipoMensajeLabels: Record<string, string> = {
@@ -84,18 +93,17 @@ const getFriendlyError = (error: string): string => {
   return error;
 };
 
-const estadoConfig: Record<EstadoReclamo, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
-  recibido: { label: 'Recibido', color: '#0891b2', bg: '#cffafe', icon: CheckCircle },
-  en_curso: { label: 'En Curso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
-  finalizado: { label: 'Finalizado', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
-  pospuesto: { label: 'Pospuesto', color: '#ea580c', bg: '#ffedd5', icon: Clock },
-  rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
-  // Legacy
-  nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
-  asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
-  en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
-  pendiente_confirmacion: { label: 'Pendiente', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
-  resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
+// Config visual de un estado, derivada de la SSoT (lib/enums/reclamo.ts).
+// bg = tinte del color de estado sobre el theme (dark-safe; reemplaza los
+// pasteles hardcodeados que rompían el modo oscuro).
+const estadoVisual = (estado: string) => {
+  const color = estadoColor(estado);
+  return {
+    label: estadoLabel(estado),
+    color,
+    bg: `${color}20`,
+    icon: estadoIcons[estado] || AlertCircle,
+  };
 };
 
 const accionIcons: Record<string, typeof CheckCircle> = {
@@ -133,6 +141,7 @@ export default function ReclamoDetalle() {
   const [reclamo, setReclamo] = useState<Reclamo | null>(null);
   const [historial, setHistorial] = useState<HistorialReclamo[]>([]);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
+  const [calificacion, setCalificacion] = useState<CalificacionVecinoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<number | null>(null);
@@ -147,6 +156,8 @@ export default function ReclamoDetalle() {
   const [showComentarioModal, setShowComentarioModal] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState<EstadoReclamo | null>(null);
   const [comentarioCambioEstado, setComentarioCambioEstado] = useState('');
+  // Módulo Órdenes de Trabajo (opt-in por muni) — gatea el botón "Crear OT".
+  const [moduloOTActivo, setModuloOTActivo] = useState(false);
 
   // Función para confirmar reclamo (supervisor)
   const handleConfirmar = async () => {
@@ -253,7 +264,7 @@ export default function ReclamoDetalle() {
         comentarioCambioEstado.trim() || undefined
       );
       setReclamo(response.data);
-      toast.success(`Estado cambiado a "${estadoConfig[nuevoEstado].label}"`);
+      toast.success(`Estado cambiado a "${estadoLabel(nuevoEstado)}"`);
       setShowComentarioModal(false);
       setNuevoEstado(null);
       setComentarioCambioEstado('');
@@ -277,6 +288,20 @@ export default function ReclamoDetalle() {
       ]);
       setReclamo(reclamoRes.data);
       setHistorial(historialRes.data);
+
+      // Si el reclamo está cerrado, traer la calificación del vecino (T5-F1).
+      // 404 = todavía no calificó → dejamos null y no mostramos el panel.
+      const estadoCierre = (reclamoRes.data.estado || '').toLowerCase();
+      if (estadoCierre === 'finalizado' || estadoCierre === 'resuelto') {
+        try {
+          const califRes = await calificacionesApi.getReclamo(Number(id));
+          setCalificacion(califRes.data);
+        } catch {
+          setCalificacion(null);
+        }
+      } else {
+        setCalificacion(null);
+      }
 
       // Cargar logs de WhatsApp (puede fallar si no hay permisos, ignorar)
       try {
@@ -308,6 +333,18 @@ export default function ReclamoDetalle() {
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Estado del módulo Órdenes de Trabajo (opt-in). Solo interesa a gestores,
+  // que son quienes pueden generar una OT desde el reclamo.
+  useEffect(() => {
+    if (!user || !['admin', 'supervisor'].includes(user.rol)) return;
+    modulosApi.list()
+      .then((res) => {
+        const rows = (res.data || []) as Array<{ modulo: string; activo: boolean }>;
+        setModuloOTActivo(rows.some(m => m.modulo === 'ordenes_trabajo' && m.activo));
+      })
+      .catch(() => setModuloOTActivo(false));
+  }, [user]);
 
   // Combinar historial y logs de WhatsApp en un timeline unificado
   const timelineEvents = useMemo(() => {
@@ -384,7 +421,7 @@ export default function ReclamoDetalle() {
 
   if (!reclamo) return null;
 
-  const estadoActual = estadoConfig[reclamo.estado];
+  const estadoActual = estadoVisual(reclamo.estado);
   const EstadoIcon = estadoActual.icon;
 
   return (
@@ -404,7 +441,7 @@ export default function ReclamoDetalle() {
         {/* Header del reclamo */}
         <div
           className="p-6 border-b"
-          style={{ borderColor: theme.border, background: `linear-gradient(135deg, ${estadoActual.bg}50 0%, transparent 100%)` }}
+          style={{ borderColor: theme.border, background: `linear-gradient(135deg, ${estadoActual.color}18 0%, transparent 100%)` }}
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1">
@@ -437,7 +474,8 @@ export default function ReclamoDetalle() {
                           <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary }}>
                             Cambiar estado a:
                           </div>
-                          {(Object.entries(estadoConfig) as [EstadoReclamo, typeof estadoActual][]).map(([estado, config]) => {
+                          {(Object.keys(estadoLabels) as EstadoReclamo[]).map((estado) => {
+                            const config = estadoVisual(estado);
                             const Icon = config.icon;
                             const isCurrentState = estado === reclamo.estado;
                             return (
@@ -584,7 +622,7 @@ export default function ReclamoDetalle() {
                 className="h-10 w-10 rounded-full flex items-center justify-center text-white font-medium"
                 style={{ backgroundColor: theme.primary }}
               >
-                {reclamo.creador.nombre[0]}{reclamo.creador.apellido[0]}
+                {(reclamo.creador.nombre?.[0] || '?')}{reclamo.creador.apellido?.[0] || ''}
               </div>
               <div>
                 <p className="font-medium" style={{ color: theme.text }}>
@@ -634,6 +672,24 @@ export default function ReclamoDetalle() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Puente al módulo de campo: generar una OT desde este reclamo.
+                Gateado por el módulo 'ordenes_trabajo' (opt-in) y por rol gestor.
+                El deep-link ?reclamo_id={id} abre el sheet de creación pre-vinculado. */}
+            {moduloOTActivo && user && ['admin', 'supervisor'].includes(user.rol) && (
+              <button
+                onClick={() => navigate(`/gestion/ordenes-trabajo?reclamo_id=${reclamo.id}`)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all hover:scale-[1.01] active:scale-95"
+                style={{
+                  backgroundColor: `${theme.primary}15`,
+                  border: `1.5px solid ${theme.primary}`,
+                  color: theme.primary,
+                }}
+              >
+                <Wrench className="h-4 w-4" />
+                Crear orden de trabajo
+              </button>
             )}
 
             {/* Timeline de eventos */}
@@ -701,7 +757,7 @@ export default function ReclamoDetalle() {
                                       onClick={() => handleResendWhatsApp(log)}
                                       disabled={resendingId === log.id}
                                       className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                                      style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+                                      style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                                       title="Reintentar envío"
                                     >
                                       <RefreshCw className={`h-3 w-3 ${resendingId === log.id ? 'animate-spin' : ''}`} />
@@ -800,11 +856,11 @@ export default function ReclamoDetalle() {
                                 <span
                                   className="px-1.5 py-0.5 text-xs rounded"
                                   style={{
-                                    backgroundColor: estadoConfig[item.estado_nuevo]?.bg || theme.backgroundSecondary,
-                                    color: estadoConfig[item.estado_nuevo]?.color || theme.text,
+                                    backgroundColor: `${estadoColor(item.estado_nuevo)}20`,
+                                    color: estadoColor(item.estado_nuevo),
                                   }}
                                 >
-                                  {estadoConfig[item.estado_nuevo]?.label || item.estado_nuevo}
+                                  {estadoLabel(item.estado_nuevo)}
                                 </span>
                               )}
                             </div>
@@ -923,6 +979,51 @@ export default function ReclamoDetalle() {
               </div>
             )}
 
+            {/* Calificación del vecino (T5-F1) — la voz del vecino del lado muni.
+                Estrella llena = primary, vacía = border (solo tokens de tema). */}
+            {calificacion && (
+              <div
+                className="p-4 rounded-xl"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <div className="flex items-start gap-3">
+                  <Star className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: theme.primary, fill: theme.primary }} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+                      Calificación del vecino
+                    </p>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => {
+                        const activa = n <= calificacion.puntuacion;
+                        return (
+                          <Star
+                            key={n}
+                            className="h-5 w-5"
+                            style={{
+                              color: activa ? theme.primary : theme.border,
+                              fill: activa ? theme.primary : 'none',
+                            }}
+                          />
+                        );
+                      })}
+                      <span className="text-sm font-semibold ml-1.5" style={{ color: theme.text }}>
+                        {calificacion.puntuacion}/5
+                      </span>
+                    </div>
+                    {calificacion.comentario?.trim() ? (
+                      <p className="text-sm mt-2 leading-relaxed" style={{ color: theme.text }}>
+                        &ldquo;{calificacion.comentario}&rdquo;
+                      </p>
+                    ) : (
+                      <p className="text-sm mt-2 italic" style={{ color: theme.textSecondary }}>
+                        El vecino no dejó comentario.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Botones de Confirmar/Devolver para supervisores cuando está pendiente confirmación */}
             {reclamo.estado === 'pendiente_confirmacion' && user && ['admin', 'supervisor'].includes(user.rol) && (
               <div
@@ -1022,7 +1123,7 @@ export default function ReclamoDetalle() {
                 >
                   <div className="flex items-center gap-3 mb-4">
                     {(() => {
-                      const config = estadoConfig[nuevoEstado];
+                      const config = estadoVisual(nuevoEstado);
                       const Icon = config.icon;
                       return (
                         <>
@@ -1075,7 +1176,7 @@ export default function ReclamoDetalle() {
                       onClick={handleConfirmarCambioEstado}
                       disabled={cambiandoEstado}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                      style={{ backgroundColor: estadoConfig[nuevoEstado].color, color: '#ffffff' }}
+                      style={{ backgroundColor: estadoColor(nuevoEstado), color: '#ffffff' }}
                     >
                       {cambiandoEstado ? (
                         <>

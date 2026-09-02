@@ -2,6 +2,13 @@
 // Sin dependencias externas — solo math + types del frontend.
 
 import { Reclamo } from '../types';
+import type { HeroKpi } from './semanticHero';
+import {
+  veredictoTasa,
+  veredictoMenosEsMejor,
+  veredictoMasEsPeor,
+  type UmbralesVeredicto,
+} from './veredictos';
 
 // =====================================================================
 // Distancia haversine (en metros)
@@ -192,6 +199,60 @@ export function computeKPIs(reclamos: Reclamo[]): MapaKPIs {
     abiertos30dPlus,
     tendenciaResueltosPp,
   };
+}
+
+// =====================================================================
+// KPIs del hero semántico (strip dentro del SemanticHero de Mapa)
+// =====================================================================
+// Única fuente de los 4 KPIs del mapa (ex fila de cards de MapaStats).
+// Puro: números de computeKPIs + veredictos vía lib/veredictos.
+export function calcularKpisMapa(
+  reclamos: Reclamo[],
+  totalUniverso: number,
+  u: UmbralesVeredicto,
+): HeroKpi[] {
+  const k = computeKPIs(reclamos);
+
+  return [
+    {
+      etiqueta: 'Georreferenciados',
+      valor: k.conUbicacion,
+      sub: `de ${totalUniverso} total · ${k.pctGeo.toFixed(0)}%`,
+      veredicto: k.total > 0 && k.conUbicacion === k.total ? 'bueno' : undefined,
+    },
+    {
+      etiqueta: '% Resueltos',
+      valor: `${k.pctResueltos.toFixed(0)}%`,
+      sub:
+        k.tendenciaResueltosPp != null
+          ? `${k.tendenciaResueltosPp >= 0 ? '+' : ''}${k.tendenciaResueltosPp.toFixed(1)}pp vs. previo`
+          : `${k.resueltos} de ${k.total}`,
+      veredicto: k.total > 0 ? veredictoTasa(k.pctResueltos, u.tasaResolucion) : undefined,
+    },
+    {
+      etiqueta: 'Tiempo medio resolución',
+      valor: k.tiempoMedioDias != null ? `${k.tiempoMedioDias.toFixed(1)}d` : 's/d',
+      sub:
+        k.tiempoMedioDias != null
+          ? `promedio sobre ${k.resueltos} ${k.resueltos === 1 ? 'resuelto' : 'resueltos'}`
+          : 'sin reclamos resueltos en el período',
+      veredicto:
+        k.tiempoMedioDias != null
+          ? veredictoMenosEsMejor(k.tiempoMedioDias, u.tiempoResolucionDias)
+          : undefined,
+    },
+    {
+      etiqueta: 'Abiertos > 30 días',
+      valor: k.abiertos30dPlus,
+      sub:
+        k.abiertos30dPlus > 0
+          ? k.abiertos30dPlus === 1
+            ? 'requiere revisión urgente'
+            : 'requieren revisión urgente'
+          : 'todo dentro del SLA',
+      veredicto: veredictoMasEsPeor(k.abiertos30dPlus, u.vencidos),
+    },
+  ];
 }
 
 // =====================================================================

@@ -1,0 +1,52 @@
+<!-- @dsCard group="Brand" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Paraguay Limpio — Brief del isotipo vectorial</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 32px; background: #f6f8f6; color: #1a2b1f; }
+  .card { max-width: 760px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 24px 0 8px; color: #1b7a3d; }
+  p, li { font-size: 14px; line-height: 1.55; } code { background: #eef3ee; padding: 1px 6px; border-radius: 4px; }
+  .refs { display: flex; gap: 16px; margin-top: 12px; } .refs figure { margin: 0; }
+  .refs img { max-width: 320px; border: 1px solid #e0e6e0; border-radius: 8px; display: block; }
+  .refs figcaption { font-size: 12px; color: #667; margin-top: 6px; }
+  .swatches { display: flex; gap: 8px; margin-top: 8px; }
+  .sw { width: 84px; height: 48px; border-radius: 8px; display: flex; align-items: flex-end; padding: 4px 6px; font-size: 10px; color: #fff; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Paraguay Limpio — isotipo vectorial (SVG)</h1>
+  <p>App municipal white-label sobre Munify (Asunción, Paraguay). El dueño definió el logo oficial
+     (referencia abajo). Pedido: <strong>reproducir SOLO el isotipo como SVG limpio</strong> (sol +
+     colinas + camino serpenteante), sin el texto "PARAGUAY LIMPIO", o generar uno muy parecido.</p>
+  <p><strong>Entregar 3 o 4 OPCIONES NUMERADAS (Opción 1, 2, 3, 4)</strong> — cada una como card de
+     preview mostrando el mark sobre fondo oscuro (#222226), fondo claro y a 24px. El dueño va a
+     elegir por número (ej. "vamos por la opción 2") y el agente de la app integra la elegida.</p>
+
+  <h2>Referencias</h2>
+  <div class="refs">
+    <figure><img src="logo-referencia.jpeg" alt="Logo oficial completo" /><figcaption>Logo oficial (fuente de verdad)</figcaption></figure>
+    <figure><img src="mark-extraido.png" alt="Isotipo extraído por crop" /><figcaption>Isotipo extraído (crop mecánico, fondo blanco)</figcaption></figure>
+  </div>
+
+  <h2>Entregable</h2>
+  <ul>
+    <li><strong>SVG con fondo transparente</strong>, viewBox cuadrado, paths limpios (sin raster embebido).</li>
+    <li>Debe funcionar en <strong>fondo oscuro</strong> (sidebar #222226) y claro: el camino blanco del centro
+        necesita resolverse (contorno o relleno) para no desaparecer sobre blanco ni sobre negro.</li>
+    <li>Legible a <strong>24px</strong> (sidebar) y rico a 512px (icono PWA).</li>
+    <li>Colores del original: sol <code>#F5A81C</code> aprox, verdes <code>#4CAF50 / #2E7D32 / #1B5E20</code>, camino blanco.</li>
+    <li>Acento de la app: <code>#1b7a3d</code> (primary del theme) — mantener armonía.</li>
+  </ul>
+
+  <h2>Dónde se usa</h2>
+  <ul>
+    <li>Sidebar y header mobile de la app (componente React <code>ParaguayLimpioLogo.tsx</code> — hoy tiene una hoja placeholder que se reemplaza por esto).</li>
+    <li>Login split (hero de marca), iconos PWA, favicon.</li>
+  </ul>
+</div>
+</body>
+</html>

@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { BarChart3, CheckCircle, Clock, TrendingUp, Calendar, Award, Target } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { HeroBannerV2, type HeroStripKpi } from '../components/dashboard/HeroBannerV2';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoMasEsPeor, veredictoMenosEsMejor } from '../lib/veredictos';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
@@ -65,12 +69,78 @@ export default function MiRendimiento() {
     ? Math.round((stats.resueltos / stats.total_asignados) * 100)
     : 0;
 
+
+  /** Los numeros del empleado, cortos para que entren en una fila. */
+  const kpisEmpleado: HeroStripKpi[] = stats
+    ? [
+        { etiqueta: 'Asignados', etiquetaCorta: 'Asignados', valor: stats.total_asignados },
+        { etiqueta: 'En curso', etiquetaCorta: 'En curso', valor: stats.en_curso },
+        { etiqueta: 'Resueltos', etiquetaCorta: 'Resueltos', valor: stats.resueltos },
+        {
+          etiqueta: 'Promedio de cierre',
+          etiquetaCorta: 'Promedio',
+          valor: `${stats.tiempo_promedio_resolucion} d`,
+          amber: stats.tiempo_promedio_resolucion > 7,
+        },
+      ]
+    : [];
+
+  /**
+   * Lo que le pasa AL EMPLEADO, en su idioma.
+   *
+   * No es el tablero del municipio: al que sale a la calle no le sirve la tasa
+   * global. Le sirve saber cuanto tiene encima, cuanto sacó y si viene rapido
+   * o lento. El veredicto mira SU carga, no la del municipio.
+   */
+  const frasesEmpleado: HeroFrase[] = (() => {
+    if (!stats) return [];
+    const u = resolverUmbrales();
+    const fs: HeroFrase[] = [];
+
+    fs.push({
+      segmentos: [
+        seg('Tenes '),
+        seg(
+          `${stats.pendientes} ${stats.pendientes === 1 ? 'trabajo pendiente' : 'trabajos pendientes'}`,
+          veredictoMasEsPeor(stats.pendientes, u.sinAsignar),
+        ),
+        seg(' y '),
+        seg(`${stats.en_curso} en curso`, stats.en_curso > 0 ? 'bueno' : undefined),
+        seg('.'),
+      ],
+      acciones: [{ label: 'Ver mis trabajos', to: '/gestion/mis-trabajos', primaria: true }],
+    });
+
+    fs.push({
+      segmentos: [
+        seg('Cerraste '),
+        seg(`${stats.resueltos_este_mes} este mes`, 'bueno'),
+        seg(', con un promedio de '),
+        seg(
+          `${stats.tiempo_promedio_resolucion} dias`,
+          veredictoMenosEsMejor(stats.tiempo_promedio_resolucion, u.tiempoResolucionDias),
+        ),
+        seg(' por trabajo.'),
+      ],
+      acciones: [{ label: 'Ver ordenes', to: '/gestion/ordenes-trabajo' }],
+    });
+
+    return fs;
+  })();
+
   return (
     <div className="space-y-6">
-      <StickyPageHeader
-        icon={<BarChart3 className="h-5 w-5" />}
-        title="Mi Rendimiento"
+      {/* Encabezado v2: las mismas piezas que el resto de la app. Antes era un
+          header viejo y cuatro tarjetas con colores FIJOS (azul, verde, ambar,
+          violeta) que no salian de ningun tema. */}
+      <HeroBannerV2
+        eyebrow="Mi trabajo"
+        titulo={`Hola, ${user?.nombre || 'equipo'}`}
+        sub="Como venis con lo que te toca."
+        kpis={kpisEmpleado}
       />
+
+      <SemanticHero etiqueta="TU TRABAJO" frases={frasesEmpleado} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

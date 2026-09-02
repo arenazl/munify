@@ -1,0 +1,299 @@
+/* ============================================================
+   TendenciaMeses — el recorrido de los últimos meses.
+
+   La frase de arriba es la pieza principal: interpreta lo que
+   pasó ("se abría la brecha") en vez de describir la curva. Los
+   cuatro números la respaldan y el gráfico va último.
+
+   Todo sobre tokens --pl-*: cero colores fijos.
+   ============================================================ */
+
+.tm {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--pl-shadow-card);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.tm-titulo {
+  margin: 0;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  color: var(--pl-text);
+  letter-spacing: -0.01em;
+}
+
+/* El mes activo, como una ficha que va cambiando durante el recorrido.
+   Neutra a propósito: el color de esta tarjeta lo pone el veredicto, y una
+   ficha verde fija competiría con él. */
+.tm-mes {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface-2);
+  color: var(--pl-text);
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.tm-sub {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+}
+
+.tm-controles {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tm-leyenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  white-space: nowrap;
+}
+.tm-punto {
+  width: 13px;
+  height: 3px;
+  border-radius: 2px;
+  display: block;
+}
+.tm-punto--in { background: var(--pl-green); }
+.tm-punto--out { background: var(--pl-border-strong); }
+
+.tm-play {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--pl-radius-pill);
+  border: 1px solid var(--pl-border);
+  background: transparent;
+  color: var(--pl-text-3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.tm-play:hover { background: var(--pl-surface-hover); }
+
+/* La lectura del mes. Es lo que se lee primero y lo único que hace falta
+   entender: los números y la curva están para respaldarla.
+
+   El párrafo va en gris y SÓLO la etiqueta inicial lleva color. Pintar la
+   frase entera de rojo la convierte en una alarma y se pierde el dato que
+   viene después; el color tiene que marcar el veredicto, no gritar. */
+.tm-veredicto {
+  margin: 10px 0 0;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.45;
+  color: var(--pl-text-3);
+  text-wrap: pretty;
+}
+.tm-veredicto strong { font-weight: 600; }
+.tm-veredicto--bueno strong { color: var(--pl-green-700); }
+.tm-veredicto--malo strong { color: var(--pl-red-700); }
+
+/* Las columnas las declara el padre (`--tm-kpis`): un período sin cierres
+   muestra tres números, no cuatro con dos ceros. Fallback en 4, el caso
+   completo. */
+.tm-kpis {
+  display: grid;
+  grid-template-columns: repeat(var(--tm-kpis, 4), minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 4px;
+  padding: 14px 0;
+  border-top: 1px solid var(--pl-border);
+  border-bottom: 1px solid var(--pl-border);
+}
+
+.tm-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tm-kpi-et {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  /* Se lee entero: en cuatro columnas angostas, "DÍA MÁS CARGADO" cortado
+     no dice nada. Baja de renglón. */
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.tm-kpi-va {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--pl-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--pl-text);
+  line-height: 1.2;
+}
+.tm-kpi-va--bueno { color: var(--pl-green-700); }
+.tm-kpi-va--malo { color: var(--pl-red-700); }
+
+.tm-kpi-nota {
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-micro);
+  font-weight: 500;
+  color: var(--pl-text-faint);
+}
+
+.tm-lienzo {
+  /* 260px como el diseño: en 150 la curva se aplasta, y la forma es lo único
+     que una tendencia tiene para decir. */
+  height: 260px;
+  margin-top: 12px;
+}
+.tm-lienzo svg { display: block; width: 100%; height: 100%; }
+
+.tm-grilla path {
+  stroke: var(--pl-border);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.tm-area { fill: color-mix(in srgb, var(--pl-green) 12%, transparent); }
+
+.tm-linea {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.tm-linea--in { stroke: var(--pl-green); stroke-width: 2.5; }
+/* Punteada y en gris: lo cerrado acompaña, lo que manda es lo que entra. */
+.tm-linea--out { stroke: var(--pl-border-strong); stroke-width: 2; stroke-dasharray: 5 5; }
+
+.tm-eje {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* UNA barra de progreso para todo el recorrido, no una por mes: lo que se
+   está mostrando es un tramo de tres meses, y la barra tiene que leerse como
+   ese tramo. Se va llenando de punta a punta y al llegar al final vuelve a
+   empezar. */
+.tm-progreso {
+  position: relative;
+  height: 3px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-border);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.tm-progreso-avance {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+  /* Escala en vez de ancho: animar `width` obliga a recalcular la caja en
+     cada cuadro; escalar no toca el layout. */
+  transform-origin: left center;
+  transform: scaleX(var(--tm-desde, 0));
+  animation: tm-avance var(--tm-paso, 6000ms) linear forwards;
+}
+
+/* Sólo la pausa EXPLÍCITA la congela. Si también la congelara el hover, no
+   se la vería correr nunca: para mirar la tarjeta hay que tener el mouse
+   encima. El hover sigue frenando el cambio de mes, que es lo que molesta
+   cuando estás leyendo. */
+.tm--pausado .tm-progreso-avance { animation-play-state: paused; }
+
+/* Del punto donde quedó al que le toca: el tramo nuevo arranca justo donde
+   terminó el anterior, así el avance no vuelve a cero en cada mes. */
+@keyframes tm-avance {
+  from { transform: scaleX(var(--tm-desde, 0)); }
+  to { transform: scaleX(var(--tm-hasta, 1)); }
+}
+
+/* Los rótulos, alineados con los tramos de la barra de arriba. Cuántos son lo
+   dice el padre (`--tm-tramos`): con dos meses de historia son dos, y tres
+   columnas fijas dejaban un hueco. */
+.tm-meses {
+  display: grid;
+  grid-template-columns: repeat(var(--tm-tramos, 3), minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.tm-mes-btn {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--pl-font-sans);
+}
+
+.tm-mes-rotulo {
+  display: block;
+  margin-top: 7px;
+  font-size: var(--pl-fs-micro);
+  font-weight: 500;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tm-mes-btn--activo .tm-mes-rotulo { font-weight: 600; color: var(--pl-text); }
+
+/* Angosto: los cuatro números pasan a dos filas de dos —en una fila de cuatro
+   no entra ni la etiqueta— y el lienzo baja, pero sin achatarse tanto que la
+   curva deje de leerse. */
+@media (max-width: 700px) {
+  .tm { padding: 16px; }
+  .tm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+  .tm-lienzo { height: 190px; }
+  /* El rótulo del mes se parte en dos renglones antes que cortarse. */
+  .tm-mes-rotulo { white-space: normal; line-height: 1.25; }
+}
+
+@media (max-width: 430px) {
+  .tm-lienzo { height: 150px; }
+  .tm-controles { gap: 8px; }
+  /* Con tres columnas los rótulos no entran: pasan a lista. */
+  .tm-meses { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-play, .tm-mes-btn { transition: none; }
+  /* Sin barra corriendo: la barra se planta en el tramo que toca. */
+  .tm-progreso-avance { animation: none; transform: scaleX(var(--tm-hasta, 1)); }
+}

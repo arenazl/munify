@@ -1,0 +1,273 @@
+## 1. Distrito Capital
+- Asunción
+## 2. Departamento de Concepción
+- Arroyito
+- Azote'y
+- Belén
+- Concepción
+- Horqueta
+- Loreto
+- Paso Barreto
+- Paso Horqueta
+- San Alfredo
+- San Carlos del Apa
+- San Lázaro
+- Sargento José Félix López
+- Yby Ya'u
+## 3. Departamento de San Pedro
+- 25 de Diciembre
+- Antequera
+- Capiibary
+- Choré
+- General Elizardo Aquino
+- General Resquín
+- Guayaibí
+- Itacurubí del Rosario
+- Liberación
+- Lima
+- Nueva Germania
+- San Estanislao
+- San Pablo
+- San Pedro del Ycuamandyyú
+- Santa Rosa del Aguaray
+- Tacuatí
+- Union
+- Yataity del Norte
+## 4. Departamento de Cordillera
+- Altos
+- Arroyos y Esteros
+- Atyrá
+- Caacupé
+- Caraguatay
+- Emboscada
+- Eusebio Ayala
+- Isla Pucú
+- Itacurubí de la Cordillera
+- Juan de Mena
+- Loma Grande
+- Mbocayaty del Yhaguy
+- Nueva Colombia
+- Piribebuy
+- Primero de Marzo
+- San Bernardino
+- San José Obrero
+- Santa Elena
+- Tobatí
+- Valenzuela
+## 5. Departamento del Guairá
+- Borja
+- Coronel Martínez
+- Doctor Botrell
+- Eugenio A. Garay
+- Félix Pérez Cardozo
+- Independencia
+- Itapé
+- Iturbe
+- José Fassardi
+- José Mauricio Troche
+- Mbocayaty del Guairá
+- Natalicio Talavera
+- Ñumí
+- Paso Yobái
+- San Salvador
+- Tebicuary
+- Villarrica
+- Yataity
+## 6. Departamento de Caaguazú
+- 3 de Febrero
+- Caaguazú
+- Carayao
+- Coronel Oviedo
+- Doctor Cecilio Báez
+- Doctor J. Eulogio Estigarribia
+- Doctor Juan Manuel Frutos
+- José Domingo Ocampos
+- La Pastora
+- Mariscal Francisco Solano López
+- Nueva Londres
+- Nueva Toledo
+- R.I. 3 Corrales
+- Raúl Arsenio Oviedo
+- Repatriación
+- San Joaquín
+- San José de los Arroyos
+- Santa Rosa del Mbutuy
+- Simón Bolívar
+- Tembiaporá
+- Vaquería
+- Yhú
+## 7. Departamento de Caazapá
+- 3 de Mayo
+- Abai
+- Buena Vista
+- Caazapá
+- Coronel Maciel
+- Doctor Moisés S. Bertoni
+- Fulgencio Yegros
+- General Higinio Morínigo
+- San Juan Nepomuceno
+- Tavaí
+- Yuty
+## 8. Departamento de Itapúa
+- Alto Verá
+- Bella Vista
+- Cambyretá
+- Capitán Meza
+- Capitán Miranda
+- Carlos Antonio López
+- Carmen del Paraná
+- Coronel Bogado
+- Edelira
+- Encarnación
+- Fram
+- General Artigas
+- General José María Delgado
+- Hohenau
+- Itapúa Poty
+- Jesús de Tavarangué
+- José Leandro Oviedo
+- La Paz
+- Mayor Otaño
+- Natalio
+- Nueva Alborada
+- Obligado
+- Pirapó
+- San Cosme y Damián
+- San Juan del Paraná
+- San Pedro del Paraná
+- San Rafael del Paraná
+- Tomás Romero Pereira
+- Trinidad
+- Yatytay
+## 9. Departamento de Misiones
+- Ayolas
+- San Ignacio Guazú
+- San Juan Bautista
+- San Miguel
+- San Patricio
+- Santa María de Fe
+- Santa Rosa Misiones
+- Santiago
+- Villa Florida
+- Yabebyry
+## 10. Departamento de Paraguarí
+- Acahay
+- Caapucú
+- Carapeguá
+- Escobar
+- General Bernardino Caballero
+- La Colmena
+- María Antonia
+- Mbuyapey
+- Paraguarí
+- Pirayú
+- Quiindy
+- Quyquyhó
+- San Roque González de Santa Cruz
+- Sapucai
+- Tebicuarymí
+- Yaguarón
+- Ybycuí
+- Ybytymí
+## 11. Departamento de Alto Paraná
+- Ciudad del Este
+- Doctor Juan León Mallorquín
+- Doctor Raúl Peña
+- Domingo Martínez de Irala
+- Hernandarias
+- Iruña
+- Itakyry
+- Juan Emilio O'Leary
+- Los Cedrales
+- Mbaracayú
+- Minga Guazú
+- Minga Porá
+- Naranjal
+- Ñacunday
+- Presidente Franco
+- San Alberto
+- San Cristóbal
+- Santa Fe del Paraná
+- Santa Rita
+- Santa Rosa del Monday
+- Tavapy
+- Yguazú
+## 12. Departamento Central
+- Areguá
+- Capiatá
+- Fernando de la Mora
+- Guarambaré
+- Itá
+- Itauguá
+- J. Augusto Saldívar
+- Lambaré
+- Limpio
+- Luque
+- Mariano Roque Alonso
+- Nueva Italia
+- Ñemby
+- San Antonio
+- San Lorenzo
+- Villa Elisa
+- Villeta
+- Ypacaraí
+- Ypané
+## 13. Departamento de Ñeembucú
+- Alberdi
+- Cerrito
+- Desmochados
+- General José Eduvigis Díaz
+- Guazucuá
+- Humaitá
+- Isla Umbú
+- Laureles
+- Mayor José De Jesús Martínez
+- Paso de Patria
+- Pilar
+- San Juan Bautista del Ñeembucú
+- Tacuaras
+- Villa Franca
+- Villa Oliva
+- Villalbín
+## 14. Departamento de Amambay
+- Bella Vista Norte
+- Capitán Bado
+- Cerro Corá
+- Karapaí
+- Pedro Juan Caballero
+- Zanja Pytá
+## 15. Departamento de Canindeyú
+- Corpus Christi
+- Curuguaty
+- General Francisco Caballero Álvarez
+- Itanará
+- Katueté
+- La Paloma del Espíritu Santo
+- Maracaná
+- Nueva Esperanza
+- Puerto Adela
+- Salto del Guairá
+- Villa Ygatimí
+- Yasy Cañy
+- Yby Pytã
+- Ybyrarobaná
+- Ypejhú
+## 16. Departamento de Presidente Hayes
+- Benjamín Aceval
+- Campo Aceval
+- General José María Bruguez
+- Nanawa
+- Puerto Pinasco
+- Teniente 1º Manuel Irala Fernández
+- Teniente Esteban Martínez
+- Villa Hayes
+## 17. Departamento de Alto Paraguay
+- Bahía Negra
+- Capitán Carmelo Peralta
+- Fuerte Olimpo
+- Puerto Casado
+## 18. Departamento de Boquerón
+- Boquerón
+- Filadelfia
+- Loma Plata
+- Mariscal José Félix Estigarribia

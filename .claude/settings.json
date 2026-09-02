@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($c = Get-NetTCPConnection -State Listen -LocalPort 8002 -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($c\\) { Stop-Process -Id $c.OwningProcess -Force -Confirm:$false; \"matado PID $\\($c.OwningProcess\\)\" } else { \"no habia proceso\" })",
+      "PowerShell($c = Get-NetTCPConnection -State Listen -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($c\\) { Stop-Process -Id $c.OwningProcess -Force -Confirm:$false; \"vite matado \\(PID $\\($c.OwningProcess\\)\\)\" } else { \"no habia vite\" })",
+      "PowerShell(Get-NetTCPConnection -State Listen -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, OwningProcess; try { \\(Invoke-WebRequest -Uri \"http://localhost:5173/\" -UseBasicParsing -TimeoutSec 5\\).StatusCode } catch { \"IWR fallo: $\\($_.Exception.Message\\)\" })"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\look\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+            "args": [
+              "D:\\Code\\structure\\scripts\\canal-pending-hook.py",
+              "munify"
+            ],
+            "timeout": 10,
+            "statusMessage": "Chequeando pendientes del canal..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\Users\\look\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+            "args": [
+              "D:\\Code\\structure\\scripts\\watch-canal.py",
+              "munify"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

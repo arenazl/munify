@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Clock,
@@ -20,7 +20,10 @@ import { toast } from 'sonner';
 import { slaApi, categoriasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
+import { SemanticHero } from '../components/ui/SemanticHero';
+import { seg, type HeroFrase } from '../lib/semanticHero';
+import { resolverUmbrales, veredictoTasa, veredictoMasEsPeor } from '../lib/veredictos';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 interface SLAConfig {
   id: number;
@@ -58,6 +61,8 @@ interface SLAAlerta {
 export default function SLA() {
   const { theme } = useTheme();
   const [configs, setConfigs] = useState<SLAConfig[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(configs.length);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [resumen, setResumen] = useState<SLAResumen | null>(null);
   const [alertas, setAlertas] = useState<SLAAlerta[]>([]);
@@ -174,6 +179,63 @@ export default function SLA() {
     }
   };
 
+  // Frases del hero semántico — solo con datos ya cargados (resumen/alertas);
+  // veredictos vía helpers de lib/veredictos.ts, nunca umbrales a mano.
+  const heroFrases = useMemo<HeroFrase[]>(() => {
+    const u = resolverUmbrales();
+    const frases: HeroFrase[] = [];
+
+    if (resumen && resumen.total_activos > 0) {
+      frases.push({
+        segmentos: [
+          seg('El cumplimiento SLA está en '),
+          seg(
+            `${resumen.porcentaje_cumplimiento.toFixed(1)}%`,
+            veredictoTasa(resumen.porcentaje_cumplimiento, u.tasaResolucion),
+          ),
+          seg(`: de ${resumen.total_activos} reclamos activos, `),
+          seg(`${resumen.en_tiempo} en tiempo`, 'bueno'),
+          seg(', '),
+          seg(`${resumen.en_riesgo} en riesgo`, veredictoMasEsPeor(resumen.en_riesgo, u.slaRiesgo)),
+          seg(' y '),
+          seg(`${resumen.vencidos} vencidos`, veredictoMasEsPeor(resumen.vencidos, u.vencidos)),
+          seg('.'),
+        ],
+        acciones: [{ label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true }],
+      });
+    }
+
+    if (alertas.length > 0) {
+      const critica = alertas.reduce(
+        (min, a) => (a.horas_restantes < min.horas_restantes ? a : min),
+        alertas[0],
+      );
+      // La urgencia la determina el backend en estado_sla (ya evaluó la config
+      // SLA del municipio) — acá solo se mapea categoría → veredicto, sin números.
+      const vencida = critica.estado_sla === 'vencido';
+      frases.push({
+        segmentos: [
+          seg('La alerta más urgente es '),
+          seg(`«${critica.titulo}»`),
+          seg(', que '),
+          vencida
+            ? seg('ya venció', 'malo')
+            : seg(
+                `vence en ${critica.horas_restantes}h`,
+                critica.estado_sla === 'en_riesgo' ? 'advertencia' : undefined,
+              ),
+          seg('.'),
+        ],
+        acciones: [{ label: 'Ver reclamos', to: '/gestion/reclamos', primaria: true }],
+      });
+    }
+
+    return frases;
+  }, [resumen, alertas]);
+
+  // Prioridad del SLA alineada al enum canónico de la OT (F6): baja=1, media=2,
+  // alta=3, urgente=4. Se eliminó el nivel fantasma "5=Crítica" que contradecía
+  // la escala del resto de la app (no existe en el enum baja/media/alta/urgente).
   const getPrioridadLabel = (prioridad: number | null) => {
     if (!prioridad) return 'Todas';
     const labels: Record<number, string> = {
@@ -181,7 +243,6 @@ export default function SLA() {
       2: 'Media',
       3: 'Alta',
       4: 'Urgente',
-      5: 'Crítica',
     };
     return labels[prioridad] || `P${prioridad}`;
   };
@@ -216,7 +277,7 @@ export default function SLA() {
   return (
     <div className="space-y-6">
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="sla" />
+        <SemanticHero etiqueta="SLA · CUMPLIMIENTO" frases={heroFrases} />
       </div>
 
       <StickyPageHeader
@@ -552,7 +613,6 @@ export default function SLA() {
                   <option value="2">Media</option>
                   <option value="3">Alta</option>
                   <option value="4">Urgente</option>
-                  <option value="5">Crítica</option>
                 </select>
               </div>
 

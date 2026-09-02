@@ -1,0 +1,1166 @@
+/* ==========================================================================
+   Generador de demos — la puerta de Munify
+   ==========================================================================
+   Esta pantalla es la continuación directa de la landing comercial
+   (`landing/index.html`): el prospecto la ve un segundo después de tocar
+   "Generá tu municipio". Por eso habla EL MISMO idioma visual que
+   `landing/css/munify-v2.css` y no el del panel interno:
+
+     · papel arena (`--dm-paper`) en vez de la superficie del tema de la app,
+     · tinta grafito CÁLIDA (`--dm-ink`), nunca negro puro,
+     · un solo acento, el marino del logo (`--dm-accent`),
+     · titulares en Instrument Serif y cuerpo en Manrope,
+     · pills, botón degradado ink→marino y cards "bento" con sombra suave.
+
+   Los tokens se declaran ACOTADOS a `.dm-fondo` (no en `:root`) para no
+   pisar el tema `--pl-*` del resto de la app, que sigue intacto. Consecuencia
+   buscada: esta pantalla ya no acompaña al tema/dark mode de la app — es
+   pieza comercial y va siempre en papel, igual que la landing.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+.dm-fondo {
+  /* --- Tokens de la landing (subconjunto: sólo lo que esta pantalla usa) --- */
+  --dm-ink: #2a2620;          /* grafito cálido, NO negro */
+  --dm-ink-soft: #3a342c;
+  --dm-muted: #6b6557;
+  --dm-muted-soft: #9a937f;
+
+  --dm-line: #ebe6dc;
+  --dm-line-soft: #f1ede4;
+  --dm-paper: #faf7f1;
+  --dm-paper-warm: #f3eee3;
+  --dm-card: #fffdf9;
+  --dm-card-line: #ece6d9;
+
+  --dm-accent: #112a6c;       /* marino del logo */
+  --dm-accent-strong: #0a1f52;
+  --dm-accent-bright: #3f6ac8;
+  --dm-accent-soft: #e9edf6;
+  --dm-accent-line: #c2cadc;
+  --dm-on-accent: #ffffff;
+
+  --dm-bad: #b91c1c;
+  --dm-bad-soft: #fef2f2;
+  --dm-bad-line: #f3d3d3;
+
+  --dm-shadow-soft: 0 1px 2px rgba(42, 38, 32, 0.04), 0 8px 24px -16px rgba(42, 38, 32, 0.10);
+  --dm-shadow-lift: 0 2px 6px rgba(17, 42, 108, 0.06), 0 22px 48px -22px rgba(17, 42, 108, 0.28);
+  --dm-shadow-panel: 0 34px 70px -34px rgba(17, 42, 108, 0.42), 0 10px 28px -14px rgba(42, 38, 32, 0.16);
+
+  --dm-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dm-dur: 220ms;
+
+  --dm-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --dm-sans: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--dm-paper);
+  color: var(--dm-ink);
+  font-family: var(--dm-sans);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tinte del hero de la landing: dos radiales del azul de marca que se
+   disuelven en el papel. Reemplaza al lavado verde del tema. */
+.dm-fondo::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 640px;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 58% at 80% 10%, rgba(63, 106, 200, 0.17), transparent 62%),
+    radial-gradient(52% 48% at 4% 42%, rgba(17, 42, 108, 0.08), transparent 60%),
+    linear-gradient(180deg, transparent 0%, var(--dm-paper) 95%);
+}
+
+/* Retícula tenue (`.hero__grain` de la landing), enmascarada al centro. */
+.dm-fondo::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 640px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(42, 38, 32, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 38, 32, 0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 25%, transparent 72%);
+          mask-image: radial-gradient(ellipse at 50% 30%, #000 25%, transparent 72%);
+}
+
+.dm-capa {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* --- Cabecera (topbar de la landing) -------------------------------- */
+
+.dm-header {
+  flex-shrink: 0;
+  padding: 14px 20px;
+  background: rgba(255, 253, 249, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--dm-line-soft);
+}
+
+.dm-header-caja {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dm-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dm-marca-nombre {
+  font-family: var(--dm-serif);
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--dm-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dm-header-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* `.btn-ghost` de la landing */
+.dm-link-suave {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: var(--dm-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--dm-ink);
+  background: transparent;
+  border: 1px solid var(--dm-line);
+  cursor: pointer;
+  transition: border-color var(--dm-dur) ease, background var(--dm-dur) ease;
+}
+.dm-link-suave:hover {
+  border-color: var(--dm-ink);
+  background: var(--dm-paper-warm);
+}
+
+/* --- Cuerpo ---------------------------------------------------------- */
+
+.dm-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(24px, 5vw, 52px) 20px 40px;
+}
+
+.dm-shell {
+  width: 100%;
+  max-width: 1120px;
+  min-width: 0;
+}
+
+/* Hero partido: en desktop el discurso a la izquierda y el formulario a la
+   derecha; en mobile una sola columna con el FORMULARIO PRIMERO — es una
+   pantalla que se usa desde el teléfono y lo primero tiene que ser la
+   acción, no el discurso. */
+.dm-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(26px, 4vw, 48px);
+  align-items: center;
+}
+
+.dm-hero-texto,
+.dm-hero-panel {
+  min-width: 0;
+}
+
+.dm-hero-texto { order: 2; }
+.dm-hero-panel { order: 1; }
+
+@media (min-width: 960px) {
+  .dm-hero { grid-template-columns: 1.02fr 0.98fr; }
+  .dm-hero-texto { order: 1; }
+  .dm-hero-panel { order: 2; }
+}
+
+/* --- Discurso -------------------------------------------------------- */
+
+.dm-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--dm-line);
+  background: rgba(245, 240, 230, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--dm-muted);
+  margin-bottom: 20px;
+}
+
+/* Punto latiendo del eyebrow de la landing (`.pulse`) */
+.dm-pulso {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--dm-accent);
+  flex-shrink: 0;
+}
+.dm-pulso::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 1px solid var(--dm-accent);
+  opacity: 0;
+  animation: dmPulso 2.2s ease-out infinite;
+}
+@keyframes dmPulso {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dm-pulso::after { animation: none; }
+}
+
+.dm-titulo {
+  font-family: var(--dm-serif);
+  font-size: clamp(2.4rem, 5.2vw, 4rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.03;
+  color: var(--dm-ink);
+  margin: 0;
+  text-wrap: balance;
+}
+.dm-titulo em {
+  font-style: normal;
+  color: var(--dm-accent);
+}
+
+.dm-bajada {
+  margin: 20px 0 0;
+  max-width: 34rem;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--dm-muted);
+  text-wrap: pretty;
+}
+
+/* Pills de beneficio (`.tag` / `.tag--accent` de la landing) */
+.dm-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.dm-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--dm-line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dm-muted);
+  background: var(--dm-paper);
+}
+.dm-tag--accent {
+  color: var(--dm-accent);
+  border-color: var(--dm-accent-line);
+  background: var(--dm-accent-soft);
+}
+
+/* --- El panel del alta (chrome de `.app-mock` de la landing) ---------- */
+
+/* Sin overflow: el desplegable del buscador se sale de la caja a propósito. */
+.dm-alta {
+  position: relative;
+  z-index: 40;
+  background: var(--dm-card);
+  border: 1px solid var(--dm-card-line);
+  border-radius: 1.25rem;
+  box-shadow: var(--dm-shadow-panel);
+}
+
+.dm-alta-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.95rem;
+  background: linear-gradient(180deg, #16285f 0%, #102046 100%);
+  border-bottom: 1px solid #0d1c3e;
+  border-radius: 1.25rem 1.25rem 0 0;
+}
+
+.dm-alta-punto {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.dm-alta-punto:nth-child(1) { background: #e4938a; }
+.dm-alta-punto:nth-child(2) { background: #e6c873; }
+.dm-alta-punto:nth-child(3) { background: #84c39b; }
+
+.dm-alta-titulo {
+  margin-left: 0.5rem;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #cdd8f2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dm-alta-cuerpo {
+  padding: clamp(16px, 2.4vw, 22px);
+}
+
+.dm-alta-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.dm-alta-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dm-muted);
+}
+
+/* --- Banderas de país ------------------------------------------------ */
+
+.dm-paises {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+@media (min-width: 480px) {
+  .dm-paises { width: auto; margin-left: auto; }
+}
+
+.dm-pais {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--dm-sans);
+  opacity: 0.55;
+  transition: opacity var(--dm-dur) ease, background var(--dm-dur) ease,
+              border-color var(--dm-dur) ease;
+}
+.dm-pais:hover { opacity: 0.95; background: var(--dm-paper-warm); }
+
+.dm-pais--activo,
+.dm-pais--activo:hover {
+  opacity: 1;
+  background: var(--dm-accent-soft);
+  border-color: var(--dm-accent-line);
+}
+
+.dm-pais-cod {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--dm-muted);
+}
+.dm-pais--activo .dm-pais-cod { color: var(--dm-accent); }
+
+/* --- Buscador + botón ------------------------------------------------ */
+
+.dm-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dm-campo {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.dm-input {
+  width: 100%;
+  /* 16px o más: abajo de eso, iOS hace zoom al enfocar y descuadra la pantalla. */
+  font-family: var(--dm-sans);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 14px 88px 14px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--dm-line);
+  background: var(--dm-paper);
+  color: var(--dm-ink);
+  outline: none;
+  transition: border-color var(--dm-dur) ease, box-shadow var(--dm-dur) ease,
+              background var(--dm-dur) ease;
+}
+.dm-input::placeholder { color: var(--dm-muted-soft); }
+.dm-input:focus {
+  background: var(--dm-card);
+  border-color: var(--dm-accent-line);
+  box-shadow: 0 0 0 4px var(--dm-accent-soft);
+}
+.dm-input:disabled { opacity: 0.5; }
+
+/* Municipio elegido del catálogo: el borde confirma sin decir nada. */
+.dm-input--ok,
+.dm-input--ok:focus {
+  border-color: var(--dm-accent);
+}
+
+.dm-input-marca {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dm-muted-soft);
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-input-marca--ok { color: var(--dm-accent); }
+
+/* `.btn .btn-primary` de la landing: degradé ink → marino, píldora. */
+.dm-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.95rem 1.6rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--dm-ink) 0%, #1a2548 55%, var(--dm-accent) 100%);
+  background-size: 180% 180%;
+  background-position: 0% 0%;
+  color: var(--dm-paper);
+  font-family: var(--dm-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset,
+              0 8px 20px -10px rgba(19, 40, 94, 0.45);
+  transition: background-position 0.5s ease, transform var(--dm-dur) ease,
+              box-shadow var(--dm-dur) ease;
+}
+.dm-boton:hover:not(:disabled) {
+  background-position: 100% 100%;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset,
+              0 12px 26px -10px rgba(19, 40, 94, 0.6);
+}
+.dm-boton:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- Desplegable del catálogo ---------------------------------------- */
+
+.dm-sug {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  z-index: 50;
+  background: var(--dm-card);
+  border: 1px solid var(--dm-card-line);
+  border-radius: 1rem;
+  box-shadow: var(--dm-shadow-lift);
+  max-height: 290px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 6px 6px;
+}
+
+.dm-sug-cab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 8px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dm-muted-soft);
+}
+
+.dm-sug-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  font-family: var(--dm-sans);
+  color: var(--dm-ink);
+}
+.dm-sug-item--activo {
+  background: var(--dm-accent-soft);
+  border-color: var(--dm-accent-line);
+}
+
+.dm-sug-pin {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  flex-shrink: 0;
+  background: var(--dm-paper-warm);
+  color: var(--dm-muted);
+}
+.dm-sug-item--activo .dm-sug-pin {
+  background: var(--dm-accent);
+  color: var(--dm-on-accent);
+}
+
+.dm-sug-nombre {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dm-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-sug-prov {
+  display: block;
+  font-size: 11.5px;
+  color: var(--dm-muted);
+}
+
+/* Tramo del nombre que matchea lo tipeado */
+.dm-sug-match {
+  font-weight: 800;
+  color: var(--dm-accent);
+}
+
+.dm-sug-flecha { color: var(--dm-accent); }
+
+/* --- Nota al pie del panel -------------------------------------------- */
+
+.dm-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--dm-line);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dm-muted);
+}
+.dm-nota svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--dm-accent-bright);
+}
+
+/* --- Las demos que ya existen ----------------------------------------- */
+
+.dm-listado {
+  margin-top: clamp(40px, 7vw, 76px);
+}
+
+.dm-separador {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.dm-separador::before,
+.dm-separador::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--dm-line);
+}
+.dm-separador span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dm-muted-soft);
+}
+
+.dm-grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+/* Card "bento": papel blanco cálido que resalta sobre el crema del fondo. */
+.dm-muni {
+  position: relative;
+  border: 1px solid var(--dm-card-line);
+  border-radius: 1.25rem;
+  background: var(--dm-card);
+  overflow: hidden;
+  box-shadow: var(--dm-shadow-soft);
+  transition: border-color 0.3s var(--dm-ease), transform 0.35s var(--dm-ease),
+              box-shadow 0.35s var(--dm-ease);
+}
+.dm-muni:hover {
+  transform: translateY(-4px);
+  border-color: var(--dm-accent-line);
+  box-shadow: var(--dm-shadow-lift);
+}
+
+/* La franja del color del municipio es lo ÚNICO que distingue una tarjeta de
+   otra, y es información —su identidad—, no decoración. */
+.dm-muni-franja {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.dm-muni-btn {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  padding: 20px 16px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--dm-sans);
+}
+.dm-muni-btn:disabled { opacity: 0.5; }
+
+.dm-muni-nombre {
+  margin: 0;
+  font-family: var(--dm-serif);
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--dm-ink);
+  padding-right: 26px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-muni-codigo {
+  margin: 5px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dm-muted-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-muni-entrar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity var(--dm-dur) ease, transform var(--dm-dur) ease;
+}
+.dm-muni:hover .dm-muni-entrar { opacity: 1; transform: none; }
+/* En touch no hay hover: si dependiera de él, la pista no aparecería nunca. */
+@media (hover: none) {
+  .dm-muni-entrar { opacity: 1; transform: none; }
+}
+
+/* Visible SIEMPRE, no sólo en hover: en un teléfono no habría forma de borrar. */
+.dm-muni-borrar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--dm-paper);
+  border: 1px solid var(--dm-line);
+  color: var(--dm-muted-soft);
+  cursor: pointer;
+  transition: color var(--dm-dur) ease, background var(--dm-dur) ease,
+              border-color var(--dm-dur) ease;
+}
+.dm-muni-borrar:hover {
+  color: var(--dm-bad);
+  background: var(--dm-bad-soft);
+  border-color: var(--dm-bad-line);
+}
+
+/* --- Probar la plataforma (municipio de muestra) ------------------------
+   La puerta abierta de la vitrina: entra sin generar nada ni dejar un dato.
+   Pesa MENOS que el CTA de crear la demo propia (que es la que convierte) y
+   mas que una card de la grilla, que es lo que es: la salida para el que
+   sospecha que esto tarda o que le van a pedir la tarjeta.                */
+
+.dm-muestra {
+  margin-bottom: 22px;
+}
+
+.dm-muestra-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 1rem;
+  border: 1px solid var(--dm-accent-line);
+  background: var(--dm-accent-soft);
+  color: var(--dm-accent-strong);
+  cursor: pointer;
+  transition: border-color var(--dm-dur) ease, box-shadow var(--dm-dur) ease,
+              transform 0.35s var(--dm-ease);
+}
+.dm-muestra-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dm-shadow-lift);
+}
+.dm-muestra-btn svg { flex: none; }
+/* El texto es lo unico que puede achicarse: sin esto, en un telefono la
+   bajada empuja la flecha fuera de la tarjeta. */
+.dm-muestra-tx { flex: 1; min-width: 0; }
+.dm-muestra-tx b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.dm-muestra-tx i {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--dm-muted);
+}
+
+.dm-muestra-nota {
+  margin: 8px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dm-muted-soft);
+}
+
+/* --- Card ajena: se ve, no se entra ------------------------------------
+   La grilla es prueba social. Una demo de otro puede tener datos cargados
+   por esa persona, asi que se muestra apagada y sin acciones.            */
+
+.dm-muni.es-ajena {
+  background: var(--dm-paper);
+  box-shadow: none;
+}
+.dm-muni.es-ajena:hover {
+  transform: none;
+  border-color: var(--dm-card-line);
+  box-shadow: none;
+}
+.dm-muni.es-ajena .dm-muni-nombre { color: var(--dm-muted); }
+
+.dm-muni-privada {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--dm-muted-soft);
+}
+
+/* Acciones del dueño de la demo: copiar su link y borrarla. */
+.dm-muni-acc {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dm-muni-acc .dm-muni-borrar {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.dm-muni-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--dm-paper);
+  border: 1px solid var(--dm-line);
+  color: var(--dm-muted);
+  font-family: var(--dm-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dm-dur) ease, background var(--dm-dur) ease,
+              border-color var(--dm-dur) ease;
+}
+.dm-muni-link:hover {
+  color: var(--dm-accent-strong);
+  background: var(--dm-accent-soft);
+  border-color: var(--dm-accent-line);
+}
+
+/* --- Estados y pie ----------------------------------------------------- */
+
+.dm-buscador-demos {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.dm-buscador-demos svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--dm-muted-soft);
+  pointer-events: none;
+}
+
+.dm-buscador-demos input {
+  width: 100%;
+  font-family: var(--dm-sans);
+  font-size: 16px;
+  padding: 11px 16px 11px 40px;
+  border-radius: 999px;
+  border: 1px solid var(--dm-line);
+  background: var(--dm-card);
+  color: var(--dm-ink);
+  outline: none;
+  transition: border-color var(--dm-dur) ease, box-shadow var(--dm-dur) ease;
+}
+.dm-buscador-demos input::placeholder { color: var(--dm-muted-soft); }
+.dm-buscador-demos input:focus {
+  border-color: var(--dm-accent-line);
+  box-shadow: 0 0 0 4px var(--dm-accent-soft);
+}
+
+.dm-vacio,
+.dm-cargando {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--dm-muted);
+  font-size: 13.5px;
+}
+
+.dm-cargando svg { margin: 0 auto; color: var(--dm-accent); }
+
+.dm-error {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 1rem;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--dm-bad);
+  background: var(--dm-bad-soft);
+  border: 1px solid var(--dm-bad-line);
+}
+
+.dm-pie {
+  flex-shrink: 0;
+  padding: 26px 20px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--dm-muted-soft);
+  border-top: 1px solid var(--dm-line-soft);
+}
+
+/* ==========================================================================
+   Pantalla "tu demo está lista" (`DemoReady.tsx`)
+   ==========================================================================
+   Vive en este archivo a propósito: es la pantalla SIGUIENTE del mismo
+   embudo y comparte los tokens declarados arriba en `.dm-fondo`. Duplicar
+   la paleta en un segundo CSS era garantía de que se desincronizara.
+   ========================================================================== */
+
+.dr-centro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.dr-hero {
+  text-align: center;
+  margin-bottom: clamp(28px, 5vw, 44px);
+}
+
+.dr-grupo {
+  margin-top: 26px;
+}
+
+.dr-grupo-tit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dm-muted);
+}
+.dr-grupo-tit svg { color: var(--dm-accent-bright); }
+.dr-grupo-cuenta {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--dm-muted-soft);
+}
+
+.dr-duo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 720px) {
+  .dr-duo { grid-template-columns: 1fr 1fr; }
+}
+
+.dr-mini-grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+/* Card de rol — mismo "bento" que las demos existentes. */
+.dr-rol {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 20px;
+  border: 1px solid var(--dm-card-line);
+  border-radius: 1.25rem;
+  background: var(--dm-card);
+  color: var(--dm-ink);
+  font-family: var(--dm-sans);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: var(--dm-shadow-soft);
+  transition: border-color 0.3s var(--dm-ease), transform 0.35s var(--dm-ease),
+              box-shadow 0.35s var(--dm-ease);
+}
+.dr-rol:hover:not(:disabled) {
+  transform: translateY(-4px);
+  border-color: var(--dm-accent-line);
+  box-shadow: var(--dm-shadow-lift);
+}
+.dr-rol:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Variante "ink" del kit de la landing (`.bento--ink`) para el rol principal. */
+.dr-rol--ink {
+  color: #f5f0e6;
+  border-color: var(--dm-ink-soft);
+  background:
+    radial-gradient(115% 95% at 88% 0%, rgba(63, 106, 200, 0.26) 0%, transparent 56%),
+    linear-gradient(158deg, var(--dm-ink) 0%, #1a2347 55%, var(--dm-accent-strong) 100%);
+}
+
+.dr-rol-ico {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  margin-bottom: 14px;
+  background: var(--dm-accent-soft);
+  border: 1px solid var(--dm-accent-line);
+  color: var(--dm-accent);
+}
+.dr-rol--ink .dr-rol-ico {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f5f0e6;
+}
+
+.dr-rol-tit {
+  margin: 0;
+  font-family: var(--dm-serif);
+  font-size: 25px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.dr-rol-desc {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--dm-muted);
+}
+.dr-rol--ink .dr-rol-desc { color: rgba(245, 240, 230, 0.72); }
+
+.dr-rol-mail {
+  display: block;
+  margin-top: 12px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--dm-muted-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dr-rol--ink .dr-rol-mail { color: rgba(245, 240, 230, 0.5); }
+
+/* Velo de "entrando..." sobre la card que se tocó. */
+.dr-rol-velo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(250, 247, 241, 0.72);
+  color: var(--dm-accent);
+}
+.dr-rol--ink .dr-rol-velo {
+  background: rgba(15, 22, 48, 0.6);
+  color: #f5f0e6;
+}
+
+/* Cards compactas de supervisores / empleados de campo */
+.dr-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: 1px solid var(--dm-card-line);
+  border-radius: 999px;
+  background: var(--dm-card);
+  color: var(--dm-ink);
+  font-family: var(--dm-sans);
+  cursor: pointer;
+  box-shadow: var(--dm-shadow-soft);
+  transition: border-color var(--dm-dur) ease, transform var(--dm-dur) ease,
+              box-shadow var(--dm-dur) ease;
+}
+.dr-mini:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--dm-accent-line);
+  box-shadow: var(--dm-shadow-lift);
+}
+.dr-mini:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.dr-mini-ico {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--dm-accent-soft);
+  border: 1px solid var(--dm-accent-line);
+  color: var(--dm-accent);
+}
+
+.dr-mini-txt { min-width: 0; flex: 1; }
+
+.dr-mini-tit {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-mini-mail {
+  display: block;
+  margin-top: 1px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--dm-muted-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dr-nota {
+  margin: 32px 0 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dm-muted-soft);
+}
+.dr-nota code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--dm-muted);
+}
+
+.dr-shell { max-width: 860px; }
+.dr-hero .dm-bajada { margin-left: auto; margin-right: auto; }
+.dr-hero .dm-titulo { margin-top: 4px; }

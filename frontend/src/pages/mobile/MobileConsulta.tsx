@@ -206,7 +206,7 @@ export default function MobileConsulta() {
                   }`}
                   style={{
                     backgroundColor: msg.role === 'user' ? theme.primary : theme.card,
-                    color: msg.role === 'user' ? '#fff' : theme.text,
+                    color: msg.role === 'user' ? 'var(--pl-on-accent)' : theme.text,
                     border: msg.role === 'assistant' ? `1px solid ${theme.border}` : 'none',
                   }}
                 >
@@ -277,7 +277,7 @@ export default function MobileConsulta() {
             className="p-2 rounded-full transition-all disabled:opacity-50"
             style={{
               backgroundColor: input.trim() ? theme.primary : 'transparent',
-              color: input.trim() ? '#fff' : theme.textSecondary,
+              color: input.trim() ? 'var(--pl-on-accent)' : theme.textSecondary,
             }}
           >
             <Send className="h-5 w-5" />

@@ -51,6 +51,16 @@ class User(Base):
     telefono = Column(String(20), nullable=True)
     dni = Column(String(20), nullable=True)
     direccion = Column(String(255), nullable=True)
+    # La ZONA que el vecino declara en su perfil (modulo Comunicacion, Etapa
+    # 3). Sin esto no se puede segmentar un aviso: la direccion es texto libre
+    # y no agrupa. Lo carga el propio vecino; nullable porque nadie esta
+    # obligado.
+    #
+    # Zona y NO barrio: los 80 municipios de la base tienen zonas cargadas y
+    # ningun barrio tiene zona asignada; los municipios nuevos nacen con zonas
+    # y sin barrios, porque no todo el pais esta mapeado a nivel barrio.
+    zona_id = Column(Integer, ForeignKey("zonas.id", ondelete="SET NULL"),
+                     nullable=True, index=True)
     es_anonimo = Column(Boolean, default=False)  # Usuario anónimo (identidad oculta para el municipio)
     # Identidad verificada por un medio externo (KYC facial / email verificado
     # / SMS OTP). Mientras sea False, el endpoint `/auth/register` permite

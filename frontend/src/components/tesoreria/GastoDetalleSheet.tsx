@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Calendar, Wallet, DollarSign, CreditCard, Receipt,
+  Receipt,
   CheckCircle2, Clock, AlertTriangle, Ban, Building2,
   Home, Save, Loader2,
   Trash2, Pencil, X, User as UserIcon, FileText,
@@ -15,6 +15,7 @@ import { MoneyInput } from '../ui/MoneyInput';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
 import { formatFechaAR, parseFechaLocal } from '../../lib/tesoreria-helpers';
+import { urlAdjunto } from '../../lib/adjuntos';
 import type {
   Gasto, GastoCuota, EstadoGastoCuota, Contacto, Caja,
   DestinoGasto, TipoFinanciacion, FormaPago, FrecuenciaRecurrencia,
@@ -526,54 +527,78 @@ export function GastoDetalleSheet({
     }
   };
 
+  // Pie del canvas: CTA de pago + acciones secundarias + eliminar a la derecha.
   const sheetFooter = (
-    <div className="flex items-center justify-between gap-2 w-full flex-wrap">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setConfirmDelete(true)}
-          disabled={deleting}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-          style={{ backgroundColor: '#ef444415', color: '#ef4444', border: '1px solid #ef444440' }}
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Eliminar
-        </button>
-        {(() => {
-          const ep = (gasto as any).estado_pago || 'concretado';
-          const isPend = ep === 'pendiente';
-          const color = isPend ? '#f59e0b' : '#10b981';
-          return (
-            <button
-              onClick={handleToggleEstado}
-              disabled={togglingEstado}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-              style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}40` }}
-              title={isPend ? 'Marcar como concretado' : 'Marcar como pendiente'}
-            >
-              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-              {isPend ? 'Pendiente · marcar pago' : 'Concretado · marcar pendiente'}
-            </button>
-          );
-        })()}
+    <div className="rs-pie-fila" style={{ marginTop: 0 }}>
+      {(() => {
+        const ep = (gasto as any).estado_pago || 'concretado';
+        const isPend = ep !== 'concretado';
+        return (
+          <button
+            type="button"
+            className="rs-cta gs-cta-pago"
+            onClick={handleToggleEstado}
+            disabled={togglingEstado}
+            title={isPend ? 'Marcar como concretado' : 'Marcar como pendiente'}
+          >
+            {togglingEstado && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isPend ? 'Marcar como pagado' : 'Marcar como pendiente'}
+          </button>
+        );
+      })()}
+      <button
+        type="button"
+        className="rs-btn"
+        onClick={handleGenerarOP}
+        disabled={generandoOP}
+        title="Generar Orden de Pago en PDF"
+      >
+        {generandoOP ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+        Generar OP
+      </button>
+      <button type="button" className="rs-btn" onClick={entrarEnEdicion}>
+        <Pencil className="h-3.5 w-3.5" /> Editar
+      </button>
+      <button
+        type="button"
+        className="rs-btn rs-btn--peligro"
+        onClick={() => setConfirmDelete(true)}
+        disabled={deleting}
+        title="Eliminar gasto"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+
+  // Header propio (modo plano v2): identificador + concepto + monto + estado.
+  const sheetHeader = (
+    <div className="rs-head">
+      <div className="rs-head-fila">
+        <span className="rs-eyebrow">Gasto #{gasto.id}</span>
+        <span className="rs-meta-sep">·</span>
+        <span className="rs-nav-pos">Registrado {formatFechaAR(gasto.fecha)}</span>
+        <div className="rs-head-icos">
+          <button type="button" className="rs-ico-btn" onClick={onClose} title="Cerrar">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleGenerarOP}
-          disabled={generandoOP}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-          style={{ backgroundColor: theme.primary + '15', color: theme.primary, border: `1px solid ${theme.primary}40` }}
-          title="Generar Orden de Pago en PDF"
-        >
-          {generandoOP ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-          Generar OP
-        </button>
-        <button
-          onClick={entrarEnEdicion}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-        >
-          <Pencil className="h-3.5 w-3.5" /> Editar
-        </button>
-        <PrimaryButton onClick={onClose}>Cerrar</PrimaryButton>
+      <h2 className="rs-titulo">{gasto.concepto}</h2>
+      <div className="gs-monto-fila">
+        <span className="gs-monto">${monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+        {montoUsd && (
+          <span className="gs-monto-sub">
+            USD {montoUsd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+            {gasto.cotizacion_usd
+              ? ` · cotización $${parseFloat(gasto.cotizacion_usd).toLocaleString('es-AR', { maximumFractionDigits: 2 })}`
+              : ''}
+          </span>
+        )}
+        <span className="rs-estado" style={{ backgroundColor: meta.bg, color: meta.color }}>
+          <span className="rs-estado-dot" style={{ backgroundColor: meta.color }} />
+          {meta.label}
+        </span>
       </div>
     </div>
   );
@@ -587,8 +612,13 @@ export function GastoDetalleSheet({
     <Sheet
       open={open}
       onClose={editMode ? cancelarEdicion : onClose}
-      title={editMode ? 'Editar gasto' : 'Detalle del gasto'}
-      description={gasto.concepto}
+      // title/description siguen alimentando el MobilePageHeader: el
+      // customHeader es sólo el header de desktop.
+      title={editMode ? 'Editar gasto' : gasto.concepto}
+      description={editMode
+        ? gasto.concepto
+        : `$${monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })} · ${meta.label}`}
+      customHeader={editMode ? undefined : sheetHeader}
       stickyFooter={editMode ? sheetFooterEdit : sheetFooter}
     >
       {editMode && editForm ? (
@@ -686,7 +716,7 @@ export function GastoDetalleSheet({
                     className="flex-1 px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5"
                     style={{
                       backgroundColor: active ? theme.primary : theme.backgroundSecondary,
-                      color: active ? '#fff' : theme.text,
+                      color: active ? 'var(--pl-on-accent)' : theme.text,
                       border: `1px solid ${active ? theme.primary : theme.border}`,
                     }}
                   >
@@ -848,7 +878,7 @@ export function GastoDetalleSheet({
                   >
                     <FileText className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
                     <a
-                      href={editForm.factura_url}
+                      href={urlAdjunto(editForm.factura_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 truncate hover:underline"
@@ -895,159 +925,146 @@ export function GastoDetalleSheet({
           </div>
         </div>
       ) : (
-      <div className="space-y-3">
+      <div>
 
-        {/* ============ Header: concepto + monto + badge estado ============ */}
-        <div
-          className="rounded-xl p-4"
-          style={{
-            background: `linear-gradient(135deg, ${theme.primary}10 0%, ${theme.card} 60%)`,
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs uppercase tracking-wider font-semibold" style={{ color: theme.textSecondary }}>
-                Concepto
-              </p>
-              <p className="text-base font-bold truncate" style={{ color: theme.text }}>
-                {gasto.concepto}
-              </p>
+        {/* ============ Progreso: sólo hitos con dato real ============
+            El canvas dibuja 4 pasos (Registrado/Autorizado/Pagado/Conciliado),
+            pero el modelo `gastos` no tiene autorización ni conciliación:
+            se muestran únicamente los hitos que existen. */}
+        <div className="gs-pasos">
+          <div className="gs-paso">
+            <span className="gs-paso-barra gs-paso-barra--ok" />
+            <span className="gs-paso-label gs-paso-label--ok">Registrado</span>
+            <span className="gs-paso-sub">{formatFechaAR(gasto.fecha)}</span>
+          </div>
+
+          {resumenCuotas.total > 0 && (
+            <div className="gs-paso">
+              <span className="gs-paso-barra">
+                <span
+                  className="gs-paso-relleno"
+                  style={{ width: `${Math.round((resumenCuotas.pagadas / resumenCuotas.total) * 100)}%` }}
+                />
+              </span>
+              <span
+                className={`gs-paso-label ${
+                  resumenCuotas.pagadas === resumenCuotas.total ? 'gs-paso-label--ok' : 'gs-paso-label--curso'
+                }`}
+              >
+                Cuotas
+              </span>
+              <span className="gs-paso-sub">
+                {resumenCuotas.pagadas} de {resumenCuotas.total} pagadas
+              </span>
             </div>
-            <span
-              className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0"
-              style={{ backgroundColor: meta.bg, color: meta.color, border: `1px solid ${meta.color}40` }}
-            >
-              {meta.label}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-3">
-            <p className="text-3xl font-bold tabular-nums" style={{ color: theme.text }}>
-              ${monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </p>
-            {montoUsd && (
-              <p className="text-sm font-medium tabular-nums" style={{ color: theme.textSecondary }}>
-                USD ${montoUsd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </p>
-            )}
-          </div>
-          {gasto.descripcion && (
-            <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
-              {gasto.descripcion}
-            </p>
           )}
+
+          {(() => {
+            const pagado = estadoAgregado === 'completado';
+            const enCurso = estadoAgregado === 'al_dia';
+            return (
+              <div className="gs-paso">
+                <span className={`gs-paso-barra ${pagado ? 'gs-paso-barra--ok' : ''}`}>
+                  {enCurso && <span className="gs-paso-relleno" style={{ width: '50%' }} />}
+                </span>
+                <span
+                  className={`gs-paso-label ${
+                    pagado ? 'gs-paso-label--ok' : enCurso ? 'gs-paso-label--curso' : ''
+                  }`}
+                >
+                  Pagado
+                </span>
+                <span className="gs-paso-sub">
+                  {pagado ? 'completo' : enCurso ? 'parcial' : 'falta marcar'}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ============ Destino ============ */}
-        <SectionTitle>Destino</SectionTitle>
-        {gasto.destino_tipo === 'contacto' ? (
-          <div
-            className="rounded-xl p-3 flex items-center gap-3"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-            >
-              <Home className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                {contacto
-                  ? `${contacto.nombre}${contacto.apellido ? ' ' + contacto.apellido : ''}`
-                  : 'Contacto'}
-              </p>
-              <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                {contacto?.tipo
-                  ? contacto.tipo.charAt(0).toUpperCase() + contacto.tipo.slice(1)
-                  : 'Contacto del intendente'}
-                {contacto?.dni ? ` · DNI ${contacto.dni}` : ''}
-              </p>
-              {contacto?.direccion && (
-                <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                  {contacto.direccion}
-                </p>
-              )}
-            </div>
+        <section className="rs-seccion">
+          <div className="rs-seccion-cab">
+            <h3 className="rs-seccion-titulo">Destino</h3>
           </div>
-        ) : (
-          <div
-            className="rounded-xl p-3 flex items-center gap-3"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{
-                backgroundColor: `${dependencia?.color || theme.primary}20`,
-                color: dependencia?.color || theme.primary,
-              }}
-            >
-              <Building2 className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                {dependencia?.nombre || 'Secretaría / Dependencia'}
-              </p>
-              <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-                Dependencia del municipio
-              </p>
-            </div>
+          <div className="rs-persona">
+            <span className="rs-avatar">
+              {gasto.destino_tipo === 'contacto' ? <Home className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
+            </span>
+            <span className="rs-persona-datos">
+              <span className="rs-persona-nombre">
+                {gasto.destino_tipo === 'contacto'
+                  ? (contacto ? `${contacto.nombre}${contacto.apellido ? ' ' + contacto.apellido : ''}` : 'Contacto')
+                  : (dependencia?.nombre || 'Secretaría / Dependencia')}
+              </span>
+              <span className="rs-dato-sub">
+                {gasto.destino_tipo === 'contacto'
+                  ? `${contacto?.tipo ? contacto.tipo.charAt(0).toUpperCase() + contacto.tipo.slice(1) : 'Contacto del intendente'}${contacto?.dni ? ` · DNI ${contacto.dni}` : ''}${contacto?.direccion ? ` · ${contacto.direccion}` : ''}`
+                  : 'Dependencia del municipio'}
+              </span>
+            </span>
           </div>
-        )}
+          {gasto.descripcion && <p className="rs-parrafo">{gasto.descripcion}</p>}
+        </section>
 
         {/* ============ Resumen ============ */}
-        <SectionTitle>Resumen</SectionTitle>
-        <div className="grid grid-cols-2 gap-2">
-          <InfoTile
-            icon={<Calendar className="h-3.5 w-3.5" />}
-            label="Fecha"
-            value={formatFechaAR(gasto.fecha)}
-          />
-          <InfoTile
-            icon={<CreditCard className="h-3.5 w-3.5" />}
-            label="Forma de pago"
-            value={FORMA_PAGO_LABEL[gasto.forma_pago] || gasto.forma_pago}
-          />
-          <InfoTile
-            icon={<Wallet className="h-3.5 w-3.5" />}
-            label="Financiación"
-            value={TIPO_FIN_LABEL[gasto.tipo_financiacion] || gasto.tipo_financiacion}
-          />
-          <InfoTile
-            icon={<Wallet className="h-3.5 w-3.5" />}
-            label="Caja"
-            value={(() => {
-              const cajaId = (gasto as any).caja_id;
-              if (!cajaId) return 'Sin asignar';
-              const c = cajas.find(x => x.id === cajaId);
-              return c ? c.nombre : `#${cajaId}`;
-            })()}
-          />
-          <InfoTile
-            icon={<DollarSign className="h-3.5 w-3.5" />}
-            label="Cotización USD"
-            value={gasto.cotizacion_usd
-              ? `$${parseFloat(gasto.cotizacion_usd).toLocaleString('es-AR', { maximumFractionDigits: 2 })}`
-              : '—'}
-          />
-        </div>
-
-        {resumenCuotas.total > 0 && (
-          <div
-            className="rounded-xl p-3 grid grid-cols-3 gap-2 text-center"
-            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-          >
-            <ResumenChip color="#10b981" value={resumenCuotas.pagadas} label="Pagadas" />
-            <ResumenChip color="#f59e0b" value={resumenCuotas.pendientes} label="Pendientes" />
-            <ResumenChip color="#ef4444" value={resumenCuotas.vencidas} label="Vencidas" />
+        <section className="rs-seccion">
+          <div className="rs-seccion-cab">
+            <h3 className="rs-seccion-titulo">Resumen</h3>
           </div>
-        )}
+          <div className="gs-resumen">
+            <div>
+              <span className="gs-campo-label">Fecha</span>
+              <span className="gs-campo-valor">{formatFechaAR(gasto.fecha)}</span>
+            </div>
+            <div>
+              <span className="gs-campo-label">Forma de pago</span>
+              <span className="gs-campo-valor">{FORMA_PAGO_LABEL[gasto.forma_pago] || gasto.forma_pago}</span>
+            </div>
+            <div>
+              <span className="gs-campo-label">Financiación</span>
+              <span className="gs-campo-valor">{TIPO_FIN_LABEL[gasto.tipo_financiacion] || gasto.tipo_financiacion}</span>
+            </div>
+            <div>
+              <span className="gs-campo-label">Caja</span>
+              <span className="gs-campo-valor">
+                {(() => {
+                  const cajaId = (gasto as any).caja_id;
+                  if (!cajaId) return 'Sin asignar';
+                  const c = cajas.find(x => x.id === cajaId);
+                  return c ? c.nombre : `#${cajaId}`;
+                })()}
+              </span>
+            </div>
+            <div>
+              <span className="gs-campo-label">Cotización USD</span>
+              <span className="gs-campo-valor">
+                {gasto.cotizacion_usd
+                  ? `$${parseFloat(gasto.cotizacion_usd).toLocaleString('es-AR', { maximumFractionDigits: 2 })}`
+                  : '—'}
+              </span>
+            </div>
+            {gasto.nro_factura && (
+              <div>
+                <span className="gs-campo-label">Factura</span>
+                <span className="gs-campo-valor">{gasto.nro_factura}</span>
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* ============ Cuotas ============ */}
         {(gasto.cuotas?.length ?? 0) > 0 && (
-          <>
-            <SectionTitle>Cuotas ({gasto.cuotas?.length})</SectionTitle>
-            <div className="space-y-1.5">
+          <section className="rs-seccion">
+            <div className="rs-seccion-cab">
+              <h3 className="rs-seccion-titulo">Cuotas</h3>
+              <span className="rs-seccion-hint">
+                {resumenCuotas.pagadas} pagada{resumenCuotas.pagadas === 1 ? '' : 's'} ·{' '}
+                {resumenCuotas.pendientes} pendiente{resumenCuotas.pendientes === 1 ? '' : 's'} ·{' '}
+                {resumenCuotas.vencidas} vencida{resumenCuotas.vencidas === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="gs-cuotas">
               {gasto.cuotas?.map(c => (
                 <CuotaRow
                   key={c.id}
@@ -1057,50 +1074,60 @@ export function GastoDetalleSheet({
                 />
               ))}
             </div>
-          </>
+          </section>
         )}
 
+        {/* ============ Comprobantes ============ */}
+        <section className="rs-seccion">
+          <div className="rs-seccion-cab">
+            <h3 className="rs-seccion-titulo">Comprobantes</h3>
+          </div>
+          {gasto.factura_url ? (
+            <div className="gs-adjuntos">
+              <a className="gs-adjunto" href={urlAdjunto(gasto.factura_url)} target="_blank" rel="noopener noreferrer">
+                <FileText className="h-3.5 w-3.5" />
+                {gasto.nro_factura || 'Factura adjunta'}
+                <span className="gs-adjunto-meta">abrir</span>
+              </a>
+            </div>
+          ) : (
+            <p className="gs-vacio">Sin comprobantes adjuntos. Se cargan desde Editar.</p>
+          )}
+        </section>
+
         {/* ============ Observaciones ============ */}
-        <SectionTitle>Observaciones</SectionTitle>
-        <div
-          className="rounded-xl p-3"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
+        <section className="rs-seccion rs-seccion--ultima">
+          <div className="rs-seccion-cab">
+            <h3 className="rs-seccion-titulo">Observaciones internas</h3>
+            <span className="rs-seccion-hint">No las ve el beneficiario</span>
+          </div>
           <textarea
             value={observaciones}
             onChange={(e) => { setObservaciones(e.target.value); setObsDirty(true); }}
-            placeholder="Anotá comentarios internos sobre este gasto (no se muestra al beneficiario)..."
+            placeholder="Anotá comentarios internos sobre este gasto..."
             rows={3}
-            className="w-full rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 transition-all"
-            style={{
-              backgroundColor: theme.background,
-              color: theme.text,
-              border: `1px solid ${theme.border}`,
-            }}
+            className="rs-pie-nota"
+            style={{ marginTop: 12 }}
           />
           {obsDirty && (
-            <div className="flex justify-end mt-2 gap-2">
+            <div className="gs-obs-acciones">
               <button
+                type="button"
+                className="rs-btn"
                 onClick={() => {
                   setObservaciones(gasto.observaciones || '');
                   setObsDirty(false);
                 }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
-                style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
               >
                 <X className="h-3.5 w-3.5" /> Cancelar
               </button>
-              <PrimaryButton
-                onClick={handleSaveObs}
-                disabled={savingObs}
-                size="sm"
-                icon={savingObs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              >
+              <button type="button" className="rs-cta" onClick={handleSaveObs} disabled={savingObs}>
+                {savingObs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                 Guardar
-              </PrimaryButton>
+              </button>
             </div>
           )}
-        </div>
+        </section>
 
       </div>
       )}
@@ -1190,48 +1217,9 @@ export function GastoDetalleSheet({
 // ============================================================
 // Subcomponentes
 // ============================================================
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <div className="flex items-center gap-2 pt-1">
-      <div className="h-px flex-1" style={{ backgroundColor: theme.border }} />
-      <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: theme.textSecondary }}>
-        {children}
-      </span>
-      <div className="h-px flex-1" style={{ backgroundColor: theme.border }} />
-    </div>
-  );
-}
-
-function InfoTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <div
-      className="rounded-lg p-2.5"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <span style={{ color: theme.textSecondary }}>{icon}</span>
-        <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: theme.textSecondary }}>
-          {label}
-        </p>
-      </div>
-      <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function ResumenChip({ color, value, label }: { color: string; value: number; label: string }) {
-  const { theme } = useTheme();
-  return (
-    <div>
-      <p className="text-lg font-bold tabular-nums" style={{ color }}>{value}</p>
-      <p className="text-[10px]" style={{ color: theme.textSecondary }}>{label}</p>
-    </div>
-  );
-}
+// SectionTitle / InfoTile / ResumenChip se eliminaron al migrar el sheet al
+// diseño del canvas: sus roles los cubren `.rs-seccion-titulo`, `.gs-resumen`
+// y el hint de la cabecera de Cuotas.
 
 function CuotaRow({
   cuota, isLoading, onPagar,
@@ -1240,9 +1228,7 @@ function CuotaRow({
   isLoading: boolean;
   onPagar: () => void;
 }) {
-  const { theme } = useTheme();
   const meta = CUOTA_META[cuota.estado] || CUOTA_META.pendiente;
-  const Icon = meta.Icon;
   const monto = parseFloat(cuota.monto);
 
   // Detectar vencidas implicitas
@@ -1250,71 +1236,52 @@ function CuotaRow({
   const venc = parseFechaLocal(cuota.fecha_vencimiento);
   const esVencidaImplicita = cuota.estado === 'pendiente' && venc < hoy;
   const realMeta = esVencidaImplicita ? CUOTA_META.vencida : meta;
-  const RealIcon = realMeta.Icon;
+
+  const variante = cuota.estado === 'pagada'
+    ? 'gs-cuota--pagada'
+    : (esVencidaImplicita || cuota.estado === 'vencida') ? 'gs-cuota--vencida' : '';
+  const varianteEstado = cuota.estado === 'pagada'
+    ? 'gs-cuota-estado--pagada'
+    : (esVencidaImplicita || cuota.estado === 'vencida') ? 'gs-cuota-estado--vencida' : '';
 
   return (
-    <div
-      className="rounded-lg p-2.5"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="flex items-center gap-2.5">
-        {/* Numero + estado */}
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-sm tabular-nums"
-          style={{ backgroundColor: realMeta.bg, color: realMeta.color, border: `1px solid ${realMeta.color}40` }}
-          title={realMeta.label}
+    <div className={`gs-cuota ${variante}`}>
+      <span className="gs-cuota-num" title={realMeta.label}>{cuota.numero}</span>
+
+      <span className="gs-cuota-cuerpo">
+        <span className="gs-cuota-fila">
+          <span className={`gs-cuota-estado ${varianteEstado}`}>{realMeta.label.toUpperCase()}</span>
+          <span className="gs-cuota-vence">vence {formatFechaAR(cuota.fecha_vencimiento)}</span>
+          {cuota.comprobante && (
+            <span className="gs-cuota-vence" title="Comprobante">
+              <Receipt className="h-2.5 w-2.5 inline" /> {cuota.comprobante}
+            </span>
+          )}
+        </span>
+        <span className="gs-cuota-monto">
+          ${monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          {cuota.fecha_pago && (
+            <span className="gs-cuota-vence"> · pagada el {formatFechaAR(cuota.fecha_pago)}</span>
+          )}
+        </span>
+      </span>
+
+      {/* Accion: marcar pagada */}
+      {(cuota.estado === 'pendiente' || cuota.estado === 'vencida') && (
+        <button
+          type="button"
+          className="rs-btn"
+          style={{ height: 30, padding: '0 10px', fontSize: 12 }}
+          onClick={onPagar}
+          disabled={isLoading}
+          title="Marcar como pagada"
         >
-          {cuota.numero}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <RealIcon className="h-3 w-3 flex-shrink-0" style={{ color: realMeta.color }} />
-            <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: realMeta.color }}>
-              {realMeta.label}
-            </span>
-            <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-              · vence {formatFechaAR(cuota.fecha_vencimiento)}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>
-              ${monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </span>
-            {cuota.fecha_pago && (
-              <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                pagada el {formatFechaAR(cuota.fecha_pago)}
-              </span>
-            )}
-            {cuota.comprobante && (
-              <span
-                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-                title="Comprobante"
-              >
-                <Receipt className="h-2.5 w-2.5" /> {cuota.comprobante}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Accion: marcar pagada */}
-        {(cuota.estado === 'pendiente' || cuota.estado === 'vencida') && (
-          <button
-            onClick={onPagar}
-            disabled={isLoading}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
-            style={{ backgroundColor: '#10b98115', color: '#10b981', border: '1px solid #10b98140' }}
-            title="Marcar como pagada"
-          >
-            {isLoading
-              ? <Loader2 className="h-3 w-3 animate-spin" />
-              : <CheckCircle2 className="h-3 w-3" />}
-            Pagar
-          </button>
-        )}
-      </div>
+          {isLoading
+            ? <Loader2 className="h-3 w-3 animate-spin" />
+            : <CheckCircle2 className="h-3 w-3" />}
+          Pagar
+        </button>
+      )}
     </div>
   );
 }

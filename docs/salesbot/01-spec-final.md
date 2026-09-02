@@ -6,7 +6,7 @@
 
 ## Auth y base
 
-- **Base URL:** `https://munify-api-vmpxsxe7ra-rj.a.run.app` (alias equivalente: `…-1060106389361.southamerica-east1.run.app`).
+- **Base URL:** `https://munify-api-vmpxsxe7ra-rj.a.run.app` (alias equivalente: `…-1060106389361.southamerica-east1.run.app`). **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app]**
 - **Header en TODOS los requests:** `X-SalesBot-Key: <SALESBOT_API_KEY>` (64 chars). El valor vive en Secret Manager de Munify (`SALESBOT_API_KEY`) y se pasa por canal seguro — no va escrito en este doc.
 - **Tenant-scoped:** el `municipio_id` va siempre en el path; el backend valida que trámites/dependencias pertenezcan a ese muni (cross-tenant → `404`).
 - **Errores comunes:** `403` key inválida/cortada · `404` muni/recurso inexistente · `400` parámetros faltantes/ inválidos.

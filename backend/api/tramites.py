@@ -15,7 +15,7 @@ Reglas de negocio:
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
@@ -37,6 +37,13 @@ from models.documento_solicitud import DocumentoSolicitud
 from models.municipio_dependencia import MunicipioDependencia
 from models.user import User
 from models.enums import RolUsuario
+from utils.busqueda import (
+    normalizar_termino,
+    patron_like,
+    clausulas_nombre_completo,
+    clausula_dni,
+    normalizar_numero,
+)
 from schemas.tramite import (
     TramiteCreate, TramiteUpdate, TramiteResponse,
     TramiteDocumentoRequeridoCreate, TramiteDocumentoRequeridoUpdate,
@@ -845,6 +852,27 @@ async def crear_solicitud(
         # Defensa: solo vecinos de este muni o sin muni asignado
         if vecino.municipio_id and vecino.municipio_id != municipio_id:
             raise HTTPException(status_code=403, detail="El vecino no pertenece a este municipio")
+        # Regla de negocio Mostrador: para TRAMITES la validacion biometrica
+        # del VECINO es obligatoria (RENAPER via Didit, self-service o
+        # asistida => nivel_verificacion >= 2). El gate `requiere_kyc` de mas
+        # arriba mira a current_user, que en ventanilla es el OPERADOR — aca
+        # validamos al vecino real. Para RECLAMOS el alta simple alcanza
+        # (api/reclamos.py no exige este check).
+        nivel_vecino = int(getattr(vecino, "nivel_verificacion", 0) or 0)
+        if nivel_vecino < 2:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "kyc_insuficiente",
+                    "mensaje": (
+                        "Para iniciar un trámite el vecino tiene que validar su "
+                        "identidad (RENAPER). Hacelo desde el Mostrador con la "
+                        "opción 'Por celular'. Para reclamos no hace falta."
+                    ),
+                    "nivel_requerido": 2,
+                    "nivel_actual": nivel_vecino,
+                },
+            )
         solicitante_id = vecino.id
         es_ventanilla_asistida = True
         # Prellenar campos del solicitante con datos del User
@@ -2029,8 +2057,14 @@ async def listar_solicitudes_gestion(
 ):
     """Lista solicitudes para gestión con paginación y filtros."""
     from models.municipio_dependencia import MunicipioDependencia
+    from models.dependencia import Dependencia
 
     query = select(Solicitud).where(Solicitud.municipio_id == municipio_id)
+
+    # ¿Ya está `tramites` en el FROM? El filtro por categoría lo joinea INNER
+    # (una solicitud sin trámite no puede ser de esa categoría); el buscador lo
+    # necesita también, pero OUTER. Se lleva la cuenta para no joinear dos veces.
+    tramite_joineado = False
 
     if estado:
         query = query.where(Solicitud.estado == estado)
@@ -2040,19 +2074,81 @@ async def listar_solicitudes_gestion(
         query = query.join(Tramite, Solicitud.tramite_id == Tramite.id).where(
             Tramite.categoria_tramite_id == categoria_tramite_id
         )
+        tramite_joineado = True
     if municipio_dependencia_id:
         query = query.where(Solicitud.municipio_dependencia_id == municipio_dependencia_id)
     if sin_asignar:
         query = query.where(Solicitud.municipio_dependencia_id.is_(None))
-    if search:
-        st = f"%{search}%"
-        query = query.where(
-            (Solicitud.numero_tramite.ilike(st))
-            | (Solicitud.asunto.ilike(st))
-            | (Solicitud.nombre_solicitante.ilike(st))
-            | (Solicitud.apellido_solicitante.ilike(st))
-            | (Solicitud.dni_solicitante.ilike(st))
+
+    # ------------------------------------------------------------------
+    # Buscador libre. Cubre lo que la gente tipea en el mostrador: el número
+    # de expediente, el asunto, los datos del solicitante (nombre completo en
+    # cualquier orden, DNI con o sin puntos, mail, teléfono, dirección), el
+    # NOMBRE DEL TRÁMITE y su categoría ("habilitación comercial"), la
+    # dependencia asignada, y el texto libre del expediente.
+    #
+    # Los joins se agregan SOLO acá (no penalizan el listado sin búsqueda) y
+    # son OUTER: una solicitud sin trámite o sin dependencia asignada NO puede
+    # desaparecer del listado por buscar. El WHERE de municipio_id sigue
+    # manejando el tenant — todas las relaciones son many-to-one, así que
+    # ningún join agrega ni duplica filas.
+    # ------------------------------------------------------------------
+    termino = normalizar_termino(search)
+    if termino:
+        st = patron_like(termino)
+
+        if not tramite_joineado:
+            query = query.outerjoin(Tramite, Solicitud.tramite_id == Tramite.id)
+        query = (
+            query
+            .outerjoin(CategoriaTramite, Tramite.categoria_tramite_id == CategoriaTramite.id)
+            .outerjoin(
+                MunicipioDependencia,
+                Solicitud.municipio_dependencia_id == MunicipioDependencia.id,
+            )
+            .outerjoin(Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
         )
+
+        clausulas = [
+            # Expediente
+            Solicitud.numero_tramite.ilike(st),
+            Solicitud.asunto.ilike(st),
+            Solicitud.descripcion.ilike(st),
+            Solicitud.observaciones.ilike(st),
+            Solicitud.respuesta.ilike(st),
+            # Solicitante (snapshot en la propia solicitud — sirve para anónimos)
+            Solicitud.nombre_solicitante.ilike(st),
+            Solicitud.apellido_solicitante.ilike(st),
+            Solicitud.dni_solicitante.ilike(st),
+            Solicitud.email_solicitante.ilike(st),
+            Solicitud.telefono_solicitante.ilike(st),
+            Solicitud.direccion_solicitante.ilike(st),
+            # Tipo de trámite y su categoría
+            Tramite.nombre.ilike(st),
+            CategoriaTramite.nombre.ilike(st),
+            # Dependencia asignada (el nombre vive en el catálogo global)
+            Dependencia.nombre.ilike(st),
+        ]
+
+        # "Perez Juan" y "Juan Perez" tienen que dar lo mismo.
+        clausulas.extend(
+            clausulas_nombre_completo(
+                Solicitud.nombre_solicitante, Solicitud.apellido_solicitante, termino
+            )
+        )
+
+        # DNI normalizado contra DNI normalizado ("30.217.134" == "30217134").
+        cl_dni = clausula_dni(Solicitud.dni_solicitante, termino)
+        if cl_dni is not None:
+            clausulas.append(cl_dni)
+
+        # El número como lo dicta el vecino por teléfono ("#12", "nro 12"): el
+        # numeral adelante rompe el LIKE crudo contra `numero_tramite`.
+        numero = normalizar_numero(termino, prefijos=("sol",))
+        if numero:
+            clausulas.append(Solicitud.numero_tramite.ilike(f"%{numero}%"))
+
+        query = query.where(or_(*clausulas))
 
     query = query.options(
         selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),

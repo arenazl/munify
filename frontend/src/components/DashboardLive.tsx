@@ -7,6 +7,7 @@ import {
   Bell, Wallet, Zap,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useCountUp } from '../hooks/useCountUp';
 import HeatmapWidget from './ui/HeatmapWidget';
 import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, RadialBarChart, RadialBar } from 'recharts';
 import { dashboardApi, analyticsApi } from '../lib/api';
@@ -53,25 +54,8 @@ interface DashboardLiveProps {
 
 const SLIDE_DURATION_MS = 10000;
 
-// Hook: cuenta de 0 al target con easing
-function useCountUp(target: number, durationMs = 1500): number {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (typeof target !== 'number' || isNaN(target)) return;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(target * eased));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, durationMs]);
-  return value;
-}
+// El count-up ahora es pieza del kit (hooks/useCountUp): antes vivía acá
+// enjaulado y el resto de los KPIs de la app no animaban.
 
 // ============================================================
 // Component

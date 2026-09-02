@@ -3,7 +3,6 @@ import { Briefcase, Edit2, Trash2, Calendar, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
@@ -162,7 +161,7 @@ export default function TesoreriaProyectos() {
         className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
         style={{
           backgroundColor: estadoFiltro === '' ? theme.primary : 'transparent',
-          color: estadoFiltro === '' ? '#fff' : theme.textSecondary,
+          color: estadoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
           border: `1px solid ${estadoFiltro === '' ? theme.primary : theme.border}`,
         }}
       >
@@ -271,12 +270,6 @@ export default function TesoreriaProyectos() {
   return (
     <>
       <div className="px-4 pt-3">
-        <TesoreriaHint titulo="Proyectos" storageKey="proyectos">
-          Un <b>proyecto</b> agrupa varios gastos de una obra o iniciativa.
-          Por ejemplo "Departamento para el vecindario" puede tener gastos de
-          ferretería, corralón, contratista, etc. Al cargar un gasto podés imputar
-          una parte (o todo) a un proyecto.
-        </TesoreriaHint>
       </div>
 
       <ABMPage

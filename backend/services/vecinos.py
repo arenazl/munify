@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import get_password_hash
 from models.enums import RolUsuario
+from models.municipio import Municipio
 from models.user import User
 
 
@@ -73,17 +74,29 @@ async def resolver_o_crear_vecino(
         #     Tampoco podemos crear un ghost con el mismo DNI porque el
         #     duplicado se permite (DNI no es unique), pero sería la misma
         #     persona con dos filas, y eso está mal.
+        # first() y no scalar_one_or_none(): con el sandbox demo el mismo DNI
+        # puede existir en más de un municipio.
         r = await db.execute(select(User).where(User.dni == dni_limpio))
-        existente = r.scalar_one_or_none()
+        existente = r.scalars().first()
         if existente:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"El DNI {dni_limpio} ya pertenece a un usuario del sistema "
-                    f"registrado en otro municipio. No podés usarlo como "
-                    f"solicitante de un reclamo en este municipio."
-                ),
+            # Sandbox demo: un municipio demo no cruza identidad con otros
+            # tenants — el mismo DNI puede ser cliente real en un municipio
+            # productivo sin bloquear la demostración. Ahí abajo se crea el
+            # ghost local del muni demo. En municipios productivos el bloqueo
+            # cross-tenant sigue intacto.
+            mq = await db.execute(
+                select(Municipio).where(Municipio.id == municipio_id)
             )
+            muni = mq.scalar_one_or_none()
+            if not (muni and muni.es_demo):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"El DNI {dni_limpio} ya pertenece a un usuario del sistema "
+                        f"registrado en otro municipio. No podés usarlo como "
+                        f"solicitante de un reclamo en este municipio."
+                    ),
+                )
 
     # 2) Match por email. `email` es unique global a nivel DB.
     if email:

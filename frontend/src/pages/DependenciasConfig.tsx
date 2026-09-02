@@ -7,12 +7,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dependenciasApi, categoriasReclamoApi, categoriasTramiteApi, tramitesApi } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
 import { MapPicker } from '../components/ui/MapPicker';
-import PageHint from '../components/ui/PageHint';
+import { useReportarTotal } from '../components/abmv2/useEmbed';
 
 type TipoJerarquico = 'SECRETARIA' | 'DIRECCION';
 
@@ -133,6 +134,7 @@ type FilterType = 'todos' | 'reclamos' | 'tramites';
 export default function DependenciasConfig() {
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { municipioActual } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
 
   const [loading, setLoading] = useState(true);
@@ -143,6 +145,8 @@ export default function DependenciasConfig() {
 
   // Datos
   const [dependenciasMunicipio, setDependenciasMunicipio] = useState<MunicipioDependencia[]>([]);
+  // Publica el total para el contador del riel de Configuración.
+  useReportarTotal(dependenciasMunicipio.length);
   const [catalogoGlobal, setCatalogoGlobal] = useState<Dependencia[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [tiposTramite, setTiposTramite] = useState<TipoTramite[]>([]);
@@ -288,9 +292,15 @@ export default function DependenciasConfig() {
 
     setSearchingAddress(true);
     try {
-      // Agregar contexto de Buenos Aires para mejores resultados
+      /* El contexto geográfico sale del país del tenant (`municipios.pais`).
+         AR conserva el "Buenos Aires, Argentina" que ya estaba; otro país
+         busca ahí — con el contexto clavado en Argentina, una dirección de
+         Asunción daba 0 resultados. */
+      const pais = (municipioActual?.pais || 'AR').toUpperCase();
+      const NOMBRE_PAIS: Record<string, string> = { AR: 'Argentina', PY: 'Paraguay', UY: 'Uruguay' };
+      const contexto = pais === 'AR' ? ', Buenos Aires, Argentina' : NOMBRE_PAIS[pais] ? `, ${NOMBRE_PAIS[pais]}` : '';
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Buenos Aires, Argentina&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(`${query}${contexto}`)}&countrycodes=${pais.toLowerCase()}&limit=5&addressdetails=1`,
         { headers: { 'Accept-Language': 'es' } }
       );
       const data = await response.json();
@@ -300,7 +310,7 @@ export default function DependenciasConfig() {
     } finally {
       setSearchingAddress(false);
     }
-  }, []);
+  }, [municipioActual]);
 
   // Debounce para búsqueda de direcciones
   useEffect(() => {
@@ -804,7 +814,6 @@ export default function DependenciasConfig() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
       <div className="px-3 sm:px-6 pt-3">
-        <PageHint pageId="dependencias-config" />
       </div>
       {/* Header sticky */}
       <StickyPageHeader
@@ -846,7 +855,7 @@ export default function DependenciasConfig() {
                 }`}
                 style={{
                   backgroundColor: mainTab === tab.key ? theme.primary : theme.backgroundSecondary,
-                  color: mainTab === tab.key ? '#fff' : theme.text,
+                  color: mainTab === tab.key ? 'var(--pl-on-accent)' : theme.text,
                   border: `1px solid ${mainTab === tab.key ? theme.primary : theme.border}`,
                 }}
               >
@@ -934,7 +943,7 @@ export default function DependenciasConfig() {
                 <button
                   onClick={abrirAiSecretarias}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 active:scale-95"
-                  style={{ backgroundColor: theme.primary, color: '#fff' }}
+                  style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                 >
                   <Sparkles className="h-4 w-4" />
                   Sugerir Secretarías

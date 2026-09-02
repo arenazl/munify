@@ -139,8 +139,7 @@ export function WizardModal({
       margin: 0 !important;
       padding: 0 !important;
       z-index: 9998;
-      background-color: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(4px);
+      background-color: var(--pl-scrim);
       opacity: ${isVisible ? 1 : 0};
       transition: opacity 0.3s ease;
     }
@@ -160,12 +159,15 @@ export function WizardModal({
     }
     .wizard-modal-content {
       width: 100%;
-      max-width: ${aiPanel ? '1200px' : '900px'};
+      /* Un poco más angosto y con el acento verde ARRIBA (pedido del dueño,
+         2026-08-07): el modal se lee como pieza del kit, no como página. */
+      max-width: ${aiPanel ? '1040px' : '760px'};
       max-height: calc(100vh - 48px);
       margin: 0 !important;
       display: flex;
       flex-direction: column;
       border-radius: 16px;
+      border-top: 3px solid var(--pl-green);
       overflow: hidden;
       transform: ${isVisible ? 'scale(1)' : 'scale(0.95)'};
       opacity: ${isVisible ? 1 : 0};
@@ -388,20 +390,20 @@ export function WizardModal({
                   {headerBadge.icon}
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0 }}>
+                  <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0, fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}>
                     {headerBadge.label}
                   </h2>
-                  <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0 }}>
+                  <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0, fontFamily: 'var(--pl-font-display)' }}>
                     {currentStepData?.description || currentStepData?.title}
                   </p>
                 </div>
               </>
             ) : (
               <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0, whiteSpace: 'nowrap' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0, whiteSpace: 'nowrap', fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}>
                   {title}
                 </h2>
-                <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0 }}>
+                <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0, fontFamily: 'var(--pl-font-display)' }}>
                   Paso {currentStep + 1} de {steps.length}
                 </p>
               </div>
@@ -427,7 +429,7 @@ export function WizardModal({
                       borderRadius: '50%',
                       border: `2px solid ${isCompleted || isCurrent ? theme.primary : theme.border}`,
                       backgroundColor: isCompleted || isCurrent ? theme.primary : theme.backgroundSecondary,
-                      color: isCompleted || isCurrent ? 'white' : theme.textSecondary,
+                      color: isCompleted || isCurrent ? 'var(--pl-on-accent)' : theme.textSecondary,
                       cursor: index <= currentStep ? 'pointer' : 'default',
                       display: 'flex',
                       alignItems: 'center',
@@ -527,11 +529,11 @@ export function WizardModal({
                   {currentStepData?.icon}
                 </span>
                 <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: theme.text, margin: 0 }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: theme.text, margin: 0, fontFamily: 'var(--pl-font-display)', letterSpacing: '-0.02em' }}>
                     {currentStepData?.title}
                   </h3>
                   {currentStepData?.description && (
-                    <p style={{ fontSize: '13px', color: theme.textSecondary, margin: '2px 0 0 0' }}>
+                    <p style={{ fontSize: '13px', color: theme.textSecondary, margin: '2px 0 0 0', fontFamily: 'var(--pl-font-display)' }}>
                       {currentStepData.description}
                     </p>
                   )}

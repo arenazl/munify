@@ -12,17 +12,28 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Carpeta | Qué tiene |
 |---|---|
 | [`plataforma/`](plataforma/) | Arquitectura, deploy, testing, refactors de referencia, schema/OpenAPI |
+| [`produccion/`](produccion/) | **Incidentes de producción y requerimientos operativos**: qué falló, la causa verificada, cómo se resolvió y qué mirar si vuelve a pasar |
 | [`salesbot/`](salesbot/) | Specs de la integración SalesBot ↔ Munify (API, turnos, verificación) |
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
-| [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
+| [`campo/`](campo/) | Módulo de campo: `01` órdenes de trabajo + inventario (activos/consumibles) + formato/PDF · `02` **el depósito**: movimientos de stock, órdenes de compra y ubicaciones |
+| [`financiero/`](financiero/) | **Qué hace hoy el módulo financiero** (Contaduría + Tesorería + Sueldos + dashboard): descripción funcional fiel, base para buscar mejoras |
+| [`comunicacion/`](comunicacion/) | **Módulo NUEVO** (a construir): avisos al vecino, obras a la vista, cronogramas. Tres etapas, spec de la primera |
+| [`recursos/`](recursos/) | **Módulo NUEVO** (a construir): flota y combustible, presentismo de cuadrillas, reservas. Tres etapas, consolidado con OT+Inventario |
+| [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
+| [`calls/`](calls/) | **Directorio de llamados** (`/calls`): `01` cómo regenerar la app y repasar los intendentes · `02` qué le falta y por dónde seguir |
+| [`dashboard/`](dashboard/) | **Dashboard modular por módulos**: diseño cerrado (registry + hooks por dominio, cinta, regla del cero, orden por actividad) + WOs F1-F4 |
+| [`e2e/`](e2e/) | **Suite Playwright de circuito completo** (agnóstica de tenant): qué cubre, cómo correrla y cómo llevarla a otro municipio |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |
 | [`marketing/`](marketing/) | Brochure comercial |
 | [`reels/`](reels/) | Contexto de reels de promoción (doc vivo entre agentes) |
 | [`clientes/`](clientes/) | Docs por cliente (`spn/` = San Pedro Norte: notas, reportes, planillas) |
-| [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`) — se crea al primer uso |
+| [`design-sync/`](design-sync/) | **Los prototipos de Claude Design en HTML autoejecutable** (doble clic, sin servidor). Es la fuente contra la que se compara la app; no vive en el contexto de ningún agente. Regla global 22 |
+| [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas, y `paquetes/` con cada bajada del canvas fechada (la de número más alto es la vigente) |
+| [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`). Último: `2026-09-01_geo-localidades-mapa-y-calls.md` — el padrón de localidades con contorno (90% del país), cómo lo consume el alta de demos, mapa a pantalla completa y dónde vive /calls |
 | [`historico/`](historico/) | Docs superados, archivados por fecha (`YYYY-MM-DD-titulo.md`) |
+| [`antigravity/`](antigravity/) | Archivo histórico de Antigravity (herramienta dada de baja): scripts de extracción del prototipo de Configuración + capturas. El código que produjo NO está acá, sigue vivo en `frontend/src/` |
 | [`legacy/`](legacy/) | Archivo histórico pre-criterio (congelado; no mover, no borrar) |
 
 ## Para qué leer cada cosa
@@ -30,6 +41,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Querés... | Leé |
 |---|---|
 | Entender qué es Munify, módulos, roles, multi-tenant | [`plataforma/01-arquitectura.md`](plataforma/01-arquitectura.md) |
+| **Un adjunto de Cloudinary no se ve / da 401 / se baja en vez de abrirse** | [`produccion/01-incidente-cloudinary-pdf.md`](produccion/01-incidente-cloudinary-pdf.md) — el checkbox de la consola que bloquea PDF, y los 6 gotchas de Cloudinary (qa y prod comparten cuenta, la URL con versión sirve la respuesta vieja, el query string no bustea el caché) |
 | Tocar UI o backend (patrones, componentes, reglas) | [`../BUILD_GUIDE.md`](../BUILD_GUIDE.md) (canónico, en root) |
 | Saber cómo se deploya | [`plataforma/02-deploy.md`](plataforma/02-deploy.md) |
 | Hacer testing manual de un módulo | [`plataforma/03-testing.md`](plataforma/03-testing.md) |
@@ -38,9 +50,18 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | La spec vigente de SalesBot (endpoints vivos) | [`salesbot/01-spec-final.md`](salesbot/01-spec-final.md) |
 | El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
+| Consolidar tesorería / entender el plan Persona + prueba de paridad | [`tesoreria/01-consolidacion-analisis.md`](tesoreria/01-consolidacion-analisis.md) |
+| **Retomar Configuración (trabajo en curso)** | [`handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md`](handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md) — **empezá por acá**, es el más nuevo y corrige dos cosas de los anteriores. Después, la sección [Configuración · orden de lectura](#configuración--orden-de-lectura) |
+| Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
+| **Promover a prod la Tarjeta de crédito como caja (qué necesita Infra)** | [`handoffs/2026-07-23_promocion-tarjeta-credito.md`](handoffs/2026-07-23_promocion-tarjeta-credito.md) — sin migración; único paso manual = crear la caja con `codigo=TARJETA` |
+| **Retomar en frío el 2026-07-06 (Reclamos COMPLETO en qa + bloqueo de ambiente + regla "nunca DB directo")** | [`handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md`](handoffs/2026-07-06_handoff-reclamos-completo-bloqueo-ambiente-y-rediseno-db-via-api.md) |
+| **Retomar el dashboard modular (diseño cerrado + WOs F1-F4)** | [`dashboard/01-diseno-dashboard-modular.md`](dashboard/01-diseno-dashboard-modular.md) — reemplaza como vigente al pasamanos `handoffs/2026-08-25` |
 | Entender el estado del universo Reclamos (análisis + decisiones abiertas) | [`reclamos/01-analisis-funcional.md`](reclamos/01-analisis-funcional.md) |
 | Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
 | Ver las inconsistencias de UX/interacción del circuito (49 hallazgos) | [`reclamos/09-analisis-ux-circuito.md`](reclamos/09-analisis-ux-circuito.md) — insumo transversal repartido entre fases |
+| Ver el test de cohesión entre módulos (Reclamo↔OT↔Inventario↔Notificaciones) y el veredicto para San Martín | [`reclamos/10-test-cohesion.md`](reclamos/10-test-cohesion.md) — 94 hallazgos viejos re-verificados + 16 costuras nuevas confirmadas (2026-07-16) |
+| Saber QUÉ queda por hacer en Reclamos/OT (hoja de ruta priorizada, con dueño Munify/externo/config) | [`reclamos/11-hoja-de-ruta-pendiente.md`](reclamos/11-hoja-de-ruta-pendiente.md) — consolida el test 10 en tareas accionables (2026-07-16) |
+| Retomar la refacción de Reclamos en frío (qué se hizo F0-F3, qué falta, cómo seguir) | [`handoffs/2026-07-04_refactor-reclamos-F0-F3-consistencia.md`](handoffs/2026-07-04_refactor-reclamos-F0-F3-consistencia.md) |
 | Pitch / argumentario de ventas para intendentes | [`sales/01-producto-munify.md`](sales/01-producto-munify.md) |
 | Prompt del agente de ventas (Bruno) | [`sales/02-sales-agent-prompt.md`](sales/02-sales-agent-prompt.md) |
 | Brochure comercial PDF | [`marketing/Munify_Brochure.pdf`](marketing/Munify_Brochure.pdf) |
@@ -49,6 +70,24 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Qué se le comunicó/arregló a San Pedro Norte | [`clientes/spn/`](clientes/spn/) |
 | Curación de gastos históricos SPN (estado + cómo retomar) | [`clientes/spn/02-curacion-gastos-historicos.md`](clientes/spn/02-curacion-gastos-historicos.md) |
 | Módulo Inventario + cruce con OT (estado + qué falta) | [`handoffs/2026-07-03_modulo-inventario-y-ot-formato.md`](handoffs/2026-07-03_modulo-inventario-y-ot-formato.md) |
+
+## Configuración · orden de lectura
+
+Es el tema con más docs y todos son del mismo par de días, así que el índice de
+arriba no alcanza para saber por dónde entrar. Leerlos en este orden:
+
+| # | Doc | Para qué |
+|---|---|---|
+| 0 | [`handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md`](handoffs/2026-08-07_configuracion-datos-reales-y-kit-unificado.md) | **EMPEZÁ POR ACÁ — es el vigente.** Mapa de archivos, flujo de datos, qué quedó roto con sus pistas, y las decisiones que no se re-discuten. Corrige dos cosas del #1: el gate `npx tsc --noEmit` **no chequea nada** en este repo, y el bug del StickyPageHeader **ya está arreglado** |
+| 1 | [`handoffs/2026-08-03_prototipo-configuracion-y-cableado.md`](handoffs/2026-08-03_prototipo-configuracion-y-cableado.md) | Cómo se armó el prototipo y la receta para cablear una pantalla. ⚠️ Su §3.1 (bug del StickyPageHeader) y su "compilando" están **superados** por el #0 |
+| 2 | [`handoffs/2026-08-03_configuracion-maestro-detalle.md`](handoffs/2026-08-03_configuracion-maestro-detalle.md) | Cómo quedó el maestro-detalle de 3 niveles |
+| 3 | [`handoffs/2026-08-03_kit-controles-y-migracion-config.md`](handoffs/2026-08-03_kit-controles-y-migracion-config.md) | Agregar un control al kit v2: las 11 piezas nuevas, la regla de ingreso, las 5 pantallas migradas |
+| 4 | [`handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md`](handoffs/2026-08-02_configuracion-catalogos-y-apariencia.md) | Lo especificado y **no implementado**: 5 grupos por FK real, temas de 40 a 6 + acento independiente, topbar sólo luna/sol |
+| 5 | [`handoffs/2026-08-02_rollout-v2-canvas-ola1.md`](handoffs/2026-08-02_rollout-v2-canvas-ola1.md) | El rollout v2 del canvas: 8 pantallas en qa, validaciones a ojo, huecos de backend |
+
+El prototipo contra el que se compara está en [`design-sync/`](design-sync/) — se abre
+con doble clic, sin servidor. Es **especificación, no código**: se implementa con los
+componentes del kit y los tokens, nunca copiando el markup (regla global 22).
 
 ## ¿Dónde va un doc nuevo?
 

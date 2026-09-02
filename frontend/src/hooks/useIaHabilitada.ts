@@ -22,7 +22,7 @@ async function preload() {
       const res = await iaConfigApi.getActual();
       cache = { habilitada: !!res.data.habilitada, provider: res.data.provider, modelo: res.data.modelo, tesoreria: res.data.tesoreria !== false, reclamos: res.data.reclamos !== false, tramites: res.data.tramites !== false };
     } catch {
-      cache = { habilitada: false, provider: 'gemini', modelo: '', tesoreria: true, reclamos: true, tramites: true };
+      cache = { habilitada: false, provider: 'groq', modelo: '', tesoreria: true, reclamos: true, tramites: true };
     } finally {
       loaded = true;
       loadingPromise = null;

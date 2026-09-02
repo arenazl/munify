@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+<script src="./image-slot.js"></script>
+<style>
+  body { margin: 0; background: #F1F4F2; font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #00B37E; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  @media (min-width: 1480px) { .mt { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+  @media (min-width: 1160px) { .vv { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+  @media (max-width: 680px) { .vv { grid-template-columns: minmax(0, 1fr) !important; } }
+  @keyframes flotar { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-8px) rotate(-3deg); } }
+  @keyframes latido { 0% { opacity: 0.5; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.35); } }
+  @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); } 70% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+</style>
+</helmet>
+
+<div style="display: flex; min-height: 1000px; background: #F1F4F2; color: #0D1412;">
+
+  <sc-if value="{{ colapsada }}" hint-placeholder-val="{{ false }}">
+    <aside style="width: 72px; flex: 0 0 72px; background: #FFFFFF; border-right: 1px solid rgba(13,20,18,0.07); display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 18px 0; position: sticky; top: 0; align-self: flex-start; height: 100vh;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(150deg, #FDF3D6 0%, #E4F5EC 60%, #D3F0E3 100%); border: 1px solid rgba(13,20,18,0.06); display: grid; place-items: center; margin-bottom: 12px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="8.6" cy="7.4" r="3.1" fill="#FFB800" /><g stroke="#FFB800" stroke-width="1.6" stroke-linecap="round"><path d="M8.6 1.6v1.4M8.6 11.8v1.4M2.8 7.4h1.4M13 7.4h1.4M4.5 3.3l1 1M12.2 10.5l1 1M12.7 3.3l-1 1M5.5 10.5l-1 1" /></g><path d="M3.2 21c0-5.2 4-9.4 9.2-9.4h7.4v3.1c0 3.5-2.9 6.3-6.4 6.3z" fill="#00B37E" /></svg>
+      </div>
+      <div title="Dashboard" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: #E7F6F0; color: #00794F; cursor: pointer;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z" /><path d="M9 21v-6h6v6" /></svg></div>
+      <div title="Reclamos" style="position: relative; width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg><span style="position: absolute; top: 3px; right: 2px; min-width: 16px; height: 15px; padding: 0 3px; border-radius: 999px; background: #00B37E; color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: center;">129</span></div>
+      <div title="Mapa" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg></div>
+      <div title="SLA" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg></div>
+      <span style="width: 26px; height: 1px; background: rgba(13,20,18,0.08); margin: 7px 0;"></span>
+      <div title="Órdenes" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4" /><path d="M14 4h6v6" /></svg></div>
+      <div title="Cuadrillas" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3" /><circle cx="17" cy="9" r="3" /><path d="M2 19c0-2.8 2.7-5 6-5s6 2.2 6 5" /><path d="M15 14.5c2.9.4 5 2.3 5 4.5" /></svg></div>
+      <div title="Trámites" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg></div>
+      <div title="Cobros" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg></div>
+      <div style="flex: 1;"></div>
+      <div onClick="{{ toggleColapso }}" title="Expandir menú" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; border: 1px solid rgba(13,20,18,0.08);" style-hover="background: #F4F7F6;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ expandida }}" hint-placeholder-val="{{ true }}">
+  <aside style="width: 256px; flex: 0 0 256px; background: #FFFFFF; border-right: 1px solid rgba(13,20,18,0.07); display: flex; flex-direction: column; position: sticky; top: 0; align-self: flex-start; height: 100vh;">
+
+    <div style="display: flex; align-items: center; gap: 10px; padding: 18px 16px 14px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(150deg, #FDF3D6 0%, #E4F5EC 60%, #D3F0E3 100%); border: 1px solid rgba(13,20,18,0.06); display: grid; place-items: center; flex: 0 0 36px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="8.6" cy="7.4" r="3.1" fill="#FFB800" />
+          <g stroke="#FFB800" stroke-width="1.6" stroke-linecap="round">
+            <path d="M8.6 1.6v1.4M8.6 11.8v1.4M2.8 7.4h1.4M13 7.4h1.4M4.5 3.3l1 1M12.2 10.5l1 1M12.7 3.3l-1 1M5.5 10.5l-1 1" />
+          </g>
+          <path d="M3.2 21c0-5.2 4-9.4 9.2-9.4h7.4v3.1c0 3.5-2.9 6.3-6.4 6.3z" fill="#00B37E" />
+          <path d="M6.4 21c1.6-3.4 4.6-5.6 8.4-6.3" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" opacity="0.75" />
+        </svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+        <div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -0.02em;">Paraguay <span style="color: #00B37E;">Limpio</span></div>
+        <div style="font-size: 11px; color: #7A8783;">Asunción, Dpto. Central</div>
+      </div>
+      <sc-if value="{{ colapsoHeader }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ toggleColapso }}" title="Colapsar menú" style="margin-left: auto; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(13,20,18,0.08); display: grid; place-items: center; cursor: pointer; flex: 0 0 28px;" style-hover="background: #F4F7F6;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+        </div>
+      </sc-if>
+    </div>
+    <sc-if value="{{ colapsoBorde }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleColapso }}" title="Colapsar menú" style="position: absolute; top: 76px; right: -13px; width: 26px; height: 26px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.10); box-shadow: 0 2px 6px rgba(13,20,18,0.10); display: grid; place-items: center; cursor: pointer; z-index: 3;" style-hover="background: #E7F6F0; border-color: #9BDCC4;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+      </div>
+    </sc-if>
+
+    <div style="padding: 0 12px 12px;">
+      <div onClick="{{ abrirBuscador }}" style="display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 11px; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.08); border-radius: 11px; cursor: text;" style-hover="background: #EDF3F0; border-color: #9BDCC4;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" style="flex: 0 0 17px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span style="font-size: 13.5px; color: #7A8783; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar reclamo…</span>
+        <span style="margin-left: auto; font-size: 10.5px; font-weight: 600; color: #7A8783; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.1); border-radius: 6px; padding: 2px 5px; flex: 0 0 auto;">⌘K</span>
+      </div>
+    </div>
+
+    <nav style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 2px;">
+
+      <a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 9px; background: #E7F6F0; color: #00794F; font-size: 13.5px; font-weight: 600; position: relative;">
+        <span style="position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: #00B37E;"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z" /><path d="M9 21v-6h6v6" /></svg>
+        Dashboard
+      </a>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleReclamos }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">RECLAMOS</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevReclamos }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openReclamos }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9z" /><path d="M9 12h6M9 16h4" /></svg>
+            Reclamos
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #00794F; background: #E7F6F0; border-radius: 999px; padding: 1px 7px;">129</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg>
+            Mapa
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
+            Tablero
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+            Planificación
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
+            SLA
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #B4560F; background: #FDF1DF; border-radius: 999px; padding: 1px 7px;">3</span>
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleCampo }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">CAMPO</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevCampo }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openCampo }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4" /><path d="M14 4h6v6" /></svg>
+            Órdenes
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #00794F; background: #E7F6F0; border-radius: 999px; padding: 1px 7px;">12</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="13" y="13" width="8" height="8" rx="1.5" /><rect x="8" y="3" width="8" height="8" rx="1.5" /></svg>
+            Inventario
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M17 8.5a3 3 0 0 1 0 5" /></svg>
+            Personal
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3" /><circle cx="17" cy="9" r="3" /><path d="M2 19c0-2.8 2.7-5 6-5s6 2.2 6 5" /><path d="M15 14.5c2.9.4 5 2.3 5 4.5" /></svg>
+            Cuadrillas
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleTramites }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">TRÁMITES</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevTramites }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openTramites }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+            Trámites
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #00794F; background: #E7F6F0; border-radius: 999px; padding: 1px 7px;">10</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /><circle cx="12" cy="15" r="2" /></svg>
+            Agenda
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.5" /><path d="M12 9.5V13l2.5 1.5M9 2h6" /></svg>
+            Horarios
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleVecino }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0;">ATENCIÓN AL VECINO</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevVecino }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openVecino }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="11" rx="2" /><path d="M8 20h8" /></svg>
+            Mostrador
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M12 7v10M14.5 9.5c0-1.1-1.1-1.7-2.5-1.7s-2.5.6-2.5 1.7 1.2 1.5 2.5 1.8 2.5.7 2.5 1.8-1.1 1.7-2.5 1.7-2.5-.6-2.5-1.7" /></svg>
+            Tasas
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #3D4945; font-size: 13.5px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg>
+            Cobros
+          </a>
+        </div>
+      </sc-if>
+    </nav>
+
+    <div style="border-top: 1px solid rgba(13,20,18,0.07); padding: 10px 12px;">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #5B6764; font-size: 13px; font-weight: 500;" style-hover="background: #F4F7F6; color: #0D1412;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.7" /><path d="M12 17h.01" /></svg>
+        Ayuda y soporte
+      </a>
+    </div>
+  </aside>
+  </sc-if>
+
+  <main style="flex: 1; min-width: 0; padding: 14px 20px 40px;">
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 0 4px 14px; flex-wrap: wrap; row-gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #7A8783; min-width: 0; flex: 1 1 auto; overflow: hidden;">
+        <sc-if value="{{ enDependencia }}" hint-placeholder-val="{{ true }}">
+          <span style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; background: #E7F6F0; border: 1px solid #C9EBDD; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: #00794F; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" /></svg>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Dirección de Habilitaciones Comerciales</span>
+          </span>
+        </sc-if>
+        <sc-if value="{{ esAdmin }}" hint-placeholder-val="{{ false }}">
+          <span style="position: relative; display: inline-flex; min-width: 0;">
+            <button onClick="{{ toggleDep }}" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 999px; cursor: pointer; font-family: Inter, sans-serif; min-width: 0;" style-hover="border-color: #9BDCC4; background: #F7FCFA;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" /></svg>
+              <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Todas las dependencias</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+            </button>
+            <sc-if value="{{ depAbierto }}" hint-placeholder-val="{{ false }}">
+              <div style="position: absolute; top: 38px; left: 0; width: 340px; max-height: 380px; overflow: auto; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.08); border-radius: 12px; box-shadow: 0 6px 20px rgba(13,20,18,0.10), 0 2px 6px rgba(13,20,18,0.06); z-index: 20; padding: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #F3F7F5; border-radius: 9px; margin-bottom: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                  <input type="text" placeholder="Buscar dependencia…" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-family: Inter, sans-serif; font-size: 13px; color: #0D1412;" />
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 9px; background: #E7F6F0; cursor: pointer;">
+                  <span style="font-size: 13px; font-weight: 600; color: #00794F;">Todas las dependencias</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto;"><path d="m5 13 4 4L19 7" /></svg>
+                </div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE OBRAS Y SERVICIOS PÚBLICOS</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Redes Pluviales</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Alumbrado Público</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Defensa Civil</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE MOVILIDAD</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Tránsito</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Transporte</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Monitoreo</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE HACIENDA</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Ingresos Públicos</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Compras y Suministros</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Tesorería</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 12px 10px 4px;">SECRETARÍA DE GOBIERNO</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">Dirección de Habilitaciones Comerciales</div>
+              </div>
+            </sc-if>
+          </span>
+        </sc-if>
+        <span style="color: #C6CFCB;">/</span>
+        <span style="color: #0D1412; font-weight: 600;">Dashboard</span>
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto;">
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E8ECEA;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="1.2" fill="#5B6764" /><circle cx="14.5" cy="9.5" r="1.2" fill="#5B6764" /></svg>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer; position: relative;" style-hover="background: #E8ECEA;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z" /><path d="M10 18.5a2 2 0 0 0 4 0" /></svg>
+          <span style="position: absolute; top: 6px; right: 7px; width: 6px; height: 6px; border-radius: 999px; background: #E5484D; border: 1.5px solid #F1F4F2;"></span>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E8ECEA;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M4.6 7.5l1.7 1M17.7 15.5l1.7 1M4.6 16.5l1.7-1M17.7 8.5l1.7-1" /></svg>
+        </div>
+        <span style="width: 1px; height: 22px; background: rgba(13,20,18,0.10); margin: 0 4px;"></span>
+        <button style="display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 6px 0 4px; background: transparent; border: 0; border-radius: 999px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="background: #E8ECEA;">
+          <span style="width: 28px; height: 28px; border-radius: 999px; background: #0D1412; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 600;">RG</span>
+          <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 0px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; line-height: 1.2;">Rocío Giménez</span>
+            <span style="font-size: 10.5px; color: #7A8783; line-height: 1.2;">Supervisora de área</span>
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <section style="position: relative; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, #00B37E 0%, #007A55 100%); box-shadow: 0 1px 2px rgba(13,20,18,0.04), 0 2px 6px rgba(13,20,18,0.04);">
+
+      <sc-if value="{{ conFoto }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0;">
+          <div style="position: absolute; inset: 0; filter: saturate(0.85) brightness(1.02);">
+            <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&amp;w=2070" alt="Ciudad" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+          </div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(96deg, rgba(0,60,42,0.90) 0%, rgba(0,72,50,0.62) 42%, rgba(0,120,84,0.18) 78%, rgba(0,140,98,0.06) 100%); pointer-events: none;"></div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,50,36,0.28) 0%, rgba(0,50,36,0) 30%, rgba(0,50,36,0.42) 100%); pointer-events: none;"></div>
+          <a href="https://unsplash.com" target="_blank" rel="noreferrer" style="position: absolute; right: 10px; top: 10px; font-size: 9.5px; color: rgba(255,255,255,0.55); letter-spacing: 0.04em;">Unsplash</a>
+        </div>
+      </sc-if>
+
+      <div style="position: relative; display: flex; align-items: flex-start; gap: 32px; padding: 26px 28px 0;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.11em; color: rgba(255,255,255,0.72);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+            MUNICIPALIDAD · VISTA CONSOLIDADA
+          </div>
+          <h1 style="margin: 10px 0 6px; font-family: Sora, sans-serif; font-weight: 700; font-size: 38px; line-height: 1.05; letter-spacing: -0.025em; color: #FFFFFF;">Asunción, Dpto. Central</h1>
+          <p style="margin: 0; font-size: 14.5px; color: rgba(255,255,255,0.82); max-width: 46ch;">Todas las dependencias en un solo tablero, actualizado hace 4 minutos.</p>
+
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; flex: 0 0 auto;">
+          <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border: 0; border-radius: 12px; background: #FFFFFF; color: #00794F; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(6,32,24,0.18);" style-hover="background: #F2FBF7;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></svg>
+            Conocé Paraguay Limpio
+          </button>
+          <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border: 1px solid rgba(255,255,255,0.6); border-radius: 12px; background: rgba(0,45,32,0.5); color: #FFFFFF; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer;" style-hover="background: rgba(255,255,255,0.22);">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #FFFFFF; animation: pulseDot 2s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            Pulso del día
+          </button>
+        </div>
+      </div>
+
+      <div style="position: relative; margin: 22px 0 0; padding: 14px 28px 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: linear-gradient(180deg, rgba(0,45,32,0.62) 0%, rgba(0,45,32,0.82) 100%); border-top: 1px solid rgba(255,255,255,0.16);">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">RECLAMOS ABIERTOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">129</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">TRÁMITES ACTIVOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">10</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">RESOLUCIÓN PROMEDIO</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">19,4 d</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">EN RIESGO DE SLA</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #FFD66B; font-feature-settings: 'tnum';">3</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="margin: 16px 0 0; padding: 18px 20px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-left: 3px solid #00B37E; border-radius: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #7A8783;">{{ moduloEtiqueta }}</span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+          <sc-for list="{{ puntos }}" as="p" hint-placeholder-count="3">
+            <span onClick="{{ p.ir }}" style="width: 7px; height: 7px; border-radius: 999px; background: {{ p.color }}; cursor: pointer;"></span>
+          </sc-for>
+          <span onClick="{{ anterior }}" style="width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(13,20,18,0.10); display: grid; place-items: center; cursor: pointer; margin-left: 4px;" style-hover="background: #F4F7F6;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg></span>
+          <span onClick="{{ siguiente }}" style="width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(13,20,18,0.10); display: grid; place-items: center; cursor: pointer;" style-hover="background: #F4F7F6;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
+        </div>
+      </div>
+      <p style="margin: 8px 0 10px; font-family: Sora, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; color: #0D1412; text-wrap: pretty;">
+        <sc-for list="{{ frase }}" as="t" hint-placeholder-count="4"><span style="color: {{ t.color }};">{{ t.texto }}</span></sc-for>
+      </p>
+      <div style="display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap;">
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #E7F6F0; border: 1px solid #C9EBDD; font-size: 12.5px; font-weight: 600; color: #00794F;">{{ accionA }}</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #F3F7F5; border: 1px solid rgba(13,20,18,0.07); font-size: 12.5px; font-weight: 600; color: #5B6764;">{{ accionB }}</a>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 10px 14px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7v6l-4 2v-8z" /></svg>
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #7A8783;">FILTRAR</span>
+      <div style="display: flex; gap: 6px; margin-left: 4px;">
+        <span style="font-size: 12.5px; font-weight: 600; color: #00794F; background: #E7F6F0; border: 1px solid #C9EBDD; border-radius: 999px; padding: 5px 12px;">Todas las dependencias</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #5B6764; background: #F6F8F7; border: 1px solid rgba(13,20,18,0.07); border-radius: 999px; padding: 5px 12px;">Últimos 30 días</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #5B6764; background: #F6F8F7; border: 1px solid rgba(13,20,18,0.07); border-radius: 999px; padding: 5px 12px;">Todos los estados</span>
+      </div>
+    </div>
+
+    <div style="margin: 26px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+      <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Reclamos</span>
+      <span style="flex: 1; height: 1px; background: rgba(13,20,18,0.08);"></span>
+      <a href="#" style="font-size: 12px; font-weight: 600;">Ver todos</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+            <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+          </span>
+          <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+            <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E7F6F0; flex: 0 0 30px;">
+              <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+            </span>
+            <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Total reclamos</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">129</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,22 14,20 26,17 38,15 50,9 62,7 74,4" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="4" r="2.6" fill="#00B37E" />
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #B4560F;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
+            80%
+          </span>
+          <span style="font-size: 11.5px; color: #98A3A0;">más que el mes pasado</span>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l2 3h4l2-3h5" /><path d="M5.5 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-2.5-7.5A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.5z" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E7F6F0; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l2 3h4l2-3h5" /><path d="M5.5 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-2.5-7.5A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.5z" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nuevos hoy</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #C6CFCB; font-feature-settings: 'tnum';">0</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,14 14,10 26,16 38,12 50,18 62,15 74,22" stroke="#D5DDDA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="22" r="2.6" fill="#C6CFCB" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #98A3A0;">Último ingreso ayer, 18:20</span>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E7F6F0; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Esta semana</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">4</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,6 14,9 26,7 38,13 50,12 62,18 74,21" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="21" r="2.6" fill="#00B37E" />
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #00794F;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v13M6 13l6 6 6-6" /></svg>
+            33%
+          </span>
+          <span style="font-size: 11.5px; color: #98A3A0;">vs. semana anterior</span>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E7F6F0; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Resolución promedio</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+            <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">19,4</span>
+            <span style="font-size: 12px; font-weight: 600; color: #7A8783;">días</span>
+          </span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,5 14,8 26,6 38,12 50,16 62,17 74,20" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="20" r="2.6" fill="#00B37E" />
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #00794F;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v13M6 13l6 6 6-6" /></svg>
+            21,8 d
+          </span>
+          <span style="font-size: 11.5px; color: #98A3A0;">más rápido que el mes pasado</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin: 22px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+      <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Trámites</span>
+      <span style="flex: 1; height: 1px; background: rgba(13,20,18,0.08);"></span>
+      <a href="#" style="font-size: 12px; font-weight: 600;">Ver todos</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E8F1FE; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #3B82F6; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Total trámites</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">10</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,20 14,18 26,19 38,14 50,13 62,10 74,8" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="8" r="2.6" fill="#3B82F6" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #98A3A0;">7 en curso · 3 finalizados</span>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l2 3h4l2-3h5" /><path d="M5.5 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-2.5-7.5A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.5z" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E8F1FE; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #3B82F6; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l2 3h4l2-3h5" /><path d="M5.5 5.5 3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5l-2.5-7.5A2 2 0 0 0 16.6 4H7.4a2 2 0 0 0-1.9 1.5z" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nuevos hoy</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #C6CFCB; font-feature-settings: 'tnum';">0</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,6 14,9 26,8 38,13 50,16 62,19 74,23" stroke="#D5DDDA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="23" r="2.6" fill="#C6CFCB" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #98A3A0;">Ayer entraron 10</span>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E8F1FE; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #3B82F6; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Esta semana</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">10</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,22 14,21 26,16 38,17 50,11 62,9 74,6" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="6" r="2.6" fill="#3B82F6" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #98A3A0;">Todo el volumen del mes</span>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="position: absolute; right: -12px; top: -12px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="104" height="104" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+        </span>
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: #E8F1FE; flex: 0 0 30px;">
+            <span style="position: absolute; inset: 0; border-radius: 10px; border: 1.5px solid #3B82F6; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Resolución promedio</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #C6CFCB; font-feature-settings: 'tnum';">—</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <path d="M2 14h72" stroke="#E3E9E6" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 5" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #98A3A0;">Sin trámites cerrados todavía</span>
+      </div>
+    </div>
+
+    <div style="margin: 26px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+      <span style="display: inline-flex; align-items: center; gap: 7px; height: 24px; padding: 0 10px; background: #E7F6F0; border-radius: 999px; flex: 0 0 auto;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #00794F;">RECLAMOS</span>
+      </span>
+      <span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Tu cola de trabajo</span>
+      <span style="font-size: 12.5px; color: #C6CFCB;">·</span>
+      <span style="font-size: 12.5px; color: #3D4945;"><strong style="font-weight: 600; color: #C93A3E;">{{ colaTotal }} reclamos</strong> {{ colaAlcance }}</span>
+      <span style="flex: 1; height: 1px; background: rgba(13,20,18,0.08);"></span>
+      <span style="font-size: 11.5px; color: #98A3A0;">Actualizado hace 4 min</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 14px; padding: 18px 18px 16px; min-width: 0; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(13,20,18,0.03);" style-hover="border-color: rgba(13,20,18,0.14);">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #FDECEC; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #E5484D; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Urgentes</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 7px; margin: 14px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 46px; line-height: 1; letter-spacing: -0.035em; color: #0D1412; font-feature-settings: 'tnum';">{{ nUrg }}</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; white-space: nowrap;">{{ uUrg }}</span>
+        </div>
+        <span style="display: block; height: 3px; border-radius: 999px; background: #EDF1EF; margin: 14px 0 12px; overflow: hidden;">
+          <span style="display: block; height: 3px; width: 25%; border-radius: 999px; background: #E5484D;"></span>
+        </span>
+        <span style="display: block; font-size: 12.5px; line-height: 1.5; color: #5B6764; text-wrap: pretty;">Prioridad alta y más de 3 días abiertos. <strong style="font-weight: 600; color: #0D1412;">{{ fraseUrg }}</strong></span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 12.5px; font-weight: 600; color: #E5484D; cursor: pointer; white-space: nowrap;" style-hover="gap: 9px;">
+          Asignar cuadrilla
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+        </span>
+      </div>
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 14px; padding: 18px 18px 16px; min-width: 0; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(13,20,18,0.03);" style-hover="border-color: rgba(13,20,18,0.14);">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2" /><path d="M3.5 19.5c0-3.3 2.7-6 6-6M17 12.5v6M14 15.5h6" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #FDF1DF; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #F59E0B; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.2" /><path d="M3.5 19.5c0-3.3 2.7-6 6-6M17 12.5v6M14 15.5h6" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sin asignar</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 7px; margin: 14px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 46px; line-height: 1; letter-spacing: -0.035em; color: #0D1412; font-feature-settings: 'tnum';">{{ nSin }}</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; white-space: nowrap;">{{ uSin }}</span>
+        </div>
+        <span style="display: block; height: 3px; border-radius: 999px; background: #EDF1EF; margin: 14px 0 12px; overflow: hidden;">
+          <span style="display: block; height: 3px; width: 56%; border-radius: 999px; background: #F59E0B;"></span>
+        </span>
+        <span style="display: block; font-size: 12.5px; line-height: 1.5; color: #5B6764; text-wrap: pretty;">Nadie a cargo todavía. El más viejo espera hace <strong style="font-weight: 600; color: #0D1412;">141 días.</strong></span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 12.5px; font-weight: 600; color: #F59E0B; cursor: pointer; white-space: nowrap;" style-hover="gap: 9px;">
+          Asignar en lote
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+        </span>
+      </div>
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 14px; padding: 18px 18px 16px; min-width: 0; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(13,20,18,0.03);" style-hover="border-color: rgba(13,20,18,0.14);">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9 17l10.5-10.5" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #E7F6F0; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9 17l10.5-10.5" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Para cerrar</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 7px; margin: 14px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 46px; line-height: 1; letter-spacing: -0.035em; color: #0D1412; font-feature-settings: 'tnum';">{{ nVisto }}</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; white-space: nowrap;">{{ uVisto }}</span>
+        </div>
+        <span style="display: block; height: 3px; border-radius: 999px; background: #EDF1EF; margin: 14px 0 12px; overflow: hidden;">
+          <span style="display: block; height: 3px; width: 19%; border-radius: 999px; background: #00B37E;"></span>
+        </span>
+        <span style="display: block; font-size: 12.5px; line-height: 1.5; color: #5B6764; text-wrap: pretty;">La cuadrilla ya terminó y subió fotos. <strong style="font-weight: 600; color: #0D1412;">2 min de trabajo.</strong></span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 12.5px; font-weight: 600; color: #00B37E; cursor: pointer; white-space: nowrap;" style-hover="gap: 9px;">
+          Revisar y cerrar
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+        </span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 0 2px; flex-wrap: wrap;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 14px;"><path d="m4 12 5 5L20 6" /></svg>
+      <span style="font-size: 12px; color: #7A8783;">Cerraste <strong style="font-weight: 600; color: #0D1412;">6 esta semana</strong>, 2 más que la anterior · nada agendado para hoy</span>
+      <a href="#" style="margin-left: auto; font-size: 12px;">Ver cerrados</a>
+    </div>
+
+    <div class="mt" style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 22px; align-items: stretch;">
+
+    <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 17px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+        <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap;">Dónde se repiten los reclamos</h3>
+        <span style="font-size: 12px; color: #98A3A0; white-space: nowrap;">últimos 90 días · 242 puntos</span>
+        <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4; background: #F7FCFA;">
+            <span style="font-size: 12.5px; color: #7A8783; white-space: nowrap;">Categoría</span>
+            <span style="font-size: 12.5px; font-weight: 600; color: #0D1412; white-space: nowrap;">Todas</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" style="flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+          </button>
+          <a href="#" style="font-size: 12.5px; white-space: nowrap;">Abrir el mapa</a>
+        </span>
+      </div>
+
+      <p style="margin: 10px 0 0; font-size: 13px; color: #7A8783;">
+        <strong style="font-weight: 600; color: #C93A3E;">4 esquinas juntan 11 reclamos.</strong> Una recorrida resuelve más que atenderlos de a uno.
+      </p>
+
+      <div style="position: relative; flex: 1; min-height: 420px; border-radius: 12px; overflow: hidden; background: #EDF1EF; margin-top: 14px;">
+        <div style="position: absolute; inset: 0;">
+          <image-slot id="mapa-calor" shape="rect" placeholder="Mapa de calor — arrastrá una captura"></image-slot>
+        </div>
+
+        <span style="position: absolute; left: 14px; top: 14px; display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; background: rgba(255,255,255,0.94); border-radius: 999px; box-shadow: 0 2px 8px rgba(13,20,18,0.12); font-size: 11.5px; color: #5B6764; white-space: nowrap;">
+          <span style="display: inline-flex; height: 8px; width: 74px; border-radius: 999px; background: linear-gradient(90deg, #3B82F6 0%, #00B37E 34%, #FFB800 68%, #E5484D 100%);"></span>
+          menos · más reclamos
+        </span>
+
+        <div style="position: absolute; left: 14px; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: rgba(255,255,255,0.96); border-radius: 14px; box-shadow: 0 6px 20px rgba(13,20,18,0.12); min-width: 0;">
+          <span onClick="{{ puntoPrev }}" title="Anterior" style="width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid rgba(13,20,18,0.10); border-radius: 999px; cursor: pointer; flex: 0 0 30px;" style-hover="background: #F4F7F6;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+          </span>
+          <span style="display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: {{ puntoBg }}; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; color: {{ puntoColor }}; flex: 0 0 36px; font-feature-settings: 'tnum';">{{ puntoN }}</span>
+          <span style="min-width: 0; flex: 1;">
+            <span style="display: block; font-size: 13.5px; font-weight: 600; color: #0D1412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ puntoCalle }}</span>
+            <span style="display: block; font-size: 11.5px; color: #7A8783; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ puntoSub }}</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 6px; flex: 0 0 auto;">
+            <span style="width: {{ d0w }}; height: 6px; border-radius: 999px; background: {{ d0 }};"></span>
+            <span style="width: {{ d1w }}; height: 6px; border-radius: 999px; background: {{ d1 }};"></span>
+            <span style="width: {{ d2w }}; height: 6px; border-radius: 999px; background: {{ d2 }};"></span>
+            <span style="width: {{ d3w }}; height: 6px; border-radius: 999px; background: {{ d3 }};"></span>
+          </span>
+          <span onClick="{{ puntoToggle }}" title="Pausar el recorrido" style="width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid rgba(13,20,18,0.10); border-radius: 999px; cursor: pointer; flex: 0 0 30px;" style-hover="background: #F4F7F6;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ puntoGlifo }}" /></svg>
+          </span>
+          <span onClick="{{ puntoNext }}" title="Siguiente" style="width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid rgba(13,20,18,0.10); border-radius: 999px; cursor: pointer; flex: 0 0 30px;" style-hover="background: #F4F7F6;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 20px 22px; min-width: 0; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap;">
+        <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap;">Tendencia de reclamos</h3>
+        <span style="display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; background: #F3F7F5; border-radius: 999px; flex: 0 0 auto;">
+          <span style="font-size: 12px; font-weight: 600; color: #0D1412; white-space: nowrap;">{{ mesLabel }}</span>
+        </span>
+        <span style="font-size: 12px; color: #98A3A0; white-space: nowrap;">de los últimos 3 meses</span>
+        <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 14px; flex: 0 0 auto;">
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #3D4945; white-space: nowrap;">
+            <span style="width: 16px; height: 2.5px; border-radius: 2px; background: #00B37E;"></span>Ingresados
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #7A8783; white-space: nowrap;">
+            <span style="width: 16px; height: 2.5px; border-radius: 2px; background: #C6CFCB;"></span>Resueltos
+          </span>
+          <span onClick="{{ mesToggle }}" title="Pausar el recorrido" style="width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(13,20,18,0.10); border-radius: 999px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ mesGlifo }}" /></svg>
+          </span>
+        </span>
+      </div>
+
+      <p style="margin: 10px 0 0; font-size: 13px; color: #7A8783; text-wrap: pretty;">{{ mesVeredicto }}</p>
+
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0 4px; padding: 14px 0; border-top: 1px solid rgba(13,20,18,0.06); border-bottom: 1px solid rgba(13,20,18,0.06);">
+        <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; white-space: nowrap;">INGRESADOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px; line-height: 1; color: #0D1412; font-feature-settings: 'tnum';">{{ mEntraron }}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; white-space: nowrap;">RESUELTOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px; line-height: 1; color: #00794F; font-feature-settings: 'tnum';">{{ mResueltos }}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; white-space: nowrap;">TASA DE CIERRE</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px; line-height: 1; color: #00794F; font-feature-settings: 'tnum';">{{ mBrecha }}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; white-space: nowrap;">DÍA MÁS CARGADO</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 19px; line-height: 1; color: #0D1412; font-feature-settings: 'tnum';">{{ mPico }}</span>
+        </div>
+      </div>
+
+      <div style="height: 260px; margin-top: 12px;">
+        <svg viewBox="0 0 620 170" width="100%" height="100%" preserveAspectRatio="none" fill="none" style="display: block; height: 100%;">
+          <g stroke="#EDF1EF" stroke-width="1"><path d="M0 14h620M0 52h620M0 90h620M0 128h620M0 166h620" /></g>
+          <polygon points="{{ mArea }}" fill="rgba(0,179,126,0.10)"></polygon>
+          <polyline points="{{ mIn }}" stroke="#00B37E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <polyline points="{{ mOut }}" stroke="#C6CFCB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 5"></polyline>
+        </svg>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #98A3A0; padding-top: 8px; font-feature-settings: 'tnum';">
+        <span>{{ mEje0 }}</span><span>{{ mEje1 }}</span><span>{{ mEje2 }}</span><span>{{ mEje3 }}</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px;">
+        <span onClick="{{ verMes0 }}" style="min-width: 0; cursor: pointer;">
+          <span style="display: block; height: 3px; border-radius: 999px; background: #E3E9E6; overflow: hidden;"><span style="display: block; height: 3px; width: {{ f0 }}; border-radius: 999px; background: {{ b0 }};"></span></span>
+          <span style="display: block; font-size: 11px; font-weight: {{ w0 }}; color: {{ c0 }}; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Mayo · 71 entraron</span>
+        </span>
+        <span onClick="{{ verMes1 }}" style="min-width: 0; cursor: pointer;">
+          <span style="display: block; height: 3px; border-radius: 999px; background: #E3E9E6; overflow: hidden;"><span style="display: block; height: 3px; width: {{ f1 }}; border-radius: 999px; background: {{ b1 }};"></span></span>
+          <span style="display: block; font-size: 11px; font-weight: {{ w1 }}; color: {{ c1 }}; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Junio · 84 entraron</span>
+        </span>
+        <span onClick="{{ verMes2 }}" style="min-width: 0; cursor: pointer;">
+          <span style="display: block; height: 3px; border-radius: 999px; background: #E3E9E6; overflow: hidden;"><span style="display: block; height: 3px; width: {{ f2 }}; border-radius: 999px; background: {{ b2 }};"></span></span>
+          <span style="display: block; font-size: 11px; font-weight: {{ w2 }}; color: {{ c2 }}; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Julio · 89 entraron</span>
+        </span>
+      </div>
+    </div>
+
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; align-items: stretch;">
+
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 20px; min-width: 0; display: flex; flex-direction: column;">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #E7F6F0; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">¿Dónde se concentran?</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 8px; margin: 16px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #0D1412; font-feature-settings: 'tnum';">Villa Morra</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">23 reclamos</span>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">De los 18 barrios, <strong style="font-weight: 600; color: #0D1412;">uno solo</strong> explica el 9% de todo. Sajonia y Microcentro lo siguen de lejos.</p>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); min-width: 0;">
+          <span style="font-size: 11.5px; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Top 5 = 72 de 244</span>
+          <a href="#" style="margin-left: auto; font-size: 11.5px; white-space: nowrap;">Ver los 18 barrios</a>
+        </div>
+      </div>
+
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 20px; min-width: 0; display: flex; flex-direction: column;">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #E7F6F0; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #00B37E; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">¿De qué se quejan?</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 8px; margin: 16px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #0D1412; font-feature-settings: 'tnum';">40%</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">es bacheo y calles</span>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #3D4945; text-wrap: pretty;"><strong style="font-weight: 600; color: #0D1412;">4 de cada 10 reclamos</strong> son calles rotas. Veredas y desagües suman otros 82 entre las dos.</p>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); min-width: 0;">
+          <span style="font-size: 11.5px; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">97 de 244 reclamos</span>
+          <a href="#" style="margin-left: auto; font-size: 11.5px; white-space: nowrap;">Ver las 10 categorías</a>
+        </div>
+      </div>
+
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 20px; min-width: 0; display: flex; flex-direction: column;">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #FDECEC; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #E5484D; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5484D" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 1.8" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">¿Cuánto tardamos?</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 8px; margin: 16px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #0D1412; font-feature-settings: 'tnum';">1 de 5</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">categorías fuera de meta</span>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">Todo cierra dentro de la meta de 7 días <strong style="font-weight: 600; color: #C93A3E;">salvo plazas y juegos</strong>, que tarda 8,4 y es la única fuera.</p>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); min-width: 0;">
+          <span style="font-size: 11.5px; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Más rápida: semáforos, 1,8 d</span>
+          <a href="#" style="margin-left: auto; font-size: 11.5px; white-space: nowrap;">Ver los tiempos</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; align-items: stretch;">
+
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 20px; min-width: 0; display: flex; flex-direction: column;">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9 17l10.5-10.5" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #E8F1FE; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #3B82F6; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9 17l10.5-10.5" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">¿En qué terminaron?</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 8px; margin: 16px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #0D1412; font-feature-settings: 'tnum';">119</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">siguen en recibido</span>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">De los 244 del trimestre, <strong style="font-weight: 600; color: #0D1412;">119 nunca se tocaron</strong> — más que los 97 que se finalizaron.</p>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); min-width: 0;">
+          <span style="font-size: 11.5px; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Finalizados 97 · rechazados 18</span>
+          <a href="#" style="margin-left: auto; font-size: 11.5px; white-space: nowrap;">Ver los 119</a>
+        </div>
+      </div>
+
+      <div style="position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 20px; min-width: 0; display: flex; flex-direction: column;">
+        <span style="position: absolute; right: -14px; top: -10px; opacity: 0.05; pointer-events: none; animation: flotar 7s cubic-bezier(0.2,0.8,0.2,1) infinite;">
+          <svg width="118" height="118" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 4.2 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z" /></svg>
+        </span>
+
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; position: relative;">
+          <span style="position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #FDF1DF; flex: 0 0 34px;">
+            <span style="position: absolute; inset: 0; border-radius: 11px; border: 1.5px solid #F59E0B; opacity: 0; animation: latido 3.6s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 4.2 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z" /></svg>
+          </span>
+          <span style="font-family: Sora, sans-serif; font-size: 14.5px; font-weight: 600; letter-spacing: -0.015em; color: #0D1412; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">¿Llegamos a todos?</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 8px; margin: 16px 0 0; min-width: 0;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #0D1412; font-feature-settings: 'tnum';">2 zonas</span>
+          <span style="font-size: 12.5px; font-weight: 500; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">por debajo del 35%</span>
+        </div>
+
+        <p style="margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">Laferrere cierra <strong style="font-weight: 600; color: #C93A3E;">18%</strong> y González Catán 31%, contra el 68% de San Justo. Dos zonas quedaron atrás.</p>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(13,20,18,0.06); min-width: 0;">
+          <span style="font-size: 11.5px; color: #98A3A0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Resolución global: 46%</span>
+          <a href="#" style="margin-left: auto; font-size: 11.5px; white-space: nowrap;">Ver las 5 zonas</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px; padding: 24px; margin-top: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 17px;"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+        <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">La voz del vecino</h3>
+        <span style="font-size: 11.5px; color: #98A3A0;">Reclamos finalizados · últimos 90 días</span>
+        <a href="#" style="margin-left: auto; font-size: 12px; font-weight: 600;">Ver todas</a>
+      </div>
+
+      <div class="vv" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; align-items: stretch;">
+
+        <div style="display: flex; flex-direction: column; gap: 14px; padding-right: 6px; min-width: 0;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 42px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">4,2</span>
+            <span style="display: flex; gap: 2px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#E3E9E6"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+            </span>
+          </div>
+          <span style="font-size: 11.5px; color: #98A3A0; margin-top: -8px;">87 calificaciones · 71% de los cerrados</span>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #7A8783; font-feature-settings: 'tnum';">5 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 100%; border-radius: 999px; background: #00B37E;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">44</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #7A8783; font-feature-settings: 'tnum';">4 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 55%; border-radius: 999px; background: #5FD2AC;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">24</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #7A8783; font-feature-settings: 'tnum';">3 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 25%; border-radius: 999px; background: #FFB800;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">11</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #7A8783; font-feature-settings: 'tnum';">2 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 11%; border-radius: 999px; background: #F59E0B;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">5</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #7A8783; font-feature-settings: 'tnum';">1 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #EDF1EF; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 7%; border-radius: 999px; background: #E5484D;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">3</span>
+            </div>
+          </div>
+        </div>
+
+          <div style="background: #F8FAF9; border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: flex; gap: 1px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              </span>
+              <span style="margin-left: auto; font-size: 11px; color: #98A3A0;">hace 2 días</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">"Vinieron a los dos días y dejaron la calle impecable. No esperaba esa rapidez."</p>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;">
+              <span style="width: 24px; height: 24px; border-radius: 999px; background: #DCF2E9; color: #008F63; display: grid; place-items: center; font-size: 9.5px; font-weight: 700;">RE</span>
+              <span style="font-size: 11.5px; color: #7A8783;">Ramona E. · Bacheo y calles</span>
+            </div>
+          </div>
+
+          <div style="background: #F8FAF9; border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: flex; gap: 1px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E3E9E6"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              </span>
+              <span style="margin-left: auto; font-size: 11px; color: #98A3A0;">hace 5 días</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">"Resolvieron bien la luminaria, aunque tardaron una semana en pasar por el barrio."</p>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;">
+              <span style="width: 24px; height: 24px; border-radius: 999px; background: #DCF2E9; color: #008F63; display: grid; place-items: center; font-size: 9.5px; font-weight: 700;">JC</span>
+              <span style="font-size: 11.5px; color: #7A8783;">Julio C. · Alumbrado público</span>
+            </div>
+          </div>
+
+          <div style="background: #FDF6F6; border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: flex; gap: 1px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E5484D"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E3E9E6"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E3E9E6"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E3E9E6"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E3E9E6"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              </span>
+              <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #C93A3E;">Requiere respuesta</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #3D4945; text-wrap: pretty;">"Cerraron el reclamo pero el contenedor sigue roto. Nadie vino a verlo."</p>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;">
+              <span style="width: 24px; height: 24px; border-radius: 999px; background: #FBE3E3; color: #C93A3E; display: grid; place-items: center; font-size: 9.5px; font-weight: 700;">MF</span>
+              <span style="font-size: 11.5px; color: #7A8783;">Mirta F. · Recolección</span>
+              <a href="#" style="margin-left: auto; font-size: 11.5px; font-weight: 600; color: #C93A3E;">Reabrir</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <sc-if value="{{ buscadorAbierto }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ cerrarBuscador }}" style="position: fixed; inset: 0; background: rgba(13,20,18,0.4); display: flex; justify-content: flex-end; z-index: 40;">
+      <div style="width: min(480px, 94vw); height: 100%; background: #FFFFFF; box-shadow: 0 6px 20px rgba(13,20,18,0.10), 0 2px 6px rgba(13,20,18,0.06); overflow: auto; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 18px; border-bottom: 1px solid rgba(13,20,18,0.07);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" style="flex: 0 0 20px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input type="text" placeholder="Buscar reclamo, trámite, vecino…" style="flex: 1; min-width: 0; border: 0; outline: none; font-family: Inter, sans-serif; font-size: 16px; color: #0D1412; background: transparent;" />
+          <span onClick="{{ cerrarBuscador }}" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: 0 0 28px;" style-hover="background: #F4F7F6;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg></span>
+        </div>
+        <div style="padding: 10px 10px 14px;">
+          <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #98A3A0; padding: 8px 10px 6px;">SUGERENCIAS</div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #E7F6F0; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 12h6M9 16h4" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Bache profundo sobre Eusebio Ayala</span>
+              <span style="display: block; font-size: 11.5px; color: #98A3A0;">Reclamo #1042 · Bacheo y calles · 3 días</span>
+            </span>
+            <span style="font-size: 11px; font-weight: 600; color: #B4560F; background: #FEF3E2; border-radius: 999px; padding: 3px 9px; flex: 0 0 auto;">Urgente</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #EAF1FD; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Habilitación comercial — Av. Mcal. López 2340</span>
+              <span style="display: block; font-size: 11.5px; color: #98A3A0;">Trámite #778 · En revisión</span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #F4F7F6;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #F1F4F2; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Ramona Escobar</span>
+              <span style="display: block; font-size: 11.5px; color: #98A3A0;">Vecina · 4 reclamos · Barrio Centro</span>
+            </span>
+          </div>
+          <div style="display: flex; gap: 8px; padding: 12px 10px 2px; border-top: 1px solid rgba(13,20,18,0.06); margin-top: 8px;">
+            <span style="font-size: 11.5px; color: #98A3A0;">Filtrá con</span>
+            <span style="font-size: 11px; font-weight: 600; color: #5B6764; background: #F3F7F5; border-radius: 6px; padding: 2px 7px;">#reclamo</span>
+            <span style="font-size: 11px; font-weight: 600; color: #5B6764; background: #F3F7F5; border-radius: 6px; padding: 2px 7px;">@vecino</span>
+            <span style="font-size: 11px; font-weight: 600; color: #5B6764; background: #F3F7F5; border-radius: 6px; padding: 2px 7px;">zona:</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;conFoto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Banner&quot;},&quot;colapso&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;header&quot;,&quot;borde&quot;],&quot;default&quot;:&quot;header&quot;,&quot;tsType&quot;:&quot;'header' | 'borde'&quot;,&quot;section&quot;:&quot;Sidebar&quot;},&quot;perfil&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dependencia&quot;,&quot;admin&quot;],&quot;default&quot;:&quot;dependencia&quot;,&quot;tsType&quot;:&quot;'dependencia' | 'admin'&quot;,&quot;section&quot;:&quot;Previsualizar sesión&quot;},&quot;modulos&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;reclamos,tramites&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Previsualizar sesión&quot;}}">
+class Component extends DCLogic {
+  state = { reclamos: true, campo: true, tramites: true, vecino: true, colapsada: false, buscador: false, dep: false, slide: 0, punto: 0, recorriendo: true, mes: 0, mesRot: true, prog: 0 };
+  componentDidMount() {
+    this._onKey = (e) => {
+      if (e.key === 'Escape') this.setState({ buscador: false });
+      if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this.setState(s => ({ buscador: !s.buscador })); }
+    };
+    window.addEventListener('keydown', this._onKey);
+    this._rot = setInterval(() => this.setState(s => ({ slide: s.slide + 1 })), 10000);
+    this._ms = setInterval(() => this.setState(st => {
+      if (!st.mesRot) return null;
+      const p = st.prog + 2;
+      return p >= 100 ? { prog: 0, mes: (st.mes + 1) % 3 } : { prog: p };
+    }), 120);
+    this._pt = setInterval(() => this.setState(s => (s.recorriendo ? { punto: (s.punto + 1) % this.puntos().length } : null)), 4000);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._onKey); clearInterval(this._rot); clearInterval(this._pt); clearInterval(this._ms); }
+  meses() {
+    return [
+      { label: 'Mayo', eje: ['1 may', '10 may', '20 may', '31 may'], entraron: 71, resueltos: 28, brecha: '39%', pico: '14 may · 7',
+        veredicto: '<strong style="font-weight: 600; color: #C93A3E;">Se abría la brecha:</strong> entraban 2,4 por día y se cerraba menos de la mitad — 4 de cada 10.',
+        inP: '0,138 41,130 82,142 124,126 165,134 206,120 248,128 289,114 330,122 372,110 413,118 454,106 496,114 537,102 578,110 620,100',
+        outP: '0,158 41,154 82,160 124,150 165,156 206,148 248,154 289,146 330,152 372,144 413,150 454,142 496,148 537,140 578,146 620,138' },
+      { label: 'Junio', eje: ['1 jun', '10 jun', '20 jun', '30 jun'], entraron: 84, resueltos: 38, brecha: '45%', pico: '9 jun · 8',
+        veredicto: '<strong style="font-weight: 600; color: #B4560F;">Empezó a acomodarse:</strong> más volumen y aun así subió a 45% de cierre — el mes en que se sumó la segunda cuadrilla.',
+        inP: '0,128 41,118 82,132 124,104 165,112 206,92 248,100 289,80 330,90 372,72 413,82 454,64 496,74 537,58 578,66 620,52',
+        outP: '0,150 41,144 82,152 124,136 165,142 206,130 248,136 289,124 330,130 372,118 413,124 454,112 496,118 537,108 578,114 620,104' },
+      { label: 'Julio', eje: ['1 jul', '10 jul', '20 jul', '30 jul'], entraron: 89, resueltos: 49, brecha: '55%', pico: '22 jul · 9',
+        veredicto: '<strong style="font-weight: 600; color: #00794F;">La brecha se está cerrando:</strong> por primera vez se cierra más de la mitad de lo que entra, 55% contra 39% en mayo.',
+        inP: '0,120 41,112 82,128 124,96 165,104 206,78 248,88 289,62 330,74 372,52 413,66 454,40 496,58 537,34 578,46 620,28',
+        outP: '0,146 41,138 82,150 124,124 165,132 206,110 248,118 289,96 330,106 372,86 413,98 454,78 496,92 537,72 578,82 620,66' },
+    ];
+  }
+
+  puntos() {
+    return [
+      { n: 4, calle: 'Estados Unidos c/ Félix de Azara', sub: 'San Roque · 4 de 4 son bacheo · el más viejo hace 42 días', bg: '#FDECEC', color: '#C93A3E' },
+      { n: 3, calle: 'Eusebio Ayala c/ Von Polesky', sub: 'Mburucuyá · los 3 son bacheo · sobre avenida principal', bg: '#FDF1DF', color: '#B4560F' },
+      { n: 2, calle: 'Mcal. López c/ San Martín', sub: 'Recoleta · veredas · ambos reportados esta semana', bg: '#F3F7F5', color: '#3D4945' },
+      { n: 2, calle: 'Avda. España c/ Brasil', sub: 'Las Mercedes · alumbrado y bacheo · 1 ya asignado', bg: '#F3F7F5', color: '#3D4945' },
+    ];
+  }
+
+  // Un resumen por módulo habilitado; el carrusel se arma solo con los que vienen en la sesión.
+  modulos() {
+    const V = '#00794F', A = '#B4560F', R = '#C93A3E', N = '#0D1412';
+    return [
+      { clave: 'reclamos', etiqueta: 'RECLAMOS · JULIO 2026', accionA: 'Ver los 4 en riesgo', accionB: 'Asignar cuadrillas',
+        frase: [ {texto: 'Resolviste el ', color: N}, {texto: '47%', color: V}, {texto: ' de julio en todo el municipio: ', color: N}, {texto: '115 cerrados', color: V}, {texto: ' y ', color: N}, {texto: '129 abiertos', color: A}, {texto: ', de los cuales ', color: N}, {texto: '3 están en riesgo de SLA', color: R}, {texto: ' y ', color: N}, {texto: '9 sin cuadrilla', color: A}, {texto: '.', color: N} ] },
+      { clave: 'tramites', etiqueta: 'TRÁMITES · JULIO 2026', accionA: 'Revisar los 7 en curso', accionB: 'Ver vencimientos',
+        frase: [ {texto: 'Entraron ', color: N}, {texto: '10 trámites', color: N}, {texto: ' este mes: ', color: N}, {texto: '3 finalizados', color: V}, {texto: ', ', color: N}, {texto: '7 en curso', color: A}, {texto: ' y ', color: N}, {texto: '2 con documentación vencida', color: R}, {texto: '.', color: N} ] },
+      { clave: 'cobros', etiqueta: 'TASAS Y COBROS · JULIO 2026', accionA: 'Ver morosos', accionB: 'Emitir recordatorios',
+        frase: [ {texto: 'Cobraste el ', color: N}, {texto: '67%', color: V}, {texto: ' de lo emitido: ', color: N}, {texto: '$ 25,9 M en caja', color: V}, {texto: ' y ', color: N}, {texto: '$ 12,7 M pendientes', color: A}, {texto: ' en ', color: N}, {texto: '52 cuentas', color: A}, {texto: '.', color: N} ] },
+      { clave: 'campo', etiqueta: 'CAMPO Y CUADRILLAS · HOY', accionA: 'Ver órdenes de hoy', accionB: 'Reprogramar',
+        frase: [ {texto: 'Hay ', color: N}, {texto: '12 órdenes activas', color: N}, {texto: ' con ', color: N}, {texto: '5 cuadrillas en calle', color: V}, {texto: '; ', color: N}, {texto: '3 quedaron sin cerrar de ayer', color: R}, {texto: '.', color: N} ] },
+    ];
+  }
+  renderVals() {
+    const esDep = (this.props.perfil ?? 'dependencia') !== 'admin';
+    const activos = this.props.modulos ?? 'reclamos,tramites';
+    const claves = String(activos).split(',').map(s => s.trim());
+    const mods = this.modulos().filter(m => claves.includes(m.clave));
+    const idx = ((this.state.slide % mods.length) + mods.length) % mods.length;
+    const mod = mods[idx] || this.modulos()[0];
+    const chev = (open) => (open ? 'rotate(0deg)' : 'rotate(-90deg)');
+    const t = (k) => () => this.setState(s => ({ [k]: !s[k] }));
+    return {
+      conFoto: this.props.conFoto ?? true,
+      moduloEtiqueta: mod.etiqueta,
+      frase: mod.frase,
+      accionA: mod.accionA,
+      accionB: mod.accionB,
+      puntos: mods.map((m, i) => ({ color: i === idx ? '#00B37E' : '#D5DDDA', ir: () => this.setState({ slide: i }) })),
+      anterior: () => this.setState({ slide: (idx - 1 + mods.length) % mods.length }),
+      siguiente: () => this.setState({ slide: (idx + 1) % mods.length }),
+      mesLabel: this.meses()[this.state.mes % 3].label,
+      mesVeredicto: React.createElement('span', { dangerouslySetInnerHTML: { __html: this.meses()[this.state.mes % 3].veredicto } }),
+      mEntraron: this.meses()[this.state.mes % 3].entraron,
+      mResueltos: this.meses()[this.state.mes % 3].resueltos,
+      mBrecha: this.meses()[this.state.mes % 3].brecha,
+      mPico: this.meses()[this.state.mes % 3].pico,
+      mIn: this.meses()[this.state.mes % 3].inP,
+      mOut: this.meses()[this.state.mes % 3].outP,
+      mArea: this.meses()[this.state.mes % 3].inP + ' 620,166 0,166',
+      mEje0: this.meses()[this.state.mes % 3].eje[0],
+      mEje1: this.meses()[this.state.mes % 3].eje[1],
+      mEje2: this.meses()[this.state.mes % 3].eje[2],
+      mEje3: this.meses()[this.state.mes % 3].eje[3],
+      mesToggle: () => this.setState(st => ({ mesRot: !st.mesRot })),
+      mesGlifo: this.state.mesRot ? 'M9 5v14M15 5v14' : 'm7 4 12 8-12 8z',
+      verMes0: () => this.setState({ mes: 0, mesRot: false, prog: 100 }),
+      verMes1: () => this.setState({ mes: 1, mesRot: false, prog: 100 }),
+      verMes2: () => this.setState({ mes: 2, mesRot: false, prog: 100 }),
+      f0: this.state.mes > 0 ? '100%' : (this.state.mes === 0 ? this.state.prog + '%' : '0%'),
+      f1: this.state.mes > 1 ? '100%' : (this.state.mes === 1 ? this.state.prog + '%' : '0%'),
+      f2: this.state.mes === 2 ? this.state.prog + '%' : '0%',
+      b0: this.state.mes % 3 === 0 ? '#00B37E' : '#9BDCC4',
+      b1: this.state.mes % 3 === 1 ? '#00B37E' : '#9BDCC4',
+      b2: '#00B37E',
+      c0: this.state.mes % 3 === 0 ? '#0D1412' : '#98A3A0',
+      c1: this.state.mes % 3 === 1 ? '#0D1412' : '#98A3A0',
+      c2: this.state.mes % 3 === 2 ? '#0D1412' : '#98A3A0',
+      w0: this.state.mes % 3 === 0 ? 600 : 500,
+      w1: this.state.mes % 3 === 1 ? 600 : 500,
+      w2: this.state.mes % 3 === 2 ? 600 : 500,
+      puntoN: this.puntos()[this.state.punto % 4].n,
+      puntoCalle: this.puntos()[this.state.punto % 4].calle,
+      puntoSub: this.puntos()[this.state.punto % 4].sub,
+      puntoBg: this.puntos()[this.state.punto % 4].bg,
+      puntoColor: this.puntos()[this.state.punto % 4].color,
+      puntoPrev: () => this.setState(st => ({ punto: (st.punto + 3) % 4, recorriendo: false })),
+      puntoNext: () => this.setState(st => ({ punto: (st.punto + 1) % 4, recorriendo: false })),
+      puntoToggle: () => this.setState(st => ({ recorriendo: !st.recorriendo })),
+      puntoGlifo: this.state.recorriendo ? 'M9 5v14M15 5v14' : 'm7 4 12 8-12 8z',
+      d0: this.state.punto % 4 === 0 ? '#00B37E' : '#C6CFCB',
+      d1: this.state.punto % 4 === 1 ? '#00B37E' : '#C6CFCB',
+      d2: this.state.punto % 4 === 2 ? '#00B37E' : '#C6CFCB',
+      d3: this.state.punto % 4 === 3 ? '#00B37E' : '#C6CFCB',
+      d0w: this.state.punto % 4 === 0 ? '18px' : '6px',
+      d1w: this.state.punto % 4 === 1 ? '18px' : '6px',
+      d2w: this.state.punto % 4 === 2 ? '18px' : '6px',
+      d3w: this.state.punto % 4 === 3 ? '18px' : '6px',
+      uUrg: esDep ? 'reclamo vencido' : 'reclamos vencidos',
+      uSin: 'reclamos sin dueño',
+      uVisto: 'reclamos por cerrar',
+      fraseUrg: esDep ? 'Ya venció su SLA.' : 'Uno ya venció el SLA.',
+      colaTotal: esDep ? 8 : 16,
+      colaAlcance: esDep ? 'de tu dirección esperan una decisión tuya' : 'esperan una decisión en todo el municipio',
+      nUrg: esDep ? 1 : 4,
+      nSin: esDep ? 4 : 9,
+      nVisto: esDep ? 3 : 3,
+      esAdmin: !esDep,
+      enDependencia: (this.props.perfil ?? 'dependencia') === 'dependencia',
+      esAdmin: (this.props.perfil ?? 'dependencia') === 'admin',
+      depAbierto: this.state.dep,
+      toggleDep: () => this.setState(s => ({ dep: !s.dep })),
+      buscadorAbierto: this.state.buscador,
+      abrirBuscador: () => this.setState({ buscador: true }),
+      cerrarBuscador: () => this.setState({ buscador: false }),
+      colapsada: this.state.colapsada,
+      expandida: !this.state.colapsada,
+      colapsoHeader: (this.props.colapso ?? 'header') === 'header',
+      colapsoBorde: (this.props.colapso ?? 'header') === 'borde',
+      toggleColapso: () => this.setState(s => ({ colapsada: !s.colapsada })),
+      openReclamos: this.state.reclamos,
+      openCampo: this.state.campo,
+      openTramites: this.state.tramites,
+      openVecino: this.state.vecino,
+      chevReclamos: chev(this.state.reclamos),
+      chevCampo: chev(this.state.campo),
+      chevTramites: chev(this.state.tramites),
+      chevVecino: chev(this.state.vecino),
+      toggleReclamos: t('reclamos'),
+      toggleCampo: t('campo'),
+      toggleTramites: t('tramites'),
+      toggleVecino: t('vecino'),
+    };
+  }
+}
+</script>
+</body>
+</html>

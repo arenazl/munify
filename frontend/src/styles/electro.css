@@ -1,0 +1,139 @@
+/* ============================================================
+   electro.css — pulso de serie temporal (components/ui/Electro)
+
+   Prefijo `el-`. Cero colores fijos: todo sale de tokens --pl-*.
+   El trazo ANTES del hito usa el tono de alerta y el de DESPUÉS el
+   tono bueno: la lectura es "acá cambió". Sin hito, el trazo va en
+   el acento neutro de la marca.
+   ============================================================ */
+
+.el {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.el-caja {
+  position: relative;
+  width: 100%;
+  height: 64px;
+  min-width: 0;
+}
+.el-caja--click { cursor: pointer; }
+.el-caja:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 3px;
+  border-radius: var(--pl-radius-sm);
+}
+
+.el-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* --- Trazos ------------------------------------------------ */
+.el-trazo {
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* El SVG se estira en X (preserveAspectRatio none): sin esto el
+     grosor del trazo se deformaría junto con la escala. */
+  vector-effect: non-scaling-stroke;
+}
+.el-trazo--antes    { stroke: var(--pl-red); }
+.el-trazo--despues  { stroke: var(--pl-green); }
+.el-trazo--neutro   { stroke: var(--pl-green); }
+.el-trazo--secundario {
+  stroke: var(--pl-border-strong);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 4;
+}
+
+/* --- Hito: la vertical y su etiqueta ----------------------- */
+.el-hito-linea {
+  stroke: color-mix(in srgb, var(--pl-text) 35%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.el-hito-tag {
+  position: absolute;
+  top: -2px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 60%;
+  padding: 3px 10px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pl-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.el-hito-punto {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+}
+
+/* --- Ventana de reproducción ------------------------------- */
+.el-ventana {
+  fill: color-mix(in srgb, var(--pl-green) 12%, transparent);
+}
+
+/* --- Cursor ------------------------------------------------ */
+.el-cursor-linea {
+  stroke: color-mix(in srgb, var(--pl-green) 45%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.el-cursor-halo {
+  fill: color-mix(in srgb, var(--pl-green) 28%, transparent);
+  animation: elLatido 1.6s var(--pl-ease) infinite;
+}
+.el-cursor-punto { fill: var(--pl-green); }
+
+.el-final { fill: var(--pl-green); }
+
+@keyframes elLatido {
+  0%, 100% { opacity: 0.35; r: 5; }
+  50%      { opacity: 0.9;  r: 7; }
+}
+
+/* El pulso es decorativo: sin él la información no se pierde. */
+@media (prefers-reduced-motion: reduce) {
+  .el-cursor-halo { animation: none; }
+}
+
+/* --- Eje de fechas ----------------------------------------- */
+.el-eje {
+  position: relative;
+  height: 14px;
+  min-width: 0;
+}
+.el-eje-marca {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* Los extremos se pegan al borde en vez de salirse de la caja. */
+.el-eje-marca:first-child { transform: none; }
+.el-eje-marca:last-child  { transform: translateX(-100%); }

@@ -6,11 +6,9 @@ import { UnificarManualModal } from '../components/tesoreria/UnificarManualModal
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 import { StatusPill } from '../components/ui/StatusPill';
@@ -69,10 +67,6 @@ export default function TesoreriaContactos() {
   // Modal de unificacion de duplicados
   const [unificarOpen, setUnificarOpen] = useState(false);
   const [unificarManualOpen, setUnificarManualOpen] = useState(false);
-
-  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
-    return <p className="p-6 text-sm">Sin permisos.</p>;
-  }
 
   // Paginacion server-side: cada cambio de filtro/pagina dispara fetch.
   // ABMPage NO se desmonta porque loading se mantiene true brevemente y
@@ -244,7 +238,7 @@ export default function TesoreriaContactos() {
         className="px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5"
         style={{
           backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
-          color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
+          color: tipoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
           border: `1px solid ${tipoFiltro === '' ? theme.primary : theme.border}`,
           height: 32,
         }}
@@ -314,7 +308,7 @@ export default function TesoreriaContactos() {
       className="inline-flex items-center gap-2 px-4 h-[34px] rounded-lg text-[12px] font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
       style={{
         background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover || theme.primary})`,
-        color: '#fff',
+        color: 'var(--pl-on-accent)',
         border: `1px solid ${theme.primary}`,
       }}
       title="Detectar y fusionar contactos duplicados (mismo nombre, distinto tipo)"
@@ -380,7 +374,7 @@ export default function TesoreriaContactos() {
             className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
             style={{
               backgroundColor: ubicacionModo === 'direccion' ? theme.primary : 'transparent',
-              color: ubicacionModo === 'direccion' ? '#fff' : theme.textSecondary,
+              color: ubicacionModo === 'direccion' ? 'var(--pl-on-accent)' : theme.textSecondary,
             }}
           >
             Dirección exacta
@@ -391,7 +385,7 @@ export default function TesoreriaContactos() {
             className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
             style={{
               backgroundColor: ubicacionModo === 'paraje' ? theme.primary : 'transparent',
-              color: ubicacionModo === 'paraje' ? '#fff' : theme.textSecondary,
+              color: ubicacionModo === 'paraje' ? 'var(--pl-on-accent)' : theme.textSecondary,
             }}
           >
             Paraje
@@ -432,14 +426,14 @@ export default function TesoreriaContactos() {
     </div>
   );
 
+  // El guard va DESPUÉS de todos los hooks: antes cortaba el render entre
+  // medio y dejaba los hooks siguientes fuera del orden fijo (React #310).
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
+    return <p className="p-6 text-sm">Sin permisos.</p>;
+  }
+
   return (
     <>
-      <PageHint pageId="tesoreria-contactos" />
-      <TesoreriaHint titulo="Agenda de Contactos" storageKey="contactos">
-        Acá guardás a las personas con las que hacés pagos. Cada uno
-        puede tener su <b>alias de transferencia</b> y <b>ubicación en el mapa</b>.
-        Podés cargarlos a mano o importar el Excel del intendente.
-      </TesoreriaHint>
 
       <ABMPage
         title="Contactos"

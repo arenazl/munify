@@ -1,0 +1,147 @@
+/* ============================================================
+   Paraguay Limpio — design tokens
+   Un solo lugar para color, tipografía, espaciado, radios y sombra.
+   Tema claro por defecto; [data-theme="dark"] sobreescribe solo color.
+   ============================================================ */
+
+:root {
+  /* --- Marca --- */
+  --pl-green:            #00B37E;
+  --pl-green-600:        #008F63;
+  --pl-green-700:        #00794F;   /* texto sobre verde claro */
+  --pl-green-200:        #C9EBDD;   /* borde de superficie verde */
+  --pl-green-100:        #E7F6F0;   /* superficie verde (activo, chips) */
+  --pl-green-050:        #F2FBF7;
+  --pl-amber:            #FFB800;
+  --pl-amber-strong:     #F59E0B;
+  --pl-amber-700:        #B4560F;   /* texto ámbar accesible */
+  --pl-amber-100:        #FEF7E8;
+  --pl-red:              #E5484D;
+  --pl-red-700:          #C93A3E;
+  --pl-red-100:          #FDF4F4;
+  --pl-blue:             #3B82F6;
+  --pl-blue-700:         #2563EB;
+  --pl-blue-100:         #EAF1FD;
+
+  /* Rampa verde para series de datos (barras, donut, top N) */
+  --pl-data-1: #00B37E;
+  --pl-data-2: #34C596;
+  --pl-data-3: #5FD2AC;
+  --pl-data-4: #8FDFC4;
+  --pl-data-5: #C6CFCB;
+
+  /* --- Superficies y texto --- */
+  --pl-bg:               #F1F4F2;   /* fondo de app */
+  --pl-surface:          #FFFFFF;   /* tarjetas, sidebar, topbar */
+  --pl-surface-2:        #F3F7F5;   /* inputs, chips neutros */
+  --pl-surface-3:        #F8FAF9;   /* tarjetas anidadas (testimonios) */
+  --pl-surface-hover:    #F4F7F6;
+  --pl-track:            #EDF1EF;   /* riel de barras de progreso */
+
+  --pl-text:             #0D1412;
+  --pl-text-2:           #3D4945;
+  --pl-text-3:           #5B6764;
+  --pl-text-muted:       #7A8783;
+  --pl-text-faint:       #98A3A0;
+  --pl-text-disabled:    #C6CFCB;
+  --pl-on-brand:         #FFFFFF;
+
+  --pl-border:           rgba(13, 20, 18, 0.07);
+  --pl-border-strong:    rgba(13, 20, 18, 0.12);
+  --pl-scrim:            rgba(13, 20, 18, 0.40);   /* backdrop de drawers */
+
+  /* Scrims del hero sobre foto */
+  --pl-hero-veil:        linear-gradient(96deg, rgba(0,60,42,.90) 0%, rgba(0,72,50,.62) 42%, rgba(0,120,84,.18) 78%, rgba(0,140,98,.06) 100%);
+  --pl-hero-fade:        linear-gradient(180deg, rgba(0,50,36,.28) 0%, rgba(0,50,36,0) 30%, rgba(0,50,36,.42) 100%);
+  --pl-hero-strip:       linear-gradient(180deg, rgba(0,45,32,.62) 0%, rgba(0,45,32,.82) 100%);
+  --pl-hero-gradient:    linear-gradient(180deg, #00B37E 0%, #007A55 100%); /* hero sin foto */
+
+  /* --- Tipografía --- */
+  --pl-font-sans:    Inter, system-ui, sans-serif;
+  --pl-font-display: Sora, var(--pl-font-sans);
+
+  --pl-fs-eyebrow:   10.5px;  /* MAYÚSCULAS, tracking .09em, 700 */
+  --pl-fs-micro:     11px;
+  --pl-fs-caption:   11.5px;
+  --pl-fs-body-sm:   12.5px;
+  --pl-fs-body:      13.5px;
+  --pl-fs-input:     16px;
+  --pl-fs-card-title:15px;    /* display 700, -0.02em */
+  --pl-fs-hero-line: 20px;    /* frase semántica, display 600 */
+  --pl-fs-kpi:       34px;    /* display 700, -0.03em */
+  --pl-fs-hero:      38px;    /* display 700, -0.025em */
+
+  --pl-tracking-eyebrow: 0.09em;
+  --pl-tracking-display: -0.02em;
+  --pl-tracking-hero:    -0.025em;
+
+  /* --- Espaciado (base 4) --- */
+  --pl-space-1: 4px;  --pl-space-2: 8px;  --pl-space-3: 12px;
+  --pl-space-4: 16px; --pl-space-5: 20px; --pl-space-6: 24px;
+  --pl-space-8: 32px; --pl-space-10: 40px;
+
+  /* --- Radios --- */
+  --pl-radius-sm:   8px;
+  --pl-radius-md:   10px;   /* inputs, botones chicos */
+  --pl-radius-lg:   12px;   /* tarjetas, botones */
+  --pl-radius-xl:   16px;   /* banner */
+  --pl-radius-pill: 999px;
+
+  /* --- Sombra (dos niveles, nunca sombra + borde visible juntos) --- */
+  --pl-shadow-card:  0 1px 2px rgba(13,20,18,.04), 0 2px 6px rgba(13,20,18,.04);
+  --pl-shadow-float: 0 6px 20px rgba(13,20,18,.10), 0 2px 6px rgba(13,20,18,.06);
+
+  /* --- Movimiento --- */
+  --pl-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --pl-dur-ui: 150ms;
+  --pl-dur-sheet: 240ms;
+
+  /* --- Layout --- */
+  --pl-sidebar-w: 256px;
+  --pl-sidebar-w-collapsed: 72px;
+  --pl-drawer-w: 480px;
+  --pl-topbar-h: 46px;
+}
+
+/* ============================================================
+   Tema oscuro — "Verde Oscuro". Solo color; tipografía,
+   espaciado y radios no cambian.
+   ============================================================ */
+[data-theme="dark"] {
+  --pl-green-700:        #57D6A9;
+  --pl-green-200:        #1E5040;
+  --pl-green-100:        #12332A;
+  --pl-green-050:        #143A2C;
+  --pl-amber-700:        #F0A85A;
+  --pl-amber-100:        #2A2214;
+  --pl-red-700:          #FF8085;
+  --pl-red-100:          #2B1A1B;
+  --pl-blue-700:         #7BA5F5;
+  --pl-blue-100:         #16233A;
+
+  --pl-bg:               #0E1614;
+  --pl-surface:          #151E1B;
+  --pl-surface-2:        #1C2522;
+  --pl-surface-3:        #1A2320;
+  --pl-surface-hover:    #212B28;
+  --pl-track:            #26302D;
+
+  --pl-text:             #EDF3F0;
+  --pl-text-2:           #C2CCC8;
+  --pl-text-3:           #AEB9B5;
+  --pl-text-muted:       #93A09B;
+  --pl-text-faint:       #7F8C88;
+  --pl-text-disabled:    #5A6763;
+
+  --pl-border:           rgba(255, 255, 255, 0.08);
+  --pl-border-strong:    rgba(255, 255, 255, 0.14);
+  --pl-scrim:            rgba(0, 0, 0, 0.62);
+
+  --pl-shadow-card:  0 1px 2px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.35);
+  --pl-shadow-float: 0 6px 20px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.35);
+}
+
+/* Tono de sidebar del selector de tema (Clara / Media / Oscura) */
+[data-sidebar="media"] { --pl-sidebar-bg: var(--pl-surface-2); }
+[data-sidebar="oscura"] { --pl-sidebar-bg: #0B1210; }
+:root { --pl-sidebar-bg: var(--pl-surface); }

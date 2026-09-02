@@ -21,6 +21,10 @@ export interface User {
   telefono?: string;
   dni?: string;
   direccion?: string;
+  // La zona que el vecino declaró. Es lo que permite segmentar los avisos:
+  // la dirección es texto libre y no se puede agrupar por ella. Zona y no
+  // barrio porque no todo el país está mapeado a nivel barrio.
+  zona_id?: number | null;
   rol: RolUsuario;
   activo: boolean;
   empleado_id?: number;
@@ -52,6 +56,9 @@ export interface CategoriaReclamo {
   orden: number;
   activo: boolean;
   created_at: string;
+  // Categoría de uso interno (Preventivo, Mantenimiento, Obra...): clasifica
+  // trabajo de campo (OT) pero NO se le ofrece al vecino al crear un reclamo.
+  interna?: boolean;
 }
 
 export interface CategoriaTramite {
@@ -154,7 +161,7 @@ export type CanalIngreso = 'app' | 'ventanilla_asistida' | 'whatsapp' | 'web_pub
 // ÓRDENES DE TRABAJO (unidad formal de trabajo de campo, N:M con reclamos)
 // =====================================================================
 
-export type EstadoOrdenTrabajo = 'pendiente' | 'asignada' | 'en_curso' | 'completada' | 'cancelada';
+export type EstadoOrdenTrabajo = 'pendiente' | 'asignada' | 'en_curso' | 'bloqueada' | 'completada' | 'cancelada';
 
 export interface OTMaterial {
   descripcion: string;
@@ -171,13 +178,83 @@ export interface OTReclamoMini {
 
 export type PrioridadOT = 'baja' | 'media' | 'alta' | 'urgente';
 
-export interface OTTipoTrabajo {
+// ============ Puntos de Interés (POI) ============
+
+// Catálogo de tipos de POI (Hospital, Escuela, ...). ABM en Configuración.
+// Matchea TipoResponse del backend (api/poi.py).
+export interface PoiTipo {
   id: number;
   nombre: string;
   icono?: string | null;
   color?: string | null;
+  radio_default_metros?: number | null;
   activo: boolean;
   orden: number;
+}
+
+// POI concreto (lat/long + radio). Se gestiona en el mapa.
+// Matchea PuntoResponse del backend: los campos `tipo_*` vienen enriquecidos
+// desde el tipo (tipo embebido, aplanado) para el marker del mapa.
+export interface PuntoInteres {
+  id: number;
+  tipo_id: number;
+  nombre: string;
+  direccion?: string | null;
+  latitud: number;
+  longitud: number;
+  radio_metros: number;
+  activo: boolean;
+  notas?: string | null;
+  // Enriquecido desde el tipo (tipo embebido aplanado).
+  tipo_nombre?: string | null;
+  tipo_color?: string | null;
+  tipo_icono?: string | null;
+}
+
+// POI (F6 · Etapa B) en cuya zona cae un reclamo. Lo llena el backend
+// (services.poi_matching.set_poi) y viaja embebido en ReclamoResponse.poi
+// para el banner de consolidación del detalle. Matchea PoiEnZona del schema.
+export interface ReclamoPoi {
+  id: number;
+  nombre: string;
+  tipo_nombre?: string | null;
+  latitud: number;
+  longitud: number;
+  radio_metros: number;
+}
+
+// Reclamo activo dentro de la zona de un POI (GET /poi/puntos/{id}/reclamos-en-zona).
+export interface PoiReclamoEnZona {
+  id: number;
+  titulo: string;
+  estado: string;
+  direccion?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
+export interface PoiReclamosEnZonaResponse {
+  poi_id: number;
+  total: number;
+  reclamos: PoiReclamoEnZona[];
+}
+
+// Resultado de POST /poi/puntos/{id}/consolidar (OT de zona).
+export interface PoiConsolidarResponse {
+  id: number;
+  numero: string;
+  titulo: string;
+  estado: string;
+  prioridad: string;
+  origen: string;
+  poi_id?: number | null;
+  reclamos_count: number;
+  creada: boolean; // true: OT nueva; false: se reusó la vigente
+}
+
+// Resultado de POST /poi/puntos/recalcular.
+export interface PoiRecalcularResponse {
+  reclamos_en_zona: number;
 }
 
 export interface OrdenTrabajo {
@@ -185,10 +262,11 @@ export interface OrdenTrabajo {
   numero: string;
   estado: EstadoOrdenTrabajo;
   prioridad: PrioridadOT;
-  tipo_trabajo_id?: number | null;
-  tipo_trabajo_nombre?: string | null;
-  tipo_trabajo_color?: string | null;
-  tipo_trabajo_icono?: string | null;
+  // Clasificación de la OT: ahora es la Categoría de Reclamo (incluye las
+  // `interna: true` — Preventivo, Mantenimiento, Obra — que no se le ofrecen
+  // al vecino pero sí sirven para clasificar trabajo de campo).
+  categoria_id?: number | null;
+  categoria_nombre?: string | null;
   titulo: string;
   descripcion?: string | null;
   cuadrilla_id?: number | null;
@@ -229,6 +307,8 @@ export interface InventarioCategoria {
 }
 
 export interface InventarioItem {
+  deposito_id?: number | null;
+  deposito_nombre?: string | null;
   id: number;
   categoria_id: number;
   categoria_nombre?: string | null;
@@ -244,6 +324,17 @@ export interface InventarioItem {
   // Activos
   identificador?: string | null;
   estado_activo?: EstadoActivo | null;
+  /** Se puede prestar al vecino: aparece en Recursos → Reservas. */
+  reservable?: boolean;
+  // Flota: un activo con `tipo_combustible` cargado ES un vehículo del
+  // municipio y aparece en Recursos → Flota. No hay tabla de vehículos.
+  marca_modelo?: string | null;
+  anio?: number | null;
+  km_actual?: number | null;
+  tipo_combustible?: string | null;
+  vencimiento_vtv?: string | null;
+  vencimiento_seguro?: string | null;
+  km_proximo_service?: number | null;
   ocupado_por_ot_id?: number | null;
   ocupado_por_ot_numero?: string | null;
   activo: boolean;
@@ -263,12 +354,55 @@ export interface OTRecurso {
   aplicado: boolean;
 }
 
+/**
+ * Payload del Tablero (GET /reclamos/tablero) — tarjetas livianas + resumen.
+ *
+ * NO es un `Reclamo` recortado: es lo que la tarjeta del kanban pinta y nada
+ * más. `categoria`/`dependencia`/`vecino` vienen planos (strings) porque el
+ * tablero nunca necesitó las entidades completas, y cada nivel anidado costaba
+ * un eager load extra en el backend.
+ */
+export interface TableroItem {
+  id: number;
+  titulo: string;
+  direccion?: string | null;
+  estado: EstadoReclamo;
+  created_at?: string | null;
+  updated_at?: string | null;
+  categoria?: string | null;
+  dependencia?: string | null;
+  vecino?: string | null;
+}
+
+export interface TableroCerradoItem {
+  id: number;
+  titulo: string;
+  estado: EstadoReclamo;
+  dias?: number | null;
+}
+
+export interface TableroPayload {
+  /** Las tres colas de trabajo. Los cerrados NO vienen como filas: son resumen. */
+  abiertos: TableroItem[];
+  cerrados: {
+    finalizados: number;
+    rechazados: number;
+    promedio_dias?: number | null;
+    ultimos: TableroCerradoItem[];
+  };
+  periodo_dias: number;
+  /** Total REAL de abiertos del período (no el largo del array si se truncó). */
+  total_abiertos: number;
+  truncado: boolean;
+}
+
 export interface Reclamo {
   id: number;
   titulo: string;
   descripcion: string;
   estado: EstadoReclamo;
-  prioridad: number;
+  prioridad: number; // LEGACY (deprecado F6): no usar. La prioridad canónica es `prioridad_ot`.
+  prioridad_ot?: PrioridadOT | null; // Prioridad canónica, leída de la OT del reclamo (F6).
   canal?: CanalIngreso | null;
   direccion: string;
   latitud?: number;
@@ -298,6 +432,11 @@ export interface Reclamo {
   fecha_confirmacion_vecino?: string;
   comentario_confirmacion_vecino?: string;
   personas?: ReclamoPersona[];
+  // POI (F6 · Etapa B): si el reclamo cae en la zona de un Punto de Interés,
+  // `poi_id` apunta al POI y `poi` trae sus datos para el banner de
+  // consolidación en OT de zona. Ambos null si no cae en ninguna zona.
+  poi_id?: number | null;
+  poi?: ReclamoPoi | null;
 }
 
 export interface ReclamoPersona {
@@ -350,6 +489,14 @@ export interface DashboardTendencias {
   creados_30d_prev: number;
   tiempo_resolucion_30d: number | null;
   tiempo_resolucion_30d_prev: number | null;
+  /**
+   * Tiempo de resolución semana a semana (8 semanas, de la más vieja a la más
+   * nueva) para el sparkline. Las semanas sin cierres vienen `null` — no se
+   * rellenan con 0, que se leería como "resolvimos todo en el día".
+   * Opcional: si el backend aún no la devuelve, la tarjeta cae al par
+   * mes-actual/mes-previo en vez de inventar la serie.
+   */
+  serie_resolucion_semanal?: (number | null)[];
 }
 
 export interface DashboardStats {

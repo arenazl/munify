@@ -5,6 +5,7 @@ import {
   IdCard, User as UserIcon,
 } from 'lucide-react';
 import { capturaMovilApi } from '../lib/api';
+import { BRAND } from '../brands';
 
 type Paso = 'cargando' | 'splash' | 'dni_dorso' | 'dni_frente' | 'selfie' | 'confirmar' | 'enviando' | 'ok' | 'cerrada' | 'error';
 
@@ -88,7 +89,7 @@ export default function CapturaMovilFake() {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 leading-tight">Validación de identidad</p>
-            <p className="text-[11px] text-slate-500 leading-tight">Munify · Captura móvil</p>
+            <p className="text-[11px] text-slate-500 leading-tight">{BRAND.name} · Captura móvil</p>
           </div>
         </div>
       </header>

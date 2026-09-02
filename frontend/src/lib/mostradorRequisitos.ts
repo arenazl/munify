@@ -10,6 +10,7 @@
  */
 import { jsPDF } from 'jspdf';
 import type { Tramite } from '../types';
+import { BRAND } from '../brands';
 
 interface VecinoMin {
   nombre: string | null;
@@ -239,7 +240,7 @@ export async function generarPdfRequisitos(tramite: Tramite, vecino: VecinoMin):
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(150);
   doc.text(
-    `Documento generado el ${new Date().toLocaleDateString('es-AR')} · Munify · Acercate al municipio cuando tengas todo`,
+    `Documento generado el ${new Date().toLocaleDateString('es-AR')} · ${BRAND.name} · Acercate al municipio cuando tengas todo`,
     margen,
     y,
   );

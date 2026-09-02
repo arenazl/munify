@@ -3,6 +3,8 @@ import { FileText, Upload, CheckCircle2, AlertTriangle, ExternalLink, Loader2 } 
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cenatApi } from '../../lib/api';
+import { urlAdjunto } from '../../lib/adjuntos';
+import { BRAND } from '../../brands';
 
 /**
  * Visor/uploader del comprobante CENAT (Agencia Nacional de Seguridad Vial).
@@ -101,7 +103,7 @@ export function CenatAdjunto({ solicitudId }: { solicitudId: number }) {
                 ? 'Comprobante verificado por el municipio'
                 : status.tiene_adjunto
                   ? 'Comprobante subido — pendiente de verificación'
-                  : 'Se paga en la Agencia Nacional de Seguridad Vial (externo a Munify). Subí el comprobante acá.'}
+                  : `Se paga en la Agencia Nacional de Seguridad Vial (externo a ${BRAND.name}). Subí el comprobante acá.`}
             </p>
             {status.monto_cenat_referencia != null && !status.tiene_adjunto && (
               <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
@@ -114,7 +116,7 @@ export function CenatAdjunto({ solicitudId }: { solicitudId: number }) {
 
       {status.tiene_adjunto && status.adjunto_url && (
         <a
-          href={status.adjunto_url}
+          href={urlAdjunto(status.adjunto_url)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline"

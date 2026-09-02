@@ -24,7 +24,7 @@ Pipeline canónico de deploy. **Reglas duras en [`CLAUDE.md`](../../CLAUDE.md) �
 | Backend API | **Google Cloud Run** | proyecto `munify-api`, región `southamerica-east1`, servicio `munify-api` | `gcloud builds submit` + `gcloud run deploy` |
 | Base de datos | Aiven MySQL | (privada) | — |
 
-- **URL del backend que usa el frontend:** `https://munify-api-1060106389361.southamerica-east1.run.app/api`
+- **URL del backend que usa el frontend:** `https://munify-api-1060106389361.southamerica-east1.run.app/api` **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app/api]**
 - Site IDs Netlify: App `edff37c1-2c43-4c01-ba71-d6c59f5cdc85` · Landing `522eac1f-fa1f-43d1-86ca-128e5467a27d`
 - **OJO:** el `gcloud config` default suele estar parado en `tasar-prod` (OTRA app del user). Por eso **todo comando lleva `--project=munify-api` explícito**.
 
@@ -72,6 +72,7 @@ Un `git push origin master` versiona pero **NO deploya el backend**. Para saber 
 ```bash
 curl -s https://munify-api-1060106389361.southamerica-east1.run.app/openapi.json | python -m json.tool | grep -i "ruta o schema que esperás"
 ```
+**[DESCONTINUADO 2026-07-11]** URL SP aislada → usar us-east4: `https://munify-api-vmpxsxe7ra-uk.a.run.app/openapi.json`
 Que un commit exista en master **no** significa que esté deployado en Cloud Run.
 
 ## Variables de entorno
@@ -86,7 +87,7 @@ Que un commit exista en master **no** significa que esté deployado en Cloud Run
 ### Frontend (Netlify — Site settings → Environment variables)
 | Variable | Para qué |
 |---|---|
-| `VITE_API_URL` | URL del backend en Cloud Run (`https://munify-api-1060106389361.southamerica-east1.run.app/api`) |
+| `VITE_API_URL` | URL del backend en Cloud Run (`https://munify-api-1060106389361.southamerica-east1.run.app/api`) **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: `https://munify-api-vmpxsxe7ra-uk.a.run.app/api`]** |
 
 ## Lo que NO hay que hacer
 

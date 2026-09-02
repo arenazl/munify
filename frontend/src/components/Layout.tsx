@@ -1,26 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp } from 'lucide-react';
+import { AlertCircle, BarChart3, Bell, BellRing, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FileCheck, Home, LogOut, Map, MapPin, Menu, Moon, Plus, Radio, ScanLine, Settings, Sparkles, Sun, Trophy, User, Wallet, Wrench, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
+// alpha()/lighten() entienden cualquier formato de color; pegar dígitos al
+// final de un color solo funciona si SIEMPRE es un hex de seis, y no lo es.
+import { alpha, lighten } from '../lib/colorUtils';
+import { BentoMenu, type BentoItem } from './ui/BentoMenu';
 import { getNavigation, isMobileDevice } from '../config/navigation';
-import { fontPresets } from '../config/fontPresets';
-import { MunifyLogo } from './ui/MunifyLogo';
+import { BrandMark } from '../brands/BrandMark';
+import { BRAND, logoDelMunicipio } from '../brands';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
+import { useNavBadges } from './shell/useNavBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
+import PresentacionLive from './PresentacionLive';
 import { Sheet } from './ui/Sheet';
 import { usersApi, municipiosApi, navegacionApi, modulosApi, iaConfigApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
+import { SidebarV2 } from './shell/SidebarV2';
+import { TopbarV2 } from './shell/TopbarV2';
+import { MigasProvider } from '../contexts/MigasProvider';
 import NotificationSettings from './NotificationSettings';
 import { NotificationActivationSheet } from './NotificationActivationSheet';
 import { subscribeToPush } from '../lib/pushNotifications';
 import { toast } from 'sonner';
 
-// Definir tabs del footer móvil según rol (siempre 5, el del medio es el principal)
-const getMobileTabs = (userRole: string) => {
+// Definir tabs del footer móvil según rol. Gestor/vecino: 5 tabs con centro de
+// acción (crear/menú). Empleado: 3-4 tabs sin centro. El render distingue cada
+// tipo por 'isCreateMenu'/'end' in tab (no por índice fijo).
+const getMobileTabs = (userRole: string, modulosActivos: string[] = []) => {
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
@@ -36,6 +46,23 @@ const getMobileTabs = (userRole: string) => {
     ];
   }
 
+  // Empleado de campo: footer operativo propio. Antes heredaba el del vecino
+  // (Inicio->mi-panel rebota, Reclamos->mis-reclamos del vecino, etc). Ahora:
+  // Trabajos · Órdenes (si el muni tiene el módulo) · Mapa · Logros.
+  if (userRole === 'empleado') {
+    const tabs: Array<{ path: string; icon: any; label: string; end: boolean }> = [
+      { path: '/gestion/mis-trabajos', icon: Wrench, label: 'Trabajos', end: false },
+    ];
+    if (modulosActivos.includes('ordenes_trabajo')) {
+      tabs.push({ path: '/gestion/ordenes-trabajo', icon: ClipboardList, label: 'Órdenes', end: false });
+    }
+    tabs.push(
+      { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
+      { path: '/gestion/logros', icon: Trophy, label: 'Logros', end: false },
+    );
+    return tabs;
+  }
+
   // Vecino: "+" en el centro abre menú con Reclamo/Trámite (los dos core features).
   // Inicio · Reclamos · + · Trámites · Tasas — los 3 pilares del ciudadano.
   return [
@@ -47,25 +74,18 @@ const getMobileTabs = (userRole: string) => {
   ];
 };
 
-// Nombres de variantes en español
-// Cada tema curado tiene 3 variantes que controlan la TONALIDAD del sidebar.
-// El id interno se mantiene (clasico/vintage/vibrante) por compatibilidad con
-// sesiones guardadas, pero el label visible es Clara/Media/Oscura.
-const variantLabels: Record<ThemeVariant, string> = {
-  clasico: 'Clara',
-  vintage: 'Media',
-  vibrante: 'Oscura',
-};
-
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved === 'true';
   });
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  // Recorrido guiado (autocontenido) accesible desde el menú "Más" del admin.
+  // El "En Vivo" (DashboardLive) necesita los datos del dashboard, así que ese
+  // navega a /gestion?live=1 y se abre allí; acá sólo montamos PresentacionLive.
+  const [presentacionOpen, setPresentacionOpen] = useState(false);
   // Estado reactivo para detectar mobile (se actualiza con resize)
   const [isMobile, setIsMobile] = useState(() => isMobileDevice());
   const navigate = useNavigate();
@@ -80,8 +100,6 @@ export default function Layout() {
     nuevoEmail: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingTheme, setSavingTheme] = useState(false);
-  const [uploadingSidebarBg, setUploadingSidebarBg] = useState(false);
   const [emailValidationOpen, setEmailValidationOpen] = useState(false);
   const [emailValidationCode, setEmailValidationCode] = useState('');
   // Items del sidebar ocultos por el superadmin para el muni actual
@@ -91,7 +109,6 @@ export default function Layout() {
   const [modulosDesactivados, setModulosDesactivados] = useState<string[]>([]);
   const [iaHabilitada, setIaHabilitada] = useState<boolean>(false);
   const [pendingEmail, setPendingEmail] = useState('');
-  const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
   const [pushSubscribed, setPushSubscribed] = useState(() => localStorage.getItem('pushActivated') === 'true');
   const [pushSubscribing, setPushSubscribing] = useState(false);
@@ -99,25 +116,49 @@ export default function Layout() {
   const { user, logout, municipioActual, refreshUser } = useAuth();
   const {
     theme,
-    currentPresetId,
-    currentVariant,
-    setPreset,
-    presets,
+    currentMode,
+    alternarModo,
     sidebarBgImage,
-    setSidebarBgImage,
     sidebarBgOpacity,
-    setSidebarBgOpacity,
     contentBgImage,
-    setContentBgImage,
     contentBgOpacity,
-    setContentBgOpacity,
-    currentFontId,
-    setFont,
   } = useTheme();
   const location = useLocation();
 
+  // Mini-muestras del selector: los colores REALES que produce cada opción,
+  // derivados con los otros dos ejes en su valor actual (antes se pintaba una
+  // paleta declarada a mano que no siempre era lo que se terminaba viendo).
+
   // Badges de items pendientes (reclamos/tramites/tasas) — solo aplica a vecinos.
+
+  // La barra inferior publica su ALTO REAL en --pl-tabbar-h, para que lo que
+  // se apoya abajo (bottom sheets, toasts) no la tape. Se mide en vez de
+  // hardcodear: el alto cambia con el area segura del telefono y con el
+  // tamano de fuente del sistema, y un numero fijo queda corto justo en los
+  // aparatos donde mas molesta.
+  const navInferiorRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const nav = navInferiorRef.current;
+    const root = document.documentElement;
+    if (!nav) {
+      root.style.setProperty('--pl-tabbar-h', '0px');
+      return;
+    }
+    const medir = () => {
+      root.style.setProperty('--pl-tabbar-h', `${Math.round(nav.getBoundingClientRect().height)}px`);
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(nav);
+    return () => {
+      ro.disconnect();
+      root.style.setProperty('--pl-tabbar-h', '0px');
+    };
+  });
+
   const badges = useVecinoBadges();
+  // Contadores de gestion (admin/supervisor). Cachea una vez por sesion.
+  const navBadges = useNavBadges();
 
   // Guardar estado del sidebar en localStorage
   useEffect(() => {
@@ -217,70 +258,8 @@ export default function Layout() {
   };
 
   // Handler para guardar el tema actual en el municipio
-  const handleSaveTheme = async () => {
-    if (!municipioActual || (user?.rol !== 'admin' && user?.rol !== 'supervisor')) return;
-
-    setSavingTheme(true);
-    try {
-      const temaConfig = {
-        presetId: currentPresetId,
-        variant: currentVariant,
-        sidebarBgImage,
-        sidebarBgOpacity,
-        contentBgImage,
-        contentBgOpacity,
-      };
-
-      await municipiosApi.updateTema(municipioActual.id, temaConfig);
-      toast.success('Tema guardado exitosamente');
-      setThemeMenuOpen(false);
-
-      // Refrescar el usuario para que tenga el municipio actualizado
-      await refreshUser();
-    } catch (error) {
-      console.error('Error guardando tema:', error);
-      toast.error('Error al guardar el tema');
-    } finally {
-      setSavingTheme(false);
-    }
-  };
 
   // Handler para subir imagen de fondo del sidebar
-  const handleSidebarBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !municipioActual) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor selecciona una imagen válida');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('La imagen no debe superar los 2MB');
-      return;
-    }
-
-    setUploadingSidebarBg(true);
-    try {
-      const formData = new FormData();
-      formData.append('imagen', file);
-
-      const response = await municipiosApi.updateSidebarBg(municipioActual.id, formData);
-
-      if (response.data?.sidebar_bg_url) {
-        setSidebarBgImage(response.data.sidebar_bg_url);
-        toast.success('Imagen de fondo actualizada');
-      }
-    } catch (error) {
-      console.error('Error subiendo imagen:', error);
-      toast.error('Error al subir la imagen');
-    } finally {
-      setUploadingSidebarBg(false);
-      // Reset input
-      if (sidebarBgInputRef.current) {
-        sidebarBgInputRef.current.value = '';
-      }
-    }
-  };
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -352,16 +331,89 @@ export default function Layout() {
     modulosDesactivados,
     iaHabilitada,
   });
-  const mobileTabs = getMobileTabs(user.rol);
+  const mobileTabs = getMobileTabs(user.rol, modulosActivos);
 
-  // Anchos dinámicos con medidas relativas para mejor responsividad
-  // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
-  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4rem' : '13rem');
+  // ---- Shell v2 (solo desktop) -------------------------------------------
+  // Acciones globales de la topbar: tema + notificaciones + ajustes. El
+  // dropdown del tema sigue viviendo en este Layout (portal siempre montado,
+  // compartido con el trigger del header mobile); acá va solo el trigger.
+  const accionesTopbar = (
+    <>
+      <button
+        type="button"
+        className="tv2-iconbtn"
+        title={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
+        aria-label={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
+        onClick={alternarModo}
+      >
+        {currentMode === 'claro'
+          ? <Moon className="tv2-iconbtn-svg" />
+          : <Sun className="tv2-iconbtn-svg" />}
+      </button>
+      <NotificacionesDropdown />
+      <Link to="/gestion/configuracion" className="tv2-iconbtn" title="Configuración">
+        <Settings className="tv2-iconbtn-svg" />
+      </Link>
+    </>
+  );
+
+  // Menú de la persona en la topbar (decisión del dueño: el switcher de
+  // usuario del sidebar viejo desaparece en desktop — la persona vive acá).
+  // Mismas opciones que el dropdown viejo: perfil, notificaciones, salir.
+  const menuUsuarioTopbar = (
+    <>
+      <div className="tv2-menu-cab">
+        <p className="tv2-menu-nombre">{user.nombre} {user.apellido}</p>
+        <p className="tv2-menu-email">{user.email}</p>
+      </div>
+      <button type="button" className="tv2-menu-item" onClick={handleOpenProfile}>
+        <User className="tv2-menu-icono" />
+        Mi Perfil
+      </button>
+      <button
+        type="button"
+        className="tv2-menu-item"
+        onClick={handleTopBarPushSubscribe}
+        disabled={pushSubscribed || pushSubscribing}
+      >
+        <BellRing className="tv2-menu-icono" />
+        {pushSubscribing
+          ? 'Activando notificaciones…'
+          : pushSubscribed
+            ? 'Notificaciones activas'
+            : 'Activar notificaciones'}
+      </button>
+      <div className="tv2-menu-sep" />
+      <button
+        type="button"
+        className="tv2-menu-item tv2-menu-item--peligro"
+        onClick={() => logout()}
+      >
+        <LogOut className="tv2-menu-icono" />
+        Cerrar sesión
+      </button>
+    </>
+  );
+
+  // Anchos dinámicos con medidas relativas para mejor responsividad.
+  // Desktop = shell v2. El ancho sale de los MISMOS tokens que usa el sidebar
+  // (--pl-sidebar-w / --pl-sidebar-w-collapsed): antes estaba duplicado como
+  // '16rem'/'4.5rem' y cualquier cambio del token dejaba el padding del
+  // contenido desfasado del ancho real de la barra.
+  // Mobile mantiene el drawer compacto de siempre (12rem).
+  const sidebarWidth = isMobile
+    ? '12rem'
+    : (sidebarCollapsed ? 'var(--pl-sidebar-w-collapsed)' : 'var(--pl-sidebar-w)');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;
 
   return (
+    // Miga de pan (Ámbito / Página) publicada para toda la app: la dibuja la
+    // TopbarV2 y la lee el PageHeader de los ABMs para no repetir el eyebrow.
+    // `visible` = hay topbar dibujándola (en mobile no hay: el header mobile
+    // muestra el municipio, no la pantalla).
+    <MigasProvider items={navigation} visible={!isMobile}>
     <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme.contentBackground, overflowX: 'clip' }}>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
@@ -371,10 +423,23 @@ export default function Layout() {
         />
       )}
 
-      {/* Sidebar - full height desde arriba */}
+      {/* Shell v2 DESKTOP: sidebar nuevo (256/72, tokens --pl-sidebar-w*).
+          Colapso controlado acá: persiste en localStorage y de él sale el
+          padding-left del contenido (var --sidebar-width). */}
+      {!isMobile && (
+        <SidebarV2
+          items={navigation}
+          colapsado={sidebarCollapsed}
+          onToggleColapsado={() => setSidebarCollapsed((v) => !v)}
+        />
+      )}
+
+      {/* Sidebar VIEJO — solo MOBILE (drawer + header + bottom bar quedan
+          como están; en desktop lo reemplaza el shell v2). */}
       {/* Transition SOLO transform para evitar jank en el primer click (antes
          usaba transition-all + -translate-x-full clase => el primer paint no
          tenia transform base y aparecia un frame mal posicionado). */}
+      {isMobile && (
       <div
         className={`fixed left-0 top-0 bottom-0 z-50 shadow-xl flex flex-col sidebar-container backdrop-blur-sm ${isCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
@@ -408,7 +473,7 @@ export default function Layout() {
 
         {/* Header del Sidebar: Logo + Municipio */}
         <div
-          className="relative z-10 px-3 py-4 border-b"
+          className="relative z-10 pl-7 pr-3 py-4 border-b"
           style={{ borderColor: `${theme.sidebarTextSecondary}20` }}
         >
           <button
@@ -418,7 +483,9 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <MunifyLogo size={40} variant="sidebar" className="flex-shrink-0" />
+            {/* Logo SIEMPRE a 40 (regla del dueño: "el logo va de este tamaño,
+                el logo que sea" — la referencia es el bloque de Munify). */}
+            <BrandMark size={40} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
@@ -427,16 +494,42 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
+              {/* Bloque de marca del sidebar: distribución y tamaños ORIGINALES
+                  (la escala grande del lockup es SOLO del hero del login).
+                  Único agregado: el bicolor tenant-driven del nombre. */}
               <span
-                className="text-lg font-bold whitespace-nowrap"
-                style={{ color: theme.sidebarText }}
+                className={`block font-bold leading-tight ${BRAND.name.length > 12 ? 'text-sm' : 'text-lg'}`}
+                style={{ color: theme.sidebarText, fontFamily: BRAND.nameFont }}
               >
-                Munify
+                {(() => {
+                  // Bicolor: multi-palabra corta por espacio; una palabra usa
+                  // nameAccentIndex (Munify: "Muni"+"fy"). Sin índice → plano.
+                  const words = BRAND.name.split(' ');
+                  let head = BRAND.name;
+                  let tail = '';
+                  if (words.length > 1) {
+                    head = words[0];
+                    tail = ' ' + words.slice(1).join(' ');
+                  } else if (BRAND.nameAccentIndex) {
+                    head = BRAND.name.slice(0, BRAND.nameAccentIndex);
+                    tail = BRAND.name.slice(BRAND.nameAccentIndex);
+                  }
+                  return (
+                    <>
+                      {head}
+                      {/* El tramo acentuado sigue el ACENTO ACTIVO del tema
+                          (mismo criterio que el shell v2), no el color fijo de
+                          marca: si el usuario cambia el acento en Apariencia,
+                          el nombre acompaña en vez de quedarse verde. */}
+                      {tail && <span className="sv2-nombre-acento">{tail}</span>}
+                    </>
+                  );
+                })()}
               </span>
               {/* Super Admin (sin municipio_id) no muestra municipio */}
               {municipioActual && user?.municipio_id && (
                 <p
-                  className="text-[10px] whitespace-nowrap -mt-0.5"
+                  className="text-[10px] leading-tight mt-0.5 line-clamp-2"
                   style={{ color: theme.sidebarTextSecondary }}
                 >
                   {municipioActual.nombre}
@@ -476,7 +569,7 @@ export default function Layout() {
               className="h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
               style={{ backgroundColor: theme.primary }}
             >
-              {user.nombre[0]}{user.apellido[0]}
+              {(user.nombre?.[0] || '?')}{user.apellido?.[0] || ''}
             </div>
             <div
               style={{
@@ -486,12 +579,17 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
               }}
             >
-              <p className="text-sm font-semibold leading-none text-left whitespace-nowrap" style={{ color: theme.sidebarText }}>
+              <p className="text-xs font-semibold leading-tight text-center" style={{ color: theme.sidebarText }}>
                 {user.nombre} {user.apellido}
               </p>
-              <p className="text-xs capitalize mt-0.5 whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>
-                {user.dependencia ? 'Dependencia' : user.rol}
-              </p>
+              {/* Rol dinámico: el bloque nunca pasa de 2 renglones. Si el
+                  nombre es largo y wrapea (>18 chars en el sidebar angosto),
+                  el rol se oculta — nombre en 2 líneas + rol = 3 renglones feos. */}
+              {`${user.nombre} ${user.apellido}`.length <= 18 && (
+                <p className="text-xs capitalize mt-0.5 whitespace-nowrap text-center" style={{ color: theme.sidebarTextSecondary }}>
+                  {user.dependencia ? 'Dependencia' : user.rol}
+                </p>
+              )}
             </div>
             {!isCollapsed && (
               <ChevronDown
@@ -563,7 +661,7 @@ export default function Layout() {
                         className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                         style={{
                           backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.primary,
-                          color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                          color: pushSubscribed ? theme.textSecondary : 'var(--pl-on-accent)',
                           opacity: pushSubscribed ? 0.5 : 1
                         }}
                       >
@@ -634,7 +732,7 @@ export default function Layout() {
         </div>
 
         {/* Navegación */}
-        <nav className="relative z-10 flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
+        <nav className="relative z-10 flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item, idx) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
@@ -653,7 +751,7 @@ export default function Layout() {
               <React.Fragment key={item.href}>
                 {showCategoryHeader && (
                   <div
-                    className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider select-none"
+                    className="pl-4 pr-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider select-none"
                     style={{ color: theme.sidebarTextSecondary, opacity: 0.55 }}
                   >
                     {itemCategoria}
@@ -664,9 +762,9 @@ export default function Layout() {
                 className="flex items-center py-2.5 rounded-lg text-xs font-medium active:scale-[0.98] group relative overflow-hidden"
                 style={{
                   backgroundColor: isActive ? theme.primary : 'transparent',
-                  color: isActive ? '#ffffff' : theme.sidebarTextSecondary,
+                  color: isActive ? 'var(--pl-on-accent)' : theme.sidebarTextSecondary,
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  paddingLeft: isCollapsed ? '0' : '12px',
+                  paddingLeft: isCollapsed ? '0' : '16px',
                   paddingRight: isCollapsed ? '0' : '12px',
                   transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
@@ -688,7 +786,7 @@ export default function Layout() {
                 {/* Barra lateral animada */}
                 <div
                   className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full transition-all duration-200 ${isActive ? 'h-6 opacity-100' : 'h-0 opacity-0 group-hover:h-4 group-hover:opacity-100'}`}
-                  style={{ backgroundColor: isActive ? '#ffffff' : theme.primary }}
+                  style={{ backgroundColor: isActive ? 'var(--pl-on-accent)' : theme.primary }}
                 />
                 <Icon
                   className="h-5 w-5 flex-shrink-0"
@@ -761,14 +859,21 @@ export default function Layout() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Header sticky solo mobile */}
       {isMobile && (
         <header
-          className="fixed top-0 left-0 right-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-sm lg:hidden"
+          className="fixed top-0 left-0 right-0 z-40 px-4 pb-3 flex items-center justify-between backdrop-blur-sm lg:hidden"
           style={{
             backgroundColor: `${theme.card}f0`,
             borderBottom: `1px solid ${theme.border}`,
+            // La PWA se dibuja DEBAJO de la barra de estado (viewport-fit=cover
+            // + status-bar-style translúcida), así que el header tiene que
+            // bajar lo que mida el notch / Dynamic Island. Nunca un número
+            // fijo: cambia por modelo, y en Android/desktop el inset vale 0
+            // — de ahí el mínimo de 12px.
+            paddingTop: 'max(env(safe-area-inset-top), 12px)',
           }}
         >
           {/* Hamburguesa */}
@@ -780,37 +885,41 @@ export default function Layout() {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Centro: Logo + Nombre del municipio */}
+          {/* Centro: Logo + Nombre del municipio. Quién manda lo decide
+              `logoDelMunicipio` (único punto): en marca mono-tenant devuelve
+              null y va el SVG de marca limpio, sin recuadro; en Munify
+              multi-tenant, el logo del muni en su badge, como siempre. */}
           <div className="flex-1 flex items-center justify-center gap-2 mx-2">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              {municipioActual?.logo_url ? (
-                <img
-                  src={municipioActual.logo_url}
-                  alt={municipioActual.nombre}
-                  className="w-5 h-5 object-contain"
-                />
-              ) : (
-                <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
-              )}
-            </div>
+            {(() => {
+              const logoMuni = logoDelMunicipio(municipioActual?.logo_url);
+              if (!logoMuni) return <BrandMark size={26} className="flex-shrink-0" />;
+              return (
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${theme.primary}20` }}
+                >
+                  <img src={logoMuni} alt={municipioActual?.nombre} className="w-5 h-5 object-contain" />
+                </div>
+              );
+            })()}
             <h1 className="text-sm font-semibold truncate" style={{ color: theme.text }}>
               {municipioActual?.nombre?.replace('Municipalidad de ', '') || 'Municipio'}
             </h1>
           </div>
 
-          {/* Derecha: Selector de tema + Notificaciones */}
+          {/* Derecha: luna/sol + Notificaciones */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* Theme selector */}
             <button
-              onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+              onClick={alternarModo}
               className="p-2 rounded-lg transition-colors"
               style={{ color: theme.textSecondary }}
-              title="Tema"
+              title={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
+              aria-label={currentMode === 'claro' ? 'Pasar al tema oscuro' : 'Pasar al tema claro'}
             >
-              <Palette className="h-5 w-5" strokeWidth={2.5} />
+              {currentMode === 'claro'
+                ? <Moon className="h-5 w-5" strokeWidth={2.5} />
+                : <Sun className="h-5 w-5" strokeWidth={2.5} />}
             </button>
             <NotificacionesDropdown />
           </div>
@@ -847,345 +956,33 @@ export default function Layout() {
           className="px-3 sm:px-6 pb-3 sm:pb-6 relative"
           style={{
             color: theme.text,
-            paddingTop: isMobile ? '64px' : undefined, // Espacio para el header sticky mobile
+            // Header sticky mobile + la safe area del teléfono: el header baja
+            // lo que mida el notch, así que el contenido tiene que acompañar o
+            // el primer bloque queda tapado.
+            paddingTop: isMobile ? 'calc(64px + env(safe-area-inset-top, 0px))' : undefined,
             paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar en mobile
             zIndex: 1,
           }}
         >
-          {/* Barra superior ultra-compacta - iconos a la derecha - SOLO DESKTOP.
-              Sticky: se mantiene visible al hacer scroll de la página. */}
-          <div
-            className="hidden lg:flex items-center justify-end pt-4 pb-2 sticky top-0 z-50"
-            style={{ backgroundColor: theme.contentBackground }}
-          >
+          {/* Topbar v2 — SOLO DESKTOP: contexto | breadcrumb || acciones |
+              persona. Sticky en flujo (mismo mecanismo que la barra vieja). */}
+          {!isMobile && (
+            <TopbarV2 acciones={accionesTopbar} menuUsuario={menuUsuarioTopbar} />
+          )}
 
-            {/* Iconos de acciones */}
-            <div className="flex items-center">
-              {/* Theme selector */}
-              <div className="relative">
-                <button
-                  className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
-                  onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-                  style={{ color: theme.textSecondary }}
-                  title="Tema"
-                >
-                  <Palette className="h-4 w-4" strokeWidth={3} />
-                </button>
+          {/* Dropdown del tema — portal SIEMPRE montado (los triggers viven
+              en la topbar v2 en desktop y en el header sticky en mobile). */}
+          {/* El selector de temas salió de la topbar (pedido del dueño,
+              2026-08-03): ahí queda SOLO la luna/sol, que alterna entre el
+              tema claro y el oscuro que el usuario eligió en Configuración →
+              Apariencia. Elegir CUÁL claro y CUÁL oscuro se hace allá, que es
+              donde se ven las seis muestras; la topbar es para el gesto de
+              todos los días, no para configurar. */}
 
-                {themeMenuOpen && createPortal(
-                  <>
-                    <div
-                      className="fixed inset-0 z-[60]"
-                      onClick={() => setThemeMenuOpen(false)}
-                    />
-                    <div
-                      className="fixed right-3 top-14 lg:right-6 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl shadow-2xl z-[70] theme-dropdown-enter"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        maxHeight: 'calc(100vh - 100px)',
-                        overflowY: 'auto',
-                      }}
-                    >
-                      <div className="px-4 py-3 border-b" style={{ borderColor: theme.border }}>
-                        <h3 className="font-semibold" style={{ color: theme.text }}>Personalizar tema</h3>
-                      </div>
-                      <div className="p-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          {presets.map((preset) => {
-                            const isSelected = currentPresetId === preset.id;
-                            return (
-                              <button
-                                key={preset.id}
-                                onClick={() => setPreset(preset.id, currentVariant)}
-                                className="relative p-2 rounded-lg transition-all duration-200 hover:scale-[1.02]"
-                                style={{
-                                  backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
-                                  border: `2px solid ${isSelected ? theme.primary : 'transparent'}`,
-                                }}
-                              >
-                                <div className="flex h-6 rounded-md overflow-hidden mb-1.5">
-                                  {preset.palette.map((color, i) => (
-                                    <div key={i} className="flex-1" style={{ backgroundColor: color }} />
-                                  ))}
-                                </div>
-                                <span className="text-xs font-medium" style={{ color: isSelected ? theme.primary : theme.text }}>
-                                  {preset.name}
-                                </span>
-                                {isSelected && (
-                                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primary }}>
-                                    <Check className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Tono sidebar</span>
-                        <div className="flex gap-2 mt-2">
-                          {(['clasico', 'vintage', 'vibrante'] as ThemeVariant[]).map((variant) => {
-                            const isSelected = currentVariant === variant;
-                            return (
-                              <button
-                                key={variant}
-                                onClick={() => setPreset(currentPresetId, variant)}
-                                className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all"
-                                style={{
-                                  backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
-                                  color: isSelected ? '#ffffff' : theme.text,
-                                }}
-                              >
-                                {variantLabels[variant]}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Tipografia — solo visible para superadmin */}
-                      {user?.rol === 'admin' && !user?.municipio_id && (
-                        <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            Tipografia (superadmin)
-                          </span>
-                          <div className="grid grid-cols-2 gap-1.5 mt-2">
-                            {fontPresets.map((f) => {
-                              const isSelected = currentFontId === f.id;
-                              return (
-                                <button
-                                  key={f.id}
-                                  onClick={() => setFont(f.id)}
-                                  className="text-left px-2 py-1.5 rounded-md transition-all"
-                                  style={{
-                                    backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
-                                    border: `1.5px solid ${isSelected ? theme.primary : 'transparent'}`,
-                                    fontFamily: f.family,
-                                  }}
-                                  title={f.name}
-                                  type="button"
-                                >
-                                  <span className="block text-[11px] font-semibold leading-tight" style={{ color: isSelected ? theme.primary : theme.text }}>
-                                    {f.name}
-                                  </span>
-                                  <span className="block text-[10px] leading-tight" style={{ color: theme.textSecondary }}>
-                                    Aa Bb Cc 123
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Fondo del sidebar */}
-                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            <Image className="h-3 w-3 inline mr-1" />
-                            Fondo sidebar
-                          </span>
-                          {sidebarBgImage && (
-                            <button
-                              onClick={() => setSidebarBgImage(null)}
-                              className="text-[10px] px-2 py-0.5 rounded"
-                              style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
-                            >
-                              Quitar
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Preview de imagen actual */}
-                        {sidebarBgImage ? (
-                          <div
-                            className="w-full h-20 rounded-lg mb-2 bg-cover bg-center"
-                            style={{
-                              backgroundImage: `url(${sidebarBgImage})`,
-                              border: `1px solid ${theme.border}`,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            className="w-full h-20 rounded-lg mb-2 flex items-center justify-center"
-                            style={{
-                              backgroundColor: theme.backgroundSecondary,
-                              border: `1px dashed ${theme.border}`,
-                            }}
-                          >
-                            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin imagen</span>
-                          </div>
-                        )}
-
-                        {/* Hidden file input */}
-                        <input
-                          type="file"
-                          ref={sidebarBgInputRef}
-                          onChange={handleSidebarBgUpload}
-                          className="hidden"
-                          accept="image/*"
-                        />
-
-                        {/* Upload button */}
-                        <button
-                          onClick={() => sidebarBgInputRef.current?.click()}
-                          disabled={uploadingSidebarBg}
-                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg mb-2 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-                          style={{
-                            backgroundColor: theme.backgroundSecondary,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        >
-                          {uploadingSidebarBg ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-xs">Subiendo...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="h-4 w-4" />
-                              <span className="text-xs">Subir imagen</span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* Slider de opacidad */}
-                        {sidebarBgImage && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>Opacidad</span>
-                            <input
-                              type="range"
-                              min="0.1"
-                              max="0.5"
-                              step="0.05"
-                              value={sidebarBgOpacity}
-                              onChange={(e) => setSidebarBgOpacity(parseFloat(e.target.value))}
-                              className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                              style={{ backgroundColor: theme.border }}
-                            />
-                            <span className="text-[10px] w-8" style={{ color: theme.textSecondary }}>
-                              {Math.round(sidebarBgOpacity * 100)}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {/* Fondo del contenido - usa imagen_portada del municipio */}
-                      {(() => {
-                        // Usar la misma lógica de fallback que Dashboard
-                        const defaultBgImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
-                        const availableBgImage = municipioActual?.imagen_portada || municipioActual?.logo_url || defaultBgImage;
-
-                        return (
-                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            <Image className="h-3 w-3 inline mr-1" />
-                            Fondo content
-                          </span>
-                          {contentBgImage && (
-                            <button
-                              onClick={() => setContentBgImage(null)}
-                              className="text-[10px] px-2 py-0.5 rounded"
-                              style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
-                            >
-                              Quitar
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Preview de imagen - siempre muestra preview */}
-                        <div
-                          className="w-full h-16 rounded-lg mb-2 bg-cover bg-center"
-                          style={{
-                            backgroundImage: `url(${contentBgImage || availableBgImage})`,
-                            border: `1px solid ${theme.border}`,
-                            opacity: contentBgImage ? 1 : 0.5,
-                          }}
-                        />
-
-                        {/* Toggle para activar/desactivar */}
-                        <button
-                          onClick={() => setContentBgImage(contentBgImage ? null : availableBgImage)}
-                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg mb-2 transition-all hover:opacity-90 active:scale-[0.98]"
-                          style={{
-                            backgroundColor: contentBgImage ? theme.primary : theme.backgroundSecondary,
-                            border: `1px solid ${contentBgImage ? theme.primary : theme.border}`,
-                            color: contentBgImage ? '#ffffff' : theme.text,
-                          }}
-                        >
-                          <Image className="h-4 w-4" />
-                          <span className="text-xs">{contentBgImage ? 'Fondo activo' : 'Usar imagen municipio'}</span>
-                        </button>
-
-                        {/* Slider de opacidad */}
-                        {contentBgImage && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>Opacidad</span>
-                            <input
-                              type="range"
-                              min="0.1"
-                              max="0.5"
-                              step="0.05"
-                              value={contentBgOpacity}
-                              onChange={(e) => setContentBgOpacity(parseFloat(e.target.value))}
-                              className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                              style={{ backgroundColor: theme.border }}
-                            />
-                            <span className="text-[10px] w-8" style={{ color: theme.textSecondary }}>
-                              {Math.round(contentBgOpacity * 100)}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                        );
-                      })()}
-                      {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-                        <div className="p-3 border-t" style={{ borderColor: theme.border }}>
-                          <button
-                            onClick={handleSaveTheme}
-                            disabled={savingTheme}
-                            className="w-full py-2 px-4 rounded-lg font-medium text-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                            style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-                          >
-                            {savingTheme ? 'Guardando...' : 'Guardar para el municipio'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>,
-                  document.body
-                )}
-              </div>
-
-              {/* Notificaciones */}
-              <NotificacionesDropdown />
-
-              {/* Asistente IA — OCULTO temporalmente por pedido del user. */}
-              {/* <button
-                onClick={() => window.dispatchEvent(new Event('munify:toggle-chat'))}
-                className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{ color: theme.primary }}
-                title="Asistente IA"
-              >
-                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-              </button> */}
-
-              {/* Ajustes */}
-              <Link
-                to="/gestion/configuracion"
-                className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{ color: theme.textSecondary }}
-                title="Configuración"
-              >
-                <Settings className="h-4 w-4" strokeWidth={3} />
-              </Link>
-            </div>
-          </div>
-
-          {/* Banner de Dependencia - visible solo para usuarios de dependencia */}
-          {user.dependencia && (() => {
+          {/* Banner de Dependencia — solo MOBILE: en desktop el contexto de
+              la dependencia vive en la pill de la topbar v2 (el breadcrumb y
+              el contexto van en la topbar, no en la página). */}
+          {isMobile && user.dependencia && (() => {
             // Usar imagen_portada, logo_url, o una imagen por defecto
             const defaultBannerImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
             const bannerImage = municipioActual?.imagen_portada || municipioActual?.logo_url || defaultBannerImage;
@@ -1306,53 +1103,107 @@ export default function Layout() {
                 animation: 'slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
               }}
             >
-              <div className="grid grid-cols-3 gap-2">
-                {(() => {
-                  // Items del menu central. Admin/Supervisor ve accesos a todas
-                  // las pantallas relevantes. Vecino solo ve Reclamo/Tramite.
-                  const items: Array<{ label: string; icon: any; color: string; onClick: () => void }> = [];
-                  if (user?.rol === 'admin' || user?.rol === 'supervisor') {
-                    items.push(
-                      { label: 'Mapa', icon: Map, color: '#3b82f6', onClick: () => navigate('/gestion/mapa') },
-                      { label: 'Mostrador', icon: ScanLine, color: '#8b5cf6', onClick: () => navigate('/gestion/mostrador') },
-                      { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
-                      { label: 'Contactos', icon: User, color: '#06b6d4', onClick: () => navigate('/gestion/tesoreria/contactos') },
-                      { label: 'Resumen', icon: TrendingUp, color: '#10b981', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
-                      { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
-                    );
-                  } else {
-                    items.push(
-                      { label: 'Reclamo', icon: AlertCircle, color: '#ef4444', onClick: () => navigate('/gestion/crear-reclamo') },
-                      { label: 'Trámite', icon: FileCheck, color: '#10b981', onClick: () => navigate('/gestion/crear-tramite') },
-                    );
-                  }
-                  return items.map((it) => (
-                    <button
-                      key={it.label}
-                      onClick={() => { setCreateMenuOpen(false); it.onClick(); }}
-                      className="flex flex-col items-center gap-1 px-2 py-3 rounded-2xl transition-all active:scale-95"
-                      style={{
-                        backgroundColor: theme.backgroundSecondary,
-                        border: `1.5px solid ${theme.border}`,
-                      }}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: `${it.color}15` }}
-                      >
-                        <it.icon className="h-5 w-5" style={{ color: it.color }} />
-                      </div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: it.color }}>
-                        {it.label}
-                      </span>
-                    </button>
-                  ));
-                })()}
-              </div>
+              {(() => {
+                // Menú en MOSAICO (BentoMenu del kit): la jerarquía la hace el
+                // TAMAÑO del bloque, no el color. Antes eran ocho tarjetas
+                // idénticas donde encontrar una era leerlas todas — y el botón
+                // decía "+" pero el menú no creaba nada. Ahora lo que crea va
+                // en el bloque grande y lo que sólo navega, en tiras al pie.
+                const items: BentoItem[] = [];
+
+                if (user?.rol === 'admin' || user?.rol === 'supervisor') {
+                  items.push(
+                    {
+                      id: 'reclamo',
+                      titulo: 'Cargar un reclamo',
+                      detalle: 'A nombre de un vecino',
+                      icono: Plus,
+                      forma: 'banner',
+                      // El dato es CONTEXTUAL a quien mira: a alguien de
+                      // gestion lo que le importa junto a "cargar" es cuanto
+                      // hay en riesgo de vencer. Solo se muestra si el
+                      // contador existe de verdad.
+                      ...(navBadges.sla
+                        ? { dato: navBadges.sla, datoSub: 'en riesgo de vencer' }
+                        : navBadges.reclamos
+                          ? { dato: navBadges.reclamos, datoSub: 'reclamos en total' }
+                          : {}),
+                      onClick: () => navigate('/gestion/crear-reclamo'),
+                    },
+                    {
+                      id: 'tramite',
+                      titulo: 'Trámite',
+                      detalle: 'Iniciar una gestión',
+                      icono: FileCheck,
+                      forma: 'chica',
+                      onClick: () => navigate('/gestion/crear-tramite'),
+                    },
+                    {
+                      id: 'mostrador',
+                      titulo: 'Mostrador',
+                      detalle: 'Atender en ventanilla',
+                      icono: ScanLine,
+                      forma: 'chica',
+                      onClick: () => navigate('/gestion/mostrador'),
+                    },
+                    { id: 'mapa', titulo: 'Mapa', detalle: 'Dónde se concentran', icono: Map, forma: 'ancha', onClick: () => navigate('/gestion/mapa') },
+                    { id: 'agenda', titulo: 'Agenda', detalle: 'Turnos del día', icono: Calendar, forma: 'ancha', onClick: () => navigate('/gestion/agenda-turnos') },
+                    // "Conocé" y "Pulso" no decían qué hacen: se nombran por lo
+                    // que son.
+                    { id: 'presentacion', titulo: 'Presentación', detalle: 'Recorrido guiado', icono: Sparkles, forma: 'ancha', onClick: () => setPresentacionOpen(true) },
+                    { id: 'vivo', titulo: 'Pantalla en vivo', detalle: 'Para mostrar en una TV', icono: Radio, forma: 'ancha', onClick: () => navigate('/gestion?live=1') },
+                    { id: 'config', titulo: 'Configuración', icono: Settings, forma: 'ancha', onClick: () => navigate('/gestion/configuracion') },
+                  );
+                } else {
+                  // El vecino sí tiene sus contadores reales a mano.
+                  items.push(
+                    {
+                      id: 'reclamo',
+                      titulo: 'Hacer un reclamo',
+                      detalle: 'Contanos qué pasa en tu barrio',
+                      icono: AlertCircle,
+                      forma: 'banner',
+                      // Al vecino no le sirve el total del municipio: le
+                      // sirve cuantos SUYOS estan en curso.
+                      ...(badges.reclamos > 0
+                        ? { dato: badges.reclamos, datoSub: 'tuyos en curso' }
+                        : {}),
+                      onClick: () => navigate('/gestion/crear-reclamo'),
+                    },
+                    {
+                      id: 'tramite',
+                      titulo: 'Trámite',
+                      detalle: 'Iniciar una gestión',
+                      icono: FileCheck,
+                      forma: 'chica',
+                      onClick: () => navigate('/gestion/crear-tramite'),
+                    },
+                    {
+                      id: 'mis-reclamos',
+                      titulo: 'Mis reclamos',
+                      icono: ClipboardList,
+                      forma: 'chica',
+                      ...(badges.reclamos > 0 ? { dato: badges.reclamos, datoSub: 'en curso' } : {}),
+                      onClick: () => navigate('/gestion/mis-reclamos'),
+                    },
+                  );
+                }
+
+                return (
+                  <BentoMenu
+                    items={items.map((it) => ({
+                      ...it,
+                      onClick: () => { setCreateMenuOpen(false); it.onClick(); },
+                    }))}
+                    ariaLabel="Acciones"
+                  />
+                );
+              })()}
             </div>
           )}
 
           <nav
+            ref={navInferiorRef}
             className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe overflow-visible"
             style={{
               backgroundColor: theme.card,
@@ -1372,17 +1223,28 @@ export default function Layout() {
                       onClick={() => setCreateMenuOpen(!createMenuOpen)}
                       className="flex flex-col items-center min-w-0 flex-1 relative -mt-5"
                     >
+                      {/* El gradiente terminaba en #ec4899 (rosa fucsia) FIJO en el
+                          código: en la marca verde el botón salía rosado y no se
+                          parecía a nada del tema. Ahora los dos extremos salen del
+                          acento activo, así que cada marca lo hereda en su color.
+                          Las transparencias van por alpha(): pegar dígitos al final
+                          del color sólo funciona si SIEMPRE es un hex de seis. */}
                       <div
                         className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 relative"
                         style={{
-                          background: `linear-gradient(135deg, ${theme.primary} 0%, #ec4899 100%)`,
+                          background: `linear-gradient(135deg, ${lighten(theme.primary, 12)} 0%, ${theme.primary} 100%)`,
                           boxShadow: createMenuOpen
-                            ? `0 6px 25px ${theme.primary}60`
-                            : `0 4px 20px ${theme.primary}50`,
+                            ? `0 6px 25px ${alpha(theme.primary, 0.38)}`
+                            : `0 4px 20px ${alpha(theme.primary, 0.31)}`,
                           transform: createMenuOpen ? 'rotate(45deg) scale(1.1)' : 'rotate(0deg) scale(1)',
                         }}
                       >
-                        <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
+                        {/* Blanco o negro según la luminancia del acento, no fijo. */}
+                        <Plus
+                          className="h-7 w-7"
+                          strokeWidth={2.5}
+                          style={{ color: 'var(--pl-on-accent)' }}
+                        />
                       </div>
                       <span
                         className="text-[10px] font-semibold mt-1"
@@ -1752,7 +1614,7 @@ export default function Layout() {
               onClick={handleSaveProfile}
               disabled={savingProfile}
               className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
               <span className="relative">{savingProfile ? 'Guardando...' : 'Guardar'}</span>
@@ -1767,7 +1629,7 @@ export default function Layout() {
               className="h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
               style={{ backgroundColor: theme.primary }}
             >
-              {user.nombre[0]}{user.apellido[0]}
+              {(user.nombre?.[0] || '?')}{user.apellido?.[0] || ''}
             </div>
             <div>
               <p className="text-lg font-semibold" style={{ color: theme.text }}>
@@ -1942,7 +1804,7 @@ export default function Layout() {
               onClick={handleValidateEmail}
               disabled={!emailValidationCode || emailValidationCode.length < 6}
               className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+              style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
             >
               Validar
             </button>
@@ -2028,7 +1890,7 @@ export default function Layout() {
                   boxShadow: `0 8px 32px ${theme.primary}40`,
                 }}
               >
-                {user.nombre[0]}{user.apellido[0]}
+                {(user.nombre?.[0] || '?')}{user.apellido?.[0] || ''}
               </div>
               <h2 className="text-xl font-bold" style={{ color: theme.text }}>
                 {user.nombre} {user.apellido}
@@ -2104,7 +1966,7 @@ export default function Layout() {
                     className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
                     style={{
                       backgroundColor: pushSubscribed ? theme.border : theme.primary,
-                      color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                      color: pushSubscribed ? theme.textSecondary : 'var(--pl-on-accent)',
                       opacity: pushSubscribed ? 0.6 : 1
                     }}
                   >
@@ -2179,6 +2041,10 @@ export default function Layout() {
       {/* Bottom-sheet de activacion de notificaciones — auto-trigger al login
           + listener para post-creacion de reclamos/tramites. */}
       <NotificationActivationSheet />
+
+      {/* Recorrido guiado abierto desde el menú "Más" del admin en mobile. */}
+      <PresentacionLive open={presentacionOpen} onClose={() => setPresentacionOpen(false)} />
     </div>
+    </MigasProvider>
   );
 }

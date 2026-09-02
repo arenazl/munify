@@ -1,0 +1,4711 @@
+/* ============================================================
+   abmv2.css — estándar SemanticAbmPage (rediseño v2)
+
+   POLIMÓRFICO: cero colores fijos. Todo sale de tokens --pl-*
+   (estáticos en pl-tokens.css; los de color los computa
+   ThemeContext desde el theme activo). Prohibido hex inline;
+   estilos inline solo para valores runtime (anchos de barras,
+   colores de categoría que vienen de datos).
+
+   CONVENCIÓN DE LA SUITE: este archivo lo abre el agente de
+   Base con los bloques compartidos; los demás agentes APENDEAN
+   sus bloques AL FINAL, cada uno bajo su comentario de sección
+   (buscar los marcadores [TABLA], [SIDEMODAL], [PERIOD] abajo).
+   Prefijo de clases: av2-. Lo importa SemanticAbmPage.tsx.
+
+   Índice:
+     [HELPERS]    eyebrow, chip de estado, money, tnum, divisor
+     [TOOLBAR]    .av2-toolbar (H1 + total + buscador + vistas + CTA)
+     [FILTERBAR]  .av2-filterbar (selects 32 + estados + resumen)
+     [TABLA]      ← pendiente (agente de DataTable)
+     [SIDEMODAL]  ← pendiente (agente de SideModal)
+     [PERIOD]     ← pendiente (agente de FilterBar/PeriodControl)
+     [VOZ-VECINO] widget dashboard "La voz del vecino" (av2-voz-)
+   ============================================================ */
+
+/* ============================================================
+   [HELPERS] — utilitarios compartidos por toda la suite
+   ============================================================ */
+
+/* Eyebrow estándar: caps, tracking, muted. Encabezados de tabla,
+   labels de sección del drawer, stat strip. */
+.av2-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+/* Números tabulares (totales, conteos, fechas alineadas). */
+.av2-tnum {
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dinero: display 700, tnum, nunca se parte, a la derecha.
+   El color NO se fija acá: neutro por defecto (--pl-text);
+   la mora/pendiente se marca con .av2-money--bad. */
+.av2-money {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--pl-text);
+}
+.av2-money--warn { color: var(--pl-amber-700); }
+.av2-money--bad  { color: var(--pl-red-700); }
+
+/* Chip de estado: pill 22px con punto (::before) + label.
+   Tonos = paleta StatusPill (azul recibido/completado, ámbar en
+   curso/pendiente, verde al día/finalizado, gris pospuesto/rechazado,
+   rojo vencido/mora). El punto hereda currentColor. */
+.av2-chip-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--pl-radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.av2-chip-estado::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  background: currentColor;
+  flex: 0 0 6px;
+}
+.av2-chip-estado--green { background: var(--pl-green-100); color: var(--pl-green-700); }
+.av2-chip-estado--amber { background: var(--pl-amber-100); color: var(--pl-amber-700); }
+.av2-chip-estado--blue  { background: var(--pl-blue-100);  color: var(--pl-blue-700); }
+.av2-chip-estado--red   { background: var(--pl-red-100);   color: var(--pl-red-700); }
+.av2-chip-estado--gray  { background: var(--pl-track);     color: var(--pl-text-3); }
+
+/* Divisor vertical de 22px entre grupos de controles. */
+.av2-divisor {
+  width: 1px;
+  height: 22px;
+  background: var(--pl-border-strong);
+  margin: 0 2px;
+  flex: 0 0 1px;
+}
+
+/* ============================================================
+   [PAGEHEAD] — PageHeader (cabecera de módulo, v2.2)
+   [EYEBROW] / H1 34 / bajada. PRIMER bloque de la página, arriba
+   del hero: hasta v2.1 el título vivía dentro de la toolbar y
+   quedaba abajo, pegado al buscador. Medidas de la referencia
+   nueva (references/reclamos-lista-v2.dc.html).
+   ============================================================ */
+
+.av2-pagehead {
+  padding: 4px 2px 20px;
+  max-width: 760px;
+  min-width: 0;
+}
+
+.av2-pagehead-eyebrow {
+  display: block;
+  font-family: var(--pl-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+.av2-pagehead-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+/* Sin eyebrow el H1 arranca pegado al tope (degradación con gracia). */
+.av2-pagehead-eyebrow + .av2-pagehead-titulo { margin-top: 10px; }
+
+.av2-pagehead-bajada {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--pl-text-3);
+  text-wrap: pretty;
+}
+
+/* Mobile: el H1 de 34px no entra sin romper el ancho. */
+@media (max-width: 640px) {
+  .av2-pagehead { padding-bottom: 16px; }
+  .av2-pagehead-titulo { font-size: 26px; }
+  .av2-pagehead-bajada { font-size: 13.5px; }
+}
+
+/* ============================================================
+   TOOLBAR EN MOBILE — que ENTRE, en vez de cortarse.
+
+   La fila está pensada para escritorio: buscador elástico + bloque
+   derecho que "nunca encoge" (`flex: 0 0 auto`) y se dockea a la
+   derecha. En un teléfono de 390px ese bloque —selector de vistas,
+   orden y el CTA "+ Nuevo…"— no entra, y como la fila no wrapeaba,
+   el botón principal quedaba cortado por el borde de la pantalla:
+   la acción más importante de la pantalla, a medio dibujar.
+
+   Acá la fila pasa a dos renglones: el buscador ocupa el ancho
+   completo y los controles bajan a su propia línea, con las vistas a
+   la izquierda y el CTA dockeado a la derecha. Un solo lugar: lo
+   heredan todas las pantallas del kit.
+   ============================================================ */
+@media (max-width: 640px) {
+  .av2-toolbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  /* El buscador se queda con el primer renglón entero. */
+  .av2-toolbar-buscador { flex: 1 1 100%; }
+  /* El divisor vertical entre buscador y controles no tiene sentido
+     cuando dejan de estar en la misma línea. */
+  .av2-toolbar > .av2-divisor { display: none; }
+  .av2-toolbar-derecha {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    row-gap: 8px;
+  }
+  /* El CTA puede encogerse antes que salirse; su texto no se parte. */
+  .av2-toolbar-derecha .av2-btn-primario,
+  .av2-toolbar-derecha .av2-btn-secundario {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+/* ============================================================
+   [TOOLBAR] — ListToolbar
+   [buscador ── flex ── ⌘K] │ [vistas] [orden] [CTA verde]
+   El bloque derecho NO encoge; el buscador sí.
+   [v2.2] Sin H1 ni chip de total, y la fila pasa a ser la MITAD
+   DE ARRIBA de la tarjeta de controles: fondo surface, borde y
+   sólo las esquinas superiores redondeadas. La FilterBar se le
+   pega abajo con margin-top:-1px (ver [FILTERBAR]).
+   ============================================================ */
+
+.av2-controles { min-width: 0; }
+
+.av2-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg) var(--pl-radius-lg) 0 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  min-width: 0;
+}
+
+/* Sin barra de filtros debajo, la toolbar es la tarjeta entera. */
+.av2-controles > .av2-toolbar:last-child { border-radius: var(--pl-radius-lg); }
+
+/* El divisor de la toolbar es un toque más alto que el de los filtros. */
+.av2-toolbar > .av2-divisor { height: 24px; }
+
+/* Buscador: es el flex-grow de la fila (absorbe TODO el sobrante — regla
+   dura del dueño: nada de gaps muertos entre el input y los controles). */
+.av2-toolbar-buscador {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  /* Fondo claro (surface, no surface-2): el gris se sentía pesado en la
+     fila del toolbar; el borde alcanza para delimitarlo. */
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+
+/* El chip del atajo ⌘K se fue de la toolbar: el atajo es del buscador GLOBAL
+   de la topbar (shell/BuscadorGlobal). Este input sigue filtrando la grilla. */
+.av2-toolbar-buscador:focus-within { border-color: var(--pl-green-200); }
+.av2-toolbar-buscador svg {
+  flex: 0 0 16px;
+  color: var(--pl-text-faint);
+}
+.av2-toolbar-buscador input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--pl-text);
+}
+.av2-toolbar-buscador input::placeholder { color: var(--pl-text-faint); }
+
+/* Bloque derecho: nunca encoge, siempre dockeado a la derecha. */
+.av2-toolbar-derecha {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* Segmented de vistas (Tarjetas / Tabla / Guiada · Día / Semana). */
+.av2-seg-vistas {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-md);
+}
+.av2-seg-vista {
+  width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-seg-vista:hover { background: var(--pl-surface-hover); }
+.av2-seg-vista--activa {
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-card);
+  color: var(--pl-green-700);
+}
+.av2-seg-vista--activa:hover { background: var(--pl-surface); }
+
+/* Botón secundario del módulo (Proyección, Orden…). */
+.av2-btn-secundario {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-btn-secundario:hover { background: var(--pl-surface-3); }
+.av2-btn-secundario svg { color: var(--pl-text-muted); }
+
+/* ÚNICO CTA primario de la pantalla ("Nuevo pago"). */
+.av2-btn-primario {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
+  background: var(--pl-green);
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-on-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-btn-primario:hover { background: var(--pl-green-600); }
+.av2-btn-primario:disabled {
+  background: var(--pl-track);
+  color: var(--pl-text-disabled);
+  cursor: not-allowed;
+}
+
+/* Variante peligro (Rechazar): delineada, nunca sólida — la acción
+   destructiva se ve pero no compite con el CTA. */
+.av2-btn-peligro {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  background: transparent;
+  border: 1px solid var(--pl-red);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-red-700);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-btn-peligro:hover { background: var(--pl-red-100); }
+.av2-btn-peligro:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Peligro SÓLIDO: solo para la acción destructiva protagonista de un
+   bloque de alerta (ej. "Reabrir caso"). */
+.av2-btn-peligro--solido {
+  background: var(--pl-red);
+  border-color: var(--pl-red);
+  color: var(--pl-on-brand);
+}
+.av2-btn-peligro--solido:hover { background: var(--pl-red-700); }
+
+/* Banda de estado final del sheet (Finalizado/Rechazado/Pospuesto):
+   informativa, no disfrazada de botón. Color por estado, inline runtime. */
+.av2-sheet-final {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  height: 36px;
+  border-radius: var(--pl-radius-md);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+}
+.av2-sheet-final--chip {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+
+/* Bloque de alerta del sheet (feedback negativo del vecino). */
+.av2-sheet-alerta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--pl-radius-lg);
+  background: var(--pl-red-100);
+  border: 1px solid var(--pl-red);
+}
+
+/* ============================================================
+   [TABS DE ESTADO v2.3] — subrayadas en el tope de la tarjeta de
+   la tabla (canvas Reclamos): "Todos 49 · Recibidos 21 …".
+   ============================================================ */
+
+.av2-ttabs {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 18px 0;
+  border-bottom: 1px solid var(--pl-border);
+  overflow-x: auto;
+}
+
+.av2-ttab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px 11px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-ttab:hover { color: var(--pl-text); }
+
+.av2-ttab--activo {
+  font-weight: 600;
+  color: var(--pl-text);
+  border-bottom-color: var(--pl-green);
+}
+
+.av2-ttab--cero,
+.av2-ttab--cero:hover {
+  color: var(--pl-text-disabled);
+  cursor: default;
+}
+
+.av2-ttab-n {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+.av2-ttab--cero .av2-ttab-n { color: var(--pl-text-disabled); }
+
+/* ============================================================
+   [SHEET DETALLE v2.2] — chips de contexto, banner de zona y pie
+   del sheet de detalle (Reclamos y los que sigan).
+   ============================================================ */
+
+/* Chip de contexto (categoría/prioridad/canal/historial). El COLOR es
+   dinámico del dato (categoría, prioridad) y va inline como valor
+   runtime; acá vive la piel: alto, radio, tipografía. */
+.av2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--pl-radius-pill);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+button.av2-chip {
+  cursor: pointer;
+  transition: opacity var(--pl-dur-ui) var(--pl-ease);
+}
+button.av2-chip:hover { opacity: 0.85; }
+
+/* Banner "está en la zona de un POI": lavado sutil del kit + CTA. */
+.av2-banner-zona {
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-green);
+  border-radius: var(--pl-radius-lg);
+}
+.av2-banner-zona::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--pl-lavado-acento-sutil);
+}
+.av2-banner-zona > * { position: relative; }
+
+.av2-banner-zona-icono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
+.av2-banner-zona-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+
+.av2-banner-zona-texto {
+  margin: 3px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+}
+
+/* Textarea del pie (nota obligatoria para cambiar de estado).
+   16px: los inputs nunca disparan zoom en mobile. */
+.av2-sheet-nota {
+  width: 100%;
+  padding: 10px 12px;
+  resize: none;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-input);
+  color: var(--pl-text);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sheet-nota::placeholder { color: var(--pl-text-faint); }
+.av2-sheet-nota:focus { outline: none; border-color: var(--pl-green); }
+/* Obligatoria y todavía vacía: el borde avisa en ámbar. */
+.av2-sheet-nota--pendiente { border-color: var(--pl-amber-strong); }
+
+/* ============================================================
+   [FILTERBAR] — FilterBar
+   Fila surface: selects 32 · PeriodControl · segmented de estados
+   con conteo (0 ⇒ disabled) · resumen a la derecha.
+   [v2.2] Es la MITAD DE ABAJO de la tarjeta de controles: se pega
+   a la toolbar (margin-top:-1px, sin borde superior) y redondea
+   sólo las esquinas inferiores. Se ven como una sola tarjeta
+   partida por una línea.
+   ============================================================ */
+
+.av2-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -1px;
+  padding: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-top: 0;
+  border-radius: 0 0 var(--pl-radius-lg) var(--pl-radius-lg);
+  flex-wrap: wrap;
+  row-gap: 10px;
+  min-width: 0;
+}
+
+/* Trigger de select (envuelve/estiliza el ModernSelect existente):
+   patrón Etiqueta (muted) + Valor (600) + chevron, alto 32. */
+.av2-select {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-select:hover { border-color: var(--pl-green-200); }
+.av2-select-etiqueta {
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-select-valor {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.av2-select svg { color: var(--pl-text-muted); flex: 0 0 13px; }
+
+/* Segmented de estados con conteo. */
+.av2-estados {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-pill);
+  flex-wrap: wrap;
+}
+.av2-estado-tab {
+  border: 0;
+  background: transparent;
+  padding: 6px 13px;
+  border-radius: var(--pl-radius-pill);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-estado-tab:hover { background: var(--pl-surface-hover); }
+.av2-estado-tab--activo {
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-card);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-estado-tab--activo:hover { background: var(--pl-surface); }
+/* Estado en 0: apagado y NO clickeable. */
+.av2-estado-tab--cero {
+  color: var(--pl-text-disabled);
+  cursor: default;
+  pointer-events: none;
+}
+.av2-estado-conteo {
+  color: var(--pl-text-muted);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  margin-left: 3px;
+}
+.av2-estado-tab--cero .av2-estado-conteo { color: var(--pl-text-disabled); }
+
+/* Resumen del filtro aplicado, dockeado a la derecha. */
+.av2-filtro-resumen {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  /* Es el ÚLTIMO de la fila y con `nowrap` puro empuja: un resumen largo
+     (el de un filtro que nombra la entidad elegida) desbordaba la tarjeta.
+     Con esto encoge y corta antes de romper la barra. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Mobile: inputs a 16px para que iOS no haga zoom (estándar
+   viewport PWA, base-compartida/11-FIX-VIEWPORT-PWA.md). --- */
+@media (max-width: 640px) {
+  .av2-toolbar-buscador input { font-size: var(--pl-fs-input); }
+  .av2-toolbar-buscador { flex-basis: 100%; }
+  /* El divisor sobra cuando cada bloque cae en su propia línea. */
+  .av2-toolbar > .av2-divisor { display: none; }
+  /* Ya cayó a su propia línea: ahí conviene que ENVUELVA y se lea entero,
+     en vez de cortarse con puntos suspensivos como en escritorio. */
+  .av2-filtro-resumen {
+    margin-left: 0;
+    white-space: normal;
+    overflow: visible;
+    flex-basis: 100%;
+  }
+  /* Los selects se reparten la fila en vez de estirarse con el nombre que
+     tengan adentro (una obra larga se comía el ancho entero). */
+  .av2-select-grupo { flex: 1 1 auto; max-width: 100%; }
+}
+
+/* ============================================================
+   [PERIOD] — bloque del agente FilterBar/PeriodControl
+   1) Grupo Etiqueta + ModernSelect (alto 32) de la FilterBar.
+   2) PeriodControl: rango dinámico alrededor del PeriodNavigator
+      existente (botón punteado "→ Hasta" + segundo stepper + ×).
+   ============================================================ */
+
+/* --- 1) Select de filtro: patrón Etiqueta (muted) + Valor (600) +
+   chevron en UN control de 32px. Se ENVUELVE el ModernSelect core:
+   el grupo pone borde/hover/focus; el trigger interno se neutraliza.
+   Los !important son necesarios SOLO donde ModernSelect pinta por
+   style inline (fondo/borde del theme) — sin tocar el componente. */
+.av2-select-grupo {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding-left: 11px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+  min-width: 0;
+}
+.av2-select-grupo:hover,
+.av2-select-grupo:focus-within { border-color: var(--pl-green-200); }
+
+/* Tope de ancho: el trigger del ModernSelect crece con el texto de la opción
+   elegida y un nombre largo (una obra, una dependencia) estiraba el control
+   hasta romper la fila. El span interno ya viene con `truncate`, así que
+   acotando el contenedor el valor se corta solo. Mismo criterio que el
+   `max-width: 180px` del patrón `.av2-select-valor`. */
+.av2-select-modern { min-width: 96px; max-width: 190px; }
+.av2-select-modern > button {
+  background: transparent !important; /* pisa el style inline del theme */
+  border: 0 !important;               /* idem */
+  box-shadow: none !important;        /* sin ring propio: el foco lo marca el grupo */
+  height: 30px;
+  padding: 0 8px 0 4px;
+  font-size: var(--pl-fs-body-sm);
+}
+/* Valor en 600 (patrón del estándar). Aplica también al placeholder. */
+.av2-select-modern > button span { font-weight: 600; }
+
+/* --- 2) PeriodControl --- */
+.av2-period {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Botón punteado que abre el rango ("→ Hasta"). */
+.av2-period-hasta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px dashed var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease),
+    background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-period-hasta:hover {
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+  background: var(--pl-green-050);
+}
+
+/* Flecha separadora entre los dos steppers del rango. */
+.av2-period-flecha {
+  color: var(--pl-text-muted);
+  flex: 0 0 auto;
+}
+
+/* × que quita el "hasta" (vuelve a período simple). */
+.av2-period-quitar {
+  width: 30px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-period-quitar:hover {
+  background: var(--pl-red-100);
+  border-color: var(--pl-red-100);
+  color: var(--pl-red-700);
+}
+
+/* Fallback: from/to vienen como etiqueta ya formateada (no ISO) —
+   el período se muestra estático, sin navegación. */
+.av2-period-label {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   [TABLA] — DataTable (encabezado, grupos, filas, pie)
+   Card surface radio 12 con overflow: clip (NO hidden — rompe el
+   sticky de descendientes) + scroller horizontal PROPIO adentro.
+   El template de columnas y el min-width son valores runtime:
+   llegan como CSS vars (--av2-cols / --av2-tabla-minw) seteadas
+   inline por DataTable.tsx desde ColumnSpec[].
+   ============================================================ */
+
+.av2-tabla {
+  margin-top: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: clip;
+}
+
+/* Lo ancho scrollea en su propio contenedor; la página nunca
+   se mueve horizontal (estándar viewport PWA). */
+.av2-tabla-scroll {
+  overflow-x: auto;
+}
+
+/* Fila-grid base: encabezado, grupos con subtotal y filas de datos
+   comparten el MISMO template para que las columnas calcen. */
+.av2-tabla-grid {
+  display: grid;
+  grid-template-columns: var(--av2-cols);
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  min-width: var(--av2-tabla-minw, 940px);
+}
+
+/* Alineado por columna (importes y acciones a la derecha). */
+.av2-al-der    { text-align: right; }
+.av2-al-centro { text-align: center; }
+
+/* Encabezado: eyebrows (clase base .av2-eyebrow) con más aire. */
+.av2-tabla-encabezado { padding: 12px 18px; }
+
+/* Toda celda es contenedor de texto ⇒ min-width: 0 (regla 5). */
+.av2-celda { min-width: 0; }
+
+/* --- Grupos (DateGroupRow / franja horaria) --- */
+.av2-tabla-grupo {
+  background: var(--pl-surface-3);
+  border-top: 1px solid var(--pl-border);
+  padding: 9px 18px;
+}
+/* Variante sin subtotal (plain / schedule): flex + hairline de relleno. */
+.av2-tabla-grupo--flex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: var(--av2-tabla-minw, 940px);
+}
+/* Cabecera de grupo en DOS renglones (diseño 2026-08-02): la fecha escrita
+   entera arriba y qué hay adentro abajo ("1 pago · venció hace 2 d"). El
+   renglón chico se tiñe por VEREDICTO — un día con vencidos se lee en rojo
+   sin abrir el grupo. Sigue funcionando con un solo renglón: las pantallas
+   que no mandan `title` renderizan el label solo, como antes. */
+.av2-tabla-grupo-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.av2-tabla-grupo-titulo {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+.av2-tabla-grupo-label {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-tabla-grupo-label--bueno { color: var(--pl-green-700); }
+.av2-tabla-grupo-label--advertencia { color: var(--pl-amber-700); }
+.av2-tabla-grupo-label--malo { color: var(--pl-red-700); }
+.av2-tabla-grupo-linea {
+  flex: 1;
+  height: 1px;
+  background: var(--pl-border);
+}
+
+/* Insignia 42×38 del grupo: día (display 700 15px) sobre mes
+   (9px/700 caps) — u hora sobre "HS" en kind='schedule'. */
+.av2-tabla-insignia {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 38px;
+  /* Superficie PRINCIPAL, no la secundaria: la franja de la cabecera de grupo
+     ya es --pl-surface-2, así que una insignia del mismo tono se funde con el
+     fondo y deja de leerse como almanaque. En claro esto la deja blanca. */
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 9px;
+  flex: 0 0 42px;
+}
+.av2-tabla-insignia-dia {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--pl-text);
+}
+/* El mes va en el ACENTO del theme: es lo que hace que la insignia se lea
+   como un almanaque y no como un cuadradito gris. */
+.av2-tabla-insignia-mes {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pl-green);
+  margin-top: 2px;
+}
+
+/* Con veredicto, la insignia entera toma el tono: fondo lavado, borde y las
+   dos líneas del mismo color. El día deja de ser negro a propósito — es el
+   dato que el ojo busca primero cuando barre la lista. */
+.av2-tabla-insignia--bueno,
+.av2-tabla-insignia--advertencia,
+.av2-tabla-insignia--malo {
+  background: color-mix(in srgb, var(--pl-tono) 8%, var(--pl-surface));
+  border-color: color-mix(in srgb, var(--pl-tono) 24%, var(--pl-border));
+}
+.av2-tabla-insignia--bueno { --pl-tono: var(--pl-green); }
+.av2-tabla-insignia--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-tabla-insignia--malo { --pl-tono: var(--pl-red); }
+.av2-tabla-insignia--bueno .av2-tabla-insignia-dia,
+.av2-tabla-insignia--bueno .av2-tabla-insignia-mes { color: var(--pl-green-700); }
+.av2-tabla-insignia--advertencia .av2-tabla-insignia-dia,
+.av2-tabla-insignia--advertencia .av2-tabla-insignia-mes { color: var(--pl-amber-700); }
+.av2-tabla-insignia--malo .av2-tabla-insignia-dia,
+.av2-tabla-insignia--malo .av2-tabla-insignia-mes { color: var(--pl-red-700); }
+
+/* Subtotal del grupo (kind='money'): anclado por DataTable a la
+   columna del importe vía grid-column (valor runtime). */
+.av2-tabla-subtotal { text-align: right; }
+.av2-tabla-subtotal-eyebrow {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  color: var(--pl-text-muted);
+}
+.av2-tabla-subtotal-valor {
+  display: block;
+  font-size: 13.5px;
+}
+
+/* --- Filas de datos --- */
+.av2-tabla-fila {
+  border-top: 1px solid var(--pl-border);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tabla-fila--click { cursor: pointer; }
+.av2-tabla-fila--click:hover { background: var(--pl-surface-3); }
+.av2-tabla-fila--click:focus-visible {
+  outline: 2px solid var(--pl-green-200);
+  outline-offset: -2px;
+}
+
+/* Renders por defecto de celdas. */
+.av2-tabla-texto {
+  display: block;
+  font-size: 12px;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-tabla-fecha {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+  white-space: nowrap;
+}
+.av2-tabla-monto {
+  display: block;
+  font-size: 13.5px;
+}
+
+/* Entidad: tile de icono + título + subtítulo con punto de color.
+   El color de familia/categoría viene de DATOS ⇒ inline (runtime);
+   sin dato, el tile queda neutro por tokens. */
+.av2-entidad {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.av2-entidad-tile {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--pl-surface-2);
+  color: var(--pl-text-2);
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+}
+.av2-entidad-cuerpo { min-width: 0; }
+.av2-entidad-titulo {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-entidad-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  min-width: 0;
+}
+.av2-entidad-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  flex: 0 0 6px;
+}
+.av2-entidad-subtexto {
+  font-size: 11px;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Acciones por fila: botones de icono 28px, trazo 1.8,
+   sin color permanente. Máx 2 visibles + menú "…". --- */
+.av2-tabla-acciones {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+.av2-tabla-accion {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease),
+              color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tabla-accion:hover { background: var(--pl-surface-hover); }
+/* Eliminar: gris que pasa a rojo SOLO en hover. */
+.av2-tabla-accion--peligro:hover {
+  background: var(--pl-red-100);
+  color: var(--pl-red-700);
+}
+
+/* Menú "…" (position: fixed para escapar del clip del scroller;
+   coords runtime desde el rect del botón). */
+.av2-tabla-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 168px; /* = MENU_ANCHO en DataTable.tsx */
+  padding: 4px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-float);
+}
+.av2-tabla-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 500;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tabla-menu-item:hover { background: var(--pl-surface-3); }
+.av2-tabla-menu-item svg { color: var(--pl-text-muted); flex: 0 0 15px; }
+.av2-tabla-menu-item--peligro:hover {
+  background: var(--pl-red-100);
+  color: var(--pl-red-700);
+}
+.av2-tabla-menu-item--peligro:hover svg { color: var(--pl-red-700); }
+
+/* Vacío: nunca un cero solo — siempre con su explicación. */
+.av2-tabla-vacia {
+  padding: 28px 18px;
+  text-align: center;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+  border-top: 1px solid var(--pl-border);
+}
+
+/* --- Pie: "Mostrando N de M" + gran total (money) o acción --- */
+.av2-tabla-pie {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--pl-border);
+  background: var(--pl-surface-3);
+}
+.av2-tabla-pie-mostrando {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.av2-tabla-pie-total-label {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.av2-tabla-pie-total-valor { font-size: 15px; }
+.av2-tabla-pie-accion {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  cursor: pointer;
+  text-decoration: none;
+}
+.av2-tabla-pie-accion:hover { text-decoration: underline; }
+.av2-tabla-pie-accion:disabled {
+  color: var(--pl-text-disabled);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* kind='board': placeholder de la fase pendiente (Planificación). */
+.av2-tabla-board-pendiente {
+  padding: 32px 18px;
+  text-align: center;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+}
+
+/* ------------------------------------------------------------
+   [TABLA v2.1] — backlog agnóstico de los pilotos (DataTable)
+   ------------------------------------------------------------ */
+
+/* Celda kind='dot': punto de color + texto NEUTRO. Versión liviana
+   de 'entity' para columnas taxonómicas (categoría, dependencia,
+   zona). El color del punto viene de DATOS ⇒ inline (runtime);
+   sin dato, punto neutro por tokens. El texto NUNCA se colorea. */
+.av2-dot-celda {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  min-width: 0;
+}
+.av2-dot-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-border-strong);
+  flex: 0 0 7px;
+}
+.av2-dot-texto {
+  font-size: 12px;
+  color: var(--pl-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Avatar de iniciales del EntityCell (excluyente con icon): círculo
+   30px, 11px/700 caps. El fondo suave lo pone inline el tileColor
+   (runtime, color-mix 12%); sin dato cae a --pl-green-100 de acá. */
+.av2-entidad-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  flex: 0 0 30px;
+}
+
+/* Skeleton rows (loading): filas fantasma sobre el MISMO template
+   de columnas (av2-tabla-grid). Shimmer 100% tokens — la barra es
+   --pl-track con un brillo que corre hacia --pl-surface. Anchos
+   por clase cíclica (--w1/2/3), nada inline. */
+.av2-tabla-fila--skel { pointer-events: none; }
+.av2-skeleton {
+  display: inline-block;
+  height: 12px;
+  width: 70%;
+  max-width: 180px;
+  border-radius: var(--pl-radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--pl-track) 30%,
+    color-mix(in srgb, var(--pl-track) 45%, var(--pl-surface)) 50%,
+    var(--pl-track) 70%
+  );
+  background-size: 200% 100%;
+  animation: av2-shimmer 1.3s linear infinite;
+}
+.av2-skeleton--w1 { width: 55%; }
+.av2-skeleton--w2 { width: 82%; }
+.av2-skeleton--w3 { width: 66%; }
+.av2-skeleton--fina { height: 9px; }
+/* Fantasmas con forma propia: tile de entidad y botón de acción. */
+.av2-skeleton--tile {
+  width: 30px;
+  height: 30px;
+  max-width: none;
+  border-radius: 9px; /* = .av2-entidad-tile */
+  flex: 0 0 30px;
+}
+.av2-skeleton--accion {
+  width: 28px;
+  height: 28px;
+  max-width: none;
+  border-radius: var(--pl-radius-sm); /* = .av2-tabla-accion */
+}
+.av2-skel-entidad {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.av2-skel-lineas {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+@keyframes av2-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .av2-skeleton { animation: none; }
+}
+
+/* ============================================================
+   [SIDEMODAL] — drawer detalle / alta / edición (SideModal.tsx)
+   Backdrop --pl-scrim a viewport completo (overflow hidden);
+   panel derecho 480/520/560 con slide-in 240ms --pl-ease.
+   Header / stepper / footer fijos, el cuerpo scrollea.
+   Cierra Esc / × / backdrop — "Cerrar" nunca es un botón.
+   ============================================================ */
+
+.av2-sm-backdrop {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--pl-scrim);
+  z-index: 9998;
+  display: flex;
+  justify-content: flex-end;
+  animation: av2-sm-fade var(--pl-dur-ui) var(--pl-ease);
+}
+@keyframes av2-sm-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.av2-sm-panel {
+  width: min(var(--pl-drawer-w), 100%);
+  height: 100vh;
+  height: 100dvh;
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-float);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  outline: none;
+  animation: av2-sm-slide var(--pl-dur-sheet) var(--pl-ease);
+}
+/* Anchos del estándar: 480 simples/alta/edición · 520 dinero · 560 proceso. */
+.av2-sm-panel--w480 { width: min(480px, 100%); }
+.av2-sm-panel--w520 { width: min(520px, 100%); }
+.av2-sm-panel--w560 { width: min(560px, 100%); }
+@keyframes av2-sm-slide {
+  from { transform: translateX(100%); }
+  to   { transform: none; }
+}
+
+/* ---- Header fijo ---- */
+.av2-sm-header {
+  flex: 0 0 auto;
+  /* Safe-area iPhone (estándar viewport PWA): baja dinámico bajo el notch. */
+  padding: max(env(safe-area-inset-top), 18px) 22px 14px;
+  border-bottom: 1px solid var(--pl-border);
+}
+.av2-sm-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.av2-sm-meta-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.av2-sm-id {
+  font-weight: 600;
+  color: var(--pl-text-2);
+}
+.av2-sm-cerrar {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sm-cerrar:hover {
+  background: var(--pl-surface-3);
+  color: var(--pl-text);
+}
+.av2-sm-titulo {
+  margin: 8px 0 0;
+  font-family: var(--pl-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  line-height: 1.3;
+  color: var(--pl-text);
+  overflow-wrap: anywhere;
+}
+.av2-sm-meta-bottom {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+/* El importe vive en el HEADER (nunca en una tarjeta bajo el título). */
+.av2-sm-importe-fila {
+  margin-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.av2-sm-importe {
+  font-family: var(--pl-font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--pl-text);
+}
+.av2-sm-importe-aside {
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+}
+.av2-sm-importe-fila .av2-sm-chip {
+  margin-left: auto;
+  align-self: center;
+}
+
+/* ---- StatusStepper fijo (grid de N columnas, barras 4px) ---- */
+.av2-sm-stepper {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+}
+.av2-sm-paso { min-width: 0; }
+.av2-sm-paso-barra {
+  height: 4px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+.av2-sm-paso--done .av2-sm-paso-barra { background: var(--pl-green); }
+/* Barra parcial del paso actual (ancho = progress, inline runtime). */
+.av2-sm-paso-avance {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pl-amber-strong);
+}
+.av2-sm-paso-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-sm-paso--done .av2-sm-paso-label    { color: var(--pl-text-2); }
+.av2-sm-paso--current .av2-sm-paso-label { color: var(--pl-text); }
+.av2-sm-paso-fecha {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--pl-text-muted);
+}
+/* Motivo del bloqueo del paso actual ("Falta autorización de…"). */
+.av2-sm-paso-motivo {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--pl-amber-700);
+}
+
+/* ---- Cuerpo scrolleable: secciones separadas por hairlines ---- */
+.av2-sm-cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 22px 18px;
+}
+.av2-sm-seccion { padding: 16px 0; }
+.av2-sm-seccion + .av2-sm-seccion { border-top: 1px solid var(--pl-border); }
+.av2-sm-seccion-label { margin: 0 0 10px; }
+.av2-sm-seccion-contenido {
+  font-size: var(--pl-fs-body);
+  color: var(--pl-text-2);
+  min-width: 0;
+}
+
+/* ---- DepartmentTrail: timeline vertical de áreas ---- */
+.av2-sm-trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.av2-sm-hito {
+  position: relative;
+  padding: 0 0 14px 22px;
+  min-width: 0;
+}
+.av2-sm-hito::before {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 14px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--pl-border-strong);
+}
+.av2-sm-hito:last-child { padding-bottom: 0; }
+.av2-sm-hito:last-child::before { display: none; }
+.av2-sm-hito-punto {
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  border: 1px solid var(--pl-border-strong);
+}
+/* Responsable actual: punto verde con halo. */
+.av2-sm-hito--actual .av2-sm-hito-punto {
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  box-shadow: 0 0 0 4px var(--pl-green-100);
+}
+.av2-sm-hito-linea1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.av2-sm-hito-area {
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-sm-hito-ahora {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-green-700);
+  white-space: nowrap;
+}
+/* Acción contextual del paso actual ("Derivar"). */
+.av2-sm-hito-accion {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-sm);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sm-hito-accion:hover { border-color: var(--pl-green-200); }
+.av2-sm-hito-meta {
+  margin-top: 2px;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+/* ---- CandidateList: radios reales + score + barra fina ---- */
+.av2-sm-candidatos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.av2-sm-cand {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sm-cand:hover { border-color: var(--pl-green-200); }
+/* Solo el SUGERIDO lleva superficie verde. */
+.av2-sm-cand--sugerido {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+}
+.av2-sm-cand-radio {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--pl-green);
+  cursor: pointer;
+}
+.av2-sm-cand-cuerpo {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.av2-sm-cand-linea1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.av2-sm-cand-nombre {
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-sm-cand-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-green-700);
+  white-space: nowrap;
+}
+.av2-sm-cand-score {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+.av2-sm-cand-barra {
+  display: block;
+  margin-top: 6px;
+  height: 3px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+.av2-sm-cand-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pl-green);
+}
+.av2-sm-cand-razones {
+  display: block;
+  margin-top: 5px;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+/* ---- Formulario create/edit: grid 2 col + labels arriba ---- */
+.av2-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+.av2-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+/* Campos largos (textarea, dirección) ocupan las 2 columnas. */
+.av2-field--full { grid-column: 1 / -1; }
+.av2-field-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-2);
+}
+/* Asterisco ámbar del obligatorio. */
+.av2-field-req {
+  color: var(--pl-amber-700);
+  font-weight: 700;
+}
+/* Ayuda bajo el campo. */
+.av2-field-ayuda {
+  margin: 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+/* ---- Footer fijo ---- */
+.av2-sm-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 22px max(env(safe-area-inset-bottom), 14px);
+  border-top: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+}
+/* Nota que justifica el cambio de estado (detail). */
+.av2-sm-nota {
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+  padding: 8px 11px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sm-nota:focus {
+  outline: none;
+  border-color: var(--pl-green-200);
+}
+.av2-sm-nota::placeholder { color: var(--pl-text-faint); }
+/* Qué falta para habilitar el primario (nunca un disabled mudo). */
+.av2-sm-footer-motivo {
+  margin: 0;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-amber-700);
+}
+.av2-sm-footer-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* Contador de obligatorios en create/edit ("2 obligatorios sin completar"). */
+.av2-sm-footer-info {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-sm-footer-acciones {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.av2-sm-footer-acciones a { text-decoration: none; }
+/* Destructivo: SOLO icono (gris → rojo en hover), nunca botón de texto. */
+.av2-sm-destructivo {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: color var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sm-destructivo:hover {
+  color: var(--pl-red-700);
+  border-color: var(--pl-red-700);
+  background: var(--pl-red-100);
+}
+.av2-sm-destructivo:disabled {
+  color: var(--pl-text-disabled);
+  cursor: not-allowed;
+}
+/* Cancelar ghost (create/edit). */
+.av2-sm-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-sm-btn-ghost:hover { background: var(--pl-surface-3); }
+
+/* ---- Mobile: panel a sangre + inputs 16px (iOS no zoomea) ---- */
+@media (max-width: 640px) {
+  .av2-sm-panel,
+  .av2-sm-panel--w480,
+  .av2-sm-panel--w520,
+  .av2-sm-panel--w560 { width: 100%; }
+  .av2-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .av2-sm-nota,
+  .av2-sm-cuerpo input,
+  .av2-sm-cuerpo textarea { font-size: var(--pl-fs-input); }
+}
+
+/* ---- Accesibilidad: sin animación si el user la redujo ---- */
+@media (prefers-reduced-motion: reduce) {
+  .av2-sm-backdrop,
+  .av2-sm-panel { animation: none; }
+}
+
+/* ============================================================
+   [PAGE] — SemanticAbmPage (orquestador)
+   Wrapper de la página + hero. El hero ES el SemanticHero
+   existente (.sh-card, semantic-hero.css): UNA sola
+   implementación. Acá vive su VARIANTE de layout para el
+   estándar ABM v2.2 (referencia references/reclamos-lista-v2),
+   activada por la clase de contexto .av2-hero que pone el
+   orquestador — no hay un segundo componente de hero.
+   El acento del borde izquierdo llega por la style var runtime
+   --av2-hero-accent (SIEMPRE un token --pl-*, ej. var(--pl-red)
+   en alerta — nunca hex).
+   ============================================================ */
+
+.av2-page { min-width: 0; }
+
+/* La var se setea inline en el wrapper (valor runtime) y la
+   hereda el .sh-card de adentro. Sin accentColor: verde marca. */
+.av2-hero-wrap { min-width: 0; }
+
+/* --- Variante v2.2 del hero: superficie neutra + gradiente de veredicto que
+   baja desde arriba (el de [LAVADO POR TONO]), borde de 4px en el tono y KPIs
+   separados por hairline.
+   La superficie era verde fija (--pl-green-050) con los KPIs derivados de
+   --pl-green-700. Dejó de servir cuando el hero pasó a teñirse por VEREDICTO:
+   un gradiente rojo de "6 pagos vencidos" sobre un fondo verde da verde con
+   rojo encima. Ahora la superficie es neutra y el único que declara estado es
+   el tono; cada KPI sigue pintando el SUYO con sh-kpi-valor--<veredicto>, que
+   es lo que hace que "VENCIDOS $23.850.000" se lea en rojo mientras
+   "COMPROMETIDO" queda en negro. --- */
+.av2-hero-wrap .av2-hero.sh-card {
+  --av2-hero-kpi-etiqueta: var(--pl-text-muted);
+  --av2-hero-kpi-valor: var(--pl-text);
+  --av2-hero-kpi-sub: var(--pl-text-muted);
+  margin: 0;
+  padding: 20px 22px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  /* El override por página (--av2-hero-accent) sigue ganando si viene; sin él
+     manda el veredicto de la frase activa. */
+  border-left: 4px solid var(--av2-hero-accent, var(--pl-tono));
+  border-radius: var(--pl-radius-lg);
+  box-shadow: none;
+}
+
+.av2-hero .sh-etiqueta {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--pl-text-muted);
+}
+
+.av2-hero .sh-frase { margin: 8px 0 16px; }
+
+/* Stat strip: celdas separadas por hairline verde. La primera empuja hacia
+   adentro con padding DERECHO (no lleva borde); las demás, a la izquierda. */
+.av2-hero .sh-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 0;
+  row-gap: 18px;
+  margin-top: 0;
+  padding-top: 16px;
+  border-top-color: var(--pl-border);
+}
+.av2-hero .sh-kpi {
+  gap: 3px;
+  padding-left: 18px;
+  border-left-color: var(--pl-border);
+}
+.av2-hero .sh-kpi:first-child {
+  padding-left: 0;
+  padding-right: 18px;
+  border-left: 0;
+}
+.av2-hero .sh-kpi-etiqueta {
+  font-size: 10.5px;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  color: var(--av2-hero-kpi-etiqueta);
+}
+.av2-hero .sh-kpi-valor {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--av2-hero-kpi-valor);
+}
+.av2-hero .sh-kpi-sub {
+  font-size: 11px;
+  color: var(--av2-hero-kpi-sub);
+}
+/* Los veredictos MANDAN sobre el neutro: el KPI que exige acción
+   pinta SOLO su número (después de las reglas de arriba, misma especificidad). */
+.av2-hero .sh-kpi-valor--bueno { color: var(--pl-green-700); }
+.av2-hero .sh-kpi-valor--advertencia { color: var(--pl-amber-700); }
+.av2-hero .sh-kpi-valor--malo { color: var(--pl-red-700); }
+
+/* Acciones (diseño 2026-08-02): la primaria pasó de SÓLIDA a TINTE del acento
+   —fondo lavado, texto y borde en el color— y las secundarias quedan blancas
+   con borde neutro. El botón sólido pesaba más que la frase que lo justifica:
+   dentro del hero el que tiene que gritar es el número, no el CTA. El sólido
+   sigue vivo donde corresponde (el "Nuevo" de la toolbar, "Pagar 3 juntos").
+   Ojo: el tinte sale del ACENTO, no del tono del veredicto. Un botón rojo
+   sobre una frase roja se lee como "esto es peligroso", y es justo lo
+   contrario — es la salida al problema. */
+.av2-hero .sh-acciones {
+  gap: 8px;
+  margin-top: 18px;
+}
+.av2-hero .sh-accion {
+  padding: 0 13px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  border-color: var(--pl-border-strong);
+  color: var(--pl-text-2);
+}
+.av2-hero .sh-accion:hover { background: var(--pl-surface-hover); }
+.av2-hero .sh-accion--primaria {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+  box-shadow: none;
+}
+.av2-hero .sh-accion--primaria:hover { background: var(--pl-green-100); }
+
+/* ============================================================
+   [VOZ-VECINO] — widget "La voz del vecino" del dashboard
+   (components/dashboard/VozDelVecino.tsx). Grilla de 4 columnas:
+   la 1 es el `RatingSummary` (promedio + distribución) y manda la
+   ALTURA de la sección; las 2-4 son el `CardCarousel` de reseñas,
+   que va absoluto para no aportar alto. Acá viven SÓLO las clases
+   del dominio (la card de reseña); el promedio/distribución y el
+   carrusel son del KIT (rating-summary.css / card-carousel.css).
+   La reseña negativa (1-2 estrellas) va con fondo/borde rojo suave,
+   chip "Requiere respuesta" y acción "Reabrir". Referencia:
+   design/handoff-v2/references/dashboard-*.dc.html. Cero hex:
+   todo sobre tokens --pl-*.
+   ============================================================ */
+
+.av2-voz {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 24px;
+  min-width: 0;
+}
+
+/* ---- Encabezado: icono + título + período + "Ver todas" ---- */
+.av2-voz-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.av2-voz-head-ico {
+  flex: 0 0 auto;
+  color: var(--pl-amber-strong);
+}
+.av2-voz-title {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+.av2-voz-sub {
+  font-size: 11.5px;
+  color: var(--pl-text-muted);
+}
+.av2-voz-link {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+}
+.av2-voz-link:hover { text-decoration: underline; }
+
+/* ---- Grilla: 4 columnas de 25% — 1 calificación + 3 reseñas ----
+   La ALTURA la manda la columna de calificación: la zona de reseñas
+   no aporta alto (su contenido va absoluto, inset:0), así la fila
+   mide lo que mide el resumen y la sección nunca crece con la
+   cantidad de reseñas. El gap de la grilla es el mismo que el del
+   carrusel (20px) ⇒ cada card cae exactamente en una columna. */
+.av2-voz-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+  align-items: stretch;
+}
+/* Sin reseñas con comentario: el resumen ocupa todo el ancho. */
+.av2-voz-grid--solo { grid-template-columns: minmax(0, 1fr); }
+
+.av2-voz-resumen { grid-column: span 1; }
+
+/* ---- Reseñas: columnas 2-4, alto heredado de la fila ---- */
+.av2-voz-resenas {
+  grid-column: span 3;
+  position: relative;
+  min-width: 0;
+}
+.av2-voz-carrusel {
+  position: absolute;
+  inset: 0;
+}
+
+/* Angosto: una sola columna. El carrusel deja de ser absoluto y toma
+   una altura fija (nunca crece con la cantidad de reseñas). */
+@media (max-width: 640px) {
+  .av2-voz-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .av2-voz-resumen,
+  .av2-voz-resenas { grid-column: span 1; }
+  .av2-voz-carrusel { position: static; height: 186px; }
+}
+
+.av2-voz-stars {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+.av2-voz-star--on  { color: var(--pl-amber-strong); }
+.av2-voz-star--bad { color: var(--pl-red); }
+.av2-voz-star--off { color: var(--pl-track); }
+
+/* ---- Cards de reseñas ---- */
+.av2-voz-card {
+  background: var(--pl-surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--pl-radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+/* Reseña negativa (1-2 estrellas): fondo y borde rojo suave. */
+.av2-voz-card--mala {
+  background: var(--pl-red-100);
+  border-color: color-mix(in srgb, var(--pl-red) 22%, transparent);
+}
+.av2-voz-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.av2-voz-card-head .av2-voz-stars { gap: 1px; }
+.av2-voz-fecha {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-voz-flag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-red-700);
+  white-space: nowrap;
+}
+/* El comentario se recorta a 3 líneas: la card no puede empujar la
+   altura del carrusel (que es fija). */
+.av2-voz-texto {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.av2-voz-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+  min-width: 0;
+}
+.av2-voz-avatar {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.av2-voz-avatar--mala {
+  background: color-mix(in srgb, var(--pl-red) 20%, var(--pl-surface));
+  color: var(--pl-red-700);
+}
+.av2-voz-autor {
+  font-size: 11.5px;
+  color: var(--pl-text-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av2-voz-reabrir {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-red-700);
+  white-space: nowrap;
+}
+.av2-voz-reabrir:hover { text-decoration: underline; }
+
+/* ============================================================
+   [ORDEN] — bloque del agente FilterBar/PeriodControl (v2.1)
+   Segmented CHICO de orden (`sortSpec`) al final de la FilterBar,
+   antes del resumen. Mismo lenguaje visual que el segmented de
+   estados en tamaño reducido. Es ORDEN, no filtro: la página
+   ordena; la barra solo pinta el criterio activo y notifica.
+   ============================================================ */
+
+.av2-orden {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-pill);
+  flex: 0 0 auto;
+}
+.av2-orden-icono {
+  color: var(--pl-text-muted);
+  margin: 0 3px 0 7px;
+  flex: 0 0 auto;
+}
+.av2-orden-tab {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: var(--pl-radius-pill);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-orden-tab:hover { background: var(--pl-surface-hover); }
+.av2-orden-tab--activo {
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-card);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-orden-tab--activo:hover { background: var(--pl-surface); }
+
+/* Con el orden presente, el empuje a la derecha lo pone .av2-orden;
+   el resumen lo sigue con el gap normal (sin doble margin auto). */
+.av2-orden ~ .av2-filtro-resumen { margin-left: 0; }
+
+@media (max-width: 640px) {
+  .av2-orden { margin-left: 0; }
+}
+
+/* ============================================================
+   [PAGE v2.1] — bloque del agente SemanticAbmPage (orquestador)
+   1) .av2-steps: chips numerados de flujo en la toolbar (entre
+      las vistas y las acciones — StepsSpec de types.ts). Mismo
+      lenguaje que el StatusStepper del drawer: completado verde
+      con check · actual ámbar · futuro muted. Clickeables solo
+      si la página pasó onStep (sin él van :disabled).
+   2) .av2-body / .av2-aside: cuerpo con panel lateral sticky a
+      la derecha, bajo el TopBar (AsideSpec); en viewports
+      angostos el aside cae DEBAJO del cuerpo a ancho completo.
+      Ancho runtime por style var --av2-aside-w (default 320).
+   Cero hex: todo tokens --pl-*.
+   ============================================================ */
+
+/* --- Steps de flujo (toolbar) --- */
+.av2-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.av2-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px 0 7px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-step:hover { background: var(--pl-surface-hover); }
+/* Sin onStep los chips son informativos: sin affordance de click. */
+.av2-step:disabled { cursor: default; }
+.av2-step:disabled:hover { background: var(--pl-surface); }
+
+/* Burbuja del número (check cuando el paso quedó completado). */
+.av2-step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--pl-radius-pill);
+  display: grid;
+  place-items: center;
+  background: var(--pl-track);
+  color: var(--pl-text-3);
+  font-size: 10px;
+  font-weight: 700;
+  flex: 0 0 18px;
+}
+
+/* Completado: verde (como los pasos done del StatusStepper). */
+.av2-step--hecho {
+  color: var(--pl-green-700);
+  border-color: var(--pl-green-200);
+}
+.av2-step--hecho .av2-step-num {
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
+/* Actual: ámbar (paso en curso). */
+.av2-step--activo {
+  color: var(--pl-amber-700);
+  border-color: var(--pl-amber-700);
+  background: var(--pl-amber-100);
+}
+.av2-step--activo:hover,
+.av2-step--activo:disabled:hover { background: var(--pl-amber-100); }
+.av2-step--activo .av2-step-num {
+  background: var(--pl-surface);
+  color: var(--pl-amber-700);
+}
+
+/* --- Cuerpo con aside sticky --- */
+.av2-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* La lista es el flex-grow; min-width 0 para que la tabla pueda
+   scrollear horizontal adentro sin empujar al aside. */
+.av2-body-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.av2-aside {
+  flex: 0 0 var(--av2-aside-w, 320px);
+  width: var(--av2-aside-w, 320px);
+  position: sticky;
+  top: calc(var(--pl-topbar-h) + var(--pl-space-3));
+  max-height: calc(100vh - var(--pl-topbar-h) - var(--pl-space-6));
+  overflow: auto;
+}
+
+/* Viewports angostos: el panel cae debajo del cuerpo, ancho completo. */
+@media (max-width: 1024px) {
+  .av2-body { flex-direction: column; }
+  .av2-aside {
+    position: static;
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+}
+
+/* ============================================================
+   [CONTROLES v2.3] — piezas genéricas de la barra de controles
+   (toggles encendido/apagado, botón sólo-icono y banda de
+   estado a ancho completo).
+
+   Nacen del piloto Mapa: una pantalla cuya toolbar NO es
+   "buscador + CTA" sino CAPAS (Pins/Calor, Hotspots, Puntos de
+   interés, Dibujar zona). Antes cada botón se pintaba con
+   estilos inline y su propio color (rojo para Hotspots, primary
+   para POI), o sea: siete lenguajes visuales en una fila.
+   Acá se unifican en el lenguaje del estándar — encendido =
+   verde tenue, igual que .av2-seg-vista--activa — y quedan
+   AGNÓSTICOS: cualquier pantalla con toggles los reusa.
+   ============================================================ */
+
+/* Botón secundario ENCENDIDO (capa visible, modo activo). */
+.av2-btn-secundario--activo {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+.av2-btn-secundario--activo:hover { background: var(--pl-green-100); }
+.av2-btn-secundario--activo svg { color: var(--pl-green-700); }
+
+/* Secundario deshabilitado: faltaba en el bloque [TOOLBAR] y el
+   `BotonAccion` del ListToolbar ya renderiza `disabled`. */
+.av2-btn-secundario:disabled {
+  color: var(--pl-text-disabled);
+  cursor: not-allowed;
+}
+.av2-btn-secundario:disabled svg { color: var(--pl-text-disabled); }
+.av2-btn-secundario:disabled:hover { background: var(--pl-surface); }
+
+/* Botón sólo-icono de la toolbar (36px, mismo borde que el secundario). */
+.av2-btn-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-muted);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-btn-icono:hover { background: var(--pl-surface-3); }
+
+/* NOTA: `.av2-toolbar-banda` y `.av2-progreso` vivían acá para la barra de
+   controles del Mapa hecha a mano (`MapaFiltrosPanel`). Esa barra se
+   reemplazó por la botonera del kit (`AdaptiveFilter`) y la banda del
+   time-lapse pasó a ser un componente propio con sus clases `.av2-tl-*`
+   en el bloque [MAPA] de más abajo. Se borraron para no dejar dos
+   implementaciones de lo mismo. */
+
+/* ============================================================
+   [MAPA] — lienzo del mapa y sus sobreimpresos (pages/Mapa.tsx)
+
+   Clases GENÉRICAS de "superficie de mapa": sirven para cualquier
+   pantalla que monte un canvas de Leaflet dentro del estándar v2.
+   El alto es ELÁSTICO: lo calcula la página según el viewport y lo
+   entrega por --av2-mapa-alto (único valor runtime), con un piso
+   duro para que en una laptop nunca quede aplastado.
+   Cero hex: superficies, textos y bordes salen de --pl-*.
+   ============================================================ */
+
+/* La botonera del kit (AdaptiveFilter) no trae margen propio: la separación
+   de la tarjeta de arriba la pone la pantalla que la monta. */
+.av2-mapa-botonera { margin-top: 18px; }
+
+/* --- Banda del time-lapse (components/mapa/MapaTimelapseBanda.tsx) ---
+   Tercera línea de la zona de controles, visible SÓLO mientras el
+   recorrido está activo. Va aparte de la botonera porque no es un
+   control: es el estado de una reproducción en curso (ancho de la
+   ventana móvil, avance, cuántos reclamos se están dibujando) más el
+   bucle y el salir, que sin reproducción no significan nada.
+   El rango de fechas no se repite acá: lo muestra el propio botón de
+   time-lapse de la botonera. */
+.av2-tl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 14px;
+  min-width: 0;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+.av2-tl-icono {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  color: var(--pl-text-muted);
+}
+.av2-tl-texto {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.av2-tl-cuenta {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+  white-space: nowrap;
+}
+
+/* Barra de progreso fina. El avance es el ÚNICO valor runtime y viaja
+   por --av2-tl-avance. */
+.av2-tl-progreso {
+  flex: 1 1 80px;
+  min-width: 60px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+.av2-tl-progreso > span {
+  display: block;
+  height: 100%;
+  width: var(--av2-tl-avance, 0%);
+  background: var(--pl-green);
+  transition: width var(--pl-dur-ui) var(--pl-ease);
+}
+
+/* Controles discretos de la banda (bucle / salir): mismo cuadrado de
+   28px, sin label — el `title` lleva el texto. */
+.av2-tl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tl-btn:hover { background: var(--pl-surface-hover); }
+.av2-tl-btn--activo {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+}
+.av2-tl-btn--activo .av2-tl-icono { color: var(--pl-green-700); }
+
+.av2-mapa {
+  position: relative;
+  margin-top: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* El contenedor de arriba ya puso su separación (modo Puntos). */
+.av2-mapa--pegado { margin-top: 0; }
+
+.av2-mapa-lienzo {
+  width: 100%;
+  height: var(--av2-mapa-alto, 520px);
+  min-height: 420px;
+}
+
+/* --- PANTALLA COMPLETA ---------------------------------------------------
+   Dos caminos para el mismo resultado, porque la Fullscreen API no existe en
+   Safari de iPhone sobre un div (sólo la acepta en <video>): si el navegador
+   la soporta manda `:fullscreen`, y si no, la clase `--expandido` clava el
+   mapa sobre el viewport. En ambos casos el lienzo pasa a ocupar todo el alto
+   disponible: si quedara el alto elástico, la pantalla completa mostraría el
+   mapa de siempre con bandas muertas arriba y abajo.
+
+   El alto va por `dvh` para que la barra del navegador del teléfono, que
+   aparece y desaparece al scrollear, no deje al mapa cortado. */
+/* Lo que se maximiza es el BLOQUE (pregunta + filtros + mapa + banda del
+   recorrido), no el lienzo solo: un mapa a pantalla completa sin sus controles
+   no se puede manejar. Mientras no está maximizado el envoltorio es
+   `display: contents` --- no genera caja, así que la página se arma igual que
+   antes de que existiera. */
+.av2-mapa-full { display: contents; }
+
+.av2-mapa-full:fullscreen,
+.av2-mapa-full--expandido {
+  display: flex;
+  flex-direction: column;
+  background: var(--pl-bg);
+  padding: 10px 12px 0;
+  overflow: hidden;
+}
+.av2-mapa-full--expandido {
+  position: fixed;
+  inset: 0;
+  z-index: var(--pl-z-modal, 1000);
+  height: 100dvh;          /* dvh: la barra del navegador del teléfono aparece
+                              y desaparece, y con vh el mapa quedaba cortado */
+}
+
+/* La barra conserva su alto natural y el mapa se queda con todo el resto. */
+.av2-mapa-full:fullscreen .av2-controles,
+.av2-mapa-full--expandido .av2-controles { flex: 0 0 auto; }
+
+/* En el TELEFONO estos controles se apilan y se comen la pantalla: medido en
+   un iPhone 13, 375px de 664 —y el mapa quedaba en 249, MENOS que los 568 de
+   la vista normal—. Una pantalla completa que muestra menos mapa que la vista
+   comun no es pantalla completa (dueño, 2026-08-31).
+
+   De esos 375, la ORACION con su play son 42: eso es lo unico que hace falta
+   para mirar el recorrido. La cabecera (124) y los combos de la pregunta
+   (144) se pliegan — para cambiar la consulta se sale de pantalla completa,
+   que en un telefono es un toque. En desktop no cambia nada: alla los
+   controles entran en una linea. */
+@media (max-width: 860px) {
+  .av2-mapa-full:fullscreen .cg-cabecera,
+  .av2-mapa-full--expandido .cg-cabecera { display: none; }
+
+  /* De la consulta se pliegan los combos, NO el play. La cadena real es
+     `.cg-consulta > .cg-oracion > .cg-continuacion`, asi que hay que bajar
+     DOS niveles: plegando la fila de arriba se iba tambien el boton, que es
+     justo lo que se viene a tocar en pantalla completa. */
+  .av2-mapa-full:fullscreen .cg-oracion > *:not(.cg-continuacion),
+  .av2-mapa-full--expandido .cg-oracion > *:not(.cg-continuacion) { display: none; }
+  .av2-mapa-full:fullscreen .cg-consulta > *:not(.cg-oracion),
+  .av2-mapa-full--expandido .cg-consulta > *:not(.cg-oracion) { display: none; }
+
+  .av2-mapa-full:fullscreen .av2-controles,
+  .av2-mapa-full--expandido .av2-controles {
+    max-height: 30dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+.av2-mapa-full:fullscreen .av2-mapa,
+.av2-mapa-full--expandido .av2-mapa {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+  /* El lienzo tiene que ESTIRARSE, y para eso su padre tiene que ser flex.
+     Con `height: 100%` sobre un padre flexible con `min-height: 0` el alto se
+     resolvia en CERO: medido en un iPhone, el mapa quedaba en 364x0 y la
+     pantalla completa mostraba un vacio (dueño, 2026-08-31). */
+  display: flex;
+  flex-direction: column;
+}
+.av2-mapa-full:fullscreen .av2-mapa-lienzo,
+.av2-mapa-full--expandido .av2-mapa-lienzo {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* Dentro del envoltorio quedan también el informe y el ranking, que en pantalla
+   completa no son lo que se mira y le robarían alto al mapa. */
+.av2-mapa-full:fullscreen .av2-informe,
+.av2-mapa-full--expandido .av2-informe,
+.av2-mapa-full:fullscreen #mapa-zonas-calientes,
+.av2-mapa-full--expandido #mapa-zonas-calientes { display: none; }
+
+/* --- Leyenda de densidad, flotante abajo a la izquierda. La rampa NO es
+   una paleta propia: son los tres matices de VEREDICTO (bueno →
+   advertencia → malo), los mismos que colorea el heatmap. --- */
+.av2-mapa-leyenda {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-float);
+  pointer-events: none;
+}
+.av2-mapa-leyenda-titulo {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.av2-mapa-leyenda-rampa {
+  display: inline-flex;
+  width: 96px;
+  height: 8px;
+  border-radius: var(--pl-radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--pl-green) 0%,
+    var(--pl-amber) 52%,
+    var(--pl-red) 100%
+  );
+}
+.av2-mapa-leyenda-extremo {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+
+/* --- Controles del CANVAS, flotando sobre el mapa ---
+   Centrar, puntos de interés y cobertura son controles de NAVEGACIÓN del
+   lienzo: van sobre el mapa, al lado del zoom, que es donde todo el mundo los
+   busca — no en una barra de arriba. Mismo tratamiento que la leyenda de
+   densidad (superficie, borde fino y sombra flotante de los tokens). */
+.av2-mapa-controles {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.av2-mapa-ctrl {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--pl-text-3);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-float);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-mapa-ctrl:hover { background: var(--pl-surface-hover); color: var(--pl-text); }
+.av2-mapa-ctrl--activo,
+.av2-mapa-ctrl--activo:hover {
+  background: var(--pl-green-100);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+
+/* Hint mientras se marca el área del informe. */
+.av2-mapa-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-on-accent);
+  background: var(--pl-green);
+  border-radius: var(--pl-radius-pill);
+  box-shadow: var(--pl-shadow-float);
+  pointer-events: none;
+}
+
+/* --- Rótulos anclados: el mapa escribe SOBRE SÍ MISMO ---
+   Son tooltips permanentes de Leaflet (ver RotulosLayer en pages/Mapa.tsx)
+   con la cara del kit en vez de la caja blanca por defecto de Leaflet: la
+   etiqueta tiene que leerse igual en claro y en oscuro. Van POCAS (3-4) y
+   sobre lo que contesta la pregunta activa — la gracia es leerlas de un
+   vistazo, no tapar el mapa. */
+.leaflet-tooltip.av2-rotulo {
+  padding: 3px 9px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--pl-text);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-sm);
+  box-shadow: var(--pl-shadow-float);
+}
+/* Sin la flechita de Leaflet: el punto de anclaje ya lo dice el lugar. */
+.leaflet-tooltip.av2-rotulo::before { display: none; }
+
+.leaflet-tooltip.av2-rotulo--malo {
+  color: var(--pl-red-700);
+  border-color: color-mix(in srgb, var(--pl-red) 55%, transparent);
+}
+.leaflet-tooltip.av2-rotulo--bueno {
+  color: var(--pl-green-700);
+  border-color: var(--pl-green-200);
+}
+.leaflet-tooltip.av2-rotulo--advertencia {
+  color: var(--pl-amber-700);
+  border-color: color-mix(in srgb, var(--pl-amber-strong) 55%, transparent);
+}
+
+/* --- Vacío: si el filtro no deja nada, el mapa mudo parece roto. Se
+   explica qué pasó y cómo salir, sin bloquear el paneo (el scrim no
+   recibe punteros; sólo la tarjeta). --- */
+.av2-mapa-vacio {
+  position: absolute;
+  inset: 0;
+  z-index: 650;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--pl-surface) 72%, transparent);
+  pointer-events: none;
+}
+.av2-mapa-vacio-card {
+  pointer-events: auto;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 22px;
+  text-align: center;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-float);
+}
+.av2-mapa-vacio-card > svg { color: var(--pl-text-muted); }
+.av2-mapa-vacio-titulo {
+  margin: 4px 0 0;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+.av2-mapa-vacio-texto {
+  margin: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+.av2-mapa-vacio-card .av2-btn-secundario { margin-top: 8px; }
+
+/* ============================================================
+   [PANEL] — card genérica de sección con cabecera
+   (título + caption opcional a la derecha del título).
+   La usan los paneles analíticos que van DEBAJO del contenido
+   principal de una pantalla (mapa, tablero…).
+   ============================================================ */
+
+.av2-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+.av2-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.av2-panel-head > svg { flex: 0 0 16px; }
+.av2-panel-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+.av2-panel-caption {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+/* --- Panel "Informe de una zona" (pages/Mapa.tsx) ---
+   Una acción que produce un DOCUMENTO merece su lugar y su explicación: qué
+   genera, con qué se arma y qué quedó adentro del área marcada. Ancho
+   completo, en una fila que envuelve. */
+.av2-informe { margin-top: 12px; }
+.av2-informe-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--pl-space-4);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.av2-informe-texto {
+  flex: 1 1 320px;
+  margin: 0;
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+.av2-informe-resumen {
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-text);
+}
+.av2-informe-snapshot { flex: 0 1 300px; min-width: 0; }
+.av2-informe-acciones {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pl-space-2);
+}
+
+.av2-panel-vacio {
+  padding: 24px 0;
+  text-align: center;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+/* ============================================================
+   SettingsShell — página de AJUSTES (Configuracion.dc.html, 2026-08-03).
+   Grupos ("padres") → riel de ajustes ("hijos") → panel.
+   Mismo lenguaje que el resto del kit: tokens --pl-*, tono por
+   modificador que setea --pl-tono (igual que av2-tabla-insignia).
+   ============================================================ */
+
+.av2-set-cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  row-gap: 14px;
+}
+.av2-set-cab-txt { flex: 1 1 420px; min-width: 0; }
+
+.av2-set-buscador {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 13px;
+  min-width: 220px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  margin-top: 6px;
+}
+.av2-set-buscador-ico {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--pl-text-faint);
+}
+.av2-set-buscador-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  /* 16px: los inputs nunca disparan zoom en mobile. */
+  font-size: var(--pl-fs-input);
+  color: var(--pl-text);
+}
+.av2-set-buscador-input::placeholder { color: var(--pl-text-faint); }
+
+/* ---------- Grupos ("padres") ---------- */
+
+.av2-set-grupos {
+  display: flex;
+  gap: 4px;
+  margin-top: 18px;
+  border-bottom: 1px solid var(--pl-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.av2-set-grupos::-webkit-scrollbar { display: none; }
+
+.av2-set-grupo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-set-grupo:hover { color: var(--pl-text); }
+.av2-set-grupo--activo,
+.av2-set-grupo--activo:hover {
+  color: var(--pl-text);
+  border-bottom-color: var(--pl-green);
+}
+.av2-set-grupo-n {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+.av2-set-grupo--activo .av2-set-grupo-n { color: var(--pl-green-700); }
+
+/* ---------- Cuerpo: riel + panel ---------- */
+
+.av2-set-cuerpo {
+  display: grid;
+  grid-template-columns: 214px minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+}
+/* Sin riel (grupos de una sola pantalla, ej. General) el panel ocupa todo:
+   si no, cae dentro de la columna angosta y aplasta el contenido. */
+.av2-set-cuerpo--sin-riel { grid-template-columns: minmax(0, 1fr); }
+
+.av2-set-riel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 14px 18px 0;
+  border-right: 1px solid var(--pl-border);
+  position: sticky;
+  top: calc(var(--pl-topbar-h) + 12px);
+}
+
+.av2-set-riel-titulo {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+  padding: 4px 8px 8px;
+}
+
+.av2-set-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--pl-text-2);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-set-item:hover { background: var(--pl-surface-hover); }
+.av2-set-item--activo,
+.av2-set-item--activo:hover {
+  background: color-mix(in srgb, var(--pl-green) 8%, transparent);
+  color: var(--pl-green-700);
+  font-weight: 600;
+}
+.av2-set-item--activo .av2-set-item-n { color: var(--pl-green-700); font-weight: 600; }
+.av2-set-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av2-set-item-n {
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+}
+
+/* Tono del ítem: mismo mecanismo que las insignias de la tabla. */
+.av2-set-item--bueno { --pl-tono: var(--pl-green); }
+.av2-set-item--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-set-item--malo { --pl-tono: var(--pl-red); }
+.av2-set-item--bueno .av2-set-item-n,
+.av2-set-item--advertencia .av2-set-item-n,
+.av2-set-item--malo .av2-set-item-n { color: var(--pl-tono); font-weight: 600; }
+
+/* ---------- Panel ---------- */
+
+.av2-set-panel { min-width: 0; }
+.av2-set-panel--bueno { --pl-tono: var(--pl-green); }
+.av2-set-panel--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-set-panel--malo { --pl-tono: var(--pl-red); }
+
+.av2-set-panel-cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 0 0 22px;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.av2-set-cuerpo--sin-riel .av2-set-panel-cab { padding-left: 0; }
+.av2-set-panel-txt { flex: 1; min-width: 0; }
+
+.av2-set-panel-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-hero);
+  color: var(--pl-text);
+}
+
+.av2-set-panel-nota {
+  margin: 6px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+}
+.av2-set-panel--bueno .av2-set-panel-nota,
+.av2-set-panel--advertencia .av2-set-panel-nota,
+.av2-set-panel--malo .av2-set-panel-nota { color: var(--pl-tono); }
+
+.av2-set-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-set-cta:hover { background: var(--pl-green-600); }
+
+.av2-set-panel-cuerpo { padding: 14px 0 24px 22px; }
+.av2-set-cuerpo--sin-riel .av2-set-panel-cuerpo { padding-left: 0; }
+
+/* Mobile: el riel deja de ser columna y pasa a scroll horizontal arriba. */
+@media (max-width: 860px) {
+  .av2-set-cuerpo { grid-template-columns: minmax(0, 1fr); }
+  .av2-set-riel {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .av2-set-riel::-webkit-scrollbar { display: none; }
+  .av2-set-riel-titulo { display: none; }
+  .av2-set-item { width: auto; white-space: nowrap; }
+}
+
+.av2-set-buscador-kbd {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid var(--pl-border);
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--pl-text-faint);
+}
+
+/* [v2.4] Página embebida (panel del SettingsShell): sin cabecera propia y sin
+   el padding de página — el contenedor ya lo puso. */
+.av2-page--embebida { padding: 0; }
+.av2-page--embebida > .av2-hero-wrap:first-child { margin-top: 0; }
+
+/* Pantalla embebida en el panel de Configuración: su cabecera de módulo
+   sobra —el título ya lo puso el panel— y el padding de página también.
+   Cubre las pantallas migradas al kit v2 (`av2-pagehead`); las que todavía
+   usan el ABMPage viejo muestran su propio título adentro del panel hasta
+   que se migren. */
+.av2-set-panel-cuerpo .av2-pagehead { display: none; }
+.av2-set-panel-cuerpo .av2-page { padding: 0; }
+
+/* ---------- Nota destacada (patrón del canvas) ----------
+   Bloque con barra de color a la izquierda y lavado en degradé. Tres tonos:
+   info (acento), ok (verde) y alerta (ámbar). Se usa para explicar qué es un
+   ajuste o avisar algo antes de que el usuario toque nada. */
+
+.av2-nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-tono, var(--pl-green));
+  border-radius: 11px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 7%, var(--pl-surface)) 0%,
+    var(--pl-surface) 62%
+  );
+}
+.av2-nota--ok { --pl-tono: var(--pl-green); }
+.av2-nota--alerta { --pl-tono: var(--pl-amber-strong); }
+.av2-nota--malo { --pl-tono: var(--pl-red); }
+
+.av2-nota-ico {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--pl-tono, var(--pl-green));
+}
+
+.av2-nota-txt {
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.55;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+}
+.av2-nota-txt strong { font-weight: 600; color: var(--pl-text); }
+
+/* Acción opcional de la nota (ej: "Ir al catálogo de trámites"): se ancla a la
+   derecha y baja de línea sola cuando el ancho no alcanza. La nota necesita
+   `flex-wrap` para eso; sin él el botón aplasta el texto en pantallas
+   angostas. */
+.av2-nota--con-accion { flex-wrap: wrap; row-gap: 10px; }
+.av2-nota .av2-btn-secundario {
+  margin-left: auto;
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.av2-nota-eyebrow {
+  display: block;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-tono, var(--pl-green));
+  margin-bottom: 4px;
+}
+
+/* ============================================================
+   [CONTROLES v2.5] — piezas del canvas de Configuración
+   ("Configuracion.dc.html", Claude Design 2026-08-03).
+
+   Regla de ingreso al kit: un control que aparece en un diseño y
+   no tenemos se componentiza acá con props y se documenta —
+   nunca se maqueta adentro de la pantalla. Ver
+   STANDARD-Controles-v2.md del paquete de diseño.
+
+   Todo sobre tokens --pl-*: el mismo control se pinta verde en
+   Paraguay Limpio y azul en Munify sin tocar una línea.
+   ============================================================ */
+
+/* --- Tile: cuadrito de icono teñido (lo usan tabla, asignación,
+   árbol y picker). El color lo pone el consumidor inline porque
+   viene de datos; acá sólo la forma. --- */
+.av2-tile {
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--pl-track);
+  color: var(--pl-text-3);
+}
+.av2-tile--lg {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: var(--pl-radius-md);
+}
+
+/* --- Switch ------------------------------------------------- */
+.av2-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.av2-switch:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.av2-switch-pista {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  flex: 0 0 32px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-switch-pista--on { background: var(--pl-green); }
+
+.av2-switch-perilla {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  transition: left var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-switch-pista--on .av2-switch-perilla { left: 16px; background: var(--pl-on-accent); }
+
+.av2-switch--sm .av2-switch-pista { width: 28px; height: 16px; flex: 0 0 28px; }
+.av2-switch--sm .av2-switch-perilla { width: 12px; height: 12px; }
+.av2-switch--sm .av2-switch-pista--on .av2-switch-perilla { left: 14px; }
+
+.av2-switch-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.av2-switch-label {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-switch-desc {
+  font-size: var(--pl-fs-micro);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
+/* --- SegmentedControl --------------------------------------- */
+.av2-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-md);
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+.av2-seg--full { display: flex; width: 100%; }
+.av2-seg--full .av2-seg-op { flex: 1; justify-content: center; }
+
+.av2-seg-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-3);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-seg-op:hover:not(:disabled):not(.av2-seg-op--activo) { color: var(--pl-text); }
+.av2-seg-op:disabled { color: var(--pl-text-disabled); cursor: not-allowed; }
+.av2-seg-op--activo {
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+}
+.av2-seg-op--icono { width: 32px; padding: 0; justify-content: center; }
+
+.av2-seg--sm .av2-seg-op { height: 28px; padding: 0 11px; font-size: var(--pl-fs-micro); }
+.av2-seg--sm .av2-seg-op--icono { width: 28px; padding: 0; }
+
+.av2-seg-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  flex: 0 0 6px;
+}
+.av2-seg-n {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-muted);
+}
+.av2-seg-op--activo .av2-seg-n { color: var(--pl-green-700); }
+
+/* --- Chips de filtro ---------------------------------------- */
+.av2-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.av2-chips-label { margin-right: 2px; }
+
+.av2-chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface);
+  color: var(--pl-text-3);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease), background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-chip-filtro:hover:not(:disabled) { border-color: var(--pl-green-200); }
+.av2-chip-filtro--activo {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green-200);
+  color: var(--pl-green-700);
+}
+.av2-chip-filtro--cero { color: var(--pl-text-disabled); cursor: not-allowed; }
+.av2-chip-filtro-n { font-size: var(--pl-fs-caption); color: var(--pl-text-muted); }
+.av2-chip-filtro--activo .av2-chip-filtro-n { color: var(--pl-green-700); }
+
+.av2-chip-filtro-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-tono, var(--pl-green));
+  flex: 0 0 6px;
+}
+.av2-chip-filtro--bueno       { --pl-tono: var(--pl-green); }
+.av2-chip-filtro--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-chip-filtro--malo        { --pl-tono: var(--pl-red); }
+
+/* --- MetricCell: número + nota ------------------------------ */
+.av2-metrica { display: block; min-width: 0; }
+.av2-metrica-valor {
+  display: block;
+  font-family: var(--pl-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+.av2-metrica-valor--bueno       { color: var(--pl-green-700); }
+.av2-metrica-valor--advertencia { color: var(--pl-amber-700); }
+.av2-metrica-valor--malo        { color: var(--pl-red-700); }
+.av2-metrica-valor--apagado     { color: var(--pl-text-disabled); }
+.av2-metrica-nota {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+/* --- ScalePicker -------------------------------------------- */
+.av2-escala { display: flex; gap: 6px; }
+.av2-escala-op {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  border: 1.5px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease), background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-escala-op:hover { border-color: var(--pl-green-200); }
+.av2-escala-op--activo {
+  border-color: var(--pl-tono, var(--pl-green));
+  background: color-mix(in srgb, var(--pl-tono, var(--pl-green)) 8%, var(--pl-surface));
+}
+.av2-escala-op--bueno       { --pl-tono: var(--pl-green); }
+.av2-escala-op--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-escala-op--malo        { --pl-tono: var(--pl-red); }
+
+.av2-escala-n {
+  font-family: var(--pl-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pl-text-3);
+}
+.av2-escala-op--activo .av2-escala-n { color: var(--pl-tono, var(--pl-green)); }
+.av2-escala-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+.av2-escala-op--activo .av2-escala-label { color: var(--pl-text-2); }
+.av2-escala-nota {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}
+
+/* --- Modo "Reordenar" de la tabla --------------------------- */
+.av2-celda--con-handle { display: flex; align-items: center; gap: 0; min-width: 0; }
+
+.av2-orden-handle {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  flex: 0 0 20px;
+  margin-right: 4px;
+  color: var(--pl-text-faint);
+  cursor: grab;
+  border-radius: var(--pl-radius-sm);
+}
+.av2-orden-handle:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 1px;
+  color: var(--pl-green-700);
+}
+.av2-tabla-fila--orden { cursor: default; user-select: none; }
+.av2-tabla-fila--orden:active .av2-orden-handle { cursor: grabbing; }
+
+/* La fila que se arrastra se apaga; la de destino muestra dónde va a
+   caer. Se marcan con data-attributes (los pone useReorder), así el
+   hook no necesita saber nombres de clase. */
+.av2-tabla-fila[data-arrastrando] { opacity: 0.45; }
+.av2-tabla-fila[data-encima] { box-shadow: inset 0 2px 0 0 var(--pl-green); }
+
+/* --- AssignmentPanel ---------------------------------------- */
+.av2-asig { display: flex; flex-direction: column; gap: 12px; }
+
+.av2-asig-controles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+.av2-asig-buscador {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text-muted);
+}
+.av2-asig-buscador input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: none;
+  outline: none;
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text);
+}
+.av2-asig-buscador input::placeholder { color: var(--pl-text-muted); }
+
+.av2-asig-masivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-asig-masivo:hover:not(:disabled) { background: var(--pl-green-600); }
+.av2-asig-masivo:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.av2-asig-filtros { padding-top: 12px; border-top: 1px solid var(--pl-border); }
+
+.av2-asig-tabla {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+
+.av2-asig-grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.5fr) minmax(72px, 96px) minmax(190px, 1.35fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+}
+/* Sin métrica en ninguna fila, la columna del medio desaparece y el destino
+   se lleva el aire. */
+.av2-asig-grid--sin-metrica {
+  grid-template-columns: minmax(180px, 1.5fr) minmax(190px, 1.35fr);
+}
+.av2-asig-encabezado {
+  background: var(--pl-surface-3);
+  border-bottom: 1px solid var(--pl-border);
+}
+.av2-asig-fila { border-bottom: 1px solid var(--pl-border); }
+.av2-asig-fila:hover { background: var(--pl-surface-hover); }
+
+.av2-asig-grupo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: color-mix(in srgb, var(--pl-tono, var(--pl-green)) 5%, var(--pl-surface));
+  border-block: 1px solid var(--pl-border);
+}
+.av2-asig-grupo--bueno       { --pl-tono: var(--pl-green); }
+.av2-asig-grupo--advertencia { --pl-tono: var(--pl-amber-strong); }
+.av2-asig-grupo--malo        { --pl-tono: var(--pl-red); }
+.av2-asig-grupo-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-tono, var(--pl-green));
+  flex: 0 0 7px;
+}
+.av2-asig-grupo-titulo {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pl-tono, var(--pl-text-2));
+}
+.av2-asig-grupo-detalle {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  min-width: 0;
+}
+
+.av2-asig-entidad { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.av2-asig-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.av2-asig-celda-destino { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.av2-asig-destino { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.av2-asig-combo { flex: 1; min-width: 0; }
+.av2-asig-punto {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+  flex: 0 0 6px;
+}
+
+/* Sugerencia: PUNTEADA y en acento, para que no se confunda con un
+   valor confirmado. Es el affordance de "esto todavía no lo decidió
+   nadie". */
+.av2-asig-sugerencia {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px dashed var(--pl-green-200);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  color: var(--pl-green-700);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-asig-sugerencia:hover:not(:disabled) {
+  background: var(--pl-green-050);
+  border-color: var(--pl-green);
+}
+.av2-asig-sugerencia:disabled { opacity: 0.5; cursor: not-allowed; }
+.av2-asig-sugerencia-txt {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.av2-asig-quitar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: none;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+}
+.av2-asig-quitar:hover { background: var(--pl-red-100); color: var(--pl-red-700); }
+
+.av2-asig-pie {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--pl-surface-3);
+  flex-wrap: wrap;
+}
+/* Acciones de mantenimiento del panel (desasignar todo, actualizar): abajo y
+   secundarias. Arriba, al lado del CTA, competían con la acción principal. */
+.av2-asig-acciones-pie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.av2-asig-pie-txt { font-size: var(--pl-fs-caption); color: var(--pl-text-3); min-width: 0; }
+.av2-asig-pie-dato {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+/* --- TreeList ----------------------------------------------- */
+.av2-arbol {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+
+.av2-arbol-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--pl-border);
+  min-width: 0;
+}
+.av2-arbol-fila--click { cursor: pointer; }
+.av2-arbol-fila--click:hover { background: var(--pl-surface-hover); }
+
+/* Jerarquía por nivel: la rama de arriba se lee como título y las
+   hojas como texto. Sin esto un árbol de tres niveles se ve como una
+   lista con sangría. */
+.av2-arbol-fila--n0 { background: var(--pl-surface-3); }
+.av2-arbol-fila--n0 .av2-arbol-label {
+  font-family: var(--pl-font-display);
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+}
+.av2-arbol-fila--n1 .av2-arbol-label { font-size: 13px; font-weight: 600; }
+.av2-arbol-fila--n2 .av2-arbol-label { font-size: 12.5px; font-weight: 500; }
+
+.av2-arbol-chevron {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 0;
+  background: none;
+  color: var(--pl-text-muted);
+  cursor: pointer;
+  transition: transform 200ms var(--pl-ease);
+}
+.av2-arbol-chevron:disabled { cursor: default; }
+.av2-arbol-chevron--abierto { transform: rotate(90deg); }
+
+.av2-arbol-cuerpo { min-width: 0; flex: 1; }
+.av2-arbol-linea {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 3px;
+}
+.av2-arbol-label { color: var(--pl-text); min-width: 0; }
+.av2-arbol-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.av2-arbol-monto { text-align: right; flex: 0 0 auto; }
+.av2-arbol-acciones { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+
+.av2-arbol-detalle {
+  padding: 14px 18px 16px;
+  background: var(--pl-surface-3);
+  border-bottom: 1px solid var(--pl-border);
+}
+
+.av2-arbol-agregar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--pl-border);
+  background: none;
+  color: var(--pl-green-700);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.av2-arbol-agregar:hover { background: var(--pl-green-050); }
+.av2-arbol-agregar-mas {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 1px dashed var(--pl-green-200);
+  border-radius: var(--pl-radius-sm);
+}
+
+.av2-arbol-pie {
+  padding: 12px 18px;
+  background: var(--pl-surface-3);
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+}
+
+/* Detalle de una hoja del árbol: qué le pide al vecino. Es contenido de la
+   página (el kit no sabe de documentos), pero las clases viven acá para que
+   cualquier árbol con requisitos se vea igual. */
+.av2-arbol-req { min-width: 0; }
+.av2-arbol-req-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.av2-arbol-req-lista li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+.av2-arbol-req-lista li svg { flex: 0 0 13px; color: var(--pl-text-muted); }
+.av2-arbol-req-nota {
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-amber-700);
+  white-space: nowrap;
+}
+.av2-arbol-req-vacio {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+}
+.av2-arbol-req-pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pl-border);
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+  flex-wrap: wrap;
+}
+.av2-arbol-req-accion {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.av2-arbol-req-accion:hover { text-decoration: underline; }
+
+/* --- CardGrid: la vista 'cards' del kit --------------------- */
+.av2-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.av2-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+.av2-card--click { cursor: pointer; }
+.av2-card--click:hover { border-color: var(--pl-green-200); }
+/* Apagada = inactiva. Se ve, pero no compite con las activas. */
+.av2-card--apagada { opacity: 0.62; }
+
+.av2-card-cab { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.av2-card-txt { min-width: 0; flex: 1; }
+.av2-card-titulo {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-card-sub {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 3px;
+  font-size: var(--pl-fs-micro);
+  line-height: 1.4;
+  color: var(--pl-text-muted);
+}
+
+.av2-card-metrica { margin-top: 14px; }
+.av2-card-metrica .av2-metrica-valor { font-size: 22px; line-height: 1; }
+.av2-card-metrica .av2-metrica-nota { margin-top: 5px; }
+
+.av2-card-pie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pl-border);
+}
+.av2-card-acciones { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+
+.av2-card--skel { gap: 8px; }
+
+/* Regla de la entidad al pie de la tabla (DataTableFooter.note): por qué el
+   sistema va a decir que no, dicho ANTES de que el usuario lo intente. Fuera
+   de la tarjeta y en muted: acompaña, no compite con el conteo. */
+.av2-tabla-regla {
+  margin: 8px 2px 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
+/* --- Campos propios de un catálogo (Props.extras del ABM genérico) ---
+   Viven acá y no en cada pantalla para que los siete catálogos escriban sus
+   campos extra con el mismo lenguaje que el resto del drawer. */
+.av2-campo-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.av2-campo-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.av2-campo-num {
+  width: 96px;
+  padding: 8px 12px;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  color: var(--pl-text);
+  font-family: inherit;
+  font-size: var(--pl-fs-body-sm);
+}
+.av2-campo-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.av2-campo-nota-larga {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
+/* ============================================================
+   [PUENTE] — el ajuste que vive en otro módulo.
+
+   Explica dónde se administra y por qué, en vez de duplicar la
+   grilla del módulo. Ver components/config/PuenteModulo.tsx.
+   ============================================================ */
+.pu-cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-green) 6%, var(--pl-surface)) 0%,
+    var(--pl-surface) 62%
+  );
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-green);
+  border-radius: var(--pl-radius-lg);
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.pu-cab-txt { flex: 1 1 340px; min-width: 0; }
+.pu-motivo {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.55;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+  max-width: 76ch;
+}
+.pu-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.pu-cta:hover { background: var(--pl-green-600); }
+
+.pu-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.pu-caja {
+  padding: 16px 18px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  min-width: 0;
+}
+.pu-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pu-lista li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+  min-width: 0;
+}
+.pu-lista svg { flex: 0 0 13px; color: var(--pl-text-muted); }
+
+.pu-atajos { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pu-atajo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.pu-atajo:hover:not(:disabled) { border-color: var(--pl-green-200); background: var(--pl-green-050); }
+.pu-atajo:disabled { cursor: default; }
+.pu-atajo-txt { min-width: 0; flex: 1; }
+.pu-atajo-label {
+  display: block;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.pu-atajo-para {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.pu-atajo svg { flex: 0 0 14px; color: var(--pl-text-muted); }
+
+.pu-muestra {
+  margin-top: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+.pu-muestra-cab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 16px;
+  background: var(--pl-surface-3);
+  border-bottom: 1px solid var(--pl-border);
+  flex-wrap: wrap;
+}
+.pu-muestra-cab svg { color: var(--pl-green-700); flex: 0 0 15px; }
+.pu-muestra-nota {
+  margin-left: auto;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.pu-muestra-filas { display: flex; flex-direction: column; }
+.pu-fila {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--pl-border);
+  min-width: 0;
+}
+.pu-fila:last-child { border-bottom: 0; }
+.pu-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--pl-radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pu-fila-txt { min-width: 0; flex: 1; }
+.pu-fila-nombre {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pu-fila-detalle {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.pu-fila-cifra {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* ============================================================
+   [APARIENCIA] — el panel de "Apariencia" del canvas.
+
+   UNA tarjeta con tres bloques separados por hairlines: tema del
+   panel, color de acento y fondo de la barra lateral. Las medidas
+   son las del .dc (lienzo de 62px, muestras de 11 de radio,
+   círculos de 34, líneas de 4px).
+
+   Los colores de las muestras los pone el consumidor inline
+   porque son valores RUNTIME derivados del motor de tema: el
+   preview tiene que SER lo que se va a ver.
+   ============================================================ */
+.ap-panel {
+  padding: 18px 20px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+
+.ap-nota {
+  margin: 5px 0 0;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-3);
+}
+
+.ap-hairline {
+  display: block;
+  height: 1px;
+  background: var(--pl-border);
+  margin: 18px 0;
+}
+
+.ap-grilla {
+  display: grid;
+  gap: 9px;
+  margin-top: 11px;
+}
+/* Seis temas entran en una fila en desktop y se reacomodan solos. */
+.ap-grilla--temas { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.ap-grilla--barras {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  max-width: 460px;
+}
+
+.ap-muestra {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  min-width: 0;
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  background: var(--pl-surface);
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.ap-muestra:hover { border-color: var(--pl-green-200); }
+.ap-muestra--activa {
+  border-color: var(--pl-green);
+  box-shadow: 0 0 0 1px var(--pl-green);
+}
+
+.ap-lienzo {
+  display: flex;
+  height: 62px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ap-lienzo-barra { width: 30%; height: 100%; }
+.ap-lienzo-cuerpo {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* La muestra de la barra lateral no tiene columna: las líneas van directo
+   sobre el lienzo, que ES el color de la barra. */
+.ap-lienzo--barra {
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 10px;
+}
+
+.ap-linea {
+  display: block;
+  height: 3px;
+  width: 92%;
+  border-radius: var(--pl-radius-pill);
+}
+.ap-linea--acento { height: 4px; width: 76%; }
+.ap-linea--corta { width: 64%; }
+
+.ap-muestra-pie {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px 1px;
+  min-width: 0;
+}
+.ap-muestra-nombre {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pl-text-2);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ap-muestra--activa .ap-muestra-nombre { font-weight: 600; color: var(--pl-text); }
+.ap-muestra-check {
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  flex: 0 0 13px;
+  stroke-width: 2.8;
+}
+
+.ap-acentos {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.ap-acento {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  cursor: pointer;
+  /* El anillo se pinta con el color del propio acento (currentColor lo trae
+     del style inline), así funciona con cualquier color sin tokens extra. */
+  transition: box-shadow var(--pl-dur-ui) var(--pl-ease);
+}
+.ap-acento--activo { box-shadow: 0 0 0 2px var(--pl-surface), 0 0 0 4px currentColor; }
+.ap-acento-check { width: 15px; height: 15px; stroke-width: 3.2; }
+.ap-acento-nombre {
+  margin-left: 4px;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ap-pie {
+  margin: 18px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.5;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+
+/* --- IconColorPicker ---------------------------------------- */
+.av2-picker { min-width: 0; }
+
+.av2-picker-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--pl-surface-3);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+}
+.av2-picker-preview-txt { min-width: 0; flex: 1; }
+.av2-picker-preview-titulo {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-picker-preview-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.av2-picker-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--pl-border);
+  border-radius: 9px;
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.av2-picker-toggle:hover { border-color: var(--pl-green-200); color: var(--pl-green-700); }
+
+.av2-picker-cuerpo { padding-top: 12px; }
+.av2-picker-eyebrow-color { display: block; margin-top: 14px; }
+
+.av2-picker-iconos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.av2-picker-icono {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border: 1.5px solid var(--pl-border);
+  border-radius: 9px;
+  background: var(--pl-surface);
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-picker-icono:hover { border-color: var(--pl-green-200); }
+.av2-picker-icono--activo {
+  border-color: var(--pl-green);
+  background: var(--pl-green-050);
+  color: var(--pl-green-700);
+}
+
+.av2-picker-colores { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+.av2-picker-color {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  color: var(--pl-on-brand);
+  cursor: pointer;
+}
+.av2-picker-color--activo {
+  box-shadow: 0 0 0 2px var(--pl-surface), 0 0 0 4px currentColor;
+}
+.av2-picker-nota {
+  margin: 10px 0 0;
+  font-size: var(--pl-fs-caption);
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}
+
+/* ============================================================
+   [FICHAS] — el renderer de la lista cuando el CONTENEDOR es angosto.
+   Ver docs/design-sync/abm-mobile/GUIA.md (secciones 03 a 05).
+
+   No es "la tabla en chico": es el otro dibujo del mismo control. Las
+   medidas salen de la guía y no se negocian con los datos — la altura
+   la fija el token, no el texto, que es lo que evita que la lista salte
+   y lo que hace calculables los `top` de los sticky.
+   ============================================================ */
+
+.av2-fichas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;                      /* el aire entre fichas ES el diseño */
+  padding: 8px 0 4px;
+}
+
+.av2-fichas-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Barra de día: chip + conteo del grupo. */
+.av2-fichas-dia {
+  position: sticky;
+  top: var(--av2-ctl-h, 0px);    /* derivado del token, nunca un número mágico */
+  z-index: 4;                    /* escala nombrada: sticky de grupo */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+  background: var(--pl-bg, var(--pl-surface));
+}
+.av2-fichas-dia-chip {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pl-text-3);
+}
+.av2-fichas-dia-conteo {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--pl-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La ficha. 88–104px de alto: densidad honesta de 6 o 7 por pantalla. */
+.av2-ficha {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 88px;
+  padding: 11px 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 13px;
+  /* Sin divisorias de borde a borde: eso dice "planilla". */
+}
+.av2-ficha--clickeable { cursor: pointer; }
+/* Táctil: el feedback es :active, no :hover. */
+.av2-ficha--clickeable:active { transform: scale(0.985); }
+.av2-ficha { transition: transform 160ms var(--pl-ease); }
+@media (prefers-reduced-motion: reduce) {
+  .av2-ficha { transition: none; }
+  .av2-ficha--clickeable:active { transform: none; }
+}
+.av2-ficha:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 2px;
+}
+
+/* Ficha de categoría: 34px, radio 10. Nunca se comprime. */
+.av2-ficha-tile {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--tile, var(--pl-green)) 14%, transparent);
+}
+.av2-ficha-tile-glifo {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.8px solid var(--tile, var(--pl-green));
+}
+
+/* El cuerpo es lo único que puede encogerse: sin min-width:0 el flex se
+   niega a truncar y la ficha desborda. */
+.av2-ficha-cuerpo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Slot 1 — encabezado: una línea, sin wrap. */
+.av2-ficha-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+.av2-ficha-id {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--pl-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.av2-ficha-taxonomia {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--pl-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-ficha-punto {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pl-text-faint);
+}
+
+/* Slot 2 — titular: lo ÚNICO que puede ocupar dos líneas. */
+.av2-ficha-titular {
+  margin: 1px 0 0;
+  font-family: var(--pl-font-display);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.28;
+  color: var(--pl-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Slot 3 — meta: una línea cada dato. Nunca comparten línea. */
+.av2-ficha-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-top: 2px;
+}
+.av2-ficha-linea {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--pl-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Slot 4 — margen derecho: ancho intrínseco, nunca se comprime. */
+.av2-ficha-margen {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  padding-left: 2px;
+}
+.av2-ficha-estado {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: var(--pl-radius-pill);
+  white-space: nowrap;
+  background: var(--pl-surface-2);
+  border: 1px solid var(--pl-border);
+  color: var(--pl-text-2);
+}
+.av2-ficha-cola {
+  font-size: 10.5px;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.av2-fichas-vacio {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: var(--pl-fs-body);
+  color: var(--pl-text-3);
+}
+.av2-fichas-pie {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* [FILTROS EN ANGOSTO] — la fila de selects sale del flujo y pasa a un panel.
+   Ver PROYECCION-MOBILE.md §05: si la cantidad de elementos de una fila
+   depende de la CONFIGURACIÓN y no del diseño, esa fila no va en la pantalla. */
+.av2-filterbar--compacta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px 12px;
+}
+.av2-filtros-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;               /* hit target real, no el dibujo */
+  padding: 0 14px;
+  border-radius: var(--pl-radius-md);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.av2-filtros-boton:active { transform: scale(0.97); }
+.av2-filtros-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.av2-filtros-resumen {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+.av2-filtros-panel {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+/* Los estados como LISTA vertical con su conteo: escala a 8 o a 40 sin tocar
+   el layout, que es lo que las píldoras en fila no pueden hacer. */
+.av2-filtros-estados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.av2-filtros-estado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-2);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  cursor: pointer;
+  text-align: left;
+}
+.av2-filtros-estado b { font-variant-numeric: tabular-nums; color: var(--pl-text-3); }
+.av2-filtros-estado--activo { background: var(--pl-green-050); color: var(--pl-text); }
+.av2-filtros-estado:disabled { opacity: 0.45; cursor: default; }
+
+/* [FILTROS EN ANGOSTO] — la fila de selects sale del flujo y pasa a un panel.
+   Ver PROYECCION-MOBILE.md §05: si la cantidad de elementos de una fila
+   depende de la CONFIGURACIÓN y no del diseño, esa fila no va en la pantalla. */
+.av2-filterbar--compacta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px 12px;
+}
+.av2-filtros-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;               /* hit target real, no el dibujo */
+  padding: 0 14px;
+  border-radius: var(--pl-radius-md);
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.av2-filtros-boton:active { transform: scale(0.97); }
+.av2-filtros-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.av2-filtros-resumen {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+}
+.av2-filtros-panel {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+/* Los estados como LISTA vertical con su conteo: escala a 8 o a 40 sin tocar
+   el layout, que es lo que las píldoras en fila no pueden hacer. */
+.av2-filtros-estados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.av2-filtros-estado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--pl-radius-sm);
+  background: transparent;
+  color: var(--pl-text-2);
+  font: inherit;
+  font-size: var(--pl-fs-body);
+  cursor: pointer;
+  text-align: left;
+}
+.av2-filtros-estado b { font-variant-numeric: tabular-nums; color: var(--pl-text-3); }
+.av2-filtros-estado--activo { background: var(--pl-green-050); color: var(--pl-text); }
+.av2-filtros-estado:disabled { opacity: 0.45; cursor: default; }
+
+/* [PAGEACCIONES] Acciones sueltas de una pantalla SIN toolbar — un reporte no
+   tiene buscador ni CTA, pero puede tener su boton de tutorial. Va alineado a
+   la derecha, arriba del contenido. Si la pantalla tiene toolbar, el boton va
+   ahi: esto es solo para las que no la tienen. */
+.av2-page-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 12px;
+}

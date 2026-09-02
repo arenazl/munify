@@ -1,0 +1,42 @@
+1. El Approach para Argentina (Interior Bonaerense, Córdoba, Santa Fe, Cuyo, NOA/NEA)
+El pulso del intendente argentino: Es un gestor territorial muy expuesto al vecino de a pie. Le terroriza la queja viral en redes sociales y la burocracia de los grandes distritos. Le gusta sentirse "moderno" pero con los pies en el barro.
+
+El ángulo de venta: Eficiencia de recursos y control operativo sin gastar fortuna en consultoras.
+
+El Script de Primer Contacto (Frío / Conmutador a Secretaría de Gobierno):
+
+"¿Qué tal, buenos días? Te llamo de Munify. Estoy intentando comunicarme con el área de Modernización o con la Secretaría de Gobierno del intendente. Te hago re breve el motivo: nosotros venimos trabajando con comunas del interior (como San Pedro o municipios similares en la región) implementando una plataforma de gestión ciudadana que centraliza los reclamos de bacheo, luminarias y servicios en un solo tablero inteligente para el Ejecutivo. Hoy los municipios chicos están resolviendo la trazabilidad de los reclamos en menos de 48 horas sin que el vecino tenga que ir presencialmente a la municipalidad a hacer colas. ¿Con quién me sugerís que converse cinco minutos para dejarle un caso de éxito medido en su misma provincia?"
+
+2. El Approach para Paraguay (Eje Central, Alto Paraná, Itapúa)
+El pulso del intendente paraguayo ("Intendencia Municipal"): Hay muchísimo orgullo por el crecimiento económico, el comercio y el desarrollo local. Valoran enormemente la prolijidad institucional, la transparencia administrativa frente a la Junta Municipal (concejales) y el orden de los tributos.
+
+El ángulo de venta: Transparencia, recaudación ordenada y modernización al nivel de las grandes ciudades del Mercosur.
+
+El Script de Primer Contacto:
+
+"¿Cómo le va, muy buenos días? Le hablo desde Argentina en representación de Munify. Estamos expandiendo nuestra plataforma de gestión y reporte ciudadano a municipios pujantes de Paraguay, enfocándonos en intendencias que están digitalizando la atención al contribuyente. Nuestra herramienta le permite al intendente tener tableros de control en tiempo real sobre el estado de los servicios urbanos y las cuadrillas en la calle, evitando la dispersión de reclamos por WhatsApp o llamadas sueltas. ¿Me podría derivar con el director de gabinete o secretaría general para enviarle un breve resumen de cómo estamos trabajando en ciudades de escala similar?"
+
+3. El Approach para Perú (Municipalidades Provinciales y Distritales)
+El pulso del alcalde peruano: Las municipalidades manejan presupuestos por canon (minero, petrolero, aduanero) y están bajo la lupa fiscal permanente de la Contraloría General de la República. El alcalde sufre horrores la gestión documentaria ineficiente y la falta de indicadores de cumplimiento para rendir cuentas.
+
+El ángulo de venta: Trazabilidad de obras, cumplimiento de metas institucionales (como los incentivos municipales del MEF) y ordenamiento frente a la Contraloría.
+
+El Script de Primer Contacto:
+
+"Buenos días, estimado, le saludo de la empresa tecnológica Munify. Nos estamos comunicando con municipalidades provinciales y distritales que están optimizando sus indicadores de gestión y la atención ciudadana. Nosotros proveemos un sistema integral de trazabilidad de reportes urbanos y expedientes que le asegura al despacho de alcaldía métricas claras de resolución ante la Contraloría y los vecinos. ¿Con qué área de gerencia municipal o sistemas podría coordinar una demostración técnica de 10 minutos adaptada a la jurisdicción?"
+
+4. El Approach para Uruguay (Intendencias Departamentales)
+El pulso del jerarca uruguayo: Es una administración extremadamente metódica, seria, de procesos muy formales. No les gusta la venta agresiva ni el "vendehumo". Van directo a los papeles, los antecedentes institucionales y la robustez técnica.
+
+El ángulo de venta: Gobierno abierto, descentralización departamental y optimización de flujos de trabajo de las direcciones de obras y servicios.
+
+El Script de Primer Contacto:
+
+"Buenos días, ¿cómo le va? Lo molesto brevemente desde Munify. Somos una compañía de desarrollo de software enfocada en plataformas de gobierno abierto y gestión de incidencias para administraciones públicas locales. Estamos vinculándonos con las Intendencias Departamentales del interior uruguayo para aportar tableros de control dinámicos que agilicen la respuesta de las direcciones territoriales. ¿Me indicaría cuál es el canal formal o la secretaría de intendencia para hacerle llegar nuestro dossier corporativo y un acceso de cortesía a nuestras estaciones de prueba?"
+
+💡 Tres consejos clave para cuando arranques a llamar:
+La chapa de la empresa argentina: En Paraguay, Perú y Uruguay el software argentino tiene prestigio. Decir "somos una empresa tecnológica consolidada en Argentina" te da estabilidad y soporte real: no sos un pibe con una notebook.
+
+El gancho de la demo express: Si muestra interés, no le expliques cómo funciona. Decile: "Pasame el nombre de tu municipio y en cinco minutos lo tenés andando con tus calles y tus barrios". Que lo vea, no que se lo cuenten.
+
+Apuntá al segundo de a bordo: Al intendente es difícil pillarlo de entrada. Buscá al Secretario de Gobierno o al de Modernización: es el que sufre los reclamos todos los días y el que le lleva la herramienta al jefe.

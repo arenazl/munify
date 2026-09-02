@@ -8,6 +8,7 @@ import { ABMPage, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage
 import { Sheet } from '../components/ui/Sheet';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, DynamicIcon, estadoColors, estadoLabels } from '../components/ui/ReclamoCard';
+import { estadoColor } from '../lib/enums/reclamo';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
 // Formatea el nombre del empleado en formato "L. Lopez"
@@ -101,8 +102,8 @@ export default function MisReclamos() {
       setLoadingHistorial(false);
     }
 
-    // Si está resuelto, verificar si ya tiene calificación
-    if (reclamo.estado === 'resuelto') {
+    // Si está resuelto/finalizado, verificar si ya tiene calificación
+    if (['resuelto', 'finalizado'].includes(reclamo.estado)) {
       setLoadingCalificacion(true);
       try {
         const res = await calificacionesApi.getReclamo(reclamo.id);
@@ -364,11 +365,11 @@ export default function MisReclamos() {
           )}
 
           {selectedReclamo.resolucion && (
-            <div className="p-3 rounded-lg" style={{ backgroundColor: '#d1fae5' }}>
-              <label className="block text-sm font-medium" style={{ color: '#065f46' }}>Resolución</label>
-              <p className="mt-1" style={{ color: '#064e3b' }}>{selectedReclamo.resolucion}</p>
+            <div className="p-3 rounded-lg" style={{ backgroundColor: `${estadoColor('finalizado')}15` }}>
+              <label className="block text-sm font-medium" style={{ color: estadoColor('finalizado') }}>Resolución</label>
+              <p className="mt-1" style={{ color: theme.text }}>{selectedReclamo.resolucion}</p>
               {selectedReclamo.fecha_resolucion && (
-                <p className="text-sm" style={{ color: '#10b981' }}>
+                <p className="text-sm" style={{ color: estadoColor('finalizado') }}>
                   Resuelto: {new Date(selectedReclamo.fecha_resolucion).toLocaleString()}
                 </p>
               )}
@@ -376,11 +377,11 @@ export default function MisReclamos() {
           )}
 
           {selectedReclamo.motivo_rechazo && (
-            <div className="p-3 rounded-lg" style={{ backgroundColor: '#fee2e2' }}>
-              <label className="block text-sm font-medium" style={{ color: '#991b1b' }}>Motivo de Rechazo</label>
-              <p className="mt-1" style={{ color: '#7f1d1d' }}>{selectedReclamo.motivo_rechazo}</p>
+            <div className="p-3 rounded-lg" style={{ backgroundColor: `${estadoColor('rechazado')}15` }}>
+              <label className="block text-sm font-medium" style={{ color: estadoColor('rechazado') }}>Motivo de Rechazo</label>
+              <p className="mt-1" style={{ color: theme.text }}>{selectedReclamo.motivo_rechazo}</p>
               {selectedReclamo.descripcion_rechazo && (
-                <p className="text-sm mt-1" style={{ color: '#ef4444' }}>{selectedReclamo.descripcion_rechazo}</p>
+                <p className="text-sm mt-1" style={{ color: estadoColor('rechazado') }}>{selectedReclamo.descripcion_rechazo}</p>
               )}
             </div>
           )}
@@ -396,34 +397,39 @@ export default function MisReclamos() {
 
             {selectedReclamo.confirmado_vecino !== null && selectedReclamo.confirmado_vecino !== undefined ? (
               // Ya confirmado - mostrar resultado
+              (() => {
+              const confColor = selectedReclamo.confirmado_vecino ? estadoColor('finalizado') : estadoColor('rechazado');
+              return (
               <div
                 className="p-4 rounded-xl"
                 style={{
-                  backgroundColor: selectedReclamo.confirmado_vecino ? '#d1fae5' : '#fee2e2',
-                  border: `1px solid ${selectedReclamo.confirmado_vecino ? '#10b981' : '#ef4444'}30`
+                  backgroundColor: `${confColor}15`,
+                  border: `1px solid ${confColor}30`
                 }}
               >
                 <div className="flex items-center gap-2 mb-2">
                   {selectedReclamo.confirmado_vecino ? (
-                    <ThumbsUp className="h-5 w-5 text-green-600" />
+                    <ThumbsUp className="h-5 w-5" style={{ color: confColor }} />
                   ) : (
-                    <ThumbsDown className="h-5 w-5 text-red-600" />
+                    <ThumbsDown className="h-5 w-5" style={{ color: confColor }} />
                   )}
-                  <span className="font-medium" style={{ color: selectedReclamo.confirmado_vecino ? '#065f46' : '#991b1b' }}>
+                  <span className="font-medium" style={{ color: confColor }}>
                     {selectedReclamo.confirmado_vecino ? 'Confirmaste que se solucionó' : 'Indicaste que sigue el problema'}
                   </span>
                 </div>
                 {selectedReclamo.comentario_confirmacion_vecino && (
-                  <p className="text-sm italic mt-1" style={{ color: selectedReclamo.confirmado_vecino ? '#047857' : '#b91c1c' }}>
+                  <p className="text-sm italic mt-1" style={{ color: confColor }}>
                     "{selectedReclamo.comentario_confirmacion_vecino}"
                   </p>
                 )}
                 {selectedReclamo.fecha_confirmacion_vecino && (
-                  <p className="text-xs mt-2" style={{ color: selectedReclamo.confirmado_vecino ? '#059669' : '#dc2626' }}>
+                  <p className="text-xs mt-2" style={{ color: confColor }}>
                     Confirmado el {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleDateString()}
                   </p>
                 )}
               </div>
+              );
+              })()
             ) : (
               // Pendiente de confirmar
               <div className="space-y-3">
@@ -451,7 +457,7 @@ export default function MisReclamos() {
                     onClick={() => handleConfirmarVecino(true)}
                     disabled={enviandoConfirmacion}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-                    style={{ backgroundColor: '#10b981', color: '#ffffff' }}
+                    style={{ backgroundColor: estadoColor('finalizado'), color: '#ffffff' }}
                   >
                     {enviandoConfirmacion ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -466,7 +472,7 @@ export default function MisReclamos() {
                     onClick={() => handleConfirmarVecino(false)}
                     disabled={enviandoConfirmacion}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-                    style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+                    style={{ backgroundColor: estadoColor('rechazado'), color: '#ffffff' }}
                   >
                     {enviandoConfirmacion ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -526,8 +532,8 @@ export default function MisReclamos() {
                 onClick={openCalificarSheet}
                 className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-all hover:opacity-90 active:scale-95"
                 style={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #eab308 100%)',
-                  color: '#ffffff'
+                  backgroundColor: theme.primary,
+                  color: 'var(--pl-on-accent)'
                 }}
               >
                 <Star className="h-5 w-5" />
@@ -567,7 +573,7 @@ export default function MisReclamos() {
                         className="absolute left-0 w-[14px] h-[14px] rounded-full border-2 flex-shrink-0"
                         style={{
                           backgroundColor: theme.card,
-                          borderColor: isComentario ? '#3b82f6' : isPersonaSumada ? '#10b981' : estadoColor,
+                          borderColor: isComentario || isPersonaSumada ? theme.primary : estadoColor,
                         }}
                         title={h.estado_nuevo ? estadoLabels[h.estado_nuevo] : h.accion}
                       >
@@ -575,7 +581,7 @@ export default function MisReclamos() {
                           <div
                             className="absolute inset-1 rounded-full"
                             style={{
-                              backgroundColor: isComentario ? '#3b82f6' : isPersonaSumada ? '#10b981' : estadoColor
+                              backgroundColor: isComentario || isPersonaSumada ? theme.primary : estadoColor
                             }}
                           />
                         )}
@@ -595,13 +601,13 @@ export default function MisReclamos() {
                             </span>
                           )}
                           {isComentario && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#dbeafe', color: '#2563eb' }}>
-                              💬 Comentario
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+                              Comentario
                             </span>
                           )}
                           {isPersonaSumada && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#d1fae5', color: '#10b981' }}>
-                              ✓ Persona sumada
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+                              Persona sumada
                             </span>
                           )}
                           <span className="text-xs" style={{ color: theme.textSecondary }}>
@@ -620,7 +626,7 @@ export default function MisReclamos() {
                             style={{
                               backgroundColor: theme.backgroundSecondary,
                               color: theme.text,
-                              borderLeft: `3px solid #3b82f6`
+                              borderLeft: `3px solid ${theme.primary}`
                             }}
                           >
                             {h.comentario}
@@ -667,7 +673,7 @@ export default function MisReclamos() {
             {selectedReclamo.categoria.nombre}
           </p>
           {selectedReclamo.resolucion && (
-            <p className="text-sm mt-2 italic" style={{ color: '#10b981' }}>
+            <p className="text-sm mt-2 italic" style={{ color: estadoColor('finalizado') }}>
               "{selectedReclamo.resolucion}"
             </p>
           )}
@@ -721,8 +727,8 @@ export default function MisReclamos() {
           disabled={enviandoCalificacion || puntuacion === 0}
           className="w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-            color: 'white',
+            backgroundColor: theme.primary,
+            color: 'var(--pl-on-accent)',
           }}
         >
           {enviandoCalificacion ? (
@@ -757,7 +763,7 @@ export default function MisReclamos() {
       <button
         onClick={goToNuevoReclamo}
         className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
-        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
       >
         <Plus className="h-4 w-4 mr-2" />
         Crear mi primer reclamo
@@ -807,7 +813,7 @@ export default function MisReclamos() {
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
                 backgroundColor: !filtroCategoria ? theme.primary : theme.backgroundSecondary,
-                color: !filtroCategoria ? '#ffffff' : theme.textSecondary,
+                color: !filtroCategoria ? 'var(--pl-on-accent)' : theme.textSecondary,
                 border: `1px solid ${!filtroCategoria ? theme.primary : theme.border}`,
               }}
             >

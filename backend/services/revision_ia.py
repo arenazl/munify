@@ -16,9 +16,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-import httpx
 
 from core.config import settings
+from services.groq_common import llamar_groq
 
 logger = logging.getLogger(__name__)
 
@@ -53,98 +53,27 @@ def cache_invalidate(municipio_id: int, kind: Optional[str] = None) -> None:
         _CACHE.pop((municipio_id, kind), None)
 
 
-async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
-    """Llama a Gemini REST. None si key no configurada o falla."""
-    if not settings.GEMINI_API_KEY:
-        return None
-    try:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
-        )
-        async with httpx.AsyncClient(timeout=28.0) as client:
-            response = await client.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.2,
-                        "maxOutputTokens": max_tokens,
-                        "responseMimeType": "application/json",
-                        # gemini-2.5-flash usa "thinking" interno que duplica
-                        # latencia con prompts grandes. Lo desactivamos.
-                        "thinkingConfig": {"thinkingBudget": 0},
-                    },
-                },
-            )
-        if response.status_code != 200:
-            logger.error(
-                "[RevisionIA] Gemini status=%s body=%s",
-                response.status_code,
-                response.text[:500],
-            )
-            return None
-        data = response.json()
-        return (
-            data.get("candidates", [{}])[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "")
-        )
-    except Exception as e:
-        logger.exception("[RevisionIA] Error llamando Gemini: %s", e)
-        return None
+async def _call_groq(prompt: str, max_tokens: int = 8000,
+                     feature: str = "revision",
+                     municipio_id: Optional[int] = None) -> Optional[str]:
+    """Groq via el cliente unico (que ademas registra el consumo)."""
+    r = await llamar_groq(
+        prompt,
+        feature=feature,
+        municipio_id=municipio_id,
+        max_tokens=max_tokens,
+        temperature=0.2,
+        json_object=True,
+    )
+    return r.texto
 
 
-async def _call_groq(prompt: str, max_tokens: int = 8000) -> Optional[str]:
-    """Llama a Groq (OpenAI-compatible). Tier gratuito generoso con Llama 3.3.
-    None si key no configurada o falla."""
-    if not settings.GROQ_API_KEY:
-        return None
-    try:
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            response = await client.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": settings.GROQ_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2,
-                    "max_tokens": max_tokens,
-                    "response_format": {"type": "json_object"},
-                },
-            )
-        if response.status_code != 200:
-            logger.error(
-                "[RevisionIA] Groq status=%s body=%s",
-                response.status_code,
-                response.text[:500],
-            )
-            return None
-        data = response.json()
-        return (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
-    except Exception as e:
-        logger.exception("[RevisionIA] Error llamando Groq: %s", e)
-        return None
-
-
-async def _call_llm(prompt: str, max_tokens: int = 8000) -> Optional[str]:
-    """Intenta primero Gemini; si no responde, cae a Groq. Devuelve el texto
-    de la respuesta o None si ambos fallan / no estan configurados."""
-    text = await _call_gemini(prompt, max_tokens=max_tokens)
-    if text:
-        return text
-    logger.info("[RevisionIA] Gemini sin respuesta, intentando Groq...")
-    text = await _call_groq(prompt, max_tokens=max_tokens)
+async def _call_llm(prompt: str, max_tokens: int = 8000,
+                    feature: str = "revision",
+                    municipio_id: Optional[int] = None) -> Optional[str]:
+    """Groq, unico proveedor desde el 2026-09-01. El texto o None."""
+    text = await _call_groq(prompt, max_tokens=max_tokens, feature=feature,
+                            municipio_id=municipio_id)
     if text:
         logger.info("[RevisionIA] Groq respondio OK")
     return text
@@ -245,11 +174,11 @@ def _is_demo_items(items: List[Dict[str, Any]]) -> bool:
 
 def _build_reclamos_demo(reason: str = "no_key") -> List[Dict[str, Any]]:
     """Fallback. `reason` ayuda a saber por que cayo:
-      - "no_key": GEMINI_API_KEY no configurada.
+      - "no_key": GROQ_API_KEY no configurada.
       - "ia_fail": la IA respondio pero no se pudo parsear.
     """
     hints = {
-        "no_key":  "[DEMO] Configurar GEMINI_API_KEY para análisis real",
+        "no_key":  "[DEMO] Configurar GROQ_API_KEY para análisis real",
         "ia_fail": "[DEMO] La IA no devolvió un análisis válido en este intento. Reintentar más tarde.",
     }
     return [
@@ -283,7 +212,7 @@ async def analizar_reclamos(
         if cached is not None:
             return cached
 
-    if not settings.GEMINI_API_KEY and not settings.GROQ_API_KEY:
+    if not settings.GROQ_API_KEY:
         # Sin IA configurada (ningun proveedor): devolvemos demo.
         return _build_reclamos_demo("no_key")
 
@@ -376,7 +305,7 @@ Solicitudes:
 
 def _build_tramites_demo(reason: str = "no_key") -> List[Dict[str, Any]]:
     hints = {
-        "no_key":  "[DEMO] Configurar GEMINI_API_KEY para análisis real",
+        "no_key":  "[DEMO] Configurar GROQ_API_KEY para análisis real",
         "ia_fail": "[DEMO] La IA no devolvió un análisis válido en este intento. Reintentar más tarde.",
     }
     return [
@@ -408,7 +337,7 @@ async def analizar_tramites(
         if cached is not None:
             return cached
 
-    if not settings.GEMINI_API_KEY and not settings.GROQ_API_KEY:
+    if not settings.GROQ_API_KEY:
         return _build_tramites_demo("no_key")
 
     compact = []

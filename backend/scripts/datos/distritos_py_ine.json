@@ -1,0 +1,1502 @@
+[
+ {
+  "cod": "0000",
+  "cod_dep": "00",
+  "departamento": "Asunción",
+  "distrito": "Asunción"
+ },
+ {
+  "cod": "0101",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Concepción"
+ },
+ {
+  "cod": "0102",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Belén"
+ },
+ {
+  "cod": "0103",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Horqueta"
+ },
+ {
+  "cod": "0104",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Loreto"
+ },
+ {
+  "cod": "0105",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "San Carlos Del Apa"
+ },
+ {
+  "cod": "0106",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "San Lázaro"
+ },
+ {
+  "cod": "0107",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Yby Yaú"
+ },
+ {
+  "cod": "0108",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Azote'Y"
+ },
+ {
+  "cod": "0109",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Sargento José Félix López"
+ },
+ {
+  "cod": "0110",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "San Alfredo"
+ },
+ {
+  "cod": "0111",
+  "cod_dep": "01",
+  "departamento": "Concepción",
+  "distrito": "Paso Barreto"
+ },
+ {
+  "cod": "0201",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "San Pedro Del Ycuamandyyú"
+ },
+ {
+  "cod": "0202",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Antequera"
+ },
+ {
+  "cod": "0203",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Choré"
+ },
+ {
+  "cod": "0204",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "General Elizardo Aquino"
+ },
+ {
+  "cod": "0205",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Itacurubí Del Rosario"
+ },
+ {
+  "cod": "0206",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Lima"
+ },
+ {
+  "cod": "0207",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Nueva Germania"
+ },
+ {
+  "cod": "0208",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "San Estanislao"
+ },
+ {
+  "cod": "0209",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "San Pablo"
+ },
+ {
+  "cod": "0210",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Tacuatí"
+ },
+ {
+  "cod": "0211",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Unión"
+ },
+ {
+  "cod": "0212",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "25 De Diciembre"
+ },
+ {
+  "cod": "0213",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Villa Del Rosario"
+ },
+ {
+  "cod": "0214",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "General Francisco Isidoro Resquín"
+ },
+ {
+  "cod": "0215",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Yataity Del Norte"
+ },
+ {
+  "cod": "0216",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Guajayvi"
+ },
+ {
+  "cod": "0217",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Capiibary"
+ },
+ {
+  "cod": "0218",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Santa Rosa Del Aguaray"
+ },
+ {
+  "cod": "0219",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Yrybucua"
+ },
+ {
+  "cod": "0220",
+  "cod_dep": "02",
+  "departamento": "San Pedro",
+  "distrito": "Liberación"
+ },
+ {
+  "cod": "0301",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Caacupé"
+ },
+ {
+  "cod": "0302",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Altos"
+ },
+ {
+  "cod": "0303",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Arroyos Y Esteros"
+ },
+ {
+  "cod": "0304",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Atyrá"
+ },
+ {
+  "cod": "0305",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Caraguatay"
+ },
+ {
+  "cod": "0306",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Emboscada"
+ },
+ {
+  "cod": "0307",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Eusebio Ayala"
+ },
+ {
+  "cod": "0308",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Isla Pucú"
+ },
+ {
+  "cod": "0309",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Itacurubí De La Cordillera"
+ },
+ {
+  "cod": "0310",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Juan De Mena"
+ },
+ {
+  "cod": "0311",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Loma Grande"
+ },
+ {
+  "cod": "0312",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Mbocayaty Del Yhaguy"
+ },
+ {
+  "cod": "0313",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Nueva Colombia"
+ },
+ {
+  "cod": "0314",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Piribebuy"
+ },
+ {
+  "cod": "0315",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Primero De Marzo"
+ },
+ {
+  "cod": "0316",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "San Bernardino"
+ },
+ {
+  "cod": "0317",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Santa Elena"
+ },
+ {
+  "cod": "0318",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Tobatí"
+ },
+ {
+  "cod": "0319",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "Valenzuela"
+ },
+ {
+  "cod": "0320",
+  "cod_dep": "03",
+  "departamento": "Cordillera",
+  "distrito": "San Jose Obrero"
+ },
+ {
+  "cod": "0401",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Villarrica"
+ },
+ {
+  "cod": "0402",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Borja"
+ },
+ {
+  "cod": "0403",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Capitán Mauricio José Troche"
+ },
+ {
+  "cod": "0404",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Coronel Martínez"
+ },
+ {
+  "cod": "0405",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Félix Pérez Cardozo"
+ },
+ {
+  "cod": "0406",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Gral. Eugenio A. Garay"
+ },
+ {
+  "cod": "0407",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Independencia"
+ },
+ {
+  "cod": "0408",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Itapé"
+ },
+ {
+  "cod": "0409",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Iturbe"
+ },
+ {
+  "cod": "0410",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "José Fassardi"
+ },
+ {
+  "cod": "0411",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Mbocayaty"
+ },
+ {
+  "cod": "0412",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Natalicio Talavera"
+ },
+ {
+  "cod": "0413",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Ñumí"
+ },
+ {
+  "cod": "0414",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "San Salvador"
+ },
+ {
+  "cod": "0415",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Yataity"
+ },
+ {
+  "cod": "0416",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Doctor Bottrell"
+ },
+ {
+  "cod": "0417",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Paso Yobai"
+ },
+ {
+  "cod": "0418",
+  "cod_dep": "04",
+  "departamento": "Guairá",
+  "distrito": "Tebicuary"
+ },
+ {
+  "cod": "0501",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Coronel Oviedo"
+ },
+ {
+  "cod": "0502",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Caaguazú"
+ },
+ {
+  "cod": "0503",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Carayaó"
+ },
+ {
+  "cod": "0504",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Dr. Cecilio Báez"
+ },
+ {
+  "cod": "0505",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Santa Rosa Del Mbutuy"
+ },
+ {
+  "cod": "0506",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Dr. Juan Manuel Frutos"
+ },
+ {
+  "cod": "0507",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Repatriación"
+ },
+ {
+  "cod": "0508",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Nueva Londres"
+ },
+ {
+  "cod": "0509",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "San Joaquín"
+ },
+ {
+  "cod": "0510",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "San José De Los Arroyos"
+ },
+ {
+  "cod": "0511",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Yhú"
+ },
+ {
+  "cod": "0512",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Dr. J. Eulogio Estigarribia"
+ },
+ {
+  "cod": "0513",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "R.I. 3 Corrales"
+ },
+ {
+  "cod": "0514",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Raúl Arsenio Oviedo"
+ },
+ {
+  "cod": "0515",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "José Domingo Ocampos"
+ },
+ {
+  "cod": "0516",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Mariscal Francisco Solano López"
+ },
+ {
+  "cod": "0517",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "La Pastora"
+ },
+ {
+  "cod": "0518",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "3 De Febrero"
+ },
+ {
+  "cod": "0519",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Simón Bolivar"
+ },
+ {
+  "cod": "0520",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Vaquería"
+ },
+ {
+  "cod": "0521",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Tembiaporá"
+ },
+ {
+  "cod": "0522",
+  "cod_dep": "05",
+  "departamento": "Caaguazú",
+  "distrito": "Nueva Toledo"
+ },
+ {
+  "cod": "0601",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Caazapá"
+ },
+ {
+  "cod": "0602",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Abaí"
+ },
+ {
+  "cod": "0603",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Buena Vista"
+ },
+ {
+  "cod": "0604",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Dr. Moisés S. Bertoni"
+ },
+ {
+  "cod": "0605",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Gral. Higinio Morinigo"
+ },
+ {
+  "cod": "0606",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Maciel"
+ },
+ {
+  "cod": "0607",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "San Juan Nepomuceno"
+ },
+ {
+  "cod": "0608",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Tavaí"
+ },
+ {
+  "cod": "0609",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Yegros"
+ },
+ {
+  "cod": "0610",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "Yuty"
+ },
+ {
+  "cod": "0611",
+  "cod_dep": "06",
+  "departamento": "Caazapá",
+  "distrito": "3 De Mayo"
+ },
+ {
+  "cod": "0701",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Encarnación"
+ },
+ {
+  "cod": "0702",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Bella Vista"
+ },
+ {
+  "cod": "0703",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Cambyretá"
+ },
+ {
+  "cod": "0704",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Capitán Meza"
+ },
+ {
+  "cod": "0705",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Capitán Miranda"
+ },
+ {
+  "cod": "0706",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Nueva Alborada"
+ },
+ {
+  "cod": "0707",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Carmen Del Paraná"
+ },
+ {
+  "cod": "0708",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Coronel Bogado"
+ },
+ {
+  "cod": "0709",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Carlos Antonio López"
+ },
+ {
+  "cod": "0710",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Natalio"
+ },
+ {
+  "cod": "0711",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Fram"
+ },
+ {
+  "cod": "0712",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "General Artigas"
+ },
+ {
+  "cod": "0713",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "General Delgado"
+ },
+ {
+  "cod": "0714",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Hohenau"
+ },
+ {
+  "cod": "0715",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Jesús"
+ },
+ {
+  "cod": "0716",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "José Leandro Oviedo"
+ },
+ {
+  "cod": "0717",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Obligado"
+ },
+ {
+  "cod": "0718",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Mayor Julio Dionisio Otaño"
+ },
+ {
+  "cod": "0719",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "San Cosme Y Damian"
+ },
+ {
+  "cod": "0720",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "San Pedro Del Paraná"
+ },
+ {
+  "cod": "0721",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "San Rafael Del Paraná"
+ },
+ {
+  "cod": "0722",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Trinidad"
+ },
+ {
+  "cod": "0723",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Edelira"
+ },
+ {
+  "cod": "0724",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Tomás Romero Pereira"
+ },
+ {
+  "cod": "0725",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Alto Verá"
+ },
+ {
+  "cod": "0726",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "La Paz"
+ },
+ {
+  "cod": "0727",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Yatytay"
+ },
+ {
+  "cod": "0728",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "San Juan Del Paraná"
+ },
+ {
+  "cod": "0729",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Pirapó"
+ },
+ {
+  "cod": "0730",
+  "cod_dep": "07",
+  "departamento": "Itapúa",
+  "distrito": "Itapúa Poty"
+ },
+ {
+  "cod": "0801",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "San Juan Bautista De Las Misiones"
+ },
+ {
+  "cod": "0802",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "Ayolas"
+ },
+ {
+  "cod": "0803",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "San Ignacio"
+ },
+ {
+  "cod": "0804",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "San Miguel"
+ },
+ {
+  "cod": "0805",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "San Patricio"
+ },
+ {
+  "cod": "0806",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "Santa María"
+ },
+ {
+  "cod": "0807",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "Santa Rosa"
+ },
+ {
+  "cod": "0808",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "Santiago"
+ },
+ {
+  "cod": "0809",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "Villa Florida"
+ },
+ {
+  "cod": "0810",
+  "cod_dep": "08",
+  "departamento": "Misiones",
+  "distrito": "Yabebyry"
+ },
+ {
+  "cod": "0901",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Paraguarí"
+ },
+ {
+  "cod": "0902",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Acahay"
+ },
+ {
+  "cod": "0903",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Caapucú"
+ },
+ {
+  "cod": "0904",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Caballero"
+ },
+ {
+  "cod": "0905",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Carapeguá"
+ },
+ {
+  "cod": "0906",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Escobar"
+ },
+ {
+  "cod": "0907",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "La Colmena"
+ },
+ {
+  "cod": "0908",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Mbuyapey"
+ },
+ {
+  "cod": "0909",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Pirayú"
+ },
+ {
+  "cod": "0910",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Quiindy"
+ },
+ {
+  "cod": "0911",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Quyquyhó"
+ },
+ {
+  "cod": "0912",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Roque Gonzalez De Santacruz"
+ },
+ {
+  "cod": "0913",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Sapucái"
+ },
+ {
+  "cod": "0914",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Tebicuary-Mí"
+ },
+ {
+  "cod": "0915",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Yaguarón"
+ },
+ {
+  "cod": "0916",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Ybycuí"
+ },
+ {
+  "cod": "0917",
+  "cod_dep": "09",
+  "departamento": "Paraguarí",
+  "distrito": "Ybytymí"
+ },
+ {
+  "cod": "1001",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Ciudad Del Este"
+ },
+ {
+  "cod": "1002",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Presidente Franco"
+ },
+ {
+  "cod": "1003",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Domingo Martínez De Irala"
+ },
+ {
+  "cod": "1004",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Dr. Juan León Mallorquín"
+ },
+ {
+  "cod": "1005",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Hernandarias"
+ },
+ {
+  "cod": "1006",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Itakyry"
+ },
+ {
+  "cod": "1007",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Juan E. O'Leary"
+ },
+ {
+  "cod": "1008",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Ñacunday"
+ },
+ {
+  "cod": "1009",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Yguazú"
+ },
+ {
+  "cod": "1010",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Los Cedrales"
+ },
+ {
+  "cod": "1011",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Minga Guazú"
+ },
+ {
+  "cod": "1012",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "San Cristobal"
+ },
+ {
+  "cod": "1013",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Santa Rita"
+ },
+ {
+  "cod": "1014",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Naranjal"
+ },
+ {
+  "cod": "1015",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Santa Rosa Del Monday"
+ },
+ {
+  "cod": "1016",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Minga Porá"
+ },
+ {
+  "cod": "1017",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Mbaracayú"
+ },
+ {
+  "cod": "1018",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "San Alberto"
+ },
+ {
+  "cod": "1019",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Iruña"
+ },
+ {
+  "cod": "1020",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Santa Fe Del Paraná"
+ },
+ {
+  "cod": "1021",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Tavapy"
+ },
+ {
+  "cod": "1022",
+  "cod_dep": "10",
+  "departamento": "Alto Paraná",
+  "distrito": "Dr. Raúl Peña"
+ },
+ {
+  "cod": "1101",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Areguá"
+ },
+ {
+  "cod": "1102",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Capiatá"
+ },
+ {
+  "cod": "1103",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Fernando De La Mora"
+ },
+ {
+  "cod": "1104",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Guarambaré"
+ },
+ {
+  "cod": "1105",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Itá"
+ },
+ {
+  "cod": "1106",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Itauguá"
+ },
+ {
+  "cod": "1107",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Lambaré"
+ },
+ {
+  "cod": "1108",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Limpio"
+ },
+ {
+  "cod": "1109",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Luque"
+ },
+ {
+  "cod": "1110",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Mariano Roque Alonso"
+ },
+ {
+  "cod": "1111",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Nueva Italia"
+ },
+ {
+  "cod": "1112",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Ñemby"
+ },
+ {
+  "cod": "1113",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "San Antonio"
+ },
+ {
+  "cod": "1114",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "San Lorenzo"
+ },
+ {
+  "cod": "1115",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Villa Elisa"
+ },
+ {
+  "cod": "1116",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Villeta"
+ },
+ {
+  "cod": "1117",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Ypacaraí"
+ },
+ {
+  "cod": "1118",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "Ypané"
+ },
+ {
+  "cod": "1119",
+  "cod_dep": "11",
+  "departamento": "Central",
+  "distrito": "J. Augusto Saldivar"
+ },
+ {
+  "cod": "1201",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Pilar"
+ },
+ {
+  "cod": "1202",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Alberdi"
+ },
+ {
+  "cod": "1203",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Cerrito"
+ },
+ {
+  "cod": "1204",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Desmochados"
+ },
+ {
+  "cod": "1205",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Gral. José Eduvigis Díaz"
+ },
+ {
+  "cod": "1206",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Guazú-Cuá"
+ },
+ {
+  "cod": "1207",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Humaitá"
+ },
+ {
+  "cod": "1208",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Isla Umbú"
+ },
+ {
+  "cod": "1209",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Laureles"
+ },
+ {
+  "cod": "1210",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Mayor José Dejesús Martínez"
+ },
+ {
+  "cod": "1211",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Paso De Patria"
+ },
+ {
+  "cod": "1212",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "San Juan Bautista De Ñeembucú"
+ },
+ {
+  "cod": "1213",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Tacuaras"
+ },
+ {
+  "cod": "1214",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Villa Franca"
+ },
+ {
+  "cod": "1215",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Villa Oliva"
+ },
+ {
+  "cod": "1216",
+  "cod_dep": "12",
+  "departamento": "Ñeembucú",
+  "distrito": "Villalbín"
+ },
+ {
+  "cod": "1301",
+  "cod_dep": "13",
+  "departamento": "Amambay",
+  "distrito": "Pedro Juan Caballero"
+ },
+ {
+  "cod": "1302",
+  "cod_dep": "13",
+  "departamento": "Amambay",
+  "distrito": "Bella Vista"
+ },
+ {
+  "cod": "1303",
+  "cod_dep": "13",
+  "departamento": "Amambay",
+  "distrito": "Capitán Bado"
+ },
+ {
+  "cod": "1304",
+  "cod_dep": "13",
+  "departamento": "Amambay",
+  "distrito": "Zanja Pytã"
+ },
+ {
+  "cod": "1305",
+  "cod_dep": "13",
+  "departamento": "Amambay",
+  "distrito": "Karapaí"
+ },
+ {
+  "cod": "1401",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Salto Del Guairá"
+ },
+ {
+  "cod": "1402",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Corpus Christi"
+ },
+ {
+  "cod": "1403",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Villa Curuguaty"
+ },
+ {
+  "cod": "1404",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Villa Ygatimí"
+ },
+ {
+  "cod": "1405",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Itanará"
+ },
+ {
+  "cod": "1406",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Ypejhú"
+ },
+ {
+  "cod": "1407",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Francisco Caballero Alvarez"
+ },
+ {
+  "cod": "1408",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Katueté"
+ },
+ {
+  "cod": "1409",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "La Paloma Del Espíritu Santo"
+ },
+ {
+  "cod": "1410",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Nueva Esperanza"
+ },
+ {
+  "cod": "1411",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Yasy Cañy"
+ },
+ {
+  "cod": "1412",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Ybyrarobaná"
+ },
+ {
+  "cod": "1413",
+  "cod_dep": "14",
+  "departamento": "Canindeyú",
+  "distrito": "Yby Pytá"
+ },
+ {
+  "cod": "1502",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "Benjamín Aceval"
+ },
+ {
+  "cod": "1503",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "Puerto Pinasco"
+ },
+ {
+  "cod": "1504",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "Villa Hayes"
+ },
+ {
+  "cod": "1505",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "Nanawa"
+ },
+ {
+  "cod": "1506",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "José Falcón"
+ },
+ {
+  "cod": "1507",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "Tte. 1° Manuel Irala Fernández"
+ },
+ {
+  "cod": "1508",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "Teniente Esteban Martínez"
+ },
+ {
+  "cod": "1509",
+  "cod_dep": "15",
+  "departamento": "Presidente Hayes",
+  "distrito": "General José María Bruguez"
+ },
+ {
+  "cod": "1602",
+  "cod_dep": "16",
+  "departamento": "Boquerón",
+  "distrito": "Mariscal José Félix Estigarribia"
+ },
+ {
+  "cod": "1604",
+  "cod_dep": "16",
+  "departamento": "Boquerón",
+  "distrito": "Filadelfia"
+ },
+ {
+  "cod": "1605",
+  "cod_dep": "16",
+  "departamento": "Boquerón",
+  "distrito": "Loma Plata"
+ },
+ {
+  "cod": "1701",
+  "cod_dep": "17",
+  "departamento": "Alto Paraguay",
+  "distrito": "Fuerte Olimpo"
+ },
+ {
+  "cod": "1702",
+  "cod_dep": "17",
+  "departamento": "Alto Paraguay",
+  "distrito": "Puerto Casado"
+ },
+ {
+  "cod": "1704",
+  "cod_dep": "17",
+  "departamento": "Alto Paraguay",
+  "distrito": "Bahía Negra"
+ },
+ {
+  "cod": "1705",
+  "cod_dep": "17",
+  "departamento": "Alto Paraguay",
+  "distrito": "Carmelo Peralta"
+ }
+]

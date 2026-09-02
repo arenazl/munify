@@ -8,12 +8,13 @@ su circuito propio (resolver → confirmar supervisor → confirmar vecino).
 Aditivo al flujo simple (Reclamo.empleado_id directo) — los munis chicos no
 necesitan OTs. Frontend gated por municipio_modulos 'ordenes_trabajo' (opt-in).
 """
-from datetime import datetime, date, time
-from typing import Optional, List
+import logging
+from datetime import datetime, date, time, timezone
+from typing import Optional, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,15 +22,30 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
-    OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo, EstadoOrdenTrabajo, PrioridadOT,
-    Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
+    OrdenTrabajo, OrdenTrabajoReclamo, EstadoOrdenTrabajo, PrioridadOT,
+    OrigenOT, Reclamo, CategoriaReclamo, HistorialReclamo, HistorialOrdenTrabajo,
+    Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+    TipoMovimientoInventario,
 )
-from models.enums import RolUsuario
+from models.enums import RolUsuario, EstadoReclamo
+from services.inventario_movimientos import registrar_movimiento
+from services.notificacion_service import NotificacionService
+from services import push_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 ESTADOS_FINALES = (EstadoOrdenTrabajo.COMPLETADA, EstadoOrdenTrabajo.CANCELADA)
+
+# T6 · etiquetas legibles del motivo de bloqueo (map resiliente, regla dura #3:
+# .get con fallback, nunca switch). El detalle libre lo agrega OTBloquear.motivo.
+MOTIVO_BLOQUEO_LABELS = {
+    "falta_material": "Falta de material",
+    "clima": "Clima",
+    "vecino_ausente": "Vecino ausente",
+    "otro": "Otro",
+}
 
 
 # ============================== Schemas ==============================
@@ -66,7 +82,9 @@ class OTCreate(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
     prioridad: PrioridadOT = PrioridadOT.MEDIA
-    tipo_trabajo_id: Optional[int] = None
+    # Catálogo ÚNICO: la OT se clasifica con las categorías de reclamo del muni
+    # (incluidas las `interna=True`, que existen solo para trabajo interno).
+    categoria_id: Optional[int] = None
     reclamo_ids: List[int] = []
     cuadrilla_id: Optional[int] = None
     empleado_id: Optional[int] = None
@@ -82,7 +100,7 @@ class OTUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
     prioridad: Optional[PrioridadOT] = None
-    tipo_trabajo_id: Optional[int] = None
+    categoria_id: Optional[int] = None
     reclamo_ids: Optional[List[int]] = None  # None = no tocar vínculos
     cuadrilla_id: Optional[int] = None
     empleado_id: Optional[int] = None
@@ -102,9 +120,28 @@ class OTAsignar(BaseModel):
     hora_fin: Optional[time] = None
 
 
+class ConsumoReal(BaseModel):
+    """Cantidad realmente consumida de un recurso al cerrar la OT.
+
+    `recurso_id` = OrdenTrabajoRecurso.id (la fila de recurso de la OT, tal como
+    la expone RecursoResponse.id), NO el item de inventario."""
+    recurso_id: int
+    cantidad_real: float
+
+
 class OTCompletar(BaseModel):
     notas_cierre: str
     horas_reales: Optional[float] = None
+    # D4: opt-in para finalizar también los reclamos vinculados al cerrar la OT.
+    finalizar_reclamos: bool = False
+    # T6: consumo REAL por consumible (lo que de verdad se usó en campo). Si no
+    # viene un recurso, se descuenta la cantidad PLANEADA (compat).
+    consumos_reales: Optional[List[ConsumoReal]] = None
+
+
+class OTBloquear(BaseModel):
+    motivo_tipo: Literal["falta_material", "clima", "vecino_ausente", "otro"]
+    motivo: Optional[str] = None
 
 
 class OTCancelar(BaseModel):
@@ -126,10 +163,12 @@ class OTResponse(BaseModel):
     numero: str
     estado: EstadoOrdenTrabajo
     prioridad: PrioridadOT = PrioridadOT.MEDIA
-    tipo_trabajo_id: Optional[int] = None
-    tipo_trabajo_nombre: Optional[str] = None
-    tipo_trabajo_color: Optional[str] = None
-    tipo_trabajo_icono: Optional[str] = None
+    # Clasificación resuelta: el front recibe el nombre/color/icono ya
+    # materializados y no tiene que ir a buscar la categoría aparte.
+    categoria_id: Optional[int] = None
+    categoria_nombre: Optional[str] = None
+    categoria_color: Optional[str] = None
+    categoria_icono: Optional[str] = None
     titulo: str
     descripcion: Optional[str] = None
     cuadrilla_id: Optional[int] = None
@@ -183,10 +222,23 @@ def _query_base():
     return select(OrdenTrabajo).options(
         selectinload(OrdenTrabajo.cuadrilla),
         selectinload(OrdenTrabajo.empleado),
-        selectinload(OrdenTrabajo.tipo_trabajo),
+        selectinload(OrdenTrabajo.categoria),
         selectinload(OrdenTrabajo.reclamos_vinculados).selectinload(OrdenTrabajoReclamo.reclamo),
         selectinload(OrdenTrabajo.recursos).selectinload(OrdenTrabajoRecurso.item),
     )
+
+
+def _orden_prioridad_ot():
+    """ORDER BY por prioridad de la OT: urgente>alta>media>baja (F6·A6). La
+    prioridad de la OT deja de ser decorativa — encabeza el orden de las listas;
+    el desempate por antigüedad (created_at desc) lo agrega el caller."""
+    return case(
+        (OrdenTrabajo.prioridad == PrioridadOT.URGENTE, 4),
+        (OrdenTrabajo.prioridad == PrioridadOT.ALTA, 3),
+        (OrdenTrabajo.prioridad == PrioridadOT.MEDIA, 2),
+        (OrdenTrabajo.prioridad == PrioridadOT.BAJA, 1),
+        else_=0,
+    ).desc()
 
 
 def _to_response(ot: OrdenTrabajo) -> OTResponse:
@@ -195,10 +247,10 @@ def _to_response(ot: OrdenTrabajo) -> OTResponse:
         resp.cuadrilla_nombre = f"{ot.cuadrilla.nombre} {ot.cuadrilla.apellido or ''}".strip()
     if ot.empleado:
         resp.empleado_nombre = f"{ot.empleado.nombre} {ot.empleado.apellido or ''}".strip()
-    if ot.tipo_trabajo:
-        resp.tipo_trabajo_nombre = ot.tipo_trabajo.nombre
-        resp.tipo_trabajo_color = ot.tipo_trabajo.color
-        resp.tipo_trabajo_icono = ot.tipo_trabajo.icono
+    if ot.categoria:
+        resp.categoria_nombre = ot.categoria.nombre
+        resp.categoria_color = ot.categoria.color
+        resp.categoria_icono = ot.categoria.icono
     resp.reclamos = [
         ReclamoMini(
             id=link.reclamo.id,
@@ -251,15 +303,18 @@ async def _validar_recursos(db: AsyncSession, municipio_id: int,
             raise HTTPException(status_code=400, detail="Empleado inválido para este municipio")
 
 
-async def _validar_tipo_trabajo(db: AsyncSession, municipio_id: int, tipo_trabajo_id: Optional[int]):
-    """El tipo de trabajo debe pertenecer al mismo municipio (anti cross-tenant)."""
-    if not tipo_trabajo_id:
+async def _validar_categoria(db: AsyncSession, municipio_id: int, categoria_id: Optional[int]):
+    """La categoría debe existir Y ser del mismo municipio (anti cross-tenant).
+
+    Acepta tanto las públicas como las `interna=True`: una OT es trabajo interno
+    y puede clasificarse con cualquiera del catálogo del muni."""
+    if not categoria_id:
         return
-    ok = (await db.execute(select(OrdenTrabajoTipo.id).where(
-        OrdenTrabajoTipo.id == tipo_trabajo_id, OrdenTrabajoTipo.municipio_id == municipio_id,
+    ok = (await db.execute(select(CategoriaReclamo.id).where(
+        CategoriaReclamo.id == categoria_id, CategoriaReclamo.municipio_id == municipio_id,
     ))).scalar_one_or_none()
     if not ok:
-        raise HTTPException(status_code=400, detail="Tipo de trabajo inválido para este municipio")
+        raise HTTPException(status_code=400, detail="Categoría inválida para este municipio")
 
 
 async def _vincular_reclamos(db: AsyncSession, ot: OrdenTrabajo, reclamo_ids: List[int],
@@ -286,6 +341,24 @@ def _historial_reclamos(db: AsyncSession, reclamos: List[Reclamo], usuario_id: i
         ))
 
 
+def _historial_ot(db: AsyncSession, ot: OrdenTrabajo, usuario_id: int, accion: str,
+                  estado_nuevo: Optional[EstadoOrdenTrabajo],
+                  estado_anterior: Optional[EstadoOrdenTrabajo] = None,
+                  comentario: Optional[str] = None):
+    """T6 · registra UNA fila de auditoría de la OT por transición: quién la
+    movió, estado_anterior → estado_nuevo y un comentario. NO commitea (el caller
+    decide el commit, en la misma transacción que la mutación de la OT).
+
+    Multi-tenant heredado: `ot` ya viene scopeada por municipio (resuelta con
+    _get_ot / crear_ot_core), y el vínculo orden_trabajo_id acota el tenant — por
+    eso no se repite municipio_id acá. Requiere `ot.id` (la OT ya flusheada)."""
+    db.add(HistorialOrdenTrabajo(
+        orden_trabajo_id=ot.id, usuario_id=usuario_id, accion=accion,
+        estado_anterior=estado_anterior, estado_nuevo=estado_nuevo,
+        comentario=comentario,
+    ))
+
+
 def _puede_operar_en_campo(ot: OrdenTrabajo, user: User, cuadrillas_ids: set) -> bool:
     """Empleado solo opera su OT: responsable directo o miembro de la cuadrilla."""
     if user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
@@ -307,6 +380,69 @@ async def _cuadrillas_del_user(db: AsyncSession, user: User) -> set:
         )
     )).scalars().all()
     return set(rows)
+
+
+# ---------------------- Notificaciones (F1 · matriz canónica) -------
+#
+# El módulo OT era 100% mudo. Acá conectamos los helpers ya existentes de
+# services/notificacion_service.py (in-app + campanita, transaccional vía flush)
+# y services/push_service.py (web-push, best-effort DESPUÉS del commit).
+# Para OT la matriz sólo pide in-app+push (nunca WhatsApp): enviar_whatsapp=False.
+
+async def _empleado_user_ids(db: AsyncSession, empleado_ids) -> List[int]:
+    """User.id vinculados a un conjunto de empleado_id (para el web-push)."""
+    ids = [e for e in empleado_ids if e]
+    if not ids:
+        return []
+    rows = (await db.execute(
+        select(User.id).where(User.empleado_id.in_(ids))
+    )).scalars().all()
+    return list(rows)
+
+
+async def _destinatarios_ot(db: AsyncSession, ot: OrdenTrabajo) -> set:
+    """empleado_id destino de una OT: responsable directo + miembros activos
+    de la cuadrilla asignada (dedup por set)."""
+    ids = set()
+    if ot.empleado_id:
+        ids.add(ot.empleado_id)
+    if ot.cuadrilla_id:
+        rows = (await db.execute(select(EmpleadoCuadrilla.empleado_id).where(
+            EmpleadoCuadrilla.cuadrilla_id == ot.cuadrilla_id,
+            EmpleadoCuadrilla.activo == True,  # noqa: E712
+        ))).scalars().all()
+        ids.update(rows)
+    return ids
+
+
+async def _notificar_ot_asignada_inapp(db: AsyncSession, ot: OrdenTrabajo) -> Optional[dict]:
+    """In-app al responsable/miembros de cuadrilla de una OT recién asignada.
+    Devuelve {user_ids, titulo, mensaje} (strings ya materializados) para
+    disparar el web-push después del commit, o None si no hay destinatarios."""
+    empleado_ids = await _destinatarios_ot(db, ot)
+    if not empleado_ids:
+        return None
+    titulo = f"OT {ot.numero} asignada"
+    mensaje = f"Te asignaron la orden {ot.numero}: {ot.titulo}"
+    for emp_id in empleado_ids:
+        await NotificacionService.notificar_empleado(
+            db=db, empleado_id=emp_id, titulo=titulo, mensaje=mensaje,
+            tipo="info", enviar_whatsapp=False,
+        )
+    user_ids = await _empleado_user_ids(db, empleado_ids)
+    return {"user_ids": user_ids, "titulo": titulo, "mensaje": mensaje}
+
+
+async def _push_a_users(db: AsyncSession, user_ids, titulo: str, mensaje: str, url: str):
+    """Web-push best-effort a un conjunto de usuarios. Se llama DESPUÉS del
+    commit: send_push_to_user ya degrada solo si no hay VAPID/suscripciones."""
+    for uid in {u for u in user_ids if u}:
+        try:
+            await push_service.send_push_to_user(
+                db=db, user_id=uid, title=titulo, body=mensaje, url=url,
+            )
+        except Exception:  # noqa: BLE001 — push nunca debe romper el flujo
+            pass
 
 
 # ---------------------- Recursos de inventario ----------------------
@@ -384,6 +520,14 @@ async def _sincronizar_recursos(db: AsyncSession, ot: OrdenTrabajo,
                 orden_trabajo_id=ot.id, item_id=item.id,
                 tipo=TipoRecursoOT.RESERVA, item_nombre=item.nombre,
             ))
+            # La TOMA tambien deja renglon en el libro. Sin esto el historial
+            # de una maquina mostraba la devolucion sin la toma que la explica
+            # (dueño, 2026-08-31): media historia es peor que ninguna.
+            await registrar_movimiento(
+                db, item, TipoMovimientoInventario.RESERVA_OT, 0,
+                motivo=f"Tomado por {ot.numero or 'una orden'}",
+                orden_trabajo_id=ot.id,
+            )
 
 
 async def _liberar_activo(db: AsyncSession, item_id: int, ot_id: int, municipio_id: int):
@@ -398,9 +542,14 @@ async def _liberar_activo(db: AsyncSession, item_id: int, ot_id: int, municipio_
 
 
 async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int,
-                           descontar_consumos: bool):
+                           descontar_consumos: bool, consumos_reales: Optional[dict] = None):
     """Al cerrar la OT: libera activos siempre; descuenta stock de
-    consumibles sólo si `descontar_consumos` (completar sí, cancelar no)."""
+    consumibles sólo si `descontar_consumos` (completar sí, cancelar no).
+
+    T6 · `consumos_reales` = {OrdenTrabajoRecurso.id: cantidad_real}. Para cada
+    consumible con cantidad real informada se descuenta ESA (y el registro pasa a
+    reflejarla); si no viene, cae a la PLANEADA (compat con el flujo previo)."""
+    consumos_reales = consumos_reales or {}
     for rec in ot.recursos:
         item = (await db.execute(select(InventarioItem).where(
             InventarioItem.id == rec.item_id, InventarioItem.municipio_id == municipio_id,
@@ -411,11 +560,304 @@ async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int
             if item.ocupado_por_ot_id in (ot.id, None):
                 item.estado_activo = EstadoActivo.DISPONIBLE
                 item.ocupado_por_ot_id = None
-        elif (rec.tipo == TipoRecursoOT.CONSUMO and descontar_consumos
-              and not rec.aplicado and rec.cantidad):
-            if item.stock_actual is not None:
-                item.stock_actual = max(0.0, (item.stock_actual or 0) - rec.cantidad)
+                # El activo vuelve al deposito: queda el renglon para poder
+                # contestar quien lo tuvo y hasta cuando, sin abrir la OT.
+                await registrar_movimiento(
+                    db, item, TipoMovimientoInventario.DEVOLUCION_OT, 0,
+                    motivo=f"Devuelto al cerrar {ot.numero or 'la orden'}",
+                    orden_trabajo_id=ot.id,
+                )
+        elif rec.tipo == TipoRecursoOT.CONSUMO and descontar_consumos and not rec.aplicado:
+            real = consumos_reales.get(rec.id)
+            cant = real if real is not None else rec.cantidad
+            if cant is None or cant < 0:
+                continue  # sin cantidad válida: no descuenta ni marca (compat planeada None)
+            if real is not None:
+                rec.cantidad = cant  # el registro refleja el consumo real informado
+            if item.stock_actual is not None and cant:
+                # El descuento pasa por el libro: es la UNICA puerta que mueve
+                # stock, si no el historial vuelve a mentir (2026-08-31).
+                await registrar_movimiento(
+                    db, item, TipoMovimientoInventario.CONSUMO_OT, cant,
+                    motivo=f"Consumido por {ot.numero or 'la orden'}",
+                    orden_trabajo_id=ot.id,
+                )
             rec.aplicado = True
+
+
+# ---------------------- OT universal · implícita 1:1 (F6) -----------
+#
+# Toda asignación de un reclamo a un empleado crea/actualiza por debajo una OT
+# "implícita" (origen=IMPLICITA) 1:1 con ese reclamo. Es transparente: se filtra
+# de las listas de OT (no es una OT "formal") y ESPEJA el estado de su reclamo.
+# La creación es SILENCIOSA (el aviso de "reclamo asignado" ya lo manda
+# reclamos.py — no se duplica). Se importa lazy desde reclamos.py /
+# planificacion.py (sin ciclo: este módulo no importa esos).
+#
+# MODELO UNIVERSAL (D11) — la OT implícita corre para TODOS los munis por igual,
+# SIN gate per-tenant. El modelo es uno solo; el flag 'ordenes_trabajo' es solo
+# de superficie (qué ve el muni en el menú), NO ramifica el modelo. Que un muni
+# no use el módulo OT no lo excluye del modelo: sus OT implícitas existen igual,
+# transparentes, y no tocan tesorería (tablas distintas). Meter un `if muni` acá
+# sería el primer paso a un modelo Frankenstein.
+#
+# GARANTÍA DURA — todos los hooks públicos (upsert/cancelar/espejar) pasan por
+# _ot_implicita_segura, que la aplica en un solo lugar (SSoT):
+#   AISLAMIENTO DEL FALLO: el trabajo sobre la OT corre en un savepoint
+#   best-effort. Un fallo (incl. la race de _siguiente_numero) se contiene y
+#   JAMÁS aborta la mutación del reclamo que disparó el hook — ningún tenant
+#   puede comerse un 500 por la OT implícita.
+
+# Espejo reclamo → OT implícita. Map resiliente (regla dura #3: .get, no switch).
+_ESPEJO_ESTADO_OT = {
+    EstadoReclamo.EN_CURSO: EstadoOrdenTrabajo.EN_CURSO,
+    EstadoReclamo.FINALIZADO: EstadoOrdenTrabajo.COMPLETADA,
+    EstadoReclamo.RESUELTO: EstadoOrdenTrabajo.COMPLETADA,
+    EstadoReclamo.RECHAZADO: EstadoOrdenTrabajo.CANCELADA,
+}
+
+
+async def _ot_implicita_segura(db: AsyncSession, reclamo: Reclamo, trabajo, ctx: str) -> None:
+    """Corre `trabajo` (callable async sin args, el laburo real sobre la OT) con la
+    garantía del bloque de arriba. Nunca propaga: un fallo se loguea y se ignora
+    (best-effort).
+
+    Detalle fino: se flushea ANTES de abrir el savepoint para que la mutación del
+    reclamo quede persistida en la transacción EXTERNA. Así, si el trabajo de la
+    OT falla, el rollback del savepoint revierte solo la OT — nunca la asignación/
+    cambio de estado del reclamo. El flush del reclamo, si fallara, sí propaga
+    (es un error real del reclamo, no de la OT)."""
+    await db.flush()
+    try:
+        async with db.begin_nested():
+            await trabajo()
+    except Exception:
+        logger.warning(
+            "OT implícita: '%s' falló para reclamo %s (best-effort, ignorado)",
+            ctx, getattr(reclamo, "id", "?"), exc_info=True,
+        )
+
+
+def _prioridad_default_a_ot(valor: Optional[int]) -> PrioridadOT:
+    """Mapea `categoria.prioridad_default` (Integer 1-5, 1=más urgente) al enum de
+    la OT: 1-2→ALTA, 3→MEDIA, 4-5→BAJA. Sin valor → MEDIA. (F6·A6: el default de
+    la categoría deja de ser fantasma — el create de la OT sí lo lee.)"""
+    if valor is None:
+        return PrioridadOT.MEDIA
+    if valor <= 2:
+        return PrioridadOT.ALTA
+    if valor == 3:
+        return PrioridadOT.MEDIA
+    return PrioridadOT.BAJA
+
+
+async def _prioridad_inicial_ot(db: AsyncSession, reclamo_ids: List[int],
+                                municipio_id: int) -> PrioridadOT:
+    """Prioridad inicial de una OT derivada de la categoría de sus reclamos. Toma
+    el `prioridad_default` más urgente (menor valor 1-5) entre las categorías de
+    los reclamos vinculados (multi-tenant: filtra por municipio). Sin reclamos,
+    sin categoría o sin valor → MEDIA. Un solo query, sin N+1."""
+    ids = [rid for rid in reclamo_ids if rid is not None]
+    if not ids:
+        return PrioridadOT.MEDIA
+    valor = (await db.execute(
+        select(func.min(CategoriaReclamo.prioridad_default))
+        .join(Reclamo, Reclamo.categoria_id == CategoriaReclamo.id)
+        .where(Reclamo.id.in_(ids), Reclamo.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    return _prioridad_default_a_ot(valor)
+
+
+async def _categoria_inicial_ot(db: AsyncSession, reclamo_ids: List[int],
+                                municipio_id: int) -> Optional[int]:
+    """Categoría heredada de los reclamos que originan la OT: la del reclamo más
+    antiguo (menor id) que tenga categoría. Multi-tenant: filtra por municipio.
+    Un solo query, sin N+1. None si no hay reclamos o ninguno tiene categoría.
+
+    Es el mismo criterio que usa la migración para rellenar el histórico, así el
+    dato viejo y el nuevo se derivan igual."""
+    ids = [rid for rid in reclamo_ids if rid is not None]
+    if not ids:
+        return None
+    return (await db.execute(
+        select(Reclamo.categoria_id)
+        .where(
+            Reclamo.id.in_(ids),
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.categoria_id.isnot(None),
+        )
+        .order_by(Reclamo.id.asc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+
+async def crear_ot_core(
+    db: AsyncSession, *, municipio_id: int, creador_id: int, titulo: str,
+    descripcion: Optional[str] = None, prioridad: Optional[PrioridadOT] = None,
+    categoria_id: Optional[int] = None, reclamo_ids: Optional[List[int]] = None,
+    cuadrilla_id: Optional[int] = None, empleado_id: Optional[int] = None,
+    fecha_programada: Optional[date] = None, hora_inicio: Optional[time] = None,
+    hora_fin: Optional[time] = None, materiales=None,
+    horas_estimadas: Optional[float] = None, origen: OrigenOT = OrigenOT.MANUAL,
+) -> tuple:
+    """Crea una OT (manual o implícita) y la vincula a sus reclamos. NO commitea,
+    NO notifica y NO toca recursos/historial — eso lo decide el caller. Devuelve
+    (ot, reclamos) con la OT flusheada (ya tiene id).
+
+    PRECONDICIÓN del caller: empleado_id/cuadrilla_id deben pertenecer a
+    municipio_id. `crear_orden` lo valida con _validar_recursos; el path de OT
+    implícita hereda el empleado ya validado en el call site (reclamos.py /
+    planificacion.py). No se revalida acá para no duplicar el query en el hot path.
+
+    `prioridad=None` (default): se deriva del `prioridad_default` de la categoría de
+    los reclamos vinculados (F6·A6); sin categoría/valor cae a MEDIA. Los callers
+    que fijan una prioridad explícita (create manual desde el Sheet) la respetan.
+
+    `categoria_id=None` (default): la OT HEREDA la categoría del reclamo que la
+    origina (el más antiguo de los vinculados). Ese es el punto del catálogo
+    único — una OT nacida de un reclamo ya clasificado no se reclasifica a mano.
+    Un `categoria_id` explícito (create manual) siempre gana.
+
+    PRECONDICIÓN del caller: si pasa `categoria_id` explícito, ya lo validó
+    contra el municipio (`_validar_categoria`). La categoría heredada no
+    necesita validación: sale de un reclamo del mismo municipio."""
+    numero = await _siguiente_numero(db, municipio_id)
+    if prioridad is None:
+        prioridad = await _prioridad_inicial_ot(db, reclamo_ids or [], municipio_id)
+    if categoria_id is None:
+        categoria_id = await _categoria_inicial_ot(db, reclamo_ids or [], municipio_id)
+    estado = (
+        EstadoOrdenTrabajo.ASIGNADA
+        if (cuadrilla_id or empleado_id)
+        else EstadoOrdenTrabajo.PENDIENTE
+    )
+    ot = OrdenTrabajo(
+        municipio_id=municipio_id, numero=numero, estado=estado, origen=origen,
+        titulo=titulo, descripcion=descripcion, prioridad=prioridad,
+        categoria_id=categoria_id, cuadrilla_id=cuadrilla_id, empleado_id=empleado_id,
+        fecha_programada=fecha_programada, hora_inicio=hora_inicio, hora_fin=hora_fin,
+        materiales=materiales, horas_estimadas=horas_estimadas, creador_id=creador_id,
+    )
+    db.add(ot)
+    await db.flush()
+    reclamos = await _vincular_reclamos(db, ot, reclamo_ids or [], municipio_id)
+    return ot, reclamos
+
+
+async def _ot_implicita_de(db: AsyncSession, reclamo_id: int, municipio_id: int,
+                           incluir_finales: bool = False) -> Optional[OrdenTrabajo]:
+    """La OT implícita 1:1 del reclamo (o None). Por defecto solo la vigente
+    (no completada/cancelada). Carga recursos para poder cerrarlos sin lazy-load."""
+    q = (
+        select(OrdenTrabajo)
+        .options(selectinload(OrdenTrabajo.recursos))
+        .join(OrdenTrabajoReclamo, OrdenTrabajoReclamo.orden_trabajo_id == OrdenTrabajo.id)
+        .where(
+            OrdenTrabajoReclamo.reclamo_id == reclamo_id,
+            OrdenTrabajo.municipio_id == municipio_id,
+            OrdenTrabajo.origen == OrigenOT.IMPLICITA,
+        )
+        .order_by(OrdenTrabajo.id.desc())
+    )
+    if not incluir_finales:
+        q = q.where(OrdenTrabajo.estado.notin_(ESTADOS_FINALES))
+    return (await db.execute(q.limit(1))).scalars().first()
+
+
+async def _upsert_ot_implicita_core(db: AsyncSession, reclamo: Reclamo,
+                                    empleado_id: int, creador_id: int) -> OrdenTrabajo:
+    # PRECONDICIÓN: empleado_id ya viene validado ↔ reclamo.municipio_id por el
+    # call site (asignar_empleado / asignar_fecha_reclamo / auto_asignar_reclamo).
+    ot = await _ot_implicita_de(db, reclamo.id, reclamo.municipio_id)
+    if ot is None:
+        ot, _ = await crear_ot_core(
+            db, municipio_id=reclamo.municipio_id, creador_id=creador_id,
+            titulo=reclamo.titulo, descripcion=reclamo.descripcion,
+            # La OT implícita HEREDA la clasificación del reclamo que la origina
+            # (catálogo único). Se pasa explícito y no por `_categoria_inicial_ot`
+            # para ahorrar un query en el hot path de la asignación.
+            categoria_id=reclamo.categoria_id,
+            reclamo_ids=[reclamo.id], empleado_id=empleado_id,
+            fecha_programada=reclamo.fecha_programada, hora_inicio=reclamo.hora_inicio,
+            hora_fin=reclamo.hora_fin, origen=OrigenOT.IMPLICITA,
+        )
+    else:
+        ot.empleado_id = empleado_id
+        ot.fecha_programada = reclamo.fecha_programada
+        ot.hora_inicio = reclamo.hora_inicio
+        ot.hora_fin = reclamo.hora_fin
+        # Espejo 1:1: si el reclamo tiene categoría, la OT implícita la refleja
+        # (igual que fecha/hora/empleado). Si el reclamo quedó sin categoría, se
+        # conserva la que ya tenía la OT en vez de desclasificarla.
+        if reclamo.categoria_id:
+            ot.categoria_id = reclamo.categoria_id
+    # Estado de la OT = espejo del reclamo, o ASIGNADA si el reclamo no mapea.
+    ot.estado = _ESPEJO_ESTADO_OT.get(reclamo.estado, EstadoOrdenTrabajo.ASIGNADA)
+    return ot
+
+
+async def upsert_ot_implicita(db: AsyncSession, reclamo: Reclamo,
+                              empleado_id: int, creador_id: int) -> None:
+    """Hook: crea/actualiza la OT implícita 1:1 de un reclamo recién asignado.
+    Silenciosa (no notifica). Gate + best-effort vía _ot_implicita_segura."""
+    await _ot_implicita_segura(
+        db, reclamo,
+        lambda: _upsert_ot_implicita_core(db, reclamo, empleado_id, creador_id),
+        ctx="upsert",
+    )
+
+
+async def _cancelar_ot_implicita_core(db: AsyncSession, reclamo: Reclamo, motivo: str) -> None:
+    ot = await _ot_implicita_de(db, reclamo.id, reclamo.municipio_id)
+    if ot is None:
+        return
+    ot.estado = EstadoOrdenTrabajo.CANCELADA
+    ot.motivo_cancelacion = motivo
+    ot.empleado_id = None
+    if ot.recursos:
+        await _cerrar_recursos(db, ot, reclamo.municipio_id, descontar_consumos=False)
+
+
+async def cancelar_ot_implicita(db: AsyncSession, reclamo: Reclamo,
+                                motivo: str = "Reclamo desasignado") -> None:
+    """Hook: al desasignar/reasignar (el reclamo vuelve al pool), cancela la OT
+    implícita vigente y libera sus recursos. Gate + best-effort. No-op si no hay
+    OT implícita."""
+    await _ot_implicita_segura(
+        db, reclamo,
+        lambda: _cancelar_ot_implicita_core(db, reclamo, motivo),
+        ctx="cancelar",
+    )
+
+
+async def _espejar_ot_implicita_core(db: AsyncSession, reclamo: Reclamo) -> None:
+    destino = _ESPEJO_ESTADO_OT.get(reclamo.estado)
+    if destino is None:
+        return
+    ot = await _ot_implicita_de(db, reclamo.id, reclamo.municipio_id)
+    if ot is None:
+        return
+    ot.estado = destino
+    if destino == EstadoOrdenTrabajo.COMPLETADA and not ot.fecha_completada:
+        ot.fecha_completada = datetime.now(timezone.utc)
+        if ot.recursos:
+            await _cerrar_recursos(db, ot, reclamo.municipio_id, descontar_consumos=True)
+    elif destino == EstadoOrdenTrabajo.CANCELADA:
+        if not ot.motivo_cancelacion:
+            ot.motivo_cancelacion = "Reclamo rechazado"
+        if ot.recursos:
+            await _cerrar_recursos(db, ot, reclamo.municipio_id, descontar_consumos=False)
+
+
+async def espejar_ot_implicita(db: AsyncSession, reclamo: Reclamo) -> None:
+    """Hook: espeja el estado del reclamo en su OT implícita vigente. Idempotente;
+    no-op si no hay OT o el estado no mapea. Solo toca OTs origen=IMPLICITA (las
+    manuales/consolidadas conservan su ciclo propio). Gate + best-effort."""
+    await _ot_implicita_segura(
+        db, reclamo,
+        lambda: _espejar_ot_implicita_core(db, reclamo),
+        ctx="espejar",
+    )
 
 
 # ============================== Endpoints ==============================
@@ -437,7 +879,12 @@ async def listar_ordenes(
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"])),
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
-    query = _query_base().where(OrdenTrabajo.municipio_id == municipio_id)
+    # Las OT implícitas (espejo 1:1 de un reclamo asignado) son transparentes:
+    # nunca se listan como OTs formales.
+    query = _query_base().where(
+        OrdenTrabajo.municipio_id == municipio_id,
+        OrdenTrabajo.origen != OrigenOT.IMPLICITA,
+    )
 
     es_empleado = current_user.rol == RolUsuario.EMPLEADO
     if es_empleado or solo_mias:
@@ -474,7 +921,7 @@ async def listar_ordenes(
         from sqlalchemy import or_
         query = query.where(or_(OrdenTrabajo.numero.ilike(s), OrdenTrabajo.titulo.ilike(s)))
 
-    query = query.order_by(OrdenTrabajo.created_at.desc()).offset(skip).limit(limit)
+    query = query.order_by(_orden_prioridad_ot(), OrdenTrabajo.created_at.desc()).offset(skip).limit(limit)
     ots = (await db.execute(query)).scalars().unique().all()
     return [_to_response(ot) for ot in ots]
 
@@ -493,8 +940,9 @@ async def ordenes_de_un_reclamo(
         .where(
             OrdenTrabajoReclamo.reclamo_id == reclamo_id,
             OrdenTrabajo.municipio_id == municipio_id,
+            OrdenTrabajo.origen != OrigenOT.IMPLICITA,
         )
-        .order_by(OrdenTrabajo.created_at.desc())
+        .order_by(_orden_prioridad_ot(), OrdenTrabajo.created_at.desc())
     )).scalars().unique().all()
     return [_to_response(ot) for ot in ots]
 
@@ -520,46 +968,43 @@ async def crear_orden(
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
-    await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
+    await _validar_categoria(db, municipio_id, data.categoria_id)
 
-    numero = await _siguiente_numero(db, municipio_id)
-    estado = (
-        EstadoOrdenTrabajo.ASIGNADA
-        if (data.cuadrilla_id or data.empleado_id)
-        else EstadoOrdenTrabajo.PENDIENTE
-    )
-
-    ot = OrdenTrabajo(
-        municipio_id=municipio_id,
-        numero=numero,
-        estado=estado,
-        titulo=data.titulo,
-        descripcion=data.descripcion,
-        prioridad=data.prioridad,
-        tipo_trabajo_id=data.tipo_trabajo_id,
-        cuadrilla_id=data.cuadrilla_id,
-        empleado_id=data.empleado_id,
-        fecha_programada=data.fecha_programada,
-        hora_inicio=data.hora_inicio,
+    ot, reclamos = await crear_ot_core(
+        db, municipio_id=municipio_id, creador_id=current_user.id,
+        titulo=data.titulo, descripcion=data.descripcion, prioridad=data.prioridad,
+        categoria_id=data.categoria_id, reclamo_ids=data.reclamo_ids,
+        cuadrilla_id=data.cuadrilla_id, empleado_id=data.empleado_id,
+        fecha_programada=data.fecha_programada, hora_inicio=data.hora_inicio,
         hora_fin=data.hora_fin,
         materiales=[m.model_dump() for m in data.materiales] if data.materiales else None,
-        horas_estimadas=data.horas_estimadas,
-        creador_id=current_user.id,
+        horas_estimadas=data.horas_estimadas, origen=OrigenOT.MANUAL,
     )
-    db.add(ot)
-    await db.flush()
-
-    reclamos = await _vincular_reclamos(db, ot, data.reclamo_ids, municipio_id)
     _historial_reclamos(
         db, reclamos, current_user.id,
         accion="ot_creada",
-        comentario=f"Orden de trabajo {numero} creada: {data.titulo}",
+        comentario=f"Orden de trabajo {ot.numero} creada: {data.titulo}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_creada",
+        estado_anterior=None, estado_nuevo=ot.estado,
+        comentario=f"OT {ot.numero} creada: {data.titulo}",
     )
 
     if data.recursos:
         await _sincronizar_recursos(db, ot, data.recursos, municipio_id)
 
+    # Si nació ya asignada, avisar al responsable/cuadrilla (matriz: OT asignada).
+    push_asig = None
+    if ot.estado == EstadoOrdenTrabajo.ASIGNADA:
+        push_asig = await _notificar_ot_asignada_inapp(db, ot)
+
     await db.commit()
+
+    if push_asig:
+        await _push_a_users(db, push_asig["user_ids"], push_asig["titulo"],
+                            push_asig["mensaje"], "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot.id, municipio_id)
     return _to_response(ot)
 
@@ -578,10 +1023,10 @@ async def actualizar_orden(
         raise HTTPException(status_code=400, detail="No se puede editar una OT completada o cancelada")
 
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
-    if "tipo_trabajo_id" in data.model_dump(exclude_unset=True):
-        await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
+    if "categoria_id" in data.model_dump(exclude_unset=True):
+        await _validar_categoria(db, municipio_id, data.categoria_id)
 
-    # prioridad/tipo_trabajo_id son escalares → se setean acá directo.
+    # prioridad/categoria_id son escalares → se setean acá directo.
     # reclamo_ids/materiales/recursos se manejan aparte (no son columnas simples).
     campos = data.model_dump(exclude_unset=True, exclude={"reclamo_ids", "materiales", "recursos"})
     for k, v in campos.items():
@@ -636,7 +1081,15 @@ async def asignar_orden(
     if ot.estado == EstadoOrdenTrabajo.PENDIENTE:
         ot.estado = EstadoOrdenTrabajo.ASIGNADA
 
+    # Avisar al nuevo responsable / miembros de cuadrilla (matriz: OT asignada).
+    push_asig = await _notificar_ot_asignada_inapp(db, ot)
+
     await db.commit()
+
+    if push_asig:
+        await _push_a_users(db, push_asig["user_ids"], push_asig["titulo"],
+                            push_asig["mensaje"], "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)
 
@@ -657,9 +1110,118 @@ async def iniciar_orden(
     if not _puede_operar_en_campo(ot, current_user, cuadrillas):
         raise HTTPException(status_code=403, detail="No sos responsable de esta OT")
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.EN_CURSO
     ot.fecha_inicio_real = datetime.utcnow()
+
+    numero = ot.numero
+    reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_iniciada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} iniciada en campo.",
+    )
+
+    # D3: los reclamos que todavía no arrancaron pasan a EN_CURSO (con miga en
+    # historial). No tocamos reclamos ya en un estado más avanzado.
+    ESTADOS_PREVIOS = (EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO)
+    a_curso = [r for r in reclamos if r.estado in ESTADOS_PREVIOS]
+    for r in a_curso:
+        r.estado = EstadoReclamo.EN_CURSO
+    if a_curso:
+        _historial_reclamos(
+            db, a_curso, current_user.id,
+            accion="ot_iniciada",
+            comentario=f"La orden {numero} comenzó: el reclamo pasó a en curso.",
+        )
+
+    # Avisar al vecino creador de cada reclamo vinculado ("comenzó el trabajo").
+    # In-app transaccional; el web-push se dispara tras el commit.
+    push_vecinos = []  # (creador_id, reclamo_id)
+    for r in reclamos:
+        await NotificacionService.notificar_vecino(
+            db=db, reclamo=r,
+            titulo="Comenzó el trabajo en tu reclamo",
+            mensaje=f"Un equipo municipal comenzó a trabajar en tu reclamo #{r.id} (orden {numero}).",
+            tipo="info", enviar_whatsapp=False,
+        )
+        if r.creador_id:
+            push_vecinos.append((r.creador_id, r.id))
+
     await db.commit()
+
+    for uid, rid in push_vecinos:
+        await _push_a_users(
+            db, [uid], "Comenzó el trabajo en tu reclamo",
+            f"Un equipo municipal comenzó a trabajar en tu reclamo #{rid}.",
+            f"/gestion/reclamos/{rid}",
+        )
+
+    ot = await _get_ot(db, ot_id, municipio_id)
+    return _to_response(ot)
+
+
+@router.post("/{ot_id}/bloquear", response_model=OTResponse)
+async def bloquear_orden(
+    ot_id: int,
+    data: OTBloquear,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"])),
+):
+    """T6 · el empleado en campo marca la OT como BLOQUEADA (frenada: falta
+    material, clima, vecino ausente, otro). Estado NO final — luego se completa o
+    se cancela. Operable por _puede_operar_en_campo (responsable/miembro de
+    cuadrilla + admin/supervisor). Avisa a los supervisores del muni (una
+    notificación)."""
+    municipio_id = get_effective_municipio_id(request, current_user)
+    ot = await _get_ot(db, ot_id, municipio_id)
+    if ot.estado not in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO):
+        raise HTTPException(status_code=400, detail="Solo se puede bloquear una OT asignada o en curso")
+
+    cuadrillas = await _cuadrillas_del_user(db, current_user)
+    if not _puede_operar_en_campo(ot, current_user, cuadrillas):
+        raise HTTPException(status_code=403, detail="No sos responsable de esta OT")
+
+    label = MOTIVO_BLOQUEO_LABELS.get(data.motivo_tipo, data.motivo_tipo)
+    detalle = f"Bloqueada · {label}"
+    if data.motivo and data.motivo.strip():
+        detalle += f": {data.motivo.strip()}"
+
+    estado_anterior = ot.estado
+    ot.estado = EstadoOrdenTrabajo.BLOQUEADA
+    # Reusa motivo_cancelacion como campo de motivo del bloqueo (no hay columna
+    # dedicada; si luego se cancela/completa, ese flujo lo sobrescribe).
+    ot.motivo_cancelacion = detalle
+
+    numero = ot.numero
+    reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+    primer_reclamo_id = reclamos[0].id if reclamos else None
+
+    _historial_reclamos(
+        db, reclamos, current_user.id,
+        accion="ot_bloqueada",
+        comentario=f"Orden de trabajo {numero} bloqueada: {detalle}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_bloqueada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} bloqueada: {detalle}",
+    )
+
+    # Avisar a supervisores del muni (matriz: OT bloqueada → supervisores).
+    titulo = f"OT {numero} bloqueada"
+    mensaje = f"La orden {numero} quedó bloqueada: {detalle}"
+    notificados = await NotificacionService.notificar_supervisores(
+        db=db, municipio_id=municipio_id, titulo=titulo, mensaje=mensaje,
+        tipo="warning", reclamo_id=primer_reclamo_id, enviar_whatsapp=False,
+    )
+
+    await db.commit()
+
+    await _push_a_users(db, notificados, titulo, mensaje, "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)
 
@@ -674,30 +1236,97 @@ async def completar_orden(
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     ot = await _get_ot(db, ot_id, municipio_id)
-    # Se permite completar desde asignada (en campo no siempre marcan "iniciar")
-    if ot.estado not in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO):
+    # Se permite completar desde asignada (en campo no siempre marcan "iniciar") y
+    # desde bloqueada (T6: el bloqueo se resolvió y el trabajo terminó).
+    if ot.estado not in (EstadoOrdenTrabajo.ASIGNADA, EstadoOrdenTrabajo.EN_CURSO,
+                         EstadoOrdenTrabajo.BLOQUEADA):
         raise HTTPException(status_code=400, detail="La OT no está en un estado completable")
 
     cuadrillas = await _cuadrillas_del_user(db, current_user)
     if not _puede_operar_en_campo(ot, current_user, cuadrillas):
         raise HTTPException(status_code=403, detail="No sos responsable de esta OT")
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.COMPLETADA
     ot.notas_cierre = data.notas_cierre
     ot.horas_reales = data.horas_reales
     ot.fecha_completada = datetime.utcnow()
 
-    # Libera activos y descuenta el stock de los consumibles usados.
-    await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=True)
+    # Libera activos y descuenta el stock de los consumibles usados. T6: si el
+    # cierre trae consumo real por recurso, se descuenta ese; si no, el planeado.
+    consumos_map = (
+        {c.recurso_id: c.cantidad_real for c in data.consumos_reales}
+        if data.consumos_reales else None
+    )
+    await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=True,
+                           consumos_reales=consumos_map)
 
+    numero = ot.numero
+    creador_id = ot.creador_id
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+    n_recl = len(reclamos)
+    primer_reclamo_id = reclamos[0].id if reclamos else None
+
     _historial_reclamos(
         db, reclamos, current_user.id,
         accion="ot_completada",
-        comentario=f"Orden de trabajo {ot.numero} completada: {data.notas_cierre}",
+        comentario=f"Orden de trabajo {numero} completada: {data.notas_cierre}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_completada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} completada: {data.notas_cierre}",
     )
 
+    # D4: opt-in para finalizar también los reclamos vinculados. No tocamos los
+    # que ya estén cerrados (finalizado/resuelto/rechazado).
+    finalizados_ids = []
+    if data.finalizar_reclamos:
+        CERRADOS = (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO, EstadoReclamo.RECHAZADO)
+        a_finalizar = [r for r in reclamos if r.estado not in CERRADOS]
+        for r in a_finalizar:
+            r.estado = EstadoReclamo.FINALIZADO
+            r.fecha_resolucion = datetime.now(timezone.utc)
+            finalizados_ids.append(r.id)
+        if a_finalizar:
+            _historial_reclamos(
+                db, a_finalizar, current_user.id,
+                accion="ot_finalizo_reclamo",
+                comentario=f"Finalizado al completar la orden {numero}.",
+            )
+
+    # Avisar al creador de la OT + supervisores del muni ("OT lista, cerrá los N").
+    titulo = f"OT {numero} completada"
+    if finalizados_ids:
+        mensaje = f"La orden {numero} se completó y se finalizaron {len(finalizados_ids)} reclamo(s) vinculado(s)."
+    else:
+        mensaje = f"La orden {numero} está lista. Revisá y cerrá los {n_recl} reclamo(s) vinculado(s)."
+
+    notificados = await NotificacionService.notificar_supervisores(
+        db=db, municipio_id=municipio_id, titulo=titulo, mensaje=mensaje,
+        tipo="info", reclamo_id=primer_reclamo_id, enviar_whatsapp=False,
+    )
+    if creador_id and creador_id not in notificados:
+        await NotificacionService.crear_notificacion_inapp(
+            db=db, usuario_id=creador_id, titulo=titulo, mensaje=mensaje,
+            tipo="info", reclamo_id=primer_reclamo_id,
+        )
+
     await db.commit()
+
+    # Web-push best-effort (fuera de la transacción).
+    push_ids = set(notificados)
+    if creador_id:
+        push_ids.add(creador_id)
+    await _push_a_users(db, push_ids, titulo, mensaje, "/gestion/reclamos")
+
+    # Vecinos de los reclamos finalizados: in-app con link a calificar + push
+    # (reusa el helper canónico de cierre; re-fetch fresco tras el commit).
+    for rid in finalizados_ids:
+        r = (await db.execute(select(Reclamo).where(Reclamo.id == rid))).scalar_one_or_none()
+        if r:
+            await push_service.notificar_reclamo_resuelto(db, r)
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)
 
@@ -715,19 +1344,39 @@ async def cancelar_orden(
     if ot.estado in ESTADOS_FINALES:
         raise HTTPException(status_code=400, detail="La OT ya está cerrada")
 
+    estado_anterior = ot.estado
     ot.estado = EstadoOrdenTrabajo.CANCELADA
     ot.motivo_cancelacion = data.motivo
 
     # Libera los activos reservados; NO descuenta consumibles (no se usaron).
     await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=False)
 
+    numero = ot.numero
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+    primer_reclamo_id = reclamos[0].id if reclamos else None
+
     _historial_reclamos(
         db, reclamos, current_user.id,
         accion="ot_cancelada",
-        comentario=f"Orden de trabajo {ot.numero} cancelada: {data.motivo}",
+        comentario=f"Orden de trabajo {numero} cancelada: {data.motivo}",
+    )
+    _historial_ot(
+        db, ot, current_user.id, accion="ot_cancelada",
+        estado_anterior=estado_anterior, estado_nuevo=ot.estado,
+        comentario=f"OT {numero} cancelada: {data.motivo}",
+    )
+
+    # Avisar a supervisores del muni (matriz: OT cancelada → supervisores).
+    titulo = f"OT {numero} cancelada"
+    mensaje = f"La orden {numero} fue cancelada: {data.motivo}"
+    notificados = await NotificacionService.notificar_supervisores(
+        db=db, municipio_id=municipio_id, titulo=titulo, mensaje=mensaje,
+        tipo="warning", reclamo_id=primer_reclamo_id, enviar_whatsapp=False,
     )
 
     await db.commit()
+
+    await _push_a_users(db, notificados, titulo, mensaje, "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)

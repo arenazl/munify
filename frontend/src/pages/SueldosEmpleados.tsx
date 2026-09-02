@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
@@ -122,7 +121,6 @@ export default function SueldosEmpleados() {
 
   return (
     <>
-      <PageHint pageId="sueldos-empleados" />
     <ABMPage
       title="Empleados"
       icon={<Users className="h-5 w-5" />}
@@ -221,7 +219,7 @@ export default function SueldosEmpleados() {
               ) : (
                 <div className="hidden sm:block flex-shrink-0">
                   <Link
-                    to="/gestion/tesoreria/agenda"
+                    to="/gestion/tesoreria/pagos-programados"
                     className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md transition-all hover:scale-105"
                     style={{
                       backgroundColor: `${theme.primary}15`,

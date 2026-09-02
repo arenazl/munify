@@ -1,0 +1,151 @@
+/* ============================================================
+   FilaLista — la fila de un listado en pantalla angosta.
+
+   El estado es una BARRA DE COLOR al costado, no una banda que
+   se come una fila entera: se escanea la columna izquierda y se
+   ve el estado de toda la lista sin leer una palabra. Con esto
+   entran 7 u 8 ítems por pantalla, contra menos de 2 con la
+   tarjeta grande.
+
+   Todo sobre tokens --pl-*: cero colores fijos.
+   ============================================================ */
+
+.fila-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  /* La barra de estado. Va en el borde y no en un pseudo-elemento para que
+     no dependa de position: relative en cada fila. */
+  border-left: 3px solid var(--pl-border-strong);
+  background: var(--pl-surface);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.fila + .fila { border-top: 1px solid var(--pl-border); }
+.fila:hover { background: var(--pl-surface-hover); }
+
+.fila--bueno { border-left-color: var(--pl-green); }
+.fila--advertencia { border-left-color: var(--pl-amber-strong); }
+.fila--malo { border-left-color: var(--pl-red); }
+.fila--info { border-left-color: var(--pl-blue); }
+.fila--neutro { border-left-color: var(--pl-border-strong); }
+
+/* El cuerpo es el área clickeable: ocupa todo lo que sobra. */
+.fila-cuerpo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--pl-font-sans);
+  color: inherit;
+}
+.fila-cuerpo:disabled { cursor: default; }
+.fila-cuerpo:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 3px;
+  border-radius: var(--pl-radius-sm);
+}
+
+.fila-titulo {
+  font-size: var(--pl-fs-body);
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--pl-text);
+  /* Se lee ENTERO: un título cortado no deja decidir si abrirlo. */
+  overflow-wrap: anywhere;
+}
+
+.fila-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  line-height: 1.35;
+}
+/* Punto medio entre datos, puesto por CSS: así el que arma la lista no tiene
+   que preocuparse por los separadores cuando un dato viene vacío. */
+.fila-meta-item + .fila-meta-item::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--pl-text-disabled);
+}
+
+.fila-dcha {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.fila-estado {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: var(--pl-radius-pill);
+  white-space: nowrap;
+}
+.fila-estado--bueno { color: var(--pl-green-700); background: var(--pl-green-100); }
+.fila-estado--advertencia { color: var(--pl-amber-700); background: var(--pl-amber-100, color-mix(in srgb, var(--pl-amber-strong) 15%, transparent)); }
+.fila-estado--malo { color: var(--pl-red-700); background: color-mix(in srgb, var(--pl-red) 14%, transparent); }
+.fila-estado--info { color: var(--pl-blue); background: color-mix(in srgb, var(--pl-blue) 14%, transparent); }
+.fila-estado--neutro { color: var(--pl-text-3); background: var(--pl-surface-2); }
+
+.fila-hace {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Despachar desde la lista, sin entrar al ítem. */
+.fila-accion {
+  margin-top: 2px;
+  padding: 5px 11px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-micro);
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fila-accion:hover { background: var(--pl-green-200); }
+
+.fila-vacio {
+  padding: 22px 14px;
+  text-align: center;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fila { transition: none; }
+}
+
+/* En pantallas anchas la fila respira un poco más y el estado vuelve a la
+   misma línea: hay lugar de sobra y apilarlo dejaría huecos. */
+@media (min-width: 768px) {
+  .fila { padding: 12px 14px; gap: 14px; }
+  .fila-dcha { flex-direction: row; align-items: center; gap: 12px; }
+  .fila-accion { margin-top: 0; }
+}

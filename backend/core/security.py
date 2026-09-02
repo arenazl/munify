@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -19,6 +21,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+
+def compute_calificacion_token(reclamo_id: int) -> str:
+    """Token determinístico y no adivinable para el link público de calificación.
+    Deriva por HMAC de SECRET_KEY: sin el secreto del servidor no se puede computar
+    el token de ningún reclamo, así que el endpoint público /calificar/{id} deja de
+    ser enumerable (el id viaja en el número REC-XXXXX) — sin necesidad de columna
+    en DB (sirve para reclamos nuevos y existentes por igual)."""
+    msg = f"calificacion:{reclamo_id}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), msg, hashlib.sha256).hexdigest()[:32]
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -119,7 +132,9 @@ def require_roles(allowed_roles: list):
 def get_municipio_id_from_header():
     """
     Obtiene el municipio_id del header X-Municipio-ID.
-    Solo admins/supervisores pueden cambiar de municipio.
+    Solo el superadmin real (sin municipio propio) puede cambiar de municipio.
+    NOTA: helper legacy sin call sites vivos; el resolver canonico es
+    core.tenancy.resolve_municipio_id.
     """
     from fastapi import Request
 
@@ -127,8 +142,9 @@ def get_municipio_id_from_header():
         request: Request,
         current_user = Depends(get_current_user)
     ) -> int:
-        # Solo admins y supervisores pueden cambiar de municipio via header
-        if current_user.rol in ['admin', 'supervisor']:
+        # Solo el superadmin real (municipio_id None) puede cambiar via header;
+        # un admin/supervisor de un muni queda atado al suyo (anti cross-tenant).
+        if current_user.municipio_id is None:
             header_municipio_id = request.headers.get('X-Municipio-ID')
             if header_municipio_id:
                 try:

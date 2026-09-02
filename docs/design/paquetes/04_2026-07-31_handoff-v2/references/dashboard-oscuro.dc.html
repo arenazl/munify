@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+<script src="./image-slot.js"></script>
+<style>
+  body { margin: 0; background: #0E1614; font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #00B37E; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); } 70% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+</style>
+</helmet>
+
+<div style="display: flex; min-height: 1000px; background: #0E1614; color: #EDF3F0;">
+
+  <sc-if value="{{ colapsada }}" hint-placeholder-val="{{ false }}">
+    <aside style="width: 72px; flex: 0 0 72px; background: #151E1B; border-right: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 18px 0; position: sticky; top: 0; align-self: flex-start; height: 100vh;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(150deg, #FDF3D6 0%, #E4F5EC 60%, #D3F0E3 100%); border: 1px solid rgba(255,255,255,0.07); display: grid; place-items: center; margin-bottom: 12px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="8.6" cy="7.4" r="3.1" fill="#FFB800" /><g stroke="#FFB800" stroke-width="1.6" stroke-linecap="round"><path d="M8.6 1.6v1.4M8.6 11.8v1.4M2.8 7.4h1.4M13 7.4h1.4M4.5 3.3l1 1M12.2 10.5l1 1M12.7 3.3l-1 1M5.5 10.5l-1 1" /></g><path d="M3.2 21c0-5.2 4-9.4 9.2-9.4h7.4v3.1c0 3.5-2.9 6.3-6.4 6.3z" fill="#00B37E" /></svg>
+      </div>
+      <div title="Dashboard" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: #12332A; color: #57D6A9; cursor: pointer;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z" /><path d="M9 21v-6h6v6" /></svg></div>
+      <div title="Reclamos" style="position: relative; width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg><span style="position: absolute; top: 3px; right: 2px; min-width: 16px; height: 15px; padding: 0 3px; border-radius: 999px; background: #00B37E; color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: center;">49</span></div>
+      <div title="Mapa" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg></div>
+      <div title="SLA" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg></div>
+      <span style="width: 26px; height: 1px; background: rgba(255,255,255,0.10); margin: 7px 0;"></span>
+      <div title="Órdenes" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4" /><path d="M14 4h6v6" /></svg></div>
+      <div title="Cuadrillas" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3" /><circle cx="17" cy="9" r="3" /><path d="M2 19c0-2.8 2.7-5 6-5s6 2.2 6 5" /><path d="M15 14.5c2.9.4 5 2.3 5 4.5" /></svg></div>
+      <div title="Trámites" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg></div>
+      <div title="Cobros" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg></div>
+      <div style="flex: 1;"></div>
+      <div onClick="{{ toggleColapso }}" title="Expandir menú" style="width: 42px; height: 38px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; border: 1px solid rgba(255,255,255,0.10);" style-hover="background: #212B28;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ expandida }}" hint-placeholder-val="{{ true }}">
+  <aside style="width: 256px; flex: 0 0 256px; background: #151E1B; border-right: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; position: sticky; top: 0; align-self: flex-start; height: 100vh;">
+
+    <div style="display: flex; align-items: center; gap: 10px; padding: 18px 16px 14px;">
+      <div style="width: 36px; height: 36px; border-radius: 11px; background: linear-gradient(150deg, #FDF3D6 0%, #E4F5EC 60%, #D3F0E3 100%); border: 1px solid rgba(255,255,255,0.07); display: grid; place-items: center; flex: 0 0 36px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="8.6" cy="7.4" r="3.1" fill="#FFB800" />
+          <g stroke="#FFB800" stroke-width="1.6" stroke-linecap="round">
+            <path d="M8.6 1.6v1.4M8.6 11.8v1.4M2.8 7.4h1.4M13 7.4h1.4M4.5 3.3l1 1M12.2 10.5l1 1M12.7 3.3l-1 1M5.5 10.5l-1 1" />
+          </g>
+          <path d="M3.2 21c0-5.2 4-9.4 9.2-9.4h7.4v3.1c0 3.5-2.9 6.3-6.4 6.3z" fill="#00B37E" />
+          <path d="M6.4 21c1.6-3.4 4.6-5.6 8.4-6.3" stroke="#151E1B" stroke-width="1.5" stroke-linecap="round" opacity="0.75" />
+        </svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+        <div style="font-family: Sora, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: -0.02em;">Paraguay <span style="color: #00B37E;">Limpio</span></div>
+        <div style="font-size: 11px; color: #93A09B;">Asunción, Dpto. Central</div>
+      </div>
+      <sc-if value="{{ colapsoHeader }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ toggleColapso }}" title="Colapsar menú" style="margin-left: auto; width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.10); display: grid; place-items: center; cursor: pointer; flex: 0 0 28px;" style-hover="background: #212B28;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+        </div>
+      </sc-if>
+    </div>
+    <sc-if value="{{ colapsoBorde }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleColapso }}" title="Colapsar menú" style="position: absolute; top: 76px; right: -13px; width: 26px; height: 26px; border-radius: 999px; background: #151E1B; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 2px 6px rgba(255,255,255,0.12); display: grid; place-items: center; cursor: pointer; z-index: 3;" style-hover="background: #12332A; border-color: #9BDCC4;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#57D6A9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg>
+      </div>
+    </sc-if>
+
+    <div style="padding: 0 12px 12px;">
+      <div onClick="{{ abrirBuscador }}" style="display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 11px; background: #1C2522; border: 1px solid rgba(255,255,255,0.10); border-radius: 11px; cursor: text;" style-hover="background: #EDF3F0; border-color: #9BDCC4;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" style="flex: 0 0 17px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span style="font-size: 13.5px; color: #93A09B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar reclamo, vecino…</span>
+        <span style="margin-left: auto; font-size: 10.5px; font-weight: 600; color: #93A09B; background: #151E1B; border: 1px solid rgba(13,20,18,0.1); border-radius: 6px; padding: 2px 5px; flex: 0 0 auto;">⌘K</span>
+      </div>
+    </div>
+
+    <nav style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 2px;">
+
+      <a href="#" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 9px; background: #12332A; color: #57D6A9; font-size: 13.5px; font-weight: 600; position: relative;">
+        <span style="position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: #00B37E;"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V21H3z" /><path d="M9 21v-6h6v6" /></svg>
+        Dashboard
+      </a>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleReclamos }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88;">RECLAMOS</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevReclamos }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openReclamos }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9z" /><path d="M9 12h6M9 16h4" /></svg>
+            Reclamos
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #57D6A9; background: #12332A; border-radius: 999px; padding: 1px 7px;">49</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg>
+            Mapa
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
+            Tablero
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+            Planificación
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
+            SLA
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #F0A85A; background: #FDF1DF; border-radius: 999px; padding: 1px 7px;">3</span>
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleCampo }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88;">CAMPO</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevCampo }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openCampo }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4" /><path d="M14 4h6v6" /></svg>
+            Órdenes
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #57D6A9; background: #12332A; border-radius: 999px; padding: 1px 7px;">12</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="13" y="13" width="8" height="8" rx="1.5" /><rect x="8" y="3" width="8" height="8" rx="1.5" /></svg>
+            Inventario
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M17 8.5a3 3 0 0 1 0 5" /></svg>
+            Personal
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3" /><circle cx="17" cy="9" r="3" /><path d="M2 19c0-2.8 2.7-5 6-5s6 2.2 6 5" /><path d="M15 14.5c2.9.4 5 2.3 5 4.5" /></svg>
+            Cuadrillas
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleTramites }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88;">TRÁMITES</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevTramites }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openTramites }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+            Trámites
+            <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #57D6A9; background: #12332A; border-radius: 999px; padding: 1px 7px;">10</span>
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /><circle cx="12" cy="15" r="2" /></svg>
+            Agenda
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.5" /><path d="M12 9.5V13l2.5 1.5M9 2h6" /></svg>
+            Horarios
+          </a>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 14px 10px 5px; cursor: pointer;" onClick="{{ toggleVecino }}">
+        <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88;">ATENCIÓN AL VECINO</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B4BDBA" stroke-width="2.5" stroke-linecap="round" style="margin-left: auto; transform: {{ chevVecino }};"><path d="m7 9 5 5 5-5" /></svg>
+      </div>
+      <sc-if value="{{ openVecino }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="11" rx="2" /><path d="M8 20h8" /></svg>
+            Mostrador
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M12 7v10M14.5 9.5c0-1.1-1.1-1.7-2.5-1.7s-2.5.6-2.5 1.7 1.2 1.5 2.5 1.8 2.5.7 2.5 1.8-1.1 1.7-2.5 1.7-2.5-.6-2.5-1.7" /></svg>
+            Tasas
+          </a>
+          <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #C2CCC8; font-size: 13.5px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg>
+            Cobros
+          </a>
+        </div>
+      </sc-if>
+    </nav>
+
+    <div style="border-top: 1px solid rgba(255,255,255,0.08); padding: 10px 12px;">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; color: #AEB9B5; font-size: 13px; font-weight: 500;" style-hover="background: #212B28; color: #EDF3F0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.7" /><path d="M12 17h.01" /></svg>
+        Ayuda y soporte
+      </a>
+    </div>
+  </aside>
+  </sc-if>
+
+  <main style="flex: 1; min-width: 0; padding: 14px 20px 40px;">
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 0 4px 14px; flex-wrap: wrap; row-gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #93A09B; min-width: 0; flex: 1 1 auto; overflow: hidden;">
+        <sc-if value="{{ enDependencia }}" hint-placeholder-val="{{ true }}">
+          <span style="display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; background: #12332A; border: 1px solid #1E5040; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: #57D6A9; min-width: 0;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" /></svg>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Dirección de Habilitaciones Comerciales</span>
+          </span>
+        </sc-if>
+        <sc-if value="{{ esAdmin }}" hint-placeholder-val="{{ false }}">
+          <span style="position: relative; display: inline-flex; min-width: 0;">
+            <button onClick="{{ toggleDep }}" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 11px; background: #151E1B; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; cursor: pointer; font-family: Inter, sans-serif; min-width: 0;" style-hover="border-color: #9BDCC4; background: #F7FCFA;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#57D6A9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 13px;"><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4" /></svg>
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Todas las dependencias</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" style="flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+            </button>
+            <sc-if value="{{ depAbierto }}" hint-placeholder-val="{{ false }}">
+              <div style="position: absolute; top: 38px; left: 0; width: 340px; max-height: 380px; overflow: auto; background: #151E1B; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; box-shadow: 0 6px 20px rgba(255,255,255,0.12), 0 2px 6px rgba(255,255,255,0.07); z-index: 20; padding: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #1C2522; border-radius: 9px; margin-bottom: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                  <input type="text" placeholder="Buscar dependencia…" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font-family: Inter, sans-serif; font-size: 13px; color: #EDF3F0;" />
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 9px; background: #12332A; cursor: pointer;">
+                  <span style="font-size: 13px; font-weight: 600; color: #57D6A9;">Todas las dependencias</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="margin-left: auto;"><path d="m5 13 4 4L19 7" /></svg>
+                </div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88; padding: 12px 10px 4px;">SECRETARÍA DE OBRAS Y SERVICIOS PÚBLICOS</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Redes Pluviales</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Alumbrado Público</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Defensa Civil</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88; padding: 12px 10px 4px;">SECRETARÍA DE MOVILIDAD</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Tránsito</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Transporte</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Monitoreo</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88; padding: 12px 10px 4px;">SECRETARÍA DE HACIENDA</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Ingresos Públicos</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Compras y Suministros</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Tesorería</div>
+                <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88; padding: 12px 10px 4px;">SECRETARÍA DE GOBIERNO</div>
+                <div style="padding: 8px 10px 8px 20px; border-radius: 9px; font-size: 13px; color: #C2CCC8; cursor: pointer;" style-hover="background: #212B28;">Dirección de Habilitaciones Comerciales</div>
+              </div>
+            </sc-if>
+          </span>
+        </sc-if>
+        <span style="color: #5A6763;">/</span>
+        <span style="color: #EDF3F0; font-weight: 600;">Dashboard</span>
+      </div>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto;">
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #242E2B;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="1.2" fill="#AEB9B5" /><circle cx="14.5" cy="9.5" r="1.2" fill="#AEB9B5" /></svg>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer; position: relative;" style-hover="background: #242E2B;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z" /><path d="M10 18.5a2 2 0 0 0 4 0" /></svg>
+          <span style="position: absolute; top: 6px; right: 7px; width: 6px; height: 6px; border-radius: 999px; background: #E5484D; border: 1.5px solid #0E1614;"></span>
+        </div>
+        <div style="width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #242E2B;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M4.6 7.5l1.7 1M17.7 15.5l1.7 1M4.6 16.5l1.7-1M17.7 8.5l1.7-1" /></svg>
+        </div>
+        <span style="width: 1px; height: 22px; background: rgba(255,255,255,0.12); margin: 0 4px;"></span>
+        <button style="display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 6px 0 4px; background: transparent; border: 0; border-radius: 999px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="background: #242E2B;">
+          <span style="width: 28px; height: 28px; border-radius: 999px; background: #57D6A9; color: #0E1614; display: grid; place-items: center; font-size: 11px; font-weight: 600;">RG</span>
+          <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 0px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; line-height: 1.2;">Rocío Giménez</span>
+            <span style="font-size: 10.5px; color: #93A09B; line-height: 1.2;">Supervisora de área</span>
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <section style="position: relative; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, #00B37E 0%, #007A55 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.35);">
+
+      <sc-if value="{{ conFoto }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0;">
+          <div style="position: absolute; inset: 0; filter: saturate(0.85) brightness(1.02);">
+            <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&amp;w=2070" alt="Ciudad" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+          </div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(96deg, rgba(0,60,42,0.90) 0%, rgba(0,72,50,0.62) 42%, rgba(0,120,84,0.18) 78%, rgba(0,140,98,0.06) 100%); pointer-events: none;"></div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,50,36,0.28) 0%, rgba(0,50,36,0) 30%, rgba(0,50,36,0.42) 100%); pointer-events: none;"></div>
+          <a href="https://unsplash.com" target="_blank" rel="noreferrer" style="position: absolute; right: 10px; top: 10px; font-size: 9.5px; color: rgba(255,255,255,0.55); letter-spacing: 0.04em;">Unsplash</a>
+        </div>
+      </sc-if>
+
+      <div style="position: relative; display: flex; align-items: flex-start; gap: 32px; padding: 26px 28px 0;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.11em; color: rgba(255,255,255,0.72);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+            MUNICIPALIDAD · VISTA CONSOLIDADA
+          </div>
+          <h1 style="margin: 10px 0 6px; font-family: Sora, sans-serif; font-weight: 700; font-size: 38px; line-height: 1.05; letter-spacing: -0.025em; color: #FFFFFF;">Asunción, Dpto. Central</h1>
+          <p style="margin: 0; font-size: 14.5px; color: rgba(255,255,255,0.82); max-width: 46ch;">Todas las dependencias en un solo tablero, actualizado hace 4 minutos.</p>
+
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; flex: 0 0 auto;">
+          <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border: 0; border-radius: 12px; background: #FFFFFF; color: #00593B; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(6,32,24,0.18);" style-hover="background: #F2FBF7;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 4.6L18 9.5l-4.3 1.9L12 16l-1.7-4.6L6 9.5l4.3-1.9z" /><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></svg>
+            Conocé Paraguay Limpio
+          </button>
+          <button style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border: 1px solid rgba(255,255,255,0.6); border-radius: 12px; background: rgba(0,45,32,0.5); color: #FFFFFF; font-family: Inter, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer;" style-hover="background: rgba(255,255,255,0.22);">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #151E1B; animation: pulseDot 2s cubic-bezier(0.2,0.8,0.2,1) infinite;"></span>
+            Pulso del día
+          </button>
+        </div>
+      </div>
+
+      <div style="position: relative; margin: 22px 0 0; padding: 14px 28px 18px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: linear-gradient(180deg, rgba(0,45,32,0.62) 0%, rgba(0,45,32,0.82) 100%); border-top: 1px solid rgba(255,255,255,0.16);">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">RECLAMOS ABIERTOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">49</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">TRÁMITES ACTIVOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">10</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">RESOLUCIÓN PROMEDIO</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #fff; font-feature-settings: 'tnum';">19,4 d</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.18);">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: rgba(255,255,255,0.66);">EN RIESGO DE SLA</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; color: #FFD66B; font-feature-settings: 'tnum';">3</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="margin: 16px 0 0; padding: 18px 20px; background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #00B37E; border-radius: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #93A09B;">{{ moduloEtiqueta }}</span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+          <sc-for list="{{ puntos }}" as="p" hint-placeholder-count="3">
+            <span onClick="{{ p.ir }}" style="width: 7px; height: 7px; border-radius: 999px; background: {{ p.color }}; cursor: pointer;"></span>
+          </sc-for>
+          <span onClick="{{ anterior }}" style="width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); display: grid; place-items: center; cursor: pointer; margin-left: 4px;" style-hover="background: #212B28;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6" /></svg></span>
+          <span onClick="{{ siguiente }}" style="width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); display: grid; place-items: center; cursor: pointer;" style-hover="background: #212B28;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
+        </div>
+      </div>
+      <p style="margin: 8px 0 10px; font-family: Sora, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; color: #EDF3F0; text-wrap: pretty;">
+        <sc-for list="{{ frase }}" as="t" hint-placeholder-count="4"><span style="color: {{ t.color }};">{{ t.texto }}</span></sc-for>
+      </p>
+      <div style="display: flex; gap: 8px; margin-top: 2px; flex-wrap: wrap;">
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #12332A; border: 1px solid #1E5040; font-size: 12.5px; font-weight: 600; color: #57D6A9;">{{ accionA }}</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #1C2522; border: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; font-weight: 600; color: #AEB9B5;">{{ accionB }}</a>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 10px 14px; background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7v6l-4 2v-8z" /></svg>
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #93A09B;">FILTRAR</span>
+      <div style="display: flex; gap: 6px; margin-left: 4px;">
+        <span style="font-size: 12.5px; font-weight: 600; color: #57D6A9; background: #12332A; border: 1px solid #1E5040; border-radius: 999px; padding: 5px 12px;">Todas las dependencias</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #AEB9B5; background: #1C2522; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 5px 12px;">Últimos 30 días</span>
+        <span style="font-size: 12.5px; font-weight: 500; color: #AEB9B5; background: #1C2522; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 5px 12px;">Todos los estados</span>
+      </div>
+    </div>
+
+    <div style="margin: 26px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12h6M9 16h4" /></svg>
+      <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Reclamos</span>
+      <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.10);"></span>
+      <a href="#" style="font-size: 12px; font-weight: 600;">Ver todos</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">TOTAL RECLAMOS</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">49</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,22 14,20 26,17 38,15 50,9 62,7 74,4" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="4" r="2.6" fill="#00B37E" />
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #F0A85A;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 11l6-6 6 6" /></svg>
+            80%
+          </span>
+          <span style="font-size: 11.5px; color: #7F8C88;">más que el mes pasado</span>
+        </div>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">NUEVOS HOY</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #5A6763; font-feature-settings: 'tnum';">0</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,14 14,10 26,16 38,12 50,18 62,15 74,22" stroke="#39433F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="22" r="2.6" fill="#5A6763" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88;">Último ingreso ayer, 18:20</span>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">ESTA SEMANA</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">4</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,6 14,9 26,7 38,13 50,12 62,18 74,21" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="21" r="2.6" fill="#00B37E" />
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #57D6A9;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v13M6 13l6 6 6-6" /></svg>
+            33%
+          </span>
+          <span style="font-size: 11.5px; color: #7F8C88;">vs. semana anterior</span>
+        </div>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">RESOLUCIÓN PROMEDIO</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+            <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">19,4</span>
+            <span style="font-size: 12px; font-weight: 600; color: #93A09B;">días</span>
+          </span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,5 14,8 26,6 38,12 50,16 62,17 74,20" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="20" r="2.6" fill="#00B37E" />
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px;">
+          <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 600; color: #57D6A9;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v13M6 13l6 6 6-6" /></svg>
+            21,8 d
+          </span>
+          <span style="font-size: 11.5px; color: #7F8C88;">más rápido que el mes pasado</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin: 22px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg>
+      <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Trámites</span>
+      <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.10);"></span>
+      <a href="#" style="font-size: 12px; font-weight: 600;">Ver todos</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">TOTAL TRÁMITES</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">10</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,20 14,18 26,19 38,14 50,13 62,10 74,8" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="8" r="2.6" fill="#3B82F6" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88;">7 en curso · 3 finalizados</span>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">NUEVOS HOY</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #5A6763; font-feature-settings: 'tnum';">0</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,6 14,9 26,8 38,13 50,16 62,19 74,23" stroke="#39433F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="23" r="2.6" fill="#5A6763" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88;">Ayer entraron 10</span>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">ESTA SEMANA</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">10</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <polyline points="2,22 14,21 26,16 38,17 50,11 62,9 74,6" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="74" cy="6" r="2.6" fill="#3B82F6" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88;">Todo el volumen del mes</span>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden;">
+        <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #93A09B;">RESOLUCIÓN PROMEDIO</span>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;">
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -0.03em; color: #5A6763; font-feature-settings: 'tnum';">—</span>
+          <svg width="76" height="28" viewBox="0 0 76 28" fill="none" preserveAspectRatio="none" style="flex: 0 1 76px; min-width: 48px; max-width: 100%;">
+            <path d="M2 14h72" stroke="#2E3835" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 5" />
+          </svg>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88;">Sin trámites cerrados todavía</span>
+      </div>
+    </div>
+
+    <div style="margin: 26px 0 10px; display: flex; align-items: center; gap: 10px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
+      <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Cola de trabajo</span>
+      <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.10);"></span>
+      <span style="font-size: 11.5px; color: #7F8C88;">Actualizado hace 4 min</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+
+      <div style="background: #151E1B; border: 1px solid #4A3620; border-radius: 12px; padding: 16px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: #E5484D; flex: 0 0 7px;"></span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Urgentes</span>
+          <span style="margin-left: auto; font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #FF8085; font-feature-settings: 'tnum';">4</span>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88; margin-top: -6px;">Prioridad alta, +3 días abiertos</span>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="padding: 9px 10px; background: #2B1A1B; border-radius: 9px; cursor: pointer;" style-hover="background: #331F20;">
+            <div style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Bache profundo sobre Eusebio Ayala</div>
+            <div style="font-size: 11px; color: #7F8C88; margin-top: 2px;">Bacheo y calles · 3 d</div>
+          </div>
+          <div style="padding: 9px 10px; background: #2B1A1B; border-radius: 9px; cursor: pointer;" style-hover="background: #331F20;">
+            <div style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Luminarias LED en Av. Mcal. López</div>
+            <div style="font-size: 11px; color: #7F8C88; margin-top: 2px;">Alumbrado público · 9 d</div>
+          </div>
+        </div>
+        <a href="#" style="font-size: 12px; font-weight: 600; color: #FF8085; margin-top: auto;">Ver los 4</a>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: #F59E0B; flex: 0 0 7px;"></span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Sin asignar</span>
+          <span style="margin-left: auto; font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #F0A85A; font-feature-settings: 'tnum';">9</span>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88; margin-top: -6px;">Esperando cuadrilla +24 h</span>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="padding: 9px 10px; background: #2A2214; border-radius: 9px; cursor: pointer;" style-hover="background: #332913;">
+            <div style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Poste de luz sin iluminación</div>
+            <div style="font-size: 11px; color: #7F8C88; margin-top: 2px;">Alumbrado público · 5 d</div>
+          </div>
+          <div style="padding: 9px 10px; background: #2A2214; border-radius: 9px; cursor: pointer;" style-hover="background: #332913;">
+            <div style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Plaga de ratas en la plaza</div>
+            <div style="font-size: 11px; color: #7F8C88; margin-top: 2px;">Zoonosis · 2 d</div>
+          </div>
+        </div>
+        <a href="#" style="font-size: 12px; font-weight: 600; color: #F0A85A; margin-top: auto;">Asignar cuadrilla</a>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: #3B82F6; flex: 0 0 7px;"></span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Para hoy</span>
+          <span style="margin-left: auto; font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #5A6763; font-feature-settings: 'tnum';">0</span>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88; margin-top: -6px;">Programados para la jornada</span>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; padding: 14px 0;">
+          <span style="font-size: 12.5px; color: #AEB9B5;">No hay nada agendado para hoy.</span>
+          <a href="#" style="font-size: 12px; font-weight: 600;">Programar una orden</a>
+        </div>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: #00B37E; flex: 0 0 7px;"></span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Resueltos esta semana</span>
+          <span style="margin-left: auto; font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #57D6A9; font-feature-settings: 'tnum';">6</span>
+        </div>
+        <span style="font-size: 11.5px; color: #7F8C88; margin-top: -6px;">+2 vs. semana anterior</span>
+        <div style="display: flex; align-items: flex-end; gap: 5px; height: 56px; padding-top: 4px;">
+          <span style="flex: 1; height: 34%; background: #D8F0E6; border-radius: 4px;"></span>
+          <span style="flex: 1; height: 20%; background: #D8F0E6; border-radius: 4px;"></span>
+          <span style="flex: 1; height: 55%; background: #A8E3CC; border-radius: 4px;"></span>
+          <span style="flex: 1; height: 40%; background: #A8E3CC; border-radius: 4px;"></span>
+          <span style="flex: 1; height: 72%; background: #5FD2AC; border-radius: 4px;"></span>
+          <span style="flex: 1; height: 90%; background: #00B37E; border-radius: 4px;"></span>
+          <span style="flex: 1; height: 62%; background: #00B37E; border-radius: 4px;"></span>
+        </div>
+        <a href="#" style="font-size: 12px; font-weight: 600; margin-top: auto;">Ver cerrados</a>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-top: 22px; align-items: stretch;">
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0;">
+        <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Por estado</h3>
+        <div style="display: flex; justify-content: center; padding: 18px 0 16px;">
+          <div style="position: relative; width: 152px; height: 152px; border-radius: 999px; background: conic-gradient(#00B37E 0 46%, #34C596 46% 62%, #FFB800 62% 78%, #F59E0B 78% 86%, #E5484D 86% 93%, #5A6763 93% 100%);">
+            <div style="position: absolute; inset: 26px; border-radius: 999px; background: #151E1B; display: grid; place-items: center; text-align: center;">
+              <span>
+                <span style="display: block; font-family: Sora, sans-serif; font-weight: 700; font-size: 24px; line-height: 1; font-feature-settings: 'tnum';">245</span>
+                <span style="display: block; font-size: 10.5px; color: #7F8C88; margin-top: 3px;">reclamos</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px;">
+            <span style="width: 9px; height: 9px; border-radius: 3px; background: #00B37E; flex: 0 0 9px;"></span>
+            <span style="color: #C2CCC8;">Finalizado</span>
+            <span style="margin-left: auto; font-weight: 600; font-feature-settings: 'tnum';">113</span>
+            <span style="color: #7F8C88; width: 34px; text-align: right; font-feature-settings: 'tnum';">46%</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px;">
+            <span style="width: 9px; height: 9px; border-radius: 3px; background: #34C596; flex: 0 0 9px;"></span>
+            <span style="color: #C2CCC8;">En curso</span>
+            <span style="margin-left: auto; font-weight: 600; font-feature-settings: 'tnum';">39</span>
+            <span style="color: #7F8C88; width: 34px; text-align: right; font-feature-settings: 'tnum';">16%</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px;">
+            <span style="width: 9px; height: 9px; border-radius: 3px; background: #FFB800; flex: 0 0 9px;"></span>
+            <span style="color: #C2CCC8;">Asignado</span>
+            <span style="margin-left: auto; font-weight: 600; font-feature-settings: 'tnum';">39</span>
+            <span style="color: #7F8C88; width: 34px; text-align: right; font-feature-settings: 'tnum';">16%</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px;">
+            <span style="width: 9px; height: 9px; border-radius: 3px; background: #F59E0B; flex: 0 0 9px;"></span>
+            <span style="color: #C2CCC8;">Recibido</span>
+            <span style="margin-left: auto; font-weight: 600; font-feature-settings: 'tnum';">20</span>
+            <span style="color: #7F8C88; width: 34px; text-align: right; font-feature-settings: 'tnum';">8%</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px;">
+            <span style="width: 9px; height: 9px; border-radius: 3px; background: #E5484D; flex: 0 0 9px;"></span>
+            <span style="color: #C2CCC8;">Rechazado</span>
+            <span style="margin-left: auto; font-weight: 600; font-feature-settings: 'tnum';">17</span>
+            <span style="color: #7F8C88; width: 34px; text-align: right; font-feature-settings: 'tnum';">7%</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07);">
+            <span style="width: 9px; height: 9px; border-radius: 3px; background: #5A6763; flex: 0 0 9px;"></span>
+            <span style="color: #7F8C88;">Nuevo y pospuesto</span>
+            <span style="margin-left: auto; font-weight: 600; color: #7F8C88; font-feature-settings: 'tnum';">17</span>
+            <span style="color: #7F8C88; width: 34px; text-align: right; font-feature-settings: 'tnum';">7%</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 9px; min-width: 0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 16px;"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11z" /><circle cx="12" cy="10" r="2.4" /></svg>
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap;">Concentración</h3>
+          <span style="font-size: 11.5px; color: #7F8C88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">90 días</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin: 14px 0 12px; min-width: 0;">
+          <button style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 34px; padding: 0 12px; background: #151E1B; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4; background: #F7FCFA;">
+            <span style="font-size: 12.5px; color: #93A09B; white-space: nowrap;">Categoría</span>
+            <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Todas</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#93A09B" stroke-width="2" stroke-linecap="round" style="margin-left: auto; flex: 0 0 13px;"><path d="m7 9 5 5 5-5" /></svg>
+          </button>
+          <span style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; background: #1C2522; border-radius: 10px; font-size: 12px; font-weight: 600; color: #AEB9B5; white-space: nowrap; flex: 0 0 auto; font-feature-settings: 'tnum';">242 puntos</span>
+        </div>
+        <div style="position: relative; flex: 1; min-height: 300px; border-radius: 10px; overflow: hidden; background: #26302D;">
+          <image-slot id="mapa-calor" shape="rect" placeholder="Mapa de calor — arrastrá una captura"></image-slot>
+        </div>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; min-width: 0;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap;">Top categorías</h3>
+          <a href="#" style="margin-left: auto; font-size: 12px; font-weight: 600;">Ver todas</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Recolección de residuos</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; font-feature-settings: 'tnum';">33</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">13%</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 999px; background: #00B37E;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 12.5px; font-weight: 500; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tránsito y señalización</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; font-feature-settings: 'tnum';">32</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">13%</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 97%; border-radius: 999px; background: #34C596;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 12.5px; font-weight: 500; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Animales sueltos</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; font-feature-settings: 'tnum';">29</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">12%</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 88%; border-radius: 999px; background: #5FD2AC;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 12.5px; font-weight: 500; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Plagas y control</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; font-feature-settings: 'tnum';">26</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">11%</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 79%; border-radius: 999px; background: #8FDFC4;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 12.5px; font-weight: 500; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Bacheo y calles</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; font-feature-settings: 'tnum';">26</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">11%</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 79%; border-radius: 999px; background: #8FDFC4;"></span></span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11.5px; color: #7F8C88;">
+          <span>Otras 5 categorías</span>
+          <span style="margin-left: auto; font-weight: 600; color: #AEB9B5; font-feature-settings: 'tnum';">99</span>
+        </div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; align-items: stretch;">
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; gap: 2px; padding: 3px; background: #1C2522; border-radius: 10px; margin-bottom: 16px; overflow: hidden;">
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; background: #151E1B; box-shadow: 0 1px 2px rgba(255,255,255,0.07); font-size: 12px; font-weight: 600; color: #EDF3F0; white-space: nowrap; cursor: pointer;">Barrios</span>
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #AEB9B5; white-space: nowrap; cursor: pointer;" style-hover="background: #26302D;">Tiempos</span>
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #AEB9B5; white-space: nowrap; cursor: pointer;" style-hover="background: #26302D;">Recurrentes</span>
+          <span style="flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #AEB9B5; white-space: nowrap; cursor: pointer;" style-hover="background: #26302D;">Categorías</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Reclamos por barrio</h3>
+          <span style="margin-left: auto; font-size: 11.5px; color: #7F8C88;">Top 5 de 22</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Virrey del Pino</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 999px; background: #00B37E;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">24</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ciudad Evita</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 96%; border-radius: 999px; background: #34C596;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">23</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Lomas del Mirador</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 92%; border-radius: 999px; background: #5FD2AC;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">22</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tapiales</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 79%; border-radius: 999px; background: #8FDFC4;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">19</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 116px) minmax(0, 1fr) 32px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Aldo Bonzi</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 75%; border-radius: 999px; background: #8FDFC4;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">18</span>
+          </div>
+        </div>
+        <a href="#" style="font-size: 12px; font-weight: 600; margin-top: auto; padding-top: 16px;">Ver los 22 barrios</a>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Cobertura por zona</h3>
+          <span style="margin-left: auto; font-size: 11.5px; color: #7F8C88;">Resueltos / recibidos</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 13px;">
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">San Justo</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #57D6A9; font-feature-settings: 'tnum';">68%</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">41/60</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 68%; border-radius: 999px; background: #00B37E;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Ramos Mejía</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #57D6A9; font-feature-settings: 'tnum';">54%</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">27/50</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 54%; border-radius: 999px; background: #34C596;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Isidro Casanova</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #F0A85A; font-feature-settings: 'tnum';">38%</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">19/50</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 38%; border-radius: 999px; background: #F59E0B;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">González Catán</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #F0A85A; font-feature-settings: 'tnum';">31%</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">14/45</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 31%; border-radius: 999px; background: #F59E0B;"></span></span>
+          </div>
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #EDF3F0;">Gregorio de Laferrere</span>
+              <span style="margin-left: auto; font-size: 12.5px; font-weight: 600; color: #FF8085; font-feature-settings: 'tnum';">18%</span>
+              <span style="font-size: 11.5px; color: #7F8C88; font-feature-settings: 'tnum';">7/40</span>
+            </div>
+            <span style="display: block; height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 18%; border-radius: 999px; background: #E5484D;"></span></span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11.5px;">
+          <span style="color: #7F8C88;">Zonas críticas</span>
+          <span style="font-weight: 600; color: #FF8085;">2</span>
+          <span style="margin-left: auto; color: #7F8C88;">Resolución global</span>
+          <span style="font-weight: 600; color: #57D6A9;">46%</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; align-items: stretch;">
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Tendencia</h3>
+          <span style="font-size: 11.5px; color: #7F8C88;">últimos 30 días</span>
+          <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #93A09B; white-space: nowrap;">
+            <span style="width: 14px; height: 2px; background: #00B37E; border-radius: 2px;"></span>Ingresados
+            <span style="width: 14px; height: 2px; background: #5A6763; border-radius: 2px; margin-left: 6px;"></span>Resueltos
+          </span>
+        </div>
+        <div style="flex: 1; min-height: 176px; margin-top: 14px;">
+          <svg viewBox="0 0 620 170" width="100%" height="100%" preserveAspectRatio="none" fill="none" style="display: block;">
+            <g stroke="#26302D" stroke-width="1"><path d="M0 14h620M0 52h620M0 90h620M0 128h620M0 166h620" /></g>
+            <path d="M0 120 41 112 82 128 124 96 165 104 206 78 248 88 289 62 330 74 372 52 413 66 454 40 496 58 537 34 578 46 620 28 620 166 0 166Z" fill="rgba(0,179,126,0.10)" />
+            <polyline points="0,120 41,112 82,128 124,96 165,104 206,78 248,88 289,62 330,74 372,52 413,66 454,40 496,58 537,34 578,46 620,28" stroke="#00B37E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline points="0,142 41,138 82,144 124,130 165,136 206,124 248,130 289,118 330,124 372,112 413,120 454,106 496,116 537,104 578,112 620,98" stroke="#5A6763" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 5" />
+          </svg>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #7F8C88; padding-top: 8px; font-feature-settings: 'tnum';">
+          <span>1 jul</span><span>10 jul</span><span>20 jul</span><span>30 jul</span>
+        </div>
+      </div>
+
+      <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 18px; min-width: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">Tiempo de resolución</h3>
+          <span style="margin-left: auto; font-size: 11.5px; color: #7F8C88;">Meta 15 d</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Plagas y control</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 96%; border-radius: 999px; background: #E5484D;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #FF8085; font-feature-settings: 'tnum';">27 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Animales sueltos</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 79%; border-radius: 999px; background: #F59E0B;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #F0A85A; font-feature-settings: 'tnum';">22 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Recolección</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 68%; border-radius: 999px; background: #F59E0B;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #F0A85A; font-feature-settings: 'tnum';">19 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Agua y cloacas</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 43%; border-radius: 999px; background: #00B37E;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #57D6A9; font-feature-settings: 'tnum';">12 d</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 130px) minmax(0, 1fr) 42px; align-items: center; gap: 10px;">
+            <span style="font-size: 12.5px; color: #C2CCC8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Espacios verdes</span>
+            <span style="height: 10px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 36%; border-radius: 999px; background: #00B37E;"></span></span>
+            <span style="font-size: 12.5px; font-weight: 600; text-align: right; color: #57D6A9; font-feature-settings: 'tnum';">10 d</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11.5px; color: #7F8C88;">
+          <span>3 de 10 categorías sobre la meta</span>
+          <a href="#" style="margin-left: auto; font-weight: 600;">Ver detalle</a>
+        </div>
+      </div>
+    </div>
+    <div style="background: #151E1B; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; margin-top: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFB800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 17px;"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+        <h3 style="margin: 0; font-family: Sora, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;">La voz del vecino</h3>
+        <span style="font-size: 11.5px; color: #7F8C88;">Reclamos finalizados · últimos 90 días</span>
+        <a href="#" style="margin-left: auto; font-size: 12px; font-weight: 600;">Ver todas</a>
+      </div>
+
+      <div style="display: grid; grid-template-columns: minmax(0, 230px) minmax(0, 1fr); gap: 28px; margin-top: 24px; align-items: start;">
+
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 42px; line-height: 1; letter-spacing: -0.03em; font-feature-settings: 'tnum';">4,2</span>
+            <span style="display: flex; gap: 2px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="#2E3835"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+            </span>
+          </div>
+          <span style="font-size: 11.5px; color: #7F8C88; margin-top: -8px;">87 calificaciones · 71% de los cerrados</span>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #93A09B; font-feature-settings: 'tnum';">5 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 100%; border-radius: 999px; background: #00B37E;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">44</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #93A09B; font-feature-settings: 'tnum';">4 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 55%; border-radius: 999px; background: #5FD2AC;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">24</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #93A09B; font-feature-settings: 'tnum';">3 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 25%; border-radius: 999px; background: #FFB800;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">11</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #93A09B; font-feature-settings: 'tnum';">2 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 11%; border-radius: 999px; background: #F59E0B;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">5</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 32px minmax(0, 1fr) 30px; align-items: center; gap: 9px;">
+              <span style="font-size: 11.5px; color: #93A09B; font-feature-settings: 'tnum';">1 ★</span>
+              <span style="height: 8px; border-radius: 999px; background: #26302D; position: relative;"><span style="position: absolute; inset: 0 0 0 0; width: 7%; border-radius: 999px; background: #E5484D;"></span></span>
+              <span style="font-size: 11.5px; font-weight: 600; text-align: right; font-feature-settings: 'tnum';">3</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+          <div style="background: #1A2320; border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: flex; gap: 1px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              </span>
+              <span style="margin-left: auto; font-size: 11px; color: #7F8C88;">hace 2 días</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #C2CCC8; text-wrap: pretty;">"Vinieron a los dos días y dejaron la calle impecable. No esperaba esa rapidez."</p>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;">
+              <span style="width: 24px; height: 24px; border-radius: 999px; background: #143A2C; color: #57D6A9; display: grid; place-items: center; font-size: 9.5px; font-weight: 700;">RE</span>
+              <span style="font-size: 11.5px; color: #93A09B;">Ramona E. · Bacheo y calles</span>
+            </div>
+          </div>
+
+          <div style="background: #1A2320; border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: flex; gap: 1px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFB800"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#2E3835"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              </span>
+              <span style="margin-left: auto; font-size: 11px; color: #7F8C88;">hace 5 días</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #C2CCC8; text-wrap: pretty;">"Resolvieron bien la luminaria, aunque tardaron una semana en pasar por el barrio."</p>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;">
+              <span style="width: 24px; height: 24px; border-radius: 999px; background: #143A2C; color: #57D6A9; display: grid; place-items: center; font-size: 9.5px; font-weight: 700;">JC</span>
+              <span style="font-size: 11.5px; color: #93A09B;">Julio C. · Alumbrado público</span>
+            </div>
+          </div>
+
+          <div style="background: #2A1B1C; border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="display: flex; gap: 1px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#E5484D"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#2E3835"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#2E3835"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#2E3835"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#2E3835"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+              </span>
+              <span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #FF8085;">Requiere respuesta</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #C2CCC8; text-wrap: pretty;">"Cerraron el reclamo pero el contenedor sigue roto. Nadie vino a verlo."</p>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;">
+              <span style="width: 24px; height: 24px; border-radius: 999px; background: #3A2224; color: #FF8085; display: grid; place-items: center; font-size: 9.5px; font-weight: 700;">MF</span>
+              <span style="font-size: 11.5px; color: #93A09B;">Mirta F. · Recolección</span>
+              <a href="#" style="margin-left: auto; font-size: 11.5px; font-weight: 600; color: #FF8085;">Reabrir</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <sc-if value="{{ buscadorAbierto }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ cerrarBuscador }}" style="position: fixed; inset: 0; background: rgba(0,0,0,0.62); display: flex; justify-content: flex-end; z-index: 40;">
+      <div style="width: min(480px, 94vw); height: 100%; background: #151E1B; box-shadow: 0 6px 20px rgba(255,255,255,0.12), 0 2px 6px rgba(255,255,255,0.07); overflow: auto; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 18px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00B37E" stroke-width="2" stroke-linecap="round" style="flex: 0 0 20px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <input type="text" placeholder="Buscar reclamo, trámite, vecino…" style="flex: 1; min-width: 0; border: 0; outline: none; font-family: Inter, sans-serif; font-size: 16px; color: #EDF3F0; background: transparent;" />
+          <span onClick="{{ cerrarBuscador }}" style="width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: 0 0 28px;" style-hover="background: #212B28;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg></span>
+        </div>
+        <div style="padding: 10px 10px 14px;">
+          <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #7F8C88; padding: 8px 10px 6px;">SUGERENCIAS</div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #212B28;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #12332A; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#57D6A9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 12h6M9 16h4" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Bache profundo sobre Eusebio Ayala</span>
+              <span style="display: block; font-size: 11.5px; color: #7F8C88;">Reclamo #1042 · Bacheo y calles · 3 días</span>
+            </span>
+            <span style="font-size: 11px; font-weight: 600; color: #F0A85A; background: #2E2415; border-radius: 999px; padding: 3px 9px; flex: 0 0 auto;">Urgente</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #212B28;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #16233A; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7BA5F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="m9 14 2 2 3.5-4" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Habilitación comercial — Av. Mcal. López 2340</span>
+              <span style="display: block; font-size: 11.5px; color: #7F8C88;">Trámite #778 · En revisión</span>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 10px; cursor: pointer;" style-hover="background: #212B28;">
+            <span style="width: 30px; height: 30px; border-radius: 9px; background: #0E1614; display: grid; place-items: center; flex: 0 0 30px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#AEB9B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /></svg></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: 13.5px; font-weight: 600;">Ramona Escobar</span>
+              <span style="display: block; font-size: 11.5px; color: #7F8C88;">Vecina · 4 reclamos · Barrio Centro</span>
+            </span>
+          </div>
+          <div style="display: flex; gap: 8px; padding: 12px 10px 2px; border-top: 1px solid rgba(255,255,255,0.07); margin-top: 8px;">
+            <span style="font-size: 11.5px; color: #7F8C88;">Filtrá con</span>
+            <span style="font-size: 11px; font-weight: 600; color: #AEB9B5; background: #1C2522; border-radius: 6px; padding: 2px 7px;">#reclamo</span>
+            <span style="font-size: 11px; font-weight: 600; color: #AEB9B5; background: #1C2522; border-radius: 6px; padding: 2px 7px;">@vecino</span>
+            <span style="font-size: 11px; font-weight: 600; color: #AEB9B5; background: #1C2522; border-radius: 6px; padding: 2px 7px;">zona:</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;conFoto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Banner&quot;},&quot;colapso&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;header&quot;,&quot;borde&quot;],&quot;default&quot;:&quot;header&quot;,&quot;tsType&quot;:&quot;'header' | 'borde'&quot;,&quot;section&quot;:&quot;Sidebar&quot;},&quot;perfil&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dependencia&quot;,&quot;admin&quot;],&quot;default&quot;:&quot;dependencia&quot;,&quot;tsType&quot;:&quot;'dependencia' | 'admin'&quot;,&quot;section&quot;:&quot;Previsualizar sesión&quot;},&quot;modulos&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;reclamos,tramites&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Previsualizar sesión&quot;}}">
+class Component extends DCLogic {
+  state = { reclamos: true, campo: true, tramites: true, vecino: true, colapsada: false, buscador: false, dep: false, slide: 0 };
+  componentDidMount() {
+    this._onKey = (e) => {
+      if (e.key === 'Escape') this.setState({ buscador: false });
+      if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); this.setState(s => ({ buscador: !s.buscador })); }
+    };
+    window.addEventListener('keydown', this._onKey);
+    this._rot = setInterval(() => this.setState(s => ({ slide: s.slide + 1 })), 10000);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._onKey); clearInterval(this._rot); }
+  // Un resumen por módulo habilitado; el carrusel se arma solo con los que vienen en la sesión.
+  modulos() {
+    const V = '#57D6A9', A = '#F0A85A', R = '#FF8085', N = '#EDF3F0';
+    return [
+      { clave: 'reclamos', etiqueta: 'RECLAMOS · JULIO 2026', accionA: 'Ver los 4 en riesgo', accionB: 'Asignar cuadrillas',
+        frase: [ {texto: 'Resolviste el ', color: N}, {texto: '61%', color: V}, {texto: ' de julio: ', color: N}, {texto: '113 cerrados', color: V}, {texto: ' y ', color: N}, {texto: '96 abiertos', color: A}, {texto: ', de los cuales ', color: N}, {texto: '4 están en riesgo de SLA', color: R}, {texto: ' y ', color: N}, {texto: '9 sin cuadrilla', color: A}, {texto: '.', color: N} ] },
+      { clave: 'tramites', etiqueta: 'TRÁMITES · JULIO 2026', accionA: 'Revisar los 7 en curso', accionB: 'Ver vencimientos',
+        frase: [ {texto: 'Entraron ', color: N}, {texto: '10 trámites', color: N}, {texto: ' este mes: ', color: N}, {texto: '3 finalizados', color: V}, {texto: ', ', color: N}, {texto: '7 en curso', color: A}, {texto: ' y ', color: N}, {texto: '2 con documentación vencida', color: R}, {texto: '.', color: N} ] },
+      { clave: 'cobros', etiqueta: 'TASAS Y COBROS · JULIO 2026', accionA: 'Ver morosos', accionB: 'Emitir recordatorios',
+        frase: [ {texto: 'Cobraste el ', color: N}, {texto: '67%', color: V}, {texto: ' de lo emitido: ', color: N}, {texto: '$ 25,9 M en caja', color: V}, {texto: ' y ', color: N}, {texto: '$ 12,7 M pendientes', color: A}, {texto: ' en ', color: N}, {texto: '52 cuentas', color: A}, {texto: '.', color: N} ] },
+      { clave: 'campo', etiqueta: 'CAMPO Y CUADRILLAS · HOY', accionA: 'Ver órdenes de hoy', accionB: 'Reprogramar',
+        frase: [ {texto: 'Hay ', color: N}, {texto: '12 órdenes activas', color: N}, {texto: ' con ', color: N}, {texto: '5 cuadrillas en calle', color: V}, {texto: '; ', color: N}, {texto: '3 quedaron sin cerrar de ayer', color: R}, {texto: '.', color: N} ] },
+    ];
+  }
+  renderVals() {
+    const activos = this.props.modulos ?? 'reclamos,tramites';
+    const claves = String(activos).split(',').map(s => s.trim());
+    const mods = this.modulos().filter(m => claves.includes(m.clave));
+    const idx = ((this.state.slide % mods.length) + mods.length) % mods.length;
+    const mod = mods[idx] || this.modulos()[0];
+    const chev = (open) => (open ? 'rotate(0deg)' : 'rotate(-90deg)');
+    const t = (k) => () => this.setState(s => ({ [k]: !s[k] }));
+    return {
+      conFoto: this.props.conFoto ?? true,
+      moduloEtiqueta: mod.etiqueta,
+      frase: mod.frase,
+      accionA: mod.accionA,
+      accionB: mod.accionB,
+      puntos: mods.map((m, i) => ({ color: i === idx ? '#00B37E' : '#39433F', ir: () => this.setState({ slide: i }) })),
+      anterior: () => this.setState({ slide: (idx - 1 + mods.length) % mods.length }),
+      siguiente: () => this.setState({ slide: (idx + 1) % mods.length }),
+      enDependencia: (this.props.perfil ?? 'dependencia') === 'dependencia',
+      esAdmin: (this.props.perfil ?? 'dependencia') === 'admin',
+      depAbierto: this.state.dep,
+      toggleDep: () => this.setState(s => ({ dep: !s.dep })),
+      buscadorAbierto: this.state.buscador,
+      abrirBuscador: () => this.setState({ buscador: true }),
+      cerrarBuscador: () => this.setState({ buscador: false }),
+      colapsada: this.state.colapsada,
+      expandida: !this.state.colapsada,
+      colapsoHeader: (this.props.colapso ?? 'header') === 'header',
+      colapsoBorde: (this.props.colapso ?? 'header') === 'borde',
+      toggleColapso: () => this.setState(s => ({ colapsada: !s.colapsada })),
+      openReclamos: this.state.reclamos,
+      openCampo: this.state.campo,
+      openTramites: this.state.tramites,
+      openVecino: this.state.vecino,
+      chevReclamos: chev(this.state.reclamos),
+      chevCampo: chev(this.state.campo),
+      chevTramites: chev(this.state.tramites),
+      chevVecino: chev(this.state.vecino),
+      toggleReclamos: t('reclamos'),
+      toggleCampo: t('campo'),
+      toggleTramites: t('tramites'),
+      toggleVecino: t('vecino'),
+    };
+  }
+}
+</script>
+</body>
+</html>

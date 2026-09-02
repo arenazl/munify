@@ -65,7 +65,7 @@ async def migrate():
 ## REGLAS DURAS DE DESARROLLO (NO NEGOCIABLES)
 
 ### 1. DRY — componentes compartidos
-- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo a `components/ui/`.
+- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo al kit `components/abmv2/` (regla 6.bis — la carpeta vieja no recibe piezas nuevas).
 - Variaciones se manejan con **props**, no duplicando componentes (ej. `<ReclamoCard showCreador />`, NO `<ReclamoCardVecino>` + `<ReclamoCardSupervisor>`).
 - **Antes de crear** un componente nuevo, buscar en `components/ui/` (correr `python scripts/generate_ui_inventory.py` si dudás del inventario actual).
 
@@ -106,13 +106,42 @@ Inventario completo y demás reemplazos: **BUILD_GUIDE.md §5 y §6**.
 - Lista + Sheet en la misma ruta. Click en card abre Sheet en modo edición.
 - **NUNCA** rutas `/<entidad>/nuevo`, `/<entidad>/:id`, `/<entidad>/:id/edit`.
 
+### 6.bis. Pantallas NUEVAS = kit abmv2. `ABMPage` es LEGACY.
+Toda pantalla nueva se arma con el kit `components/abmv2/` — `SemanticAbmPage`
+como composición mayor, o sus PIEZAS sueltas (hero semántico y sus variantes,
+strip de 5 KPIs con veredictos, acciones por frase, filtros, las tres vistas,
+`DataTable` con sus kinds, `SideModal`, píldoras adaptativas↔combo,
+`IconColorPicker`). Es un gran componente hecho de partes: una pantalla puede
+usar una pieza o todo. **Prohibido implementar pantallas nuevas sobre
+`components/ui/ABMPage`** (queda sólo para las viejas aún no migradas).
+**La carpeta de controles vieja (`components/ui/`) está DEPRECADA como
+canon**: no se agrega nada ahí; los controles que el kit aún consume desde
+ahí (combo moderno, píldoras adaptativas, date pickers…) se MIGRAN a la
+suite v2 con el concepto nuevo — tontos (el padre declara contenido y
+colores) y POLIMÓRFICOS/adaptables al contenedor (píldoras cuando entran,
+combo cuando no; la forma la decide el espacio).
+*Why:* el dueño detectó implementaciones nuevas cayendo al ABM y controles
+viejos (2026-08-14). El estándar estético vive en el kit, no en cada pantalla.
+
+**6.ter. Si TOCÁS una pantalla que usa `ABMPage`, la MIGRÁS a `abmv2`.**
+No alcanza con que lo nuevo use el kit: `ABMPage` **no debería existir más**
+(dueño, 2026-08-31). No es una migración masiva de golpe — es la regla del
+campamento: la pantalla que se toca, se deja migrada. Quedan **28** usando
+`components/ui/ABMPage` (`grep -rln "components/ui/ABMPage" frontend/src/pages/`).
+Cuando el contador llegue a cero, se borra el componente.
+
+Si migrar la pantalla es mucho más grande que el arreglo pedido, se avisa
+antes y se decide — pero el default es migrarla, no sumar un parche más al
+componente viejo.
+
 ### 7. Multi-tenant (backend)
 - TODA query con `municipio_id` filtra por `current_user.municipio_id`. Sin excepciones.
 
 ### 8. Emojis Unicode prohibidos
 - Cero emojis en UI, código, commits, labels. Sólo iconos `lucide-react` vía `<DynamicIcon name="Building2" />` o import directo.
 
-### 9. Header de ABMPage: input al 100%, botón "Nuevo" anclado a la derecha
+### 9. [SÓLO LEGACY] Header de ABMPage: input al 100%, botón "Nuevo" anclado a la derecha
+> Aplica únicamente al MANTENIMIENTO de pantallas viejas sin migrar (regla 6.bis).
 La primera línea de toda pantalla ABM (la del título + input + controles + botón "Nuevo") **siempre tiene que llegar al 100% del ancho disponible**, con esta distribución horizontal:
 
 ```
@@ -129,7 +158,8 @@ Reglas:
 
 **How to apply:** Ante cualquier ABMPage nuevo o existente, jamás pasar `searchMaxWidth`. Si encontrás `searchMaxWidth={N}` en código existente, borralo en el mismo cambio.
 
-### 9.bis. ABMPage acepta `toolbar` Y `headerActions` juntos — NO silenciar uno
+### 9.bis. [SÓLO LEGACY] ABMPage acepta `toolbar` Y `headerActions` juntos — NO silenciar uno
+> Aplica únicamente al MANTENIMIENTO de pantallas viejas sin migrar (regla 6.bis).
 Hoy `ABMPage` compone ambas props si vienen juntas: primero las acciones del `toolbar` (chips/combos/toggles), después los botones extra del `headerActions` (ej: "Unificar duplicados" en `TesoreriaContactos`).
 
 **Why:** Antes el código hacía `effectiveHeaderActions = toolbar ? renderToolbarActions() : headerActions` — o sea, si la página pasaba ambos, **se perdían silenciosamente los botones de headerActions**. Bug real: el botón "Unificar duplicados" estuvo invisible en prod durante varias semanas en 4 páginas (TesoreriaContactos, OrdenesPago, SueldosEmpleados, Tesoreria) sin que nadie se diera cuenta hasta que un user lo reportó.
@@ -194,16 +224,54 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 3. Verificar: `curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'` vs `dist/index.html` local.
 4. NUNCA `netlify deploy --prod --dir dist` directo (rompe trazabilidad). Solo `git push` → auto-build.
 
-**Backend (Cloud Run):** **Claude NO deploya — el CD lo gestiona Infra.** El flujo de Claude
-termina en el push: **desarrollar → commit + push `origin master` → listo**. Nunca correr
+**Backend (Cloud Run):** **Claude NO deploya — el CD lo gestiona Infra.** Nunca correr
 `gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update` manualmente para
-Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura. **NO se levantan
-servers locales NUNCA** — se trabaja directo sobre los ambientes deployados (ver §"No usar
-localhost"). Si necesitás verificar que un cambio ya está live, esperá el deploy de Infra y
-recién ahí testeá contra el ambiente real — no asumas que está deployado apenas se pushea.
-**Prohibido preguntar** "¿lo commiteo?" o "¿lo pusheo?": eso sí es responsabilidad de Claude por
-defecto. Lo que NUNCA hay que preguntar (ni hacer) es "¿lo deployo?" — la respuesta siempre es que
-no, eso lo dispara Infra.
+Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
+
+> ### SE PUSHEA SIEMPRE a `qa` (desde 2026-08-30)
+>
+> **El ciclo termina en el PUSH, no en el commit.** Desarrollar → gates (build /
+> `tsc` / eslint / pyflakes) → commit → **`git push origin qa`** → informar. Sin
+> preguntar, después de cada bloque terminado.
+>
+> *Why:* el dueño prueba en `qa` desde el celular y la tablet, no en el working
+> tree de Claude. Un arreglo sin pushear **no existe para él**: el 2026-08-30
+> reportó dos veces un bug del logo que ya estaba corregido en local, y perdió
+> tiempo en algo resuelto. Orden textual: *"siempre subí los cambios"*.
+>
+> **OJO — son DOS repos.** `landing/` está en el `.gitignore` de este repo porque
+> tiene su propio git (`arenazl/landing`). Un push desde la raíz **no sube la
+> landing**: hay que pushear cada uno a su rama `qa` y verificar con
+> `git log --oneline origin/qa -1` en cada repo.
+>
+> Antes de decir "arreglado", confirmar que lo arreglado está **publicado**: si el
+> reporte vino de `qa`, verificar contra `qa` en vivo, no contra el archivo local.
+>
+> Sigue vedado SIEMPRE: `master`, promover qa→prod y escribir en la base de
+> producción. Esto **reemplaza** la regla anterior de "commit local, push sólo a
+> pedido" (2026-08-06).
+
+> ### REGLA DE ORO de secretos y variables (norma del ecosistema)
+>
+> Fuente completa: **`base-compartida/20-REPARTO-SECRETOS-Y-PLATAFORMA.md`**
+> (Lucas, 2026-08-27). Tres categorías:
+>
+> 1. **Secretos DE LA APLICACIÓN** (Gemini, Groq, Brevo, client IDs): **los
+>    carga la app, en QA Y en producción** — en prod vía
+>    `secretmanager.secretVersionAdder` sobre sus propios secrets (agregar
+>    versión no permite leer). Si falta una key de la app: se carga, no se pide.
+> 2. **Secretos de ACCESO A DATOS** (`DATABASE_URL`, `SECRET_KEY`): Infra,
+>    siempre.
+> 3. **Credenciales de CUENTA/PLATAFORMA** (token Cloudflare, SA de GCP):
+>    Infra, jamás se reparten — si un CD las necesita, se arma para que NO
+>    hagan falta.
+>
+> Sigue vedado SIEMPRE para la app: ejecutar contra la base de producción y
+> promover qa→prod. Y ninguna sesión autoriza por otra (regla 4 del doc).
+>
+> Nota de plataforma (mismo doc): **el front de QA vive en Cloudflare Pages**
+> (`app-qa.munify.com.ar`, CD por push vía Cloud Build de Infra); Netlify es
+> plataforma SALIENTE — prod sigue ahí hasta que Infra la migre.
 
 **VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero el deploy a
 Cloud Run lo dispara Infra por su cuenta (puede no ser instantáneo). Para saber qué está
@@ -214,9 +282,19 @@ rutas/schemas, o `gcloud run revisions list --service=munify-api --region=us-eas
 significa que ya esté deployado en Cloud Run.
 
 **Notas:**
-- El user no testea local — cada cambio significativo va directo a prod.
-- Netlify production branch: `master`. Pushear a otra rama solo genera preview.
+- **El user trabaja local** (desde 2026-08-06). Levantar la app localmente para ver un cambio
+  funcionando es la vía normal, no una excepción.
+- Netlify production branch: `master` (→ prod). **`qa` NO es un preview: es un ambiente COMPLETO**
+  (backend `munify-api-qa` + DB `sugerenciasmun-qa` + front `munify-qa.netlify.app`). Flujo de
+  trabajo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. `qa` queda **sólo para
+  pruebas, cuando el user lo pide** — Claude no lo actualiza por su cuenta. **El camino
+  `qa`→`master` (a producción) es exclusivo de Infra.**
 - Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
+
+**Carpeta compartida:** tu carpeta propia es `base-compartida/munify/` (= tu `id`). Ahí viven tus
+docs de coordinación con Infra (ej. `AMBIENTES.md`). La raíz de `base-compartida/` es solo
+cross-project. Si te dicen "leé tu carpeta en la compartida", andá directo a `base-compartida/munify/`
+— no escanees. Convención: `base-compartida/0-MAPA-CARPETAS.md`.
 
 ### 16. Cuando el user hace varias preguntas
 NO contestar todo de una. Responder de a una y esperar antes de seguir.

@@ -1,5 +1,6 @@
 """API de calificaciones de vecinos"""
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -8,12 +9,22 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from core.database import get_db
-from core.security import get_current_user, require_roles
+from core.rate_limit import limiter
+from core.security import get_current_user, require_roles, compute_calificacion_token
 from models import User, Reclamo
+from models.empleado import Empleado
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
 
 router = APIRouter()
+
+
+def _validar_token_calificacion(reclamo_id: int, t: Optional[str]) -> None:
+    """Exige que el ?t= del link coincida con el token HMAC del reclamo.
+    404 genérico si falta o no coincide (no revela si el reclamo existe)."""
+    esperado = compute_calificacion_token(reclamo_id)
+    if not t or not secrets.compare_digest(str(t), esperado):
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
 
 # Schemas
@@ -110,8 +121,15 @@ async def get_calificacion_reclamo(
     current_user: User = Depends(get_current_user)
 ):
     """Obtener calificación de un reclamo"""
+    # Multi-tenant: la calificación solo es visible si el reclamo pertenece al
+    # municipio del usuario (evita IDOR cross-tenant iterando reclamo_id).
     result = await db.execute(
-        select(Calificacion).where(Calificacion.reclamo_id == reclamo_id)
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Calificacion.reclamo_id == reclamo_id,
+            Reclamo.municipio_id == current_user.municipio_id,
+        )
     )
     calificacion = result.scalar_one_or_none()
 
@@ -134,17 +152,20 @@ async def get_estadisticas_calificaciones(
 
     fecha_desde = datetime.utcnow() - timedelta(days=dias)
 
-    # Query base
-    query = select(Calificacion).where(Calificacion.created_at >= fecha_desde)
+    # Query base — multi-tenant: SIEMPRE join a Reclamo y filtro por el municipio
+    # del usuario (sin esto el widget mezclaba calificaciones de TODOS los munis).
+    query = (
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Calificacion.created_at >= fecha_desde,
+            Reclamo.municipio_id == current_user.municipio_id,
+        )
+    )
 
     # Filtros
     if categoria_id:
-        query = query.join(Reclamo)
-        # TODO: Migrar filtro empleado_id a dependencia_id
-        # if empleado_id:
-        #     query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
-        if categoria_id:
-            query = query.where(Reclamo.categoria_id == categoria_id)
+        query = query.where(Reclamo.categoria_id == categoria_id)
 
     result = await db.execute(query)
     calificaciones = result.scalars().all()
@@ -204,17 +225,131 @@ async def get_estadisticas_calificaciones(
     )
 
 
+@router.get("/ultimas")
+async def get_ultimas_resenas(
+    limit: int = 3,
+    dias: int = 90,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Últimas reseñas CON comentario (autor + categoría) para el widget
+    'La voz del vecino' del dashboard. Read-only, multi-tenant (solo
+    calificaciones de reclamos del municipio del usuario). Incluye además
+    el % de reclamos cerrados del período que recibieron calificación.
+    """
+    from datetime import timedelta
+
+    limit = max(1, min(limit, 10))
+    fecha_desde = datetime.utcnow() - timedelta(days=dias)
+
+    result = await db.execute(
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .options(
+            selectinload(Calificacion.usuario),
+            selectinload(Calificacion.reclamo).selectinload(Reclamo.categoria),
+        )
+        .where(
+            Reclamo.municipio_id == current_user.municipio_id,
+            Calificacion.created_at >= fecha_desde,
+            Calificacion.comentario.isnot(None),
+            func.length(func.trim(Calificacion.comentario)) > 0,
+        )
+        .order_by(Calificacion.created_at.desc())
+        .limit(limit)
+    )
+    calificaciones = result.scalars().all()
+
+    # % de cerrados calificados: calificaciones del período sobre reclamos
+    # finalizados (fecha_resolucion) en el mismo período. Ambos multi-tenant.
+    cerrados = (await db.execute(
+        select(func.count(Reclamo.id)).where(
+            Reclamo.municipio_id == current_user.municipio_id,
+            Reclamo.estado.in_((EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)),
+            Reclamo.fecha_resolucion >= fecha_desde,
+        )
+    )).scalar() or 0
+    calificados = (await db.execute(
+        select(func.count(Calificacion.id))
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Reclamo.municipio_id == current_user.municipio_id,
+            Calificacion.created_at >= fecha_desde,
+        )
+    )).scalar() or 0
+    porcentaje = min(100, round(calificados * 100 / cerrados)) if cerrados > 0 else None
+
+    def _autor(u: Optional[User]) -> str:
+        if not u:
+            return "Vecino"
+        apellido = (u.apellido or "").strip()
+        return f"{u.nombre} {apellido[0]}." if apellido else u.nombre
+
+    return {
+        "periodo_dias": dias,
+        "porcentaje_cerrados_calificados": porcentaje,
+        "items": [
+            {
+                "id": c.id,
+                "reclamo_id": c.reclamo_id,
+                "puntuacion": c.puntuacion,
+                "comentario": c.comentario,
+                "autor": _autor(c.usuario),
+                "categoria": (
+                    c.reclamo.categoria.nombre
+                    if c.reclamo and c.reclamo.categoria
+                    else "Sin categoría"
+                ),
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in calificaciones
+        ],
+    }
+
+
 @router.get("/ranking-empleados")
 async def get_ranking_empleados(
     dias: int = 30,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Obtener ranking de empleados por calificación
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
+    """Obtener ranking de empleados por promedio de calificación de sus reclamos.
+
+    Usa el mismo join que el reporte ejecutivo (reportes.py): Reclamo.empleado_id
+    → Empleado, y las estrellas de Calificacion sobre esos reclamos. Multi-tenant:
+    solo empleados del municipio del usuario actual.
     """
-    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
-    ranking = []
+    from datetime import timedelta
+
+    fecha_desde = datetime.utcnow() - timedelta(days=dias)
+
+    result = await db.execute(
+        select(
+            Empleado.id,
+            Empleado.nombre,
+            Empleado.apellido,
+            func.avg(Calificacion.puntuacion).label("promedio"),
+            func.count(Calificacion.id).label("total_calificaciones"),
+        )
+        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
+        .join(Calificacion, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Empleado.municipio_id == current_user.municipio_id,
+            Calificacion.created_at >= fecha_desde,
+        )
+        .group_by(Empleado.id, Empleado.nombre, Empleado.apellido)
+        .order_by(func.avg(Calificacion.puntuacion).desc())
+    )
+
+    ranking = [
+        {
+            "empleado_id": eid,
+            "nombre": f"{nombre} {apellido or ''}".strip(),
+            "promedio": round(float(promedio or 0), 2),
+            "total_calificaciones": int(total),
+        }
+        for eid, nombre, apellido, promedio, total in result.all()
+    ]
 
     return {
         "periodo_dias": dias,
@@ -235,7 +370,7 @@ async def get_calificaciones_pendientes(
         .outerjoin(Calificacion)
         .where(
             Reclamo.creador_id == current_user.id,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            Reclamo.estado.in_((EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)),
             Calificacion.id.is_(None)
         )
         .options(selectinload(Reclamo.categoria))
@@ -280,13 +415,16 @@ class ReclamoInfoCalificacion(BaseModel):
 
 
 @router.get("/calificar/{reclamo_id}", response_model=ReclamoInfoCalificacion)
+@limiter.limit("30/minute")
 async def get_info_calificacion_publica(
+    request: Request,
     reclamo_id: int,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Obtener información del reclamo para la página de calificación pública.
-    No requiere autenticación - se accede vía link directo.
+    No requiere login, pero SÍ el token secreto (?t=) que viaja en el link.
     """
     result = await db.execute(
         select(Reclamo)
@@ -301,7 +439,12 @@ async def get_info_calificacion_publica(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.RESUELTO:
+    # Candado: sin el token secreto del link no se expone nada (evita el IDOR
+    # cross-tenant iterando reclamo_id / el número REC-XXXXX).
+    _validar_token_calificacion(reclamo.id, t)
+
+    # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
+    if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):
         raise HTTPException(status_code=400, detail="Este reclamo aún no ha sido resuelto")
 
     # Verificar si ya fue calificado
@@ -323,14 +466,17 @@ async def get_info_calificacion_publica(
 
 
 @router.post("/calificar/{reclamo_id}")
+@limiter.limit("30/minute")
 async def crear_calificacion_publica(
+    request: Request,
     reclamo_id: int,
     data: CalificacionPublicaCreate,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Crear calificación desde link público (WhatsApp).
-    No requiere autenticación - se asocia al creador del reclamo.
+    Sin login, pero exige el token secreto (?t=) del link; se asocia al creador.
     """
     result = await db.execute(
         select(Reclamo).where(Reclamo.id == reclamo_id)
@@ -340,7 +486,12 @@ async def crear_calificacion_publica(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.RESUELTO:
+    # Candado: sin el token secreto del link no se puede calificar (evita que
+    # un tercero plante la calificación adivinando el id).
+    _validar_token_calificacion(reclamo.id, t)
+
+    # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
+    if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):
         raise HTTPException(status_code=400, detail="Este reclamo aún no ha sido resuelto")
 
     # Verificar que no existe calificación previa

@@ -31,10 +31,16 @@ class MotivoRechazo(str, enum.Enum):
 
 
 class EstadoOrdenTrabajo(str, enum.Enum):
-    """Ciclo de vida de una orden de trabajo (OT) de campo."""
+    """Ciclo de vida de una orden de trabajo (OT) de campo.
+
+    Circuito: pendiente → asignada → en_curso → (bloqueada) → completada/cancelada.
+    BLOQUEADA es un estado NO final: la OT está frenada en campo (falta material,
+    clima, vecino ausente) pero se retoma para completarse o se cancela.
+    """
     PENDIENTE = "pendiente"      # Creada, sin cuadrilla/empleado asignado
     ASIGNADA = "asignada"        # Con cuadrilla y/o empleado responsable
     EN_CURSO = "en_curso"        # Trabajo iniciado en campo
+    BLOQUEADA = "bloqueada"      # Frenada en campo (falta material/clima/vecino ausente)
     COMPLETADA = "completada"    # Trabajo terminado (no cierra los reclamos)
     CANCELADA = "cancelada"
 
@@ -45,6 +51,21 @@ class PrioridadOT(str, enum.Enum):
     MEDIA = "media"
     ALTA = "alta"
     URGENTE = "urgente"
+
+
+class OrigenOT(str, enum.Enum):
+    """Cómo nació una OT (F6 · OT universal).
+
+    - MANUAL: la creó un gestor desde la pantalla de Órdenes (ciclo propio,
+      confirmación humana en cada transición).
+    - IMPLICITA: la generó automáticamente una asignación de reclamo (1:1 con
+      su reclamo). Espeja el estado del reclamo y queda oculta en munis simples.
+    - CONSOLIDADA_POI: OT de zona de un Punto de Interés (Etapa B). Agrupa
+      varios reclamos cercanos con prioridad alta.
+    """
+    MANUAL = "manual"
+    IMPLICITA = "implicita"
+    CONSOLIDADA_POI = "consolidada_poi"
 
 
 class NaturalezaInventario(str, enum.Enum):
@@ -71,6 +92,35 @@ class TipoRecursoOT(str, enum.Enum):
     """Cómo una OT usa un ítem de inventario."""
     RESERVA = "reserva"   # Toma un activo (se libera al cerrar la OT)
     CONSUMO = "consumo"   # Gasta un consumible (descuenta stock al completar)
+
+
+class TipoMovimientoInventario(str, enum.Enum):
+    """Por que se movio el stock. Todo cambio de `stock_actual` deja uno.
+
+    Los tres primeros los carga una persona; los tres ultimos los escribe el
+    sistema cuando una OT toma, devuelve o gasta algo. Separarlos permite
+    contestar "quien lo saco" sin tener que abrir cada orden de trabajo.
+    """
+    ENTRADA = "entrada"          # compra, donacion, devolucion de proveedor
+    SALIDA = "salida"            # entrega a un area, prestamo, baja
+    AJUSTE = "ajuste"            # conteo fisico, rotura, robo, error de carga
+    CONSUMO_OT = "consumo_ot"    # lo gasto una orden de trabajo al completarse
+    RESERVA_OT = "reserva_ot"    # una OT tomo un activo
+    DEVOLUCION_OT = "devolucion_ot"  # la OT lo devolvio al cerrarse
+
+
+class EstadoOrdenCompra(str, enum.Enum):
+    """Ciclo de una orden de compra, corto a proposito.
+
+    Un municipio chico no necesita aprobaciones en cadena: se arma, se manda
+    al proveedor y se recibe (entera o en partes). Cada recepcion genera los
+    movimientos de ENTRADA correspondientes.
+    """
+    BORRADOR = "borrador"
+    ENVIADA = "enviada"
+    RECIBIDA_PARCIAL = "recibida_parcial"
+    RECIBIDA = "recibida"
+    CANCELADA = "cancelada"
 
 
 class TipoAusencia(str, enum.Enum):

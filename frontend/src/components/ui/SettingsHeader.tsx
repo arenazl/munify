@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useEmbed } from '../abmv2/useEmbed';
 
 interface SettingsHeaderProps {
   title: string;
@@ -31,8 +32,14 @@ export default function SettingsHeader({
   saveLabel = 'Guardar',
   statusBadge,
 }: SettingsHeaderProps) {
+  // Embebida en el panel de Configuración: el contenedor ya puso el título,
+  // y este header es sticky/fixed — flotaría sobre el panel. No se renderiza.
+  const { embedded } = useEmbed();
+
   const { theme } = useTheme();
   const color = iconColor || theme.primary;
+
+  if (embedded) return null;
 
   return (
     <div
@@ -92,7 +99,7 @@ export default function SettingsHeader({
                 background: saveDisabled
                   ? theme.backgroundSecondary
                   : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                color: saveDisabled ? theme.textSecondary : '#ffffff',
+                color: saveDisabled ? theme.textSecondary : 'var(--pl-on-accent)',
               }}
             >
               {saving ? (

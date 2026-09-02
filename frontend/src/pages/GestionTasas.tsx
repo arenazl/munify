@@ -6,7 +6,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { ABMPage } from '../components/ui/ABMPage';
 import { FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
-import PageHint from '../components/ui/PageHint';
 import type { Partida, TipoTasa } from '../types';
 
 /**
@@ -85,7 +84,6 @@ export default function GestionTasas() {
 
   return (
     <>
-      <PageHint pageId="gestion-tasas" />
       <ABMPage
         title="Tasas"
         icon={<Wallet className="h-5 w-5" />}

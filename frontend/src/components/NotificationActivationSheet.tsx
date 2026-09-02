@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Bell, BellRing, X, CheckCircle2, BellOff, Sparkles } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { alpha } from '../lib/colorUtils';
 import {
   isPushSupported,
   getNotificationPermission,
@@ -34,7 +35,11 @@ import {
 const STORAGE_DISMISSAL_COUNT = 'notif_activation_dismiss_count';
 const STORAGE_LAST_DISMISSAL_AT = 'notif_activation_last_dismissal';
 const STORAGE_POST_CREATION_SHOWN = 'notif_activation_post_creation_shown';
+/** Ya se le explicó cómo desbloquear: no se le vuelve a tapar la pantalla. */
+const STORAGE_DENIED_SHOWN = 'notif_activation_denied_shown';
 const COOLDOWN_HOURS = 6;
+/** Con el permiso bloqueado la app no puede hacer nada: silencio largo. */
+const COOLDOWN_DENIED_HOURS = 24 * 30;
 const AUTO_TRIGGER_DELAY_MS = 2000;
 
 type Context = 'login' | 'post-creation';
@@ -57,10 +62,21 @@ function shouldAutoShow(): boolean {
   const perm = getNotificationPermission();
   // Si ya activo, no molestar.
   if (perm === 'granted') return false;
-  // Si ya bloqueo en el browser, mostrar instrucciones (solo 1 vez por cooldown).
-  // Si esta en 'default', mostrar segun cooldown.
+
   const lastDismissal = readLastDismissalAt();
   const elapsedMs = Date.now() - lastDismissal;
+
+  // BLOQUEADO en el navegador: el permiso ya no se puede pedir desde la web —
+  // el navegador no vuelve a preguntar nunca. Insistir cada 6 horas con un
+  // cartel que tapa la pantalla es molestar por algo que la app NO puede
+  // resolver: hay que ir a la configuración del navegador a mano. Se muestran
+  // las instrucciones UNA vez y después se respeta un silencio largo.
+  if (perm === 'denied') {
+    if (localStorage.getItem(STORAGE_DENIED_SHOWN)) return false;
+    return elapsedMs >= COOLDOWN_DENIED_HOURS * 60 * 60 * 1000;
+  }
+
+  // En 'default' sí tiene sentido volver: el navegador todavía puede preguntar.
   return elapsedMs >= COOLDOWN_HOURS * 60 * 60 * 1000;
 }
 
@@ -133,6 +149,15 @@ export function NotificationActivationSheet() {
     localStorage.setItem(STORAGE_DISMISSAL_COUNT, String(next));
     localStorage.setItem(STORAGE_LAST_DISMISSAL_AT, String(Date.now()));
     setDismissCount(next);
+    setOpen(false);
+  }, []);
+
+  /** Cierre cuando el permiso está bloqueado: se anota que ya se explicó cómo
+   *  desbloquearlo, para no volver a tapar la pantalla con algo que sólo se
+   *  arregla en la configuración del navegador. */
+  const dismissDenied = useCallback(() => {
+    localStorage.setItem(STORAGE_DENIED_SHOWN, String(Date.now()));
+    localStorage.setItem(STORAGE_LAST_DISMISSAL_AT, String(Date.now()));
     setOpen(false);
   }, []);
 
@@ -214,17 +239,29 @@ export function NotificationActivationSheet() {
 
   return (
     <>
-      {/* Overlay oscuro detras (deja visible la parte superior atenuada). */}
+      {/* Velo oscuro detrás, SIN capturar el toque.
+          Este cartel NO lo pidió el usuario: se abre solo a los dos segundos
+          de entrar. Con `pointer-events: auto` (el default) su capa a pantalla
+          completa se quedaba con TODOS los gestos —`elementFromPoint` en el
+          medio de la pantalla devolvía este div— y la app entera dejaba de
+          scrollear en el teléfono hasta cerrarlo. Un aviso que aparece solo no
+          puede secuestrar la pantalla: acá sólo atenúa, y se cierra con la X o
+          con "ahora no". */}
       <div
-        onClick={dismiss}
         className="fixed inset-0 z-[100] animate-in fade-in duration-200"
-        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }}
         aria-hidden="true"
       />
 
-      {/* Sheet ~35vh anclado abajo. */}
+      {/* Sheet anclado abajo, pero POR ENCIMA de la barra de navegación.
+          Antes se apoyaba en bottom-0, igual que la barra, y la tapaba
+          entera: el aviso aparece solo a los dos segundos de entrar, así que
+          alcanzaba con eso para dejar la app sin navegación hasta cerrarlo.
+          El alto de la barra sale de --pl-tabbar-h (con un valor por defecto
+          por si la pantalla no la tiene) más el área segura del teléfono. */}
       <div
-        className="fixed left-0 right-0 bottom-0 z-[101] animate-in slide-in-from-bottom duration-300"
+        className="fixed left-0 right-0 z-[101] animate-in slide-in-from-bottom duration-300"
+        style={{ bottom: 'calc(var(--pl-tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
         role="dialog"
         aria-modal="true"
       >
@@ -366,21 +403,28 @@ export function NotificationActivationSheet() {
 
               {/* Acciones — botones separados, primario gigante */}
               <div className="space-y-2">
+                {/* Con el permiso BLOQUEADO el botón no puede decir "Activar
+                    avisos": el navegador ya no vuelve a preguntar, así que al
+                    tocarlo no pasaba nada y el cartel quedaba ahí — se sentía
+                    como un bucle. Cuando está bloqueado, la única acción
+                    honesta es cerrar: las instrucciones para desbloquearlo ya
+                    están arriba, y hay que hacerlo en el navegador, no acá. */}
                 <button
-                  onClick={handleEnable}
+                  onClick={isDenied ? dismissDenied : handleEnable}
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-base font-bold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-base font-bold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
                   style={{
-                    background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}dd 100%)`,
-                    boxShadow: `0 8px 24px ${theme.primary}55`,
+                    background: `linear-gradient(135deg, ${theme.primary} 0%, ${alpha(theme.primary, 0.87)} 100%)`,
+                    boxShadow: `0 8px 24px ${alpha(theme.primary, 0.33)}`,
+                    color: 'var(--pl-on-accent)',
                   }}
                 >
                   {loading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <Bell className="h-5 w-5" />
-                      {copy.ctaLabel}
+                      {!isDenied && <Bell className="h-5 w-5" />}
+                      {isDenied ? 'Entendido' : copy.ctaLabel}
                     </>
                   )}
                 </button>

@@ -1,0 +1,100 @@
+{
+  "_lea_esto_primero": "Estado del rediseño v2 de Munify al 2026-08-01. Sirve para retomar en frío: la FILOSOFIA manda sobre el detalle. Todo lo listado como hecho está SIN COMMITEAR en la rama qa de la máquina del dueño.",
+
+  "filosofia": {
+    "jerarquia_de_criterios": [
+      "1. NAVEGABILIDAD: que el usuario entienda para qué sirve cada cosa. Manda sobre todo lo demás.",
+      "2. QUE SE ENTIENDA LA FEATURE: si está y no se nota, no existe.",
+      "3. QUE VENDA: pensar siempre desde lo comercial, qué hace que un intendente firme.",
+      "4. Recién después: polimorfismo, reuso, simetría, elegancia del kit."
+    ],
+    "usuario_objetivo": "Empleado municipal de 50 años, no informatizado. Si él no entiende la pantalla, la pantalla está mal. Cero vocabulario técnico en la interfaz: nada de pins, calor, hotspots, capa, time-lapse.",
+    "web_semantica": "La app HABLA. Cada pantalla enuncia en castellano qué está pasando, con los números coloreados por veredicto (bueno = acento de marca, regular = ámbar, malo = rojo pálido). El dato viene con su consecuencia, no suelto.",
+    "el_patron_que_vende": "No mostrar un estado: mostrar un CAMBIO con un momento de inflexión visible. La línea arranca roja y agitada, hay una marca, y después se pone verde. El vendedor señala la marca y dice 'acá empezaron a usar el sistema'. El intendente no ve un gráfico: ve su gestión ordenándose.",
+    "componentes_inteligentes": "Se adaptan al contenedor y degradan PROGRESIVAMENTE (lo que entra + un '+N' con el resto), jamás todo-o-nada ni reglas por cantidad fija. Se mide contra un render fantasma invisible; si se mide el nodo real, colapsa, deja de desbordar, vuelve y parpadea para siempre.",
+    "framework_first": "Hoy es Munify, pero se está curando el KIT para todas las apps del dueño (CRMs y grillas). Mañana 'fábrica de tornillos' o 'venta de churros' tienen que salir con la misma estructura. El kit es en CAPAS y las de abajo nunca saben de las de arriba.",
+    "datos_reales": "JAMÁS simular datos como reales. Nada de coordenadas al azar ni identidades fabricadas. La geografía sale de OpenStreetMap; lo que no existe se omite y se reporta, nunca se rellena."
+  },
+
+  "reglas_de_trabajo_con_el_dueño": {
+    "formato_de_respuesta": "Bullets telegráficos: qué se hizo / situación / qué falta. Nunca párrafos. Cerrar siempre con 'En resumen' de 2-3 líneas.",
+    "mostrar_no_contar": "Capturas antes que tablas de métricas. Las mediciones son para no mentir, no para reportar.",
+    "opinar_siempre": "Ante cada propuesta suya, dar mi enfoque antes de ejecutar, incluso para contradecirlo. Él se sabe falible: 'por querer abstraer todo se complica la navegabilidad'.",
+    "pero_si_hay_mockup_SE_COPIA": "LECCIÓN CARA DE ESTA SESIÓN. Cuando el diseñador entregó un diseño resuelto, mi trabajo es que la implementación no lo empeore, NO proponer alternativas. Las tres veces que 'mejoré' el mockup (la leyenda con el dato, la separación, la etiqueta del electro) el dueño tenía razón y se perdió tiempo.",
+    "verificar_antes_de_afirmar": "Nunca reportar un hecho sin volver a comprobarlo. Le dije 'el electro no está cableado' cuando ya lo estaba: eso destruye la confianza en todos los reportes.",
+    "agentes_y_archivos_en_vivo": "El dueño tiene la app abierta con recarga en caliente y VE cada guardado. Ningún agente puede editar un archivo que él está mirando; y todo cambio debe dejar el archivo compilable después de cada bloque, no solo al final."
+  },
+
+  "gotchas_criticos": {
+    "gate_de_tipos_falso": "npx tsc --noEmit NO CHEQUEA NADA en este repo: el tsconfig raíz es solución con files:[]. El gate real es 'npx tsc --noEmit -p tsconfig.app.json'. Se estuvo validando con un comando ciego durante horas.",
+    "eslint_hooks": "tsc no ve dependencias faltantes en useMemo/useEffect. El bug del cartel 'Nada que dibujar' fue exactamente eso: un useMemo que leía filtroDependencia sin declararlo en las deps. Correr siempre eslint.",
+    "ambiente_local": "pm2 con vite en el 5173, proxy /api al backend de QA. Levantar con: npx pm2 start node_modules/vite/bin/vite.js --name munify-front-dev -- --port 5173",
+    "agentes_sin_designsync": "Los subagentes NO heredan la conexión con el proyecto de Claude Design. Los .dc.html los baja solo la sesión principal."
+  },
+
+  "hecho_y_verificado": {
+    "dashboard": "Banner calcado del mockup (foto de portada suave bajo los veils, fuente Sora, colores medidos uno a uno). Analítica rehecha: 'Tiempo de resolución' dejó de ser gráfico y es lista con veredicto; se podaron los charts sueltos que no estaban en la referencia.",
+    "estandar_abm": "Orden nuevo aplicado en Reclamos, Personal y Gastos: eyebrow + título grande + bajada, después hero semántico, después buscador y filtros PEGADOS como una sola tarjeta, después la grilla. Vive en SemanticAbmPage: se cambia una vez y arrastra a todas las pantallas.",
+    "shell": "Miga de pan SIEMPRE de dos tramos (ámbito / página). Se eliminó el buscador falso del sidebar y el buscador global de la topbar: la búsqueda vive en cada listado, que es donde están los datos.",
+    "buscadores_backend": "Cobros ahora encuentra por vecino, DNI (con o sin puntos), teléfono, mail y monto. Reclamos sumó nombre completo en cualquier orden y número con numeral. Trámites pasó de 5 a 18 campos, incluyendo tipo de trámite y categoría. Helper compartido en backend/utils/busqueda.py. NO PROBADO contra datos reales: falta deploy.",
+    "mapa": "Reescrito entero como CONSULTA GUIADA. Ver sección aparte."
+  },
+
+  "el_mapa": {
+    "por_que_se_rehizo": "Tenía nueve controles con nombres técnicos que ni el dueño (que diseñó la pantalla) sabía qué hacían. 'Una ensalada de botones'.",
+    "como_quedo": "El usuario elige una PREGUNTA en castellano y el sistema le contesta. Cuatro preguntas: Dónde se repiten · Lo atrasado · Qué resolvimos · Dónde no llegamos. Abre ya contestada con la primera.",
+    "la_oracion": "Los filtros son parte de una frase que se lee de corrido: 'Mostrame dónde se repiten los reclamos de [ÁREA], del tipo [TIPO], en [PERÍODO]'. ORDEN IMPORTANTE: primero el área y después el tipo, porque el área CONTIENE a las categorías; al revés se armaban combinaciones que no existen.",
+    "la_respuesta": "Debajo de las preguntas, el RESULTADO con números reales y veredicto ('14 esquinas concentran 76 reclamos: 1 de cada 10'). NUNCA una descripción de lo que hace el botón: eso fue un error que el dueño rechazó.",
+    "el_electro": "Banda DEBAJO del mapa (no arriba). Línea que late: roja antes del hito, verde después, con la marca 'EMPEZARON A USAR EL SISTEMA' en la fecha real de alta del municipio. Avanza cuadro a cuadro (requestAnimationFrame), no a saltos. Vuelta completa en ~14 segundos. Abajo el remate: 'El tiempo de respuesta bajó de 8 días a 2'.",
+    "herramientas_fuera_de_la_ecuacion": "Centrar el mapa y puntos de interés FLOTAN sobre el canvas (donde la mano los busca). El informe de zona tiene panel propio abajo: no es un control del mapa, produce un PDF.",
+    "componentes_nuevos": ["ConsultaGuiada", "Electro", "RankedList"]
+  },
+
+  "kit_de_componentes": {
+    "ubicacion": "frontend/src/components/ui/ (implementación) y D:\\Code\\APP_GUIDE\\components\\v2\\ (espejo agnóstico)",
+    "capas": {
+      "base_no_saben_de_nada": ["AdaptiveFilter", "ModernSelect", "BarList", "CardCarousel", "RankedList", "Electro", "DataTable"],
+      "con_opinion_traen_veredicto": ["SemanticHero", "KpiCardV2", "PageHeader", "RatingSummary", "ConsultaGuiada"],
+      "plantilla_de_pantalla": ["SemanticAbmPage"]
+    },
+    "adaptive_filter": "LA botonera del kit. Cinco tipos de control (opciones, toggles, acción, icono, búsqueda), grupos etiquetados que nunca se parten, una o dos filas en la misma tarjeta, y una escalera de degradación de 8 peldaños: primero se achica la búsqueda, después las píldoras van al +N, después las acciones pierden el label, después los toggles colapsan a combo, y último los rótulos.",
+    "deuda_del_kit": [
+      "Los tokens se llaman --pl-green-* pero son el ACENTO, no verde. En otra app van a ser naranja. Renombrar a --pl-accent-* con alias temporal.",
+      "El prefijo --pl- viene de Paraguay Limpio; para un kit genérico convendría uno neutro.",
+      "Las primitivas de formulario (ABMInput, ABMSelect...) siguen viviendo dentro del ABMPage viejo: el kit v2 depende del componente que vino a reemplazar.",
+      "Hay dos KpiCard."
+    ]
+  },
+
+  "datos_de_qa": {
+    "municipio": "Asunción, id 146, tenant paraguay-limpio",
+    "semilla": "backend/scripts/semillas/m_60_mapa_volumen.py (+ osm_asuncion_fetch.py y datos/osm_asuncion.json con 3000 esquinas reales de OpenStreetMap)",
+    "volumen": "939 reclamos en 12 meses, 89% cerrados, 24 zonas calientes, 54 puntos de interés",
+    "la_curva_que_vende": "Tasa de resolución de 53,7% a 89,4%. Tiempo de respuesta de 8,2 días a 1,7.",
+    "cobertura": "Las 126 combinaciones de pregunta x área x período devuelven datos. Ninguna en cero.",
+    "idempotente": "Correrla de nuevo crea 0."
+  },
+
+  "pendiente": {
+    "urgente": "NADA ESTÁ PUSHEADO. Cuatro horas de trabajo sin un commit, todo en la máquina del dueño. Es el mayor riesgo.",
+    "decisiones_del_dueño": [
+      "Hotfix de forma de pago en Liquidaciones para el cliente de producción que preguntó cómo distinguir transferencia de efectivo. El campo existe y se guarda, pero la pantalla nunca dejó elegirlo: todos los registros dicen 'transferencia'. Mientras tanto puede usar el filtro de cajas, que ya funciona.",
+      "Cómo se calcula el vencimiento de un reclamo: hoy usa 30 días fijos para todos porque el listado no manda el SLA de la categoría, y el SLA está en horas pero se suma como días. Propuesta: que el backend calcule y guarde fecha_estimada_resolucion al crear el reclamo (el campo ya existe, vacío).",
+      "Dos índices en la tabla de pagos y dos en reclamos/solicitudes por fecha de creación."
+    ],
+    "siguiente_modulo": "Trámites, que es primo hermano de Reclamos y debería ser mayormente pasarle sus textos.",
+    "despues": "22 pantallas siguen con StickyPageHeader (el header viejo). El criterio de cuándo va hero semántico está escrito en design/handoff-v2/STANDARD-Cuando-hero-semantico.md: va donde haya una frase que cambie mañana y diga qué hacer hoy; en catálogos y configuración alcanza el título con bajada."
+  },
+
+  "referencias": {
+    "disenos_del_disenador": "design/handoff-v2/references/*.dc.html (dashboard-claro, dashboard-oscuro, reclamos-lista-v2, mapa-v2, gastos-lista, agenda-turnos, mostrador-flujo, personal-empleados, planificacion-semanal, liquidaciones-programados)",
+    "proyecto_de_diseño": "Claude Design, id 46976e44-b6dc-4395-b1fe-15aa2a8f9584. Los archivos de la RAÍZ son los que el diseñador edita en vivo; la carpeta references/ es el handoff congelado.",
+    "estandares_escritos": [
+      "design/handoff-v2/STANDARD-SemanticAbmPage.md",
+      "design/handoff-v2/STANDARD-Variaciones-por-props.md",
+      "design/handoff-v2/STANDARD-Cuando-hero-semantico.md",
+      "design/handoff-v2/tokens.css (los del diseñador, con colores fijos: nosotros los derivamos del tema)"
+    ],
+    "scripts_de_verificacion": "frontend/_*.mjs (Playwright: loguean en localhost:5173/asuncion y miden lo que se afirma). No son parte de la app."
+  }
+}

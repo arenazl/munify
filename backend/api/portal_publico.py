@@ -528,13 +528,18 @@ async def get_categorias_publicas(
     municipio_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtener lista de categorías - SIN AUTENTICACIÓN"""
+    """Obtener lista de categorías - SIN AUTENTICACIÓN
+
+    Catálogo del VECINO: excluye las `interna=True` (clasifican trabajo interno
+    del municipio — Preventivo, Mantenimiento, Obra — y no son un reclamo que el
+    ciudadano pueda cargar)."""
     if municipio_id:
         query = (
             select(Categoria)
             .where(
                 Categoria.municipio_id == municipio_id,
                 Categoria.activo == True,
+                Categoria.interna == False,
             )
             .order_by(Categoria.orden, Categoria.nombre)
         )
@@ -673,11 +678,13 @@ async def clasificar_reclamo_endpoint(
     if not data.texto or len(data.texto) < 5:
         raise HTTPException(status_code=400, detail="El texto debe tener al menos 5 caracteres")
 
-    # Categorías per-municipio
+    # Categorías per-municipio (sin las internas: el vecino no puede terminar
+    # clasificado en una categoría de trabajo interno del municipio)
     result = await db.execute(
         select(Categoria).where(
             Categoria.municipio_id == data.municipio_id,
             Categoria.activo == True,
+            Categoria.interna == False,
         )
     )
     categorias_db = result.scalars().all()
@@ -708,7 +715,7 @@ async def clasificar_reclamo_endpoint(
 
     # Clasificar. Si el muni tiene la IA deshabilitada, forzamos solo matching
     # local (keywords): sigue sugiriendo categoria, sin LLM (gratis, no se rompe).
-    # Si esta habilitada, usa el modelo de Gemini configurado para ese muni.
+    # Si esta habilitada, usa el modelo configurado para ese muni.
     from core.ia_config import get_ia_config
     cfg = await get_ia_config(db, data.municipio_id)
     usar_ia = data.usar_ia and cfg.habilitada
@@ -717,6 +724,7 @@ async def clasificar_reclamo_endpoint(
         categorias=categorias,
         usar_ia=usar_ia,
         modelo=cfg.modelo,
+        municipio_id=data.municipio_id,
     )
 
     return resultado
@@ -751,7 +759,7 @@ async def chat_publico(
             response="El asistente no está disponible en este momento. Por favor intentá más tarde."
         )
 
-    # Categorías per-municipio
+    # Categorías per-municipio (sin las internas — es el chat del vecino)
     categorias = []
     if data.municipio_id:
         result = await db.execute(
@@ -759,6 +767,7 @@ async def chat_publico(
             .where(
                 Categoria.municipio_id == data.municipio_id,
                 Categoria.activo == True,
+                Categoria.interna == False,
             )
             .order_by(Categoria.orden, Categoria.nombre)
         )

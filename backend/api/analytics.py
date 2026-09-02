@@ -7,7 +7,7 @@ Endpoints de analytics avanzados para el Dashboard.
 """
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, case
+from sqlalchemy import select, func, and_, case, or_
 from datetime import datetime, timedelta
 from typing import List, Optional
 from math import radians, cos, sin, asin, sqrt
@@ -22,10 +22,21 @@ from models.empleado import Empleado
 from models.configuracion import Configuracion
 from models.municipio import Municipio
 from models.enums import EstadoReclamo, RolUsuario
+from services.prioridad import prioridad_ot_map
 
 from core.tenancy import get_effective_municipio_id  # noqa: E402
 
 router = APIRouter()
+
+# Peso de intensidad del heatmap por prioridad de la OT (F6 · prioridad única).
+# La prioridad canónica vive en la OT; `Reclamo.prioridad` (Integer) está deprecado.
+# Sin OT viva -> se pondera como 'media' (0.5).
+_PESO_PRIORIDAD_OT = {
+    "urgente": 1.0,
+    "alta": 0.8,
+    "media": 0.5,
+    "baja": 0.3,
+}
 
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -57,28 +68,50 @@ async def get_heatmap_data(
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
-    query = select(
-        Reclamo.latitud,
-        Reclamo.longitud,
-        Reclamo.estado,
-        Reclamo.prioridad,
-        Categoria.nombre.label('categoria')
-    ).join(Categoria, Reclamo.categoria_id == Categoria.id).where(
-        and_(
-            Reclamo.latitud.isnot(None),
-            Reclamo.longitud.isnot(None),
-            Reclamo.created_at >= fecha_inicio,
-            Reclamo.municipio_id == municipio_id
+    def _build_query(con_fecha: bool):
+        q = select(
+            Reclamo.id,
+            Reclamo.latitud,
+            Reclamo.longitud,
+            Reclamo.estado,
+            Categoria.nombre.label('categoria')
+        ).join(Categoria, Reclamo.categoria_id == Categoria.id).where(
+            and_(
+                Reclamo.latitud.isnot(None),
+                Reclamo.longitud.isnot(None),
+                Reclamo.municipio_id == municipio_id,
+                # Solo ubicaciones PRECISAS: las aproximadas (ip/municipio)
+                # pintarían esquinas calientes falsas. NULL = legacy preciso.
+                or_(
+                    Reclamo.ubicacion_origen.is_(None),
+                    Reclamo.ubicacion_origen.notin_(("ip", "municipio")),
+                ),
+            )
         )
-    )
+        if con_fecha:
+            q = q.where(Reclamo.created_at >= fecha_inicio)
+        if categoria_id:
+            q = q.where(Reclamo.categoria_id == categoria_id)
+        if dependencia_id:
+            q = q.where(Reclamo.municipio_dependencia_id == dependencia_id)
+        return q
 
-    if categoria_id:
-        query = query.where(Reclamo.categoria_id == categoria_id)
-    if dependencia_id:
-        query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
-
-    result = await db.execute(query)
+    result = await db.execute(_build_query(con_fecha=True))
     reclamos = result.all()
+
+    # Fallback histórico: si no hubo actividad geolocalizada en la ventana pedida
+    # (muni recién arrancado o data vieja), mostrar TODOS los reclamos con coords
+    # del muni en vez de un mapa vacío. Se marca en la respuesta para que el front
+    # pueda avisar "sin actividad reciente — mostrando histórico".
+    historico = False
+    if not reclamos:
+        result = await db.execute(_build_query(con_fecha=False))
+        reclamos = result.all()
+        historico = bool(reclamos)
+
+    # Prioridad canónica desde la OT del reclamo (Reclamo.prioridad deprecado en F6).
+    # {reclamo_id: 'baja'|'media'|'alta'|'urgente'}; los reclamos sin OT viva no aparecen.
+    prioridad_ot = await prioridad_ot_map(db, [r.id for r in reclamos], municipio_ids=[municipio_id])
 
     # Calcular intensidad basada en densidad de puntos cercanos
     points = []
@@ -90,9 +123,8 @@ async def get_heatmap_data(
         elif r.estado == EstadoReclamo.EN_CURSO:
             intensidad = 1.2
 
-        # Ajustar por prioridad (1 = más urgente)
-        if r.prioridad:
-            intensidad *= (6 - r.prioridad) / 5
+        # Ajustar por prioridad de la OT (canónica; sin OT viva -> media = 0.5)
+        intensidad *= _PESO_PRIORIDAD_OT.get(prioridad_ot.get(r.id), 0.5)
 
         points.append({
             "lat": r.latitud,
@@ -105,7 +137,8 @@ async def get_heatmap_data(
     return {
         "puntos": points,
         "total": len(points),
-        "periodo_dias": dias
+        "periodo_dias": dias,
+        "historico": historico
     }
 
 
@@ -163,15 +196,11 @@ async def get_clusters(
             lat_centro = sum(r.latitud for r in cluster_reclamos) / len(cluster_reclamos)
             lon_centro = sum(r.longitud for r in cluster_reclamos) / len(cluster_reclamos)
 
-            # Calcular prioridad promedio del cluster
-            prioridad_promedio = sum(r.prioridad or 3 for r in cluster_reclamos) / len(cluster_reclamos)
-
             clusters.append({
                 "id": len(clusters) + 1,
                 "centro": {"lat": lat_centro, "lng": lon_centro},
                 "cantidad": len(cluster_reclamos),
                 "reclamos_ids": [r.id for r in cluster_reclamos],
-                "prioridad_promedio": round(prioridad_promedio, 1),
                 "radio_km": radio_km
             })
 
@@ -242,10 +271,10 @@ async def get_cobertura_zonas(
             Zona.id,
             Zona.nombre,
             func.count(Reclamo.id).label('total'),
-            func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
+            # Cierre canónico 'finalizado' + 'resuelto' (legacy) para la tasa de resolución.
+            func.sum(case((Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]), 1), else_=0)).label('resueltos'),
             func.sum(case((Reclamo.estado == EstadoReclamo.NUEVO, 1), else_=0)).label('pendientes'),
             func.sum(case((Reclamo.estado == EstadoReclamo.EN_CURSO, 1), else_=0)).label('en_curso'),
-            func.avg(Reclamo.prioridad).label('prioridad_promedio')
         )
         .select_from(Zona)
         .outerjoin(Reclamo, and_(*join_conds))
@@ -287,7 +316,6 @@ async def get_cobertura_zonas(
             "en_curso": en_curso,
             "tasa_resolucion": round(tasa_resolucion, 1),
             "porcentaje_total": round(porcentaje_total, 1),
-            "prioridad_promedio": round(zona.prioridad_promedio or 3, 1),
             "indice_atencion": round(indice_atencion, 1)
         })
 

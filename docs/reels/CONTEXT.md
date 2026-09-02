@@ -201,6 +201,41 @@ Meter **b-roll cinematográfico real** generado con Veo (Flow:
 `broll-tramite.mp4`, `broll-tesoreria.mp4`, `broll-cierre.mp4`. Dejarlos en
 `design/reels/broll/` y desde ahí se componen con ffmpeg.
 
+## 5-bis. TEMPLATE GANADOR — presentador a cámara (Veo 3 / Flow) · validado 2026-06-13
+
+Talking head 9:16: una persona mira a cámara, dice una frase de venta y remata
+con euforia. **Validado** con el clip de la chica en la puerta del municipio
+(expresión + narrativa aprobadas por el user).
+
+**ESTÁNDAR DE LOOK ACTUAL — "videos más reales" (fijado 2026-06-13):**
+- **Gente común, NO modelos:** `an ordinary, real-looking, everyday Argentine [woman/man], natural and relatable, not a model`. Caras reales > caras de publicidad.
+- **Tomas profesionales:** `professional cinematic, clean, sharp, well-lit, smooth and steady camera, high production quality`. **Descartado** el look `handheld UGC / grainy / lower quality` que probamos antes (el user lo bajó: gente común sí, calidad casera no).
+- **Encuadre:** dolly-out que **arranca en medium (de la cintura para arriba, NO close-up de cara)** y abre a full body.
+- Este look **pisa** los descriptores `beautiful / golden-hour / Photorealistic` del prompt patrón de abajo. Mantener la **estructura narrativa** del patrón (dolly-out, pausa actuada, euforia voz+cara, only-once), cambiando solo los descriptores visuales por los de arriba.
+
+**Prompt patrón** (reemplazar `[LOCACIÓN]`, `[LO QUE SE REVELA]`, `[FRASE]`, `[REMATE]`):
+```
+Continuous dolly-out shot. It begins as a medium close-up of a beautiful young Argentine woman in her late 20s speaking to camera [LOCACIÓN], and the camera smoothly pulls backwards the entire time, ending as a wide full-body shot that reveals [LO QUE SE REVELA]. Warm golden-hour light, cheerful joyful atmosphere. She says in Argentine Rioplatense Spanish: "[FRASE]... ¡[REMATE]!" She delivers the first line in a calm, confident tone with a soft smile, pauses for a beat, then exclaims the final "¡[REMATE]!" with euphoric, excited, high-energy delivery — her voice rising enthusiastically while her face lights up in perfect sync: a big radiant smile, wide bright eyes and raised eyebrows, the facial expression matching the euphoric energy of her voice. Photorealistic, vertical 9:16, natural lip-sync, highly expressive face, no on-screen text, no logos.
+```
+
+**Ejemplo validado** (chica, puerta del municipio):
+`[LOCACIÓN]` = `standing at the entrance of an Argentine town hall with a classic institutional facade, columns and an Argentine flag`; `[LO QUE SE REVELA]` = `the whole welcoming municipal building entrance with people happily coming and going`; `[FRASE]` = `Munifái es la forma más inteligente de gestionar tu municipio`; `[REMATE]` = `¿qué esperás?`.
+
+**Por qué funciona — las 5 palancas:**
+1. **Dolly-out de verdad:** liderar con `Continuous dolly-out shot` + definir encuadre **inicial ≠ final** (`begins as a medium close-up ... ending as a wide full-body shot`). En talking heads Veo ancla el plano fijo para el lip-sync; un simple "zooms out" lo ignora. Definir los dos extremos lo obliga.
+2. **Pausa actuada, no muerta:** `...` en el diálogo + `pauses for a beat`.
+3. **Euforia = voz + cara juntas:** `¡...!` con exclamación + contraste (`calm confident tone ... then exclaims with euphoric high-energy delivery, voice rising`) + sincronía (`face lights up in perfect sync ... matching the euphoric energy of her voice`).
+4. **Marca fonética:** en el diálogo SIEMPRE `Munifái`, JAMÁS `Munify` (Veo la leería en inglés).
+5. **Rioplatense:** `says in Argentine Rioplatense Spanish` + voseo (`tenés`, `esperás`).
+
+**GOTCHAS de settings/prompt (aprendidos 2026-06-13):**
+- **Formato:** el 9:16 lo manda el **selector de aspect ratio de Flow**, NO el texto del prompt. Con el selector en 16:9 sale horizontal aunque el prompt diga "vertical 9:16" (le pasó al clip de oficina).
+- **B-roll sin presentador → que NO hablen:** agregar `No spoken dialogue, no talking; ambient sound only; people may smile and laugh naturally`. Si no, Veo mete diálogo en inglés y el lip-sync se ve raro.
+- **Verificar movimiento de cámara:** NO con 3 frames sueltos (engañan — me pasó). Tira equiespaciada:
+  `ffmpeg -i x.mp4 -vf "select='not(mod(n\,48))',scale=220:-1,tile=5x1" -frames:v 1 strip.jpg` → mirás si el sujeto cambia de tamaño a lo largo del clip.
+- **Veo repite palabras** (salió "tu municipio tu municipio"): cerrar la frase con **punto** antes del remate (`...municipio. ¡¿Qué esperás?!`, NO `...`) y agregar al diálogo `says ... only once and without repeating any words`. Pasa cuando el diálogo es corto y Veo "rellena" los 8s.
+- Settings base: **Veo 3, 9:16, 8s, "Texto a video"**.
+
 ## 6. Próximos pasos
 1. User elige **voz** en el probador → generar la locución del `tour` (offline,
    con la key de SalesBot) y mezclar: voz adelante + música -18dB (ducking).

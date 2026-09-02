@@ -1,0 +1,322 @@
+/* ============================================================
+   SemanticHero — card de "hero semántico" del rediseño v2.
+   Reemplaza los hints estáticos de las pantallas por una frase
+   con INFO DINÁMICA coloreada por VEREDICTO:
+     bueno → acento · advertencia → ámbar · malo → rojo
+   Todo sobre tokens --pl-* (polimórfico: funciona en todos los
+   themes y marcas). Cero colores fijos en este archivo.
+   ============================================================ */
+
+.sh-card {
+  /* TONO de la card: lo define el veredicto de la frase activa (ver los
+     modificadores de abajo). Sin veredicto queda el acento del theme, así
+     que una pantalla que sólo informa —"pagaste 12 facturas"— no se pinta
+     de rojo ni de ámbar: se pinta de la marca. */
+  --pl-tono: var(--pl-green);
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 16px;
+  padding: 18px 20px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-tono);
+  border-radius: var(--pl-radius-lg);
+  box-shadow: var(--pl-shadow-card);
+}
+
+/* El veredicto tiñe TODO lo que sale de --pl-tono de una sola vez: el
+   gradiente de arriba y la barra izquierda. Antes el color de la barra se
+   pasaba a mano desde cada página (--av2-hero-accent) y el gradiente iba
+   siempre en el acento; ahora los dos salen del mismo dato. */
+.sh-card--bueno { --pl-tono: var(--pl-green); }
+.sh-card--advertencia { --pl-tono: var(--pl-amber-strong); }
+.sh-card--malo { --pl-tono: var(--pl-red); }
+
+/* [size="simple"] — el hero de las pantallas que no tienen números que contar.
+   Queda el borde con el color del veredicto y la frase, nada más.
+
+   No toda pantalla tiene cinco KPIs para explotar (los datos del municipio, el
+   QR, Apariencia). Con el hero completo, la strip vacía promete un dato que no
+   existe; sin ningún hero, esas pantallas se salen de la familia del resto. La
+   variante chica resuelve las dos cosas: misma pieza, misma barra de veredicto,
+   menos aire. */
+.sh-card--simple {
+  margin-bottom: 12px;
+  padding: 13px 16px;
+}
+
+/* La frase baja un escalón: sin KPIs abajo no necesita el peso de titular. */
+.sh-card--simple .sh-frase {
+  font-size: var(--pl-fs-body);
+  line-height: 1.5;
+}
+
+/* Sin strip, el aire entre etiqueta y frase sobra. */
+.sh-card--simple .sh-head { margin-bottom: 4px; }
+
+/* El gradiente que NACE ARRIBA en el color del veredicto lo pone la clase
+   utilitaria `.pl-tinte-tono` ([TINTE POR TONO] en pl-tokens.css), que el
+   componente agrega junto a `sh-card`. Antes entraba en diagonal desde el
+   borde izquierdo y siempre en el color de la marca; ahora baja desde el
+   techo y lleva el estado, así se lee de un vistazo aunque no llegues a leer
+   la frase.
+   No se declara acá para no tener dos fórmulas del mismo lavado: la
+   intensidad se toca en un solo lugar y cambia en todo el kit. */
+/* Todo el contenido por encima del lavado. */
+.sh-card > * { position: relative; }
+
+.sh-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sh-etiqueta {
+  font-family: var(--pl-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+.sh-controles {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-text-disabled);
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  transition: background var(--pl-dur-ui) var(--pl-ease), transform var(--pl-dur-ui) var(--pl-ease);
+}
+.sh-dot:hover { transform: scale(1.25); }
+.sh-dot--activo { background: var(--pl-green); }
+.sh-dot--advertencia.sh-dot--activo { background: var(--pl-amber-strong); }
+.sh-dot--malo.sh-dot--activo { background: var(--pl-red); }
+
+.sh-nav {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--pl-radius-sm);
+  border: 1px solid var(--pl-border-strong);
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--pl-text-3);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.sh-nav:hover { background: var(--pl-surface-hover); }
+.sh-nav:first-of-type { margin-left: 4px; }
+
+/* ============================================================
+   Pila de frases — de acá sale la ALTURA ESTABLE del carrusel.
+
+   Todas las frases van a la MISMA celda del grid (1 / 1). Las
+   inactivas se ocultan con `visibility`, NO con `display`: siguen
+   ocupando su lugar, así que el alto de la pila es siempre el de
+   la frase más larga y al rotar no hay salto. Sin medir nada por
+   JS — medir el nodo real lo hace colapsar, dejar de desbordar,
+   volver, y parpadear para siempre.
+   ============================================================ */
+.sh-stack {
+  display: grid;
+  grid-template-areas: 'frase';
+}
+
+.sh-slide {
+  grid-area: frase;
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(var(--sh-salida, 14px));
+  transition:
+    opacity var(--pl-dur-panel, 260ms) var(--pl-ease),
+    transform var(--pl-dur-panel, 260ms) var(--pl-ease),
+    visibility 0s linear var(--pl-dur-panel, 260ms);
+}
+
+.sh-slide--activo {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  transition-delay: 0s;
+}
+
+/* La frase nueva entra del lado hacia el que avanza el carrusel. */
+.sh-stack--adelante { --sh-salida: 14px; }
+.sh-stack--atras { --sh-salida: -14px; }
+
+.sh-frase {
+  margin: 8px 0 10px;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-hero-line);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+
+.sh-seg--bueno { color: var(--pl-green-700); }
+.sh-seg--advertencia { color: var(--pl-amber-700); }
+.sh-seg--malo { color: var(--pl-red-700); }
+
+/* Pie de acciones: bajo el strip de KPIs, cerrando la tarjeta. */
+.sh-pie {
+  margin-top: 14px;
+}
+
+.sh-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Estilo del diseño 2026-08-02: secundarias blancas con borde, primaria
+   SÓLIDA en el acento con texto on-brand. */
+.sh-accion {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.sh-accion:hover { background: var(--pl-surface-hover); text-decoration: none; }
+
+.sh-accion--primaria {
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  color: var(--pl-on-accent);
+  box-shadow: var(--pl-shadow-card);
+}
+.sh-accion--primaria:hover { background: var(--pl-green-700); }
+
+/* Strip de KPIs opcional (estilo del hero del mockup de Design: eyebrow en
+   caps + numero display tabular, celdas separadas por hairline). */
+.sh-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pl-border);
+  row-gap: 10px;
+}
+
+.sh-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 20px;
+  border-left: 1px solid var(--pl-border);
+  min-width: 0;
+}
+.sh-kpi:first-child { padding-left: 0; border-left: 0; }
+
+.sh-kpi-etiqueta {
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-kpi-valor {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.sh-kpi-sub {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-faint);
+  line-height: 1.2;
+}
+
+.sh-kpi-valor--bueno { color: var(--pl-green-700); }
+.sh-kpi-valor--advertencia { color: var(--pl-amber-700); }
+.sh-kpi-valor--malo { color: var(--pl-red-700); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-dot, .sh-nav, .sh-accion { transition: none; }
+  /* Sin desplazamiento: la frase funde en el lugar. La rotación automática
+     además se apaga desde el componente. */
+  .sh-slide {
+    transform: none;
+    transition: opacity 120ms linear, visibility 0s linear 120ms;
+  }
+  .sh-slide--activo { transform: none; }
+}
+
+/* ============================================================
+   TABLERO ANALÓGICO — los datos giran como las fichas de un
+   tablero de estación cuando cambia la frase.
+
+   Gira SÓLO lo veredictado (los números), no la frase entera:
+   con todo girando el texto queda ilegible casi medio segundo,
+   y los números son justamente lo que cambia entre una frase y
+   otra — el giro dice "esto es lo que se actualizó".
+
+   La animación arranca cuando el slide pasa a activo, así que
+   se repite en cada vuelta del carrusel sin tocar el JS.
+   ============================================================ */
+.sh-tablero {
+  /* Las fichas rotan en 3D: sin perspectiva el giro se ve plano. */
+  perspective: 420px;
+  display: inline-block;
+}
+
+.sh-ficha {
+  display: inline-block;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* SIN `backwards` a propósito (bug real en QA, 2026-08-25): con fill-mode
+   backwards cada ficha queda en su 0% (opacity 0) mientras espera su delay,
+   y si el navegador cancela o pausa la cascada a mitad de camino —tab en
+   background, throttling, re-layout— los caracteres restantes quedan
+   INVISIBLES para siempre ("Quedan 13 por at…"). Sin fill, la ficha es
+   visible por defecto y sólo desaparece durante su PROPIO giro: el efecto
+   pasa de "revelado" a "vuelta de ficha sobre texto visible" (más parecido
+   al tablero real) y el peor caso degrada a texto legible, nunca a blanco. */
+.sh-slide--activo .sh-ficha {
+  animation: shFicha 340ms cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+@keyframes shFicha {
+  0%   { transform: rotateX(-90deg) translateY(-3px); opacity: 0; }
+  60%  { transform: rotateX(12deg) translateY(0); opacity: 1; }
+  100% { transform: rotateX(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Sin giro: el dato aparece y listo. */
+  .sh-slide--activo .sh-ficha { animation: none; }
+  .sh-tablero { perspective: none; }
+}

@@ -16,6 +16,7 @@ from typing import Optional
 import httpx
 import logging
 
+from core.config import settings
 from models.pago_sesion import MedioPagoGateway
 from .provider import GatewayPagoProvider, CrearSesionResponse, EstadoPagoExterno
 
@@ -58,6 +59,12 @@ class MercadoPagoProvider(GatewayPagoProvider):
         return_url: str,
     ) -> CrearSesionResponse:
         """Crea una Preference en MP y devuelve el init_point para redirigir."""
+        # MP exige back_urls ABSOLUTAS (con auto_return las valida al crear la
+        # preference y una relativa da 400). El resto de la app maneja rutas
+        # relativas del SPA, asi que la normalizacion vive aca y cubre a
+        # todos los callers.
+        if return_url.startswith("/"):
+            return_url = f"{settings.FRONTEND_URL.rstrip('/')}{return_url}"
         # `external_reference` nos permite correlacionar cuando vuelve el webhook
         payload = {
             "items": [

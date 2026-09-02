@@ -11,6 +11,7 @@ from .empleado_categoria import empleado_categoria
 from .empleado import Empleado
 from .empleado_cuadrilla import EmpleadoCuadrilla
 from .empleado_ausencia import EmpleadoAusencia
+from .empleado_jornada import EmpleadoJornada
 from .empleado_horario import EmpleadoHorario
 from .empleado_metrica import EmpleadoMetrica
 from .empleado_capacitacion import EmpleadoCapacitacion
@@ -23,11 +24,20 @@ from .notificacion import Notificacion
 from .sla import SLAConfig, SLAViolacion
 from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
-from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo
-from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
+from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+from .historial_orden_trabajo import HistorialOrdenTrabajo
+from .inventario import (
+    InventarioCategoria, InventarioItem, OrdenTrabajoRecurso,
+    InventarioDeposito, InventarioMovimiento,
+    InventarioOrdenCompra, InventarioOrdenCompraLinea,
+)
+from .flota import FlotaCarga
+from .reserva import Reserva
+from .poi import PoiTipo, PuntoInteres
 from .enums import (
     EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana,
-    EstadoOrdenTrabajo, PrioridadOT, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+    EstadoOrdenTrabajo, PrioridadOT, OrigenOT, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+    TipoMovimientoInventario, EstadoOrdenCompra,
 )
 from .gamificacion import (
     PuntosUsuario, HistorialPuntos, BadgeUsuario,
@@ -37,6 +47,8 @@ from .gamificacion import (
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .salesbot_config import SalesbotConfig
 from .municipio_ia_config import MunicipioIaConfig
+from .ia_uso import IaUso, IaUsoDiario
+from .calls import CallsUsuario, CallsRegistro, CallsEvento
 from .noticia import Noticia
 from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from .turno import Turno
@@ -44,9 +56,11 @@ from .tramite_documento_requerido import TramiteDocumentoRequerido
 from .tramite_sugerido import TramiteSugerido
 from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
+from .calls_push import CallsPushSub
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
 from .audit_log import AuditLog
+from .demo_seed_log import DemoSeedLog
 from .captura_movil_sesion import (
     CapturaMovilSesion,
     EstadoCapturaMovil,
@@ -65,6 +79,7 @@ __all__ = [
     "Empleado",
     "EmpleadoCuadrilla",
     "EmpleadoAusencia",
+    "EmpleadoJornada",
     "EmpleadoHorario",
     "EmpleadoMetrica",
     "EmpleadoCapacitacion",
@@ -87,16 +102,26 @@ __all__ = [
     # Órdenes de trabajo (campo)
     "OrdenTrabajo",
     "OrdenTrabajoReclamo",
-    "OrdenTrabajoTipo",
+    "HistorialOrdenTrabajo",
     "EstadoOrdenTrabajo",
     "PrioridadOT",
+    "OrigenOT",
     # Inventario (activos + consumibles)
     "InventarioCategoria",
     "InventarioItem",
+    "InventarioDeposito",
+    "InventarioMovimiento",
+    "InventarioOrdenCompra",
+    "InventarioOrdenCompraLinea",
+    "TipoMovimientoInventario",
+    "EstadoOrdenCompra",
     "OrdenTrabajoRecurso",
     "NaturalezaInventario",
     "EstadoActivo",
     "TipoRecursoOT",
+    # Puntos de interés (F6 · Etapa B)
+    "PoiTipo",
+    "PuntoInteres",
     # Gamificación
     "PuntosUsuario",
     "HistorialPuntos",
@@ -124,12 +149,14 @@ __all__ = [
     "DocumentoSolicitud",
     # Push Notifications
     "PushSubscription",
+    "CallsPushSub",
     # Consultas guardadas / BI
     "ConsultaGuardada",
     # Email validation
     "EmailValidation",
     # Audit logs
     "AuditLog",
+    "DemoSeedLog",
     # Captura móvil (handoff PC ↔ celular)
     "CapturaMovilSesion",
     "EstadoCapturaMovil",
@@ -260,4 +287,11 @@ __all__ += [
     "EtapaContable",
     "ContaduriaRetencion",
     "TarjetaCredito",
+    "FlotaCarga",
+    "Reserva",
+    "IaUso",
+    "IaUsoDiario",
+    "CallsUsuario",
+    "CallsRegistro",
+    "CallsEvento",
 ]

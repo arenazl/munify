@@ -1,0 +1,224 @@
+/* ============================================================
+   KpiSemantico — la tarjeta que contesta una pregunta.
+
+   Portado del diseño (Rediseño Sidebar y Banner.dc.html,
+   líneas 798-930), medida por medida. El tono elige el juego
+   de color y todo lo demás cuelga de ahí.
+   ============================================================ */
+
+.kse-fila-3 {
+  display: grid;
+  /* Tres mientras entren sus 280px, si no dos, y al final una. Sin media
+     queries: lo decide el contenedor. */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.kse-fila-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+/* Una sola tarjeta ocupando la fila: el estado sin datos de un bloque que
+   igual tiene que estar (la voz del vecino sin calificaciones). No se estira
+   a todo el ancho —una tarjeta de 1.400px es una pared de vacío—, se queda
+   en la medida de dos columnas. */
+.kse-fila-1 {
+  display: grid;
+  grid-template-columns: minmax(280px, 720px);
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* Las cinco tarjetas miden lo MISMO, estén en la fila de tres o en la de dos.
+   Sin este piso, la fila de abajo queda más baja que la de arriba —el texto
+   ocupa distinto— y el bloque se lee como dos grillas sueltas en vez de una. */
+.kse {
+  min-height: 232px;
+  position: relative;
+  overflow: hidden;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 20px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--pl-shadow-card);
+}
+
+/* El tono: un solo lugar donde se decide el color de la tarjeta. */
+.kse--bueno { --kse-color: var(--pl-green); --kse-tenue: var(--pl-green-100); }
+.kse--neutro { --kse-color: var(--pl-green); --kse-tenue: var(--pl-green-100); }
+.kse--malo { --kse-color: var(--pl-red); --kse-tenue: var(--pl-red-100); }
+.kse--advertencia { --kse-color: var(--pl-amber); --kse-tenue: var(--pl-amber-100); }
+.kse--info { --kse-color: var(--pl-blue, #3B82F6); --kse-tenue: var(--pl-blue-100, #E8F1FE); }
+
+.kse-marca {
+  position: absolute;
+  right: -14px;
+  top: -10px;
+  opacity: 0.05;
+  pointer-events: none;
+  color: var(--kse-color);
+  animation: kse-flotar 7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.kse-marca > svg { width: 118px; height: 118px; stroke-width: 1.4; }
+
+.kse-cab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  position: relative;
+}
+
+.kse-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--kse-tenue);
+  color: var(--kse-color);
+  flex: 0 0 34px;
+}
+.kse-icono > svg { width: 18px; height: 18px; stroke-width: 1.9; }
+
+.kse-latido {
+  position: absolute;
+  inset: 0;
+  border-radius: 11px;
+  border: 1.5px solid var(--kse-color);
+  opacity: 0;
+  animation: kse-latido 3.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.kse-pregunta {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--pl-text);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kse-valor-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 16px 0 0;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.kse-valor {
+  font-family: var(--pl-font-display);
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--pl-text);
+  font-variant-numeric: tabular-nums;
+  /* Un nombre largo ("Villa Morra") baja de renglón antes que desbordar. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kse-unidad {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pl-text-faint);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kse-detalle {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--pl-text-3);
+  text-wrap: pretty;
+}
+/* El resaltado normal va en el color del texto; el que marca un problema,
+   en rojo. El que escribe la frase elige cuál usar. */
+.kse-detalle strong { font-weight: 600; color: var(--pl-text); }
+.kse-detalle .kse-mal { color: var(--pl-red-700); }
+
+/* Los nombres que son ENTIDADES del sistema (una categoría, un barrio, una
+   zona) van subrayados: avisan que eso no es texto, es un registro que se
+   puede abrir. El subrayado va separado de la letra y más fino que el texto
+   para no competir con el resaltado en negrita que lleva el dato. */
+.kse-tag {
+  color: var(--pl-text);
+  /* En negrita: el nombre de la entidad pesa tanto como el numero. Con peso
+     normal el subrayado solo se leia como un enfasis timido. */
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--pl-border-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.kse-tag--link {
+  cursor: pointer;
+  transition:
+    color var(--pl-dur-ui) var(--pl-ease),
+    text-decoration-color var(--pl-dur-ui) var(--pl-ease);
+}
+.kse-tag--link:hover {
+  color: var(--pl-green-700);
+  text-decoration-color: var(--pl-green);
+}
+
+.kse-pie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Empuja el pie al piso: las tarjetas de una fila terminan con la línea a
+     la misma altura aunque el texto de arriba ocupe distinto. */
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--pl-border);
+  min-width: 0;
+}
+
+.kse-pie-dato {
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kse-pie-link {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  text-decoration: none;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.kse-pie-link:hover { text-decoration: underline; }
+
+@keyframes kse-latido {
+  0% { opacity: 0.5; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes kse-flotar {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kse-marca, .kse-latido { animation: none; }
+}

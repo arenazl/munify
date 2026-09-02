@@ -1,0 +1,159 @@
+/* ============================================================
+   ranked-list.css — componente RankedList (components/ui/RankedList.tsx)
+
+   AGNÓSTICO y POLIMÓRFICO: cero colores fijos, cero lógica de
+   dominio. Todo sale de tokens --pl-* (los estáticos viven en
+   pl-tokens.css; los de color los computa ThemeContext desde el
+   theme activo), así el ranking sigue al tema y a la marca.
+
+   El número de ranking se DEGRADA por posición con dos variables
+   discretas que setea la clase --p1..--p5:
+     --rk-bg   → cuánto matiz tiene el cuadrito (fondo)
+     --rk-fade → cuánto se apaga el número hacia el gris de texto
+   El matiz base (--rk-tono / --rk-ink) lo elige el `tono` del item.
+
+   Medidas: design/handoff-v2/references/mapa-v2.dc.html (card
+   "Zonas calientes"). Prefijo de clases: rk-.
+   ============================================================ */
+
+.rk-wrap {
+  min-width: 0;
+}
+
+.rk {
+  list-style: none;
+  /* Sangría negativa: el hover de la fila respira más allá del padding
+     de la card que la contiene (igual que en la referencia). */
+  margin: 0 -12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ---------- Matiz base por tono ---------- */
+.rk-item {
+  --rk-tono: var(--pl-green);
+  --rk-ink: var(--pl-green-700);
+  min-width: 0;
+}
+.rk-item--bueno {
+  --rk-tono: var(--pl-green);
+  --rk-ink: var(--pl-green-700);
+}
+.rk-item--advertencia {
+  --rk-tono: var(--pl-amber);
+  --rk-ink: var(--pl-amber-700);
+}
+.rk-item--malo {
+  --rk-tono: var(--pl-red);
+  --rk-ink: var(--pl-red-700);
+}
+.rk-item--neutro {
+  --rk-tono: var(--pl-text-3);
+  --rk-ink: var(--pl-text-2);
+}
+
+/* ---------- Degradación por posición (1 = el más intenso) ---------- */
+.rk-item--p1 { --rk-bg: 26%; --rk-fade: 0%; }
+.rk-item--p2 { --rk-bg: 21%; --rk-fade: 12%; }
+.rk-item--p3 { --rk-bg: 16%; --rk-fade: 24%; }
+.rk-item--p4 { --rk-bg: 12%; --rk-fade: 36%; }
+.rk-item--p5 { --rk-bg: 9%;  --rk-fade: 46%; }
+
+/* ---------- Fila ---------- */
+.rk-fila {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  background: transparent;
+  text-align: left;
+  font-family: var(--pl-font-sans);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.rk-fila--click { cursor: pointer; }
+.rk-fila--click:hover { background: var(--pl-surface-hover); }
+.rk-fila--click:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: -2px;
+}
+
+/* ---------- Cuadrito del puesto ---------- */
+.rk-num {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--pl-radius-sm);
+  display: grid;
+  place-items: center;
+  font-size: var(--pl-fs-micro);
+  font-weight: 700;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--rk-tono) var(--rk-bg, 18%), var(--pl-surface));
+  color: color-mix(in srgb, var(--pl-text-muted) var(--rk-fade, 0%), var(--rk-ink));
+}
+
+/* ---------- Cuerpo (título + detalle) ---------- */
+.rk-cuerpo {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rk-titulo {
+  display: block;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rk-detalle {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Valor ---------- */
+.rk-valor-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+.rk-valor {
+  font-family: var(--pl-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+.rk-valor-sub {
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--pl-text-muted);
+}
+
+/* ---------- Pie: lo que no entró ---------- */
+.rk-resto {
+  margin: 8px 0 0;
+  padding: 0 12px;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rk-fila { transition: none; }
+}

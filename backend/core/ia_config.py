@@ -24,7 +24,7 @@ class IaConfig:
 
 
 def _default() -> IaConfig:
-    return IaConfig(habilitada=False, provider="gemini", modelo=settings.GEMINI_MODEL or "gemini-2.5-flash", tesoreria=True, reclamos=True, tramites=True)
+    return IaConfig(habilitada=False, provider="groq", modelo=settings.GROQ_MODEL, tesoreria=True, reclamos=True, tramites=True)
 
 
 async def get_ia_config(db: AsyncSession, municipio_id: Optional[int]) -> IaConfig:
@@ -37,8 +37,11 @@ async def get_ia_config(db: AsyncSession, municipio_id: Optional[int]) -> IaConf
         return _default()
     return IaConfig(
         habilitada=bool(row.habilitada),
-        provider=row.provider or "gemini",
-        modelo=row.modelo or (settings.GEMINI_MODEL or "gemini-2.5-flash"),
+        # Las filas viejas pueden traer provider/modelo de Gemini: se leen
+        # tal cual y el servicio de IA los ignora (usa el modelo de Groq).
+        # La tabla se normaliza con la migracion agendada.
+        provider=row.provider or "groq",
+        modelo=row.modelo or settings.GROQ_MODEL,
         tesoreria=bool(row.tesoreria),
         reclamos=bool(row.reclamos),
         tramites=bool(row.tramites),

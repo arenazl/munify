@@ -1,0 +1,83 @@
+x 0 0; font-family: Sora, sans-serif; font-size: 34px; font-weight: 700; line-height: 1.12; letter-spacing: -0.03em; color: #0D1412; text-wrap: pretty;">Todo lo que el vecino pidió y qué falta resolver</h1>
+      <p style="margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: #5B6764; text-wrap: pretty;">Reclamos recibidos por mostrador, web y teléfono, con su cuadrilla, su plazo y su estado. Se agrupan por día de ingreso.</p>
+    </header>
+
+    <section style="padding: 20px 22px; background: #F2FBF7; border: 1px solid #C9EBDD; border-left: 4px solid #00B37E; border-radius: 12px;">
+      <span style="font-family: Inter, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #00794F;">JULIO 2026 · EN CURSO</span>
+      <p style="margin: 8px 0 16px; font-family: Sora, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.02em; color: #0D1412; text-wrap: pretty;">De los <span style="color: #0D1412;">49 reclamos del mes</span> te quedan <span style="color: #B4560F;">21 sin asignar</span> y <span style="color: #C93A3E;">4 vencen hoy</span>. Si los tomás hoy, julio cierra arriba del <span style="color: #00794F;">60% resuelto</span>.</p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 0; padding-top: 16px; row-gap: 18px; border-top: 1px solid #C9EBDD;">
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-right: 18px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #4A8C77;">TOTAL</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #00593B; font-feature-settings: 'tnum';">49</span>
+          <span style="font-size: 11px; color: #6E8A81;">en el período</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid #C9EBDD;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #4A8C77;">RECIBIDOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #00593B; font-feature-settings: 'tnum';">21</span>
+          <span style="font-size: 11px; color: #6E8A81;">43% · 9 sin cuadrilla</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid #C9EBDD;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #4A8C77;">EN CURSO</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #00593B; font-feature-settings: 'tnum';">18</span>
+          <span style="font-size: 11px; color: #6E8A81;">37% · 12 con cuadrilla</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid #C9EBDD;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #4A8C77;">FINALIZADOS</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #00593B; font-feature-settings: 'tnum';">10</span>
+          <span style="font-size: 11px; color: #6E8A81;">20% · 4,2 ★ promedio</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid #C9EBDD;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em; color: #4A8C77;">VENCEN HOY</span>
+          <span style="font-family: Sora, sans-serif; font-weight: 700; font-size: 22px; line-height: 1; color: #B4560F; font-feature-settings: 'tnum';">4</span>
+          <span style="font-size: 11px; color: #6E8A81;">y 3 ya vencidos</span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;">
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #00B37E; font-size: 12.5px; font-weight: 600; color: #FFFFFF;">Ver los 4 que vencen hoy</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #FFFFFF; border: 1px solid #C9EBDD; font-size: 12.5px; font-weight: 600; color: #00794F;">Asignar los 9 sin cuadrilla</a>
+        <a href="#" style="display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 10px; background: #FFFFFF; border: 1px solid #C9EBDD; font-size: 12.5px; font-weight: 600; color: #00794F;">Exportar el período</a>
+      </div>
+    </section>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 12px 12px 0 0; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 9px; flex: 1 1 260px; min-width: 0; height: 36px; padding: 0 12px; background: #F6F8F7; border: 1px solid rgba(13,20,18,0.08); border-radius: 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9AA5A1" stroke-width="2" stroke-linecap="round" style="flex: 0 0 16px;"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span style="font-size: 13px; color: #9AA5A1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Buscar por título, vecino o dirección…</span>
+        <span style="margin-left: auto; font-size: 10.5px; color: #9AA5A1; border: 1px solid rgba(13,20,18,0.1); border-radius: 5px; padding: 1px 5px; flex: 0 0 auto;">⌘K</span>
+      </div>
+      <span style="width: 1px; height: 24px; background: rgba(13,20,18,0.08); flex: 0 0 1px;"></span>
+      <div style="display: flex; align-items: center; gap: 8px; flex: 0 0 auto;">
+        <div style="display: flex; gap: 2px; padding: 3px; background: #EDF1EF; border-radius: 10px;">
+          <span title="Tarjetas" style="width: 30px; height: 28px; border-radius: 7px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E2E9E6;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+          <span title="Tabla" style="width: 30px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: #FFFFFF; box-shadow: 0 1px 2px rgba(13,20,18,0.06); cursor: pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00794F" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+          <span title="Guiada" style="width: 30px; height: 28px; border-radius: 7px; display: grid; place-items: center; cursor: pointer;" style-hover="background: #E2E9E6;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5B6764" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h6"/></svg></span>
+        </div>
+        <button style="display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-radius: 10px; font-family: Inter, sans-serif; font-size: 12.5px; font-weight: 600; color: #3D4945; cursor: pointer;" style-hover="background: #F4F7F6;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"/></svg>
+          Más recientes
+        </button>
+        <button style="display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 15px; background: #00B37E; border: 0; border-radius: 10px; font-family: Inter, sans-serif; font-size: 12.5px; font-weight: 600; color: #FFFFFF; cursor: pointer;" style-hover="background: #008F63;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Nuevo reclamo
+        </button>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: -1px; padding: 12px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.07); border-top: 0; border-radius: 0 0 12px 12px; flex-wrap: wrap; row-gap: 10px;">
+      <button style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4;">
+        <span style="font-size: 12.5px; color: #7A8783;">Categoría</span><span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Todas</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5" /></svg>
+      </button>
+      <button style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4;">
+        <span style="font-size: 12.5px; color: #7A8783;">Dependencia</span><span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Todas</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stroke-width="2" stroke-linecap="round"><path d="m7 9 5 5 5-5" /></svg>
+      </button>
+      <button style="display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; background: #FFFFFF; border: 1px solid rgba(13,20,18,0.12); border-radius: 10px; cursor: pointer; font-family: Inter, sans-serif;" style-hover="border-color: #9BDCC4;">
+        <span style="font-size: 12.5px; color: #7A8783;">Canal</span><span style="font-size: 12.5px; font-weight: 600; color: #0D1412;">Todos</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7A8783" stro

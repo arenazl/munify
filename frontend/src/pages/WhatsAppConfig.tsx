@@ -10,6 +10,7 @@ import { whatsappApi, salesbotApi, reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Reclamo } from '../types';
 import SettingsHeader from '../components/ui/SettingsHeader';
+import { BRAND } from '../brands';
 
 type Provider = 'meta' | 'twilio';
 
@@ -434,7 +435,7 @@ export default function WhatsAppConfigPage() {
               <h3 className="font-medium" style={{ color: theme.text }}>Derivación a SalesBot</h3>
             </div>
             <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
-              SalesBot (el asistente de ventas de Munify) deriva los prospectos interesados en tu
+              SalesBot (el asistente de ventas de {BRAND.name}) deriva los prospectos interesados en tu
               municipio a este WhatsApp. Es <b>independiente</b> de la integración de WhatsApp
               Business de arriba: con cargar el número y activarlo alcanza, no hace falta Meta.
             </p>

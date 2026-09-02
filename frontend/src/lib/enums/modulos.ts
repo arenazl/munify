@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, FileCheck, Map, ScanLine, Receipt, Wallet,
   LayoutDashboard, CalendarClock, Activity, Sparkles, PiggyBank, Hammer,
-  FileSignature, Users,
+  FileSignature, Users, MapPin, Megaphone, Truck, UserCheck, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -26,7 +26,10 @@ export const MODULOS: ModuloDef[] = [
   { key: 'tramites', label: 'Trámites', descripcion: 'Trámites online con documentación y turnos', icon: FileCheck, optIn: false },
   { key: 'mapa', label: 'Mapa', descripcion: 'Mapa de reclamos con capa de calor', icon: Map, optIn: false },
   { key: 'mostrador', label: 'Mostrador', descripcion: 'Ventanilla asistida con biometría', icon: ScanLine, optIn: false },
-  { key: 'tasas', label: 'Tasas', descripcion: 'Padrón y deudas (canal ciudadano, no calcula tasas)', icon: Receipt, optIn: false },
+  // OPT-IN desde 2026-08-29: Munify no cubre tasas hoy y el módulo aparecía
+  // solo en todos los municipios (sin fila = activo). Ahora hay que prenderlo
+  // a propósito; los munis que ya lo tienen prendido no se ven afectados.
+  { key: 'tasas', label: 'Tasas', descripcion: 'Padrón y deudas (canal ciudadano, no calcula tasas)', icon: Receipt, optIn: true },
   { key: 'pagos', label: 'Cobros', descripcion: 'Cobro online (gateway por proveedor)', icon: Wallet, optIn: false },
   { key: 'tablero', label: 'Tablero', descripcion: 'Kanban de reclamos', icon: LayoutDashboard, optIn: false },
   { key: 'planificacion', label: 'Planificación', descripcion: 'Agenda semanal de trabajos', icon: CalendarClock, optIn: false },
@@ -36,6 +39,11 @@ export const MODULOS: ModuloDef[] = [
   { key: 'sueldos', label: 'Sueldos', descripcion: 'Liquidaciones, empleados con sueldo y pagos recurrentes', icon: Users, optIn: true },
   { key: 'contaduria', label: 'Contaduría', descripcion: 'Órdenes de pago con autorización formal y sus reportes', icon: FileSignature, optIn: true },
   { key: 'ordenes_trabajo', label: 'Órdenes de trabajo', descripcion: 'OTs de campo con cuadrillas y materiales', icon: Hammer, optIn: true },
+  { key: 'poi', label: 'Puntos de interés', descripcion: 'POIs en el mapa (hospital, escuela, bomberos...) con radio de zona y prioridad', icon: MapPin, optIn: true },
+  { key: 'flota', label: 'Flota', descripcion: 'Vehículos del municipio, combustible y consumo real por unidad', icon: Truck, optIn: true },
+  { key: 'reservas', label: 'Reservas', descripcion: 'Préstamo de salón, cancha y maquinaria al vecino', icon: CalendarCheck, optIn: true },
+  { key: 'presentismo', label: 'Presentismo', descripcion: 'Jornadas fichadas por la cuadrilla; alimenta el premio de Sueldos', icon: UserCheck, optIn: true },
+  { key: 'comunicacion', label: 'Comunicación', descripcion: 'Avisos y novedades del municipio al celular del vecino', icon: Megaphone, optIn: true },
 ];
 
 /** Estado efectivo de un módulo dado el set de filas de la tabla. */

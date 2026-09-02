@@ -10,14 +10,13 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 import { Sheet } from '../components/ui/Sheet';
 import { ABMPage } from '../components/ui/ABMPage';
-import PageHint from '../components/ui/PageHint';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import { contactosApi, gastosApi } from '../lib/api';
 import type { Contacto, Gasto, GastoCuota, TipoContacto } from '../types';
+import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM } from '../lib/basemaps';
 import {
   estadoDeContacto, estadoDeGasto, gastoEnRango, recortarGastoARango,
   ESTADO_CONTACTO_LABEL, ESTADO_CONTACTO_COLOR,
@@ -65,15 +64,19 @@ const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attri
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
   },
+  // Stadia tambien pide key (desde 2023): en su lugar, el Canvas oscuro.
   stadia: {
-    label: 'Stadia',
-    url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; Stadia Maps &copy; OpenStreetMap',
+    label: 'Oscuro',
+    url: BASEMAP,
+    attribution: BASEMAP_ATTR,
   },
+  // Era el voyager de CARTO, que paso a exigir key y estampaba la marca de
+  // agua sobre el mapa. El Canvas gris de Esri cumple el mismo papel: base
+  // neutra para que los pines se lean.
   voyager: {
-    label: 'Voyager',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OSM &copy; CARTO',
+    label: 'Neutro',
+    url: BASEMAP,
+    attribution: BASEMAP_ATTR,
   },
 };
 
@@ -519,7 +522,7 @@ export default function TesoreriaMapa() {
             className="px-2.5 py-1 rounded-md text-xs font-medium"
             style={{
               backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
-              color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
+              color: tipoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
               border: `1px solid ${theme.border}`,
             }}
           >
@@ -601,12 +604,6 @@ export default function TesoreriaMapa() {
 
   return (
     <>
-      <PageHint pageId="tesoreria-ubicacion" />
-      <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
-        Cada casita es un contacto con ubicación cargada. Tocá un pin para
-        ver el detalle de los gastos. El tamaño del pin indica cuánto le
-        pagaste en total. Usá los filtros para acotar período y estado.
-      </TesoreriaHint>
 
       <ABMPage
         title="Mapa"
@@ -782,7 +779,7 @@ export default function TesoreriaMapa() {
                             className="text-[10px] font-semibold px-2 py-1 rounded-md transition-all hover:scale-105"
                             style={{
                               backgroundColor: isPending ? theme.primary : `${theme.primary}20`,
-                              color: isPending ? '#fff' : theme.primary,
+                              color: isPending ? 'var(--pl-on-accent)' : theme.primary,
                               border: `1px solid ${theme.primary}40`,
                             }}
                             title={isPending ? 'Cancelar' : 'Click en el mapa para fijar ubicación'}
@@ -834,12 +831,16 @@ export default function TesoreriaMapa() {
                 filter: none;
               }
             `}</style>
-            <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+            <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
+        zoomSnap={1} center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
               <TileLayer
                 key={tileProvider}
                 attribution={tile.attribution}
                 url={tile.url}
-                maxZoom={19}
+                maxZoom={BASEMAP_MAX_ZOOM}
               />
               <MapController points={points} triggerFit={fitTrigger} onReady={(m) => { mapRef.current = m; }} />
               <MapClickCapture
@@ -880,7 +881,7 @@ export default function TesoreriaMapa() {
             {pendingGeoId != null && (
               <div
                 className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] px-3 py-2 rounded-lg shadow-lg flex items-center gap-2"
-                style={{ backgroundColor: theme.primary, color: '#fff', border: `2px solid ${theme.primary}` }}
+                style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)', border: `2px solid ${theme.primary}` }}
               >
                 <MapPin className="h-4 w-4" />
                 <span className="text-xs font-semibold">
@@ -951,7 +952,7 @@ export default function TesoreriaMapa() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95"
                 style={{
                   background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                  color: '#fff',
+                  color: 'var(--pl-on-accent)',
                   boxShadow: `0 4px 14px ${theme.primary}40`,
                 }}
               >
@@ -1029,6 +1030,10 @@ export default function TesoreriaMapa() {
                 style={{ height: 140, border: `1px solid ${theme.border}` }}
               >
                 <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
+        zoomSnap={1}
                   center={[selected.latitud, selected.longitud]}
                   zoom={16}
                   style={{ width: '100%', height: '100%' }}

@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import { useTheme } from '../../contexts/ThemeContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BASEMAP_MAX_ZOOM } from '../../lib/basemaps';
 
 // Proveedores de tiles disponibles. Toggle visible en la UI para probar
 // y comparar cuál se ve mejor en esta app. Los dos son gratis y sin API key.
@@ -192,6 +193,10 @@ export function MapPicker({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
+        zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
@@ -277,6 +282,10 @@ export function MapView({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
+        zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}

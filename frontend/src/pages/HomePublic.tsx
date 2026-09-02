@@ -472,7 +472,7 @@ export default function HomePublic() {
                     <button
                       onClick={promptInstall}
                       className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-                      style={{ backgroundColor: theme.primary, color: 'white' }}
+                      style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
                     >
                       Instalar ahora
                     </button>

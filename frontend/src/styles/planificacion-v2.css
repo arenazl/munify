@@ -1,0 +1,586 @@
+/* ============================================================
+   Planificación semanal — lenguaje v2 del kit.
+   Referencia: design/handoff-v2/references/planificacion-semanal.dc.html
+   (canvas Claude Design) + la descripción canónica del canvas.
+
+   Prefijo `plw-` (PLanificación semanal). ARCHIVO PROPIO de la
+   pantalla: no se toca ninguna hoja compartida. Lo importa
+   pages/Planificacion.tsx, igual que ConsultaGuiada o
+   MapaTimelapseBanda importan la suya.
+
+   100% tokens --pl-* (polimórfico: sigue al theme activo y a
+   cualquier marca). Cero hex. El ÚNICO color que entra por
+   variable inline es `--plw-acento`: es el color del DATO
+   (categoría del reclamo / del empleado), no decoración.
+   ============================================================ */
+
+/* ============================================================
+   [FILA DE TÍTULO] — compacta, no cabecera grande.
+   tile con latido + H1 chico + stepper de semana + Hoy … filtros
+   ============================================================ */
+
+.plw-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  padding: 2px 2px 0;
+  min-width: 0;
+}
+
+/* Tile del icono. `position: relative` es lo que le da marco al
+   `rs-latido` del kit, que se monta adentro. */
+.plw-head-tile {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+}
+
+.plw-head-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  line-height: 1.2;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+
+/* Stepper de semana: ‹ | 3 al 7 de agosto | › en una sola pieza. */
+.plw-stepper {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  overflow: hidden;
+}
+
+.plw-stepper-btn {
+  width: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.plw-stepper-btn:hover { background: var(--pl-surface-hover); }
+.plw-stepper-btn--prev { border-right: 1px solid var(--pl-border); }
+.plw-stepper-btn--next { border-left: 1px solid var(--pl-border); }
+
+.plw-stepper-rango {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+}
+.plw-stepper-rango svg {
+  flex: 0 0 14px;
+  color: var(--pl-green);
+}
+
+.plw-head-der {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* La fila es COMPACTA: los botones del kit (36px) bajan a 32 acá
+   para quedar a la altura del stepper. Override acotado a esta
+   pantalla — no se toca la clase compartida. */
+.plw-head .av2-btn-secundario { height: 32px; }
+.plw-head .av2-btn-icono {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+
+/* Puntito de "hay filtros aplicados" sobre el botón cuadrado. */
+.plw-filtro-punto {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-red);
+}
+
+/* ============================================================
+   [FRASE SEMÁNTICA] — el estado de la semana en un renglón.
+   Lo urgente en rojo; el resto, gris.
+   ============================================================ */
+
+.plw-frase {
+  margin: 12px 0 0;
+  font-family: var(--pl-font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text-3);
+  text-wrap: pretty;
+}
+.plw-frase-alerta { color: var(--pl-red-700); }
+.plw-frase-ok { color: var(--pl-green-700); }
+.plw-frase-resto {
+  font-weight: 500;
+  color: var(--pl-text-3);
+}
+
+/* ============================================================
+   [FILTROS] — la FilterBar del kit, suelta (sin toolbar arriba),
+   así que recupera sus cuatro esquinas y su borde superior.
+   ============================================================ */
+
+.plw-filtros .av2-filterbar {
+  margin-top: 12px;
+  border-top: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+
+.plw-filtros-pie {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* ============================================================
+   [SIN ASIGNAR] — el pozo de tareas que todavía no tienen dueño.
+   Carrusel horizontal: nada queda fuera de alcance del arrastre
+   (una lista recortada dejaría tarjetas imposibles de asignar).
+   ============================================================ */
+
+.plw-pool { margin-top: 14px; }
+
+.plw-pool-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.plw-pool-icono {
+  flex: 0 0 16px;
+  color: var(--pl-amber-700);
+}
+.plw-pool-conteo {
+  padding: 2px 9px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-amber-100);
+  color: var(--pl-amber-700);
+  font-size: 12px;
+  font-weight: 600;
+  font-feature-settings: 'tnum';
+}
+.plw-pool-hint {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+.plw-carrusel {
+  display: flex;
+  gap: 8px;
+  min-height: 58px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.plw-carrusel::-webkit-scrollbar { height: 6px; }
+.plw-carrusel::-webkit-scrollbar-thumb {
+  background: var(--pl-border-strong);
+  border-radius: var(--pl-radius-pill);
+}
+
+.plw-tarjeta-pool {
+  flex: 0 0 208px;
+  max-width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  min-width: 0;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--plw-acento, var(--pl-green));
+  border-radius: var(--pl-radius-sm);
+  cursor: grab;
+}
+.plw-tarjeta-pool:hover { border-color: var(--pl-green-200); }
+.plw-tarjeta-pool:hover { border-left-color: var(--plw-acento, var(--pl-green)); }
+
+.plw-pool-vacio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.plw-pool-vacio svg { color: var(--pl-green); }
+
+/* ============================================================
+   [GRILLA SEMANAL] — columna EQUIPO + un track por día.
+   Dos anchos fijos (5 y 7 días) en vez de un `repeat(var())`:
+   el conteo de tracks por variable no es fiable en todos los
+   motores, y acá sólo existen esos dos casos.
+   ============================================================ */
+
+.plw-grid-card {
+  margin-top: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+}
+
+.plw-grid-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.plw-fila {
+  display: grid;
+  grid-template-columns: 250px repeat(5, minmax(132px, 1fr));
+  gap: 8px;
+  align-items: stretch;
+  min-width: 980px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--pl-border);
+}
+.plw-fila--7 {
+  grid-template-columns: 250px repeat(7, minmax(122px, 1fr));
+  min-width: 1180px;
+}
+.plw-fila--cab {
+  padding: 12px 14px;
+  border-top: 0;
+  border-bottom: 1px solid var(--pl-border);
+}
+
+/* --- Encabezado --- */
+
+.plw-cab-equipo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+
+.plw-cab-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.plw-cab-dia-linea {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.plw-cab-dow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.plw-cab-num {
+  font-family: var(--pl-font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+}
+.plw-cab-hoy {
+  padding: 1px 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  font-size: 10px;
+  font-weight: 600;
+}
+.plw-cab-sub {
+  font-size: 10.5px;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plw-cab-dia--hoy .plw-cab-dow,
+.plw-cab-dia--hoy .plw-cab-num { color: var(--pl-green-700); }
+
+/* --- Columna EQUIPO --- */
+
+.plw-emp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.plw-emp-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--pl-radius-pill);
+  background: color-mix(in srgb, var(--plw-acento, var(--pl-green)) 16%, var(--pl-surface));
+  color: var(--plw-acento, var(--pl-green));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.plw-emp-cuerpo {
+  flex: 1;
+  min-width: 0;
+}
+.plw-emp-nombre {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plw-emp-esp {
+  display: block;
+  font-size: 10.5px;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Barra de carga: cuánto de su capacidad tiene tomado esta semana. */
+.plw-carga {
+  flex: 0 0 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.plw-carga-barra {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+.plw-carga-relleno {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--pl-green);
+}
+.plw-carga-texto {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  white-space: nowrap;
+  font-feature-settings: 'tnum';
+}
+.plw-carga--pasado .plw-carga-relleno { background: var(--pl-amber-strong); }
+.plw-carga--pasado .plw-carga-texto { color: var(--pl-amber-700); }
+.plw-carga--libre .plw-carga-texto { color: var(--pl-red-700); }
+
+/* --- Celdas --- */
+
+.plw-celda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 74px;
+  padding: 6px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 9px;
+  transition: box-shadow var(--pl-dur-ui) var(--pl-ease);
+}
+/* El día de hoy se tiñe entero, de la cabecera para abajo. */
+.plw-celda--hoy { background: var(--pl-green-050); }
+.plw-celda--sobre { box-shadow: inset 0 0 0 2px var(--pl-green); }
+
+.plw-celda-vacia {
+  flex: 1;
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--pl-border-strong);
+  border-radius: var(--pl-radius-sm);
+  color: var(--pl-text-faint);
+}
+
+.plw-celda--ausencia {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--pl-surface) 0 6px,
+    var(--pl-surface-3) 6px 12px
+  );
+}
+.plw-celda-ausencia-txt {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  text-transform: capitalize;
+  text-align: center;
+  padding: 0 6px;
+}
+
+/* Ausencia CON tareas cargadas igual: la celda no puede volverse rayada
+   (taparía las tarjetas), pero el aviso no se pierde — va como chip. */
+.plw-celda-ausencia-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 1px 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-red-100);
+  color: var(--pl-red-700);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tarjeta de tarea dentro de una celda. */
+.plw-tarjeta {
+  display: block;
+  padding: 7px 9px;
+  min-width: 0;
+  background: color-mix(in srgb, var(--plw-acento, var(--pl-green)) 10%, var(--pl-surface));
+  border-left: 3px solid var(--plw-acento, var(--pl-green));
+  border-radius: 7px;
+  cursor: grab;
+}
+.plw-tarjeta-titulo {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pl-text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+a.plw-tarjeta-titulo:hover { text-decoration: underline; }
+.plw-tarjeta-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plw-grid-vacia {
+  padding: 28px 16px;
+  text-align: center;
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+
+/* --- Pie de la grilla: quién quedó libre + leyenda --- */
+
+.plw-pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--pl-border);
+}
+.plw-pie-texto {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-muted);
+}
+.plw-pie-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  text-decoration: none;
+}
+.plw-pie-link:hover { text-decoration: underline; }
+
+.plw-leyenda {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.plw-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--pl-text-muted);
+}
+.plw-leyenda-muestra {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 10px;
+}
+.plw-leyenda-muestra--ok { background: var(--pl-green); }
+.plw-leyenda-muestra--pasado { background: var(--pl-amber-strong); }
+.plw-leyenda-muestra--ausencia {
+  border: 1px dashed var(--pl-border-strong);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--pl-surface) 0 3px,
+    var(--pl-surface-3) 3px 6px
+  );
+}
+
+/* ============================================================
+   [ANGOSTO] — la grilla ya scrollea de costado; lo que se ajusta
+   es la fila de título, que si no se parte fea.
+   ============================================================ */
+
+@media (max-width: 720px) {
+  .plw-head-der {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .plw-head-titulo { font-size: 18px; }
+  .plw-frase { font-size: 15.5px; }
+  .plw-leyenda { margin-left: 0; }
+}

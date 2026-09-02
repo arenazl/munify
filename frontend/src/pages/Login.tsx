@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
+import { capturarTokenDeUrl, queryToken } from '../utils/demoAcceso';
 import { getDefaultRouteForUser } from '../config/navigation';
-import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench } from 'lucide-react';
+import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles, ChevronRight } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
+import { fetchJsonRetry } from '../lib/fetchRetry';
+import { BRAND, marcaDeMunicipio } from '../brands';
+import { BrandMark } from '../brands/BrandMark';
+import DemoPinGate from '../components/DemoPinGate';
+import { mix } from '../lib/colorUtils';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -59,7 +65,14 @@ export default function Login() {
   // Leer valores de localStorage con state para forzar re-render
   const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
   const [municipioCodigo, setMunicipioCodigo] = useState<string | null>(null);
-  const [municipioColor, setMunicipioColor] = useState('#3b82f6');
+  const [municipioColor, setMunicipioColor] = useState(BRAND.primary);
+
+  // Demo PROTEGIDA por PIN: la botonera se ve igual, pero al tocar un perfil
+  // se pregunta la clave numérica y se usa como password real del quick-login
+  // (el gate verdadero lo hace /auth/login contra el hash del usuario).
+  const [demoProtegido, setDemoProtegido] = useState(false);
+  const [pinGateEmail, setPinGateEmail] = useState<string | null>(null);
+  const [pinError, setPinError] = useState('');
 
   // Cargar datos del municipio al montar
   useEffect(() => {
@@ -71,7 +84,29 @@ export default function Login() {
     const codigo = localStorage.getItem('municipio_codigo');
     const color = localStorage.getItem('municipio_color');
 
-    if (!codigo || !nombre) {
+    // Un municipio con MARCA PROPIA no se muestra dentro del acceso genérico:
+    // quedaba la mezcla de entrar por la raíz (marca Munify) y ver "Asunción,
+    // Dpto. Central" arriba de un login que NO es el de Asunción, sólo porque
+    // el nombre había quedado guardado de una visita anterior.
+    //
+    // Se IGNORA ese municipio y se cae al selector. Ojo: acá NO se puede
+    // redirigir a `/<codigo>` —se probó y hace un bucle infinito—, porque
+    // `BRAND` se resuelve una sola vez al cargar el módulo: al navegar dentro
+    // de la SPA sigue valiendo Munify, vuelve a entrar por esta rama y rebota
+    // /login -> /asuncion -> /login para siempre. Para ver la marca hay que
+    // cargar SU ruta de entrada, no navegar hacia ella.
+    const municipioAjeno = Boolean(codigo && !BRAND.municipioCodigo && marcaDeMunicipio(codigo));
+
+    if (!codigo || !nombre || municipioAjeno) {
+      // Mono-tenant: hay un único municipio fijo (el del brand). No mandamos a
+      // elegir muni; cargamos el del brand para que el login se muestre con su
+      // identidad aunque el municipio aún no esté sembrado.
+      if (BRAND.municipioCodigo) {
+        setMunicipioNombre(BRAND.name);
+        setMunicipioCodigo(BRAND.municipioCodigo);
+        setMunicipioColor(BRAND.primary);
+        return;
+      }
       // Limpiar todo y redirigir
       localStorage.removeItem('municipio_codigo');
       localStorage.removeItem('municipio_id');
@@ -83,7 +118,7 @@ export default function Login() {
 
     setMunicipioNombre(nombre);
     setMunicipioCodigo(codigo);
-    setMunicipioColor(color || '#3b82f6');
+    setMunicipioColor(color || BRAND.primary);
 
     // Pre-llenar email si viene desde el botón de supervisor
     const prefilledEmail = localStorage.getItem('prefill_email');
@@ -111,29 +146,72 @@ export default function Login() {
   };
 
   const quickLogin = async (userEmail: string, userPassword: string) => {
+    // Demo protegida: la password real es el PIN del muni. Si aún no lo
+    // tenemos en esta sesión, se abre el modal y el login sigue desde ahí.
+    let passReal = userPassword;
+    if (demoProtegido) {
+      const pinGuardado = sessionStorage.getItem(`demo_pin_${municipioCodigo}`);
+      if (!pinGuardado) {
+        setPinError('');
+        setPinGateEmail(userEmail);
+        return;
+      }
+      passReal = pinGuardado;
+    }
     setEmail(userEmail);
-    setPassword(userPassword);
+    setPassword(passReal);
     setError('');
     setLoading(true);
 
     try {
-      await login(userEmail, userPassword);
+      await login(userEmail, passReal);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || 'Error al iniciar sesión');
+      if (demoProtegido) {
+        // PIN vencido o mal tipeado: se descarta y se vuelve a preguntar.
+        sessionStorage.removeItem(`demo_pin_${municipioCodigo}`);
+        setPinError('PIN incorrecto. Probá de nuevo.');
+        setPinGateEmail(userEmail);
+      } else {
+        const error = err as { response?: { data?: { detail?: string } } };
+        setError(error.response?.data?.detail || 'Error al iniciar sesión');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // El modal queda abierto mientras se valida: si el PIN está mal, el catch
+  // de quickLogin lo repregunta con error; si está bien, navigate desmonta.
+  const confirmarPin = (pin: string) => {
+    if (!pinGateEmail) return;
+    sessionStorage.setItem(`demo_pin_${municipioCodigo}`, pin);
+    void quickLogin(pinGateEmail, '');
+  };
+
+  const pinGate = (
+    <DemoPinGate
+      abierto={pinGateEmail !== null}
+      nombreMunicipio={municipioNombre || ''}
+      cargando={loading}
+      error={pinError}
+      onSubmit={confirmarPin}
+      onClose={() => { setPinGateEmail(null); setPinError(''); }}
+    />
+  );
+
   // Configuración visual por rol
-  const rolConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
-    admin: { icon: Shield, color: 'from-red-500 to-rose-600', label: 'Administrador' },
-    supervisor: { icon: Users, color: 'from-orange-500 to-amber-600', label: 'Supervisor' },
-    empleado: { icon: Wrench, color: 'from-emerald-500 to-teal-600', label: 'Empleado' },
-    vecino: { icon: User, color: 'from-blue-500 to-indigo-600', label: 'Vecino' },
+  // Los perfiles de demo se distinguen por ICONO y etiqueta, no por un color
+  // propio. Antes cada rol traía su gradiente fijo (rojo, naranja, verde,
+  // azul): un arcoíris que no tiene nada que ver con la marca y que hacía ver
+  // el login de cualquier municipio como otra aplicación. El color ahora sale
+  // del tema y es el mismo para todos; lo que cambia es el símbolo.
+  const rolConfig: Record<string, { icon: typeof Shield; label: string }> = {
+    admin: { icon: Shield, label: 'Administrador' },
+    supervisor: { icon: Users, label: 'Supervisor' },
+    empleado: { icon: Wrench, label: 'Empleado' },
+    vecino: { icon: User, label: 'Vecino' },
   };
 
   // Estado para usuarios demo cargados desde la API
@@ -143,6 +221,7 @@ export default function Login() {
     apellido: string;
     nombre_completo: string;
     rol: string;
+    dependencia_nombre?: string | null;
   }>>([]);
 
   // Estado para usuarios de dependencia
@@ -156,40 +235,60 @@ export default function Login() {
     maneja_reclamos: boolean;
     maneja_tramites: boolean;
   }>>([]);
+  // true cuando las dos listas de perfiles ya respondieron (con datos o vacías).
+  const [perfilesResueltos, setPerfilesResueltos] = useState(false);
 
   // API_URL importado desde lib/api.ts
 
-  // Cargar usuarios demo y dependencia desde la API
+  // Cargar usuarios demo y dependencia desde la API.
+  // Con retry+backoff (fetchJsonRetry): si el backend está frío (cold start de
+  // Cloud Run) el primer fetch puede fallar, y sin reintento el login quedaba
+  // con la MITAD de los perfiles (sin la sección ÁREAS) en silencio.
   useEffect(() => {
     if (municipioCodigo) {
-      // Cargar usuarios demo
       const loadDemoUsers = async () => {
         try {
-          const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/demo-users`);
-          if (response.ok) {
-            const users = await response.json();
-            setDemoUsers(users);
-          }
+          // Entrada por link: si la URL trae la llave se guarda y se usa.
+          // Sin llave, un muni demo ajeno no devuelve perfiles y el login
+          // queda solo con email + contraseña, que es lo que corresponde.
+          capturarTokenDeUrl(municipioCodigo);
+          const users = await fetchJsonRetry<typeof demoUsers>(
+            `${API_URL}/municipios/public/${municipioCodigo}/demo-users${queryToken(municipioCodigo)}`);
+          setDemoUsers(users);
         } catch (error) {
           console.error('Error al cargar usuarios demo:', error);
         }
       };
 
-      // Cargar usuarios de dependencia
       const loadDependenciaUsers = async () => {
         try {
-          const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/dependencia-users`);
-          if (response.ok) {
-            const users = await response.json();
-            setDependenciaUsers(users);
-          }
+          const users = await fetchJsonRetry<typeof dependenciaUsers>(
+            `${API_URL}/municipios/public/${municipioCodigo}/dependencia-users${queryToken(municipioCodigo)}`);
+          setDependenciaUsers(users);
         } catch (error) {
           console.error('Error al cargar usuarios dependencia:', error);
         }
       };
 
-      loadDemoUsers();
-      loadDependenciaUsers();
+      // Ficha pública del muni: trae demo_protegido (si el quick-login debe
+      // pedir PIN en vez de usar demo123).
+      const loadProteccion = async () => {
+        try {
+          const muni = await fetchJsonRetry<{ demo_protegido?: boolean }>(
+            `${API_URL}/municipios/public/${municipioCodigo}`);
+          setDemoProtegido(Boolean(muni.demo_protegido));
+        } catch (error) {
+          console.error('Error al cargar la ficha del municipio:', error);
+        }
+      };
+
+      // El form de credenciales del layout split espera a que las DOS listas
+      // resuelvan: sin esto, en un muni demo el form flashea un instante antes
+      // de que llegue la botonera. 4xx no reintenta, así que un cliente
+      // productivo resuelve en un solo round-trip.
+      void Promise.allSettled([loadDemoUsers(), loadDependenciaUsers()])
+        .then(() => setPerfilesResueltos(true));
+      loadProteccion();
     }
   }, [municipioCodigo]);
 
@@ -202,14 +301,347 @@ export default function Login() {
     );
   }
 
+  // ================= LOGIN SPLIT (loginLayout === 'split') =================
+  // Hero de marca a la izquierda + panel de acceso (perfiles + email) a la
+  // derecha. Identidad propia con el color del brand. Reusa toda la lógica de
+  // auth (handleSubmit, quickLogin, Google) del login estándar. La marca elige
+  // este layout por su config (BRAND.loginLayout), no por un flag white-label.
+  if (BRAND.loginLayout === 'split') {
+    // ¿De quién es esta portada? En una marca MONO-TENANT (Paraguay Limpio) es
+    // la portada de la MARCA: acento del brand, no de la ficha del muni (dos
+    // marcas pueden compartir tenant y el color de la ficha no manda). En
+    // Munify multi-tenant con municipio elegido es la portada del TENANT
+    // (pedido del dueño, 2026-08-25): el municipio en grande y su color como
+    // acento — al entrar por /merlo/login tiene que GRITAR Merlo.
+    const muniPropio = !BRAND.municipioCodigo && municipioNombre
+      ? municipioNombre.replace(/^Municipalidad de\s*/i, '')
+      : null;
+    const accent = (muniPropio && municipioColor) || BRAND.primary;
+    // Cliente PRODUCTIVO (es_demo=false): el backend devuelve las listas de
+    // perfiles vacías, así que el panel no tiene botonera. Sin esto la
+    // pantalla decía "Elegí un perfil" sin NINGÚN perfil ni campo — San Pedro
+    // Norte quedaba sin forma de escribir sus credenciales (2026-08-28).
+    // `perfilesResueltos` evita el flash del form en munis demo mientras
+    // llegan los perfiles.
+    const sinPerfiles = perfilesResueltos && demoUsers.length === 0 && dependenciaUsers.length === 0;
+    // Fondos del hero TEÑIDOS con el acento sobre un casi-negro neutro. Antes
+    // eran tres verdes fijos, que es justo lo que no puede tener un shell
+    // white-label. Las proporciones están elegidas para reproducir los verdes
+    // originales de Paraguay Limpio.
+    const tintaBase = '#05070a';
+    const fondoHero = mix(tintaBase, accent, 0.10);
+    const gradienteHero = `linear-gradient(160deg, ${mix(tintaBase, accent, 0.28)} 0%, ${mix(tintaBase, accent, 0.15)} 60%, ${fondoHero} 100%)`;
+    // Tramo acentuado del nombre: el MISMO token que usa el sidebar
+    // (`BRAND.accent`), para que el lockup no viva en dos verdes distintos.
+    const nameAccent = BRAND.accent || accent;
+    // Marcas de una sola palabra: el corte lo da `nameAccentIndex`, igual que
+    // en el sidebar ("Muni" + "fy"). Las multi-palabra cortan por el espacio.
+    const [nombreBase, nombreAcento] = (() => {
+      const partes = BRAND.name.split(' ');
+      if (partes.length > 1) return [partes[0], ` ${partes.slice(1).join(' ')}`];
+      const corte = BRAND.nameAccentIndex;
+      return corte ? [BRAND.name.slice(0, corte), BRAND.name.slice(corte)] : [BRAND.name, ''];
+    })();
+    const features = [
+      { Icon: AlertCircle, t: 'Reportá', s: 'RECLAMOS EN 1 MINUTO' },
+      { Icon: Building2, t: 'Seguí', s: 'ESTADO EN TIEMPO REAL' },
+      { Icon: FileCheck, t: 'Trámites', s: 'ONLINE, SIN FILAS' },
+      { Icon: Wrench, t: 'Resolvé', s: 'CUADRILLAS Y OT' },
+    ];
+    return (
+      <div className="min-h-screen w-full flex flex-col lg:flex-row text-white" style={{ background: fondoHero }}>
+        {/* ===== HERO (izquierda) ===== */}
+        <div
+          className="relative lg:w-1/2 flex flex-col justify-between gap-10 p-8 sm:p-12 lg:p-16 overflow-hidden"
+          style={{ background: gradienteHero }}
+        >
+          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-25" style={{ background: accent }} />
+          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full blur-3xl opacity-10" style={{ background: accent }} />
+
+          {/* marca — lockup "Logo XL" elegido por el dueño (2026-07-31): logo
+              grande y SUELTO (sin tile con fill), nombre bicolor (primera
+              palabra blanca, resto verde claro) con la tipografía de siempre,
+              y la bajada intacta con sus caps espaciadas. */}
+          <div className="relative flex items-center gap-5">
+            <BrandMark size={82} className="flex-shrink-0" />
+            <div className="leading-tight">
+              <div className="text-[32px] font-extrabold tracking-tight" style={{ fontFamily: BRAND.nameFont }}>
+                <span className="text-white">{nombreBase}</span>
+                {nombreAcento !== '' && <span style={{ color: nameAccent }}>{nombreAcento}</span>}
+              </div>
+              <div className="text-[10px] font-semibold tracking-[0.25em] mt-1" style={{ color: accent }}>PLATAFORMA CIUDADANA</div>
+            </div>
+          </div>
+
+          {/* copy */}
+          <div className="relative max-w-lg">
+            <div className="text-xs font-bold tracking-[0.25em] mb-4" style={{ color: accent }}>
+              {muniPropio ? 'MUNICIPALIDAD DE' : 'GESTIÓN MUNICIPAL'}
+            </div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.03]" style={{ fontFamily: BRAND.nameFont }}>
+              {muniPropio ? (
+                <>{muniPropio}<span style={{ color: accent }}>.</span></>
+              ) : (
+                <>De tu reclamo<br />a la <span style={{ color: accent }}>solución.</span></>
+              )}
+            </h1>
+            <p className="mt-6 text-base lg:text-lg text-white/70 leading-relaxed">
+              {muniPropio
+                ? 'De tu reclamo a la solución: reclamos, trámites y seguimiento en tiempo real.'
+                : (BRAND.tagline || 'Reclamos, trámites y seguimiento en tiempo real, en una sola plataforma.')}
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 mt-8">
+              {features.map(({ Icon, t, s }) => (
+                <div key={t} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
+                  <Icon className="h-5 w-5 mb-2" style={{ color: accent }} />
+                  <div className="font-bold text-sm">{t}</div>
+                  <div className="text-[10px] text-white/45 tracking-wide mt-0.5">{s}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative flex items-center gap-2 text-[11px] text-white/40">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: accent }} />
+            Sistema operativo · SSL · JWT 24h · 2026 {BRAND.name}
+          </div>
+        </div>
+
+        {/* ===== PANEL (derecha) ===== */}
+        <div className="lg:w-1/2 flex items-center justify-center px-6 py-6 sm:px-10 sm:py-8 lg:px-16 lg:py-6">
+          <div className="w-full max-w-md">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${accent}1f` }}>
+              <Sparkles className="h-5 w-5" style={{ color: accent }} />
+            </div>
+            <h2 className="text-3xl font-extrabold" style={{ fontFamily: BRAND.nameFont }}>Bienvenido</h2>
+            <p className="text-white/60 mt-1 mb-3">
+              {sinPerfiles
+                ? 'Ingresá con tu cuenta'
+                : muniPropio ? `Elegí un perfil para entrar a ${muniPropio}` : 'Elegí un perfil para entrar a la demo'}
+            </p>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/25 text-red-300 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>
+            )}
+
+            {(demoUsers.length > 0 || dependenciaUsers.length > 0) && (() => {
+              const admins = demoUsers.filter(u => u.rol === 'admin');
+              const vecinos = demoUsers.filter(u => u.rol === 'vecino');
+              const empleados = demoUsers.filter(u => u.rol === 'empleado');
+              const Heading = ({ t }: { t: string }) => (
+                <div className="text-[10px] font-bold tracking-[0.2em] text-white/40 mb-1.5">{t}</div>
+              );
+              return (
+                <div className="space-y-3 mb-2">
+                  {/* ADMINISTRACIÓN — verde del brand, destacado arriba */}
+                  {admins.map(u => (
+                    <div key={u.email}>
+                      <Heading t="ADMINISTRACIÓN" />
+                      <button
+                        type="button"
+                        onClick={() => quickLogin(u.email, 'demo123')}
+                        disabled={loading}
+                        className="w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-50 shadow-lg"
+                        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: fondoHero }}
+                      >
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-black/15">
+                          <Shield className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-extrabold truncate">Administrador</div>
+                          <div className="text-[11px] font-semibold opacity-70 truncate">Acceso a todas las áreas</div>
+                        </div>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* ÁREAS — cada dependencia con su color + reclamos/trámites */}
+                  {dependenciaUsers.length > 0 && (
+                    <div>
+                      <Heading t="ÁREAS" />
+                      {/* Dos columnas: con seis dependencias, una sola fila por
+                          area empujaba media pantalla de scroll. */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {dependenciaUsers.map(dep => (
+                          <button
+                            key={dep.email}
+                            type="button"
+                            onClick={() => quickLogin(dep.email, 'demo123')}
+                            disabled={loading}
+                            className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
+                            style={{ backgroundColor: `${dep.color || accent}1f`, border: `1px solid ${dep.color || accent}33` }}
+                          >
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${dep.color || accent}2e` }}>
+                              <Building2 className="h-4 w-4" style={{ color: dep.color || accent }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-bold text-white truncate">{dep.nombre_dependencia}</div>
+                              <div className="text-[11px] text-white/50 truncate">
+                                {dep.reclamos_count} {dep.reclamos_count === 1 ? 'reclamo' : 'reclamos'} · {dep.tramites_count} {dep.tramites_count === 1 ? 'trámite' : 'trámites'}
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-white/30 flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VECINOS — tono azul */}
+                  {vecinos.length > 0 && (
+                    <div>
+                      <Heading t="VECINOS" />
+                      <div className="grid grid-cols-3 gap-2">
+                        {vecinos.map(u => (
+                          <button
+                            key={u.email}
+                            type="button"
+                            onClick={() => quickLogin(u.email, 'demo123')}
+                            disabled={loading}
+                            className="flex items-center gap-2 p-2 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.98] disabled:opacity-50"
+                            style={{ backgroundColor: '#3b82f61a', border: '1px solid #3b82f633' }}
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#3b82f626' }}>
+                              <User className="h-3.5 w-3.5" style={{ color: '#7cb0ff' }} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold text-white truncate">{u.nombre}</div>
+                              <div className="text-[9px] text-white/45 truncate">Ciudadano</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CAMPO — tono ámbar */}
+                  {empleados.length > 0 && (
+                    <div>
+                      <Heading t="CAMPO" />
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {empleados.map(u => (
+                          <button
+                            key={u.email}
+                            type="button"
+                            onClick={() => quickLogin(u.email, 'demo123')}
+                            disabled={loading}
+                            className="flex items-center gap-2 p-2 rounded-xl text-left transition-all hover:brightness-125 active:scale-[0.99] disabled:opacity-50"
+                            style={{ backgroundColor: '#f59e0b1a', border: '1px solid #f59e0b33' }}
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#f59e0b26' }}>
+                              <Wrench className="h-3.5 w-3.5" style={{ color: '#fbbf24' }} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold text-white truncate">{u.nombre_completo}</div>
+                              <div className="text-[9px] text-white/45 truncate">Órdenes de trabajo</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Cliente productivo, sin botonera: el form de credenciales va acá
+                mismo, con los MISMOS handlers del login estándar. Es el acceso
+                real de San Pedro Norte — sin esto no puede entrar. */}
+            {sinPerfiles && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-white/30 focus:ring-2 outline-none transition-all ${
+                      touched.email && !emailValidation.isValid
+                        ? 'border-red-500/50 focus:border-red-500/50'
+                        : 'border-white/10 focus:border-white/30'
+                    }`}
+                    placeholder="tu@email.com"
+                  />
+                  {touched.email && !emailValidation.isValid && (
+                    <p className="mt-1 text-xs text-red-400">{emailValidation.error}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm text-white/50 mb-1">Contraseña</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-white/30 focus:ring-2 outline-none transition-all ${
+                      touched.password && !passwordValidation.isValid
+                        ? 'border-red-500/50 focus:border-red-500/50'
+                        : 'border-white/10 focus:border-white/30'
+                    }`}
+                    placeholder="Tu contraseña"
+                  />
+                  {touched.password && !passwordValidation.isValid && (
+                    <p className="mt-1 text-xs text-red-400">{passwordValidation.error}</p>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 font-extrabold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: fondoHero }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Ingresando...
+                    </>
+                  ) : (
+                    'Ingresar'
+                  )}
+                </button>
+              </form>
+            )}
+
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-[10px] tracking-[0.2em] text-white/40">O</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleClick}
+              disabled={googleLoading}
+              className="mt-3 w-full flex items-center justify-center gap-3 py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-xl transition-all disabled:opacity-60"
+            >
+              {googleLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                <>
+                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" /><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+                  <span>Continuar con Google</span>
+                </>
+              )}
+            </button>
+
+            <p className="text-center text-white/40 text-xs mt-6">
+              {demoUsers.length > 0 ? 'Acceso de demostración' : 'Acceso'} · {municipioNombre}
+            </p>
+          </div>
+        </div>
+        {pinGate}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
         <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl" style={{ backgroundColor: municipioColor }} />
+          <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full blur-3xl" style={{ backgroundColor: municipioColor }} />
         </div>
       </div>
 
@@ -233,13 +665,13 @@ export default function Login() {
             {/* Logo y título */}
             <div className="text-center mb-8">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                style={{ backgroundColor: `${municipioColor}20` }}
+                className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl ring-1 ring-white/10"
+                style={{ backgroundColor: `${municipioColor}22` }}
               >
-                <Building2 className="h-8 w-8" style={{ color: municipioColor }} />
+                <BrandMark size={48} />
               </div>
-              <h1 className="text-2xl font-bold text-white mb-1">{municipioNombre}</h1>
-              <p className="text-slate-400 text-sm">Acceso al sistema</p>
+              <h1 className="text-2xl font-bold text-white mb-1" style={{ fontFamily: BRAND.nameFont }}>{municipioNombre}</h1>
+              <p className="text-slate-400 text-sm">{BRAND.tagline || 'Acceso al sistema'}</p>
             </div>
 
             {/* Form Card */}
@@ -298,7 +730,8 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 text-white font-semibold rounded-xl transition-all shadow-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: `linear-gradient(135deg, ${municipioColor}, ${municipioColor}dd)`, boxShadow: `0 10px 25px ${municipioColor}40` }}
                 >
                   {loading ? (
                     <>
@@ -379,7 +812,12 @@ export default function Login() {
                           type="button"
                           onClick={() => quickLogin(user.email, 'demo123')}
                           disabled={loading}
-                          className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                          className="relative overflow-hidden py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+                          style={{
+                            backgroundColor: `${municipioColor}1f`,
+                            border: `1px solid ${municipioColor}45`,
+                            color: 'var(--pl-text, #fff)',
+                          }}
                         >
                           <div className="flex items-center gap-2">
                             <Icon className="h-4 w-4 flex-shrink-0" />
@@ -484,6 +922,7 @@ export default function Login() {
           </div>
         </main>
       </div>
+      {pinGate}
     </div>
   );
 }

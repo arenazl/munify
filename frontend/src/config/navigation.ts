@@ -1,9 +1,38 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
-  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote, Hammer, Boxes,
+  Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
+  Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
+  CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
+  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen, Gauge,
+  type LucideIcon,
 } from 'lucide-react';
+
+/**
+ * Icono que representa a una CATEGORÍA entera (no a un item).
+ *
+ * Lo usa el rail del sidebar colapsado: ahí no entran los ~24 items sueltos,
+ * entra un icono por grupo y sus items salen en un flyout. Vive acá, con la
+ * config de navegación, y no en el componente: la categoría es un dato de
+ * navegación, no una decisión de pintura.
+ *
+ * Resiliente a propósito: una categoría que no esté en el mapa NO rompe ni
+ * queda sin icono — el sidebar cae al icono de su primer item.
+ */
+export const ICONO_CATEGORIA: Record<string, LucideIcon> = {
+  'Reclamos': ClipboardList,
+  'Trámites': FileCheck,
+  'Tesorería': Wallet,
+  'Sueldos': Banknote,
+  'Contaduría': Receipt,
+  'Campo': Hammer,
+  'Comunicación': Megaphone,
+  'Recursos': Truck,
+  'Mi Área': Layers,
+  'Atención al vecino': Building2,
+  'Configuración': Settings,
+  'Mi cuenta': Users,
+  'Super Admin': Activity,
+};
 
 interface NavigationOptions {
   userRole: string;
@@ -50,9 +79,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   const hasDependencia = typeof userRoleOrOptions === 'object' ? userRoleOrOptions.hasDependencia : false;
   const hasEmpleado = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.hasEmpleado : false;
   const isSuperAdmin = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.isSuperAdmin : false;
-  const abmEnSidebar = typeof userRoleOrOptions === 'object'
-    ? (userRoleOrOptions.abmEnSidebar ?? true)
-    : true;
+  // NOTA: `abmEnSidebar` quedó sin efecto — los 3 ABMs que gateaba (categorías
+  // de reclamo/trámite y tipos de trámite) ya no están en el sidebar, se llega
+  // por Configuración → Catálogos. La prop se mantiene en la interfaz para no
+  // romper a los llamadores que la siguen pasando.
   const hrefsOcultos = (() => {
     if (typeof userRoleOrOptions !== 'object') return new Set<string>();
     const raw = userRoleOrOptions.hrefsOcultos;
@@ -146,11 +176,26 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Resumen y métricas'
     },
     {
+      // 'Principal' = items sueltos arriba del sidebar (sin acordeón), ver
+      // CATEGORIA_SUELTOS en SidebarV2. Mostrador va acá, debajo de Dashboard:
+      // es la puerta de entrada del funcionario que tiene un vecino adelante.
+      name: 'Mostrador',
+      href: '/gestion/mostrador',
+      icon: ScanLine,
+      show: esFuncionarioMuni && moduloOn('mostrador'),
+      categoria: 'Principal',
+      description: 'Ventanilla asistida — biometría + trámite presencial'
+    },
+    // === UNIVERSO RECLAMOS (Reclamos + Mapa + Tablero + Planificación + SLA + Análisis) ===
+    // Reagrupación F2/D1 (variante C): las piezas del universo reclamos quedan
+    // contiguas y ANTES del bloque financiero. Antes Tablero/Planificación/SLA/
+    // Análisis vivían en la categoría 'Operación' al final; se fusionaron acá.
+    {
       name: 'Reclamos',
       href: '/gestion/reclamos',
       icon: ClipboardList,
       show: isAdminOrSupervisor && moduloOn('reclamos'),
-      categoria: 'Principal',
+      categoria: 'Reclamos',
       description: 'Gestionar todos los reclamos'
     },
     {
@@ -158,8 +203,104 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mapa',
       icon: Map,
       show: isAdminOrSupervisor && moduloOn('mapa'),
-      categoria: 'Principal',
+      categoria: 'Reclamos',
       description: 'Ver reclamos en el mapa'
+    },
+    {
+      name: 'Tablero',
+      href: '/gestion/tablero',
+      icon: Wrench,
+      show: isAdminOrSupervisor && moduloOn('tablero'),
+      categoria: 'Reclamos',
+      description: 'Tablero Kanban'
+    },
+    {
+      name: 'Planificación',
+      href: '/gestion/planificacion',
+      icon: CalendarDays,
+      show: isAdminOrSupervisor && moduloOn('planificacion'),
+      categoria: 'Reclamos',
+      description: 'Calendario semanal del personal'
+    },
+    {
+      // Despacho del trabajo que sale de un reclamo → vive con Planificación,
+      // no en 'Campo' (Campo quedó como la vista del operario).
+      name: 'Órdenes',
+      href: '/gestion/ordenes-trabajo',
+      icon: Hammer,
+      // Opt-in por municipio (como tesorería): sin fila en municipio_modulos = oculto
+      show: (isAdminOrSupervisor || userRole === 'empleado') && modulosActivos.has('ordenes_trabajo'),
+      categoria: 'Reclamos',
+      description: 'Órdenes de trabajo de cuadrillas'
+    },
+    // 'SLA' (/gestion/sla) salió del sidebar: no es laburo diario sino el
+    // catálogo de plazos comprometidos — se define una vez y se consulta poco.
+    // Vive como tile en Configuración → Catálogos, con el mismo gate de módulo.
+    {
+      name: 'Análisis',
+      href: '/gestion/panel-bi',
+      icon: LayoutDashboard,
+      show: isAdminOrSupervisor && moduloOn('panel-bi') && iaHabilitada,
+      categoria: 'Reclamos',
+      description: 'Consultas y análisis con IA'
+    },
+    // === SECCIÓN CAMPO (empleados/operarios con tareas asignadas) ===
+    {
+      name: 'Trabajos',
+      href: '/gestion/mis-trabajos',
+      icon: Wrench,
+      show: userRole === 'empleado' || ((isSupervisor || isAdmin) && hasEmpleado),
+      categoria: 'Campo',
+      description: 'Mis tareas asignadas en campo'
+    },
+    {
+      // Lo OPERACIONAL del inventario: el stock se mueve todos los días y hay
+      // que poder cargarlo sin pasar por Configuración. El catálogo de
+      // artículos (/gestion/inventario) sigue llegándose desde Configuración:
+      // una fila sólo cambia si alguien la edita a mano (dueño, 2026-08-31).
+      name: 'Movimientos',
+      href: '/gestion/inventario/movimientos',
+      icon: PackageOpen,
+      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
+      categoria: 'Campo',
+      description: 'Entradas, salidas y ajustes de stock'
+    },
+    {
+      // La reposición. Va al lado de Movimientos porque son la misma tarea:
+      // que el depósito no se quede sin nada.
+      name: 'Compras',
+      href: '/gestion/inventario/compras',
+      icon: Truck,
+      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
+      categoria: 'Campo',
+      description: 'Órdenes de compra y reposición'
+    },
+    // NOTA: 'Inventario' (/gestion/inventario) salió del sidebar — se llega por
+    // el tile de Configuración → Catálogos, al lado de "Categorías Inventario".
+    // NOTA: 'Personal' (/gestion/empleados) y 'Cuadrillas' (/gestion/cuadrillas)
+    // NO van en el sidebar. Ambas son ABMs de ficha — la fila solo cambia si
+    // alguien la edita a mano, no se mueve con el trabajo del día — y ya se
+    // llegan por los tiles de Configuración → "Usuarios y Empleados"
+    // (Configuracion.tsx). Tenerlas acá era una segunda puerta a la misma
+    // pantalla. Lo operacional del personal (carga, disponibilidad, a quién
+    // asignar) vive en Planificación/Tablero/Órdenes, no en esas pantallas.
+    {
+      // F2/D8: se habilita para el empleado (endpoints abiertos por otro agente).
+      name: 'Rendimiento',
+      href: '/gestion/mi-rendimiento',
+      icon: TrendingUp,
+      show: userRole === 'empleado' && moduloOn('reclamos'),
+      categoria: 'Campo',
+      description: 'Mi rendimiento y estadísticas'
+    },
+    {
+      // F2/D8: historial de tareas resueltas del propio empleado.
+      name: 'Historial',
+      href: '/gestion/mi-historial',
+      icon: History,
+      show: userRole === 'empleado' && moduloOn('reclamos'),
+      categoria: 'Campo',
+      description: 'Historial de mis tareas resueltas'
     },
     // === SECCIÓN TRÁMITES (la unidad trámite → turno → agenda, consolidación 2026-07) ===
     {
@@ -186,54 +327,26 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Trámites',
       description: 'Horarios, cupos y feriados de la agenda de turnos'
     },
-    // === SECCIÓN CAMPO (empleados/operarios con tareas asignadas) ===
+    // La categoría 'Atención al vecino' se eliminó: Mostrador subió a
+    // 'Principal' (arriba, debajo de Dashboard) y Tasas/Cobros quedaron ocultos.
     {
-      name: 'Trabajos',
-      href: '/gestion/mis-trabajos',
-      icon: Wrench,
-      show: userRole === 'empleado' || ((isSupervisor || isAdmin) && hasEmpleado),
-      categoria: 'Campo',
-      description: 'Mis tareas asignadas en campo'
-    },
-    {
-      name: 'Órdenes',
-      href: '/gestion/ordenes-trabajo',
-      icon: Hammer,
-      // Opt-in por municipio (como tesorería): sin fila en municipio_modulos = oculto
-      show: (isAdminOrSupervisor || userRole === 'empleado') && modulosActivos.has('ordenes_trabajo'),
-      categoria: 'Campo',
-      description: 'Órdenes de trabajo de cuadrillas'
-    },
-    {
-      name: 'Inventario',
-      href: '/gestion/inventario',
-      icon: Boxes,
-      // Opt-in por municipio: activos (vehículos, herramientas) + consumibles (materiales)
-      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
-      categoria: 'Campo',
-      description: 'Vehículos, herramientas y materiales'
-    },
-    {
-      name: 'Mostrador',
-      href: '/gestion/mostrador',
-      icon: ScanLine,
-      show: esFuncionarioMuni && moduloOn('mostrador'),
-      categoria: 'Atención al vecino',
-      description: 'Ventanilla asistida — biometría + trámite presencial'
-    },
-    {
+      // Oculto por decisión de producto (2026-08-02). La pantalla y la ruta
+      // siguen vivas; para reactivarlo, restaurar el gate original:
+      //   show: isAdminOrSupervisor && moduloOn('tasas'),
       name: 'Tasas',
       href: '/gestion/tasas',
       icon: Receipt,
-      show: isAdminOrSupervisor && moduloOn('tasas'),
+      show: false,
       categoria: 'Atención al vecino',
       description: 'Partidas del padrón y deudas'
     },
     {
+      // Oculto por decisión de producto (2026-08-02). Gate original:
+      //   show: isAdminOrSupervisor && moduloOn('pagos'),
       name: 'Cobros',
       href: '/gestion/cobros',
       icon: Wallet,
-      show: isAdminOrSupervisor && moduloOn('pagos'),
+      show: false,
       categoria: 'Atención al vecino',
       description: 'Histórico transaccional para contaduría'
     },
@@ -245,14 +358,9 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Tesorería',
       description: 'Gastos cargados del municipio'
     },
-    {
-      name: 'Cajas',
-      href: '/gestion/tesoreria/cajas',
-      icon: PiggyBank,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Saldo de cada caja con ingresos y egresos'
-    },
+    // NOTA: 'Cajas' (/gestion/tesoreria/cajas — saldo de cada caja) salió del
+    // sidebar; se llega por el tile de Configuración → Tesorería, al lado del
+    // ABM de cajas (?tab=cajas), que es otra pantalla.
     {
       name: 'Conciliación',
       href: '/gestion/tesoreria/conciliacion',
@@ -278,54 +386,64 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Mapa de contactos y gastos'
     },
     {
+      // VUELVE al sidebar (2026-08-30) a pedido del cliente de San Pedro Norte.
+      // Habia salido el 2026-08-02 por decision de producto —se llegaba por el
+      // tile de Configuracion → Tesoreria—, pero es la pantalla donde esta el
+      // boton "Unificar duplicados", que se usa despues de cada importacion de
+      // Excel: enterrarla dos clicks adentro la volvia inencontrable.
       name: 'Contactos',
       href: '/gestion/tesoreria/contactos',
       icon: Users,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Tesorería',
-      description: 'Personas y proveedores'
+      description: 'Padrón de personas y proveedores'
     },
     {
+      // Oculto por decisión de producto (2026-08-02). Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       name: 'Reportes',
       href: '/gestion/tesoreria/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      show: false,
       categoria: 'Tesorería',
       description: 'Egresos por caja, top conceptos, evolución'
     },
+    // NOTA: 'Tarjetas' (/gestion/tarjetas) salió del sidebar — es un ABM de
+    // referencia (las tarjetas con las que se pagan gastos), se llega por el
+    // tile de Configuración → pestaña Tesorería.
+    // === SUELDOS: la categoría se disolvió (2026-08-02) ===
+    // Sus dos pantallas vivas pasan a Tesorería, que es donde corresponden: lo
+    // que se paga todos los meses es un egreso de caja, no un módulo aparte.
+    // Conservan el gate del módulo 'sueldos' — mueven de lugar en el menú, no
+    // cambian de visibilidad.
     {
-      // Tarjetas de crédito con las que se pagan gastos — vive con Tesorería,
-      // no en Configuración general (movido en la reorg de módulos 2026-07).
-      name: 'Tarjetas',
-      href: '/gestion/tarjetas',
-      icon: Banknote,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Tarjetas de crédito para pagos'
-    },
-    // === SUELDOS (flag propio desde la reorg 2026-07; antes cluster 'tesoreria') ===
-    {
-      name: 'Liquidaciones',
-      href: '/gestion/tesoreria/agenda',
+      // "Programados", no "Liquidaciones": la pantalla NO liquida sueldos (no
+      // hay básico, antigüedad, aportes ni recibo en el modelo) — agenda pagos
+      // que se repiten, y el alquiler del depósito es uno de ellos.
+      name: 'Programados',
+      href: '/gestion/tesoreria/pagos-programados',
       icon: CalendarClock,
       show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Sueldos',
-      description: 'Pago de sueldos y recurrentes con premios'
+      categoria: 'Tesorería',
+      description: 'Pagos que se repiten: sueldos, honorarios, alquileres'
     },
     {
       name: 'Empleados',
       href: '/gestion/sueldos/empleados',
       icon: Users,
       show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Sueldos',
+      categoria: 'Tesorería',
       description: 'Personal del muni con sueldo asignado'
     },
     {
+      // Oculto por decisión de producto (2026-08-02): los reportes por módulo
+      // no aportan; se rehacen como módulo propio. Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
       name: 'Reportes',
       href: '/gestion/sueldos/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
-      categoria: 'Sueldos',
+      show: false,
+      categoria: 'Tesorería',
       description: 'Masa salarial, top sueldos, próximos pagos'
     },
     // === CONTADURÍA (flag propio desde la reorg 2026-07; apagado por default) ===
@@ -338,70 +456,67 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Autorización formal de pagos'
     },
     {
+      // Oculto por decisión de producto (2026-08-02): los reportes por módulo
+      // no aportan; se rehacen como módulo propio. Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('contaduria'),
       name: 'Reportes',
       href: '/gestion/contaduria/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('contaduria'),
+      show: false,
       categoria: 'Contaduría',
       description: 'OPs vencidas, próximas, top beneficiarios'
     },
+    // === RECURSOS (módulo nuevo 2026-08-29, opt-in) ===
+    // Lo que el municipio administra de sí mismo. Ver docs/recursos/.
     {
-      name: 'Tablero',
-      href: '/gestion/tablero',
-      icon: Wrench,
-      show: isAdminOrSupervisor && moduloOn('tablero'),
-      categoria: 'Operación',
-      description: 'Tablero Kanban'
+      name: 'Flota',
+      href: '/gestion/flota',
+      icon: Truck,
+      show: isAdminOrSupervisor && modulosActivos.has('flota'),
+      categoria: 'Recursos',
+      description: 'Vehículos, combustible y consumo por unidad'
     },
     {
-      name: 'Planificación',
-      href: '/gestion/planificacion',
-      icon: CalendarDays,
-      show: isAdminOrSupervisor && moduloOn('planificacion'),
-      categoria: 'Operación',
-      description: 'Calendario semanal del personal'
+      name: 'Reservas',
+      href: '/gestion/reservas',
+      icon: CalendarCheck,
+      show: isAdminOrSupervisor && modulosActivos.has('reservas'),
+      categoria: 'Recursos',
+      description: 'Salón, cancha y maquinaria que se presta'
     },
     {
-      name: 'SLA',
-      href: '/gestion/sla',
-      icon: Clock,
-      show: isAdminOrSupervisor && moduloOn('sla'),
-      categoria: 'Operación',
-      description: 'Gestión de SLA'
+      name: 'Presentismo',
+      href: '/gestion/presentismo',
+      icon: UserCheck,
+      show: isAdminOrSupervisor && modulosActivos.has('presentismo'),
+      categoria: 'Recursos',
+      description: 'Quién vino, quién avisó y quién no'
     },
     {
-      name: 'Análisis',
-      href: '/gestion/panel-bi',
-      icon: LayoutDashboard,
-      show: isAdminOrSupervisor && moduloOn('panel-bi') && iaHabilitada,
-      categoria: 'Operación',
-      description: 'Consultas y análisis con IA'
+      // Misma pantalla, otra cara: el empleado ve su botón de fichar. Los dos
+      // `show` son excluyentes por rol, así que nunca aparecen juntos.
+      name: 'Jornada',
+      href: '/gestion/presentismo',
+      icon: UserCheck,
+      show: hasEmpleado && !isAdminOrSupervisor && modulosActivos.has('presentismo'),
+      categoria: 'Mi cuenta',
+      description: 'Fichar la entrada y la salida'
     },
-    // === ABMs per-municipio (solo si el modulo correspondiente esta activo) ===
+    // === COMUNICACIÓN (módulo nuevo 2026-08-29, opt-in) ===
+    // Lo que el municipio le cuenta al vecino sin que el vecino pregunte.
+    // Ver docs/comunicacion/01-modulo-comunicacion.md
     {
-      name: 'Reclamos',
-      href: '/gestion/categorias-reclamo',
-      icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('reclamos'),
-      categoria: 'Configuración',
-      description: 'Categorías de reclamos del municipio'
+      name: 'Avisos',
+      href: '/gestion/avisos',
+      icon: Megaphone,
+      show: isAdminOrSupervisor && modulosActivos.has('comunicacion'),
+      categoria: 'Comunicación',
+      description: 'Novedades y avisos al celular del vecino'
     },
-    {
-      name: 'Trámites',
-      href: '/gestion/categorias-tramite',
-      icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
-      categoria: 'Configuración',
-      description: 'Categorías de trámites del municipio'
-    },
-    {
-      name: 'Tipos',
-      href: '/gestion/tramites-config',
-      icon: FileText,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
-      categoria: 'Configuración',
-      description: 'Trámites específicos del municipio'
-    },
+    // === ABMs per-municipio ===
+    // 'Categorías' (categorias-reclamo), 'Trámites' (categorias-tramite) y
+    // 'Tipos' (tramites-config) salieron del sidebar: los tres ya están como
+    // tiles en Configuración → Catálogos. El sidebar deja una sola puerta.
     {
       // Si el muni solo tiene Tesoreria activa, "Configuracion" entra
       // directo a la config de Tesoreria (no a la config general que esta vacia).
@@ -443,6 +558,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Activar/desactivar módulos por municipio (feature flags)'
     },
     {
+      // Regla 10 del CLAUDE.md: una sola palabra. "Semilla" es como se llama
+      // el generador de demos en todo el código; "Logs de seeding" no entra.
+      name: 'Semilla',
+      href: '/gestion/admin/seed-logs',
+      icon: Sprout,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Paso a paso de lo que hizo la semilla en cada demo creada'
+    },
+    {
       name: 'Auditoría',
       href: '/gestion/admin/audit-logs',
       icon: Activity,
@@ -452,11 +577,19 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     },
     {
       name: 'IA',
-      href: '/gestion/admin/configuracion-ia',
+      href: '/gestion/configuracion-ia',
       icon: Sparkles,
       show: isSuperAdmin,
       categoria: 'Super Admin',
       description: 'Prender/apagar IA por municipio y por módulo (Tesorería, Reclamos, Trámites)'
+    },
+    {
+      name: 'Consumo',
+      href: '/gestion/admin/consumo-ia',
+      icon: Gauge,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Tokens, latencia y llamadas de IA que no devolvieron nada'
     },
     {
       name: 'Sidebar',
@@ -507,7 +640,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Tasas',
       href: '/gestion/mis-tasas',
       icon: BarChart3,
-      show: isVecino,
+      // Antes era `show: isVecino` a secas: el vecino veía "Tasas" aunque su
+      // municipio no tuviera el módulo. Ahora sigue la misma regla que el
+      // resto de los módulos opt-in.
+      show: isVecino && modulosActivos.has('tasas'),
       categoria: 'Mi cuenta',
       description: 'Tasas y boletas pendientes (ABL, patente, multas)',
       badgeKey: 'tasas',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
@@ -10,27 +10,69 @@ import {
   HelpCircle,
   Moon,
   Sun,
-  Building2
+  Building2,
+  MapPin
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import NotificationSettings from '../../components/NotificationSettings';
+import { ModernSelect, type SelectOption } from '../../components/ui/ModernSelect';
+import { zonasApi, usersApi } from '../../lib/api';
 
 export default function MobilePerfil() {
-  const { theme, currentPresetId, currentVariant, setPreset } = useTheme();
-  // Detectar si el tema actual es "oscuro" basándose en el background
-  const isDarkMode = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const { theme, currentMode, setPreset } = useTheme();
+  // El modo lo declara el tema de fondo activo (antes se adivinaba con una
+  // lista de ids, y el toggle apuntaba a presets que ya no existían).
+  const isDarkMode = currentMode === 'oscuro';
   const toggleDarkMode = () => {
-    // Alternar entre arctic (claro) y carbon (oscuro)
-    if (isDarkMode) {
-      setPreset('arctic', currentVariant);
-    } else {
-      setPreset('carbon', currentVariant);
-    }
+    setPreset(isDarkMode ? 'niebla' : 'carbon');
   };
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  // La zona del vecino: con esto el municipio le manda solo lo que le toca
+  // (la recolección de SU zona, no la de las otras seis).
+  const [zonas, setZonas] = useState<Array<{ id: number; nombre: string }>>([]);
+  const [zonaId, setZonaId] = useState<string>(user?.zona_id ? String(user.zona_id) : '');
+  const [guardandoZona, setGuardandoZona] = useState(false);
+
+  // El user llega DESPUES del primer render (el contexto lo resuelve en un
+  // efecto), asi que el valor inicial del useState siempre se calcula con
+  // `user` en null: sin esto el selector mostraba "Todo el municipio" aunque
+  // el vecino ya tuviera su zona guardada.
+  useEffect(() => {
+    setZonaId(user?.zona_id ? String(user.zona_id) : '');
+  }, [user?.zona_id]);
+
+  useEffect(() => {
+    if (!user?.municipio_id) return;
+    zonasApi.getAll(true)
+      .then((r) => setZonas((r.data as Array<{ id: number; nombre: string }>) || []))
+      .catch(() => setZonas([]));
+  }, [user?.municipio_id]);
+
+  const guardarZona = async (valor: string) => {
+    const anterior = zonaId;
+    setZonaId(valor);
+    setGuardandoZona(true);
+    try {
+      await usersApi.updateMyProfile({ zona_id: valor ? Number(valor) : null });
+      // El contexto guarda al usuario en localStorage y lo restaura al
+      // recargar: sin refrescarlo, la zona quedaba bien en el servidor pero
+      // la pantalla volvia a "Todo el municipio" en la proxima entrada.
+      await refreshUser();
+      toast.success(valor ? 'Listo: vas a recibir los avisos de tu zona' : 'Vas a recibir los avisos generales');
+    } catch {
+      // Se vuelve atrás: dejar el selector mostrando una zona que no se
+      // guardó haría creer al vecino que está recibiendo avisos que no le
+      // van a llegar.
+      setZonaId(anterior);
+      toast.error('No se pudo guardar la zona');
+    } finally {
+      setGuardandoZona(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -77,6 +119,11 @@ export default function MobilePerfil() {
     );
   }
 
+  const opcionesZona: SelectOption[] = [
+    { value: '', label: 'Todo el municipio' },
+    ...zonas.map((z) => ({ value: String(z.id), label: z.nombre })),
+  ];
+
   const menuItems = [
     {
       icon: Bell,
@@ -110,7 +157,7 @@ export default function MobilePerfil() {
             className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold"
             style={{
               background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}aa)`,
-              color: '#fff',
+              color: 'var(--pl-on-accent)',
             }}
           >
             {user.nombre.charAt(0).toUpperCase()}
@@ -169,6 +216,35 @@ export default function MobilePerfil() {
           Cambiar
         </button>
       </div>
+
+      {zonas.length > 0 && (
+        <div
+          className="rounded-2xl p-4"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}15` }}
+            >
+              <MapPin className="h-5 w-5" style={{ color: theme.primary }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Tu zona</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Para recibir los avisos que son de tu zona
+              </p>
+            </div>
+          </div>
+          <ModernSelect
+            options={opcionesZona}
+            value={zonaId}
+            onChange={guardarZona}
+            placeholder="Elegí tu zona"
+            disabled={guardandoZona}
+          />
+        </div>
+      )}
 
       <div
         className="rounded-2xl overflow-hidden"

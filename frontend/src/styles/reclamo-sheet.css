@@ -1,0 +1,578 @@
+/* ============================================================
+   Sheet de detalle de Reclamo — implementación fiel de
+   "Reclamo Detalle.dc.html" (canvas Claude Design, 2026-08-02).
+   Prefijo rs-. 100% tokens --pl-* (polimórfico: themes y marcas).
+   Las animaciones (latido) reusan los keyframes del design system
+   definidos en shell-v2.css.
+   ============================================================ */
+
+/* ---------- Header propio del sheet ---------- */
+
+.rs-head {
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+}
+
+.rs-head-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rs-eyebrow {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+.rs-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.rs-nav-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--pl-border);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--pl-text-3);
+}
+.rs-nav-btn:hover { background: var(--pl-surface-hover); }
+.rs-nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+.rs-nav-pos {
+  font-size: 11px;
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+  white-space: nowrap;
+}
+
+.rs-head-icos {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.rs-ico-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  border-radius: var(--pl-radius-sm);
+  cursor: pointer;
+  color: var(--pl-text-3);
+  position: relative;
+}
+.rs-ico-btn:hover { background: var(--pl-surface-hover); }
+
+/* Puntito de alerta sobre el icono (vecino disconforme en Historial). */
+.rs-ico-alerta {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-red);
+}
+
+.rs-titulo {
+  margin: 10px 0 0;
+  font-family: var(--pl-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-hero);
+  line-height: 1.3;
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+
+.rs-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  font-size: 12px;
+  color: var(--pl-text-3);
+}
+.rs-meta-sep { color: var(--pl-border-strong); }
+.rs-meta > span { white-space: nowrap; }
+
+.rs-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--pl-radius-pill);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rs-estado-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--pl-radius-pill);
+}
+
+/* Categoría: link punteado que filtra la lista. */
+.rs-meta-cat {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-text);
+  text-decoration: underline dotted;
+  text-decoration-color: var(--pl-green-200);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+}
+.rs-meta-cat:hover {
+  color: var(--pl-green-700);
+  text-decoration-color: var(--pl-green);
+}
+
+/* ---------- Banner de consolidación (zona POI) ---------- */
+
+.rs-banner {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--pl-green) 6%, var(--pl-surface));
+  border: 1px solid var(--pl-green-200);
+  border-radius: var(--pl-radius-lg);
+}
+
+.rs-banner-icono {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  flex: 0 0 32px;
+}
+
+.rs-latido {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid var(--pl-green);
+  opacity: 0;
+  animation: sv2-latido 3.6s var(--pl-ease) infinite;
+}
+
+.rs-banner-cuerpo { min-width: 0; flex: 1; }
+
+.rs-banner-texto {
+  display: block;
+  font-size: var(--pl-fs-body);
+  line-height: 1.5;
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+.rs-banner-texto strong { font-weight: 600; }
+
+.rs-banner-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-green-700);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  transition: gap var(--pl-dur-ui) var(--pl-ease);
+}
+.rs-banner-accion:hover { gap: 9px; }
+.rs-banner-accion:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- Secciones del cuerpo ---------- */
+
+.rs-seccion {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--pl-border);
+}
+.rs-seccion--ultima { border-bottom: 0; padding-bottom: 8px; }
+
+.rs-seccion-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rs-seccion-titulo {
+  font-family: var(--pl-font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--pl-text);
+}
+
+.rs-seccion-hint {
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+}
+
+.rs-seccion-link {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+}
+.rs-seccion-link:hover { text-decoration: underline; }
+
+.rs-parrafo {
+  margin: 8px 0 0;
+  font-size: var(--pl-fs-body);
+  line-height: 1.55;
+  color: var(--pl-text-2);
+  text-wrap: pretty;
+}
+.rs-parrafo--destacado {
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.rs-seccion-titulo--malo { color: var(--pl-red-700); }
+
+/* Fotos del vecino: miniaturas fijas + "+N". */
+.rs-fotos {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.rs-foto {
+  width: 88px;
+  height: 64px;
+  border-radius: 9px;
+  background: var(--pl-surface-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  color: var(--pl-text-faint);
+}
+.rs-foto:hover { background: var(--pl-surface-hover); }
+.rs-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rs-foto--mas {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-text-3);
+}
+
+/* Grilla DÓNDE / QUIÉN LO REPORTÓ. */
+.rs-grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--pl-border);
+}
+
+.rs-mini-eyebrow {
+  display: block;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pl-text-faint);
+}
+
+.rs-dato {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.rs-dato-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--pl-text-muted);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rs-mini-link {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pl-green-700);
+  margin-top: 8px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+}
+.rs-mini-link:hover { text-decoration: underline; }
+
+.rs-persona {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  min-width: 0;
+}
+.rs-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex: 0 0 26px;
+}
+.rs-persona-datos { min-width: 0; }
+.rs-persona-nombre {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Línea de tiempo "Por dónde pasó" ---------- */
+
+.rs-tl {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+}
+.rs-tl-col {
+  display: grid;
+  justify-items: center;
+}
+.rs-tl-dot {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-border-strong);
+  margin-top: 4px;
+}
+.rs-tl-dot--actual { background: var(--pl-green); }
+.rs-tl-dot--actual .rs-latido { inset: -4px; border-radius: var(--pl-radius-pill); }
+.rs-tl-linea {
+  width: 1.5px;
+  flex: 1;
+  min-height: 22px;
+  background: var(--pl-border);
+}
+.rs-tl-txt {
+  padding-bottom: 12px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--pl-text-2);
+}
+.rs-tl-txt--actual { font-weight: 600; color: var(--pl-text); }
+.rs-tl-sub {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--pl-text-faint);
+  margin-top: 2px;
+}
+
+/* ---------- Candidatos: tarjetas-radio (calcadas del diseño) ---------- */
+
+.rs-cand {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 6px;
+  padding: 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.rs-cand:first-of-type { margin-top: 12px; }
+.rs-cand:hover { background: var(--pl-surface-hover); }
+
+.rs-cand--activo,
+.rs-cand--activo:hover {
+  background: color-mix(in srgb, var(--pl-green) 6%, var(--pl-surface));
+  border-color: var(--pl-green-200);
+}
+
+.rs-cand-radio {
+  margin-top: 2px;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  accent-color: var(--pl-green);
+}
+
+.rs-cand-cuerpo { min-width: 0; flex: 1; }
+
+.rs-cand-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.rs-cand-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pl-text);
+}
+.rs-cand-estado {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--pl-text-faint);
+  white-space: nowrap;
+}
+.rs-cand-estado--ok {
+  font-weight: 600;
+  color: var(--pl-green-700);
+}
+.rs-cand-razon {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--pl-text-2);
+  margin-top: 4px;
+}
+
+/* Combo "O elegir otro" debajo de las tarjetas. */
+.rs-asignar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.rs-asignar-combo {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Pie: nota + CTAs ---------- */
+
+.rs-pie-nota {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 54px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--pl-border-strong);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  /* 16px: los inputs nunca disparan zoom en mobile. */
+  font-size: var(--pl-fs-input);
+  line-height: 1.5;
+  color: var(--pl-text);
+  outline: none;
+  background: var(--pl-surface);
+}
+.rs-pie-nota::placeholder { color: var(--pl-text-faint); }
+.rs-pie-nota:focus { border-color: var(--pl-green); }
+.rs-pie-nota--pendiente { border-color: var(--pl-amber-strong); }
+
+.rs-pie-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.rs-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.rs-cta:hover { background: var(--pl-green-600); }
+.rs-cta:disabled {
+  background: var(--pl-track);
+  color: var(--pl-text-disabled);
+  cursor: not-allowed;
+}
+
+.rs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--pl-border-strong);
+  border-radius: 11px;
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.rs-btn:hover { background: var(--pl-surface-hover); }
+.rs-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.rs-btn--peligro {
+  margin-left: auto;
+  border-color: var(--pl-red);
+  color: var(--pl-red-700);
+}
+.rs-btn--peligro:hover { background: var(--pl-red-100); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-latido { animation: none; }
+  .rs-banner-accion { transition: none; }
+}

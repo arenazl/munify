@@ -8,10 +8,14 @@ import { ModernSelect } from '../components/ui/ModernSelect';
 
 interface MuniOpt { id: number; nombre: string; codigo: string; }
 
+// Fallback mientras carga la lista real de modelos del backend
+// (GET /admin/ia-config/modelos). Un solo proveedor: Groq.
+const MODELO_DEFAULT = 'openai/gpt-oss-120b';
+
 /**
  * Configuración de IA por municipio (SOLO superadmin).
  *
- * Elegís un municipio y prendés/apagás su IA + elegís el modelo de Gemini.
+ * Elegís un municipio y prendés/apagás su IA + elegís el modelo de Groq.
  * Cuando está apagada, el front oculta todas las superficies de IA de ese muni
  * (gate central useIaHabilitada) y el backend cae a los fallbacks no-IA.
  * El intendente NO ve esta pantalla.
@@ -24,8 +28,8 @@ export default function ConfiguracionIA() {
   const [tesoreria, setTesoreria] = useState(true);
   const [reclamos, setReclamos] = useState(true);
   const [tramites, setTramites] = useState(true);
-  const [modelo, setModelo] = useState('gemini-2.5-flash');
-  const [modelos, setModelos] = useState<string[]>(['gemini-2.5-flash']);
+  const [modelo, setModelo] = useState(MODELO_DEFAULT);
+  const [modelos, setModelos] = useState<string[]>([MODELO_DEFAULT]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -43,8 +47,8 @@ export default function ConfiguracionIA() {
     if (!muniId) return;
     setLoading(true);
     iaConfigApi.adminGet(muniId)
-      .then((r) => { setHabilitada(!!r.data.habilitada); setModelo(r.data.modelo || 'gemini-2.5-flash'); setTesoreria(r.data.tesoreria !== false); setReclamos(r.data.reclamos !== false); setTramites(r.data.tramites !== false); })
-      .catch(() => { setHabilitada(false); setModelo('gemini-2.5-flash'); setTesoreria(true); setReclamos(true); setTramites(true); })
+      .then((r) => { setHabilitada(!!r.data.habilitada); setModelo(r.data.modelo || MODELO_DEFAULT); setTesoreria(r.data.tesoreria !== false); setReclamos(r.data.reclamos !== false); setTramites(r.data.tramites !== false); })
+      .catch(() => { setHabilitada(false); setModelo(MODELO_DEFAULT); setTesoreria(true); setReclamos(true); setTramites(true); })
       .finally(() => setLoading(false));
   }, [muniId]);
 
@@ -52,7 +56,7 @@ export default function ConfiguracionIA() {
     if (!muniId) return;
     setSaving(true);
     try {
-      await iaConfigApi.adminPut(muniId, { habilitada, provider: 'gemini', modelo, tesoreria, reclamos, tramites });
+      await iaConfigApi.adminPut(muniId, { habilitada, provider: 'groq', modelo, tesoreria, reclamos, tramites });
       toast.success('Configuración de IA guardada');
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -109,7 +113,7 @@ export default function ConfiguracionIA() {
           </div>
 
           <div className={habilitada ? '' : 'opacity-50 pointer-events-none'}>
-            <label className="block text-[11px] font-semibold mb-1" style={{ color: theme.textSecondary }}>Modelo de Gemini</label>
+            <label className="block text-[11px] font-semibold mb-1" style={{ color: theme.textSecondary }}>Modelo de Groq</label>
             <div className="max-w-xs">
               <ModernSelect
                 value={modelo}

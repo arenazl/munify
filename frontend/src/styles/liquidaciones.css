@@ -1,0 +1,168 @@
+/* ============================================================
+   [PAGOS PROGRAMADOS] — CSS propio de pages/TesoreriaAgenda.
+   Referencia: canvas "Pagos programados".
+
+   Vive acá y NO en abmv2.css/shell-v2.css a propósito: son las
+   piezas específicas de esta pantalla (selección múltiple para
+   cerrar varios pagos en una transferencia, banner de cierre y
+   el panel de pago masivo). Si alguna se vuelve transversal, se
+   promueve al kit — no al revés.
+
+   POLIMÓRFICO: cero colores fijos, todo sobre tokens --pl-*.
+   ============================================================ */
+
+/* ---------- Checkbox de fila / de día ---------- */
+.liq-check {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  padding: 0;
+  border: 1.5px solid var(--pl-border-strong);
+  border-radius: 5px;
+  background: var(--pl-surface);
+  color: transparent;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease),
+              border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.liq-check:hover { border-color: var(--pl-green); }
+.liq-check--on {
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  color: var(--pl-on-accent);
+}
+
+/* Texto de urgencia próxima (la vencida usa .av2-money--bad del kit). */
+.liq-warn { color: var(--pl-amber-700); }
+
+/* ---------- Acciones de fila: las 4 SIEMPRE visibles ----------
+   El DataTable del kit sólo muestra 2 y manda el resto a un menú "…";
+   el diseño canónico pide Pagar + Omitir + Editar + Borrar a la vista,
+   así que esta pantalla las pinta en una celda propia. */
+.liq-acciones {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.liq-pagar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-green);
+  color: var(--pl-on-accent);
+  font-family: inherit;
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.liq-pagar:hover { background: var(--pl-green-600); }
+.liq-pagar:disabled { background: var(--pl-track); color: var(--pl-text-disabled); cursor: not-allowed; }
+
+/* ---------- Banner de cierre (post-pago) ---------- */
+.liq-cerrados {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--pl-green-200);
+  border-radius: var(--pl-radius-lg);
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+}
+.liq-cerrados-link {
+  margin-left: auto;
+  color: var(--pl-green-700);
+  font-weight: 700;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.liq-cerrados-x {
+  border: 0;
+  background: transparent;
+  color: var(--pl-green-700);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+/* ---------- Grilla de tarjetas ---------- */
+.liq-cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+}
+
+/* ---------- Panel de pago masivo (drawer) ---------- */
+.liq-masivo-rotulo {
+  display: block;
+  margin: 18px 0 8px;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.liq-masivo-op {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  background: var(--pl-surface);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease),
+              border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.liq-masivo-op:hover { background: var(--pl-surface-hover); }
+.liq-masivo-op--on { background: var(--pl-green-050); border-color: var(--pl-green-200); }
+.liq-masivo-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.liq-masivo-titulo {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  text-transform: capitalize;
+}
+.liq-masivo-detalle { font-size: var(--pl-fs-caption); color: var(--pl-text-3); }
+.liq-masivo-vacio {
+  padding: 28px 8px;
+  text-align: center;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-3);
+}
+.liq-masivo-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+}
+.liq-masivo-total-label {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.liq-masivo-total-valor {
+  margin-left: auto;
+  font-family: var(--pl-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-text);
+}

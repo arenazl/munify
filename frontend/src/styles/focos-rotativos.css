@@ -1,0 +1,189 @@
+/* ============================================================
+   FocosRotativos — el mapa recorriendo los focos del municipio.
+
+   La clave de este archivo es que el ALTO NO DEPENDE DE LOS
+   DATOS: el mapa mide fijo y el pie se apila en una sola celda
+   de grid, así la tarjeta mantiene el mismo alto que sus
+   vecinas de la fila y la grilla no se desarma.
+   Todo sobre tokens --pl-*: cero colores fijos.
+   ============================================================ */
+
+.fr {
+  /* El pie flota SOBRE el mapa (posicionado contra este contenedor), así que
+     el mapa se queda con todo el alto y los controles se apoyan sobre la
+     franja de abajo, que es la que menos información tiene. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Aire entre el mapa y el pie. Con poca separación el nombre de la calle
+     queda pegado al borde del mapa y se lee como si fuera parte de la imagen.
+     El PISO es 16px y no 12: a 834px de ancho (una tablet de 11") el tramo
+     proporcional todavía no llega, así que el mínimo es el que manda ahí — y
+     con 12 se seguía viendo apretado. Arriba crece hasta 22. */
+  gap: clamp(16px, 1.6vw, 22px);
+}
+
+.fr-mapa {
+  border-radius: var(--pl-radius-lg);
+  overflow: hidden;
+  /* El mapa es una imagen a sangre: sin un borde propio se funde con el
+     fondo de la tarjeta y no se entiende dónde termina. */
+  border: 1px solid var(--pl-border);
+}
+
+.fr-pie {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  /* Casi opaco, no translúcido: encima de un mapa de calor con manchas
+     naranjas, un fondo transparente vuelve ilegible el nombre de la calle. */
+  background: color-mix(in srgb, var(--pl-surface) 96%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgb(13 20 18 / 12%);
+}
+
+/* Los tres controles redondos: anterior, pausa y siguiente. */
+.fr-nav {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.fr-nav:hover { background: var(--pl-surface-hover); }
+.fr-nav-icono { width: 14px; height: 14px; }
+
+.fr-puesto {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--pl-radius-sm);
+  display: grid;
+  place-items: center;
+  background: var(--pl-green-100);
+  color: var(--pl-green-700);
+  font-family: var(--pl-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pila: todos los focos en la misma celda; los inactivos siguen ocupando
+   lugar (visibility, no display) para que el alto sea el del más largo. */
+.fr-stack {
+  display: grid;
+  grid-template-areas: 'foco';
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fr-foco {
+  grid-area: foco;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(5px);
+  transition:
+    opacity var(--pl-dur-panel, 260ms) var(--pl-ease),
+    transform var(--pl-dur-panel, 260ms) var(--pl-ease),
+    visibility 0s linear var(--pl-dur-panel, 260ms);
+}
+
+.fr-foco--activo {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+
+.fr-direccion {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 650;
+  color: var(--pl-text);
+  /* Una calle larga baja de renglón, no se corta con puntos. */
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+.fr-icono { width: 13px; height: 13px; flex: 0 0 13px; color: var(--pl-green); }
+
+.fr-detalle {
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-3);
+  line-height: 1.3;
+}
+.fr-detalle b { color: var(--pl-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.fr-dots {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fr-dot {
+  width: 6px;
+  height: 6px;
+  transition: width var(--pl-dur-ui) var(--pl-ease), background var(--pl-dur-ui) var(--pl-ease);
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-text-disabled);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), transform var(--pl-dur-ui) var(--pl-ease);
+}
+.fr-dot:hover { transform: scale(1.3); }
+/* El activo se ESTIRA: con cuatro puntos iguales sólo cambiando de color no
+   se ve de un vistazo en cuál estás. */
+.fr-dot--activo { width: 18px; background: var(--pl-green); }
+
+/* Angosto: el pie de un mapa chico no entra con los tres botones, el badge,
+   dos renglones de texto y los puntos. Se van los puntos —el badge y las
+   flechas ya dicen dónde estás— y el pie deja de flotar para no tapar
+   medio mapa. */
+@media (max-width: 560px) {
+  .fr-pie {
+    position: static;
+    margin-top: 10px;
+    padding: 10px 12px;
+    gap: 8px;
+    box-shadow: none;
+    border: 1px solid var(--pl-border);
+  }
+  .fr-dots { display: none; }
+  .fr-puesto { flex: 0 0 30px; width: 30px; height: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-nav, .fr-dot { transition: none; }
+  .fr-foco {
+    transform: none;
+    transition: opacity 120ms linear, visibility 0s linear 120ms;
+  }
+  .fr-foco--activo { transform: none; }
+  .fr-dot { transition: none; }
+}

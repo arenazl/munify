@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, LogIn, Wrench } from 'lucide-react';
-import { MunifyMark } from '../components/ui/MunifyMark';
+import { BrandMark } from '../brands/BrandMark';
+import { BRAND } from '../brands';
 import { useAuth } from '../contexts/AuthContext';
+import { capturarTokenDeUrl, queryToken } from '../utils/demoAcceso';
 import { getDefaultRouteForUser } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
 import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
@@ -202,7 +204,11 @@ export default function Landing() {
 
     // Cargar usuarios demo desde la API
     try {
-      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/demo-users`);
+      // La llave viaja en el pedido: sin ella el backend no lista perfiles
+      // (la botonera ES el acceso, ver _demo_acceso_ok en el backend).
+      const acc = capturarTokenDeUrl(municipio.codigo);
+      const q = acc ? `?t=${encodeURIComponent(acc)}` : '';
+      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/demo-users${q}`);
       if (response.ok) {
         const users = await response.json();
         setDemoUsers(users);
@@ -213,7 +219,7 @@ export default function Landing() {
 
     // Cargar usuarios de dependencias desde la API
     try {
-      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/dependencia-users`);
+      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/dependencia-users${queryToken(municipio.codigo)}`);
       if (response.ok) {
         const users = await response.json();
         setDependenciaUsers(users);
@@ -303,12 +309,12 @@ export default function Landing() {
         <header className="px-3 sm:px-6 py-4 sm:py-6">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              {/* Logo OFICIAL de Munify sobre navy de marca — nunca un icono generico */}
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: '#103070', boxShadow: '0 10px 25px -5px rgba(64,112,192,0.45)' }}>
-                <MunifyMark size={22} />
-              </div>
+              {/* Logo OFICIAL de la marca, SIEMPRE suelto — jamás adentro de un
+                  tile con fill (regla del dueño 2026-07-31: el recuadro pintado
+                  aplasta el logo "en ningun caso va"). */}
+              <BrandMark size={44} className="flex-shrink-0" />
               <div className="min-w-0">
-                <h1 className="font-bold text-white text-base sm:text-xl truncate">Munify</h1>
+                <h1 className="font-bold text-white text-base sm:text-xl truncate">{BRAND.name}</h1>
                 <p className="text-[10px] sm:text-xs text-slate-400 truncate">Gestión municipal integral</p>
               </div>
             </div>

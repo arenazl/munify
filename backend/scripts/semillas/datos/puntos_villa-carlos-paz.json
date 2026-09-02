@@ -1,0 +1,116 @@
+{
+ "municipio": "Villa Carlos Paz",
+ "pedidos": 8,
+ "resueltos": 8,
+ "llamadas_nominatim": 11,
+ "areas": [
+  {
+   "nombre": "Villa Carlos Paz",
+   "puntos_del_anillo": 48
+  }
+ ],
+ "nucleo_urbano": [
+  -31.4183774,
+  -64.4936985
+ ],
+ "puntos": [
+  {
+   "lat": -31.428911,
+   "lon": -64.489597,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Sendero de la Cruz",
+   "calle": "Sendero de la Cruz",
+   "altura": null,
+   "barrio": "Domingo Faustino Sarmiento",
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.414356,
+   "lon": -64.512745,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Lima",
+   "calle": "Lima",
+   "altura": null,
+   "barrio": "La Quinta 1°",
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.422702,
+   "lon": -64.509812,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "José Hernandez",
+   "calle": "José Hernandez",
+   "altura": null,
+   "barrio": "Los Manantiales",
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.426994,
+   "lon": -64.497407,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Tupungato 310",
+   "calle": "Tupungato",
+   "altura": "310",
+   "barrio": "Manuel Belgrano",
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.414866,
+   "lon": -64.497707,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Avenida Uruguay",
+   "calle": "Avenida Uruguay",
+   "altura": null,
+   "barrio": "Villa Suiza",
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.438749,
+   "lon": -64.488346,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Florencio Sánchez",
+   "calle": "Florencio Sánchez",
+   "altura": null,
+   "barrio": null,
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.421579,
+   "lon": -64.469013,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Troncal",
+   "calle": "Troncal",
+   "altura": null,
+   "barrio": "Country Tierralta",
+   "ciudad": "Villa San Nicolás",
+   "fuente": "nominatim"
+  },
+  {
+   "lat": -31.416367,
+   "lon": -64.479159,
+   "zona_nombre": "Villa Carlos Paz",
+   "zona_id": null,
+   "direccion": "Los Cerros",
+   "calle": "Los Cerros",
+   "altura": null,
+   "barrio": "La Cuesta",
+   "ciudad": "Villa Carlos Paz",
+   "fuente": "nominatim"
+  }
+ ],
+ "fuente": "OpenStreetMap / Nominatim -- ODbL",
+ "fuente_area": "circulo APROXIMADO de 2.5 km (NO es un limite oficial)"
+}

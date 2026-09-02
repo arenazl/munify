@@ -37,6 +37,13 @@ async def listar_categorias_reclamo(
 ):
     """Lista las categorías de reclamo del municipio actual.
     En modo Global (superadmin sin muni) devuelve [] sin 400.
+
+    Catálogo único (OT + reclamos): las categorías `interna=True` (Preventivo,
+    Mantenimiento, Obra) clasifican trabajo del municipio pero NO se le ofrecen
+    al vecino. Este endpoint es de doble uso — lo consume el ABM de admin y el
+    formulario del vecino logueado — así que bifurca por rol: el VECINO recibe
+    solo las públicas; gestión (admin/supervisor/empleado) las ve todas, que es
+    lo que necesita el Sheet de la OT para clasificar trabajo interno.
     """
     municipio_id = resolve_municipio_id(request, current_user)
     if not municipio_id:
@@ -45,12 +52,36 @@ async def listar_categorias_reclamo(
     query = select(CategoriaReclamo).where(
         CategoriaReclamo.municipio_id == municipio_id
     )
+    if current_user.rol == RolUsuario.VECINO:
+        query = query.where(CategoriaReclamo.interna == False)  # noqa: E712
     if activo is not None:
         query = query.where(CategoriaReclamo.activo == activo)
     query = query.order_by(CategoriaReclamo.orden, CategoriaReclamo.nombre)
 
     result = await db.execute(query)
-    return result.scalars().all()
+    categorias = result.scalars().all()
+
+    # Uso de cada categoría (cuántos reclamos la referencian). UNA sola query
+    # agrupada para todas, no una por fila: con 17 categorías, la versión
+    # ingenua son 17 viajes a una base que está en otro continente.
+    #
+    # Lo consume la pantalla de Configuración: es lo que dice si una categoría
+    # se puede borrar y cuál concentra el trabajo. Sin este dato, la pantalla
+    # muestra "—" en vez de estimar (un número inventado ahí termina en
+    # alguien borrando algo que sí se usaba).
+    if categorias:
+        conteo = await db.execute(
+            select(Reclamo.categoria_id, func.count(Reclamo.id))
+            .where(Reclamo.categoria_id.in_([c.id for c in categorias]))
+            .group_by(Reclamo.categoria_id)
+        )
+        usos = dict(conteo.all())
+        for cat in categorias:
+            # Atributo suelto: el schema lo lee con from_attributes y el modelo
+            # no necesita una columna que no existe en la base.
+            cat.en_uso = usos.get(cat.id, 0)
+
+    return categorias
 
 
 @router.get("/{categoria_id}", response_model=CategoriaReclamoResponse)
@@ -105,6 +136,7 @@ async def crear_categoria_reclamo(
         tiempo_resolucion_estimado=data.tiempo_resolucion_estimado,
         prioridad_default=data.prioridad_default,
         orden=data.orden,
+        interna=data.interna,
         activo=True,
     )
     db.add(nueva)

@@ -210,7 +210,7 @@ async def notificar_reclamo_recibido(db: AsyncSession, reclamo) -> int:
         user_id=reclamo.creador_id,
         title=titulo,
         body=mensaje,
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "reclamo_recibido", "reclamo_id": reclamo.id}
     )
 
@@ -226,7 +226,7 @@ async def notificar_reclamo_asignado(db: AsyncSession, reclamo, empleado_nombre:
         user_id=reclamo.creador_id,
         title="Reclamo Asignado",
         body=f"Tu reclamo #{reclamo.id} fue asignado a {empleado_nombre}.",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "reclamo_asignado", "reclamo_id": reclamo.id}
     )
 
@@ -256,7 +256,7 @@ async def notificar_cambio_estado(db: AsyncSession, reclamo, estado_anterior: st
         user_id=reclamo.creador_id,
         title=titulo,
         body=mensaje,
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "cambio_estado", "reclamo_id": reclamo.id}
     )
 
@@ -271,8 +271,11 @@ async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
     titulo = "Reclamo Resuelto"
     mensaje = f"Tu reclamo #{reclamo.id} fue finalizado. Calificá la atención recibida."
     # URL a la pantalla de calificación (no al detalle) — el usuario llega
-    # ahí, califica con estrellas + comentario y vuelve.
-    url_calificar = f"/calificar/{reclamo.id}"
+    # ahí, califica con estrellas + comentario y vuelve. El token secreto del
+    # reclamo viaja en ?t= : el endpoint público lo exige (sin él no se puede
+    # leer/escribir la calificación, cierra el IDOR por id enumerable).
+    from core.security import compute_calificacion_token
+    url_calificar = f"/calificar/{reclamo.id}?t={compute_calificacion_token(reclamo.id)}"
 
     # Crear notificación en BD con accion_url explícita
     await crear_notificacion_db(
@@ -306,7 +309,7 @@ async def notificar_nuevo_comentario_vecino(db: AsyncSession, reclamo, comentari
         user_id=reclamo.creador_id,
         title="Nuevo Comentario",
         body=f"Hay un nuevo comentario en tu reclamo #{reclamo.id}.",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "nuevo_comentario", "reclamo_id": reclamo.id}
     )
 
@@ -364,7 +367,7 @@ async def notificar_nuevo_comentario(db: AsyncSession, reclamo, comentario_texto
         user_id=reclamo.creador_id,
         title=f"💬 {titulo}",
         body=mensaje,
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "nuevo_comentario", "reclamo_id": reclamo.id}
     )
 
@@ -380,7 +383,7 @@ async def notificar_asignacion_empleado(db: AsyncSession, empleado_user_id: int,
         user_id=empleado_user_id,
         title="Nueva Asignación",
         body=f"Se te asignó el reclamo #{reclamo.id}: {reclamo.descripcion[:50]}...",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "asignacion_empleado", "reclamo_id": reclamo.id}
     )
 
@@ -396,7 +399,7 @@ async def notificar_comentario_vecino_a_empleado(db: AsyncSession, empleado_user
         user_id=empleado_user_id,
         title="Comentario del Vecino",
         body=f"El vecino comentó en el reclamo #{reclamo.id}.",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "comentario_vecino", "reclamo_id": reclamo.id}
     )
 
@@ -495,7 +498,7 @@ async def notificar_supervisor_reclamo_nuevo(db: AsyncSession, supervisor_user_i
         user_id=supervisor_user_id,
         title="Nuevo Reclamo",
         body=f"Nuevo reclamo #{reclamo.id} pendiente de revisión.",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "reclamo_nuevo_supervisor", "reclamo_id": reclamo.id}
     )
 
@@ -612,7 +615,7 @@ async def notificar_supervisor_pendiente_confirmacion(db: AsyncSession, supervis
         user_id=supervisor_user_id,
         title="Pendiente Confirmación",
         body=f"El reclamo #{reclamo.id} está esperando tu confirmación.",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "pendiente_confirmacion", "reclamo_id": reclamo.id}
     )
 
@@ -635,7 +638,7 @@ async def notificar_sla_vencido(db: AsyncSession, supervisor_user_ids: List[int]
         user_ids=enabled_user_ids,
         title="SLA Vencido",
         body=f"El reclamo #{reclamo.id} ha superado el tiempo de SLA.",
-        url=f"/reclamos/{reclamo.id}",
+        url=f"/gestion/reclamos/{reclamo.id}",
         data={"tipo": "sla_vencido", "reclamo_id": reclamo.id}
     )
 

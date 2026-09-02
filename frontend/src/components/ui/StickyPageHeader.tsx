@@ -3,6 +3,7 @@ import { Search, Plus, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { PrimaryButton } from './PrimaryButton';
+import { useEmbed } from '../abmv2/useEmbed';
 
 interface StickyPageHeaderProps {
   /** Icono del título (ReactNode, ej: <FileText className="h-5 w-5" />) */
@@ -69,6 +70,10 @@ export function StickyPageHeader({
   children,
   onRefresh,
 }: StickyPageHeaderProps) {
+  // Embebida en el panel de Configuración: el contenedor ya puso el título,
+  // y este header es sticky/fixed — flotaría sobre el panel. No se renderiza.
+  const { embedded } = useEmbed();
+
   const { theme } = useTheme();
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -143,7 +148,7 @@ export function StickyPageHeader({
   // Modo custom: si hay children, renderizar como antes
   const useCustomMode = !!children;
 
-  // Usar position sticky - se queda fijo cuando llega al top
+  // Usar position sticky - se queda fijo cuando llega al top (salvo si está embebido)
   return (
     <>
       {/* Pull-to-refresh indicator */}
@@ -170,9 +175,9 @@ export function StickyPageHeader({
         </div>
       )}
 
-      {/* Header sticky - se pega al top cuando scrolleas */}
+      {/* Header - se pega al top cuando scrolleas (salvo si es embebido) */}
       <div
-        className="sticky z-40 top-0 pt-1 pb-3 transition-transform"
+        className={`${embedded ? 'relative' : 'sticky top-0'} z-40 pt-1 pb-3 transition-transform`}
         style={{
           backgroundColor: theme.background,
           transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
@@ -192,8 +197,8 @@ export function StickyPageHeader({
             children
           ) : (
             <>
-              {/* BackLink + Icono + Título - se oculta en mobile cuando search enfocado */}
-              {(backLink || icon || title) && (
+              {/* BackLink + Icono + Título - se oculta en mobile cuando search enfocado y SIEMPRE en modo embebido */}
+              {(!embedded && (backLink || icon || title)) && (
                 <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
                   {backLink && (
                     <Link
@@ -227,8 +232,8 @@ export function StickyPageHeader({
                 </div>
               )}
 
-              {/* Separador - se oculta en mobile */}
-              {(backLink || icon || title) && onSearchChange && (
+              {/* Separador - se oculta en mobile y en embebido */}
+              {(!embedded && (backLink || icon || title)) && onSearchChange && (
                 <div
                   className="h-8 w-px hidden sm:block flex-shrink-0"
                   style={{ backgroundColor: theme.border }}
@@ -481,7 +486,7 @@ export function FilterChipRow({
               {chip.icon && (
                 <span
                   className={`flex-shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5 sm:[&>svg]:h-4 sm:[&>svg]:w-4 ${isLoading ? 'animate-pulse' : ''}`}
-                  style={{ color: isActive ? '#ffffff' : chipColor }}
+                  style={{ color: isActive ? theme.primaryText : chipColor }}
                 >
                   {chip.icon}
                 </span>
@@ -489,14 +494,14 @@ export function FilterChipRow({
               {/* Label solo en desktop */}
               <span
                 className={`hidden sm:inline text-xs font-medium whitespace-nowrap ${isLoading ? 'animate-pulse' : ''}`}
-                style={{ color: isActive ? '#ffffff' : chipColor }}
+                style={{ color: isActive ? theme.primaryText : chipColor }}
               >
                 {chip.label}
               </span>
               {chip.count !== undefined && (
                 <span
                   className={`text-[9px] sm:text-[10px] font-bold ${isLoading ? 'animate-pulse' : ''}`}
-                  style={{ color: isActive ? '#ffffff' : chipColor }}
+                  style={{ color: isActive ? theme.primaryText : chipColor }}
                 >
                   {chip.count}
                 </span>

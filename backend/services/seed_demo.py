@@ -7,12 +7,15 @@ zonas, barrios, empleados, cuadrillas, SLAs, reclamos de ejemplo (con
 coordenadas reales para el mapa) y una solicitud — además de las
 categorías que ya siembra `crear_categorias_default()`.
 """
-from datetime import datetime
+import re
+import unicodedata
+from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
 from core.security import get_password_hash
+from services import geo_ciudad
 from models.user import User
 from models.enums import RolUsuario, EstadoReclamo
 from models.municipio import Municipio
@@ -202,34 +205,201 @@ TRAMITES_DEMO = [
 ]
 
 # ============================================================
-# Zonas (offsets sobre el centro del muni, ~2km de radio)
+# Completitud del catálogo de trámites (regla del dueño: NINGUNA categoría
+# de trámite queda con 0 tipos en la demo)
 # ============================================================
-ZONAS_DEMO = [
-    ("Centro",    "Z-CENTRO",    0.000,  0.000),
-    ("Norte",     "Z-NORTE",    -0.020,  0.000),
-    ("Sur",       "Z-SUR",       0.020,  0.000),
-    ("Este",      "Z-ESTE",      0.000,  0.020),
-    ("Oeste",     "Z-OESTE",     0.000, -0.020),
-    ("Periferia", "Z-PERIFERIA", 0.025,  0.025),
+# Mapeo categoría de trámite → dependencia responsable. Fuente canónica:
+# TIPOS_A_DEPENDENCIAS de scripts/seed_chacabuco_dependencias.py (el "mapeo
+# consciente" tipo de trámite → dependencia), traducido a los nombres default
+# de CATEGORIAS_TRAMITE_DEFAULT (services/categorias_seed.py). Se usa para los
+# trámites de TRAMITES_CATALOGO_EXTRA (los de TRAMITES_DEMO ya traen su
+# dep_codigo curado inline).
+CATEGORIA_TRAMITE_DEP_MAP = {
+    "Tránsito y Transporte": "TRANSITO_VIAL",
+    "Habilitaciones Comerciales": "HABILITACIONES",
+    "Obras Particulares": "OBRAS_PARTICULARES",
+    "Catastro": "CATASTRO",
+    "Tasas y Tributos": "RENTAS",
+    "Salud y Bromatología": "BROMATOLOGIA",
+    # "Espacio Público" → HABILITACIONES en la fuente (permisos de uso).
+    "Espacios Públicos": "HABILITACIONES",
+    # "Documentación Personal" → ATENCION_VECINO en la fuente.
+    "Certificados y Documentación": "ATENCION_VECINO",
+    "Desarrollo Social": "DESARROLLO_SOCIAL",
+    # "Cementerio" → ATENCION_VECINO en la fuente (no hay dep específica).
+    "Cementerios": "ATENCION_VECINO",
+}
+
+# Trámites de completitud: 1 tipo por cada categoría de trámite default que
+# TRAMITES_DEMO no cubre (Catastro, Salud y Bromatología, Espacios Públicos,
+# Certificados y Documentación, Desarrollo Social, Cementerios). Fuentes
+# canónicas: nombre/descripción/tiempo/costo de TRAMITES_CATALOGO de
+# scripts/seed_10_demos.py (el catálogo por categoría del pipeline de demos)
+# y documentos del rubro homólogo en scripts/seed_tramites_sugeridos.py.
+# `solo_catalogo=True` = completan el catálogo pero NO generan solicitudes de
+# ejemplo — el set operativo de la demo sigue curado y acotado (regla 3).
+TRAMITES_CATALOGO_EXTRA = [
+    {
+        "nombre": "Certificado de dominio",
+        "descripcion": "Solicitud de certificado de titularidad de un inmueble en el municipio.",
+        "categoria_tramite_nombre": "Catastro",
+        "tiempo_estimado_dias": 7,
+        "costo": 1500.0,
+        "tipo_pago": "rapipago",
+        "momento_pago": "fin",
+        "modo_atencion": "online",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Partida inmobiliaria", "Número de partida o título de propiedad del inmueble", True),
+        ],
+    },
+    {
+        "nombre": "Carnet de manipulación de alimentos",
+        "descripcion": "Certificado obligatorio para personal de gastronomía y comercios alimenticios.",
+        "categoria_tramite_nombre": "Salud y Bromatología",
+        "tiempo_estimado_dias": 7,
+        "costo": 2500.0,
+        "tipo_pago": "boton_pago",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_con_turno",
+        "duracion_turno_min": 30,
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Análisis clínicos", "Estudios exigidos por el área de bromatología", True),
+        ],
+    },
+    {
+        "nombre": "Permiso de uso de plaza",
+        "descripcion": "Autorización para realizar un evento público en plaza o espacio verde municipal.",
+        "categoria_tramite_nombre": "Espacios Públicos",
+        "tiempo_estimado_dias": 10,
+        "costo": 3000.0,
+        "tipo_pago": "boton_pago",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_sin_turno",
+        "solo_catalogo": True,
+        "documentos": [
+            ("Descripción del evento", "Detalle de la actividad, fecha y horario propuestos", True),
+            ("Seguro de responsabilidad civil", "Póliza que cubra el evento", True),
+        ],
+    },
+    {
+        "nombre": "Certificado de residencia",
+        "descripcion": "Acreditación de domicilio dentro del municipio para trámites administrativos.",
+        "categoria_tramite_nombre": "Certificados y Documentación",
+        "tiempo_estimado_dias": 2,
+        "costo": 500.0,
+        "tipo_pago": "rapipago",
+        "momento_pago": "fin",
+        "modo_atencion": "online",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Servicio a nombre del solicitante", "Factura de un servicio que acredite el domicilio", True),
+        ],
+    },
+    {
+        "nombre": "Tarjeta alimentaria",
+        "descripcion": "Inscripción al programa de asistencia alimentaria para familias en situación vulnerable.",
+        "categoria_tramite_nombre": "Desarrollo Social",
+        "tiempo_estimado_dias": 15,
+        "costo": 0.0,
+        "tipo_pago": None,
+        "momento_pago": None,
+        "modo_atencion": "presencial_sin_turno",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Constancia de AUH o ingresos", "Documentación que respalde la situación socioeconómica", True),
+        ],
+    },
+    {
+        "nombre": "Renovación de bóveda",
+        "descripcion": "Renovación del derecho de uso de bóveda familiar en el cementerio municipal.",
+        "categoria_tramite_nombre": "Cementerios",
+        "tiempo_estimado_dias": 5,
+        "costo": 12000.0,
+        "tipo_pago": "adhesion_debito",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_sin_turno",
+        "solo_catalogo": True,
+        "documentos": [
+            ("DNI del solicitante", "Copia digitalizada del documento nacional de identidad", True),
+            ("Concesión anterior", "Constancia del derecho de uso a renovar", True),
+        ],
+    },
 ]
 
 # ============================================================
-# Barrios (offsets sobre el centro, sin Nominatim)
+# Zonas y barrios: SALEN DE LA CIUDAD, no de una lista
 # ============================================================
-BARRIOS_DEMO = [
-    ("Centro",         0.000,  0.000),
-    ("Villa Norte",   -0.015,  0.002),
-    ("San Martín",    -0.010, -0.008),
-    ("Belgrano",       0.012,  0.005),
-    ("Güemes",         0.008, -0.012),
-    ("Sarmiento",     -0.005,  0.015),
-    ("Rivadavia",      0.003,  0.018),
-    ("Los Álamos",    -0.012, -0.015),
-    ("Las Lomas",      0.018,  0.010),
-    ("Parque",        -0.008,  0.010),
-    ("La Estación",    0.005, -0.005),
-    ("Periferia Sur",  0.022,  0.020),
-]
+# Aca vivian ZONAS_DEMO ("Centro / Norte / Sur / Este / Oeste / Periferia") y
+# BARRIOS_DEMO ("Villa Norte", "Los Alamos", "Periferia Sur"): offsets fijos
+# sobre el centro del municipio. Estan BORRADAS y no vuelven.
+#
+# El dueño creo la demo de Lujan y vio "Centro / Norte / Sur" donde tenian que
+# decir Ameghino, Open Door, Jauregui, Lezica y Torrezuri. Son puntos cardinales
+# inventados presentados como los barrios de la ciudad del cliente --- justo lo
+# que la regla 11 prohibe, y justo lo que esta demo tiene que vender.
+#
+# Ahora la geografia sale de `services/geo_ciudad.py`: poligono real del
+# municipio (tabla `municipios_catalogo`) + UNA consulta a Overpass cacheada. Si
+# OSM no tiene barrios para esa ciudad, las zonas toman el nombre de sus calles
+# principales REALES; si no tiene ni eso, el municipio queda SIN zonas y el alta
+# lo informa. Nunca mas un nombre inventado.
+
+# Cuantos puntos geolocalizados se le piden a la ciudad. Es un PARAMETRO, no un
+# numero atado al volumen de reclamos: cuando la semilla suba de 13 a 50 casos
+# alcanza con subir esto, y aunque quede corto no rompe nada --- el consumidor
+# recorre la lista con modulo, solo se repiten calles.
+# 140 = 50 reclamos + 50 solicitudes + el domicilio de los vecinos, con margen
+# para que las direcciones NO se repitan salvo en los focos deliberados.
+PUNTOS_GEO = 140
+
+
+# ============================================================
+# LA DEMO SON TRES MESES DE VIDA MUNICIPAL
+# ============================================================
+# Regla del dueño: "50 reclamos, 50 trámites y 50 cobros o pagos repartidos en
+# tres meses hacia atrás; esa es la única parte estática. Cómo se resuelve cada
+# caso se genera con cierta aleatoriedad para que ninguna demo sea igual."
+#
+# El VOLUMEN y la VENTANA son parámetros (abajo). Los CIRCUITOS —quién asignó,
+# si hubo cuadrilla, si el vecino disputó el cierre— se sortean con una semilla
+# que mezcla el código del municipio con su id, así dos demos de la MISMA ciudad
+# salen distintas. Lo que NO se toca es la geografía: `geo_ciudad` siembra con el
+# slug del nombre, o sea que las zonas, los barrios y las coordenadas de Luján
+# son siempre las mismas, se cree la demo las veces que se cree.
+VENTANA_DIAS = 90
+OBJETIVO_RECLAMOS = 50
+OBJETIVO_SOLICITUDES = 50
+# Movimientos de plata (los "50 cobros o pagos"): 44 gastos históricos + 6 pagos
+# programados. El reparto lo consume `seed_demo_tesoreria`. Se eligió 44/6 —y no
+# 25/25— porque un pago programado es una REGLA que se repite todos los meses
+# (sueldo, presentismo): con 25 la pantalla de Pagos Programados quedaría con más
+# reglas que empleados tiene el municipio demo, mientras que el gasto es el hecho
+# puntual y es el que llena la historia de los tres meses.
+OBJETIVO_GASTOS = 44
+OBJETIVO_PAGOS_PROGRAMADOS = 6
+
+# Densidad: exponente de la curva índice→antigüedad. >1 concentra los casos en
+# las semanas recientes (una bandeja con trabajo de esta semana, no un archivo
+# muerto) sin dejar huecos: con 50 casos en 90 días el salto más grande entre
+# dos consecutivos es de ~3 días.
+CURVA_DENSIDAD = 1.55
+
+# Cuántos reclamos comparten cada esquina recurrente. Regla del dueño: toda demo
+# nace con RECURRENCIA real, para que el mapa de focos ("Dónde se repiten los
+# reclamos", que agrupa por dirección con mínimo 2) tenga recorrido desde el día
+# uno. El resto de los reclamos cae en un punto propio.
+FOCOS_DEMO = (4, 3, 2)
+
+# Reparto de la actividad entre los tres vecinos demo. Despareja a propósito:
+# en un municipio real hay un vecino que reclama por todo y otros dos que
+# aparecen de vez en cuando.
+VECINOS_REPARTO = (0.50, 0.30, 0.20)
 
 # ============================================================
 # Empleados demo
@@ -243,6 +413,12 @@ EMPLEADOS_DEMO = [
     ("Pedro",   "Sánchez",   "+5491155550005", "operario",       "Señalización vial",       "Tránsito y señalización",      "Este"),
     ("Laura",   "Torres",    "+5491155550006", "administrativo", "Habilitaciones",          None,                           None),
     ("Ana",     "Ruiz",      "+5491155550007", "administrativo", "Atención al vecino",      None,                           None),
+    # Con 50 reclamos repartidos en 9 categorías, los 5 operarios de arriba
+    # dejaban Agua y cloacas y Zoonosis SIN nadie a cargo: el reclamo caía en el
+    # round-robin y lo terminaba ejecutando el electricista. Estos dos cierran la
+    # cobertura de las categorías que la demo usa.
+    ("Sergio",  "Medina",    "+5491155550008", "operario",       "Redes de agua y cloacas", "Agua y cloacas",               None),
+    ("Diego",   "Vera",      "+5491155550009", "operario",       "Zoonosis y plagas",       "Animales sueltos",             None),
 ]
 
 # ============================================================
@@ -254,6 +430,7 @@ CUADRILLAS_DEMO = [
     ("Cuadrilla Bacheo",    "Equipo de reparación de baches y pavimento",   "Bacheo y calles",            "Sur",   0, 2),
     ("Cuadrilla Alumbrado", "Equipo de mantenimiento eléctrico",            "Alumbrado público",          "Norte", 1, 4),
     ("Cuadrilla Poda",      "Equipo de poda y mantenimiento de espacios verdes", "Arbolado y espacios verdes", "Oeste", 3, 2),
+    ("Cuadrilla Zoonosis",  "Equipo de control animal y plagas",             "Animales sueltos",           "Este",  8, 7),
 ]
 
 # ============================================================
@@ -277,212 +454,451 @@ SLA_CONFIGS_DEMO = [
 # reclamo insignia que más se muestra en las demos.
 # (titulo, descripcion, categoria_nombre, estado, direccion,
 #  dep_codigo, zona_nombre, barrio_nombre, lat_offset, lng_offset, historial)
-RECLAMOS_DEMO = [
-    # --- Servicios Públicos (4 — alumbrado x3 + residuos x1) ---
-    {
-        "titulo": "Luminaria quemada en Plaza Central",
-        "descripcion": "La luminaria de la esquina noroeste de la plaza central lleva una semana sin funcionar. La zona queda muy oscura de noche.",
-        "categoria_nombre": "Alumbrado público",
-        "estado": EstadoReclamo.EN_CURSO,
-        "direccion": "Plaza Central, esquina noroeste",
-        "dependencia_codigo": "SERVICIOS_PUBLICOS",
-        "zona_nombre": "Centro",
-        "barrio_nombre": "Centro",
-        "lat_offset": 0.002,
-        "lng_offset": 0.001,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Asignado a Carlos Gómez (Cuadrilla Alumbrado). Se envió cuadrilla de mantenimiento."},
-        ],
-    },
-    {
-        "titulo": "Falta de alumbrado en Villa Norte",
-        "descripcion": "Toda la cuadra de Villa Norte está sin luz desde hace varios días, los vecinos piden recorrida urgente.",
-        "categoria_nombre": "Alumbrado público",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Calle Güemes al 400, Villa Norte",
-        "dependencia_codigo": "SERVICIOS_PUBLICOS",
-        "zona_nombre": "Norte",
-        "barrio_nombre": "Villa Norte",
-        "lat_offset": -0.018,
-        "lng_offset": 0.003,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Poste de luz caído tras la tormenta",
-        "descripcion": "Un poste de alumbrado quedó caído sobre la vereda después de la tormenta de anoche. Riesgo para los peatones.",
-        "categoria_nombre": "Alumbrado público",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Sarmiento y Los Álamos",
-        "dependencia_codigo": "SERVICIOS_PUBLICOS",
-        "zona_nombre": "Oeste",
-        "barrio_nombre": "Los Álamos",
-        "lat_offset": -0.014,
-        "lng_offset": -0.017,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Basura acumulada en esquina",
-        "descripcion": "Hace tres días que no pasa el recolector por la esquina de Mitre y Belgrano. La basura se está acumulando.",
-        "categoria_nombre": "Recolección de residuos",
-        "estado": EstadoReclamo.FINALIZADO,
-        "direccion": "Mitre y Belgrano",
-        "dependencia_codigo": "SERVICIOS_PUBLICOS",
-        "zona_nombre": "Norte",
-        "barrio_nombre": "Belgrano",
-        "lat_offset": -0.012,
-        "lng_offset": 0.008,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Se coordinó con el servicio de recolección"},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO, "comentario": "Recolección normalizada en la zona"},
-        ],
-    },
-    # --- Obras Públicas (3) ---
-    {
-        "titulo": "Bache peligroso en Av. San Martín",
-        "descripcion": "Hay un bache de gran tamaño en Av. San Martín al 800 que representa un riesgo para los vehículos y peatones.",
-        "categoria_nombre": "Bacheo y calles",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Av. San Martín 800",
-        "dependencia_codigo": "OBRAS_PUBLICAS",
-        "zona_nombre": "Sur",
-        "barrio_nombre": "San Martín",
-        "lat_offset": 0.015,
-        "lng_offset": -0.010,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Vereda hundida por raíces",
-        "descripcion": "Las raíces de un árbol levantaron las baldosas de la vereda, varios vecinos ya tropezaron.",
-        "categoria_nombre": "Bacheo y calles",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Güemes al 250",
-        "dependencia_codigo": "OBRAS_PUBLICAS",
-        "zona_nombre": "Este",
-        "barrio_nombre": "Güemes",
-        "lat_offset": 0.007,
-        "lng_offset": -0.011,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Zanja sin señalizar tras arreglo de cañería",
-        "descripcion": "Quedó una zanja abierta después de un arreglo de agua y no tiene ningún vallado ni cinta de precaución.",
-        "categoria_nombre": "Bacheo y calles",
-        "estado": EstadoReclamo.EN_CURSO,
-        "direccion": "Rivadavia y Belgrano",
-        "dependencia_codigo": "OBRAS_PUBLICAS",
-        "zona_nombre": "Periferia",
-        "barrio_nombre": "Las Lomas",
-        "lat_offset": 0.021,
-        "lng_offset": 0.012,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Cuadrilla de bacheo asignada para vallar y reparar."},
-        ],
-    },
-    # --- Tránsito y Vialidad (3) ---
-    {
-        "titulo": "Semáforo intermitente en Rivadavia y Sarmiento",
-        "descripcion": "El semáforo de la intersección Rivadavia y Sarmiento está en modo intermitente desde ayer a la tarde.",
-        "categoria_nombre": "Tránsito y señalización",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Rivadavia y Sarmiento",
-        "dependencia_codigo": "TRANSITO_VIAL",
-        "zona_nombre": "Este",
-        "barrio_nombre": "Rivadavia",
-        "lat_offset": 0.005,
-        "lng_offset": 0.018,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Falta de señalización en cruce escolar",
-        "descripcion": "El cruce peatonal frente a la escuela no tiene demarcación horizontal ni cartel de reductor de velocidad.",
-        "categoria_nombre": "Tránsito y señalización",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "La Estación y Belgrano",
-        "dependencia_codigo": "TRANSITO_VIAL",
-        "zona_nombre": "Centro",
-        "barrio_nombre": "La Estación",
-        "lat_offset": 0.004,
-        "lng_offset": -0.004,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Cartel de PARE caído en Belgrano y Mitre",
-        "descripcion": "El cartel de PARE de la esquina está tirado en el pasto desde el fin de semana, la esquina quedó sin señalización.",
-        "categoria_nombre": "Tránsito y señalización",
-        "estado": EstadoReclamo.EN_CURSO,
-        "direccion": "Belgrano y Mitre",
-        "dependencia_codigo": "TRANSITO_VIAL",
-        "zona_nombre": "Norte",
-        "barrio_nombre": "Belgrano",
-        "lat_offset": -0.011,
-        "lng_offset": 0.006,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Cuadrilla de señalización notificada para reposición."},
-        ],
-    },
-    # --- Zoonosis (3) ---
-    {
-        "titulo": "Perros sueltos en Plaza Central",
-        "descripcion": "Una jauría de perros sueltos anda por la plaza central, ya hubo un intento de mordedura a un chico.",
-        "categoria_nombre": "Animales sueltos",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Plaza Central",
-        "dependencia_codigo": "ZOONOSIS",
-        "zona_nombre": "Centro",
-        "barrio_nombre": "Centro",
-        "lat_offset": 0.001,
-        "lng_offset": 0.002,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Enjambre de avispas en plaza del barrio",
-        "descripcion": "Hay un panal de avispas en un árbol de la plaza del barrio, varios vecinos ya fueron picados.",
-        "categoria_nombre": "Plagas y control",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Plaza de Los Álamos",
-        "dependencia_codigo": "ZOONOSIS",
-        "zona_nombre": "Oeste",
-        "barrio_nombre": "Los Álamos",
-        "lat_offset": -0.013,
-        "lng_offset": -0.014,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
-    {
-        "titulo": "Perro atropellado necesita atención veterinaria",
-        "descripcion": "Un perro sin dueño aparente fue atropellado y está herido sobre la vereda, necesita asistencia urgente.",
-        "categoria_nombre": "Animales sueltos",
-        "estado": EstadoReclamo.EN_CURSO,
-        "direccion": "Parque Municipal",
-        "dependencia_codigo": "ZOONOSIS",
-        "zona_nombre": "Sur",
-        "barrio_nombre": "Parque",
-        "lat_offset": 0.011,
-        "lng_offset": 0.009,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Se coordinó traslado con la veterinaria municipal."},
-        ],
-    },
+# Munify NO cobra tasas (decisión del dueño, 2026-08-29). Las demos ya no
+# siembran partidas ni deudas: mostraban al vecino boletas para pagar de un
+# circuito que el producto no ofrece, y eso confunde en una demostración.
+# El código de la siembra queda intacto abajo, gobernado por esta constante:
+# si el producto vuelve a cubrir tasas, se prende acá y vuelve entero.
+SEMBRAR_TASAS = False
+
+
+def _punto_con_focos(i: int) -> int:
+    """Regla del dueño: toda demo nace con RECURRENCIA real. Los primeros
+    reclamos se apilan en tres esquinas (4 + 3 + 2, ver FOCOS_DEMO) para que el
+    mapa de focos ("Dónde se repiten los reclamos" agrupa por dirección, mínimo
+    2) tenga recorrido desde el día uno; el resto se dispersa en puntos propios.
+    """
+    acumulado = 0
+    for foco, cuantos in enumerate(FOCOS_DEMO):
+        if i < acumulado + cuantos:
+            return foco
+        acumulado += cuantos
+    return i - acumulado + len(FOCOS_DEMO)
+
+
+def rng_circuitos(codigo: str, municipio_id: int):
+    """La ALEATORIEDAD ACOTADA de los circuitos, y SOLO de los circuitos.
+
+    La semilla mezcla el código del municipio con su `id` —que es distinto en
+    cada alta, aunque sea la misma ciudad—, así dos demos de Luján creadas el
+    mismo día no muestran la misma bandeja: cambian las proporciones de
+    resueltos/disputados/pospuestos y a quién le tocó cada caso.
+
+    Lo que NO pasa por acá es la GEOGRAFÍA: `geo_ciudad.armar()` siembra con el
+    slug del nombre de la ciudad y sigue siendo idéntica entre altas — las zonas,
+    los barrios y las coordenadas de Luján son las de Luján siempre. Si un
+    vendedor muestra la demo dos veces, no se le mueve el mapa abajo de los pies;
+    lo que cambia es la historia.
+    """
+    import random as _random
+    return _random.Random(f"{codigo}:{municipio_id}")
+
+
+def _dias_atras(i: int, total: int) -> int:
+    """Antigüedad del caso `i` de `total`, dentro de la ventana de 3 meses.
+
+    Curva, no reparto parejo: `frac ** CURVA_DENSIDAD` amontona los casos en las
+    semanas recientes (la mitad cae en el último mes) y estira los viejos, que es
+    como se ve una bandeja de verdad. El índice 0 es HOY y el último es el borde
+    de los 90 días; entre dos consecutivos nunca hay más de ~3 días, así que la
+    tendencia mensual no muestra semanas en blanco.
+    """
+    frac = (i + 0.5) / max(total, 1)
+    dias = int(round(VENTANA_DIAS * (frac ** CURVA_DENSIDAD)))
+    return max(0, min(VENTANA_DIAS - 1, dias))
+
+
+def _fecha_historica(i: int, total: int, rnd=None) -> datetime:
+    """`created_at` del caso `i`: su antigüedad por la curva, a una hora hábil.
+
+    Regla del dueño: sin componente histórico no es una demo funcional. La hora
+    sale del índice (o del sorteo, si hay rnd) dentro de la franja 07-19: un
+    reclamo cargado a las 3 de la mañana delata la semilla tanto como uno de
+    medianoche.
+    """
+    dias = _dias_atras(i, total)
+    hora = rnd.randint(7, 19) if rnd else 7 + (i * 5) % 13
+    minuto = rnd.randint(0, 59) if rnd else (i * 17) % 60
+    fecha = (datetime.utcnow() - timedelta(days=dias)).replace(
+        hour=hora, minute=minuto, second=0, microsecond=0)
+    # Nunca futura: con dias=0 la hora hábil puede caer más tarde que el momento
+    # real en que se está creando la demo.
+    return min(fecha, datetime.utcnow() - timedelta(minutes=20))
+
+
+def _mezcla(objetivo: int, base: list[tuple], rnd) -> dict:
+    """Cuántos casos lleva cada circuito, con jitter acotado.
+
+    `base` son (clave, peso, madurez). Si las cantidades fueran fijas, dos demos
+    de la misma ciudad tendrían EXACTAMENTE la misma bandeja y la aleatoriedad
+    sería decorativa; si fueran libres, una demo podría salir sin un solo reclamo
+    resuelto. Se mueve ±2 sobre el peso base y se corrige el redondeo contra los
+    circuitos más grandes, así el total siempre da `objetivo` y ningún circuito
+    desaparece.
+    """
+    cuentas = {clave: max(1, peso + rnd.randint(-2, 2)) for clave, peso, _m in base}
+    orden = [clave for clave, _p, _m in sorted(base, key=lambda b: -b[1])]
+    while sum(cuentas.values()) != objetivo:
+        delta = 1 if sum(cuentas.values()) < objetivo else -1
+        for clave in orden:
+            if sum(cuentas.values()) == objetivo:
+                break
+            if delta < 0 and cuentas[clave] <= 1:
+                continue
+            cuentas[clave] += delta
+    return cuentas
+
+
+def _circuitos_por_antiguedad(cuentas: dict, base: list[tuple], rnd) -> list:
+    """Ordena las instancias de circuito de la más RECIENTE a la más vieja.
+
+    Cada circuito tiene una `madurez` (0 = recién entrado, 1 = caso viejo). Un
+    reclamo resuelto con orden de trabajo y calificación del vecino no puede ser
+    de anteayer, y uno sin asignar tampoco puede llevar tres meses en la cola. Se
+    ordena por madurez con un ruido de ±0,18 para que igual haya casos que
+    rompan la regla: el que se resolvió en el día y el que se está arrastrando.
+    """
+    madurez = {clave: m for clave, _p, m in base}
+    instancias = []
+    for clave, n in cuentas.items():
+        for _ in range(n):
+            instancias.append((madurez[clave] + rnd.uniform(-0.18, 0.18), clave))
+    instancias.sort(key=lambda x: x[0])
+    return [clave for _score, clave in instancias]
+
+
+# ============================================================
+# Historia de TRÁMITES y TURNOS (misma regla que _fecha_historica)
+# ============================================================
+# Regla del dueño: "los demos tienen que parecer apps en funcionamiento".
+# Una solicitud que nace y se cierra en el mismo segundo delata la semilla
+# (el KPI de tiempo de resolución da 0 y la bandeja no tiene pasado), igual
+# que un turno vencido que sigue en "reservado". Todo lo de abajo se deriva
+# del ÍNDICE — determinístico, sin randoms, reproducible entre demos.
+
+# Días que tarda cada FAMILIA de trámite, de mínimo a máximo. Las claves se
+# buscan dentro del nombre normalizado, así el mapeo sobrevive a que se
+# sumen trámites nuevos al catálogo (el que no matchea cae al default).
+DURACION_TRAMITE_DIAS = [
+    (("habilitacion",), (12, 20)),   # inspección de rubro + verificación
+    (("obra",), (5, 10)),            # visado de planos
+    (("licencia",), (1, 3)),         # psicofísico y entrega
+    (("libre deuda",), (0, 0)),      # se emite en el mostrador, mismo día
+    (("plan de pago",), (1, 2)),
+]
+DURACION_TRAMITE_DEFAULT = (2, 5)
+
+
+def _hora_mostrador(i: int) -> tuple:
+    """Hora de atención al público (08 a 13). Que todas las solicitudes de
+    la demo tengan la misma hora — o peor, medianoche — es lo primero que
+    se nota al abrir la bandeja ordenada por fecha."""
+    return 8 + (i * 5) % 6, (i * 17) % 60
+
+
+def _duracion_tramite_dias(nombre: str, i: int) -> int:
+    """Días que tarda ESE tipo de trámite en resolverse. Dos solicitudes del
+    mismo trámite no tardan igual, pero una habilitación comercial siempre
+    tarda más que un libre deuda: el ranking por tipo se sostiene."""
+    nom = _sin_tildes(nombre or "").lower()
+    lo, hi = DURACION_TRAMITE_DEFAULT
+    for claves, rango in DURACION_TRAMITE_DIAS:
+        if any(c in nom for c in claves):
+            lo, hi = rango
+            break
+    return lo + (i % (hi - lo + 1))
+
+
+def _fecha_solicitud(i: int, total: int, rnd=None) -> datetime:
+    """created_at de una solicitud: misma curva de densidad que los reclamos,
+    pero en HORARIO DE MOSTRADOR (08 a 13).
+
+    Que el orden por antigüedad se corresponda con el estado —las cerradas
+    viejas, las abiertas de esta semana— ya no lo decide esta función: lo decide
+    `_circuitos_por_antiguedad`, que reparte los circuitos sobre estas fechas.
+    """
+    dias = _dias_atras(i, total)
+    if rnd:
+        hh, mm = rnd.randint(8, 13), rnd.randint(0, 59)
+    else:
+        hh, mm = _hora_mostrador(i)
+    fecha = (datetime.utcnow() - timedelta(days=dias)).replace(
+        hour=hh, minute=mm, second=0, microsecond=0)
+    # Nunca futura: con dias=0 la hora de mostrador puede caer más tarde que
+    # el momento real de la creación de la demo.
+    return min(fecha, datetime.utcnow() - timedelta(hours=1))
+
+
+def _fecha_resolucion_solicitud(creado: datetime, nombre_tramite: str, i: int) -> datetime:
+    """Cierre = creación + la duración del TIPO de trámite. Nunca futura y
+    nunca igual a la creación (el libre deuda cierra el mismo día, pero unas
+    horas después: es un mostrador, no un batch)."""
+    dias = _duracion_tramite_dias(nombre_tramite, i)
+    resol = (creado + timedelta(days=dias)).replace(
+        hour=9 + (i * 3) % 5, minute=(i * 23) % 60, second=0, microsecond=0)
+    if resol <= creado:
+        resol = creado + timedelta(hours=1 + i % 3)
+    return min(resol, datetime.utcnow() - timedelta(hours=1))
+
+
+# Mix de una agenda REAL: la mayoría de los turnos se cumple, algunos faltan
+# y alguno se cancela. 8 cumplidos / 2 ausentes / 1 cancelado por cada 11,
+# repartidos por índice (no al azar) para que los KPIs de la agenda den
+# siempre lo mismo en todas las demos.
+_CICLO_TURNO_PASADO = (
+    "cumplido", "cumplido", "ausente", "cumplido", "cumplido", "cancelado",
+    "cumplido", "cumplido", "ausente", "cumplido", "cumplido",
+)
+
+
+def _estado_turno_pasado(i: int) -> str:
+    """Estado con el que se cierra un turno cuya fecha ya pasó. NINGÚN turno
+    vencido puede quedar en 'reservado' — es el síntoma más visible de que
+    la data es sintética."""
+    return _CICLO_TURNO_PASADO[i % len(_CICLO_TURNO_PASADO)]
+
+
+# Devoluciones de vecinos sobre reclamos cerrados. Cortas y con matices
+# (no todas elogiosas), como las de una app en uso.
+COMENTARIOS_CALIFICACION = [
+    "Vinieron al otro día y lo dejaron impecable.",
+    "Tardaron un poco pero lo resolvieron bien.",
+    "Muy buen trato de la cuadrilla, muy amables.",
+    "Se solucionó, aunque nadie avisó cuándo iban a venir.",
+    "Rápido y prolijo, se nota el trabajo.",
+    "Lo arreglaron, pero hubo que insistir por teléfono.",
+    "Quedó bien resuelto, gracias por el seguimiento.",
+    "Conforme con el resultado, ojalá siempre sea así.",
+]
+
+
+# ============================================================
+# EL CATÁLOGO DE RECLAMOS: qué le pasa a la gente en una ciudad
+# ============================================================
+# Antes había 13 reclamos escritos a mano, cada uno con su dirección y su
+# historial fijo. Con 50 casos eso no escala y, peor, esas direcciones eran
+# inventadas ("Villa Norte", "Los Álamos"): la ubicación REAL sale de
+# `geo_ciudad`, así que acá queda SOLO el asunto — el qué pasó, no el dónde.
+#
+# 6 asuntos por cada una de las 9 categorías que la demo opera (la décima,
+# Ruidos y convivencia, depende de Seguridad, que no es una dependencia activa y
+# por lo tanto no tiene supervisor que gestione: un reclamo ahí quedaría sin
+# nadie que lo cierre, y eso es peor que no tenerlo).
+RECLAMOS_CATALOGO = {
+    "Alumbrado público": [
+        ("Luminaria quemada en la esquina", "La luz de la esquina lleva más de una semana sin funcionar y de noche no se ve nada."),
+        ("Media cuadra sin alumbrado", "Desde la última tormenta quedaron cuatro luminarias apagadas seguidas. Los vecinos evitan pasar de noche."),
+        ("Poste de luz caído sobre la vereda", "El poste quedó tumbado después del temporal y los cables están al alcance de la mano."),
+        ("Luminaria que prende y apaga toda la noche", "La luz titila sin parar desde hace días; además del molestar, deja la cuadra a oscuras a ratos."),
+        ("Plaza a oscuras desde hace dos semanas", "Los reflectores de la plaza no encienden y los chicos no pueden usar los juegos a la tarde."),
+        ("Cables sueltos colgando del poste", "Hay cables sueltos a menos de dos metros del piso. Con lluvia es un peligro concreto."),
+    ],
+    "Bacheo y calles": [
+        ("Bache profundo en el medio de la calzada", "El pozo tiene casi medio metro y ya reventó la goma de dos autos esta semana."),
+        ("Vereda hundida por raíces", "Las raíces de un árbol levantaron las baldosas y varios vecinos ya tropezaron."),
+        ("Zanja sin señalizar tras arreglo de cañería", "Quedó una zanja abierta después del arreglo de agua, sin vallado ni cinta de precaución."),
+        ("Badén roto que hace saltar a los autos", "El badén se partió al medio y los autos lo cruzan a los saltos a cualquier hora."),
+        ("Calle de tierra intransitable después de la lluvia", "Con cada lluvia la cuadra queda hecha un barrial y no entra ni la ambulancia."),
+        ("Cordón cuneta destruido", "El cordón está partido en varios tramos y el agua se mete a los terrenos."),
+    ],
+    "Recolección de residuos": [
+        ("El camión no pasa hace tres días", "Hace tres días que no pasa el recolector y la basura se está acumulando en la esquina."),
+        ("Contenedor desbordado", "El contenedor está desbordado y las bolsas terminan en la calle."),
+        ("Basural clandestino en el terreno baldío", "Están tirando escombros y restos de poda en el baldío de la esquina."),
+        ("Contenedor roto y volcado", "El contenedor quedó volcado y con la tapa arrancada; los perros desparraman todo."),
+        ("Restos de poda sin retirar hace dos semanas", "Los vecinos podaron y las ramas siguen apiladas en la vereda, tapando el paso."),
+        ("Recolección que pasa de madrugada y saltea cuadras", "El camión pasa a las 4 de la mañana y hay cuadras que directamente no hace."),
+    ],
+    "Higiene urbana": [
+        ("Desagüe pluvial tapado", "La boca de tormenta está tapada con hojas y tierra; con cualquier lluvia se inunda la esquina."),
+        ("Falta barrido en la zona comercial", "Hace semanas que no barren la cuadra de los comercios y está llena de papeles."),
+        ("Cartelería ilegal pegada en toda la cuadra", "Pegaron carteles sobre los postes y las paredes de toda la cuadra."),
+        ("Graffiti en el frente del edificio municipal", "Aparecieron pintadas en el frente del edificio durante el fin de semana."),
+        ("Terreno baldío con pasto de un metro", "El baldío está sin desmalezar y ya es refugio de alimañas."),
+        ("Vereda con barro acumulado del desagüe", "El agua de la cuneta desemboca en la vereda y quedó una capa de barro permanente."),
+    ],
+    "Arbolado y espacios verdes": [
+        ("Árbol caído tras el temporal", "El árbol cayó sobre la vereda y bloquea el paso completo."),
+        ("Rama a punto de caer sobre la calle", "Hay una rama grande quebrada que quedó colgando justo arriba de la calzada."),
+        ("Poda urgente: ramas contra los cables", "Las ramas están rozando los cables de luz y hacen chispas con el viento."),
+        ("Juegos de la plaza rotos", "Dos hamacas están cortadas y el tobogán tiene una chapa levantada."),
+        ("Riego cortado en el cantero central", "El cantero central está seco hace un mes y las plantas se están perdiendo."),
+        ("Bancos de la plaza vandalizados", "Rompieron tres bancos de la plaza y quedaron los hierros a la vista."),
+    ],
+    "Tránsito y señalización": [
+        ("Semáforo en intermitente desde ayer", "El semáforo de la esquina quedó en amarillo intermitente y el cruce es un caos."),
+        ("Cartel de PARE caído", "El cartel está tirado en el pasto desde el fin de semana; la esquina quedó sin señalización."),
+        ("Senda peatonal borrada frente a la escuela", "La senda peatonal de la escuela no se ve más y los chicos cruzan entre los autos."),
+        ("Falta cartel de reductor de velocidad", "Los autos pasan a toda velocidad por una cuadra con dos escuelas."),
+        ("Semáforo apagado por completo", "El semáforo no enciende desde anoche y no hay ningún inspector en el cruce."),
+        ("Lomo de burro sin pintar", "El lomo de burro no tiene la pintura reflectiva y de noche no se ve."),
+    ],
+    "Agua y cloacas": [
+        ("Pérdida de agua en la vía pública", "Hay una pérdida importante que corre por la calle hace días; se está perdiendo muchísima agua."),
+        ("Cloaca desbordada", "La cloaca desborda en la esquina y el olor es insoportable."),
+        ("Tapa de cámara faltante", "Falta la tapa de la cámara y quedó el pozo abierto en plena vereda."),
+        ("Sin presión de agua en toda la cuadra", "Desde el martes que no sube el agua a los tanques en toda la cuadra."),
+        ("Caño roto que socavó el asfalto", "La pérdida socavó abajo del asfalto y se está hundiendo la calzada."),
+        ("Corte de suministro sin aviso", "Cortaron el agua sin aviso previo y estuvimos todo el día sin servicio."),
+    ],
+    "Plagas y control": [
+        ("Enjambre de avispas en la plaza", "Hay un panal de avispas en un árbol de la plaza y varios vecinos ya fueron picados."),
+        ("Roedores en el baldío", "Se ven ratas grandes saliendo del baldío hacia las casas vecinas."),
+        ("Foco de mosquitos en agua estancada", "Quedó agua estancada de la última lluvia y hay una nube de mosquitos."),
+        ("Colonia de palomas en el galpón municipal", "Las palomas se metieron al galpón y está lleno de guano."),
+        ("Hormigueros que arruinaron el cantero", "Los hormigueros se comieron todo el cantero de la entrada."),
+        ("Necesidad de fumigación en la manzana", "Después de la crecida quedó todo lleno de bichos; piden fumigación."),
+    ],
+    "Animales sueltos": [
+        ("Perros sueltos en la plaza", "Hay una jauría dando vueltas por la plaza; ya hubo un intento de mordedura a un chico."),
+        ("Perro atropellado necesita atención", "Un perro sin dueño aparente fue atropellado y está herido sobre la vereda."),
+        ("Caballos sueltos en la avenida", "Hay dos caballos sueltos caminando por la avenida; es un riesgo para los autos."),
+        ("Animal muerto en la vía pública", "Hay un animal muerto en el cordón desde ayer y nadie lo retira."),
+        ("Denuncia por maltrato animal", "Un vecino tiene un perro atado al sol todo el día sin agua."),
+        ("Gatos sin castrar en la esquina", "Se juntaron muchos gatos en la esquina; piden campaña de castración."),
+    ],
+}
+
+# Categoría → dependencia responsable, derivado de DEPENDENCIA_CATEGORIAS_MAP
+# (fuente única) para no repetir el mapeo al revés.
+CATEGORIA_RECLAMO_DEP = {
+    cat: dep
+    for dep, cats in DEPENDENCIA_CATEGORIAS_MAP.items()
+    for cat in cats
+}
+
+# Categorías que la demo OPERA: las de las 4 dependencias activas que manejan
+# reclamos. Se derivan, no se listan: si mañana Seguridad entra a
+# DEPENDENCIAS_ACTIVAS, Ruidos y convivencia empieza a tener casos sola.
+CATEGORIAS_RECLAMO_DEMO = [
+    cat for cat in RECLAMOS_CATALOGO
+    if CATEGORIA_RECLAMO_DEP.get(cat) in DEPENDENCIAS_ACTIVAS
+]
+
+
+# ============================================================
+# LOS CIRCUITOS: cómo termina cada reclamo
+# ============================================================
+# (clave, peso_base, madurez). La `madurez` es qué tan VIEJO tiende a ser ese
+# circuito: 1 = caso de hace tres meses, 0 = entró esta semana. Un reclamo
+# resuelto, con orden de trabajo y calificación del vecino no puede ser de
+# anteayer; uno sin asignar no puede llevar tres meses en la cola. El ruido de
+# `_circuitos_por_antiguedad` deja igual algunos que rompen la regla — el que se
+# resolvió en el día y el que se viene arrastrando.
+CIRCUITOS_RECLAMO = [
+    ("resuelto_directo",      12, 0.85),  # el vecino avisa, van y lo arreglan
+    ("resuelto_con_ot",        8, 0.90),  # con OT, materiales consumidos y máquina
+    ("reabierto_disputado",    4, 0.80),  # el vecino NO conformó el cierre
+    ("esperando_visto_bueno",  4, 0.45),  # terminado en campo, falta que el supervisor cierre
+    ("en_curso_cuadrilla",     7, 0.30),  # cuadrilla asignada, trabajando
+    ("pospuesto",              4, 0.60),  # diferido con motivo
+    ("rechazado",              4, 0.55),  # no corresponde al municipio / duplicado
+    ("sin_asignar",            7, 0.08),  # la cola del supervisor, sin tocar
+]
+
+# Estado FINAL de cada circuito. Sale de acá y de ningún otro lado: el historial
+# se construye para llegar exactamente a este estado.
+ESTADO_FINAL_RECLAMO = {
+    "resuelto_directo": EstadoReclamo.FINALIZADO,
+    "resuelto_con_ot": EstadoReclamo.FINALIZADO,
+    "reabierto_disputado": EstadoReclamo.EN_CURSO,
+    "esperando_visto_bueno": EstadoReclamo.EN_CURSO,
+    "en_curso_cuadrilla": EstadoReclamo.EN_CURSO,
+    "pospuesto": EstadoReclamo.POSPUESTO,
+    "rechazado": EstadoReclamo.RECHAZADO,
+    "sin_asignar": EstadoReclamo.RECIBIDO,
+}
+
+# Circuitos que abren una orden de trabajo, y en qué estado queda.
+OT_POR_CIRCUITO = {
+    "resuelto_con_ot": "completada",
+    "esperando_visto_bueno": "completada",
+    "en_curso_cuadrilla": "en_curso",
+    "pospuesto": "bloqueada",
+}
+
+MOTIVOS_POSPUESTO = [
+    "Se difiere hasta la próxima licitación de materiales.",
+    "Frenado por el temporal: la cuadrilla no puede intervenir con esta lluvia.",
+    "Depende de una obra de la empresa de agua que todavía no tiene fecha.",
+    "Se pospone hasta terminar el bacheo del corredor, para no romper dos veces.",
+]
+
+# (motivo_rechazo del enum, descripción para el vecino)
+MOTIVOS_RECHAZO = [
+    ("no_competencia", "El tendido es de la distribuidora eléctrica: se derivó el pedido y se le informó al vecino."),
+    ("duplicado", "Ya existe un reclamo abierto por el mismo hecho; se unifica el seguimiento en el original."),
+    ("info_insuficiente", "No se pudo ubicar el lugar con los datos aportados. Se le pidió al vecino que amplíe y no hubo respuesta."),
+    ("fuera_jurisdiccion", "La calle es de jurisdicción provincial; se giró el reclamo a Vialidad."),
+]
+
+DISPUTAS_VECINO = [
+    "Volvieron a taparlo con tierra y a los dos días estaba igual que antes.",
+    "Dicen que está resuelto pero nadie vino. Sigue exactamente igual.",
+    "Lo arreglaron a medias: quedó el pozo tapado pero la vereda sigue rota.",
+    "Estuvo bien tres días y volvió a fallar. Pido que lo vean de nuevo.",
+]
+
+RESOLUCIONES_RECLAMO = [
+    "Trabajo terminado y verificado en el lugar.",
+    "Resuelto por la cuadrilla; se dejó el sector limpio.",
+    "Se normalizó el servicio en toda la cuadra.",
+    "Reparación terminada. Se notificó al vecino.",
+    "Intervención completa; se recomienda revisión a los 90 días.",
+]
+
+
+# ============================================================
+# LOS CIRCUITOS DE TRÁMITE (misma mecánica que los de reclamo)
+# ============================================================
+# Un mostrador de verdad no tiene todo finalizado ni todo en cola: tiene
+# expedientes esperando un papel que el vecino no trajo, otros esperando que
+# pague, y algunos que se pospusieron. Esos son los que hay que poder mostrar.
+CIRCUITOS_SOLICITUD = [
+    ("finalizado",             16, 0.88),
+    ("rechazado",               4, 0.62),
+    ("pospuesto",               4, 0.58),
+    ("esperando_documentacion", 6, 0.45),
+    ("pendiente_pago",          6, 0.35),
+    ("en_curso",                9, 0.25),
+    ("recibido",                5, 0.06),
+]
+
+ESTADO_FINAL_SOLICITUD = {
+    "finalizado": EstadoSolicitud.FINALIZADO,
+    "rechazado": EstadoSolicitud.RECHAZADO,
+    "pospuesto": EstadoSolicitud.POSPUESTO,
+    # No hay estado propio "espera documentación" fuera de los legacy en
+    # MAYÚSCULAS (REQUIERE_DOCUMENTACION), que son de datos viejos y no los
+    # dibuja ninguna pantalla. El expediente queda EN_CURSO —que es la verdad:
+    # el municipio ya lo está trabajando— y lo que falta se lee en el historial
+    # y en `observaciones`.
+    "esperando_documentacion": EstadoSolicitud.EN_CURSO,
+    "pendiente_pago": EstadoSolicitud.PENDIENTE_PAGO,
+    "en_curso": EstadoSolicitud.EN_CURSO,
+    "recibido": EstadoSolicitud.RECIBIDO,
+}
+
+DOCS_FALTANTES = [
+    "Falta el certificado médico psicofísico: el presentado está vencido.",
+    "Falta la constancia de CUIT actualizada.",
+    "El plano presentado no está firmado por profesional matriculado.",
+    "Falta el comprobante de pago de la tasa de inicio.",
+    "La copia del DNI está ilegible; se pidió que la vuelva a subir.",
+]
+
+MOTIVOS_RECHAZO_SOLICITUD = [
+    "El rubro solicitado no está permitido para esa zona según el código de habilitaciones.",
+    "El solicitante registra deuda vigente; se le informó el plan de pago disponible.",
+    "Documentación incompleta después de dos intimaciones. Se archiva el expediente.",
+    "El inmueble no está dentro del ejido municipal.",
+]
+
+MOTIVOS_POSPUESTO_SOLICITUD = [
+    "En espera del informe del área técnica.",
+    "Suspendido a pedido del solicitante hasta el mes que viene.",
+    "Frenado hasta que se resuelva el expediente de obra vinculado.",
+    "En espera de la inspección conjunta con Bromatología.",
 ]
 
 
@@ -500,24 +916,59 @@ def _slug_palabra(texto: str) -> str:
     return limpio.lower().split()[0]
 
 
+def _sin_tildes(texto: str) -> str:
+    return unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+
+
+def _codigo_zona(nombre: str, municipio_id: int) -> str:
+    """Codigo corto y unico para una zona. `Zona.codigo` es VARCHAR(20)."""
+    base = re.sub(r"[^A-Z0-9]+", "", _sin_tildes(nombre).upper())[:10] or "Z"
+    return f"{base}-{municipio_id}"[:20]
+
+
 async def _seed_zonas(
     db: AsyncSession,
     municipio_id: int,
-    codigo_muni: str,
-    muni_lat: float,
-    muni_lng: float,
+    zonas_reales: list[dict],
 ) -> dict[str, Zona]:
-    """Crea 6 zonas con coords offset sobre el centro del municipio."""
-    zonas = {}
-    for nombre, cod_zona, dlat, dlng in ZONAS_DEMO:
-        # Sufijar con municipio_id (numérico, corto) para garantizar unicidad
-        # global sin superar los 20 chars del VARCHAR(20) de Zona.codigo.
+    """Las zonas del municipio: las localidades REALES de esa ciudad, o ninguna.
+
+    `zonas_reales` viene de `geo_ciudad` y son places de OpenStreetMap dentro
+    del poligono oficial del municipio: en Lujan, Olivera / Open Door / Torres /
+    Carlos Keen / Jauregui / Lezica y Torrezuri --- las localidades del partido,
+    con su coordenada real.
+
+    Si la lista viene vacia el municipio queda SIN zonas, a proposito. Antes
+    caia a Centro/Norte/Sur/Este/Periferia y eso es peor que no tener nada: una
+    zona vacia se nota y se corrige, un nombre inventado se toma por bueno.
+    """
+    zonas: dict[str, Zona] = {}
+    codigos_usados: set[str] = set()
+    for z in zonas_reales:
+        nombre = (z.get("nombre") or "").strip()
+        if not nombre or nombre in zonas:
+            continue
+        # "Asentamiento San Antonio" y "Asentamiento B. Belgrano" truncan al
+        # mismo ASENTAMIEN-<muni> y `zonas.codigo` es UNIQUE: el alta de San
+        # Salvador de Jujuy moria en el INSERT con Duplicate entry. Ante
+        # colision, sufijo numerico deterministico sobre la misma base.
+        codigo = _codigo_zona(nombre, municipio_id)
+        seq = 1
+        while codigo in codigos_usados:
+            seq += 1
+            base = re.sub(r"[^A-Z0-9]+", "", _sin_tildes(nombre).upper())[:10] or "Z"
+            codigo = f"{base}{seq}-{municipio_id}"[:20]
+        codigos_usados.add(codigo)
         zona = Zona(
             municipio_id=municipio_id,
-            nombre=nombre,
-            codigo=f"{cod_zona}-{municipio_id}",
-            latitud_centro=muni_lat + dlat,
-            longitud_centro=muni_lng + dlng,
+            nombre=nombre[:100],
+            codigo=codigo,
+            latitud_centro=z.get("lat"),
+            longitud_centro=z.get("lon"),
+            # El contorno viene del padron (`catalogo_zonas`). Sin esto la zona
+            # nacia siendo un punto y el mapa del municipio no tenia una sola
+            # division que dibujar --- que es de lo unico que habla el mapa.
+            poligono=z.get("poligono"),
             activo=True,
         )
         db.add(zona)
@@ -529,24 +980,51 @@ async def _seed_zonas(
 async def _seed_barrios(
     db: AsyncSession,
     municipio_id: int,
-    muni_lat: float,
-    muni_lng: float,
+    barrios_reales: list[dict],
 ) -> dict[str, Barrio]:
-    """Crea 12 barrios hardcoded alrededor del centro del municipio."""
-    barrios = {}
-    for nombre, dlat, dlng in BARRIOS_DEMO:
+    """Los barrios REALES del municipio, o ninguno.
+
+    Salen de OSM (`place=suburb|neighbourhood|quarter`) y por eso nacen
+    `validado=True`: la coordenada es la que tiene mapeada OpenStreetMap, no una
+    que calculamos nosotros.
+    """
+    barrios: dict[str, Barrio] = {}
+    for b in barrios_reales:
+        nombre = (b.get("nombre") or "").strip()
+        if not nombre or nombre in barrios:
+            continue
         barrio = Barrio(
             municipio_id=municipio_id,
-            nombre=nombre,
-            latitud=muni_lat + dlat,
-            longitud=muni_lng + dlng,
-            tipo="suburb",
-            validado=False,
+            nombre=nombre[:100],
+            latitud=b.get("lat"),
+            longitud=b.get("lon"),
+            tipo=b.get("tipo") or "suburb",
+            validado=True,
         )
         db.add(barrio)
         barrios[nombre] = barrio
     await db.flush()
     return barrios
+
+
+def _zona_para(zonas: dict[str, Zona], zona_nombre: Optional[str],
+               idx: int) -> Optional[Zona]:
+    """La zona de un empleado o cuadrilla, ahora que las zonas son REALES.
+
+    `EMPLEADOS_DEMO`/`CUADRILLAS_DEMO` traen nombres de zona genéricos ("Sur",
+    "Norte") que eran los de la lista vieja. Con las zonas de la ciudad de
+    verdad ese match no da nunca, y sin esto los 7 empleados quedaban con
+    `zona_id` NULL — el reparto por zona del tablero mostraba todo vacío.
+
+    Se reparten por POSICIÓN sobre las zonas reales: determinístico, y cada
+    operario queda a cargo de una localidad que existe.
+    """
+    if zona_nombre and zona_nombre in zonas:
+        return zonas[zona_nombre]
+    if not zona_nombre:
+        return None  # los administrativos no tienen zona a propósito
+    pool = list(zonas.values())
+    return pool[idx % len(pool)] if pool else None
 
 
 async def _seed_empleados(
@@ -557,9 +1035,10 @@ async def _seed_empleados(
 ) -> list[Empleado]:
     """Crea 7 empleados con categoría principal, zona y telefono."""
     empleados = []
-    for nombre, apellido, telefono, tipo, especialidad, cat_nombre, zona_nombre in EMPLEADOS_DEMO:
+    for _i, (nombre, apellido, telefono, tipo, especialidad, cat_nombre,
+             zona_nombre) in enumerate(EMPLEADOS_DEMO):
         cat = cats_reclamo.get(cat_nombre) if cat_nombre else None
-        zona = zonas.get(zona_nombre) if zona_nombre else None
+        zona = _zona_para(zonas, zona_nombre, _i)
         empleado = Empleado(
             municipio_id=municipio_id,
             nombre=nombre,
@@ -603,9 +1082,10 @@ async def _seed_cuadrillas(
     """Crea 3 cuadrillas con líder + 1 miembro cada una."""
     cuadrillas = []
     from datetime import date
-    for nombre, desc, cat_nombre, zona_nombre, lider_idx, miembro_idx in CUADRILLAS_DEMO:
+    for _i, (nombre, desc, cat_nombre, zona_nombre, lider_idx,
+             miembro_idx) in enumerate(CUADRILLAS_DEMO):
         cat = cats_reclamo.get(cat_nombre)
-        zona = zonas.get(zona_nombre)
+        zona = _zona_para(zonas, zona_nombre, _i)
         cuadrilla = Cuadrilla(
             municipio_id=municipio_id,
             nombre=nombre,
@@ -692,6 +1172,8 @@ async def seed_demo_completo(
     db: AsyncSession,
     municipio_id: int,
     codigo: str,
+    password: str = "demo123",
+    log=None,
 ) -> dict:
     """
     Arma toda la estructura de datos para que un municipio demo sea
@@ -701,14 +1183,41 @@ async def seed_demo_completo(
     `crear_categorias_default()` y que la sesión tiene un flush pendiente
     con el municipio ya insertado.
 
+    `log` es un `services.seed_log.SeedLog` opcional: si viene, cada etapa deja
+    su nombre, estado, counts y duracion para la consola del super admin.
+
     Retorna un dict con info del seed para la response del endpoint.
     """
-    hash_demo = get_password_hash("demo123")
+    from services.seed_log import SeedLog
+
+    # Demo protegida por PIN: el alta puede pasar otra password (el PIN) y
+    # todos los usuarios demo del muni nacen con ella en vez de demo123.
+    hash_demo = get_password_hash(password)
 
     # Cargar municipio para usar sus coords como centro de zonas/barrios/reclamos
     muni = await db.get(Municipio, municipio_id)
     muni_lat = muni.latitud if muni and muni.latitud else -34.603722
     muni_lng = muni.longitud if muni and muni.longitud else -58.381592
+
+    # Sin log del llamador se arma uno propio y no se guarda: asi los pasos se
+    # escriben una sola vez y los scripts no necesitan saber que existe.
+    log = log or SeedLog(muni.nombre if muni else codigo, codigo=codigo)
+
+    # LA GEOGRAFIA DE ESTA CIUDAD, EN VIVO Y SIN CACHE PREVIO.
+    # Poligono oficial desde `municipios_catalogo` + UNA consulta a Overpass
+    # (cacheada en disco para la proxima demo de la misma ciudad). De ahi salen
+    # las zonas, los barrios y los puntos con direccion real. Si algo no esta
+    # disponible, `geografia` degrada y lo explica en `degradacion` --- nunca
+    # levanta y nunca inventa nombres.
+    geo_ctx = await geo_ciudad.geografia(
+        db,
+        nombre=muni.nombre if muni else codigo,
+        pais=(muni.pais if muni and muni.pais else "AR"),
+        cantidad_puntos=PUNTOS_GEO,
+        lat=muni_lat, lon=muni_lng,
+        log=log,
+    )
+    geo = geo_ctx["puntos"]
 
     # ------------------------------------------------------------------
     # 1. Habilitar dependencias del catálogo global
@@ -732,6 +1241,8 @@ async def seed_demo_completo(
         db.add(muni_dep)
         muni_deps[dep_codigo] = muni_dep
     await db.flush()
+    log.hito("dependencias", dependencias=len(muni_deps),
+             nombres=list(muni_deps.keys()))
 
     # ------------------------------------------------------------------
     # 2. Mapear categorías de reclamo → dependencias
@@ -758,6 +1269,7 @@ async def seed_demo_completo(
                 activo=True,
             ))
     await db.flush()
+    log.hito("categorias_reclamo", categorias=len(cats_reclamo))
 
     # ------------------------------------------------------------------
     # 3. Crear trámites con documentos requeridos
@@ -767,9 +1279,11 @@ async def seed_demo_completo(
     )
     cats_tramite = {c.nombre: c for c in r.scalars().all()}
 
-    tramites_creados = []
-    tramite_to_dep: dict[int, int] = {}  # tramite.id → muni_dep.id (post-flush)
-    for i, t_data in enumerate(TRAMITES_DEMO):
+    # Se crean los trámites OPERATIVOS (TRAMITES_DEMO, con solicitudes/turnos)
+    # y los de COMPLETITUD (TRAMITES_CATALOGO_EXTRA): así ninguna categoría de
+    # trámite del default queda con 0 tipos.
+    tramites_creados: list[tuple] = []  # [(Tramite, t_data del seed)]
+    for i, t_data in enumerate(TRAMITES_DEMO + TRAMITES_CATALOGO_EXTRA):
         cat = cats_tramite.get(t_data["categoria_tramite_nombre"])
         if not cat:
             continue
@@ -801,13 +1315,19 @@ async def seed_demo_completo(
             documentos_requeridos=docs,
         )
         db.add(tramite)
-        tramites_creados.append((tramite, t_data.get("dep_codigo")))
+        tramites_creados.append((tramite, t_data))
     await db.flush()
 
     # Mapeo trámite → dependencia (tabla pivot MunicipioDependenciaTramite).
     # Esto permite auto-asignar la dep al crear una solicitud desde el vecino.
+    # Regla: CERO trámites huérfanos — el dep_codigo curado del seed manda y,
+    # si el trámite no lo trae, se resuelve por su categoría con el mapa
+    # canónico CATEGORIA_TRAMITE_DEP_MAP.
     from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
-    for tramite, dep_codigo in tramites_creados:
+    for tramite, t_data in tramites_creados:
+        dep_codigo = t_data.get("dep_codigo") or CATEGORIA_TRAMITE_DEP_MAP.get(
+            t_data["categoria_tramite_nombre"]
+        )
         if not dep_codigo:
             continue
         muni_dep = muni_deps.get(dep_codigo)
@@ -819,8 +1339,14 @@ async def seed_demo_completo(
             activo=True,
         ))
     await db.flush()
-    # Back-compat: resto del código espera list de Tramite
-    tramites_creados = [t for t, _ in tramites_creados]
+    # Solo los trámites de TRAMITES_DEMO llevan actividad de ejemplo
+    # (solicitudes) — los `solo_catalogo` completan el catálogo sin sumar
+    # ruido al set operativo curado (regla 3).
+    tramites_operativos = [
+        (t, d) for t, d in tramites_creados if not d.get("solo_catalogo")
+    ]
+    log.hito("tramites", tramites=len(tramites_creados),
+             operativos=len(tramites_operativos))
 
     # ------------------------------------------------------------------
     # 4. Crear usuarios demo
@@ -898,41 +1424,22 @@ async def seed_demo_completo(
     _tel_suffix = str(_h % 100_000_000).zfill(8)
     _telefono_demo = f"+54 9 11 {_tel_suffix[:4]}-{_tel_suffix[4:]}"
 
-    # Dirección: reverse-geocode contra Nominatim con un offset determinístico
-    # al centro del muni (~500m-2km). Así cada vecino demo vive en una calle
-    # REAL de su muni, geocodeable en el mapa. Si Nominatim falla, queda None
-    # y el vecino la carga al crear su primer trámite (que tiene autocomplete).
+    # Direccion del vecino demo. Sale de los puntos ya geolocalizados de esta
+    # ciudad: una calle real, con la altura que devolvio el geocoding o sin
+    # altura si no la hay.
+    #
+    # OJO con lo que habia antes: se pedia el reverse a Nominatim EN VIVO dentro
+    # del alta (con lo que la demo dependia de un servicio externo para crearse)
+    # y a la calle real se le pegaba un numero de puerta sacado de un hash
+    # ---`100 + ((_h >> 31) % 4900)`---, o sea una altura inventada presentada como
+    # direccion real. Sin cache ahora queda la calle sola: preferible una
+    # direccion incompleta a una que parece precisa y no lo es.
     _direccion_demo: Optional[str] = None
-    try:
-        import httpx as _httpx
-        # Offset entre -0.01° y +0.01° (~1km) para no caer siempre en el mismo
-        # punto, pero sin salir del muni.
-        _dlat = ((((_h >> 37) % 2000) - 1000) / 100000.0)
-        _dlng = ((((_h >> 43) % 2000) - 1000) / 100000.0)
-        async with _httpx.AsyncClient(timeout=5.0) as _hc:
-            _r = await _hc.get(
-                "https://nominatim.openstreetmap.org/reverse",
-                params={
-                    "lat": muni_lat + _dlat,
-                    "lon": muni_lng + _dlng,
-                    "format": "json",
-                    "zoom": 18,  # street-level
-                    "addressdetails": 1,
-                },
-                headers={"User-Agent": "Munify/1.0 (demo seed)"},
-            )
-            if _r.status_code == 200:
-                _data = _r.json()
-                _addr = _data.get("address", {}) if isinstance(_data, dict) else {}
-                _road = _addr.get("road") or _addr.get("pedestrian") or _addr.get("street")
-                if _road:
-                    _num = 100 + ((_h >> 31) % 4900)
-                    _loc = _addr.get("suburb") or _addr.get("city_district") or _addr.get("city") or _addr.get("town") or _addr.get("village") or ""
-                    _direccion_demo = f"{_road} {_num}" + (f", {_loc}" if _loc else "")
-    except Exception:
-        # Nominatim caido o timeout — el vecino queda sin direccion,
-        # la completa al crear su primer tramite.
-        pass
+    if geo:
+        _p_vecino = geo[_h % len(geo)]
+        _direccion_demo = _p_vecino["direccion"]
+        if _p_vecino.get("barrio"):
+            _direccion_demo = f"{_direccion_demo}, {_p_vecino['barrio']}"
 
     vecino_demo = User(
         email=f"vecino@{codigo}.demo.com",
@@ -954,7 +1461,62 @@ async def seed_demo_completo(
         cuenta_verificada=True,
     )
     db.add(vecino_demo)
+
+    # --- Los OTROS DOS vecinos ---
+    # Con 50 reclamos y 50 trámites colgando de un único vecino la demo se
+    # rompe sola: nadie tiene 50 reclamos, y sobre todo NO se puede mostrar la
+    # óptica del vecino (que ve SOLO lo suyo) si lo suyo es todo. Tres vecinos
+    # con actividad despareja (50/30/20, ver VECINOS_REPARTO) muestran un vecino
+    # que reclama por todo y dos que aparecen cada tanto.
+    #
+    # El email va `vecino-<nombre>@{codigo}.demo.com`: el patrón `vecino-%` ya lo
+    # matchea la botonera del picker (ver api/municipios.py, endpoint
+    # `/public/{codigo}/demo-users`), así que los tres entran con un click y con
+    # la misma password que el resto de los usuarios demo.
+    vecinos_demo: list[User] = [vecino_demo]
+    for _n in (2, 3):
+        _hv = int(hashlib.sha1(f"{codigo}-vecino-{_n}".encode()).hexdigest(), 16)
+        _sx = _hv % 2
+        _nom = (_NOMBRES_M if _sx == 0 else _NOMBRES_F)[(_hv >> 3) % 8]
+        _ape = _APELLIDOS[(_hv >> 7) % len(_APELLIDOS)]
+        # Sin choque de nombre con el vecino principal: dos "Juan González" en la
+        # misma demo se leen como un bug, no como dos vecinos.
+        if (_nom, _ape) == (_nombre_demo, _apellido_demo):
+            _ape = _APELLIDOS[((_hv >> 7) + 5) % len(_APELLIDOS)]
+        _dir = None
+        if geo:
+            _pv = geo[(_hv + _n * 7) % len(geo)]
+            _dir = _pv["direccion"] + (f", {_pv['barrio']}" if _pv.get("barrio") else "")
+        _tel = str(_hv % 100_000_000).zfill(8)
+        _otro = User(
+            email=f"vecino-{_slug_palabra(_nom)}@{codigo}.demo.com",
+            nombre=_nom,
+            apellido=_ape,
+            dni=str(25_000_000 + (_hv % 23_000_000)),
+            telefono=f"+54 9 11 {_tel[:4]}-{_tel[4:]}",
+            direccion=_dir,
+            sexo="M" if _sx == 0 else "F",
+            fecha_nacimiento=date(1965 + ((_hv >> 11) % 36),
+                                  1 + ((_hv >> 17) % 12),
+                                  1 + ((_hv >> 23) % 28)),
+            nacionalidad="ARG",
+            # Solo el vecino principal viene con biometría hecha: los otros dos
+            # quedan en nivel 1 a propósito, para poder mostrar el trámite que
+            # PIDE KYC y todavía no lo tiene (licencia de conducir).
+            nivel_verificacion=1,
+            password_hash=hash_demo,
+            rol=RolUsuario.VECINO,
+            municipio_id=municipio_id,
+            activo=True,
+            cuenta_verificada=True,
+        )
+        db.add(_otro)
+        vecinos_demo.append(_otro)
     await db.flush()
+    log.hito("usuarios", admin=1, vecinos=len(vecinos_demo),
+             supervisores=len(supervisores_demo),
+             emails_vecinos=[v.email for v in vecinos_demo],
+             direccion_vecino=_direccion_demo)
 
     # ------------------------------------------------------------------
     # Tasas demo: partidas ABL + Patente + Multa + sus deudas
@@ -972,6 +1534,8 @@ async def seed_demo_completo(
         select(TipoTasa).where(TipoTasa.codigo.in_(["abl", "patente_automotor", "multa_transito"]))
     )
     tipos_map = {t.codigo: t for t in tipos_q.scalars().all()}
+    if not SEMBRAR_TASAS:
+        tipos_map = {}      # ver SEMBRAR_TASAS: la demo no muestra tasas
 
     # Solo generar si el catalogo esta poblado.
     if tipos_map:
@@ -1088,18 +1652,58 @@ async def seed_demo_completo(
             ))
 
         await db.flush()
+    log.hito("tasas", tipos_de_tasa=len(tipos_map),
+             motivo=None if tipos_map else "catalogo global de tipos de tasa vacio",
+             estado="ok" if tipos_map else "degradado")
 
     # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)
     # ------------------------------------------------------------------
-    zonas = await _seed_zonas(db, municipio_id, codigo, muni_lat, muni_lng)
-    barrios = await _seed_barrios(db, municipio_id, muni_lat, muni_lng)
+    # La geografia NO puede tirar abajo la creacion. Que falte el mapa es una
+    # demo con menos, pero una demo; que reviente el alta es no tener nada. Ya
+    # se degradaba cuando la geografia venia VACIA --- lo que faltaba era
+    # aguantar que el paso se ROMPA, que es lo que paso de verdad: un error de
+    # programacion al crear la zona mataba el alta entera y el usuario veia "No
+    # pudimos crear la demo" despues de esperar todos los pasos.
+    # SAVEPOINT y no rollback pelado: si el bloque falla se deshace SOLO lo suyo
+    # y la transaccion sigue viva. Un `db.rollback()` aca se llevaria puesto todo
+    # lo que ya se creo antes en el alta --- dependencias, categorias, tasas ---
+    # y la demo quedaria peor que sin zonas.
+    zonas: dict = {}
+    with log.paso("zonas") as _p:
+        try:
+            async with db.begin_nested():
+                zonas = await _seed_zonas(db, municipio_id, geo_ctx["zonas"])
+        except Exception as ex:
+            zonas = {}
+            _p.fallo(f"no se pudieron crear las zonas: {ex}")
+        if zonas:
+            _p.ok(zonas=len(zonas), nombres=list(zonas.keys()))
+        else:
+            _p.degradado(
+                "sin divisiones para esta ciudad; el municipio queda sin zonas "
+                "(antes se inventaban Centro/Norte/Sur)")
+    barrios: dict = {}
+    with log.paso("barrios") as _p:
+        try:
+            async with db.begin_nested():
+                barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"])
+        except Exception as ex:
+            barrios = {}
+            _p.fallo(f"no se pudieron crear los barrios: {ex}")
+        if barrios:
+            _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15])
+        else:
+            _p.degradado("OSM no tiene barrios mapeados dentro del poligono")
 
     # ------------------------------------------------------------------
     # 6. Empleados + Cuadrillas (personal operativo)
     # ------------------------------------------------------------------
     empleados = await _seed_empleados(db, municipio_id, cats_reclamo, zonas)
     cuadrillas = await _seed_cuadrillas(db, municipio_id, empleados, cats_reclamo, zonas)
+    log.hito("empleados_cuadrillas", empleados=len(empleados),
+             cuadrillas=len(cuadrillas),
+             con_zona=sum(1 for e in empleados if e.zona_id))
 
     # Usuarios con rol EMPLEADO — sin esto no hay con qué entrar como el
     # operario de campo (ve "Mis Trabajos" y, si el módulo está activo, sus
@@ -1108,6 +1712,10 @@ async def seed_demo_completo(
     # slug derivado de su categoría — nada hardcodeado a nombres puntuales,
     # así escala igual en cualquier demo nueva que se genere.
     empleados_login: list[User] = []
+    # empleado.id → su usuario de login. Es lo que permite que el historial
+    # diga "lo ejecutó Carlos Gómez" con el usuario REAL de Carlos y no con el
+    # admin: sin este mapeo la traza por actor no existe.
+    user_de_empleado: dict[int, User] = {}
     for idx, (nombre, apellido, _tel, tipo, _esp, cat_nombre, _zona) in enumerate(EMPLEADOS_DEMO):
         if tipo != "operario" or idx >= len(empleados):
             continue
@@ -1125,85 +1733,418 @@ async def seed_demo_completo(
         )
         db.add(emp_user)
         empleados_login.append(emp_user)
+        user_de_empleado[empleados[idx].id] = emp_user
     await db.flush()
 
     # ------------------------------------------------------------------
     # 7. SLA configs
     # ------------------------------------------------------------------
     sla_count = await _seed_sla_configs(db, municipio_id, cats_reclamo)
+    log.hito("sla", sla_configs=sla_count)
 
     # ------------------------------------------------------------------
-    # 8. Reclamos de ejemplo (con coords + zona + barrio)
+    # 8. Inventario (VA ANTES QUE LAS OT: las órdenes consumen de acá)
     # ------------------------------------------------------------------
-    # Crear reclamos y sus historiales en 2 pasos (no uno por uno):
-    #   paso A: agregar todos los reclamos y flush UNA vez para obtener ids.
-    #   paso B: agregar todos los historiales referenciando esos ids.
-    reclamos_creados_list: list[Reclamo] = []
-    historiales_data: list[tuple[int, list[dict]]] = []  # (idx_reclamo_en_lista, historial_dicts)
-    import random as _random_rec
+    # Antes se sembraba después de las OT y por eso ninguna orden podía tener
+    # materiales de verdad: la lista `materiales` era un JSON suelto que no
+    # descontaba stock ni tomaba una máquina. Ahora el inventario existe primero
+    # y las OT completadas descuentan de verdad.
+    from services.inventario_seed import seed_inventario
+    # `seed_inventario` trae ademas los depositos (siempre) y, con demo, los 90
+    # dias de movimientos y las dos ordenes de compra: el deposito nace con
+    # historia, no vacio (dueño, 2026-08-31).
+    inv_res = await seed_inventario(db, municipio_id, incluir_demo=True)
+    log.hito(
+        "inventario",
+        items=inv_res["items"],
+        depositos=inv_res.get("depositos", 0),
+        movimientos=inv_res.get("movimientos", 0),
+        ordenes_compra=inv_res.get("ordenes_compra", 0),
+    )
+
+    # ------------------------------------------------------------------
+    # 9. TRES MESES DE VIDA MUNICIPAL — 50 reclamos con su circuito
+    # ------------------------------------------------------------------
+    # La aleatoriedad de acá para abajo es ACOTADA y va toda por `rnd`: cambia
+    # QUIÉN atendió, CUÁNTO tardó y CÓMO terminó cada caso. Lo que no cambia es
+    # el volumen, la ventana de 90 días ni la geografía.
+    rnd = rng_circuitos(codigo, municipio_id)
+
+    # --- Quién es quién (los actores de la traza) ---
+    sup_por_dep: dict[str, User] = {}
+    for _dep_cod, _sup in zip(
+            [d for d in DEPENDENCIAS_ACTIVAS if d in muni_deps], supervisores_demo):
+        sup_por_dep[_dep_cod] = _sup
+    _sup_fallback = supervisores_demo[0] if supervisores_demo else admin_demo
+
+    _operarios = [e for e, d in zip(empleados, EMPLEADOS_DEMO) if d[3] == "operario"]
+    _administrativos = [e for e, d in zip(empleados, EMPLEADOS_DEMO) if d[3] == "administrativo"]
+    _op_por_cat: dict[int, Empleado] = {
+        e.categoria_principal_id: e for e in _operarios if e.categoria_principal_id
+    }
+    _cuad_por_cat: dict[int, Cuadrilla] = {
+        c.categoria_principal_id: c for c in cuadrillas if c.categoria_principal_id
+    }
+
+    def _operario_para(cat_id: Optional[int], i: int) -> Optional[Empleado]:
+        """El operario a cargo: el de ESA categoría si existe, si no el que
+        sigue en la rueda. Nunca None mientras haya operarios — un reclamo
+        asignado sin nadie adentro es justo lo que la traza tiene que evitar."""
+        emp = _op_por_cat.get(cat_id) if cat_id else None
+        if emp:
+            return emp
+        return _operarios[i % len(_operarios)] if _operarios else None
+
+    def _cuadrilla_para(cat_id: Optional[int], i: int) -> Optional[Cuadrilla]:
+        cua = _cuad_por_cat.get(cat_id) if cat_id else None
+        if cua:
+            return cua
+        return cuadrillas[i % len(cuadrillas)] if cuadrillas else None
+
+    def _actor_operario(emp: Optional[Empleado]) -> User:
+        """El USUARIO con el que ese operario entra a la app. Si el empleado no
+        tiene login propio (los administrativos no lo tienen), firma el
+        supervisor: el historial no puede quedar sin actor."""
+        if emp is not None and emp.id in user_de_empleado:
+            return user_de_empleado[emp.id]
+        return _sup_fallback
+
+    def _linea_de_tiempo(creado: datetime, pasos: int, dias: int) -> list:
+        """Las fechas de los movimientos de un caso, SIEMPRE hacia adelante.
+
+        Nada puede caer después de ahora (un reclamo cerrado el mes que viene se
+        nota de inmediato) ni antes de su creación. Se reparten dentro de la
+        ventana [creación, creación + duración del circuito], con un jitter chico
+        para que los pasos intermedios no queden a intervalos de reloj.
+        """
+        tope = datetime.utcnow() - timedelta(minutes=10)
+        fin = min(creado + timedelta(days=max(dias, 1)), tope)
+        span = max((fin - creado).total_seconds(), 60.0)
+        fechas = [creado]
+        for k in range(1, pasos):
+            frac = k / max(pasos - 1, 1)
+            if 0 < k < pasos - 1:
+                frac = min(max(frac + rnd.uniform(-0.06, 0.06), 0.02), 0.98)
+            fechas.append(creado + timedelta(seconds=span * frac))
+        return fechas
+
+    # --- El reparto de la actividad entre los tres vecinos ---
+    def _reparto(objetivo: int, corrimiento: int = 0) -> list:
+        """Qué vecino es dueño de cada caso: 50 / 30 / 20 barajado.
+
+        `corrimiento` rota el reparto para que el vecino que más RECLAMA no sea
+        automáticamente el que más TRÁMITES inicia — se parecen más a tres
+        personas distintas y no a un mismo perfil clonado.
+        """
+        pool = []
+        for k, parte in enumerate(VECINOS_REPARTO):
+            idx = (k + corrimiento) % len(vecinos_demo)
+            pool += [vecinos_demo[idx]] * int(round(objetivo * parte))
+        while len(pool) < objetivo:
+            pool.append(vecinos_demo[0])
+        pool = pool[:objetivo]
+        rnd.shuffle(pool)
+        return pool
+
+    # --- El catálogo de asuntos, repartido entre las 9 categorías operadas ---
+    _cats_demo = [c for c in CATEGORIAS_RECLAMO_DEMO if c in cats_reclamo]
+    _asuntos: list[tuple] = []
+    if _cats_demo:
+        _max_por_cat = max(len(RECLAMOS_CATALOGO[c]) for c in _cats_demo)
+        for _j in range(_max_por_cat):          # rueda por categoría: ninguna
+            for _c in _cats_demo:               # se queda sin casos
+                if _j < len(RECLAMOS_CATALOGO[_c]):
+                    _asuntos.append((_c, *RECLAMOS_CATALOGO[_c][_j]))
+    _asuntos = _asuntos[:OBJETIVO_RECLAMOS]
+    rnd.shuffle(_asuntos)
+
+    cuentas_rec = _mezcla(OBJETIVO_RECLAMOS, CIRCUITOS_RECLAMO, rnd)
+    circuitos_rec = _circuitos_por_antiguedad(cuentas_rec, CIRCUITOS_RECLAMO, rnd)
+    duenios_rec = _reparto(OBJETIVO_RECLAMOS)
+
     _zonas_pool = list(zonas.values())
     _barrios_pool = list(barrios.values())
-    _muni_deps_pool = list(muni_deps.values())
-    for r_data in RECLAMOS_DEMO:
-        cat = cats_reclamo.get(r_data["categoria_nombre"])
+    total_rec = min(OBJETIVO_RECLAMOS, len(_asuntos)) if _asuntos else 0
+
+    reclamos_creados_list: list[Reclamo] = []
+    trazas_rec: list[list[dict]] = []   # historial de cada reclamo, ya con actor
+    plan_ots: list[dict] = []           # las OT que hay que abrir después
+    resumen_circuitos: dict[str, int] = {}
+
+    for i in range(total_rec):
+        cat_nombre, titulo, descripcion = _asuntos[i]
+        cat = cats_reclamo.get(cat_nombre)
         if not cat:
             continue
-        muni_dep = muni_deps.get(r_data["dependencia_codigo"])
-        zona = zonas.get(r_data["zona_nombre"])
-        barrio = barrios.get(r_data["barrio_nombre"])
+        circuito = circuitos_rec[i] if i < len(circuitos_rec) else "sin_asignar"
+        resumen_circuitos[circuito] = resumen_circuitos.get(circuito, 0) + 1
+        vecino = duenios_rec[i]
+        dep_codigo = CATEGORIA_RECLAMO_DEP.get(cat_nombre)
+        muni_dep = muni_deps.get(dep_codigo) if dep_codigo else None
+        supervisor = sup_por_dep.get(dep_codigo) or _sup_fallback
 
-        # Fallback random si el match por nombre no devolvió nada — evita
-        # quedar con FKs en NULL que rompen las queries agrupadas.
+        # La ubicación sale del punto REAL de la ciudad (con sus focos
+        # repetidos); zona y barrio ya vienen resueltos por el geocoding.
+        punto = geo[_punto_con_focos(i) % len(geo)] if geo else None
+        zona = zonas.get(punto.get("zona_nombre")) if punto else None
+        barrio = barrios.get(punto.get("barrio")) if punto else None
         if zona is None and _zonas_pool:
-            zona = _random_rec.choice(_zonas_pool)
+            zona = _zonas_pool[i % len(_zonas_pool)]
         if barrio is None and _barrios_pool:
-            barrio = _random_rec.choice(_barrios_pool)
-        if muni_dep is None and _muni_deps_pool:
-            muni_dep = _random_rec.choice(_muni_deps_pool)
+            barrio = _barrios_pool[i % len(_barrios_pool)]
 
-        # Mezcla de canales para que el demo muestre la omnicanalidad
-        _canal_demo = ["app", "whatsapp", "ventanilla_asistida"][len(reclamos_creados_list) % 3]
+        creado = _fecha_historica(i, total_rec, rnd)
+        emp = None if circuito in ("sin_asignar", "rechazado") else _operario_para(cat.id, i)
+        cua = _cuadrilla_para(cat.id, i) if circuito in (
+            "resuelto_con_ot", "en_curso_cuadrilla", "esperando_visto_bueno", "pospuesto") else None
+        actor_campo = _actor_operario(emp)
+
+        # --- LA TRAZA: quién hizo qué, en orden ---
+        pasos: list[dict] = [{
+            "accion": "Reclamo creado",
+            "estado_nuevo": EstadoReclamo.RECIBIDO,
+            "comentario": None,
+            "usuario": vecino,
+        }]
+        extra: dict = {}
+        dias_circuito = 1
+
+        if circuito == "sin_asignar":
+            dias_circuito = 0
+
+        elif circuito == "rechazado":
+            dias_circuito = rnd.randint(1, 4)
+            motivo, texto = MOTIVOS_RECHAZO[i % len(MOTIVOS_RECHAZO)]
+            pasos.append({
+                "accion": "Reclamo rechazado",
+                "estado_anterior": EstadoReclamo.RECIBIDO,
+                "estado_nuevo": EstadoReclamo.RECHAZADO,
+                "comentario": texto, "usuario": supervisor,
+            })
+            extra = {"motivo_rechazo": motivo, "descripcion_rechazo": texto,
+                     "cierra": True}
+
+        elif circuito == "pospuesto":
+            dias_circuito = rnd.randint(2, 9)
+            motivo = MOTIVOS_POSPUESTO[i % len(MOTIVOS_POSPUESTO)]
+            pasos.append({
+                "accion": "Asignado a la dependencia",
+                "estado_anterior": EstadoReclamo.RECIBIDO,
+                "estado_nuevo": EstadoReclamo.EN_CURSO,
+                "comentario": f"Asignado a {emp.nombre} {emp.apellido}." if emp else
+                              "Tomado por la dependencia.",
+                "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "Trabajo diferido",
+                "estado_anterior": EstadoReclamo.EN_CURSO,
+                "estado_nuevo": EstadoReclamo.POSPUESTO,
+                "comentario": motivo, "usuario": supervisor,
+            })
+
+        elif circuito == "en_curso_cuadrilla":
+            dias_circuito = rnd.randint(1, 5)
+            pasos.append({
+                "accion": "Cuadrilla asignada",
+                "estado_anterior": EstadoReclamo.RECIBIDO,
+                "estado_nuevo": EstadoReclamo.EN_CURSO,
+                "comentario": f"Se despachó {cua.nombre}." if cua else "Se despachó la cuadrilla.",
+                "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "Parte de campo",
+                "comentario": "La cuadrilla llegó al lugar y está trabajando.",
+                "usuario": actor_campo,
+            })
+
+        elif circuito == "esperando_visto_bueno":
+            dias_circuito = rnd.randint(2, 8)
+            pasos.append({
+                "accion": "Cuadrilla asignada",
+                "estado_anterior": EstadoReclamo.RECIBIDO,
+                "estado_nuevo": EstadoReclamo.EN_CURSO,
+                "comentario": f"Se despachó {cua.nombre}." if cua else "Se despachó la cuadrilla.",
+                "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "Trabajo terminado en campo",
+                "comentario": "Terminado. Queda a la espera del visto bueno del supervisor "
+                              "para cerrar el reclamo.",
+                "usuario": actor_campo,
+            })
+
+        elif circuito in ("resuelto_directo", "resuelto_con_ot"):
+            dias_circuito = rnd.randint(1, 6) if circuito == "resuelto_directo" else rnd.randint(3, 12)
+            pasos.append({
+                "accion": "Asignado" if circuito == "resuelto_directo" else "Cuadrilla asignada",
+                "estado_anterior": EstadoReclamo.RECIBIDO,
+                "estado_nuevo": EstadoReclamo.EN_CURSO,
+                "comentario": (f"Asignado a {emp.nombre} {emp.apellido}." if emp else
+                               "Tomado por la dependencia.") if circuito == "resuelto_directo"
+                              else (f"Se despachó {cua.nombre} con materiales." if cua else
+                                    "Se despachó la cuadrilla con materiales."),
+                "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "Parte de campo",
+                "comentario": "Trabajo ejecutado en el lugar.",
+                "usuario": actor_campo,
+            })
+            resolucion = RESOLUCIONES_RECLAMO[i % len(RESOLUCIONES_RECLAMO)]
+            pasos.append({
+                "accion": "Reclamo finalizado",
+                "estado_anterior": EstadoReclamo.EN_CURSO,
+                "estado_nuevo": EstadoReclamo.FINALIZADO,
+                "comentario": resolucion, "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "El vecino confirmó la solución",
+                "comentario": "El vecino verificó el trabajo y lo dio por resuelto.",
+                "usuario": vecino,
+            })
+            extra = {"resolucion": resolucion, "cierra": True, "confirmado": True}
+
+        elif circuito == "reabierto_disputado":
+            dias_circuito = rnd.randint(6, 20)
+            disputa = DISPUTAS_VECINO[i % len(DISPUTAS_VECINO)]
+            pasos.append({
+                "accion": "Asignado",
+                "estado_anterior": EstadoReclamo.RECIBIDO,
+                "estado_nuevo": EstadoReclamo.EN_CURSO,
+                "comentario": f"Asignado a {emp.nombre} {emp.apellido}." if emp else
+                              "Tomado por la dependencia.",
+                "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "Reclamo finalizado",
+                "estado_anterior": EstadoReclamo.EN_CURSO,
+                "estado_nuevo": EstadoReclamo.FINALIZADO,
+                "comentario": "Se dio por resuelto tras el paso de la cuadrilla.",
+                "usuario": supervisor,
+            })
+            pasos.append({
+                "accion": "El vecino NO conformó el cierre",
+                "estado_anterior": EstadoReclamo.FINALIZADO,
+                "estado_nuevo": EstadoReclamo.EN_CURSO,
+                "comentario": disputa, "usuario": vecino,
+            })
+            pasos.append({
+                "accion": "Reabierto y reasignado",
+                "comentario": f"Se reabre por disputa del vecino y se reasigna a "
+                              f"{emp.nombre} {emp.apellido}." if emp else
+                              "Se reabre por disputa del vecino.",
+                "usuario": supervisor,
+            })
+            extra = {"disputa": disputa}
+
+        fechas = _linea_de_tiempo(creado, len(pasos), dias_circuito)
+        for _p_idx, _p in enumerate(pasos):
+            _p["created_at"] = fechas[_p_idx]
+
+        # Prioridad: la que trae la categoría, salvo la tanda que el municipio
+        # marcó URGENTE (la cola con urgentes que ve el supervisor).
+        prioridad = getattr(cat, "prioridad_default", None) or 3
+        if rnd.random() < 0.16:
+            prioridad = 1
 
         reclamo = Reclamo(
             municipio_id=municipio_id,
-            titulo=r_data["titulo"],
-            descripcion=r_data["descripcion"],
-            estado=r_data["estado"],
-            prioridad=3,
-            direccion=r_data["direccion"],
-            latitud=muni_lat + r_data["lat_offset"],
-            longitud=muni_lng + r_data["lng_offset"],
+            titulo=titulo,
+            descripcion=descripcion,
+            estado=ESTADO_FINAL_RECLAMO[circuito],
+            created_at=creado,
+            fecha_recibido=fechas[1] if len(fechas) > 1 else None,
+            fecha_resolucion=(fechas[-2] if circuito in ("resuelto_directo", "resuelto_con_ot")
+                              else fechas[-1]) if extra.get("cierra") else None,
+            resolucion=extra.get("resolucion"),
+            motivo_rechazo=extra.get("motivo_rechazo"),
+            descripcion_rechazo=extra.get("descripcion_rechazo"),
+            confirmado_vecino=(True if extra.get("confirmado")
+                               else (False if extra.get("disputa") else None)),
+            fecha_confirmacion_vecino=(fechas[-1] if extra.get("confirmado")
+                                       else (fechas[-2] if extra.get("disputa") else None)),
+            comentario_confirmacion_vecino=extra.get("disputa"),
+            prioridad=prioridad,
+            # SIN PUNTO REAL NO SE INVENTA UNA DIRECCION (regla 11): queda el
+            # nombre del municipio (que es cierto) y sin coordenada, así el mapa
+            # no muestra un pin falso. `direccion` es NOT NULL.
+            direccion=punto["direccion"] if punto else (muni.nombre if muni else codigo),
+            latitud=punto["lat"] if punto else None,
+            longitud=punto["lon"] if punto else None,
             categoria_id=cat.id,
             zona_id=zona.id if zona else None,
             barrio_id=barrio.id if barrio else None,
-            creador_id=vecino_demo.id,
+            creador_id=vecino.id,
+            empleado_id=emp.id if emp else None,
             municipio_dependencia_id=muni_dep.id if muni_dep else None,
-            canal=_canal_demo,
+            canal=["app", "app", "whatsapp", "ventanilla_asistida"][i % 4],
         )
         db.add(reclamo)
         reclamos_creados_list.append(reclamo)
-        historiales_data.append(r_data["historial"])
+        trazas_rec.append(pasos)
 
-    await db.flush()  # UN solo flush para obtener los ids de los 4 reclamos
+        if circuito in OT_POR_CIRCUITO:
+            plan_ots.append({
+                "reclamo_pos": len(reclamos_creados_list) - 1,
+                "estado": OT_POR_CIRCUITO[circuito],
+                "titulo": titulo,
+                "categoria_id": cat.id,
+                "cuadrilla": cua,
+                "empleado": emp,
+                "inicio": fechas[1] if len(fechas) > 1 else creado,
+                "fin": fechas[-1],
+            })
 
-    for reclamo, hist_list in zip(reclamos_creados_list, historiales_data):
-        for h_data in hist_list:
-            db.add(HistorialReclamo(
+    await db.flush()   # UN solo flush para los 50 ids
+
+    historiales = []
+    for reclamo, pasos in zip(reclamos_creados_list, trazas_rec):
+        for p in pasos:
+            historiales.append(HistorialReclamo(
                 reclamo_id=reclamo.id,
-                usuario_id=vecino_demo.id,
-                accion=h_data["accion"],
-                estado_anterior=h_data.get("estado_anterior"),
-                estado_nuevo=h_data.get("estado_nuevo"),
-                comentario=h_data.get("comentario"),
+                usuario_id=p["usuario"].id,
+                accion=p["accion"],
+                estado_anterior=p.get("estado_anterior"),
+                estado_nuevo=p.get("estado_nuevo"),
+                comentario=p.get("comentario"),
+                created_at=p["created_at"],
             ))
-    reclamos_creados = len(reclamos_creados_list)
+    db.add_all(historiales)
     await db.flush()
 
-    # 9. Solicitudes de ejemplo: 2 por trámite del catálogo (estados variados).
-    # Genera datos de demo realistas. El vecino demo es solicitante de la mitad;
-    # el resto se genera como "otro vecino" sin user asociado (solo datos de contacto).
-    solicitudes_creadas = 0
+    reclamos_creados = len(reclamos_creados_list)
+    _con_coord = sum(1 for r in reclamos_creados_list if r.latitud is not None)
+    log.hito("reclamos", reclamos=reclamos_creados,
+             con_coordenada_real=_con_coord,
+             con_zona=sum(1 for r in reclamos_creados_list if r.zona_id),
+             con_barrio=sum(1 for r in reclamos_creados_list if r.barrio_id),
+             con_empleado_asignado=sum(1 for r in reclamos_creados_list if r.empleado_id),
+             urgentes=sum(1 for r in reclamos_creados_list if r.prioridad == 1),
+             movimientos_de_historial=len(historiales),
+             circuitos=[f"{k}: {v}" for k, v in sorted(resumen_circuitos.items())],
+             direcciones=[r.direccion for r in reclamos_creados_list[:10]],
+             estado="ok" if _con_coord == reclamos_creados else "degradado",
+             motivo=None if _con_coord == reclamos_creados else
+             f"{reclamos_creados - _con_coord} reclamos sin coordenada: no habia "
+             f"geografia real para esta ciudad (no se inventa una direccion)")
 
+    # 9.bis. Calificaciones: la devolución del vecino sobre lo que se cerró.
+    calificaciones_creadas = await _seed_calificaciones(db, reclamos_creados_list)
+    log.hito("calificaciones", calificaciones=calificaciones_creadas)
+
+    # ------------------------------------------------------------------
+    # 10. Órdenes de trabajo (el circuito de campo formal sobre los reclamos)
+    # ------------------------------------------------------------------
+    ot_counts = await _seed_ordenes_trabajo(
+        db, municipio_id, reclamos_creados_list, plan_ots, cuadrillas,
+        _operarios, admin_demo.id, rnd,
+    )
+    ots_creadas = ot_counts["ordenes_trabajo"]
+    log.hito("ordenes_trabajo", **ot_counts)
+
+    # ------------------------------------------------------------------
+    # 11. Solicitudes de trámite: 50 expedientes con sus circuitos
+    # ------------------------------------------------------------------
     # numero_tramite es UNIQUE GLOBAL (no por municipio). Arrancar desde el max
     # actual del año para no chocar con demos creadas previamente.
     _year = date.today().year
@@ -1212,128 +2153,476 @@ async def seed_demo_completo(
         "FROM solicitudes WHERE numero_tramite LIKE :patt"
     ), {"patt": f"SOL-{_year}-%"})
     _sol_offset = int(_r.scalar() or 0)
+
     _ASUNTOS_EXTRA = [
-        "Solicitud iniciada por ventanilla",
-        "Necesito resolver esto antes de fin de mes",
-    ]
-    _ESTADOS_CICLO = [
-        EstadoSolicitud.RECIBIDO,
-        EstadoSolicitud.EN_CURSO,
-        EstadoSolicitud.RECIBIDO,
-        EstadoSolicitud.FINALIZADO,
-        EstadoSolicitud.EN_CURSO,
-        EstadoSolicitud.POSPUESTO,
-        EstadoSolicitud.RECIBIDO,
-        EstadoSolicitud.FINALIZADO,
+        "Solicitud iniciada por la app.",
+        "Solicitud iniciada por ventanilla.",
+        "Necesito resolver esto antes de fin de mes.",
+        "Lo inicio ahora para tenerlo listo cuando abra el local.",
     ]
 
-    for t_idx, tramite in enumerate(tramites_creados):
-        for j in range(2):
-            sol_idx = t_idx * 2 + j
-            _sh = int(hashlib.sha1(f"{codigo}-sol-{sol_idx}".encode()).hexdigest(), 16)
-            estado = _ESTADOS_CICLO[sol_idx % len(_ESTADOS_CICLO)]
+    cuentas_sol = _mezcla(OBJETIVO_SOLICITUDES, CIRCUITOS_SOLICITUD, rnd)
+    circuitos_sol = _circuitos_por_antiguedad(cuentas_sol, CIRCUITOS_SOLICITUD, rnd)
+    # Corrimiento 1: el vecino que más reclama no es el que más trámites inicia.
+    duenios_sol = _reparto(OBJETIVO_SOLICITUDES, corrimiento=1)
+    resumen_circuitos_sol: dict[str, int] = {}
 
-            es_del_vecino = (sol_idx % 2 == 0)
-            _nom_sol = _nombre_demo if es_del_vecino else (
-                ["Mariana", "Roberto", "Claudia", "Héctor", "Patricia"][_sh % 5]
-            )
-            _ape_sol = _apellido_demo if es_del_vecino else (
-                ["Díaz", "Morales", "Herrera", "Castro", "Ríos"][_sh % 5]
-            )
-            _dni_sol = _dni_demo if es_del_vecino else str(30_000_000 + (_sh % 18_000_000))
+    solicitudes_nuevas: list[tuple] = []   # (Solicitud, pasos, circuito)
+    if tramites_operativos:
+        for i in range(OBJETIVO_SOLICITUDES):
+            tramite, t_data = tramites_operativos[i % len(tramites_operativos)]
+            circuito = circuitos_sol[i] if i < len(circuitos_sol) else "recibido"
+            # Un trámite gratis no puede estar "pendiente de pago": el circuito
+            # se degrada al que sí corresponde en vez de mentir un cobro.
+            if circuito == "pendiente_pago" and not (tramite.costo or 0) > 0:
+                circuito = "en_curso"
+            resumen_circuitos_sol[circuito] = resumen_circuitos_sol.get(circuito, 0) + 1
 
-            # Buscar dep asignada para este trámite. Si no hay match, fallback
-            # a una dependencia random del muni para no dejar la solicitud
-            # huérfana (causaba que las queries por dependencia las omitieran).
-            dep_id_sol = None
-            if t_idx < len(TRAMITES_DEMO):
-                dep_code = TRAMITES_DEMO[t_idx].get("dep_codigo")
-                if dep_code:
-                    muni_dep_obj = muni_deps.get(dep_code)
-                    if muni_dep_obj:
-                        dep_id_sol = muni_dep_obj.id
-            if dep_id_sol is None and muni_deps:
-                import random as _random
-                dep_id_sol = _random.choice(list(muni_deps.values())).id
+            # 4 de cada 5 expedientes son de los vecinos demo; el quinto entra
+            # por ventanilla a nombre de otra persona (sin cuenta), que es como
+            # llega buena parte del trabajo real de un municipio.
+            del_vecino = (i % 5) != 4
+            vecino = duenios_sol[i]
+            _sh = int(hashlib.sha1(f"{codigo}-sol-{i}".encode()).hexdigest(), 16)
+            if del_vecino:
+                _nom_sol, _ape_sol = vecino.nombre, vecino.apellido
+                _dni_sol, _tel_sol = vecino.dni, vecino.telefono
+                _mail_sol, _dir_sol = vecino.email, vecino.direccion
+            else:
+                _nom_sol = ["Mariana", "Roberto", "Claudia", "Héctor", "Patricia"][_sh % 5]
+                _ape_sol = ["Díaz", "Morales", "Herrera", "Castro", "Ríos"][_sh % 5]
+                _dni_sol = str(30_000_000 + (_sh % 18_000_000))
+                _tel_sol = _dir_sol = None
+                _mail_sol = f"{_nom_sol.lower()}.{_ape_sol.lower()}@mail.com"
 
-            numero = f"SOL-{_year}-{(_sol_offset + sol_idx + 1):05d}"
+            dep_code = t_data.get("dep_codigo") or CATEGORIA_TRAMITE_DEP_MAP.get(
+                t_data["categoria_tramite_nombre"])
+            muni_dep_sol = muni_deps.get(dep_code) if dep_code else None
+            supervisor_sol = sup_por_dep.get(dep_code) or _sup_fallback
+            # El expediente lo trabaja un administrativo, no un operario de campo.
+            emp_sol = _administrativos[i % len(_administrativos)] if _administrativos else None
+
+            creado_sol = _fecha_solicitud(i, OBJETIVO_SOLICITUDES, rnd)
+            dur = _duracion_tramite_dias(tramite.nombre, i)
+            estado_final = ESTADO_FINAL_SOLICITUD[circuito]
+
+            pasos_sol: list[dict] = [{
+                "accion": "Solicitud creada",
+                "estado_nuevo": EstadoSolicitud.RECIBIDO,
+                "comentario": ("Iniciada por el vecino desde la app."
+                               if del_vecino else
+                               "Iniciada en ventanilla con los datos del solicitante."),
+                # Si la inició otra persona sin cuenta, el actor es el
+                # administrativo que la cargó en el mostrador.
+                "usuario": vecino if del_vecino else supervisor_sol,
+            }]
+            observaciones = None
+
+            if circuito == "recibido":
+                dur = 0
+            elif circuito == "pendiente_pago":
+                pasos_sol.append({
+                    "accion": "A la espera del pago",
+                    "estado_anterior": EstadoSolicitud.RECIBIDO,
+                    "estado_nuevo": EstadoSolicitud.PENDIENTE_PAGO,
+                    "comentario": f"Se emitió la boleta por ${tramite.costo:,.0f}. "
+                                  f"El trámite avanza cuando se acredite el pago.",
+                    "usuario": supervisor_sol,
+                })
+            elif circuito == "esperando_documentacion":
+                observaciones = DOCS_FALTANTES[i % len(DOCS_FALTANTES)]
+                pasos_sol.append({
+                    "accion": "Expediente en curso",
+                    "estado_anterior": EstadoSolicitud.RECIBIDO,
+                    "estado_nuevo": EstadoSolicitud.EN_CURSO,
+                    "comentario": "Se abrió el expediente y se revisó la documentación.",
+                    "usuario": supervisor_sol,
+                })
+                pasos_sol.append({
+                    "accion": "Se pidió documentación al vecino",
+                    "comentario": observaciones,
+                    "usuario": supervisor_sol,
+                })
+            elif circuito == "en_curso":
+                pasos_sol.append({
+                    "accion": "Expediente en curso",
+                    "estado_anterior": EstadoSolicitud.RECIBIDO,
+                    "estado_nuevo": EstadoSolicitud.EN_CURSO,
+                    "comentario": f"Tomado por {emp_sol.nombre} {emp_sol.apellido}."
+                                  if emp_sol else "Tomado por la dependencia.",
+                    "usuario": supervisor_sol,
+                })
+            elif circuito == "pospuesto":
+                observaciones = MOTIVOS_POSPUESTO_SOLICITUD[i % len(MOTIVOS_POSPUESTO_SOLICITUD)]
+                pasos_sol.append({
+                    "accion": "Expediente en curso",
+                    "estado_anterior": EstadoSolicitud.RECIBIDO,
+                    "estado_nuevo": EstadoSolicitud.EN_CURSO,
+                    "comentario": "Se abrió el expediente.",
+                    "usuario": supervisor_sol,
+                })
+                pasos_sol.append({
+                    "accion": "Trámite pospuesto",
+                    "estado_anterior": EstadoSolicitud.EN_CURSO,
+                    "estado_nuevo": EstadoSolicitud.POSPUESTO,
+                    "comentario": observaciones, "usuario": supervisor_sol,
+                })
+            elif circuito == "rechazado":
+                observaciones = MOTIVOS_RECHAZO_SOLICITUD[i % len(MOTIVOS_RECHAZO_SOLICITUD)]
+                pasos_sol.append({
+                    "accion": "Expediente en curso",
+                    "estado_anterior": EstadoSolicitud.RECIBIDO,
+                    "estado_nuevo": EstadoSolicitud.EN_CURSO,
+                    "comentario": "Se abrió el expediente y pasó a revisión.",
+                    "usuario": supervisor_sol,
+                })
+                pasos_sol.append({
+                    "accion": "Trámite rechazado",
+                    "estado_anterior": EstadoSolicitud.EN_CURSO,
+                    "estado_nuevo": EstadoSolicitud.RECHAZADO,
+                    "comentario": observaciones, "usuario": supervisor_sol,
+                })
+            else:  # finalizado
+                if (tramite.costo or 0) > 0:
+                    pasos_sol.append({
+                        "accion": "Pago acreditado",
+                        "comentario": f"Se acreditó el pago de ${tramite.costo:,.0f}.",
+                        "usuario": vecino if del_vecino else supervisor_sol,
+                    })
+                pasos_sol.append({
+                    "accion": "Expediente en curso",
+                    "estado_anterior": EstadoSolicitud.RECIBIDO,
+                    "estado_nuevo": EstadoSolicitud.EN_CURSO,
+                    "comentario": f"Tomado por {emp_sol.nombre} {emp_sol.apellido}."
+                                  if emp_sol else "Tomado por la dependencia.",
+                    "usuario": supervisor_sol,
+                })
+                pasos_sol.append({
+                    "accion": "Trámite finalizado",
+                    "estado_anterior": EstadoSolicitud.EN_CURSO,
+                    "estado_nuevo": EstadoSolicitud.FINALIZADO,
+                    "comentario": "Trámite terminado. Se notificó al solicitante para el retiro.",
+                    "usuario": supervisor_sol,
+                })
+
+            fechas_sol = _linea_de_tiempo(creado_sol, len(pasos_sol), max(dur, 1))
+            for _k, _p in enumerate(pasos_sol):
+                _p["created_at"] = fechas_sol[_k]
+
             sol = Solicitud(
                 municipio_id=municipio_id,
-                numero_tramite=numero,
+                numero_tramite=f"SOL-{_year}-{(_sol_offset + i + 1):05d}",
                 tramite_id=tramite.id,
                 asunto=f"{tramite.nombre} — {_nom_sol} {_ape_sol}",
-                descripcion=_ASUNTOS_EXTRA[j % len(_ASUNTOS_EXTRA)],
-                estado=estado,
-                solicitante_id=vecino_demo.id if es_del_vecino else None,
+                descripcion=_ASUNTOS_EXTRA[i % len(_ASUNTOS_EXTRA)],
+                estado=estado_final,
+                solicitante_id=vecino.id if del_vecino else None,
                 nombre_solicitante=_nom_sol,
                 apellido_solicitante=_ape_sol,
                 dni_solicitante=_dni_sol,
-                email_solicitante=f"vecino@{codigo}.demo.com" if es_del_vecino else f"{_nom_sol.lower()}@mail.com",
-                telefono_solicitante=_telefono_demo if es_del_vecino else None,
-                direccion_solicitante=_direccion_demo if es_del_vecino else None,
-                municipio_dependencia_id=dep_id_sol,
-                prioridad=2 + (sol_idx % 3),
+                email_solicitante=_mail_sol,
+                telefono_solicitante=_tel_sol,
+                direccion_solicitante=_dir_sol,
+                municipio_dependencia_id=muni_dep_sol.id if muni_dep_sol else None,
+                empleado_id=emp_sol.id if emp_sol and circuito != "recibido" else None,
+                observaciones=observaciones,
+                canal="app" if del_vecino else "ventanilla_asistida",
+                prioridad=2 + (i % 3),
+                created_at=creado_sol,
+                fecha_resolucion=fechas_sol[-1] if circuito in ("finalizado", "rechazado") else None,
             )
             db.add(sol)
-            await db.flush()
+            solicitudes_nuevas.append((sol, pasos_sol, circuito))
 
-            db.add(HistorialSolicitud(
+    await db.flush()   # UN flush para los 50 ids (antes era uno POR solicitud)
+
+    hist_sol = []
+    for sol, pasos_sol, _circ in solicitudes_nuevas:
+        for p in pasos_sol:
+            hist_sol.append(HistorialSolicitud(
                 solicitud_id=sol.id,
-                usuario_id=vecino_demo.id if es_del_vecino else None,
-                estado_nuevo=EstadoSolicitud.RECIBIDO,
-                accion="Solicitud creada",
-                comentario="Solicitud generada automáticamente en la demo.",
+                usuario_id=p["usuario"].id if p.get("usuario") is not None else None,
+                estado_anterior=p.get("estado_anterior"),
+                estado_nuevo=p.get("estado_nuevo"),
+                accion=p["accion"],
+                comentario=p.get("comentario"),
+                created_at=p["created_at"],
             ))
-            if estado != EstadoSolicitud.RECIBIDO:
-                db.add(HistorialSolicitud(
-                    solicitud_id=sol.id,
-                    usuario_id=supervisores_demo[0].id if supervisores_demo else None,
-                    estado_anterior=EstadoSolicitud.RECIBIDO,
-                    estado_nuevo=estado,
-                    accion=f"Cambio a {estado.value}",
-                    comentario="Avance del trámite (demo).",
-                ))
-            solicitudes_creadas += 1
+    db.add_all(hist_sol)
     await db.flush()
+    solicitudes_creadas = len(solicitudes_nuevas)
+    log.hito("solicitudes", solicitudes=solicitudes_creadas,
+             movimientos_de_historial=len(hist_sol),
+             de_los_vecinos_demo=sum(1 for s, _p, _c in solicitudes_nuevas if s.solicitante_id),
+             por_ventanilla=sum(1 for s, _p, _c in solicitudes_nuevas if not s.solicitante_id),
+             circuitos=[f"{k}: {v}" for k, v in sorted(resumen_circuitos_sol.items())])
 
     # ------------------------------------------------------------------
-    # 10. Órdenes de trabajo (el circuito de campo formal sobre los reclamos)
+    # 12. TRAZABILIDAD POR ACTOR + reparto en el tiempo
     # ------------------------------------------------------------------
-    ots_creadas = await _seed_ordenes_trabajo(
-        db, municipio_id, reclamos_creados_list, cuadrillas, empleados, admin_demo.id,
+    # Lo que el dueño quiere leer en la pantalla "Semilla" sin abrir la base:
+    # quién creó qué, quién lo gestionó y quién lo ejecutó.
+    def _por_actor(pares: list) -> list:
+        """[(nombre, 1), ...] → ["Nombre — N"], de mayor a menor."""
+        acc: dict[str, int] = {}
+        for nombre, cuanto in pares:
+            acc[nombre] = acc.get(nombre, 0) + cuanto
+        return [f"{k} — {v}" for k, v in sorted(acc.items(), key=lambda kv: -kv[1])]
+
+    _nom_user = {v.id: f"{v.nombre} {v.apellido or ''}".strip() for v in vecinos_demo}
+    _nom_sup = {s.id: f"{s.nombre} {s.apellido or ''}".strip() for s in supervisores_demo}
+
+    _mes = {}
+    for r in reclamos_creados_list:
+        k = (r.created_at or datetime.utcnow()).strftime("%Y-%m")
+        _mes[k] = _mes.get(k, 0) + 1
+    _mes_sol = {}
+    for s, _p, _c in solicitudes_nuevas:
+        k = (s.created_at or datetime.utcnow()).strftime("%Y-%m")
+        _mes_sol[k] = _mes_sol.get(k, 0) + 1
+
+    _gestion_sup = []
+    for _r_obj, _pasos in zip(reclamos_creados_list, trazas_rec):
+        for _p in _pasos:
+            if _p["usuario"].id in _nom_sup:
+                _gestion_sup.append((_nom_sup[_p["usuario"].id], 1))
+    for _s_obj, _pasos_s, _c in solicitudes_nuevas:
+        for _p in _pasos_s:
+            if _p["usuario"] is not None and _p["usuario"].id in _nom_sup:
+                _gestion_sup.append((_nom_sup[_p["usuario"].id], 1))
+
+    log.hito(
+        "trazabilidad",
+        reclamos_por_vecino=_por_actor(
+            [(_nom_user.get(r.creador_id, "?"), 1) for r in reclamos_creados_list]),
+        solicitudes_por_vecino=_por_actor(
+            [(_nom_user.get(s.solicitante_id, "por ventanilla"), 1)
+             for s, _p, _c in solicitudes_nuevas]),
+        movimientos_por_supervisor=_por_actor(_gestion_sup),
+        ots_por_cuadrilla=ot_counts.get("por_cuadrilla") or [],
+        ots_por_operario=ot_counts.get("por_operario") or [],
+        reclamos_por_mes=[f"{k}: {v}" for k, v in sorted(_mes.items())],
+        solicitudes_por_mes=[f"{k}: {v}" for k, v in sorted(_mes_sol.items())],
+        ventana_dias=VENTANA_DIAS,
     )
 
-    # Inventario demo (activos + consumibles) — se cruza con las OT.
-    from services.inventario_seed import seed_inventario
-    inv_res = await seed_inventario(db, municipio_id, incluir_demo=True)
-
-    # Tipos de trabajo (template configurable, para el formato de la OT).
-    from services.ot_tipos_seed import seed_tipos_trabajo
-    await seed_tipos_trabajo(db, municipio_id)
+    # La OT ya no tiene catálogo propio de "tipos de trabajo": clasifica con las
+    # categorías de reclamo del muni (sembradas en categorias_seed), así que acá
+    # no hay nada extra que sembrar.
 
     # Activar los módulos opt-in en los munis demo, así la demo muestra el
     # circuito completo (campo + inventario + sueldos + contaduría). El seed
     # corre una sola vez por muni nuevo, no hace falta chequear duplicados.
     from models.municipio_modulo import MunicipioModulo
-    for _mod in ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria'):
+    _modulos = ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria', 'comunicacion')
+    for _mod in _modulos:
         db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()
+    log.hito("modulos", modulos=list(_modulos))
+
+    avisos_creados = await _seed_avisos(db, municipio_id, len(vecinos_demo), log)
 
     return {
         "dependencias": len(muni_deps),
         "dependencias_activas": len(supervisores_demo),
         "tramites": len(tramites_creados),
-        "usuarios": 2 + len(supervisores_demo) + len(empleados_login),  # admin + vecino + supervisores + logins de empleado
+        # admin + los 3 vecinos + supervisores + logins de empleado
+        "usuarios": 1 + len(vecinos_demo) + len(supervisores_demo) + len(empleados_login),
+        "vecinos": len(vecinos_demo),
         "zonas": len(zonas),
         "barrios": len(barrios),
         "empleados": len(empleados),
         "cuadrillas": len(cuadrillas),
         "sla_configs": sla_count,
         "reclamos": reclamos_creados,
+        "calificaciones": calificaciones_creadas,
         "solicitudes": solicitudes_creadas,
         "ordenes_trabajo": ots_creadas,
         "inventario_items": inv_res["items"],
+        "avisos": avisos_creados,
+        # La demo tiene que poder DECIR si hablo de la ciudad del cliente o si
+        # se quedo corta. Sin esto una demo sin geografia se ve igual de bien en
+        # la respuesta del alta y el problema aparece recien en pantalla.
+        "geografia": {
+            "fuente_poligono": geo_ctx.get("fuente_poligono"),
+            "degradacion": geo_ctx.get("degradacion"),
+            "zonas_reales": [z["nombre"] for z in geo_ctx.get("zonas") or []],
+            "barrios_reales": [b["nombre"] for b in geo_ctx.get("barrios") or []],
+            "puntos": len(geo),
+        },
     }
+
+
+# ============================================================
+# Avisos al vecino (modulo Comunicacion)
+# ============================================================
+
+# La demo tiene que mostrar la pantalla EN USO, no una lista vacia: por eso
+# hay avisos ya notificados, uno vigente SIN notificar (para que el tablero
+# tenga algo para hacer), uno programado y uno vencido (que prueba que la
+# vigencia apaga el aviso sola). Contenido municipal generico: ningun nombre
+# de persona ni dato que se pueda confundir con real.
+#
+# Fotos REALES con licencia comercial (Openverse/Flickr), verificadas una por
+# una: responden 200, son JPEG y pesan menos de 350 KB. Nada de placeholders
+# genericos ni fotos sin relacion con el tema del aviso.
+FOTO = {
+    "agua": "https://live.staticflickr.com/1160/979654762_e69e4770e3_b.jpg",
+    "vacunacion": "https://live.staticflickr.com/3601/3610076880_b09b78550a_b.jpg",
+    "recoleccion": "https://live.staticflickr.com/7015/6469424599_0b0912bd92_b.jpg",
+    "poda": "https://live.staticflickr.com/5517/9517319399_c94037c6f4_b.jpg",
+    "obra": "https://live.staticflickr.com/8533/15615541840_f94883830d_b.jpg",
+    "feria": "https://live.staticflickr.com/8433/7590604662_cdd8eedc1c_b.jpg",
+}
+
+# (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto,
+#  recurrencia, dias, segmentada)
+#   creado_hace: dias hacia atras del created_at
+#   desde/hasta: dias respecto de HOY (None = sin fecha)
+# Los dos ultimos campos son el CRONOGRAMA: cada cuanto se repite y, en la
+# semanal, que dias (0 = lunes). Lo que ya se contaba en el texto ("los martes
+# y viernes") ahora tambien es un dato: asi el vecino lo ve como cronograma y
+# no como un aviso que vence. El ultimo campo marca la unica segmentada de la
+# demo, para que se vea que un aviso puede ir a una sola zona.
+AVISOS_DEMO = [
+    ("Corte de agua en el centro",
+     "Manana de 8 a 14 no va a haber agua por una reparacion en la red. Recomendamos juntar antes.",
+     "aviso", 1, 0, 1, True, True, FOTO["agua"], None, None, False),
+    ("Cambia el cronograma de recoleccion",
+     "Desde esta semana los residuos reciclables se retiran los martes y viernes por la manana.",
+     "aviso", 2, 0, None, False, True, FOTO["recoleccion"], "semanal", "1,4", False),
+    ("Vacunacion antirrabica gratuita",
+     "Los sabados de 9 a 13 en la plaza central. Traer al animal con correa o en transportadora.",
+     "aviso", 0, 0, 10, False, False, FOTO["vacunacion"], "semanal", "5", False),
+    ("Poda de arbolado",
+     "La proxima semana empieza la poda programada. Los dias que toque cada sector se avisan por este medio.",
+     "aviso", 0, 3, 12, False, False, FOTO["poda"], None, None, True),
+    ("Termino la obra de cordon cuneta",
+     "Se completaron las diez cuadras previstas. La proxima etapa arranca el mes que viene.",
+     "noticia", 8, None, None, False, True, FOTO["obra"], None, None, False),
+    ("Feria de emprendedores",
+     "El fin de semana pasado la feria reunio a mas de treinta puestos de vecinos de la ciudad.",
+     "aviso", 12, -10, -3, False, True, FOTO["feria"], None, None, False),
+]
+
+
+async def _seed_avisos(db: AsyncSession, municipio_id: int, vecinos: int, log=None) -> int:
+    """Siembra el feed de novedades del vecino con historia.
+
+    `enviados_count` sale de los vecinos que la demo realmente creo: un numero
+    inventado ahi seria un dato falso en pantalla."""
+    from models.noticia import Noticia
+    from models.zona import Zona
+
+    # La zona de la publicacion segmentada. Si la demo no llego a cargar
+    # zonas, esa publicacion sale para todo el municipio: mejor sin segmentar
+    # que apuntando a una zona que no existe.
+    primera_zona = (await db.execute(
+        select(Zona.id).where(Zona.municipio_id == municipio_id).order_by(Zona.nombre).limit(1)
+    )).scalar_one_or_none()
+
+    hoy = datetime.utcnow().date()
+    creados = 0
+    dirigidas: list = []
+    for (titulo, texto, tipo, creado_hace, desde, hasta, fijado, avisado, foto,
+         recurrencia, dias, segmentada) in AVISOS_DEMO:
+        created = (datetime.utcnow() - timedelta(days=creado_hace)).replace(
+            hour=9 + (creados * 3) % 8, minute=(creados * 13) % 60, second=0, microsecond=0)
+        db.add(Noticia(
+            municipio_id=municipio_id,
+            titulo=titulo,
+            descripcion=texto,
+            imagen_url=foto,
+            tipo=tipo,
+            fecha_desde=(hoy + timedelta(days=desde)) if desde is not None else None,
+            fecha_hasta=(hoy + timedelta(days=hasta)) if hasta is not None else None,
+            fijado=fijado,
+            activo=True,
+            enviado_at=(created + timedelta(hours=2)) if avisado else None,
+            enviados_count=vecinos if avisado else 0,
+            recurrencia=recurrencia,
+            dias_semana=dias,
+            created_at=created,
+        ))
+        # A que zonas va: la puente se llena despues del flush, cuando la
+        # noticia ya tiene id.
+        if segmentada and primera_zona:
+            dirigidas.append((titulo, primera_zona))
+        creados += 1
+
+    await db.flush()
+
+    if dirigidas:
+        from models.noticia import noticia_zonas
+        for titulo, zona in dirigidas:
+            nid = (await db.execute(
+                select(Noticia.id).where(
+                    Noticia.municipio_id == municipio_id, Noticia.titulo == titulo)
+            )).scalar_one_or_none()
+            if nid:
+                await db.execute(noticia_zonas.insert(),
+                                 [{"noticia_id": nid, "zona_id": zona}])
+
+    if log:
+        log.hito("avisos", avisos=creados)
+    return creados
+
+
+# ============================================================
+# Calificaciones demo (la devolución del vecino sobre lo cerrado)
+# ============================================================
+
+async def _seed_calificaciones(db: AsyncSession, reclamos: list) -> int:
+    """Califica DOS DE CADA TRES reclamos cerrados (determinístico).
+
+    Que califiquen todos es tan falso como que no califique nadie: en la
+    realidad contesta una parte. Con puntuaciones 3-5 y alguna 2 (un municipio
+    con 5,0 perfecto no le cree nadie), sub-puntajes coherentes con la nota
+    general y 1 de cada 3 sin comentario. La fecha es 1-5 días DESPUÉS de la
+    resolución — el vecino contesta cuando ya vio el trabajo hecho.
+
+    Como el `usuario_id` sale de `reclamo.creador_id`, las calificaciones se
+    reparten solas entre los tres vecinos demo, en la misma proporción en la
+    que reclamaron.
+    """
+    from models.calificacion import Calificacion
+
+    ahora = datetime.utcnow()
+    cerrados = [r for r in reclamos
+                if r.estado in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)]
+    creadas = 0
+    nuevas = []
+    for k, rec in enumerate(cerrados):
+        if k % 3 == 2:  # dos sí, uno no
+            continue
+        # `n` es el número de calificación (no de reclamo): así las primeras
+        # tres ya cubren un 5, un 3 y un 4. Con el ciclo sobre `k` un demo
+        # chico daba 5-5-4 y un promedio de 4,7 que no le cree nadie.
+        n = creadas
+        puntuacion = (5, 3, 4, 5, 2, 4, 5, 3)[n % 8]
+        base = rec.fecha_resolucion or rec.created_at or ahora
+        cuando = base + timedelta(days=1 + (n % 5), hours=(n * 7) % 10)
+        if cuando >= ahora:
+            cuando = ahora - timedelta(hours=6)
+        nuevas.append(Calificacion(
+            reclamo_id=rec.id,
+            usuario_id=rec.creador_id,
+            puntuacion=puntuacion,
+            # El que puntúa alto suele quejarse igual de la demora, y al
+            # revés: los sub-puntajes se mueven alrededor de la nota, no la
+            # repiten.
+            tiempo_respuesta=max(1, min(5, puntuacion - (1 if n % 3 == 0 else 0))),
+            calidad_trabajo=max(1, min(5, puntuacion + (1 if n % 4 == 0 else 0))),
+            atencion=max(1, min(5, puntuacion + (1 if puntuacion < 5 else 0))),
+            comentario=None if n % 3 == 2 else COMENTARIOS_CALIFICACION[
+                n % len(COMENTARIOS_CALIFICACION)],
+            tags="rapido,amable" if puntuacion >= 4 else "demoro",
+            created_at=cuando,
+        ))
+        creadas += 1
+    db.add_all(nuevas)
+    await db.flush()
+    return creadas
 
 
 # ============================================================
@@ -1344,94 +2633,215 @@ async def _seed_ordenes_trabajo(
     db: AsyncSession,
     municipio_id: int,
     reclamos: list,
+    plan: list,
     cuadrillas: list,
-    empleados: list,
+    operarios: list,
     creador_id: int,
-) -> int:
-    """10 OTs en estados variados, vinculadas a los reclamos demo.
+    rnd,
+) -> dict:
+    """Las órdenes de trabajo que PIDIERON los reclamos, más las preventivas.
 
-    Cubre los casos que se muestran en demo: OT pendiente sin asignar,
-    asignada a cuadrilla, en curso, completada (con horas reales y notas)
-    y cancelada. Incluye 1 reclamo con 2 OTs (poda + bacheo del mismo
-    evento), 1 OT que agrupa 2 reclamos, y 2 preventivas sin reclamo.
+    Antes eran 10 OTs de una lista fija cuyos `materiales` eran un JSON suelto:
+    una OT "completada" que decía haber usado 4 bolsas de cemento sin que el
+    inventario del municipio se enterara. Ahora:
+
+      - cada OT nace del circuito de su reclamo (`plan`), con la MISMA cuadrilla
+        y el mismo operario que figuran en el historial del reclamo y con fechas
+        dentro de la vida de ese reclamo;
+      - una OT completada CONSUME de verdad (descuenta stock del consumible y
+        deja el `OrdenTrabajoRecurso` aplicado) y devuelve el activo que tomó;
+      - una OT en curso tiene el activo TOMADO (el ítem queda `en_uso` y sabe
+        qué OT lo tiene), que es lo que hace demostrable la pantalla de
+        inventario;
+      - las preventivas (sin reclamo), la cancelada y las pendientes sin asignar
+        se agregan al final para que la cola de la cuadrilla no quede vacía.
+
+    Devuelve counts para el log de seeding.
     """
     from datetime import date, time as _time, timedelta
     from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
-    from models.enums import EstadoOrdenTrabajo
+    from models.inventario import InventarioItem, OrdenTrabajoRecurso
+    from models.enums import (
+        EstadoOrdenTrabajo, PrioridadOT, NaturalezaInventario, EstadoActivo,
+        TipoRecursoOT,
+    )
 
     hoy = date.today()
     ahora = datetime.utcnow()
 
-    def _c(i):
-        return cuadrillas[i % len(cuadrillas)].id if cuadrillas else None
+    items = (await db.execute(
+        select(InventarioItem).where(InventarioItem.municipio_id == municipio_id)
+    )).scalars().all()
+    activos = [i for i in items if i.naturaleza == NaturalezaInventario.ACTIVO]
+    consumibles = [i for i in items if i.naturaleza == NaturalezaInventario.CONSUMIBLE]
 
-    def _e(i):
-        return empleados[i % len(empleados)].id if empleados else None
+    _ESTADOS = {
+        "completada": EstadoOrdenTrabajo.COMPLETADA,
+        "en_curso": EstadoOrdenTrabajo.EN_CURSO,
+        "bloqueada": EstadoOrdenTrabajo.BLOQUEADA,
+        "asignada": EstadoOrdenTrabajo.ASIGNADA,
+        "pendiente": EstadoOrdenTrabajo.PENDIENTE,
+        "cancelada": EstadoOrdenTrabajo.CANCELADA,
+    }
 
-    def _r(i):
-        return reclamos[i % len(reclamos)] if reclamos else None
-
-    # (titulo, estado, cuadrilla_idx|None, empleado_idx|None, dias_prog,
-    #  materiales, h_est, h_real, notas_cierre, reclamo_idxs)
-    OTS = [
-        ("Bacheo de la calzada", EstadoOrdenTrabajo.PENDIENTE, None, None, 3,
-         [{"descripcion": "Asfalto en frío", "cantidad": 6, "unidad": "bolsas"}], 4.0, None, None, [0]),
-        ("Reposición de luminaria", EstadoOrdenTrabajo.PENDIENTE, None, None, 2,
-         [{"descripcion": "Lámpara LED 150W", "cantidad": 1, "unidad": "u"}], 2.0, None, None, [1]),
-        ("Retiro de residuos acumulados", EstadoOrdenTrabajo.ASIGNADA, 0, 2, 1,
-         None, 3.0, None, None, [2]),
-        ("Recambio de semáforo", EstadoOrdenTrabajo.ASIGNADA, 1, 4, 2,
-         [{"descripcion": "Controlador semafórico", "cantidad": 1, "unidad": "u"}], 6.0, None, None, [3]),
-        ("Poda correctiva de arbolado", EstadoOrdenTrabajo.EN_CURSO, 2, 3, 0,
-         [{"descripcion": "Combustible motosierra", "cantidad": 10, "unidad": "l"}], 5.0, None, None, [0]),
-        ("Limpieza integral del sector", EstadoOrdenTrabajo.EN_CURSO, 0, 2, 0,
-         None, 4.0, None, None, [1, 2]),
-        ("Nivelación y compactado", EstadoOrdenTrabajo.EN_CURSO, 0, 0, 0,
-         [{"descripcion": "Tosca", "cantidad": 2, "unidad": "m3"}], 8.0, None, None, [3]),
-        ("Reparación de vereda hundida", EstadoOrdenTrabajo.COMPLETADA, 0, 0, -2,
-         [{"descripcion": "Cemento", "cantidad": 4, "unidad": "bolsas"}], 6.0, 5.0,
-         "Trabajo terminado sin observaciones. Se repuso la baldosa faltante.", [0]),
-        ("Mantenimiento preventivo de luminarias", EstadoOrdenTrabajo.COMPLETADA, 1, 1, -5,
-         [{"descripcion": "Lámpara LED 150W", "cantidad": 4, "unidad": "u"}], 4.0, 3.5,
-         "Recorrida completa del corredor. 4 luminarias recambiadas.", []),
-        ("Desmalezado de banquinas", EstadoOrdenTrabajo.CANCELADA, 2, None, -1,
-         None, 6.0, None, None, []),
+    # Las órdenes preventivas y de cola: no salen de un reclamo, salen de la
+    # planificación del municipio. Sin ellas la pantalla de OT sería un espejo
+    # exacto de la de reclamos, y no lo es.
+    PREVENTIVAS = [
+        ("Mantenimiento preventivo de luminarias del corredor", "completada", -18),
+        ("Recorrida de desmalezado de banquinas", "completada", -9),
+        ("Limpieza de sumideros antes de la temporada de lluvias", "en_curso", 0),
+        ("Pintura de sendas peatonales de las escuelas", "asignada", 3),
+        ("Reposición de cartelería del casco urbano", "pendiente", 6),
+        ("Poda programada del arbolado del boulevard", "pendiente", 9),
+        ("Bacheo del acceso norte", "cancelada", -4),
     ]
 
-    creadas = 0
-    for i, (titulo, estado, c_idx, e_idx, dias, mat, h_est, h_real, notas, r_idxs) in enumerate(OTS):
+    filas: list[tuple] = []   # (OrdenTrabajo, reclamo|None, clave_estado)
+    numero = 0
+
+    def _nueva(titulo, clave, cuadrilla, empleado, inicio, fin, dias_prog,
+               categoria_id=None, reclamo=None):
+        nonlocal numero
+        numero += 1
+        estado = _ESTADOS[clave]
+        completada = clave == "completada"
+        arrancada = clave in ("completada", "en_curso", "bloqueada")
+        h_est = float(rnd.choice([2, 3, 4, 5, 6, 8]))
         ot = OrdenTrabajo(
             municipio_id=municipio_id,
-            numero=f"OT-{hoy.year}-{i + 1:04d}",
+            numero=f"OT-{hoy.year}-{numero:04d}",
             estado=estado,
-            titulo=titulo,
-            descripcion=f"{titulo} — generada como ejemplo del circuito de campo.",
-            cuadrilla_id=_c(c_idx) if c_idx is not None else None,
-            empleado_id=_e(e_idx) if e_idx is not None else None,
-            fecha_programada=hoy + timedelta(days=dias),
+            titulo=titulo[:200],
+            descripcion=f"{titulo} — trabajo de campo del municipio.",
+            categoria_id=categoria_id,
+            prioridad=rnd.choice([PrioridadOT.BAJA, PrioridadOT.MEDIA,
+                                  PrioridadOT.MEDIA, PrioridadOT.ALTA,
+                                  PrioridadOT.URGENTE]),
+            cuadrilla_id=cuadrilla.id if cuadrilla is not None else None,
+            empleado_id=empleado.id if empleado is not None else None,
+            fecha_programada=(inicio.date() if inicio else hoy + timedelta(days=dias_prog)),
             hora_inicio=_time(8, 0),
             hora_fin=_time(12, 0),
-            materiales=mat,
             horas_estimadas=h_est,
-            horas_reales=h_real,
-            notas_cierre=notas,
-            motivo_cancelacion="Se resolvió por administración antes de salir a campo."
-            if estado == EstadoOrdenTrabajo.CANCELADA else None,
-            fecha_inicio_real=ahora - timedelta(hours=3)
-            if estado in (EstadoOrdenTrabajo.EN_CURSO, EstadoOrdenTrabajo.COMPLETADA) else None,
-            fecha_completada=ahora - timedelta(days=abs(dias))
-            if estado == EstadoOrdenTrabajo.COMPLETADA else None,
+            horas_reales=round(h_est + rnd.uniform(-1.5, 1.5), 1) if completada else None,
+            notas_cierre=("Trabajo terminado y verificado en el lugar."
+                          if completada else None),
+            motivo_cancelacion=("Se resolvió por administración antes de salir a campo."
+                                if clave == "cancelada" else None),
+            fecha_inicio_real=inicio if arrancada else None,
+            fecha_completada=fin if completada else None,
             creador_id=creador_id,
         )
         db.add(ot)
-        await db.flush()
-        for r_idx in r_idxs:
-            rec = _r(r_idx)
-            if rec is not None:
-                db.add(OrdenTrabajoReclamo(orden_trabajo_id=ot.id, reclamo_id=rec.id))
-        creadas += 1
+        filas.append((ot, reclamo, clave))
+        return ot
+
+    for p in plan:
+        rec = reclamos[p["reclamo_pos"]] if p["reclamo_pos"] < len(reclamos) else None
+        _nueva(p["titulo"], p["estado"], p.get("cuadrilla"), p.get("empleado"),
+               p.get("inicio"), p.get("fin"), 0,
+               categoria_id=p.get("categoria_id"), reclamo=rec)
+
+    for titulo, clave, dias in PREVENTIVAS:
+        cua = rnd.choice(cuadrillas) if cuadrillas and clave != "pendiente" else None
+        emp = rnd.choice(operarios) if operarios and clave not in ("pendiente", "cancelada") else None
+        inicio = (ahora + timedelta(days=dias)) if dias < 0 else None
+        fin = (ahora + timedelta(days=dias, hours=5)) if dias < 0 else None
+        _nueva(titulo, clave, cua, emp, inicio, fin, dias)
+
+    await db.flush()   # UN flush para todos los ids (antes era uno por OT)
+
+    # --- Vínculos con los reclamos + recursos de inventario ---
+    vinculos = []
+    recursos = []
+    materiales_por_ot: dict[int, list] = {}
+    con_consumo = con_activo = 0
+    activos_tomados = 0
+    i_act = i_con = 0
+
+    for ot, rec, clave in filas:
+        if rec is not None:
+            vinculos.append(OrdenTrabajoReclamo(orden_trabajo_id=ot.id, reclamo_id=rec.id))
+
+        # CONSUMO: solo las que efectivamente se ejecutaron. Una OT completada
+        # sin materiales es lo que el WO pide evitar.
+        if clave == "completada" and consumibles:
+            cuantos = 1 + (i_con % 2)
+            usados = []
+            for k in range(cuantos):
+                item = consumibles[(i_con + k) % len(consumibles)]
+                cant = float(rnd.randint(1, 6))
+                recursos.append(OrdenTrabajoRecurso(
+                    orden_trabajo_id=ot.id, item_id=item.id,
+                    tipo=TipoRecursoOT.CONSUMO, cantidad=cant,
+                    item_nombre=item.nombre, aplicado=True,
+                ))
+                # El stock BAJA de verdad: si no, la pantalla de inventario
+                # muestra el stock inicial intacto después de 20 trabajos.
+                item.stock_actual = max(0.0, (item.stock_actual or 0.0) - cant)
+                usados.append({"descripcion": item.nombre, "cantidad": cant,
+                               "unidad": item.unidad or "u"})
+            materiales_por_ot[ot.id] = usados
+            i_con += cuantos
+            con_consumo += 1
+
+        # RESERVA de un activo. Las en curso lo tienen TOMADO; las completadas
+        # lo tomaron y lo devolvieron (queda el registro, el ítem vuelve libre).
+        if clave in ("completada", "en_curso") and activos:
+            item = activos[i_act % len(activos)]
+            i_act += 1
+            ya_ocupado = item.estado_activo == EstadoActivo.EN_USO
+            if not (clave == "en_curso" and ya_ocupado):
+                recursos.append(OrdenTrabajoRecurso(
+                    orden_trabajo_id=ot.id, item_id=item.id,
+                    tipo=TipoRecursoOT.RESERVA, cantidad=None,
+                    item_nombre=item.nombre, aplicado=True,
+                ))
+                con_activo += 1
+                if clave == "en_curso":
+                    item.estado_activo = EstadoActivo.EN_USO
+                    item.ocupado_por_ot_id = ot.id
+                    activos_tomados += 1
+
+    for ot, _rec, _clave in filas:
+        if ot.id in materiales_por_ot:
+            ot.materiales = materiales_por_ot[ot.id]
+
+    db.add_all(vinculos)
+    db.add_all(recursos)
     await db.flush()
-    return creadas
+
+    por_estado: dict[str, int] = {}
+    for _ot, _rec, clave in filas:
+        por_estado[clave] = por_estado.get(clave, 0) + 1
+
+    por_cuadrilla: dict[str, int] = {}
+    por_operario: dict[str, int] = {}
+    nom_cua = {c.id: c.nombre for c in cuadrillas}
+    nom_ope = {e.id: f"{e.nombre} {e.apellido}" for e in operarios}
+    for ot, _rec, _clave in filas:
+        if ot.cuadrilla_id in nom_cua:
+            por_cuadrilla[nom_cua[ot.cuadrilla_id]] = por_cuadrilla.get(
+                nom_cua[ot.cuadrilla_id], 0) + 1
+        if ot.empleado_id in nom_ope:
+            por_operario[nom_ope[ot.empleado_id]] = por_operario.get(
+                nom_ope[ot.empleado_id], 0) + 1
+
+    return {
+        "ordenes_trabajo": len(filas),
+        "desde_reclamo": len(plan),
+        "preventivas_y_cola": len(filas) - len(plan),
+        "vinculos_ot_reclamo": len(vinculos),
+        "con_materiales_consumidos": con_consumo,
+        "con_activo_reservado": con_activo,
+        "activos_en_uso_ahora": activos_tomados,
+        "por_estado": [f"{k}: {v}" for k, v in sorted(por_estado.items())],
+        "por_cuadrilla": [f"{k} — {v}" for k, v in sorted(por_cuadrilla.items(),
+                                                          key=lambda kv: -kv[1])],
+        "por_operario": [f"{k} — {v}" for k, v in sorted(por_operario.items(),
+                                                         key=lambda kv: -kv[1])],
+    }
 
 
 # ============================================================
@@ -1444,7 +2854,7 @@ _MODOS_SIN_TURNO_KW = ("denuncia", "reclamo")
 _MODOS_KYC_KW = ("licencia", "conducir")
 
 
-async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
+async def seed_turnero_demo(db: AsyncSession, municipio_id: int, log=None) -> dict:
     """Deja el turnero demoable: cura el modo de atención de TODOS los
     trámites del muni (los de seed_10_demos nacen 'online'), asegura que
     cada trámite presencial tenga oficina mapeada, y carga turnos de
@@ -1534,10 +2944,6 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
             excepciones_creadas += 1
         await db.flush()
 
-    vecino = (await db.execute(
-        select(User).where(User.municipio_id == municipio_id, User.rol == RolUsuario.VECINO).limit(1)
-    )).scalars().first()
-
     mapeados = set((await db.execute(
         select(MunicipioDependenciaTramite.tramite_id)
         .join(MunicipioDependencia,
@@ -1580,10 +2986,23 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
                 con_turno.append(t)
     await db.flush()
 
-    # Turnos de ejemplo sobre los trámites con turno (si hay vecino demo).
-    # Futuros: próximos días hábiles a la mañana. Pasados: última semana con
-    # estados variados para que los KPIs de la agenda no arranquen en cero.
-    if vecino and con_turno and deps:
+    # ==================================================================
+    # LOS TURNOS CUELGAN DE EXPEDIENTES QUE EXISTEN
+    # ==================================================================
+    # Antes los turnos se inventaban sueltos: 15 futuros + 22 pasados sobre un
+    # trámite cualquiera y siempre del mismo vecino. Un turno "cumplido" de una
+    # solicitud que nunca existió es exactamente lo que el WO prohíbe, y además
+    # dejaba la agenda desconectada del mostrador.
+    #
+    # Ahora cada turno sale de una SOLICITUD real del muni:
+    #   - expediente cerrado (finalizado / rechazado) -> turno PASADO, entre su
+    #     creación y su resolución, con resultado (cumplido / ausente / cancelado);
+    #   - expediente abierto y viejo -> turno pasado, ya atendido;
+    #   - expediente abierto y reciente -> turno FUTURO reservado.
+    # El dueño del turno es el solicitante; si la solicitud entró por ventanilla
+    # a nombre de otra persona, el turno queda con el nombre y el DNI de esa
+    # persona y sin usuario, que es como se ve un turno de mostrador.
+    if con_turno and deps:
         dep_de = {}
         for fila in (await db.execute(
             select(MunicipioDependenciaTramite).join(
@@ -1593,6 +3012,14 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
         )).scalars().all():
             dep_de[fila.tramite_id] = fila.municipio_dependencia_id
 
+        ids_con_turno = {t.id: t for t in con_turno}
+        solicitudes = (await db.execute(
+            select(Solicitud).where(
+                Solicitud.municipio_id == municipio_id,
+                Solicitud.tramite_id.in_(list(ids_con_turno.keys())),
+            ).order_by(Solicitud.id)
+        )).scalars().all()
+
         def _dia_habil(base: date, delta: int) -> date:
             d = base + timedelta(days=delta)
             while d.weekday() >= 5:
@@ -1600,65 +3027,109 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
             return d
 
         hoy = date.today()
-        nombre_vec = f"{vecino.nombre} {vecino.apellido or ''}".strip()
-        # (delta_dias, hora, minuto, estado, recordatorio)
-        # delta 0 = HOY: la Agenda del día muestra actividad apenas entran
-        # (uno ya atendido a la mañana + dos reservados para más tarde).
-        TURNOS = [
-            # Hoy: la Agenda del día muestra actividad apenas entran
-            # (uno ya atendido a la mañana + dos reservados para más tarde).
-            (0, 8, 30, "cumplido", True),
-            (0, 11, 30, "reservado", True),
-            (0, 12, 0, "reservado", True),
-            # Próximos días hábiles (semana actual y siguiente)
-            (1, 9, 0, "reservado", False),
-            (1, 11, 0, "reservado", False),
-            (2, 9, 30, "reservado", False),
-            (2, 12, 30, "reservado", False),
-            (3, 10, 0, "reservado", False),
-            (4, 10, 30, "reservado", False),
-            # Resto del mes hacia adelante — puebla la vista calendario
-            (6, 9, 0, "reservado", False),
-            (7, 9, 30, "reservado", False),
-            (8, 11, 0, "reservado", False),
-            (9, 10, 0, "reservado", False),
-            (10, 9, 0, "reservado", False),
-            (12, 10, 30, "reservado", False),
-            # Pasados recientes — cumplidos/ausentes/cancelado con recordatorio
-            (-2, 9, 0, "cumplido", True),
-            (-3, 9, 30, "cumplido", True),
-            (-4, 10, 0, "cumplido", True),
-            (-5, 11, 0, "ausente", True),
-            (-6, 11, 30, "cancelado", False),
-            # Resto del mes hacia atrás — completa la vista calendario
-            (-8, 9, 0, "cumplido", True),
-            (-9, 10, 0, "cumplido", True),
-            (-11, 9, 30, "ausente", True),
-            (-12, 11, 0, "cumplido", True),
-        ]
-        for j, (delta, hh, mm, estado, recordado) in enumerate(TURNOS):
-            t = con_turno[j % len(con_turno)]
-            dep_id = dep_de.get(t.id)
+        ahora = datetime.now()
+        nuevos_turnos = []
+        # Sólo 2 de cada 3 expedientes de trámite presencial sacan turno: el
+        # resto se atendió por orden de llegada. Que TODOS tengan turno se lee
+        # tan sintético como que no lo tenga ninguno.
+        for k, sol in enumerate(solicitudes):
+            if k % 3 == 2:
+                continue
+            dep_id = dep_de.get(sol.tramite_id)
             if not dep_id:
                 continue
-            fh = datetime.combine(_dia_habil(hoy, delta), datetime.min.time()).replace(hour=hh, minute=mm)
-            db.add(Turno(
+            tram = ids_con_turno[sol.tramite_id]
+            creada = sol.created_at or (datetime.utcnow() - timedelta(days=5))
+            if creada.tzinfo is not None:
+                creada = creada.replace(tzinfo=None)
+            cerrada = sol.fecha_resolucion
+            if cerrada is not None and cerrada.tzinfo is not None:
+                cerrada = cerrada.replace(tzinfo=None)
+            dias_desde = (ahora - creada).days
+
+            if cerrada is not None:
+                # Entre que entró y que se resolvió: el día en que lo atendieron.
+                margen = max((cerrada - creada).days, 1)
+                fecha = _dia_habil(creada.date(), max(1, margen // 2))
+                if fecha > cerrada.date():
+                    fecha = _dia_habil(cerrada.date(), 0)
+                estado = _estado_turno_pasado(k)
+            elif dias_desde >= 4:
+                fecha = _dia_habil(creada.date(), 2)
+                estado = _estado_turno_pasado(k)
+            else:
+                # Expediente de esta semana: el turno todavía no llegó. Se
+                # reparte en los próximos 12 días hábiles para que la agenda
+                # tenga "hoy", "esta semana" y "el mes".
+                fecha = _dia_habil(hoy, k % 13)
+                estado = "reservado"
+
+            hora = 8 + (k * 3) % 5
+            minuto = (0, 30)[k % 2]
+            fh = datetime.combine(fecha, datetime.min.time()).replace(
+                hour=hora, minute=minuto)
+            # Guardarraíl: un turno cuya hora YA pasó no puede quedar
+            # "reservado" — pasa con los de hoy cuando la demo se crea a la
+            # tarde. Se cierra con el mismo mix determinístico.
+            if fh < ahora and estado == "reservado":
+                estado = _estado_turno_pasado(k)
+            if fh > ahora and estado != "reservado":
+                # Y al revés: nada atendido en el futuro.
+                fh = datetime.combine(_dia_habil(hoy, -1), datetime.min.time()).replace(
+                    hour=hora, minute=minuto)
+
+            nombre_sol = f"{sol.nombre_solicitante or ''} {sol.apellido_solicitante or ''}".strip()
+            nuevos_turnos.append(Turno(
                 motivo_tipo="tramite",
-                tramite_id=t.id,
-                usuario_id=vecino.id,
+                solicitud_id=sol.id,
+                origen_id=sol.id,
+                tramite_id=tram.id,
+                usuario_id=sol.solicitante_id,
                 municipio_dependencia_id=dep_id,
                 municipio_id=municipio_id,
                 fecha_hora=fh,
-                duracion_min=t.duracion_turno_min or 30,
+                duracion_min=tram.duracion_turno_min or 30,
                 estado=estado,
-                nombre_solicitante=nombre_vec or None,
-                dni_solicitante=vecino.dni,
-                telefono_solicitante=vecino.telefono,
-                recordatorio_enviado_at=datetime.utcnow() - timedelta(days=abs(delta))
-                if recordado else None,
+                nombre_solicitante=nombre_sol or None,
+                dni_solicitante=sol.dni_solicitante,
+                telefono_solicitante=sol.telefono_solicitante,
+                recordatorio_enviado_at=(datetime.utcnow() - timedelta(days=1))
+                if estado != "reservado" else None,
             ))
-            counts["turnos"] += 1
+        db.add_all(nuevos_turnos)
+        counts["turnos"] = len(nuevos_turnos)
+        counts["turnos_futuros"] = sum(1 for t in nuevos_turnos if t.estado == "reservado")
+        counts["turnos_del_mostrador"] = sum(
+            1 for t in nuevos_turnos if t.usuario_id is None)
         await db.flush()
+
+    # Turnos que ENVEJECIERON: una demo creada hace semanas queda con turnos
+    # "reservados" de fecha vencida — el síntoma más visible de que la data
+    # es sintética. Re-correr la semilla del turnero sobre ese muni los
+    # cierra con el mismo mix determinístico (por id, así el resultado es
+    # reproducible). En un muni recién creado esto no encuentra nada.
+    vencidos = (await db.execute(
+        select(Turno).where(
+            Turno.municipio_id == municipio_id,
+            Turno.estado == "reservado",
+            Turno.fecha_hora < datetime.now(),
+        )
+    )).scalars().all()
+    for t_viejo in vencidos:
+        t_viejo.estado = _estado_turno_pasado(t_viejo.id)
+    counts["vencidos_cerrados"] = len(vencidos)
+    await db.flush()
+
+    # El reparto REAL de la agenda, para el log del super admin: no alcanza con
+    # "37 turnos" — lo que se mira es cuántos se cumplieron, cuántos faltaron y
+    # cuánto queda por atender.
+    por_estado = dict((await db.execute(text(
+        "SELECT estado, COUNT(*) FROM turnos WHERE municipio_id = :m GROUP BY estado"
+    ), {"m": municipio_id})).fetchall())
+    counts["por_estado"] = [f"{k}: {v}" for k, v in sorted(por_estado.items())]
+    if log is not None:
+        log.hito("turnos", **{k: v for k, v in counts.items()
+                              if k not in ("estado", "motivo", "nombre")})
 
     # NOTA: antes había un "balanceo" acá que le inyectaba 2 reclamos
     # sintéticos a CUALQUIER dependencia con <2 reclamos — incluidas las 6

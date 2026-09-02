@@ -1,0 +1,229 @@
+/* ============================================================
+   Tokens del rediseño v2 (origen: Claude Design, handoff
+   design_handoff_dashboard_municipal/tokens.css).
+
+   POLIMÓRFICO: acá viven SOLO los tokens ESTÁTICOS (tipografía,
+   espaciado, radios, sombras, motion, layout). Los tokens de COLOR
+   (--pl-green*, superficies, textos, bordes, scrims, rampa de datos)
+   los COMPUTA ThemeContext desde el theme activo y los setea en :root
+   en runtime — así el diseño se adapta a los 12+ presets y a cualquier
+   marca sin hardcodear un solo color.
+   ============================================================ */
+
+:root {
+  /* --- Tipografía (una sola familia para toda la app; display = la misma
+     salvo que el dueño apruebe otra) --- */
+  --pl-font-sans: var(--app-font-family, Inter, system-ui, sans-serif);
+  /* Display (H1, números grandes, títulos de card): Sora como en la referencia.
+     Una marca puede pisarlo definiendo --app-font-display. */
+  --pl-font-display: var(--app-font-display, 'Sora', system-ui, sans-serif);
+
+  --pl-fs-eyebrow:    10.5px;  /* MAYÚSCULAS, tracking .09em, 700 */
+  --pl-fs-micro:      11px;
+  --pl-fs-caption:    11.5px;
+  --pl-fs-body-sm:    12.5px;
+  --pl-fs-body:       13.5px;
+  --pl-fs-input:      16px;
+  --pl-fs-card-title: 15px;
+  --pl-fs-hero-line:  20px;   /* frase semántica */
+  --pl-fs-kpi:        34px;
+  --pl-fs-hero:       38px;
+
+  --pl-tracking-eyebrow: 0.09em;
+  --pl-tracking-display: -0.02em;
+  --pl-tracking-hero:    -0.025em;
+
+  /* Ancho útil de contenido: lo usan las superficies del kit para no
+     desbordar el viewport en pantallas angostas. */
+  --pl-content-max: 100%;
+
+  /* --- Espaciado (base 4) --- */
+  --pl-space-1: 4px;  --pl-space-2: 8px;  --pl-space-3: 12px;
+  --pl-space-4: 16px; --pl-space-5: 20px; --pl-space-6: 24px;
+  --pl-space-8: 32px; --pl-space-10: 40px;
+
+  /* --- Radios --- */
+  --pl-radius-sm:   8px;
+  --pl-radius-md:   10px;
+  --pl-radius-lg:   12px;
+  --pl-radius-xl:   16px;
+  --pl-radius-pill: 999px;
+
+  /* --- Movimiento --- */
+  --pl-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --pl-dur-ui: 150ms;
+  --pl-dur-sheet: 240ms;
+
+  /* --- Layout --- */
+  --pl-sidebar-w: 256px;
+  /* 68px: el rail dejó de listar items sueltos y pasó a un icono por grupo. */
+  --pl-sidebar-w-collapsed: 68px;
+  --pl-drawer-w: 480px;
+  --pl-topbar-h: 46px;
+
+  /* --- Colores: DEFAULTS neutros de arranque (los pisa ThemeContext en el
+     primer render; están para que nada quede transparente si algo se lee
+     antes del bridge) --- */
+  --pl-green: var(--color-primary, #1b7a3d);
+  --pl-on-brand: #ffffff;
+  --pl-on-accent: #ffffff;
+  --pl-bg: var(--bg-primary, #1a1a1d);
+  --pl-surface: var(--bg-card, #222226);
+  --pl-text: var(--text-primary, #eef2ea);
+  --pl-border: var(--border-color, rgba(128, 128, 128, 0.2));
+}
+
+/* ============================================================
+   [SUPERFICIE DE ACENTO] — .pl-acento, LA clase del par fondo+tinta.
+
+   Regla única del dueño (2026-08-13, reafirmada 2026-08-25): NADIE pinta
+   el acento a mano. Esta clase entrega el fondo Y su tinta JUNTOS: la
+   tinta sale de la luminancia del acento (--pl-on-accent, una sola
+   fuente en ThemeContext) y es imposible quedarse con media pareja —
+   que es exactamente como nacen los botones oscuros con texto oscuro.
+
+   Sintaxis a propósito SIN !important y SIN :not: la clase pesa lo que
+   pesa una clase, y los hijos heredan vía :where() (especificidad CERO,
+   cualquier estilo propio les gana sin pelear). Si un elemento necesita
+   el acento y esta clase no le alcanza, el fix es mejorar ESTA clase,
+   no hardcodear un color al lado. */
+.pl-acento {
+  background: var(--pl-green);
+  border-color: var(--pl-green);
+  color: var(--pl-on-accent);
+}
+/* Sin :hover a propósito (hallazgo de la barrida 2026-08-25): un hover
+   incondicional acá le cambiaría el comportamiento a badges sin hover y a
+   botones disabled, y --pl-green-700 es un token de TEXTO, no de fondo.
+   El hover es del consumidor; esta clase garantiza el PAR, nada más. */
+.pl-acento :where(svg, span, strong, small) { color: inherit; }
+
+/* ============================================================
+   [LAVADO DE ACENTO] — el patrón de fondo del kit.
+
+   Una diagonal que NACE en el borde izquierdo (donde vive la
+   barra de acento) y se disuelve antes de llegar al texto. El
+   borde deja de ser un apéndice suelto: tiñe lo que toca.
+
+   Hay dos intensidades a propósito. Si todas las superficies
+   llevaran la misma, ninguna destacaría y la pantalla entera
+   quedaría teñida — el hero es la pieza que habla, así que se
+   lleva la fuerte; las tarjetas apenas la insinúan.
+
+   Se deriva del token de acento, así que cada marca lo hereda
+   en su color sin tocar una línea.
+   ============================================================ */
+:root {
+  /* Pieza protagonista (hero semántico). MUY suave a pedido del dueño
+     (2026-08-02, dos vueltas): una insinuación, no un fondo — quedó incluso
+     por debajo del sutil; la jerarquía del hero la dan la barra de acento,
+     la frase y los CTAs, no el lavado. */
+  /* Se disuelve TEMPRANO (transparente a mitad de camino): el color vive
+     pegado al borde izquierdo y el resto de la tarjeta queda limpio. */
+  --pl-lavado-acento: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--pl-green) 2%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 0.5%, transparent) 22%,
+    transparent 45%
+  );
+  /* Superficies de apoyo (tarjetas, paneles): se percibe, no se mira. */
+  --pl-lavado-acento-sutil: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--pl-green) 3.6%, transparent) 0%,
+    color-mix(in srgb, var(--pl-green) 1.2%, transparent) 40%,
+    transparent 74%
+  );
+
+  /* [LAVADO POR TONO] — la fórmula NO vive acá, y no es un descuido.
+     Un token de :root que adentro tenga var(--pl-tono) se computa EN :root:
+     como ahí --pl-tono no existe, resuelve contra su fallback y lo que se
+     hereda hacia abajo es un gradiente con el color ya fijado. Un hero en
+     veredicto 'malo' terminaba con la barra roja y el gradiente verde.
+     Por eso el gradiente por tono se escribe en la MISMA regla donde el
+     elemento declara su --pl-tono. Está en [TINTE POR TONO], al final de
+     este archivo, como clase utilitaria. */
+}
+
+/* ============================================================
+   [BARRA INFERIOR] — alto de la tab bar de la app móvil.
+
+   Lo declara el shell cuando la barra está en pantalla, y lo
+   consumen las piezas que se apoyan abajo (bottom sheets, toasts)
+   para no taparla. Sin esto, un sheet anclado en bottom:0 cubre
+   la navegación entera y deja la app sin salida hasta cerrarlo.
+
+   Vale 0 por defecto: en las pantallas sin barra, todo lo que se
+   apoya abajo sigue pegado al borde como antes.
+   ============================================================ */
+:root { --pl-tabbar-h: 0px; }
+
+/* El valor REAL lo publica el shell midiendo su propia barra (ver Layout):
+   el alto cambia con el área segura del teléfono y con el tamaño de fuente
+   del sistema, así que un número fijo queda corto justo en los aparatos
+   donde más molesta. Este 0 es sólo el default de arranque. */
+
+/* ============================================================
+   [TINTE POR TONO] — gradiente mínimo que nace ARRIBA y muere
+   antes de llegar al contenido, en el color del VEREDICTO.
+
+   Se aplica con la clase `.pl-tinte-tono` sobre cualquier pieza
+   que declare su propio `--pl-tono` (el hero lo saca del
+   veredicto de la frase activa). Sin `--pl-tono` cae al acento
+   del theme, así que una pantalla que sólo informa se tiñe de la
+   marca y no de rojo.
+
+   POR QUÉ ES UNA CLASE Y NO UN TOKEN DE :root — un token con
+   var(--pl-tono) adentro se computa EN :root, donde --pl-tono no
+   existe: resuelve contra el fallback y lo que hereda cada pieza
+   es un gradiente con el color ya fijado. Se ve como un hero con
+   la barra roja y el gradiente verde. Acá el var() se resuelve
+   en el elemento, que es el que sabe su estado.
+
+   INTENSIDAD: 4.5%, disuelto a mitad de camino. Es una
+   insinuación a propósito — el estado lo declaran la barra
+   izquierda y la frase; el gradiente sólo los acompaña. Un solo
+   lugar para moverlo en todo el kit.
+   ============================================================ */
+.pl-tinte-tono { position: relative; }
+.pl-tinte-tono::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 4.5%, transparent) 0%,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 1.2%, transparent) 34%,
+    transparent 62%
+  );
+}
+
+/* ============================================================
+   ESCALA MOBILE — un solo lugar, lo hereda TODO el kit.
+
+   Los tokens de arriba están dimensionados para desktop y no tenían
+   ninguna media query: el mismo titular de 38px que respira en un
+   monitor se come cuatro renglones en un teléfono de 390px, y la
+   frase semántica de 20px empujaba los KPIs abajo del pliegue.
+
+   Acá NO se redefine ningún componente: se re-dimensionan los mismos
+   tokens. Cualquier pieza del kit (hero, KPIs, cards, tablas) queda
+   proporcional en mobile sin tocar su CSS ni su markup.
+
+   `--pl-fs-input` NO baja de 16px a propósito: menos que eso hace que
+   iOS haga auto-zoom al enfocar el campo.
+   ============================================================ */
+@media (max-width: 640px) {
+  :root {
+    --pl-fs-hero:       25px;   /* titular de pantalla (era 38) */
+    --pl-fs-hero-line:  16.5px; /* frase semántica (era 20) */
+    --pl-fs-kpi:        26px;   /* número de KPI (era 34) */
+    --pl-fs-card-title: 14px;   /* título de card (era 15) */
+
+    /* El aire también escala: con el padding de desktop, una card de
+       390px se queda sin ancho para su propio contenido. */
+    --pl-space-6:  18px;
+    --pl-space-8:  22px;
+    --pl-space-10: 26px;
+  }
+}

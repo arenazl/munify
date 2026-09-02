@@ -10,6 +10,7 @@ import { MapContainer, TileLayer, Polygon, CircleMarker, useMapEvents, useMap } 
 import { Trash2, MapPin } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { BASEMAP_MAX_ZOOM } from '../../lib/basemaps';
 
 interface Props {
   value: number[][] | null | undefined;  // [[lat, lon], ...]
@@ -95,6 +96,10 @@ export function PolygonDrawer({
 
       <div className="rounded-xl overflow-hidden" style={{ height, border: '1px solid currentColor' }}>
         <MapContainer
+        wheelPxPerZoomLevel={180}
+        wheelDebounceTime={60}
+        maxZoom={BASEMAP_MAX_ZOOM}
+        zoomSnap={1}
           center={centro}
           zoom={zoom}
           style={{ width: '100%', height: '100%' }}

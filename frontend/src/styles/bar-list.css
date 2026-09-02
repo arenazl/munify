@@ -1,0 +1,140 @@
+/* ============================================================
+   bar-list.css — componente BarList (components/ui/BarList.tsx)
+
+   AGNÓSTICO y POLIMÓRFICO: cero colores fijos, cero lógica de
+   dominio. Todo sale de tokens --pl-* (estáticos en pl-tokens.css;
+   los de color los computa ThemeContext desde el theme activo).
+   Los anchos de columna llegan como custom properties desde el
+   componente (--bl-label-w / --bl-value-w), que son los únicos
+   valores runtime junto al ancho % del relleno.
+
+   Medidas: design/handoff-v2/_analitica_claro.txt.
+   Prefijo de clases: bl-.
+   ============================================================ */
+
+.bl {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bl--inline { gap: 12px; }
+.bl--stacked { gap: 13px; }
+
+/* ---------- layout inline: [label] [barra] [valor] ---------- */
+.bl-fila {
+  display: grid;
+  grid-template-columns: minmax(0, var(--bl-label-w, 116px)) minmax(0, 1fr) var(--bl-value-w, 32px);
+  align-items: center;
+  gap: 10px;
+}
+
+.bl-label {
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* Top 1 del ranking */
+.bl-label--top {
+  font-weight: 600;
+  color: var(--pl-text);
+}
+
+.bl-valor {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  text-align: right;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bl-valor--bueno { color: var(--pl-green-700); }
+.bl-valor--advertencia { color: var(--pl-amber-700); }
+.bl-valor--malo { color: var(--pl-red-700); }
+
+/* ---------- layout stacked: head (label + valor + sub) + barra ---------- */
+.bl-bloque { min-width: 0; }
+
+.bl-bloque-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+  min-width: 0;
+}
+.bl-bloque-label {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.bl-bloque-valor {
+  margin-left: auto;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bl-bloque-valor.bl-valor--bueno { color: var(--pl-green-700); }
+.bl-bloque-valor.bl-valor--advertencia { color: var(--pl-amber-700); }
+.bl-bloque-valor.bl-valor--malo { color: var(--pl-red-700); }
+.bl-bloque-sub {
+  font-size: var(--pl-fs-caption);
+  color: var(--pl-text-faint);
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- barra ---------- */
+.bl-track {
+  height: 10px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  position: relative;
+  overflow: hidden;
+}
+/* En stacked la barra es más fina y ocupa toda la fila */
+.bl-track--stacked {
+  display: block;
+  height: 8px;
+}
+
+.bl-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--pl-radius-pill);
+  transition: width 400ms var(--pl-ease);
+}
+
+/* Rampa de datos: el top 1 es el más saturado */
+.bl-fill--d1 { background: var(--pl-data-1); }
+.bl-fill--d2 { background: var(--pl-data-2); }
+.bl-fill--d3 { background: var(--pl-data-3); }
+.bl-fill--d4 { background: var(--pl-data-4); }
+.bl-fill--d5 { background: var(--pl-data-5); }
+
+/* Matices semánticos (el veredicto lo decide quien usa el componente) */
+.bl-fill--bueno { background: var(--pl-green); }
+.bl-fill--advertencia { background: var(--pl-amber-strong); }
+.bl-fill--malo { background: var(--pl-red); }
+.bl-fill--neutro { background: var(--pl-border-strong); }
+
+@media (max-width: 640px) {
+  /* En pantallas angostas el label cede ancho a la barra */
+  .bl-fila { grid-template-columns: minmax(0, 96px) minmax(0, 1fr) var(--bl-value-w, 32px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bl-fill { transition: none; }
+}

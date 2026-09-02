@@ -1,3 +1,24 @@
+/**
+ * @deprecated CÓDIGO MUERTO — CANDIDATO A BORRAR (detectado 2026-08-02)
+ *
+ * ESTA PANTALLA NO ES ALCANZABLE. No tiene import, ni ruta en routes.tsx, ni
+ * item en navigation.ts: no hay URL que la abra. Se conserva a pedido del
+ * dueño hasta confirmar que no falta nada; no se le agregan features ni se la
+ * migra al kit v2.
+ *
+ * Su función —el horario semanal de trabajo de un empleado (día, entrada,
+ * salida)— YA ESTÁ ABSORBIDA por el Sheet de edición de `Empleados.tsx`, con
+ * los mismos endpoints (`empleadosGestionApi.getHorarios` / `setHorariosSemana`).
+ *
+ * OJO, no confundir con los horarios de ATENCIÓN: esos son otra cosa (cupos,
+ * feriados, agenda de turnos) y viven en `ConfiguracionAgenda.tsx`
+ * (/gestion/configuracion-agenda), que es la que el sidebar muestra como
+ * "Horarios" y la que tiene el diseño del canvas aplicado.
+ *
+ * Antes de borrarla: confirmar que el editor de Empleados cubre todo lo que
+ * hacía acá. Al borrarla se va también su entrada de este archivo y nada más
+ * —nadie la referencia—.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { Edit, Trash2, Clock, Calendar, Save, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';

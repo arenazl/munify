@@ -18,6 +18,7 @@ import type {
 } from '../../types';
 
 import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_COLORS } from '../../lib/contactoIcons';
+import { urlAdjunto } from '../../lib/adjuntos';
 
 interface Props {
   open: boolean;
@@ -354,7 +355,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
             className="flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
             style={{
               backgroundColor: destinoTipo === t ? theme.primary : theme.backgroundSecondary,
-              color: destinoTipo === t ? '#fff' : theme.text,
+              color: destinoTipo === t ? 'var(--pl-on-accent)' : theme.text,
               border: `2px solid ${destinoTipo === t ? theme.primary : theme.border}`,
             }}
           >
@@ -377,7 +378,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
               className="flex-shrink-0 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
               style={{
                 backgroundColor: contactoTipoFiltro === '' ? theme.primary : 'transparent',
-                color: contactoTipoFiltro === '' ? '#fff' : theme.textSecondary,
+                color: contactoTipoFiltro === '' ? 'var(--pl-on-accent)' : theme.textSecondary,
                 border: `1px solid ${contactoTipoFiltro === '' ? theme.primary : theme.border}`,
               }}
             >
@@ -675,7 +676,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
             {facturaUrl ? (
               <div className="flex items-center gap-1.5">
                 <a
-                  href={facturaUrl}
+                  href={urlAdjunto(facturaUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold truncate"
@@ -746,7 +747,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
             className="px-2 py-2 rounded-xl text-xs font-bold capitalize transition-all"
             style={{
               backgroundColor: tipoFinanciacion === t ? theme.primary : theme.backgroundSecondary,
-              color: tipoFinanciacion === t ? '#fff' : theme.text,
+              color: tipoFinanciacion === t ? 'var(--pl-on-accent)' : theme.text,
               border: `2px solid ${tipoFinanciacion === t ? theme.primary : 'transparent'}`,
             }}
           >
@@ -1037,7 +1038,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
             border: `2px solid ${generarOPDespues ? theme.primary : theme.border}`,
           }}
         >
-          {generarOPDespues && <CheckCircle2 className="h-3 w-3" style={{ color: '#fff' }} />}
+          {generarOPDespues && <CheckCircle2 className="h-3 w-3" style={{ color: 'var(--pl-on-accent)' }} />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold" style={{ color: theme.text }}>

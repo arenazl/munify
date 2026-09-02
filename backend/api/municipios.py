@@ -3,7 +3,8 @@ API de Municipios - Endpoints publicos y protegidos
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, delete
+from sqlalchemy.exc import IntegrityError
 from typing import Optional, List
 from pydantic import BaseModel
 from math import radians, cos, sin, asin, sqrt
@@ -37,18 +38,26 @@ class MunicipioPublic(BaseModel):
     id: int
     nombre: str
     codigo: str
+    # ISO-3166 alpha-2: en que pais busca direcciones el autocomplete.
+    pais: str = "AR"
     latitud: float
     longitud: float
     radio_km: float
     logo_url: Optional[str] = None
     color_primario: str
     activo: bool
+    # Unica demo que se entra sin llave: la de muestra. El resto se ve en la
+    # grilla pero necesita el link personal de quien la genero.
+    demo_publica: bool = False
     # Flag de UI: si es True, los ABMs de categorías / tipos de trámite se
     # muestran como items del sidebar. Si es False, quedan sólo en Ajustes.
     abm_en_sidebar: bool = True
     # True = demo de venta (aparece en /demo, expone accesos rápidos).
     # False = cliente productivo (oculto de /demo, sin accesos rápidos).
     es_demo: bool = True
+    # True = demo con PIN: la botonera se ve, pero el quick-login pide la
+    # clave numérica (que es la password real de los usuarios demo del muni).
+    demo_protegido: bool = False
 
     class Config:
         from_attributes = True
@@ -240,6 +249,7 @@ class DemoUser(BaseModel):
 @router.get("/public/{codigo}/demo-users", response_model=List[DemoUser])
 async def obtener_usuarios_demo(
     codigo: str,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -258,9 +268,13 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Cliente productivo (cerrojo): no exponer cuentas demo. El login queda
-    # solo con email + contraseña.
-    if not municipio.es_demo:
+    # LA PUERTA DE ATRAS. Sacar el boton "Entrar" de la grilla no alcanza:
+    # esta lista ES el acceso (son los perfiles del quick-login, sin password).
+    # Si quedaba abierta, el link personal era decorativo — se entraba por
+    # /login?muni=<codigo> y listo. Ahora la botonera sale solo si la demo es
+    # de muestra o si viene la llave. Cliente productivo: nunca (salvo el clon
+    # de tenant en QA, que ademas gatea cada perfil con el PIN).
+    if not _demo_acceso_ok(municipio, t):
         return []
 
     # Buscar usuarios de prueba con tres patrones:
@@ -290,6 +304,8 @@ async def obtener_usuarios_demo(
             User.email.like("supervisor-%"),
             User.email.like("empleado-%"),
             User.email.like("vecino@%"),
+            # Munis con varios vecinos demo (ej. asuncion: vecino-liz@, vecino-rodrigo@).
+            User.email.like("vecino-%"),
         ),
     )
     from sqlalchemy.orm import selectinload
@@ -345,6 +361,7 @@ class DependenciaUser(BaseModel):
 @router.get("/public/{codigo}/dependencia-users", response_model=List[DependenciaUser])
 async def obtener_usuarios_dependencias(
     codigo: str,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -369,8 +386,9 @@ async def obtener_usuarios_dependencias(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Cliente productivo (cerrojo): no exponer accesos rápidos por dependencia.
-    if not municipio.es_demo:
+    # Misma puerta que demo-users: los accesos rapidos por dependencia son
+    # otra forma de entrar, asi que piden la misma llave.
+    if not _demo_acceso_ok(municipio, t):
         return []
 
     # Buscar usuarios con municipio_dependencia_id asignado
@@ -426,29 +444,100 @@ async def obtener_usuarios_dependencias(
 
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
+# Paises con catalogo de municipios cargado. Se llenan por batch
+# (`scripts/cargar_catalogo_latam.py`), nunca en vivo: el alta de una demo no
+# puede depender de un servicio externo. Agregar uno es cargar su nivel con
+# intendente/alcalde y sumar su bandera en `components/ui/BanderaPais.tsx`.
+PAISES_CATALOGO = {"AR", "PY", "CL", "UY", "PE", "BO"}
+
+
+@router.get("/catalogo")
+async def buscar_municipios_catalogo(
+    q: str = "",
+    pais: str = "AR",
+    provincia: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    """Autocomplete PÚBLICO del catálogo oficial de municipios.
+
+    Sólo se puede crear una demo con un municipio REAL elegido de esta lista.
+    Fuentes: Argentina, dataset georef de datos.gob.ar (2.082); Paraguay,
+    registro del INE + las intendencias creadas después del censo 2012 (263);
+    Chile, Uruguay, Perú y Bolivia, GeoNames (CC-BY) al nivel donde hay
+    intendente o alcalde —comuna, departamento, distrito y municipio
+    respectivamente—, que no es el mismo en los cuatro.
+
+    Busca por nombre Y por ALIAS: un municipio se conoce por más de un nombre
+    —el oficial de la ley y el que usa la gente— y quien crea la demo escribe
+    el que conoce ("Campo 9", no "Doctor J. Eulogio Estigarribia").
+
+    La provincia/departamento desambigua homónimos: hay 6 'San Martín' en
+    Argentina y dos 'Asunción' en Paraguay.
+    """
+    q = (q or "").strip()
+    pais = (pais or "AR").upper()
+    if pais not in PAISES_CATALOGO:
+        raise HTTPException(status_code=400, detail=f"País no soportado: {pais}")
+    if len(q) < 2:
+        return []
+    # `provincia` es opcional: la pantalla de demos deja elegir provincia
+    # primero para desambiguar homonimos (6 'San Martin' en Argentina).
+    params = {"pais": pais, "patt": f"%{q}%", "prefijo": f"{q}%"}
+    filtro_prov = ""
+    if (provincia or "").strip():
+        filtro_prov = " AND provincia = :provincia"
+        params["provincia"] = provincia.strip()
+    rows = (await db.execute(text(f"""
+        SELECT id, nombre, provincia, lat, lng, pais, alias
+        FROM municipios_catalogo
+        WHERE pais = :pais AND (nombre LIKE :patt OR alias LIKE :patt){filtro_prov}
+        ORDER BY (nombre LIKE :prefijo) DESC, CHAR_LENGTH(nombre), nombre
+        LIMIT 10
+    """), params)).fetchall()
+    return [
+        {"id": r[0], "nombre": r[1], "provincia": r[2],
+         "lat": float(r[3]), "lng": float(r[4]), "pais": r[5],
+         "alias": [a for a in (r[6] or "").split("|") if a]}
+        for r in rows
+    ]
+
+
+@router.get("/catalogo/provincias")
+async def provincias_catalogo(
+    pais: str = "AR",
+    db: AsyncSession = Depends(get_db),
+):
+    """Provincias/departamentos de un pais, con cuantos municipios tiene cada una.
+
+    Alimenta el combo de la pantalla publica de demos (sitio comercial): el
+    prospecto elige su provincia y el autocomplete de municipio filtra por ahi.
+    El conteo NO es decorativo — es lo que dibuja la barra de cada provincia,
+    asi que sale de la tabla, nunca hardcodeado.
+
+    El nombre del nivel cambia por pais (provincia en AR/PY, region en CL,
+    departamento en UY/BO, departamento en PE); la clave se llama `provincia`
+    en todos porque es la columna del catalogo.
+    """
+    pais = (pais or "AR").upper()
+    if pais not in PAISES_CATALOGO:
+        raise HTTPException(status_code=400, detail=f"Pais no soportado: {pais}")
+    rows = (await db.execute(text("""
+        SELECT provincia, COUNT(*) AS total
+        FROM municipios_catalogo
+        WHERE pais = :pais AND provincia IS NOT NULL AND provincia <> ''
+        GROUP BY provincia
+        ORDER BY total DESC, provincia
+    """), {"pais": pais})).fetchall()
+    return [{"provincia": r[0], "total": int(r[1])} for r in rows]
+
+
 @router.get("/argentina")
 async def buscar_municipios_argentina(
     q: str = "",
     db: AsyncSession = Depends(get_db),
 ):
-    """Autocomplete PÚBLICO del catálogo oficial de municipios argentinos
-    (tabla municipios_argentina, dataset georef de datos.gob.ar, 2.082
-    municipios con centroide). Devuelve top 10 por nombre; la provincia
-    desambigua homónimos (hay 6 'San Martín' en el país)."""
-    q = (q or "").strip()
-    if len(q) < 2:
-        return []
-    rows = (await db.execute(text("""
-        SELECT id, nombre, provincia, lat, lng FROM municipios_argentina
-        WHERE nombre LIKE :patt
-        ORDER BY (nombre LIKE :prefijo) DESC, CHAR_LENGTH(nombre), nombre
-        LIMIT 10
-    """), {"patt": f"%{q}%", "prefijo": f"{q}%"})).fetchall()
-    return [
-        {"id": r[0], "nombre": r[1], "provincia": r[2],
-         "lat": float(r[3]), "lng": float(r[4])}
-        for r in rows
-    ]
+    """DEPRECADO: quedó del catálogo mono-país. Usar `/catalogo?pais=AR`."""
+    return await buscar_municipios_catalogo(q=q, pais="AR", db=db)
 
 
 @router.get("", response_model=List[MunicipioDetalle])
@@ -513,6 +602,15 @@ class MunicipioDemoCreate(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     provincia: Optional[str] = None
+    # País del catálogo (ISO-3166 alpha-2). Decide dónde se busca el POLÍGONO
+    # oficial del municipio en `municipios_catalogo` y, con él, los barrios y
+    # calles reales de la ciudad (ver services/geo_ciudad.py). Sin esto, una
+    # demo de Encarnación buscaba su contorno entre los municipios argentinos.
+    pais: Optional[str] = "AR"
+    # PIN numérico opcional (4-8 dígitos). Si viene, la demo nace PROTEGIDA:
+    # los usuarios demo se crean con el PIN como password (en vez de demo123)
+    # y el frontend pide la clave al tocar un perfil de la botonera.
+    demo_pin: Optional[str] = None
 
 
 class MunicipioDemoResponse(BaseModel):
@@ -522,6 +620,36 @@ class MunicipioDemoResponse(BaseModel):
     nombre: str
     codigo: str
     redirect_path: str
+    # LA LLAVE, y esta es la UNICA vez que sale del backend: la grilla publica
+    # no la devuelve nunca. El frontend la guarda en el localStorage del que
+    # creo la demo y arma con ella el link para compartir. Si se pierde, se
+    # pierde: no hay recupero por UI (a proposito).
+    demo_token: Optional[str] = None
+
+
+def _demo_acceso_ok(municipio: Municipio, token: Optional[str]) -> bool:
+    """Si el que golpea la puerta puede ENTRAR a esta demo.
+
+    Tres casos, en orden:
+      - No es demo: es un cliente productivo. Solo pasa el clon de tenant en
+        QA (`demo_protegido`), que ademas tiene su quick-login gateado por PIN.
+      - Demo DE MUESTRA (`demo_publica`): entra cualquiera, es la vitrina.
+      - Demo de alguien: solo con la llave que se emitio al crearla.
+
+    Las demos viejas (sin `demo_token`) quedan cerradas a proposito: nadie
+    entra a una demo con los datos que cargo otro (dueño, 2026-09-02).
+    """
+    if not municipio.es_demo:
+        return bool(municipio.demo_protegido)
+    if municipio.demo_publica:
+        return True
+    guardada = municipio.demo_token or ""
+    entregada = (token or "").strip()
+    if not guardada or not entregada:
+        return False
+    # compare_digest y no ==: comparar llaves con corte temprano filtra, de a
+    # un caracter y por tiempo de respuesta, cual era el prefijo correcto.
+    return secrets.compare_digest(entregada, guardada)
 
 
 def _normalizar_codigo(nombre: str) -> str:
@@ -532,6 +660,72 @@ def _normalizar_codigo(nombre: str) -> str:
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
     return s
+
+
+class LiberarDniDemoRequest(BaseModel):
+    dni: str
+
+
+@router.post("/demo/liberar-dni")
+async def liberar_dni_demo(
+    body: LiberarDniDemoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN])),
+):
+    """
+    Libera un DNI para volver a registrarse en las demos.
+
+    Herramienta del demostrador: cada registro real (QR + foto del DNI) deja
+    un vecino verificado con ese DNI, y la próxima demo lo rechaza como "ya
+    registrado". Esto ANONIMIZA esos vecinos (dni y email a placeholder,
+    verificación a cero) SOLO en municipios demo — el mismo DNI como cliente
+    real de un municipio productivo (San Pedro Norte) jamás se toca. No borra
+    usuarios: sus reclamos/historial de demo siguen colgando del registro
+    anónimo, así no se rompe ninguna FK.
+    """
+    dni_limpio = "".join(c for c in body.dni if c.isdigit())
+    if len(dni_limpio) < 6:
+        raise HTTPException(status_code=400, detail="DNI inválido")
+
+    # Solo se opera DESDE un municipio demo.
+    mq = await db.execute(
+        select(Municipio).where(Municipio.id == current_user.municipio_id)
+    )
+    muni_actual = mq.scalar_one_or_none()
+    if not (muni_actual and muni_actual.es_demo):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta herramienta sólo está disponible en municipios demo.",
+        )
+
+    # Vecinos con ese DNI en CUALQUIER municipio demo. El join con es_demo
+    # es el guardarraíl: un tenant productivo nunca entra en el resultado.
+    q = await db.execute(
+        select(User, Municipio.nombre)
+        .join(Municipio, User.municipio_id == Municipio.id)
+        .where(
+            User.dni == dni_limpio,
+            Municipio.es_demo == True,  # noqa: E712 — comparación SQL
+            User.rol == RolUsuario.VECINO,
+        )
+    )
+    filas = q.all()
+
+    municipios_afectados: list[str] = []
+    for usuario, muni_nombre in filas:
+        usuario.dni = None
+        usuario.email = f"liberado+{usuario.id}@demo.local"
+        usuario.cuenta_verificada = False
+        usuario.nivel_verificacion = 0
+        usuario.didit_session_id = None
+        municipios_afectados.append(muni_nombre)
+
+    await db.commit()
+    return {
+        "liberados": len(municipios_afectados),
+        "municipios": sorted(set(municipios_afectados)),
+        "dni": dni_limpio,
+    }
 
 
 @router.post("/crear-demo", response_model=MunicipioDemoResponse)
@@ -558,12 +752,31 @@ async def crear_municipio_demo(
     """
     from services.categorias_default import crear_categorias_default
     from services.seed_demo import seed_demo_completo
+    from services.seed_log import SeedLog
+
+    def _counts(d) -> dict:
+        """Counts de un sub-seed, sin las claves reservadas del log.
+
+        `hito(nombre, motivo, estado, **detalle)`: si un sub-seed devolviera un
+        count llamado `estado`, pisaria el estado del paso y el log mentiria.
+        """
+        return {k: v for k, v in (d or {}).items()
+                if k not in ("estado", "motivo", "nombre")}
 
     nombre_limpio = (data.nombre or "").strip()
     if len(nombre_limpio) < 3:
         raise HTTPException(
             status_code=400,
             detail="El nombre del municipio debe tener al menos 3 caracteres",
+        )
+
+    # PIN opcional de demo protegida (ver MunicipioDemoCreate.demo_pin).
+    import re as _re
+    demo_pin = (data.demo_pin or "").strip() or None
+    if demo_pin and not _re.fullmatch(r"\d{4,8}", demo_pin):
+        raise HTTPException(
+            status_code=400,
+            detail="El PIN debe ser numérico, de 4 a 8 dígitos",
         )
 
     # Normalizar código. Si ya existe, sufijar con -2, -3... hasta encontrar
@@ -576,10 +789,28 @@ async def crear_municipio_demo(
     suffix = 1
     while True:
         r = await db.execute(select(Municipio).where(Municipio.codigo == codigo))
-        if not r.scalar_one_or_none():
+        libre_muni = r.scalar_one_or_none() is None
+        # No alcanza con que el CODIGO este libre: los usuarios del seed se
+        # llaman `<rol>@<codigo>.demo.com` y su email es unico en toda la base.
+        # Si quedaron usuarios de una demo anterior (un borrado a medias, un
+        # alta que reventó despues de crearlos), el codigo figura libre y el
+        # alta muere con "Duplicate entry ... ix_usuarios_email" — pasó en qa
+        # con la segunda demo de Moreno, delante del prospecto.
+        r2 = await db.execute(
+            select(User.id).where(User.email.like(f"%@{codigo}.demo.com")).limit(1)
+        )
+        libre_mail = r2.scalar_one_or_none() is None
+        if libre_muni and libre_mail:
             break
         suffix += 1
         codigo = f"{base_codigo}-{suffix}"
+
+    # BITACORA DE LA CREACION. Se abre ACA, antes de tocar la base, porque el
+    # caso que hay que poder mirar es justamente el alta que se rompe a mitad:
+    # el log se escribe en su propia sesion (ver services/seed_log.py) y queda
+    # aunque la transaccion del alta se revierta.
+    log = SeedLog(nombre_limpio, codigo=codigo, pais=(data.pais or "AR"),
+                  provincia=data.provincia, origen="endpoint")
 
     # 1. Coordenadas del municipio. Si el autocomplete oficial ya las trajo
     # (tabla municipios_argentina), se usan directo. Si no, fallback al
@@ -610,53 +841,141 @@ async def crear_municipio_demo(
             # Silenciamos el error — el fallback de CABA ya está asignado
             pass
 
-    # 2. Crear fila del municipio con coords (reales o fallback)
-    municipio = Municipio(
-        nombre=nombre_limpio,
-        codigo=codigo,
-        latitud=lat,
-        longitud=lng,
-        radio_km=10.0,
-        color_primario="#0088cc",
-        color_secundario="#005fa3",
-        zoom_mapa_default=13,
-        activo=True,
-        abm_en_sidebar=False,
-    )
-    db.add(municipio)
-    await db.flush()
+    # ============================================================
+    # ALTA + SEMILLA, con reintento si el nombre quedo ocupado
+    #
+    # Entre el chequeo de disponibilidad y el INSERT pasan ~20 segundos de
+    # semilla. En el medio otro vendedor puede estar creando la misma ciudad,
+    # o puede quedar algun rastro que choque. Si eso pasa, el que lo paga es
+    # el que esta hablando por telefono con el intendente: ve "no pudimos
+    # crear la demo" y se queda sin nada que mostrar.
+    #
+    # Por eso una colision de unicidad NO se propaga: se reintenta con el
+    # sufijo siguiente (moreno-2, moreno-3) y el vendedor no se entera.
+    # Cualquier otro error si se propaga — si la base esta caida o el seed
+    # tiene un bug, reintentar es esconder el problema y hacer esperar tres
+    # veces de gusto.
+    # ============================================================
+    async def _alta(codigo_actual: str):
+        # 2. Crear fila del municipio con coords (reales o fallback)
+        municipio = Municipio(
+            nombre=nombre_limpio,
+            codigo=codigo_actual,
+            pais=(data.pais or "AR").upper(),
+            latitud=lat,
+            longitud=lng,
+            radio_km=10.0,
+            color_primario="#0088cc",
+            color_secundario="#005fa3",
+            zoom_mapa_default=13,
+            activo=True,
+            abm_en_sidebar=False,
+            demo_protegido=bool(demo_pin),
+            # La llave de acceso, que viaja una sola vez en la respuesta del
+            # alta. 24 bytes url-safe (32 caracteres): entra comodo en un link
+            # de WhatsApp y no se adivina. Una demo generada por un visitante
+            # NUNCA nace publica: la de muestra se marca a mano.
+            demo_token=secrets.token_urlsafe(24),
+            demo_publica=False,
+            # Las demos NUEVAS abren en MARINO, el azul oscuro de la marca
+            # (decisión del dueño, 2026-08-30): el vendedor las muestra en
+            # pantalla compartida justo después de la página comercial, que
+            # también es azul oscuro — el salto de identidad se notaba. El
+            # claro queda a un click (la luna) y cae en Hielo, el claro frío
+            # de la misma familia. El usuario que elige otro tema pisa esto
+            # (prioridad: localStorage > tema_config > default global). Las
+            # demos existentes no se tocan.
+            tema_config={"presetId": "marino"},
+        )
+        db.add(municipio)
+        await db.flush()
 
-    # 2. Sembrar categorías default (10 reclamo + 10 trámite)
-    await crear_categorias_default(db, municipio.id)
-    await db.flush()
+        # 2. Sembrar categorías default (10 reclamo + 10 trámite)
+        await crear_categorias_default(db, municipio.id)
+        await db.flush()
 
-    # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud.
-    # Es LA semilla única y coherente — categorías, trámites y reclamos ya
-    # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
-    # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
-    # la coherencia dependencia↔categoría con asignaciones random.
-    seed_info = await seed_demo_completo(db, municipio.id, codigo)
+        # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud.
+        # Es LA semilla única y coherente — categorías, trámites y reclamos ya
+        # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
+        # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
+        # la coherencia dependencia↔categoría con asignaciones random.
+        #
+        # Va envuelto para que el log quede grabado TAMBIÉN si revienta acá: es el
+        # caso que hay que poder mirar desde la consola del super admin.
+        # El id se captura ANTES del try: si la semilla revienta, la sesión queda
+        # con rollback pendiente y `municipio.id` ya no se puede leer
+        # (PendingRollbackError) — la bitácora del alta fallido se perdía justo en
+        # el caso que tenía que cubrir (visto con San Salvador de Jujuy).
+        muni_id = municipio.id
+        try:
+            seed_info = await seed_demo_completo(db, municipio.id, codigo_actual,
+                                                 password=demo_pin or "demo123",
+                                                 log=log)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            # La fila del municipio puede sobrevivir al rollback (se escribio antes
+            # del punto que fallo). Sin esto queda una cascara: municipio sin un
+            # solo usuario, imposible de usar, y encima ocupando el nombre para el
+            # proximo intento. Se limpia en su propia operacion, best-effort.
+            try:
+                await db.execute(delete(Municipio).where(
+                    Municipio.id == muni_id, Municipio.codigo == codigo_actual))
+                await db.commit()
+            except Exception:
+                await db.rollback()
+            # El helper limpia y propaga; QUIEN decide que hacer con el error
+            # es el bucle de afuera. Si guardara la bitacora aca, un reintento
+            # que despues sale bien dejaria un "fallo" escrito igual — y peor,
+            # reusaria en la vuelta siguiente un log ya cerrado.
+            raise
+        return municipio, muni_id, seed_info
 
-    await db.commit()
+    intentos = 0
+    while True:
+        try:
+            municipio, muni_id, seed_info = await _alta(codigo)
+            break
+        except IntegrityError:
+            intentos += 1
+            if intentos >= 3:
+                log.hito("colision", estado="fallo",
+                         motivo="tres nombres seguidos ocupados")
+                await log.guardar(municipio_id=None)
+                raise HTTPException(
+                    status_code=409,
+                    detail="No pudimos reservar un nombre para la demo. Probá de nuevo.",
+                )
+            suffix += 1
+            codigo = f"{base_codigo}-{suffix}"
+            log.hito("colision", estado="degradado",
+                     motivo=f"nombre ocupado, reintento como {codigo}")
+        except Exception as e:
+            # Base caida, seed roto, timeout: esto NO se reintenta — seria
+            # esconder el problema y hacer esperar tres veces de gusto.
+            log.error(e)
+            await log.guardar(municipio_id=None)
+            raise
 
     # 4. Turnero (best-effort): agenda, horarios y turnos de ejemplo sobre
     # los trámites ya creados en el paso 3.
     try:
         from services.seed_demo import seed_turnero_demo
-        turnero_counts = await seed_turnero_demo(db, municipio.id)
+        turnero_counts = await seed_turnero_demo(db, municipio.id, log=log)
         print(f"[CREAR DEMO] Turnero seed: {turnero_counts}")
         await db.commit()
+        log.hito("turnero", **_counts(turnero_counts))
     except Exception as e:
         print(f"[CREAR DEMO] Seed de turnero fallo (best-effort): {e}")
         await db.rollback()
+        log.hito("turnero", estado="fallo", motivo=f"{type(e).__name__}: {str(e)[:300]}")
 
-    # 5. Seed de tasas (best-effort): partidas + deudas ficticias para el demo
-    # del Boton de Pago GIRE. Requiere seed_tipos_tasa.py ya corrido (global).
-    try:
-        from scripts.seed_tasas_completo import seed_para_municipio as seed_tasas
-        await seed_tasas(municipio.id, limpiar=False)
-    except Exception as e:
-        print(f"[CREAR DEMO] Seed de tasas fallo (best-effort): {e}")
+    # 5. Tasas: NO se siembran (dueño, 2026-08-29). Munify no cubre el cobro de
+    # tasas hoy, y la demo mostraba al vecino boletas vencidas de un circuito
+    # que el producto no ofrece. El módulo ademas paso a OPT-IN
+    # (lib/enums/modulos.ts): sin fila explicita ya no aparece en ningun lado.
+    # El seeder sigue existiendo (scripts/seed_tasas_completo.py) para cuando
+    # se retome: se vuelve a enganchar aca.
 
     # 6. Seed Tesoreria (best-effort): activa el modulo + carga catalogos
     # (15 tipos concepto, 300 conceptos, 10 tipos empleado), 5 cajas/fondos
@@ -673,10 +992,17 @@ async def crear_municipio_demo(
             t_counts = await seed_tesoreria_demo(db, municipio.id, admin_user.id)
             print(f"[CREAR DEMO] Tesoreria seed: {t_counts}")
             await db.commit()
+            log.hito("tesoreria", **_counts(t_counts))
+        else:
+            log.hito("tesoreria", estado="degradado",
+                     motivo="no se encontro el admin del muni recien creado")
     except Exception as e:
         print(f"[CREAR DEMO] Seed de Tesoreria fallo (best-effort): {e}")
         await db.rollback()
+        log.hito("tesoreria", estado="fallo",
+                 motivo=f"{type(e).__name__}: {str(e)[:300]}")
 
+    await log.guardar(municipio_id=municipio.id)
     await db.refresh(municipio)
 
     return MunicipioDemoResponse(
@@ -684,6 +1010,7 @@ async def crear_municipio_demo(
         nombre=municipio.nombre,
         codigo=municipio.codigo,
         redirect_path=f"/demo/listo?muni={municipio.codigo}",
+        demo_token=municipio.demo_token,
     )
 
 
@@ -811,12 +1138,16 @@ async def eliminar_municipio(
 @router.delete("/demo/{codigo}")
 async def eliminar_municipio_demo(
     codigo: str,
+    pin: Optional[str] = None,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Elimina un municipio demo (hard delete con cascade).
     Endpoint PÚBLICO — solo borra munis que tengan usuarios @demo.com.
     No permite borrar municipios "reales" (producción).
+    Si la demo está protegida por PIN, exige `?pin=` y lo valida contra la
+    password del admin demo (que ES el PIN — ver crear-demo).
     """
     from sqlalchemy import func as sqla_func
     query = select(Municipio).where(
@@ -848,6 +1179,44 @@ async def eliminar_municipio_demo(
             detail="Solo se pueden eliminar municipios de demo",
         )
 
+    # LA DE MUESTRA NO SE BORRA desde la UI publica: es la que se abre en las
+    # llamadas comerciales y la que toca el visitante que llega de la landing.
+    # Se apaga por base (demo_publica = 0), no con un boton que ve cualquiera.
+    if municipio.demo_publica:
+        raise HTTPException(
+            status_code=403,
+            detail="El municipio de muestra no se elimina desde acá",
+        )
+
+    # Borra el DUEÑO de la demo, que es el que tiene la llave. Hasta hoy este
+    # endpoint era publico y sin credencial: un DELETE de una linea se llevaba
+    # puesta cualquier demo, con hard delete y cascade (dueño, 2026-09-02).
+    # Las demos viejas, que no tienen llave, quedan imborrables desde la UI: es
+    # el default seguro — se limpian por script, no por un boton anonimo.
+    if not _demo_acceso_ok(municipio, t):
+        raise HTTPException(
+            status_code=403,
+            detail="Para eliminar esta demo hace falta el link de acceso de quien la generó",
+        )
+
+    # Demo protegida: ademas del link, el PIN. Se valida contra el hash del
+    # admin demo porque el PIN es su password (no se guarda aparte).
+    if municipio.demo_protegido:
+        from core.security import verify_password
+        admin_q = await db.execute(
+            select(User).where(
+                User.municipio_id == municipio.id,
+                User.email.like("admin@%"),
+                User.activo == True,  # noqa: E712
+            )
+        )
+        admin_demo = admin_q.scalars().first()
+        if not pin or not admin_demo or not verify_password(pin, admin_demo.password_hash):
+            raise HTTPException(
+                status_code=403,
+                detail="Esta demo está protegida: hace falta el PIN para eliminarla",
+            )
+
     muni_id = municipio.id
     await db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
 
@@ -859,6 +1228,9 @@ async def eliminar_municipio_demo(
         "DELETE hs FROM historial_solicitudes hs JOIN solicitudes s ON hs.solicitud_id = s.id WHERE s.municipio_id = :mid",
         "DELETE td FROM tramite_documentos_requeridos td JOIN tramites t ON td.tramite_id = t.id WHERE t.municipio_id = :mid",
         "DELETE sv FROM sla_violaciones sv JOIN reclamos r ON sv.reclamo_id = r.id WHERE r.municipio_id = :mid",
+        # Calificaciones del vecino (cuelgan del reclamo; el seed demo ya las
+        # crea sobre los reclamos cerrados)
+        "DELETE ca FROM calificaciones ca JOIN reclamos r ON ca.reclamo_id = r.id WHERE r.municipio_id = :mid",
         # Intermedias de empleados (via JOIN con empleados.municipio_id)
         "DELETE ec FROM empleado_cuadrillas ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
         "DELETE ec FROM empleado_categorias ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
@@ -870,6 +1242,8 @@ async def eliminar_municipio_demo(
         "DELETE cc FROM cuadrilla_categorias cc JOIN cuadrillas c ON cc.cuadrilla_id = c.id WHERE c.municipio_id = :mid",
         # Ordenes de trabajo (pivot N:M con reclamos)
         "DELETE otr FROM orden_trabajo_reclamos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
+        # Recursos de OT (cuelgan de la OT y del item de inventario)
+        "DELETE otr FROM orden_trabajo_recursos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
         # Mapeo tramite → dependencia (cuelga de municipio_dependencias)
         "DELETE mdt FROM municipio_dependencia_tramites mdt JOIN municipio_dependencias md ON mdt.municipio_dependencia_id = md.id WHERE md.municipio_id = :mid",
         # Tasas: deudas/pagos cuelgan de partidas
@@ -897,12 +1271,20 @@ async def eliminar_municipio_demo(
         # Turnero + campo (2026-07)
         "turnos", "ordenes_trabajo", "municipio_modulos",
         "agenda_configs", "agenda_excepciones",
+        # Inventario demo (seed_inventario) — quedaban huerfanos al borrar.
+        # ORDEN: primero lo que apunta a los items (lineas de compra y
+        # movimientos), despues los items, y al final depositos y categorias.
+        # Al reves, las FK con RESTRICT frenan el borrado.
+        "inventario_orden_compra_lineas", "inventario_movimientos",
+        "inventario_ordenes_compra",
+        "inventario_items", "inventario_categorias", "inventario_depositos",
         # Tasas demo
         "tasas_partidas",
         # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)
         "tesoreria_movimientos_caja", "tesoreria_pagos_programados",
         "tesoreria_premios", "tesoreria_cajas", "tesoreria_parajes",
         "tesoreria_conceptos", "tesoreria_tipos_concepto", "tesoreria_tipos_empleado",
+        "tesoreria_conceptos_liquidacion", "proyectos",
         "gasto_proyectos", "gastos", "contactos", "ordenes_pago",
         "salesbot_configs", "configuraciones",
     ]

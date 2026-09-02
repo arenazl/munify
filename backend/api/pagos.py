@@ -526,6 +526,89 @@ async def obtener_sesion(
 # 3. Confirmar pago (desde el checkout externo)
 # ============================================================
 
+async def _aplicar_aprobacion(
+    db: AsyncSession,
+    sesion: PagoSesion,
+    medio_pago,
+    metadatos_extra: Optional[dict] = None,
+) -> bool:
+    """Aplica los efectos de un pago APROBADO sobre la sesión y su objeto de
+    negocio. Camino ÚNICO para el mock (/confirmar) y el webhook de MP: marca
+    la sesión, genera el CUT, deja la imputación pendiente, paga la Deuda o
+    pasa la Solicitud PENDIENTE_PAGO → RECIBIDO con historial.
+    Devuelve True si la solicitud pasó a RECIBIDO. NO commitea."""
+    sesion.estado = EstadoSesionPago.APPROVED
+    if medio_pago:
+        sesion.medio_pago = medio_pago
+    sesion.completed_at = datetime.utcnow()
+    if metadatos_extra:
+        sesion.metadatos = (sesion.metadatos or {}) | metadatos_extra
+
+    # CUT (Código Único de Trámite): el operador de ventanilla lo escanea
+    # para verificar el pago.
+    if not sesion.codigo_cut_qr:
+        sesion.codigo_cut_qr = await _generar_cut_unico(db)
+
+    # Pendiente de imputación contable: Contaduría lo pasa a 'imputado'
+    # cuando carga el asiento en el sistema tributario (RAFAM).
+    if sesion.imputacion_estado is None:
+        sesion.imputacion_estado = EstadoImputacion.PENDIENTE
+
+    # Deuda de tasas: marcarla pagada + registro de Pago.
+    if sesion.deuda_id:
+        dq = await db.execute(select(Deuda).where(Deuda.id == sesion.deuda_id))
+        deuda = dq.scalar_one_or_none()
+        if deuda and deuda.estado != EstadoDeuda.PAGADA:
+            deuda.estado = EstadoDeuda.PAGADA
+            deuda.fecha_pago = datetime.utcnow()
+            deuda.pago_externo_id = sesion.external_id
+            medio_tasa_map = {
+                MedioPagoGateway.TARJETA: MedioPagoTasa.TARJETA_CREDITO,
+                MedioPagoGateway.QR: MedioPagoTasa.QR,
+                MedioPagoGateway.EFECTIVO_CUPON: MedioPagoTasa.RAPIPAGO,
+                MedioPagoGateway.TRANSFERENCIA: MedioPagoTasa.TRANSFERENCIA,
+                MedioPagoGateway.DEBITO_AUTOMATICO: MedioPagoTasa.DEBITO_AUTOMATICO,
+            }
+            db.add(Pago(
+                deuda_id=deuda.id,
+                usuario_id=sesion.vecino_user_id,
+                monto=sesion.monto,
+                medio=medio_tasa_map.get(sesion.medio_pago, MedioPagoTasa.TARJETA_CREDITO) if sesion.medio_pago else MedioPagoTasa.TARJETA_CREDITO,
+                pago_externo_id=sesion.external_id,
+                estado="confirmado",
+                payload_externo=sesion.metadatos,
+            ))
+
+    # Solicitud de trámite: registrar el evento y, si estaba en
+    # PENDIENTE_PAGO (cobro al inicio), pasarla a RECIBIDO ahora que el
+    # dinero entró. Las dependencias recién ahí la pueden trabajar.
+    solicitud_pasa_a_recibido = False
+    if sesion.solicitud_id:
+        from models.tramite import Solicitud, EstadoSolicitud, HistorialSolicitud
+        sol_q = await db.execute(
+            select(Solicitud).where(Solicitud.id == sesion.solicitud_id)
+        )
+        solicitud = sol_q.scalar_one_or_none()
+        if solicitud:
+            estado_previo = solicitud.estado
+            costo_fmt = f"${sesion.monto:,.2f}".replace(",", ".") if sesion.monto else ""
+            estado_nuevo = estado_previo
+            if estado_previo == EstadoSolicitud.PENDIENTE_PAGO:
+                solicitud.estado = EstadoSolicitud.RECIBIDO
+                estado_nuevo = EstadoSolicitud.RECIBIDO
+                solicitud_pasa_a_recibido = True
+            medio_label = sesion.medio_pago.value if sesion.medio_pago else "gateway"
+            db.add(HistorialSolicitud(
+                solicitud_id=solicitud.id,
+                usuario_id=sesion.vecino_user_id,
+                estado_anterior=estado_previo,
+                estado_nuevo=estado_nuevo,
+                accion=f"Pago aprobado · {medio_label}",
+                comentario=f"Sesión {sesion.id} · {costo_fmt} · N° operación {sesion.external_id}",
+            ))
+    return solicitud_pasa_a_recibido
+
+
 @router.post("/sesiones/{session_id}/confirmar", response_model=ConfirmarPagoResponse)
 async def confirmar_pago(
     session_id: str,
@@ -548,78 +631,22 @@ async def confirmar_pago(
     if sesion.estado in (EstadoSesionPago.EXPIRED, EstadoSesionPago.CANCELLED):
         raise HTTPException(status_code=400, detail=f"Sesion {sesion.estado.value}")
 
-    # En un provider real acá haríamos POST al provider y esperaríamos webhook.
-    # Como es mock, simulamos el camino feliz: marcamos aprobado directo.
-    sesion.estado = EstadoSesionPago.APPROVED
-    sesion.medio_pago = body.medio_pago
-    sesion.completed_at = datetime.utcnow()
-    sesion.metadatos = (sesion.metadatos or {}) | {
-        "medio_detalle": body.metadatos or {},
-        "simulado": True,
-    }
-
-    # Generar CUT (Codigo Unico de Tramite) si aun no lo tiene —
-    # el operador de ventanilla lo escanea para verificar el pago.
-    if not sesion.codigo_cut_qr:
-        sesion.codigo_cut_qr = await _generar_cut_unico(db)
-
-    # Marcar pendiente de imputacion contable. Contaduria despues lo pasa
-    # a 'imputado' cuando carga el asiento en el sistema tributario (RAFAM).
-    if sesion.imputacion_estado is None:
-        sesion.imputacion_estado = EstadoImputacion.PENDIENTE
-
-    # Marcar la deuda como pagada + crear registro de Pago
-    if sesion.deuda:
-        sesion.deuda.estado = EstadoDeuda.PAGADA
-        sesion.deuda.fecha_pago = datetime.utcnow()
-        sesion.deuda.pago_externo_id = sesion.external_id
-
-        # Mapear el medio del gateway al medio de pago de Tasas
-        medio_tasa_map = {
-            MedioPagoGateway.TARJETA: MedioPagoTasa.TARJETA_CREDITO,
-            MedioPagoGateway.QR: MedioPagoTasa.QR,
-            MedioPagoGateway.EFECTIVO_CUPON: MedioPagoTasa.RAPIPAGO,
-            MedioPagoGateway.TRANSFERENCIA: MedioPagoTasa.TRANSFERENCIA,
-            MedioPagoGateway.DEBITO_AUTOMATICO: MedioPagoTasa.DEBITO_AUTOMATICO,
-        }
-        db.add(Pago(
-            deuda_id=sesion.deuda.id,
-            usuario_id=sesion.vecino_user_id,
-            monto=sesion.monto,
-            medio=medio_tasa_map.get(body.medio_pago, MedioPagoTasa.TARJETA_CREDITO),
-            pago_externo_id=sesion.external_id,
-            estado="confirmado",
-            payload_externo=sesion.metadatos,
-        ))
-
-    # Si era pago de un tramite: registrar el evento y, si estaba en
-    # PENDIENTE_PAGO (cobro al inicio), pasar la solicitud a RECIBIDO ahora
-    # que el dinero ya entró. Las dependencias recién la pueden trabajar.
-    solicitud_pasa_a_recibido = False
-    if sesion.solicitud_id:
-        from models.tramite import Solicitud, EstadoSolicitud, HistorialSolicitud
-        sol_q = await db.execute(
-            select(Solicitud).options(selectinload(Solicitud.tramite)).where(Solicitud.id == sesion.solicitud_id)
+    # Gate de seguridad: con un provider REAL la aprobación entra por el
+    # webhook firmado del proveedor. Este endpoint es público (lo llama el
+    # checkout simulado) y solo puede confirmar sesiones del mock — sin esto,
+    # cualquiera con un session_id aprobaba un pago de MP sin pagar.
+    if sesion.provider and sesion.provider != "paybridge":
+        raise HTTPException(
+            status_code=403,
+            detail="Esta sesión se confirma por el proveedor de pago, no manualmente",
         )
-        solicitud = sol_q.scalar_one_or_none()
-        if solicitud:
-            estado_previo = solicitud.estado
-            costo_fmt = f"${sesion.monto:,.2f}".replace(",", ".") if sesion.monto else ""
 
-            estado_nuevo = estado_previo
-            if estado_previo == EstadoSolicitud.PENDIENTE_PAGO:
-                solicitud.estado = EstadoSolicitud.RECIBIDO
-                estado_nuevo = EstadoSolicitud.RECIBIDO
-                solicitud_pasa_a_recibido = True
-
-            db.add(HistorialSolicitud(
-                solicitud_id=solicitud.id,
-                usuario_id=sesion.vecino_user_id,
-                estado_anterior=estado_previo,
-                estado_nuevo=estado_nuevo,
-                accion=f"💳 Pago aprobado · {body.medio_pago.value if hasattr(body.medio_pago, 'value') else body.medio_pago}",
-                comentario=f"Sesión {sesion.id} · {costo_fmt} · N° operación {sesion.external_id}",
-            ))
+    # Mock: se simula el camino feliz y se aplican los efectos por el mismo
+    # helper que usa el webhook real.
+    await _aplicar_aprobacion(
+        db, sesion, body.medio_pago,
+        metadatos_extra={"medio_detalle": body.metadatos or {}, "simulado": True},
+    )
 
     await db.commit()
 
@@ -837,23 +864,45 @@ async def webhook_mercadopago(request: Request, db: AsyncSession = Depends(get_d
     firma_header = request.headers.get("x-signature", "")
     request_id = request.headers.get("x-request-id", "")
 
-    # Buscar la sesion por external_reference (el preference_id lo
-    # almacenamos en external_id cuando creamos la sesion). MP a veces
-    # manda payment_id, que no es preference_id — en ese caso buscamos
-    # por pago completo con /v1/payments/{id} y obtenemos el external_reference.
+    # Resolver la sesion. MP manda data.id = PAYMENT id, pero al crear la
+    # sesion guardamos el id de la PREFERENCE en external_id, asi que el
+    # lookup directo casi nunca matchea. Camino real: consultar
+    # /v1/payments/{id} y correlacionar por external_reference (que es
+    # NUESTRO session_id — lo seteamos al crear la preference).
     sesion: Optional[PagoSesion] = None
-    external_ref: Optional[str] = None
-
-    # Por ahora: si el evento es payment.updated, consultamos MP para
-    # obtener el external_reference real (que es nuestro sesion_id).
-    # Esto requiere tener credenciales validas para el muni en cuestion.
-    # Como no sabemos el muni hasta resolver la sesion, buscamos por
-    # external_id primero (preference_id) y sino ignoramos silenciosamente.
+    estado_ext = None  # si la resolucion ya consulto MP, se reusa mas abajo
 
     q = await db.execute(
         select(PagoSesion).where(PagoSesion.external_id == data_id)
     )
     sesion = q.scalar_one_or_none()
+
+    if not sesion:
+        # El payment no dice de que muni es: se prueba con cada config MP
+        # activa (son pocas; el token equivocado da 404/401 y se saltea).
+        cfgs_q = await db.execute(
+            select(MunicipioProveedorPago).where(
+                MunicipioProveedorPago.proveedor == PROVEEDOR_MERCADOPAGO,
+                MunicipioProveedorPago.activo == True,  # noqa: E712
+            )
+        )
+        for cfg in cfgs_q.scalars().all():
+            provider_cand = await get_provider_para_muni(db, cfg.municipio_id)
+            if provider_cand.nombre != PROVEEDOR_MERCADOPAGO:
+                continue  # sin credenciales validas cayo al mock: no sirve
+            try:
+                candidato = await provider_cand.consultar_estado(data_id)
+            except Exception:
+                continue
+            ref = str((candidato.payload_raw or {}).get("external_reference") or "")
+            if not ref:
+                continue
+            sq = await db.execute(select(PagoSesion).where(PagoSesion.id == ref))
+            posible = sq.scalar_one_or_none()
+            if posible and posible.municipio_id == cfg.municipio_id:
+                sesion = posible
+                estado_ext = candidato
+                break
 
     # Validar firma si tenemos el muni
     firma_ok = False
@@ -894,49 +943,26 @@ async def webhook_mercadopago(request: Request, db: AsyncSession = Depends(get_d
     if not sesion:
         return {"received": True, "session_resolved": False}
 
-    # Consultar estado real en MP (el payload del webhook no lo trae)
-    provider = await get_provider_para_muni(db, sesion.municipio_id)
-    try:
-        estado_ext = await provider.consultar_estado(data_id)
-    except Exception as e:
-        evt.error = str(e)[:500]
-        await db.commit()
-        logger.error("Webhook MP no pudo consultar estado: %s", e)
-        return {"received": True, "error": "consulta_estado_fallo"}
+    # Consultar estado real en MP (el payload del webhook no lo trae). Si la
+    # resolucion de arriba ya consulto el payment, se reusa esa respuesta.
+    if estado_ext is None:
+        provider = await get_provider_para_muni(db, sesion.municipio_id)
+        try:
+            estado_ext = await provider.consultar_estado(data_id)
+        except Exception as e:
+            evt.error = str(e)[:500]
+            await db.commit()
+            logger.error("Webhook MP no pudo consultar estado: %s", e)
+            return {"received": True, "error": "consulta_estado_fallo"}
 
     if estado_ext.aprobado and sesion.estado != EstadoSesionPago.APPROVED:
-        # Ejecutar el mismo path que /confirmar (marcar deuda pagada + pago)
-        sesion.estado = EstadoSesionPago.APPROVED
-        sesion.medio_pago = estado_ext.medio_pago or sesion.medio_pago
-        sesion.completed_at = datetime.utcnow()
-        sesion.metadatos = (sesion.metadatos or {}) | {"webhook": evento, "mp_payload": estado_ext.payload_raw or {}}
-        if not sesion.codigo_cut_qr:
-            sesion.codigo_cut_qr = await _generar_cut_unico(db)
-        if sesion.imputacion_estado is None:
-            sesion.imputacion_estado = EstadoImputacion.PENDIENTE
-        if sesion.deuda_id:
-            dq = await db.execute(select(Deuda).where(Deuda.id == sesion.deuda_id))
-            deuda = dq.scalar_one_or_none()
-            if deuda and deuda.estado != EstadoDeuda.PAGADA:
-                deuda.estado = EstadoDeuda.PAGADA
-                deuda.fecha_pago = datetime.utcnow()
-                deuda.pago_externo_id = sesion.external_id
-                medio_tasa_map = {
-                    MedioPagoGateway.TARJETA: MedioPagoTasa.TARJETA_CREDITO,
-                    MedioPagoGateway.QR: MedioPagoTasa.QR,
-                    MedioPagoGateway.EFECTIVO_CUPON: MedioPagoTasa.RAPIPAGO,
-                    MedioPagoGateway.TRANSFERENCIA: MedioPagoTasa.TRANSFERENCIA,
-                    MedioPagoGateway.DEBITO_AUTOMATICO: MedioPagoTasa.DEBITO_AUTOMATICO,
-                }
-                db.add(Pago(
-                    deuda_id=deuda.id,
-                    usuario_id=sesion.vecino_user_id,
-                    monto=sesion.monto,
-                    medio=medio_tasa_map.get(sesion.medio_pago, MedioPagoTasa.TARJETA_CREDITO) if sesion.medio_pago else MedioPagoTasa.TARJETA_CREDITO,
-                    pago_externo_id=sesion.external_id,
-                    estado="confirmado",
-                    payload_externo=sesion.metadatos,
-                ))
+        # Mismo camino que /confirmar: deuda pagada / solicitud a RECIBIDO,
+        # CUT, imputacion pendiente — todo en _aplicar_aprobacion.
+        await _aplicar_aprobacion(
+            db, sesion,
+            estado_ext.medio_pago or sesion.medio_pago,
+            metadatos_extra={"webhook": evento, "mp_payload": estado_ext.payload_raw or {}},
+        )
 
     evt.procesado_at = datetime.utcnow()
     await db.commit()

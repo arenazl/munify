@@ -131,6 +131,18 @@ async def recomendaciones_vecino(
     ahora = datetime.utcnow()
 
     # --- TASAS ---
+    # Sólo si el municipio TIENE el módulo. `tasas` es opt-in desde 2026-08-29
+    # (Munify no cubre el cobro de tasas): sin fila explícita, el vecino no
+    # puede recibir una recomendación de pagar boletas de un circuito que su
+    # municipio no ofrece. Antes se recomendaba sin mirar el módulo.
+    from models.municipio_modulo import MunicipioModulo
+    _mod_tasas = (await db.execute(
+        select(MunicipioModulo.activo).where(
+            MunicipioModulo.municipio_id == current_user.municipio_id,
+            MunicipioModulo.modulo == "tasas",
+        )
+    )).scalar_one_or_none()
+    tasas_on = bool(_mod_tasas)
     partida_match = [Partida.titular_user_id == current_user.id]
     if current_user.dni:
         partida_match.append(Partida.titular_dni == current_user.dni)
@@ -149,7 +161,7 @@ async def recomendaciones_vecino(
     )
     vencidas_row = vencidas_q.one()
     cant_vencidas, monto_vencidas = vencidas_row[0], float(vencidas_row[1])
-    if cant_vencidas > 0:
+    if tasas_on and cant_vencidas > 0:
         recs.append(Recomendacion(
             tipo="tasas", icono="AlertTriangle", color="#ef4444",
             titulo=f"Tenés {cant_vencidas} {'boleta vencida' if cant_vencidas == 1 else 'boletas vencidas'}",
@@ -171,7 +183,7 @@ async def recomendaciones_vecino(
         )
     )
     cant_proximas = proximas_q.scalar() or 0
-    if cant_proximas > 0:
+    if tasas_on and cant_proximas > 0:
         recs.append(Recomendacion(
             tipo="tasas", icono="Clock", color="#f59e0b",
             titulo=f"{cant_proximas} {'boleta vence' if cant_proximas == 1 else 'boletas vencen'} en los próximos 7 días",
@@ -186,7 +198,7 @@ async def recomendaciones_vecino(
         select(func.count(Partida.id)).where(partida_filter)
     )
     cant_partidas = partidas_q.scalar() or 0
-    if cant_partidas == 0:
+    if tasas_on and cant_partidas == 0:
         recs.append(Recomendacion(
             tipo="tasas", icono="Search", color="#6366f1",
             titulo="Asociá tus tasas municipales",
