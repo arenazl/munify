@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, FileCheck, Map, ScanLine, Receipt, Wallet,
   LayoutDashboard, CalendarClock, Activity, Sparkles, PiggyBank, Hammer,
-  FileSignature, Users, MapPin, Megaphone, Truck, UserCheck, CalendarCheck,
+  FileSignature, Users, MapPin, Megaphone, UserCheck, CalendarCheck, Boxes,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -40,7 +40,12 @@ export const MODULOS: ModuloDef[] = [
   { key: 'contaduria', label: 'Contaduría', descripcion: 'Órdenes de pago con autorización formal y sus reportes', icon: FileSignature, optIn: true },
   { key: 'ordenes_trabajo', label: 'Órdenes de trabajo', descripcion: 'OTs de campo con cuadrillas y materiales', icon: Hammer, optIn: true },
   { key: 'poi', label: 'Puntos de interés', descripcion: 'POIs en el mapa (hospital, escuela, bomberos...) con radio de zona y prioridad', icon: MapPin, optIn: true },
-  { key: 'flota', label: 'Flota', descripcion: 'Vehículos del municipio, combustible y consumo real por unidad', icon: Truck, optIn: true },
+  // Fusion de `inventario` + `flota` (2026-09-02). En el modelo nunca
+  // estuvieron separados: un vehiculo es un item con naturaleza ACTIVO y
+  // `flota_cargas` solo le cuelga el combustible. `inventario` ademas era un
+  // modulo fantasma: la tabla y el sidebar lo usaban, pero no figuraba aca,
+  // asi que no se podia prender ni apagar desde Configuracion.
+  { key: 'patrimonio', label: 'Patrimonio', descripcion: 'Lo que tiene el municipio: materiales, vehículos y bienes, con sus movimientos y compras', icon: Boxes, optIn: true },
   { key: 'reservas', label: 'Reservas', descripcion: 'Préstamo de salón, cancha y maquinaria al vecino', icon: CalendarCheck, optIn: true },
   { key: 'presentismo', label: 'Presentismo', descripcion: 'Jornadas fichadas por la cuadrilla; alimenta el premio de Sueldos', icon: UserCheck, optIn: true },
   { key: 'comunicacion', label: 'Comunicación', descripcion: 'Avisos y novedades del municipio al celular del vecino', icon: Megaphone, optIn: true },

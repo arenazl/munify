@@ -1700,11 +1700,12 @@ async def _habilitar_modulos(db: AsyncSession, muni_id: int) -> None:
     existentes = {m.modulo for m in (await db.execute(
         select(MunicipioModulo).where(MunicipioModulo.municipio_id == muni_id)
     )).scalars().all()}
-    for mod in ("ordenes_trabajo", "inventario", "sueldos", "contaduria", "tesoreria"):
+    # `patrimonio` = fusión de los viejos `inventario` + `flota` (2026-09-02).
+    for mod in ("ordenes_trabajo", "patrimonio", "sueldos", "contaduria", "tesoreria"):
         if mod not in existentes:
             db.add(MunicipioModulo(municipio_id=muni_id, modulo=mod, activo=True))
     await db.flush()
-    print("[modulos] opt-in habilitados (ordenes_trabajo, inventario, sueldos, contaduria, tesoreria)")
+    print("[modulos] opt-in habilitados (ordenes_trabajo, patrimonio, sueldos, contaduria, tesoreria)")
 
 
 # ============================================================

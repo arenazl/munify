@@ -48,7 +48,8 @@ import { MODULOS } from '../../lib/enums/modulos';
 const MODULOS_DEL_GRUPO: Record<string, string[]> = {
   reclamos: ['reclamos'],
   tramites: ['tramites'],
-  inventario: ['inventario', 'ordenes_trabajo'],
+  // `patrimonio` = el viejo `inventario` + `flota`, fusionados el 2026-09-02.
+  inventario: ['patrimonio', 'ordenes_trabajo'],
   tesoreria: ['tesoreria', 'sueldos', 'contaduria'],
   personal: ['sueldos', 'ordenes_trabajo', 'reclamos'],
   integraciones: ['pagos'],
@@ -80,7 +81,7 @@ export default function Configuracion() {
      invita a tocarlo. Super admin = admin SIN municipio_id. Los grupos de
      módulo respetan el destilde del muni (MODULOS_DEL_GRUPO): fila explícita
      mata semántica; sin fila, opt-out = activo y opt-in (o desconocido,
-     ej. 'inventario' que no está en el catálogo del front) = oculto. */
+     una clave que no esté en el catálogo del front) = oculto. */
   const arbol = useMemo(() => {
     const grupos = MockData.arbol().filter((g: { id: string }) => g.id !== 'super' || isSuperAdmin);
     if (!modulosMuni || isSuperAdmin) return grupos;

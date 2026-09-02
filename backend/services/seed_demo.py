@@ -2411,10 +2411,13 @@ async def seed_demo_completo(
     # no hay nada extra que sembrar.
 
     # Activar los módulos opt-in en los munis demo, así la demo muestra el
-    # circuito completo (campo + inventario + sueldos + contaduría). El seed
+    # circuito completo (trabajos + patrimonio + sueldos + contaduría). El seed
     # corre una sola vez por muni nuevo, no hace falta chequear duplicados.
+    # `patrimonio` unifica los viejos `inventario` + `flota` (2026-09-02): el
+    # sidebar y Configuración sólo conocen el nombre nuevo — una demo sembrada
+    # con `inventario` nacería sin la sección Patrimonio visible.
     from models.municipio_modulo import MunicipioModulo
-    _modulos = ('ordenes_trabajo', 'inventario', 'sueldos', 'contaduria', 'comunicacion')
+    _modulos = ('ordenes_trabajo', 'patrimonio', 'sueldos', 'contaduria', 'comunicacion')
     for _mod in _modulos:
         db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()

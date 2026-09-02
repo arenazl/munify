@@ -244,25 +244,44 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Reclamos',
       description: 'Consultas y análisis con IA'
     },
-    // === SECCIÓN CAMPO (empleados/operarios con tareas asignadas) ===
+    // === TRABAJOS (lo que el municipio HACE: tareas asignadas en campo) ===
+    // Antes esta seccion se llamaba "Campo" y mezclaba las tareas del operario
+    // con el stock del deposito. El dueño lo marco el 2026-09-02: "campo no se
+    // entiende un choto". Lo que se TIENE es Patrimonio; lo que se HACE queda
+    // aca.
     {
       name: 'Trabajos',
       href: '/gestion/mis-trabajos',
       icon: Wrench,
       show: userRole === 'empleado' || ((isSupervisor || isAdmin) && hasEmpleado),
-      categoria: 'Campo',
+      categoria: 'Trabajos',
       description: 'Mis tareas asignadas en campo'
     },
+    // === PATRIMONIO (lo que el municipio TIENE) ===
+    // `patrimonio` reemplaza a `inventario` + `flota` (2026-09-02). En el modelo
+    // nunca estuvieron separados: un vehiculo es un `inventario_items` con
+    // naturaleza ACTIVO y su dominio en `identificador`; `flota_cargas` solo le
+    // cuelga la bitacora de combustible. Tener dos switches para la misma cosa
+    // era el error.
     {
-      // Lo OPERACIONAL del inventario: el stock se mueve todos los días y hay
-      // que poder cargarlo sin pasar por Configuración. El catálogo de
-      // artículos (/gestion/inventario) sigue llegándose desde Configuración:
-      // una fila sólo cambia si alguien la edita a mano (dueño, 2026-08-31).
+      // El catalogo VUELVE al sidebar: es la puerta del modulo y quien carga su
+      // inventario desde cero no puede estar entrando y saliendo de
+      // Configuracion todo el dia (dueño, 2026-09-02).
+      name: 'Patrimonio',
+      href: '/gestion/inventario',
+      icon: PackageOpen,
+      show: isAdminOrSupervisor && modulosActivos.has('patrimonio'),
+      categoria: 'Patrimonio',
+      description: 'Lo que tiene el municipio: materiales, vehículos y bienes'
+    },
+    {
+      // Lo OPERACIONAL: el stock se mueve todos los días y hay que poder
+      // cargarlo sin pasar por Configuración.
       name: 'Movimientos',
       href: '/gestion/inventario/movimientos',
-      icon: PackageOpen,
-      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
-      categoria: 'Campo',
+      icon: Layers,
+      show: isAdminOrSupervisor && modulosActivos.has('patrimonio'),
+      categoria: 'Patrimonio',
       description: 'Entradas, salidas y ajustes de stock'
     },
     {
@@ -270,13 +289,11 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       // que el depósito no se quede sin nada.
       name: 'Compras',
       href: '/gestion/inventario/compras',
-      icon: Truck,
-      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
-      categoria: 'Campo',
+      icon: PackageOpen,
+      show: isAdminOrSupervisor && modulosActivos.has('patrimonio'),
+      categoria: 'Patrimonio',
       description: 'Órdenes de compra y reposición'
     },
-    // NOTA: 'Inventario' (/gestion/inventario) salió del sidebar — se llega por
-    // el tile de Configuración → Catálogos, al lado de "Categorías Inventario".
     // NOTA: 'Personal' (/gestion/empleados) y 'Cuadrillas' (/gestion/cuadrillas)
     // NO van en el sidebar. Ambas son ABMs de ficha — la fila solo cambia si
     // alguien la edita a mano, no se mueve con el trabajo del día — y ya se
@@ -469,11 +486,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     // === RECURSOS (módulo nuevo 2026-08-29, opt-in) ===
     // Lo que el municipio administra de sí mismo. Ver docs/recursos/.
     {
+      // Flota NO es un modulo aparte: es la vista de los activos del patrimonio
+      // que son vehiculos, con su bitacora de combustible.
       name: 'Flota',
       href: '/gestion/flota',
       icon: Truck,
-      show: isAdminOrSupervisor && modulosActivos.has('flota'),
-      categoria: 'Recursos',
+      show: isAdminOrSupervisor && modulosActivos.has('patrimonio'),
+      categoria: 'Patrimonio',
       description: 'Vehículos, combustible y consumo por unidad'
     },
     {
