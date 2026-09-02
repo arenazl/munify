@@ -79,41 +79,45 @@ def cache_invalidate(municipio_id: int, modulo: Optional[str] = None) -> None:
 # LLM caller
 # ===================================================================
 
-async def _call_gemini(prompt: str, max_tokens: int = 4000, modelo: Optional[str] = None) -> Optional[str]:
-    if not settings.GEMINI_API_KEY:
+async def _call_llm(prompt: str, max_tokens: int = 4000, modelo: Optional[str] = None) -> Optional[str]:
+    """Groq, unico proveedor desde el 2026-09-01. `modelo` viene de la config
+    de IA del municipio; si ahi quedo guardado un modelo de Gemini se ignora y
+    va el de Groq (esa tabla se migra aparte)."""
+    if not settings.GROQ_API_KEY:
         return None
-    model = modelo or settings.GEMINI_MODEL
+    model = modelo if (modelo and "gemini" not in modelo.lower()) else settings.GROQ_MODEL
+    cuerpo = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "max_tokens": max_tokens,
+        "response_format": {"type": "json_object"},
+    }
+    # gpt-oss razona por default y ese reasoning se descuenta de max_tokens:
+    # sin esto la respuesta puede volver vacia (mismo gotcha que calls_ia).
+    if "gpt-oss" in model:
+        cuerpo["reasoning_effort"] = "low"
     try:
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{model}:generateContent?key={settings.GEMINI_API_KEY}"
-        )
         async with httpx.AsyncClient(timeout=28.0) as client:
             response = await client.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.2,
-                        "maxOutputTokens": max_tokens,
-                        "responseMimeType": "application/json",
-                        "thinkingConfig": {"thinkingBudget": 0},
-                    },
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                    "Content-Type": "application/json",
                 },
+                json=cuerpo,
             )
         if response.status_code != 200:
-            logger.error("[DashboardIA] Gemini status=%s", response.status_code)
+            logger.error("[DashboardIA] Groq status=%s body=%s", response.status_code, response.text[:300])
             return None
         data = response.json()
         return (
-            data.get("candidates", [{}])[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "")
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
         )
     except Exception as e:
-        logger.exception("[DashboardIA] Gemini exc: %s", e)
+        logger.exception("[DashboardIA] Groq exc: %s", e)
         return None
 
 
@@ -278,12 +282,12 @@ async def build_reclamos_dashboard(db: AsyncSession, municipio_id: int, force: b
     # ---------- LLM: URGENTES + RECOMENDACIONES ----------
     urgentes: List[Dict[str, Any]] = []
     recomendaciones: List[Dict[str, Any]] = []
-    if (settings.GEMINI_API_KEY or settings.GROQ_API_KEY) and items_criticos:
+    if settings.GROQ_API_KEY and items_criticos:
         prompt = RECLAMOS_PROMPT.format(
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_gemini(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
+        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]
@@ -422,12 +426,12 @@ async def build_tramites_dashboard(db: AsyncSession, municipio_id: int, force: b
 
     urgentes: List[Dict[str, Any]] = []
     recomendaciones: List[Dict[str, Any]] = []
-    if (settings.GEMINI_API_KEY or settings.GROQ_API_KEY) and items_criticos:
+    if settings.GROQ_API_KEY and items_criticos:
         prompt = TRAMITES_PROMPT.format(
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_gemini(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
+        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]
@@ -580,12 +584,12 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
 
     urgentes: List[Dict[str, Any]] = []
     recomendaciones: List[Dict[str, Any]] = []
-    if (settings.GEMINI_API_KEY or settings.GROQ_API_KEY) and items_criticos:
+    if settings.GROQ_API_KEY and items_criticos:
         prompt = TESORERIA_PROMPT.format(
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_gemini(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
+        text_resp = await _call_llm(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]

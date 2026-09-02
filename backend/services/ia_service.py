@@ -382,76 +382,6 @@ def clasificar_local(texto: str, categorias: List[Dict]) -> List[Dict]:
     return scores[:3]
 
 
-async def clasificar_con_gemini(texto: str, categorias: List[Dict], modelo: Optional[str] = None) -> Optional[List[Dict]]:
-    """
-    Clasificación usando Gemini (Google) - IA por defecto.
-    Se usa cuando el matching local no es suficiente.
-    """
-    if not settings.GEMINI_API_KEY:
-        return None
-
-    # Construir lista de categorías
-    cats_list = "\n".join([f"- ID {c['id']}: {c['nombre']}" for c in categorias])
-
-    prompt = f"""Eres un asistente que clasifica reclamos municipales argentinos.
-
-TEXTO DEL RECLAMO:
-"{texto}"
-
-CATEGORÍAS DISPONIBLES:
-{cats_list}
-
-Analiza el texto y devuelve las 3 categorías más probables en formato JSON.
-Responde SOLO con un JSON válido, sin explicaciones:
-[
-  {{"categoria_id": <id>, "categoria_nombre": "<nombre>", "confianza": <0-100>}},
-  {{"categoria_id": <id>, "categoria_nombre": "<nombre>", "confianza": <0-100>}},
-  {{"categoria_id": <id>, "categoria_nombre": "<nombre>", "confianza": <0-100>}}
-]
-
-Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []"""
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{modelo or settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.1,
-                        "maxOutputTokens": 1000,
-                        # Gemini 2.5 "piensa" por default y se come el presupuesto
-                        # de tokens, truncando el JSON. Lo desactivamos para que
-                        # toda la salida vaya a la respuesta (mismo patron que dashboard_ia).
-                        "thinkingConfig": {"thinkingBudget": 0},
-                    }
-                }
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                text_response = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-
-                # Extraer JSON de la respuesta
-                json_match = re.search(r'\[[\s\S]*\]', text_response)
-                if json_match:
-                    result = json.loads(json_match.group())
-                    # Agregar metodo
-                    for item in result:
-                        item['metodo'] = 'gemini'
-                        item['score'] = item.get('confianza', 50)
-                    return result
-
-            return None
-
-    except Exception as e:
-        print(f"Error en Gemini: {e}")
-        return None
-
-
 async def clasificar_con_groq(texto: str, categorias: List[Dict]) -> Optional[List[Dict]]:
     """
     Clasificación usando Groq (API rápida con Llama) - alternativa a Gemini.
@@ -519,7 +449,8 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
 async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool = True, modelo: Optional[str] = None) -> Dict:
     """
     Clasificación: usa IA si está habilitada, sino local.
-    Prioridad de IA: Groq > Gemini > local
+    Prioridad de IA: Groq > local (Gemini se saco el 2026-09-01: la app
+    usa un solo proveedor y no hay fallback silencioso a otro modelo).
 
     Args:
         texto: Título y/o descripción del reclamo
@@ -536,18 +467,13 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
     ia_results = None
     ia_metodo = None
 
-    if usar_ia:
-        # Intentar Groq primero (más rápido)
-        if settings.GROQ_API_KEY:
-            ia_results = await clasificar_con_groq(texto, categorias)
-            if ia_results:
-                ia_metodo = 'groq'
-
-        # Si Groq no funcionó, intentar Gemini como fallback
-        if not ia_results and settings.GEMINI_API_KEY:
-            ia_results = await clasificar_con_gemini(texto, categorias, modelo=modelo)
-            if ia_results:
-                ia_metodo = 'gemini'
+    if usar_ia and settings.GROQ_API_KEY:
+        # `modelo` sale de la config de IA del municipio, que todavia
+        # puede tener guardado un modelo de Gemini: en ese caso se
+        # ignora y va el de Groq. Esa tabla se migra por separado.
+        ia_results = await clasificar_con_groq(texto, categorias)
+        if ia_results:
+            ia_metodo = 'groq'
 
     # 4. Combinar resultados
     if ia_results:
@@ -560,7 +486,7 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
         return {
             'sugerencias': local_results,
             'metodo_principal': 'local',
-            'ia_disponible': bool(settings.GROQ_API_KEY or settings.GEMINI_API_KEY)
+            'ia_disponible': bool(settings.GROQ_API_KEY)
         }
 
 

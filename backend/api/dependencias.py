@@ -827,7 +827,7 @@ class AutoAsignarCategoriasTramiteRequest(BaseModel):
 
 
 async def asignar_con_ia(items: List[dict], dependencias: List[dict], tipo: str) -> dict:
-    """Usa IA (Groq/Gemini) para asignar items (categorías o tipos) a dependencias."""
+    """Usa Groq para asignar items (categorías o tipos) a dependencias."""
     tipo_label = "categorías de reclamos" if tipo == "categorias" else "tipos de trámite"
 
     deps_list = "\n".join([
@@ -872,24 +872,6 @@ Responde SOLO con JSON válido: {{"<dependencia_id>": [<lista de IDs>]}}"""
         except Exception as e:
             logger.error(f"[IA] Error en Groq: {e}")
 
-    if not result and settings.GEMINI_API_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                    headers={"Content-Type": "application/json"},
-                    json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2000}}
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    text_response = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                    json_match = re.search(r'\{[\s\S]*\}', text_response)
-                    if json_match:
-                        result = json.loads(json_match.group())
-                        logger.info(f"[IA] Auto-asignación con Gemini exitosa para {tipo}")
-        except Exception as e:
-            logger.error(f"[IA] Error en Gemini: {e}")
-
     return result or {}
 
 
@@ -910,7 +892,7 @@ async def auto_asignar_categorias_ia(
     if not data.categorias or not data.dependencias:
         raise HTTPException(status_code=400, detail="Se requieren categorías y dependencias")
 
-    if not settings.GROQ_API_KEY and not settings.GEMINI_API_KEY:
+    if not settings.GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="Servicio de IA no configurado")
 
     categorias_dict = [{"id": c.id, "nombre": c.nombre} for c in data.categorias]
@@ -968,7 +950,7 @@ async def auto_asignar_categorias_tramite_ia(
     if not data.categorias_tramite or not data.dependencias:
         raise HTTPException(status_code=400, detail="Se requieren categorías de trámite y dependencias")
 
-    if not settings.GROQ_API_KEY and not settings.GEMINI_API_KEY:
+    if not settings.GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="Servicio de IA no configurado")
 
     cats_dict = [{"id": c.id, "nombre": c.nombre} for c in data.categorias_tramite]
@@ -1225,8 +1207,8 @@ async def sugerir_jerarquicas(
 ):
     """
     Devuelve sugerencias de Secretarias o Direcciones para precargar la pantalla
-    de configuracion. Usa IA si esta configurada (Groq/Gemini), sino cae al
-    template estatico de organigrama municipal tipico.
+    de configuracion. Usa Groq si esta configurado, sino cae al template
+    estatico de organigrama municipal tipico.
     """
     excluir_lower = {n.strip().lower() for n in (data.excluir_nombres or [])}
 
@@ -1234,7 +1216,7 @@ async def sugerir_jerarquicas(
         return [i for i in items if i.nombre.lower() not in excluir_lower]
 
     # 1) Intento IA primero (si hay clave) — pero con timeout corto y fallback al template.
-    if (settings.GROQ_API_KEY or settings.GEMINI_API_KEY):
+    if settings.GROQ_API_KEY:
         if data.nivel == "SECRETARIA":
             ya_cargadas = ", ".join(data.excluir_nombres) if data.excluir_nombres else "ninguna"
             prompt = f"""Sos un experto en organigramas municipales argentinos.
@@ -1272,24 +1254,6 @@ Respondé SOLO con JSON valido en este formato exacto:
                             ia_items = [SugerenciaJerarquicaItem(**it) for it in parsed.get("items", []) if it.get("nombre")]
         except Exception as e:
             logger.warning(f"[Sugerencias IA] Groq fallo: {e}")
-
-        if not ia_items and settings.GEMINI_API_KEY:
-            try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    r = await client.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                        headers={"Content-Type": "application/json"},
-                        json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800}},
-                    )
-                    if r.status_code == 200:
-                        body = r.json()
-                        text_resp = body.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                        m = re.search(r'\{[\s\S]*\}', text_resp)
-                        if m:
-                            parsed = json.loads(m.group())
-                            ia_items = [SugerenciaJerarquicaItem(**it) for it in parsed.get("items", []) if it.get("nombre")]
-            except Exception as e:
-                logger.warning(f"[Sugerencias IA] Gemini fallo: {e}")
 
         if ia_items:
             return SugerenciasJerarquicasResponse(items=filtrar(ia_items), fuente="ia")

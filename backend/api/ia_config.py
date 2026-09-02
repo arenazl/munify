@@ -1,7 +1,7 @@
 """Config de IA por municipio.
 
   - Superadmin (admin sin municipio_id): GET/PUT /admin/ia-config/{municipio_id}
-    para prender/apagar la IA y elegir el modelo de Gemini de cada municipio.
+    para prender/apagar la IA y elegir el modelo de Groq de cada municipio.
     El intendente NO accede (guard require_super_admin).
   - Gate del frontend: GET /ia-config/actual devuelve la config del municipio
     actual (cualquier usuario autenticado del muni) para ocultar/mostrar la IA.
@@ -23,19 +23,21 @@ from models.municipio_ia_config import MunicipioIaConfig
 
 router = APIRouter()
 
-# Modelos de Gemini ofrecidos en la pantalla del superadmin.
-MODELOS_GEMINI: List[str] = [
-    "gemini-2.5-flash",       # económico + bueno (default)
-    "gemini-2.5-flash-lite",  # el más liviano/barato (light)
-    "gemini-2.5-pro",         # el mejor (más caro)
-    "gemini-2.0-flash",       # alternativa más barata
+# Modelos de Groq ofrecidos en la pantalla del superadmin. Salen de lo que
+# la cuenta tiene ACTIVO hoy (GET /openai/v1/models, 2026-09-01), no de una
+# lista inventada: si Groq da de baja alguno, hay que revisar esta lista.
+MODELOS_GROQ: List[str] = [
+    "openai/gpt-oss-120b",  # el que usa la app por default
+    "openai/gpt-oss-20b",   # mas liviano y barato
+    "qwen/qwen3.8-27b",
+    "qwen/qwen3.6-27b",
 ]
 
 
 class IaConfigIn(BaseModel):
     habilitada: bool = False
-    provider: str = "gemini"
-    modelo: str = "gemini-2.5-flash"
+    provider: str = "groq"
+    modelo: str = MODELOS_GROQ[0]
     tesoreria: bool = True
     reclamos: bool = True
     tramites: bool = True
@@ -55,7 +57,7 @@ class IaConfigOut(BaseModel):
 
 @router.get("/admin/ia-config/modelos", response_model=List[str])
 async def admin_listar_modelos(_: User = Depends(require_super_admin)):
-    return MODELOS_GEMINI
+    return MODELOS_GROQ
 
 
 @router.get("/admin/ia-config/{municipio_id}", response_model=IaConfigOut)
