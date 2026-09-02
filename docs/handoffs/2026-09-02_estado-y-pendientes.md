@@ -33,6 +33,17 @@
 > `base-compartida/munify/PROMOCION-20260902-BASE.sql` (tablas+índices,
 > orden, fusión de módulos, verificación).
 >
+> **Alta de demos en PROD "fallando" (diagnosticado, no era falla):** el alta
+> del 02-09 18:38 UTC (15:38 ART) terminó 200 OK con semilla completa en
+> **84 segundos**; el celular cortó el fetch antes y la landing pintó "No
+> pudimos crear la demo" → reintentar creaba un duplicado con sufijo -2. No
+> falta NADA en prod. Parche en `landing` rama qa (commit `597e0fc`): el
+> catch verifica contra `demo-stats` y si la demo nació lo dice (WhatsApp
+> prellenado), sin invitar al duplicado. OJO al promover la landing: las
+> constantes API/APP difieren por rama (está documentado en el header del
+> archivo). **Proyecto anotado:** alta asíncrona con id de solicitud + bajar
+> los ~80s (Overpass en el medio).
+>
 > **PENDIENTE MAÑANA:** (1) sembrar los usuarios de `/calls` en prod — las
 > claves (`CLAVE_LUCAS`/`CLAVE_SOFI`) las tiene sólo Lucas; hasta entonces el
 > login de /calls en prod no anda (nada más depende de eso); (2) verificación
