@@ -23,6 +23,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
 | [`calls/`](calls/) | **Directorio de llamados** (`/calls`): `01` cómo regenerar la app y repasar los intendentes · `02` qué le falta y por dónde seguir |
+| [`geo/`](geo/) | Cartografía del alta de demos. **`03-forense-cartografia-demos.md`** (2026-09-02): qué está precargado y su calidad medida, los 4 bugs del día, lo que FALTA (capa de barrios/calles precargada, 53% de contornos groseros) y la hoja de ruta del batch offline — **regla de Lucas: NADA de cartografía online durante el alta** |
 | [`dashboard/`](dashboard/) | **Dashboard modular por módulos**: diseño cerrado (registry + hooks por dominio, cinta, regla del cero, orden por actividad) + WOs F1-F4 |
 | [`e2e/`](e2e/) | **Suite Playwright de circuito completo** (agnóstica de tenant): qué cubre, cómo correrla y cómo llevarla a otro municipio |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |
