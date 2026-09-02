@@ -642,30 +642,38 @@ export default function Tesoreria() {
   ];
 
   // --- PeriodControl: mapea el estado de periodo existente al contrato.
-  // GOTCHA piloto: cuando todosLosMeses=true el contrato no puede expresarlo
-  // (no hay estado "todos" en PeriodControlValue) — el control muestra el
-  // mes/año actual como PROPUESTA y el eyebrow del hero + el resumen dicen la
-  // verdad ("Todos los períodos"). Cualquier interacción con el control aplica
-  // el período elegido (sale de "todos"). Necesidad anotada en dudas.
+  // Desde v2.1 el contrato SÍ expresa "todos los períodos" (`todos`, opt-in
+  // con el flag definido) y el control lo dibuja con el PeriodNavigator del
+  // dueño (modoTodos). Este mapeo era anterior y no pasaba el flag: el
+  // control mostraba un mes como si filtrara mientras la página estaba en
+  // "todos" — el hallazgo de Infra del 2026-09-02.
   const periodValue = useMemo<PeriodControlValue>(() => {
     const unit = modoPeriodo === 'anio' ? ('year' as const) : ('month' as const);
     if (rangoActivo) {
       const d = parseFechaLocal(rangoFechas.desde);
       const h = parseFechaLocal(rangoFechas.hasta);
       return unit === 'year'
-        ? { unit, from: String(d.getFullYear()), to: String(h.getFullYear()) }
+        ? { unit, from: String(d.getFullYear()), to: String(h.getFullYear()), todos: false }
         : {
             unit,
             from: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`,
             to: `${h.getFullYear()}-${pad2(h.getMonth() + 1)}`,
+            todos: false,
           };
     }
     return unit === 'year'
-      ? { unit, from: String(anioActual) }
-      : { unit, from: `${anioActual}-${pad2(mesActual + 1)}` };
-  }, [modoPeriodo, rangoActivo, rangoFechas.desde, rangoFechas.hasta, anioActual, mesActual]);
+      ? { unit, from: String(anioActual), todos: todosLosMeses }
+      : { unit, from: `${anioActual}-${pad2(mesActual + 1)}`, todos: todosLosMeses };
+  }, [modoPeriodo, rangoActivo, rangoFechas.desde, rangoFechas.hasta, anioActual, mesActual, todosLosMeses]);
 
   const handlePeriodChange = (v: PeriodControlValue) => {
+    // Volver a "todos": sin filtro temporal; unit/from quedan como propuesta
+    // de aterrizaje para cuando el usuario vuelva a acotar.
+    if (v.todos) {
+      setTodosLosMeses(true);
+      setRangoFechas({ desde: '', hasta: '' });
+      return;
+    }
     const esAnio = v.unit === 'year';
     setModoPeriodo(esAnio ? 'anio' : 'mes');
     setTodosLosMeses(false);
