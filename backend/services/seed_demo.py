@@ -1652,9 +1652,20 @@ async def seed_demo_completo(
             ))
 
         await db.flush()
-    log.hito("tasas", tipos_de_tasa=len(tipos_map),
-             motivo=None if tipos_map else "catalogo global de tipos de tasa vacio",
-             estado="ok" if tipos_map else "degradado")
+    # El apagado DELIBERADO (SEMBRAR_TASAS=False, decision de producto) reporta
+    # OK con su verdad: registrarlo como "degradado: catalogo vacio" era un
+    # motivo FALSO que teñia TODAS las altas — desde el 29/08 ninguna demo
+    # llegaba a estado ok y la bitacora gritaba un problema que no existia.
+    # "degradado" queda para lo unico que lo es: catalogo global realmente
+    # vacio con la siembra prendida.
+    if not SEMBRAR_TASAS:
+        log.hito("tasas", tipos_de_tasa=0,
+                 motivo="tasas apagadas por decision de producto (SEMBRAR_TASAS=False)",
+                 estado="ok")
+    else:
+        log.hito("tasas", tipos_de_tasa=len(tipos_map),
+                 motivo=None if tipos_map else "catalogo global de tipos de tasa vacio",
+                 estado="ok" if tipos_map else "degradado")
 
     # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)

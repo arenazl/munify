@@ -593,8 +593,11 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
                   direcciones=len(osm.get("direcciones") or []))
         except OsmNoDisponible as e:
             # Sin Overpass no hay calles, pero las zonas ya no dependen de el:
-            # la demo nace con sus localidades dibujadas igual.
-            po.fallo(f"Overpass no respondio: {e}")
+            # la demo nace con sus localidades dibujadas igual. Es DEGRADADO y
+            # no fallo: el alta sobrevive y entrega una demo usable — 'fallo'
+            # ponia toda la bitacora en rojo por un servicio publico caido y
+            # el 2026-09-02 se leyo como "las demos fallan" cuando no fallaban.
+            po.degradado(f"Overpass no respondio: {e}")
             return {**vacio, "zonas": zonas_padron, "poligono": anillo,
                     "fuente_poligono": "municipios_catalogo",
                     "degradacion": f"overpass_no_disponible: {e}"}
