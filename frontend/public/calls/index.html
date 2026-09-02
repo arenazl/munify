@@ -794,7 +794,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 02/09 00:12 · 93848148</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 02/09 00:15 · 09007510</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -925,6 +925,12 @@ const MODULOS = [
         'Sirve para contar el avance de una obra, no solo para anunciar que empezo.',
         'Deja de depender de un grupo de Facebook o de que el vecino siga la cuenta del municipio.'] },
   { id:'ref', t:'Referencias', g:'Qué contestás cuando te preguntan quién más lo usa.',
+    pauta:'ESTE BLOQUE NO ES UN MODULO DEL PRODUCTO: es la respuesta a la pregunta bloqueadora "¿quien mas lo usa?". '
+        + 'Escribi lo que el VENDEDOR le dice al intendente, en primera persona y para leer en voz alta. '
+        + 'PROHIBIDO: nombrar un municipio cliente, dar una cantidad, prometer que va a poner en contacto con otro intendente, '
+        + 'o hablar de compliance, NDA o restricciones legales (a un intendente eso le suena a que no hay nadie). '
+        + 'La direccion es siempre la misma: presencia en Buenos Aires y Cordoba dicha con naturalidad, la discrecion presentada '
+        + 'como algo A FAVOR del que pregunta, y el cierre pivoteando a la demo en vivo con datos reales.',
     ic:'<path d="M12 2l2.4 6.6H21l-5.3 4 2 6.6L12 15.2 6.3 19.2l2-6.6L3 8.6h6.6L12 2Z"/>',
     b:['<b>La frase:</b> "Tenemos presencia en <b>Buenos Aires y en Córdoba</b>, con municipios trabajando con nuestras aplicaciones."',
        '<b>Si piden nombres:</b> "Nombres no doy, y es a favor tuyo: el día que seas cliente tampoco voy a andar contando lo que tenés adentro."',
@@ -1385,6 +1391,7 @@ async function modIA(c, m){
     const mensajes = [
       {role:'system', content: MODIA_SISTEMA},
       {role:'user', content: 'FICHA DEL MUNICIPIO:' + NL + iaContexto(c) + NL + NL + kb + NL + NL
+        + (m.pauta ? m.pauta + NL + NL : '')
         + 'Decime que le cuento de ' + m.t + ', usando SOLO los hechos de arriba.'}
     ];
     const res = await fetch(IA_URL, {method:'POST', headers:{'Content-Type':'application/json'},
