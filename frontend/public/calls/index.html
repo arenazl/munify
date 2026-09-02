@@ -80,14 +80,27 @@ header.top{flex:none;z-index:40;background:rgba(15,23,32,.96);backdrop-filter:bl
 
 /* Quien esta usando el pipeline. Con dos personas anotando sobre los mismos
    154 municipios, saber con que usuario entraste no es decorativo: cada linea
-   del historial se firma con ese nombre. */
-.yo{display:flex;align-items:center;gap:8px;min-width:0}
-.yo .av{width:30px;height:30px;border-radius:999px;background:var(--acc);color:#fff;
- display:grid;place-items:center;font-weight:800;font-size:14px;flex:none;letter-spacing:0}
-.yo .nom{font-size:19px;font-weight:800;letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.yo .salir{border:0;background:transparent;color:var(--ink3);font-size:12px;font-weight:700;
- cursor:pointer;padding:4px 6px;border-radius:7px}
-.yo .salir:hover{color:var(--ink);background:var(--card2)}
+   del historial se firma con ese nombre.
+
+   Va en el HEADER, no en el contenido: en el telefono el nombre y el "Salir"
+   sueltos abrian una TERCERA linea abajo de las pildoras y el menu quedaba
+   desarmado. Como en cualquier app mobile, es un avatar que despliega su
+   menu — el area de toque es de 34px y no empuja nada. */
+.yo{position:relative;flex:0 0 auto}
+.yo .av{width:34px;height:34px;border-radius:999px;background:var(--acc);color:#fff;border:0;
+ display:grid;place-items:center;font-weight:800;font-size:14.5px;cursor:pointer;
+ font-family:inherit;letter-spacing:0;padding:0}
+.yo .av:hover{filter:brightness(1.06)}
+.menu-yo{position:absolute;right:0;top:calc(100% + 8px);z-index:70;min-width:170px;
+ background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:6px;
+ box-shadow:0 18px 40px -18px rgba(0,0,0,.7);display:none}
+.menu-yo.on{display:block}
+.menu-yo .quien{padding:8px 10px 9px;border-bottom:1px solid var(--line2);margin-bottom:5px}
+.menu-yo .quien b{display:block;font-size:14px;letter-spacing:-.2px}
+.menu-yo .quien i{display:block;font-style:normal;font-size:11.5px;color:var(--ink3);margin-top:2px}
+.menu-yo button{width:100%;text-align:left;border:0;background:transparent;color:var(--ink2);
+ font-family:inherit;font-size:13.5px;font-weight:700;padding:9px 10px;border-radius:8px;cursor:pointer}
+.menu-yo button:hover{background:var(--card2);color:var(--ink)}
 .spacer{flex:1 1 0;min-width:0}
 /* Los controles de la barra conservan su tamaño: son destinos de toque, no
    texto. Achicarlos rompe el area minima de 34px. */
@@ -538,7 +551,7 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
    Cerrados de arranque: el centro es la narracion y nada mas; se abre el que
    el otro pida. */
 .g-hint{font-size:12.5px;color:var(--ink3);margin-bottom:9px}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px}
 .tab{border:1px solid var(--line2);background:var(--card2);color:var(--ink2);border-radius:10px;
  padding:10px 6px;cursor:pointer;font-size:12.5px;font-weight:700;position:relative;overflow:hidden;
  display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;
@@ -547,6 +560,7 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
    este en el telefono y no en la pantalla. */
 .tab[data-g=plat]{--c:var(--acc)} .tab[data-g=rec]{--c:var(--warn)}
 .tab[data-g=tra]{--c:var(--purple)} .tab[data-g=tes]{--c:var(--ok)}
+.tab[data-g=ref]{--c:var(--bad)}
 .tab svg{width:17px;height:17px;fill:none;stroke:var(--c);stroke-width:2;stroke-linecap:round;
  stroke-linejoin:round;transition:transform .16s cubic-bezier(.2,.8,.3,1.2)}
 .tab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -590,6 +604,7 @@ body[data-vista="ops"] .ops{flex:1;min-height:0;margin-top:12px}
    salio sin tener que mirar cual quedo marcado. */
 .g-txt[data-g=plat]{--gc:var(--acc)} .g-txt[data-g=rec]{--gc:var(--warn)}
 .g-txt[data-g=tra]{--gc:var(--purple)} .g-txt[data-g=tes]{--gc:var(--ok)}
+.g-txt[data-g=ref]{--gc:var(--bad)}
 .g-txt.otra{border-left-style:dashed}
 /* "Decilo de otra forma" se usa EN VIVO, mientras se habla: tiene que verse sin
    buscarlo. Antes era gris sobre gris del mismo color de la caja --- se perdia.
@@ -779,13 +794,14 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
   <div class="spacer"></div>
   <button class="tema" id="btnNotif" type="button" aria-label="Recordatorios" style="display:none"></button>
   <button class="tema" id="btnTema" type="button" aria-label="Cambiar tema"></button>
+  <div class="yo" id="yoBox"></div>
   <div class="kpis" id="kpis"></div>
 </div></header>
 
 <div class="app-scroll"><div class="wrap">
   <div id="vHoy">
     <div class="hoy-top">
-      <span class="tit" id="titHoy">Hoy</span>
+      <span class="tit">Hoy</span>
       <div class="paises" id="paisesHoy"></div>
     </div>
     <div class="hoy-grid">
@@ -829,7 +845,7 @@ footer.pie{flex:none;background:rgba(15,23,32,.97);border-top:1px solid var(--li
 
 <footer class="pie"><div class="foot-in">
   <span id="pieTxt"></span>
-  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 02/09 00:35 · 125b7ff0</span>
+  <span class="vtag" title="Version publicada — si no coincide con lo esperado, recarga">v 02/09 00:43 · 96caa631</span>
   <div class="barra"><i id="pieBar" style="width:0%"></i></div>
   <button class="btn sm" id="btnExport">Bajar copia</button>
   <button class="btn sm" id="btnImport">Restaurar</button>
@@ -911,6 +927,11 @@ const GUION = [
     p:['El vecino saca el turno online y ve la disponibilidad real en el momento, sin llamar por teléfono ni ir a preguntar.',
        'Antes de arrancar ve cuánto sale y lo puede pagar desde el celular, y le llega un WhatsApp con los requisitos: viene con todo y no vuelve dos veces.',
        'Habilitaciones, permisos de obra, certificados, inscripciones: ustedes arman su propio árbol de trámites y definen quién atiende cada uno. Se termina la cola en la ventanilla y el "vuelva mañana".'] },
+  { id:'ref', t:'Referencias', sinIA:true,
+    ic:'<path d="M12 2l2.4 6.6H21l-5.3 4 2 6.6L12 15.2 6.3 19.2l2-6.6L3 8.6h6.6L12 2Z"/>',
+    p:['Tenemos presencia en Buenos Aires y en Córdoba, con municipios trabajando con nuestras aplicaciones.',
+       'Nombres no te doy, y es a favor tuyo: el día que estés vos adentro, tampoco voy a andar contando por ahí lo que tenés. Y si me preguntás cuántos somos, te digo la verdad: pocos y elegidos. Prefiero cinco municipios donde el intendente me tiene el teléfono, a cincuenta donde soy un proveedor más.',
+       'Igual la mejor referencia no es el teléfono de otro intendente, es verlo funcionando. En diez minutos te lo muestro andando, con datos reales, y sacás tus propias conclusiones.'] },
   { id:'tes', t:'Tesorería',
     ic:'<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/>',
     p:['El vecino entra, ve lo que debe de tasas y lo paga desde el celular. Del lado de ustedes el pago queda registrado y conciliado solo, sin el cuaderno de cada caja.',
@@ -1454,15 +1475,21 @@ async function haySesion(){
 }
 
 function pintarYo(){
-  const t = document.getElementById('titHoy'); if (!t) return;
-  if (!yo || !yo.nombre){ t.className = 'tit'; t.textContent = 'Hoy'; return; }
+  const box = document.getElementById('yoBox'); if (!box) return;
+  if (!yo || !yo.nombre){ box.innerHTML = ''; return; }
   const inicial = yo.nombre.trim().charAt(0).toUpperCase();
-  t.className = 'yo';
-  t.innerHTML = '<span class="av">' + esc(inicial) + '</span>'
-    + '<span class="nom">' + esc(yo.nombre) + '</span>'
-    + '<button type="button" class="salir" id="btnSalir">Salir</button>';
-  const b = document.getElementById('btnSalir');
-  if (b) b.onclick = () => cerrarSesion();
+  box.innerHTML = '<button type="button" class="av" id="btnYo" aria-label="Tu sesion">'
+      + esc(inicial) + '</button>'
+    + '<div class="menu-yo" id="menuYo">'
+      + '<div class="quien"><b>' + esc(yo.nombre) + '</b><i>Lo que anotes lo ve el otro</i></div>'
+      + '<button type="button" id="btnSalir">Cerrar sesion</button>'
+    + '</div>';
+  const av = document.getElementById('btnYo'), menu = document.getElementById('menuYo');
+  av.onclick = (e) => { e.stopPropagation(); menu.classList.toggle('on'); };
+  document.getElementById('btnSalir').onclick = () => { menu.classList.remove('on'); cerrarSesion(); };
+  // Un toque en cualquier otro lado lo cierra: en el telefono no hay "afuera"
+  // obvio y un menu que queda abierto tapa la lista.
+  document.addEventListener('click', () => menu.classList.remove('on'));
 }
 
 function armarLogin(){
@@ -1654,7 +1681,11 @@ const TEMA_SISTEMA = [
 function pintarTema(c, g, txt, estado){
   const caja = document.getElementById('pGuion'); if (!caja || !g) return;
   const parrafos = txt ? String(txt).split(NL).map(x => x.trim()).filter(Boolean) : g.p;
-  const refresh = '<button type="button" class="g-re" id="gRe" title="Decilo de otra forma">'
+  /* Referencias no se reescribe: ver `sinIA`. Es la unica respuesta que tiene
+     que salir SIEMPRE igual, y el riesgo de que la IA invente un municipio
+     cliente no se compensa con nada. */
+  const refresh = g.sinIA ? '' :
+    '<button type="button" class="g-re" id="gRe" title="Decilo de otra forma">'
     + '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg></button>';
   caja.innerHTML = '<div class="g-txt' + (estado === 'ia' ? ' otra' : '') + '" data-g="' + g.id + '">' + refresh
     + parrafos.map(t => '<p>' + esc(t) + '</p>').join('')
@@ -1667,6 +1698,7 @@ function pintarTema(c, g, txt, estado){
 }
 
 async function temaOtra(c, g){
+  if (!g || g.sinIA) return;                 // Referencias no se regenera
   pintarTema(c, g, null, 'pensando');
   try {
     const mensajes = [
