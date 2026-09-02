@@ -31,7 +31,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`clientes/`](clientes/) | Docs por cliente (`spn/` = San Pedro Norte: notas, reportes, planillas) |
 | [`design-sync/`](design-sync/) | **Los prototipos de Claude Design en HTML autoejecutable** (doble clic, sin servidor). Es la fuente contra la que se compara la app; no vive en el contexto de ningún agente. Regla global 22 |
 | [`design/`](design/) | Circuito del diseño (canvas de Claude Design → código), inventario de las 21 pantallas, y `paquetes/` con cada bajada del canvas fechada (la de número más alto es la vigente) |
-| [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`). Último: `2026-08-27_dashboard-modular-calls-y-mapas.md` — dashboard F1-F3 + circuito, semilla con geografia real, /calls, y la trampa de los deploys de QA que fallan |
+| [`handoffs/`](handoffs/) | Cierres de sesión por fecha (`YYYY-MM-DD_titulo.md`). Último: `2026-09-01_geo-localidades-mapa-y-calls.md` — el padrón de localidades con contorno (90% del país), cómo lo consume el alta de demos, mapa a pantalla completa y dónde vive /calls |
 | [`historico/`](historico/) | Docs superados, archivados por fecha (`YYYY-MM-DD-titulo.md`) |
 | [`antigravity/`](antigravity/) | Archivo histórico de Antigravity (herramienta dada de baja): scripts de extracción del prototipo de Configuración + capturas. El código que produjo NO está acá, sigue vivo en `frontend/src/` |
 | [`legacy/`](legacy/) | Archivo histórico pre-criterio (congelado; no mover, no borrar) |
