@@ -7,12 +7,15 @@ cada uno (habia que pegarla por browser, o pasarla por ?k=...). El dueño lo
 marco como friccion inaceptable (2026-08-28): la key vive aca, como en
 cualquier aplicacion, y la pagina le pega a /api same-origin.
 
-Proveedor: Groq si hay GROQ_API_KEY (el chat de /calls nacio con Groq);
-si no, Gemini (que QA ya tiene configurado en Cloud Run) — mismo espiritu
-que AI_PROVIDER_ORDER. Sin ninguno, 503 honesto.
+Proveedor: Groq y NADA MAS. Habia un fallback a Gemini y el dueño lo saco
+(2026-09-01) por dos razones: Gemini no se usa por costo, y un fallback
+silencioso hacia que la pagina contestara con OTRO modelo sin que nadie se
+enterara (en produccion, que no monta GROQ_API_KEY, /calls venia contestando
+con Gemini). Si la key de Groq falta o vencio, el endpoint falla FUERTE y se
+renueva la key — es la unica señal honesta.
 
-Es un endpoint PUBLICO (la pagina no tiene login): va con rate limit por IP
-y topes de tamaño para que no sirva de proxy gratis a terceros.
+Es un endpoint PUBLICO (la pagina todavia no tiene login): va con rate limit
+por IP y topes de tamaño para que no sirva de proxy gratis a terceros.
 """
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -57,6 +60,15 @@ async def _groq(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:
         json=cuerpo,
     )
     j = r.json()
+    # Sin fallback, la key es el unico punto de falla que importa: que el error
+    # diga "renovala" y no un 502 generico que obligue a leer logs.
+    if r.status_code in (401, 403):
+        raise HTTPException(
+            status_code=502,
+            detail="La key de Groq no es valida o vencio — hay que renovarla en Secret Manager",
+        )
+    if r.status_code == 429:
+        raise HTTPException(status_code=502, detail="Groq esta limitando por cuota (429) — reintentar en un rato")
     if r.status_code != 200:
         detalle = (j.get("error") or {}).get("message") or f"HTTP {r.status_code}"
         raise HTTPException(status_code=502, detail=f"Groq no respondio: {detalle[:200]}")
@@ -72,52 +84,22 @@ async def _groq(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:
     return texto
 
 
-async def _gemini(cli: httpx.AsyncClient, mensajes: list[dict]) -> str:
-    sistema = "\n\n".join(m["content"] for m in mensajes if m["role"] == "system")
-    contents = [
-        {"role": "user" if m["role"] == "user" else "model",
-         "parts": [{"text": m["content"]}]}
-        for m in mensajes if m["role"] != "system"
-    ]
-    gen: dict = {"temperature": 0.6, "maxOutputTokens": 700}
-    # GOTCHA conocido del proyecto: los Gemini 2.5 razonan por default y hay
-    # que apagarlo; los 1.5 no aceptan el campo (400).
-    if "2.5" in settings.GEMINI_MODEL:
-        gen["thinkingConfig"] = {"thinkingBudget": 0}
-    r = await cli.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-        json={
-            "system_instruction": {"parts": [{"text": sistema}]},
-            "contents": contents,
-            "generationConfig": gen,
-        },
-    )
-    j = r.json()
-    if r.status_code != 200:
-        detalle = (j.get("error") or {}).get("message") or f"HTTP {r.status_code}"
-        raise HTTPException(status_code=502, detail=f"Gemini no respondio: {detalle[:200]}")
-    try:
-        return (j["candidates"][0]["content"]["parts"][0]["text"] or "").strip()
-    except (KeyError, IndexError):
-        raise HTTPException(status_code=502, detail="Gemini devolvio una respuesta vacia")
-
-
 @router.post("/ia")
 @limiter.limit("40/hour")
 async def preguntar_ia(request: Request, data: ConsultaIA):
     """La conversacion viene armada del front (sistema + ficha + chat); aca
-    solo se ejecuta contra el proveedor que tenga key. El PROMPT es del
-    front a proposito: la ficha del municipio vive alla y este endpoint no
-    conoce el dominio de /calls."""
+    solo se ejecuta contra Groq. El PROMPT es del front a proposito: la ficha
+    del municipio vive alla y este endpoint no conoce el dominio de /calls."""
+    if not settings.GROQ_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Sin GROQ_API_KEY en el servidor — /calls no tiene otro proveedor a proposito",
+        )
+
     total = sum(len(m.content) for m in data.mensajes)
     if total > MAX_CHARS_TOTAL:
         raise HTTPException(status_code=413, detail="La consulta es demasiado larga")
 
     mensajes = [m.model_dump() for m in data.mensajes]
     async with httpx.AsyncClient(timeout=45.0) as cli:
-        if settings.GROQ_API_KEY:
-            return {"respuesta": await _groq(cli, mensajes), "proveedor": "groq"}
-        if settings.GEMINI_API_KEY:
-            return {"respuesta": await _gemini(cli, mensajes), "proveedor": "gemini"}
-    raise HTTPException(status_code=503, detail="Sin proveedor de IA configurado en el servidor")
+        return {"respuesta": await _groq(cli, mensajes), "proveedor": "groq"}
