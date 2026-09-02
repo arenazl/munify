@@ -170,7 +170,10 @@ def _simplificar(anillo: list, maximo: int = VERTICES_FILTRO) -> list:
 
 
 def ruta_cache(nombre_municipio: str) -> Path:
-    return CACHE_DIR / f"osmgeo_{_slug(nombre_municipio)}.json"
+    # "osmgeo2": el sufijo de version invalida el cache cuando CAMBIA la
+    # consulta (2026-09-02 se sumaron los limites administrativos 9/10) — sin
+    # esto una ciudad cacheada seguia sirviendo el resultado del query viejo.
+    return CACHE_DIR / f"osmgeo2_{_slug(nombre_municipio)}.json"
 
 
 # ==========================================================================
@@ -288,6 +291,7 @@ def _consulta(anillo: list) -> str:
   node(poly:"{p}")["place"~"^(city|town|village|hamlet|suburb|neighbourhood|quarter)$"]["name"];
   way(poly:"{p}")["place"~"^(suburb|neighbourhood|quarter)$"]["name"];
   relation(poly:"{p}")["place"~"^(suburb|neighbourhood|quarter)$"]["name"];
+  relation(poly:"{p}")["boundary"="administrative"]["admin_level"~"^(9|10)$"]["name"];
   way(poly:"{p}")["highway"~"^(primary|secondary|tertiary|residential)$"]["name"];
 )->.geo;
 .geo out tags center {TOPE_GEO};
@@ -330,6 +334,15 @@ def _parsear(cruda: dict, anillo: list) -> dict:
         if tags.get("place"):
             places.append({"nombre": tags["name"], "tipo": tags["place"],
                            "lat": round(lat, 6), "lon": round(lon, 6)})
+        elif (tags.get("boundary") == "administrative"
+              and tags.get("admin_level") in ("9", "10") and tags.get("name")):
+            # Barrios mapeados como LIMITE ADMINISTRATIVO, sin tag `place`.
+            # En Rafaela son 74 de los 86: la app "no traia" un dato que SI
+            # esta en la fuente (reporte de Infra, 2026-09-02). Entran como
+            # barrio; si el mismo barrio ademas existe como place, el dedup de
+            # abajo se queda con uno.
+            places.append({"nombre": tags["name"], "tipo": "neighbourhood",
+                           "lat": round(lat, 6), "lon": round(lon, 6)})
         elif tags.get("highway"):
             nombre = _limpiar_calle(tags.get("name", ""))
             if not nombre:
@@ -349,7 +362,19 @@ def _parsear(cruda: dict, anillo: list) -> dict:
             direcciones.append({"calle": calle, "altura": altura,
                                 "lat": round(lat, 6), "lon": round(lon, 6)})
 
-    return {"places": places, "calles": list(calles.values()),
+    # Dedup por nombre dentro de cada clase (zona/barrio): el mismo barrio
+    # puede venir como place=suburb Y como limite administrativo.
+    vistos: set = set()
+    unicos = []
+    for p in places:
+        clase = "z" if p["tipo"] in PLACES_ZONA else "b"
+        clave = (_norm(p["nombre"]), clase)
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        unicos.append(p)
+
+    return {"places": unicos, "calles": list(calles.values()),
             "direcciones": direcciones}
 
 
@@ -417,17 +442,22 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
     # principales. En un partido (Lujan, Merlo) hay varias localidades y este
     # caso no toca nada.
     zp = zonas_padron or []
+    promovidas = False
     if len(gruesas) <= 1:
         if len(zp) > 1:
-            # EL PADRON YA DIVIDE (bug Rafaela, 2026-09-02): con 12 localidades
-            # del catalogo como zonas, promover los 86 barrios de OSM a zonas
-            # era COMERSELOS — el caller despues impone el padron y los barrios
-            # quedaban en CERO teniendo el dato en la fuente. Si el padron
-            # divide, los barrios se quedan donde estan: de barrios.
+            # EL PADRON YA DIVIDE (bug Rafaela capa 1, 2026-09-02): promover
+            # los barrios de OSM a zonas era COMERSELOS — el caller despues
+            # impone el padron y los barrios quedaban en CERO teniendo el dato
+            # en la fuente. Si el padron divide, los barrios quedan de barrios.
             gruesas = []
         elif finas:
+            # Ciudad sin padron que divida: los barrios pasan a ser las zonas
+            # (fix de Villa Carlos Paz) — pero SOLO los que entren en el corte
+            # de max_zonas. Antes se vaciaba la lista entera y una ciudad con
+            # 80 barrios quedaba con 12 zonas y CERO barrios (bug Rafaela capa
+            # 2): el resto sigue siendo barrio, que es lo que es.
             gruesas = finas
-            finas = []
+            promovidas = True
         else:
             gruesas = []
 
@@ -467,6 +497,9 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
                       key=lambda p: _km(centro_ciudad, (p["lat"], p["lon"])))[:tope]
 
     zonas = _recortar(gruesas, max_zonas)
+    if promovidas:
+        nombres_zona = {_norm(z["nombre"]) for z in zonas}
+        finas = [f for f in finas if _norm(f["nombre"]) not in nombres_zona]
     barrios = _recortar(finas, max_barrios)
 
     # --- los puntos ---
