@@ -4,6 +4,7 @@ import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinn
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND } from '../brands';
 import { useAuth } from '../contexts/AuthContext';
+import { capturarTokenDeUrl, queryToken } from '../utils/demoAcceso';
 import { getDefaultRouteForUser } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
 import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
@@ -203,7 +204,11 @@ export default function Landing() {
 
     // Cargar usuarios demo desde la API
     try {
-      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/demo-users`);
+      // La llave viaja en el pedido: sin ella el backend no lista perfiles
+      // (la botonera ES el acceso, ver _demo_acceso_ok en el backend).
+      const acc = capturarTokenDeUrl(municipio.codigo);
+      const q = acc ? `?t=${encodeURIComponent(acc)}` : '';
+      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/demo-users${q}`);
       if (response.ok) {
         const users = await response.json();
         setDemoUsers(users);
@@ -214,7 +219,7 @@ export default function Landing() {
 
     // Cargar usuarios de dependencias desde la API
     try {
-      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/dependencia-users`);
+      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/dependencia-users${queryToken(municipio.codigo)}`);
       if (response.ok) {
         const users = await response.json();
         setDependenciaUsers(users);

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, Sparkles, ArrowRight, Trash2, Check, Search, ShieldCheck, CreditCard, MapPin } from 'lucide-react';
+import { Loader2, LogIn, Sparkles, ArrowRight, Trash2, Check, Search, ShieldCheck, CreditCard, MapPin, Lock, Link2, PlayCircle } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
+import { tokenDe, guardarToken, linkDeAcceso } from '../utils/demoAcceso';
 import DemoCreationProgress from '../components/DemoCreationProgress';
 import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
 import { BrandMark } from '../brands/BrandMark';
@@ -17,6 +18,8 @@ interface Municipio {
   codigo: string;
   color_primario?: string;
   logo_url?: string;
+  /** La de muestra: la única que se entra sin llave. */
+  demo_publica?: boolean;
 }
 
 // Municipio del catálogo OFICIAL (tabla local municipios_argentina, georef).
@@ -60,6 +63,11 @@ export default function Demo() {
   const [eliminando, setEliminando] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Municipio | null>(null);
   const [search, setSearch] = useState('');
+  // Las llaves que tiene ESTE navegador. En un estado (y no leyendo el
+  // localStorage al vuelo) para que la grilla se repinte sola cuando el alta
+  // devuelve una nueva y la card pase de "privada" a "tuya" sin recargar.
+  const [misLlaves, setMisLlaves] = useState<Record<string, boolean>>({});
+  const [copiado, setCopiado] = useState<string | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   // Autocomplete del catálogo oficial: solo se puede crear una demo con un
   // municipio REAL elegido de la lista (basta de "Pepito Pepito").
@@ -112,6 +120,13 @@ export default function Demo() {
       try {
         const response = await municipiosApi.getPublic();
         setMunicipios(response.data);
+        // Cuáles de estas tengo llave para entrar. Se calcula una vez contra
+        // lo que hay guardado, no card por card.
+        const propias: Record<string, boolean> = {};
+        for (const m of response.data as Municipio[]) {
+          if (tokenDe(m.codigo)) propias[m.codigo] = true;
+        }
+        setMisLlaves(propias);
       } catch (err) {
         console.error('Error cargando municipios:', err);
         setError('No se pudieron cargar los municipios');
@@ -141,7 +156,21 @@ export default function Demo() {
 
   const handleSelectMunicipio = (municipio: Municipio) => {
     saveMunicipioToStorage(municipio);
-    navigate(`/demo/listo?muni=${municipio.codigo}`);
+    // La llave viaja en la URL: la landing del muni la necesita para pedir los
+    // perfiles del quick-login. La de muestra no lleva ninguna.
+    const t = tokenDe(municipio.codigo);
+    navigate(`/demo/listo?muni=${municipio.codigo}${t ? `&t=${encodeURIComponent(t)}` : ''}`);
+  };
+
+  /** Copia el link personal de una demo propia, para pasarlo por donde sea. */
+  const copiarLink = async (municipio: Municipio) => {
+    try {
+      await navigator.clipboard.writeText(linkDeAcceso(municipio.codigo));
+      setCopiado(municipio.codigo);
+      setTimeout(() => setCopiado((c) => (c === municipio.codigo ? null : c)), 1800);
+    } catch {
+      setError('No se pudo copiar el link');
+    }
   };
 
   const confirmEliminar = async () => {
@@ -149,7 +178,7 @@ export default function Demo() {
     const muni = toDelete;
     setEliminando(muni.codigo);
     try {
-      await municipiosApi.eliminarDemo(muni.codigo);
+      await municipiosApi.eliminarDemo(muni.codigo, tokenDe(muni.codigo));
       setMunicipios((prev) => prev.filter((m) => m.id !== muni.id));
       setToDelete(null);
     } catch (err) {
@@ -187,6 +216,12 @@ export default function Demo() {
         pais: muniSel.pais || pais,
       });
       const muni = res.data;
+      // La llave sale del backend una unica vez, en esta respuesta. Si no se
+      // guarda acá, el que acaba de crear la demo no puede volver a entrar.
+      if (muni.demo_token) {
+        guardarToken(muni.codigo, muni.demo_token);
+        setMisLlaves((prev) => ({ ...prev, [muni.codigo]: true }));
+      }
       saveMunicipioToStorage({
         id: muni.id,
         nombre: muni.nombre,
@@ -209,15 +244,26 @@ export default function Demo() {
   const nameValid = trimmed.length >= MIN_NAME && trimmed.length <= MAX_NAME
     && !!muniSel && muniSel.nombre === trimmed;
 
+  // La demo DE MUESTRA no va en la grilla: sale arriba como "Probar la
+  // plataforma", sin decir de que municipio es. En la grilla seria una card
+  // mas —la unica entrable— y eso confunde: parece que esa esta abierta por
+  // error. Si manana hay mas de una marcada, entra la primera y el resto
+  // queda fuera de la vitrina, que es el default seguro.
+  const muestra = useMemo(
+    () => municipios.find((m) => m.demo_publica) || null,
+    [municipios],
+  );
+  const otras = useMemo(() => municipios.filter((m) => !m.demo_publica), [municipios]);
+
   const filteredMunicipios = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return municipios;
-    return municipios.filter(
+    if (!q) return otras;
+    return otras.filter(
       (m) => m.nombre.toLowerCase().includes(q) || m.codigo.toLowerCase().includes(q),
     );
-  }, [municipios, search]);
+  }, [otras, search]);
 
-  const showSearch = municipios.length >= SEARCH_THRESHOLD;
+  const showSearch = otras.length >= SEARCH_THRESHOLD;
 
   return (
     <div className="dm-fondo relative overflow-hidden">
@@ -436,8 +482,35 @@ export default function Demo() {
           </div>
 
           <div className="dm-listado">
-            {municipios.length > 0 && (
-              <div className="dm-separador"><span>o entrá a uno existente</span></div>
+            {/* PROBAR SIN GENERAR NADA. El que llega de la landing sospecha que
+                esto tarda o que le van a pedir la tarjeta; un click que entra
+                al instante contesta las dos cosas. Adentro sigue el CTA de
+                generar la suya, que es la que convierte. No se nombra el
+                municipio a proposito: es "el de muestra", no una referencia. */}
+            {muestra && (
+              <div className="dm-muestra">
+                <button
+                  onClick={() => handleSelectMunicipio(muestra)}
+                  className="dm-muestra-btn"
+                >
+                  <PlayCircle className="h-5 w-5" />
+                  <span className="dm-muestra-tx">
+                    <b>Probar la plataforma</b>
+                    <i>Entrá ahora a un municipio de muestra, con datos ya cargados</i>
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                <p className="dm-muestra-nota">
+                  Los vecinos, reclamos y trámites que vas a ver son inventados. La
+                  geografía —barrios y calles— es información pública.
+                </p>
+              </div>
+            )}
+
+            {otras.length > 0 && (
+              <div className="dm-separador">
+                <span>municipios que ya generaron su demo</span>
+              </div>
             )}
 
             {loading ? (
@@ -462,8 +535,16 @@ export default function Demo() {
                   {filteredMunicipios.map((municipio) => {
                     const primaryColor = municipio.color_primario || '#0088cc';
                     const isEliminando = eliminando === municipio.codigo;
+                    // TRES ESTADOS y el default es el cerrado: la demo de otro
+                    // se VE (prueba social: mira cuantos ya la tienen) pero no
+                    // se entra ni se borra. Puede tener datos cargados por esa
+                    // persona (dueño, 2026-09-02).
+                    const mia = Boolean(misLlaves[municipio.codigo]);
                     return (
-                      <div key={municipio.id} className="dm-muni">
+                      <div
+                        key={municipio.id}
+                        className={`dm-muni${mia ? '' : ' es-ajena'}`}
+                      >
                         {/* La franja del color del municipio es lo ÚNICO que
                             distingue una tarjeta de otra, y es informacion: su
                             identidad. Antes habia ademas una inicial serif de 8rem
@@ -471,37 +552,75 @@ export default function Demo() {
                             nombre real y no decia nada que el nombre no dijera. */}
                         <span className="dm-muni-franja" style={{ background: primaryColor }} />
 
-                        <button
-                          onClick={() => handleSelectMunicipio(municipio)}
-                          disabled={isEliminando}
-                          className="dm-muni-btn"
-                        >
-                          <h3 className="dm-muni-nombre">{municipio.nombre}</h3>
-                          <p className="dm-muni-codigo">{municipio.codigo}</p>
-                          <span className="dm-muni-entrar" style={{ color: primaryColor }}>
-                            Entrar
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          </span>
-                        </button>
+                        {mia ? (
+                          <button
+                            onClick={() => handleSelectMunicipio(municipio)}
+                            disabled={isEliminando}
+                            className="dm-muni-btn"
+                          >
+                            <h3 className="dm-muni-nombre">{municipio.nombre}</h3>
+                            <p className="dm-muni-codigo">{municipio.codigo}</p>
+                            <span className="dm-muni-entrar" style={{ color: primaryColor }}>
+                              Entrar
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </span>
+                          </button>
+                        ) : (
+                          <div className="dm-muni-btn">
+                            <h3 className="dm-muni-nombre">{municipio.nombre}</h3>
+                            <p className="dm-muni-codigo">{municipio.codigo}</p>
+                            <span className="dm-muni-privada">
+                              <Lock className="h-3.5 w-3.5" />
+                              Privada
+                            </span>
+                          </div>
+                        )}
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setToDelete(municipio);
-                          }}
-                          disabled={isEliminando}
-                          // SIEMPRE visible (antes solo en hover: inaccesible en mobile).
-                          // Las demos se administran desde esta UI pública a propósito.
-                          className="dm-muni-borrar"
-                          title={`Eliminar demo ${municipio.nombre}`}
-                          aria-label={`Eliminar demo ${municipio.nombre}`}
-                        >
-                          {isEliminando ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                        </button>
+                        {/* Copiar y borrar SOLO en las propias: son las dos
+                            cosas que hace el dueño de una demo. El borrado era
+                            público y sin credencial hasta el 2026-09-02. */}
+                        {mia && (
+                          <div className="dm-muni-acc">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void copiarLink(municipio);
+                              }}
+                              className="dm-muni-link"
+                              title="Copiar mi link de acceso"
+                              aria-label={`Copiar el link de acceso a ${municipio.nombre}`}
+                            >
+                              {copiado === municipio.codigo ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" />
+                                  Copiado
+                                </>
+                              ) : (
+                                <>
+                                  <Link2 className="h-3.5 w-3.5" />
+                                  Mi link
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setToDelete(municipio);
+                              }}
+                              disabled={isEliminando}
+                              className="dm-muni-borrar"
+                              title={`Eliminar demo ${municipio.nombre}`}
+                              aria-label={`Eliminar demo ${municipio.nombre}`}
+                            >
+                              {isEliminando ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

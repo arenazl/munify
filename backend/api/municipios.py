@@ -46,6 +46,9 @@ class MunicipioPublic(BaseModel):
     logo_url: Optional[str] = None
     color_primario: str
     activo: bool
+    # Unica demo que se entra sin llave: la de muestra. El resto se ve en la
+    # grilla pero necesita el link personal de quien la genero.
+    demo_publica: bool = False
     # Flag de UI: si es True, los ABMs de categorías / tipos de trámite se
     # muestran como items del sidebar. Si es False, quedan sólo en Ajustes.
     abm_en_sidebar: bool = True
@@ -246,6 +249,7 @@ class DemoUser(BaseModel):
 @router.get("/public/{codigo}/demo-users", response_model=List[DemoUser])
 async def obtener_usuarios_demo(
     codigo: str,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -264,13 +268,13 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Cliente productivo (cerrojo): no exponer cuentas demo. El login queda
-    # solo con email + contraseña. EXCEPCIÓN: un muni con demo_protegido
-    # (acceso directo con PIN, ej. el clon de un tenant productivo en QA)
-    # muestra la botonera aunque no sea demo — igual acá abajo SOLO matchean
-    # cuentas con emails patrón demo, nunca los usuarios reales, y el click
-    # exige el PIN.
-    if not municipio.es_demo and not municipio.demo_protegido:
+    # LA PUERTA DE ATRAS. Sacar el boton "Entrar" de la grilla no alcanza:
+    # esta lista ES el acceso (son los perfiles del quick-login, sin password).
+    # Si quedaba abierta, el link personal era decorativo — se entraba por
+    # /login?muni=<codigo> y listo. Ahora la botonera sale solo si la demo es
+    # de muestra o si viene la llave. Cliente productivo: nunca (salvo el clon
+    # de tenant en QA, que ademas gatea cada perfil con el PIN).
+    if not _demo_acceso_ok(municipio, t):
         return []
 
     # Buscar usuarios de prueba con tres patrones:
@@ -357,6 +361,7 @@ class DependenciaUser(BaseModel):
 @router.get("/public/{codigo}/dependencia-users", response_model=List[DependenciaUser])
 async def obtener_usuarios_dependencias(
     codigo: str,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -381,10 +386,9 @@ async def obtener_usuarios_dependencias(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Cliente productivo (cerrojo): no exponer accesos rápidos por dependencia.
-    # Misma excepción que demo-users: demo_protegido muestra la botonera
-    # (solo emails patrón demo) con el click gateado por PIN.
-    if not municipio.es_demo and not municipio.demo_protegido:
+    # Misma puerta que demo-users: los accesos rapidos por dependencia son
+    # otra forma de entrar, asi que piden la misma llave.
+    if not _demo_acceso_ok(municipio, t):
         return []
 
     # Buscar usuarios con municipio_dependencia_id asignado
@@ -616,6 +620,36 @@ class MunicipioDemoResponse(BaseModel):
     nombre: str
     codigo: str
     redirect_path: str
+    # LA LLAVE, y esta es la UNICA vez que sale del backend: la grilla publica
+    # no la devuelve nunca. El frontend la guarda en el localStorage del que
+    # creo la demo y arma con ella el link para compartir. Si se pierde, se
+    # pierde: no hay recupero por UI (a proposito).
+    demo_token: Optional[str] = None
+
+
+def _demo_acceso_ok(municipio: Municipio, token: Optional[str]) -> bool:
+    """Si el que golpea la puerta puede ENTRAR a esta demo.
+
+    Tres casos, en orden:
+      - No es demo: es un cliente productivo. Solo pasa el clon de tenant en
+        QA (`demo_protegido`), que ademas tiene su quick-login gateado por PIN.
+      - Demo DE MUESTRA (`demo_publica`): entra cualquiera, es la vitrina.
+      - Demo de alguien: solo con la llave que se emitio al crearla.
+
+    Las demos viejas (sin `demo_token`) quedan cerradas a proposito: nadie
+    entra a una demo con los datos que cargo otro (dueño, 2026-09-02).
+    """
+    if not municipio.es_demo:
+        return bool(municipio.demo_protegido)
+    if municipio.demo_publica:
+        return True
+    guardada = municipio.demo_token or ""
+    entregada = (token or "").strip()
+    if not guardada or not entregada:
+        return False
+    # compare_digest y no ==: comparar llaves con corte temprano filtra, de a
+    # un caracter y por tiempo de respuesta, cual era el prefijo correcto.
+    return secrets.compare_digest(entregada, guardada)
 
 
 def _normalizar_codigo(nombre: str) -> str:
@@ -837,6 +871,12 @@ async def crear_municipio_demo(
             activo=True,
             abm_en_sidebar=False,
             demo_protegido=bool(demo_pin),
+            # La llave de acceso, que viaja una sola vez en la respuesta del
+            # alta. 24 bytes url-safe (32 caracteres): entra comodo en un link
+            # de WhatsApp y no se adivina. Una demo generada por un visitante
+            # NUNCA nace publica: la de muestra se marca a mano.
+            demo_token=secrets.token_urlsafe(24),
+            demo_publica=False,
             # Las demos NUEVAS abren en MARINO, el azul oscuro de la marca
             # (decisión del dueño, 2026-08-30): el vendedor las muestra en
             # pantalla compartida justo después de la página comercial, que
@@ -970,6 +1010,7 @@ async def crear_municipio_demo(
         nombre=municipio.nombre,
         codigo=municipio.codigo,
         redirect_path=f"/demo/listo?muni={municipio.codigo}",
+        demo_token=municipio.demo_token,
     )
 
 
@@ -1098,6 +1139,7 @@ async def eliminar_municipio(
 async def eliminar_municipio_demo(
     codigo: str,
     pin: Optional[str] = None,
+    t: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -1137,8 +1179,28 @@ async def eliminar_municipio_demo(
             detail="Solo se pueden eliminar municipios de demo",
         )
 
-    # Demo protegida: sin el PIN correcto no se borra. Se valida contra el
-    # hash del admin demo porque el PIN es su password (no se guarda aparte).
+    # LA DE MUESTRA NO SE BORRA desde la UI publica: es la que se abre en las
+    # llamadas comerciales y la que toca el visitante que llega de la landing.
+    # Se apaga por base (demo_publica = 0), no con un boton que ve cualquiera.
+    if municipio.demo_publica:
+        raise HTTPException(
+            status_code=403,
+            detail="El municipio de muestra no se elimina desde acá",
+        )
+
+    # Borra el DUEÑO de la demo, que es el que tiene la llave. Hasta hoy este
+    # endpoint era publico y sin credencial: un DELETE de una linea se llevaba
+    # puesta cualquier demo, con hard delete y cascade (dueño, 2026-09-02).
+    # Las demos viejas, que no tienen llave, quedan imborrables desde la UI: es
+    # el default seguro — se limpian por script, no por un boton anonimo.
+    if not _demo_acceso_ok(municipio, t):
+        raise HTTPException(
+            status_code=403,
+            detail="Para eliminar esta demo hace falta el link de acceso de quien la generó",
+        )
+
+    # Demo protegida: ademas del link, el PIN. Se valida contra el hash del
+    # admin demo porque el PIN es su password (no se guarda aparte).
     if municipio.demo_protegido:
         from core.security import verify_password
         admin_q = await db.execute(

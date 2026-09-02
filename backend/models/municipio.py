@@ -82,6 +82,21 @@ class Municipio(Base):
     # pregunte en vez de usar demo123.
     demo_protegido = Column(Boolean, default=False, nullable=False, server_default="0")
 
+    # LLAVE DE ACCESO de la demo. Se genera al crearla y viaja UNA sola vez,
+    # en la respuesta del alta: el que la genero se lo guarda y puede pasarle
+    # el link a quien quiera. Sin esta llave la demo se VE en la vitrina de
+    # /demo pero no se entra — la grilla es prueba social, no una puerta.
+    # Motivo (dueño, 2026-09-02): las demos ajenas pueden tener datos cargados
+    # por otra persona y nadie tiene por que entrar ahi.
+    demo_token = Column(String(64), nullable=True, index=True)
+
+    # Demo DE MUESTRA: la unica que se entra sin llave. Es la vitrina que el
+    # visitante toca antes de generar la suya ("Probar la plataforma", con
+    # datos ya cargados). Se marca a mano sobre las demos propias — las que
+    # genera un visitante nacen SIEMPRE en False. Tampoco se pueden borrar
+    # desde la UI publica.
+    demo_publica = Column(Boolean, default=False, nullable=False, server_default="0")
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

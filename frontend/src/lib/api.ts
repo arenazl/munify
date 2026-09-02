@@ -737,6 +737,10 @@ export const municipiosApi = {
       nombre: string;
       codigo: string;
       redirect_path: string;
+      // LA LLAVE de la demo, y esta es la unica vez que el backend la manda:
+      // la grilla publica no la devuelve nunca. Se guarda en el navegador del
+      // que creo la demo (utils/demoAcceso) y con ella se arma el link.
+      demo_token?: string;
     }>('/municipios/crear-demo', { nombre, ...(geo || {}) }),
   // Autocomplete del catálogo OFICIAL de municipios (tabla local
   // municipios_catalogo, cargada una vez — sin API externa en runtime).
@@ -747,7 +751,11 @@ export const municipiosApi = {
       id: string; nombre: string; provincia: string;
       lat: number; lng: number; pais: string; alias: string[];
     }>>('/municipios/catalogo', { params: { q, pais } }),
-  eliminarDemo: (codigo: string) => api.delete(`/municipios/demo/${codigo}`),
+  // Borrar pide la MISMA llave que entrar: hasta el 2026-09-02 este delete era
+  // publico y sin credencial (hard delete con cascade), o sea que cualquiera
+  // borraba la demo de cualquiera.
+  eliminarDemo: (codigo: string, token?: string) =>
+    api.delete(`/municipios/demo/${codigo}`, { params: token ? { t: token } : {} }),
   update: (id: number, data: object) => api.put(`/municipios/${id}`, data),
   delete: (id: number) => api.delete(`/municipios/${id}`),
   // Barrios (se cargan automáticamente)

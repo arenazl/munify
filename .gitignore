@@ -31,6 +31,9 @@ env/
 .env
 .env.local
 .env.*.local
+# Copias de .env con fecha (backend/.env.bak-1802 y compañia): son el
+# .env con las credenciales adentro, y sin esta linea no las tapa nada.
+.env.bak*
 
 # IDE
 .idea/
@@ -121,3 +124,5 @@ backend/scripts/datos/geonames/*.txt
 # GeoJSON de limites administrativos (geoBoundaries). Tampoco se versionan:
 # entre 3 y 164 MB por pais. Lo que queda es el contorno recortado, en la base.
 backend/scripts/datos/contornos/
+docs/geo/
+docs/*.geojson

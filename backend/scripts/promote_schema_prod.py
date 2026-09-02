@@ -109,6 +109,12 @@ COLUMNAS = [
      "ALTER TABLE `categorias_reclamo` ADD COLUMN `interna` tinyint(1) NOT NULL DEFAULT 0"),
     ("municipios", "demo_protegido",
      "ALTER TABLE `municipios` ADD COLUMN `demo_protegido` tinyint(1) NOT NULL DEFAULT 0"),
+    # Acceso por link a las demos: sin estas dos, /demo queda abierta (cualquiera
+    # entra y BORRA la demo de otro). Van juntas con el deploy del backend.
+    ("municipios", "demo_publica",
+     "ALTER TABLE `municipios` ADD COLUMN `demo_publica` tinyint(1) NOT NULL DEFAULT 0"),
+    ("municipios", "demo_token",
+     "ALTER TABLE `municipios` ADD COLUMN `demo_token` varchar(64) NULL"),
     ("municipios", "pais",
      "ALTER TABLE `municipios` ADD COLUMN `pais` varchar(2) NOT NULL DEFAULT 'AR'"),
     ("ordenes_trabajo", "categoria_id",

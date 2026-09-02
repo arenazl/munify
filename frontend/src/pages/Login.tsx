@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
+import { capturarTokenDeUrl, queryToken } from '../utils/demoAcceso';
 import { getDefaultRouteForUser } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench, Sparkles, ChevronRight } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
@@ -247,8 +248,12 @@ export default function Login() {
     if (municipioCodigo) {
       const loadDemoUsers = async () => {
         try {
+          // Entrada por link: si la URL trae la llave se guarda y se usa.
+          // Sin llave, un muni demo ajeno no devuelve perfiles y el login
+          // queda solo con email + contraseña, que es lo que corresponde.
+          capturarTokenDeUrl(municipioCodigo);
           const users = await fetchJsonRetry<typeof demoUsers>(
-            `${API_URL}/municipios/public/${municipioCodigo}/demo-users`);
+            `${API_URL}/municipios/public/${municipioCodigo}/demo-users${queryToken(municipioCodigo)}`);
           setDemoUsers(users);
         } catch (error) {
           console.error('Error al cargar usuarios demo:', error);
@@ -258,7 +263,7 @@ export default function Login() {
       const loadDependenciaUsers = async () => {
         try {
           const users = await fetchJsonRetry<typeof dependenciaUsers>(
-            `${API_URL}/municipios/public/${municipioCodigo}/dependencia-users`);
+            `${API_URL}/municipios/public/${municipioCodigo}/dependencia-users${queryToken(municipioCodigo)}`);
           setDependenciaUsers(users);
         } catch (error) {
           console.error('Error al cargar usuarios dependencia:', error);

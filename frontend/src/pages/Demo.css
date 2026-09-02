@@ -757,6 +757,122 @@
   border-color: var(--dm-bad-line);
 }
 
+/* --- Probar la plataforma (municipio de muestra) ------------------------
+   La puerta abierta de la vitrina: entra sin generar nada ni dejar un dato.
+   Pesa MENOS que el CTA de crear la demo propia (que es la que convierte) y
+   mas que una card de la grilla, que es lo que es: la salida para el que
+   sospecha que esto tarda o que le van a pedir la tarjeta.                */
+
+.dm-muestra {
+  margin-bottom: 22px;
+}
+
+.dm-muestra-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 1rem;
+  border: 1px solid var(--dm-accent-line);
+  background: var(--dm-accent-soft);
+  color: var(--dm-accent-strong);
+  cursor: pointer;
+  transition: border-color var(--dm-dur) ease, box-shadow var(--dm-dur) ease,
+              transform 0.35s var(--dm-ease);
+}
+.dm-muestra-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dm-shadow-lift);
+}
+.dm-muestra-btn svg { flex: none; }
+/* El texto es lo unico que puede achicarse: sin esto, en un telefono la
+   bajada empuja la flecha fuera de la tarjeta. */
+.dm-muestra-tx { flex: 1; min-width: 0; }
+.dm-muestra-tx b {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.dm-muestra-tx i {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--dm-muted);
+}
+
+.dm-muestra-nota {
+  margin: 8px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dm-muted-soft);
+}
+
+/* --- Card ajena: se ve, no se entra ------------------------------------
+   La grilla es prueba social. Una demo de otro puede tener datos cargados
+   por esa persona, asi que se muestra apagada y sin acciones.            */
+
+.dm-muni.es-ajena {
+  background: var(--dm-paper);
+  box-shadow: none;
+}
+.dm-muni.es-ajena:hover {
+  transform: none;
+  border-color: var(--dm-card-line);
+  box-shadow: none;
+}
+.dm-muni.es-ajena .dm-muni-nombre { color: var(--dm-muted); }
+
+.dm-muni-privada {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--dm-muted-soft);
+}
+
+/* Acciones del dueño de la demo: copiar su link y borrarla. */
+.dm-muni-acc {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dm-muni-acc .dm-muni-borrar {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.dm-muni-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--dm-paper);
+  border: 1px solid var(--dm-line);
+  color: var(--dm-muted);
+  font-family: var(--dm-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dm-dur) ease, background var(--dm-dur) ease,
+              border-color var(--dm-dur) ease;
+}
+.dm-muni-link:hover {
+  color: var(--dm-accent-strong);
+  background: var(--dm-accent-soft);
+  border-color: var(--dm-accent-line);
+}
+
 /* --- Estados y pie ----------------------------------------------------- */
 
 .dm-buscador-demos {
