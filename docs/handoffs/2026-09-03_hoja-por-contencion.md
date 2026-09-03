@@ -112,42 +112,61 @@ dibujan.
 Columnas nuevas en `catalogo_barrios`:
 `hoja TINYINT(1) NOT NULL DEFAULT 1 AFTER osm_id`, `motivo_hoja VARCHAR(120) NULL AFTER hoja`.
 
-## 6. Estado al cierre — BLOQUEADO por Aiven, nada marcado todavía
+## 6. Estado al cierre — QA MARCADA y verificada con la demo de Lanús
 
-Al correr `--aplicar` en QA el ALTER falló con `(1290) --read-only`: el
-servidor **`mysql-aiven` (proyecto `arenazl`, plan `free-1-5gb`) está al 96,2 %
-de disco y Aiven lo puso read-only** — QA **y producción** de Munify sin poder
-escribir desde las 03:26 ART. No es de la app (credencial de CUENTA): se
-escaló a Infra con el diagnóstico crudo en `CANAL_AGENTES.md`
-(`MSG-20260903-0331-01`) y por SendMessage a `structure-b9`. Candidatos a
-liberar: `sugerenciasmun-ensayo` (231 MB) y `sugerenciasmun` (85 MB), que el
-doc de migración da por borrados y siguen ahí.
+**El incidente que lo trabó:** al correr `--aplicar` el ALTER falló con
+`(1290) --read-only`: el servidor **`mysql-aiven` (proyecto `arenazl`, plan
+`free-1-5gb`, 5 GB) estaba al 96 % de disco** — 2,5 GB de esquemas + 2,5 GB de
+binlogs — y Aiven lo puso read-only de 03:26 a ~13:50 ART. QA **y producción**
+sin poder escribir (los dos "hotfix" de Bartolo de esa mañana —crear un gasto
+y marcarlo pagado— eran este mismo 1290, no bugs de la app). Se escaló a Infra
+(`MSG-20260903-0331-01` + SendMessage a `structure-b9`); lo resolvió Lucas con
+Infra: bases muertas borradas, `binlog_retention_period` al mínimo y truncado
+de tablas transaccionales de otras apps (`MSG-20260903-1420-01`). Es
+credencial de CUENTA: la app no toca eso. Lección: **antes de una carga masiva,
+mirar el disco** (`avn service get mysql-aiven --project arenazl`).
 
-Lo que corre en cuanto vuelva `@@read_only = 0` (en orden):
+**Lo que se corrió después (2026-09-03 ~13:50 → 14:20 ART):**
 
 ```bash
 cd backend && export DATABASE_URL_QA="$(grep -E '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '\r')"
 ./.venv/Scripts/python.exe -u scripts/geo/marcar_hojas.py --env qa --pais AR,PY,UY,CL,BO,PE --aplicar
-# esperado AR: 18.512 hoja / 11.893 con contorno; tabla por país como en la sección 2
-./.venv/Scripts/python.exe -u scripts/geo/marcar_hojas.py --env qa --muni 060434 --detalle   # Lanús, sección 4
 ```
+Agregó las dos columnas y escribió **9.029 filas** (las que cambian). Resultado
+real, idéntico contador por contador a la simulación de la sección 2:
+`156.453 filas, 147.424 hoja, 14.365 hoja con contorno` — AR 23.434 /
+18.512 / 11.893 · BO 27.902 / 24.980 / 358 · CL 23.353 / 23.030 / 388 ·
+PE 78.152 / 77.598 / 877 · PY 2.211 / 1.950 / 588 · UY 1.401 / 1.354 / 261.
+El dry-run de Lanús (`--muni 060434 --detalle`) dio 43 hojas / 42 con contorno
+y **0 cambios pendientes**.
 
-Después: crear una demo de Lanús en QA y verificar 1 zona, ~43 barrios, 42 con
-polígono, reclamos con `barrio_id`, bitácora sin quejas. Y avisar a Infra el
-paquete para prod (sección 7).
+**Demo de Lanús en QA deployado** (`POST /api/municipios/crear-demo`, PIN
+2468, 18 s → muni `1000184`, código `lanus`): 1 zona ("Zona única", con
+polígono), **43 barrios, 42 con polígono**, 43/43 con zona, 50/50 reclamos con
+`barrio_id` y coordenadas. Gerli y Remedios de Escalada no aparecen como
+polígonos gigantes encima de sus barrios. Aviso a Infra con la tabla real:
+`MSG-20260903-1725-01` (+ SendMessage). Ojo con el body del `curl`: escribirlo
+con `json.dumps(..., ensure_ascii=True)` — el `printf` de bash convirtió la
+"ú" en un byte 0xFA y la API devolvía 400 "error parsing the body".
+
+**Trampa de rendimiento pagada:** el `--aplicar` tardó **29,5 min** para 9.029
+filas porque escribía un `UPDATE … WHERE id = :id` por fila (una ida y vuelta a
+Aiven cada una, ~190 ms). Se corrigió después del marcado: ahora arma UN
+`UPDATE … SET hoja = CASE id … END, motivo_hoja = CASE id … END WHERE id IN (…)`
+por tanda de 500 (ver sección 5). Si Infra elige F2 en prod, tarda ~1 min.
 
 ## 7. Lo que tiene que repetir Infra al promover
 
 El código ya viaja con `qa` (lee `hoja = 1` con fallback). Para los datos, una
 de dos — la primera es la misma operación que ya hizo para `catalogo_geo_osm`:
 
-1. **Volver a copiar `catalogo_barrios` de QA a prod** después de que QA quede
-   marcada (`mysqldump --replace`, mismo procedimiento de
+1. **Volver a copiar `catalogo_barrios` de QA a prod** — QA ya está marcada
+   (`mysqldump --replace`, mismo procedimiento de
    `PROMOCION-CARTOGRAFIA-OFFLINE.md`). La copia trae las columnas y la marca;
    verificar `SELECT COUNT(*), SUM(hoja=1), SUM(hoja=1 AND poligono IS NOT NULL) FROM catalogo_barrios WHERE pais='AR'`
    y que dé lo mismo que QA.
 2. O correr en prod `marcar_hojas.py --env prod --pais AR,PY,UY,CL,BO,PE --aplicar`
-   (hace el ALTER y marca; ~2 min). Necesita `DATABASE_URL_PROD` y el
+   (hace el ALTER y marca; ~1 min con el UPDATE por tanda). Necesita `DATABASE_URL_PROD` y el
    `PURGA_CONFIRMO`/TTY de `_entorno.py`, igual que la purga.
 
 Mientras prod no tenga la columna, las demos de prod siguen mostrando todas

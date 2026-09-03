@@ -74,6 +74,22 @@ async def _cargar(conn, paises: list[str], provincia: str, muni: str, con_column
     return munis, por_muni
 
 
+async def _escribir_tanda(conn, tanda: list[dict]) -> None:
+    """UN solo UPDATE para toda la tanda. Con executemany aiomysql manda un round trip por fila
+    (~190 ms contra Aiven): 9.000 filas eran 30 min; asi son segundos."""
+    params: dict = {}
+    casos_hoja, casos_motivo = [], []
+    for n, c in enumerate(tanda):
+        params[f"i{n}"], params[f"h{n}"], params[f"m{n}"] = c["id"], c["hoja"], c["motivo"]
+        casos_hoja.append(f"WHEN :i{n} THEN :h{n}")
+        casos_motivo.append(f"WHEN :i{n} THEN :m{n}")
+    await conn.execute(text(f"""
+        UPDATE catalogo_barrios
+        SET hoja = CASE id {' '.join(casos_hoja)} END,
+            motivo_hoja = CASE id {' '.join(casos_motivo)} END
+        WHERE id IN ({','.join(f':i{n}' for n in range(len(tanda)))})"""), params)
+
+
 async def main() -> None:
     args = _args()
     cfg = resolver_db(args)
@@ -135,9 +151,7 @@ async def main() -> None:
         escritas = 0
         for i in range(0, len(cambios), TANDA):
             async with engine.begin() as conn:
-                await conn.execute(text(
-                    "UPDATE catalogo_barrios SET hoja = :hoja, motivo_hoja = :motivo WHERE id = :id"),
-                    cambios[i:i + TANDA])
+                await _escribir_tanda(conn, cambios[i:i + TANDA])
             escritas += len(cambios[i:i + TANDA])
             print(f"  escritas {escritas:,}/{len(cambios):,} ({time.time() - inicio:.0f}s)", flush=True)
         async with engine.connect() as conn:
