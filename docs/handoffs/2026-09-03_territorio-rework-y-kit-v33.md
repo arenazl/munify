@@ -124,9 +124,15 @@ Semilla sana 10/10; dos cosas nuestras:
    comparar demos borradas. `TABLAS_QUE_SOBREVIVEN = {"demo_seed_logs"}` en
    `services/demo_borrado.py`.
 
-Pendiente: Infra corre `24-SMOKE-DEMOS-MUNIFY.py --env qa --n 10 --provincia
-"Buenos Aires"` contra la revisión 00403; Pila tendría que dar 34/34 sin el
-paso `colision`.
+**Smoke de Infra en QA (rev 00403, mismos 10 municipios que en prod, MSG-20260903-2100-01):**
+10/10 ok, cero degradados, cero huérfanos. Fix 1 VERIFICADO (Pila sale como
+`pila`, 25/25 pasos, sin paso `colision`; vecinos `vecino-juan@` y
+`vecino-juan-3@`). Fix 3 VERIFICADO (las 10 bitácoras sobreviven al borrado).
+Fix 2 NO EJERCITADO: ninguna demo colisionó, justamente porque el 1 lo
+previene — queda sin caso, no se da por verificado. Número que justifica F1 +
+promover `fa4065a5` juntos: mismas 10 demos, 344 barrios en prod contra 130 en
+QA (La Matanza 214 → 24). Sigue el HOLD hasta el OK del dueño en la sesión de
+Infra.
 
 ## 6. Otras cosas del día (fuera del paquete)
 
