@@ -88,6 +88,7 @@ FUENTE / LICENCIA
 from __future__ import annotations
 
 import json
+import logging
 import math
 import random
 import re
@@ -95,6 +96,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from services.geo_demo import CACHE_DIR, _norm, _slug, dentro
+
+logger = logging.getLogger(__name__)
 
 # Instancias publicas con el planeta completo. El alta usa las dos primeras
 # (INTENTOS); el batch offline recorre todas, porque la noche que se curo AR
@@ -132,36 +135,35 @@ VERTICES_FILTRO = 80
 TOPE_GEO = 4000      # places + calles
 TOPE_DIRECCIONES = 2000
 
-# Cuantas zonas y barrios se cargan como maximo. Un partido grande tiene 60
-# barrios en OSM y un selector con 60 items no se usa; se toman los mas cercanos
-# al centro de la ciudad, que son los que el intendente nombra.
-MAX_ZONAS = 12
-# 40 y no 30: con 30, Lujan cortaba en 5 km y se quedaba afuera Ameghino, que es
-# uno de los barrios que el dueño nombro como prueba de que la demo habla de SU
-# ciudad. El corte es por cercania al centro, asi que subirlo suma barrios de
-# verdad --- todos salen de OSM --- sin ensuciar con nada inventado.
-MAX_BARRIOS = 40
-
-# Distancia maxima para adjudicarle un barrio a un punto. Mas lejos que esto el
-# punto no es "de" ese barrio y se deja sin barrio, que es la verdad.
+# Distancia maxima para adjudicarle un barrio a un punto que no cae dentro del
+# contorno de ninguno. Mas lejos que esto el punto no es "de" ese barrio y se
+# deja sin barrio, que es la verdad.
 MAX_KM_BARRIO = 3.0
 
 PLACES_ZONA = ("city", "town", "village", "hamlet")
 PLACES_BARRIO = ("suburb", "neighbourhood", "quarter")
 
-# LA ZONA DE UN MUNICIPIO SIN DIVISION. Decision de producto (dueño,
-# 2026-09-02): la zona es una unidad OPERATIVA —a que cuadrilla le toca, que
-# supervisor mira que— y ese reparto no esta en ninguna cartografia: lo decide
-# cada municipio a su criterio. Lo unico oficial que divide un municipio son
-# sus LOCALIDADES (el padron); una ciudad de una sola localidad no tiene
-# division que copiar, y nosotros no la inventamos: ni "Norte/Sur", ni las
-# calles principales como zona, ni los barrios de OSM promovidos a zona (eso
-# ultimo dejaba la demo SIN barrios y con "zonas" que no eran tales — La Paz,
-# Villa Carlos Paz). Nace UNA zona que abarca el municipio entero, con su
-# contorno, y todos los barrios cuelgan de ella; el ABM explica como dividirla.
+# LA ZONA ES DEL NEGOCIO, NO DE LA CARTOGRAFIA. Decision de producto (dueño,
+# 2026-09-02, cerrada el 2026-09-03): la zona es una unidad OPERATIVA —a que
+# cuadrilla le toca, que supervisor mira que— y ese reparto no esta en ninguna
+# fuente externa: lo decide cada municipio a su criterio. Por eso la cadena de
+# una demo es SIEMPRE municipio -> Zona unica -> barrios: una zona que abarca
+# el municipio entero, con su contorno, y todos los barrios cuelgan de ella;
+# el ABM explica como dividirla. Nada asciende a zona: ni "Norte/Sur", ni las
+# calles principales, ni los barrios de OSM, ni las localidades del padron
+# (2026-09-02 esas eran zonas y metian un nivel que no existe: Merlo tenia 5
+# "zonas" y Libertad, que es un barrio, no aparecia como tal).
 # El nombre no repite el del municipio para no confundir los dos niveles, y se
 # descarto "Sin zonificar" porque eso nombra la FALTA de zonas y esto ES una.
 ZONA_UNICA = "Zona única"
+
+# LOS BARRIOS SE LEEN, NO SE FABRICAN. La semilla toma los barrios del
+# municipio —nombre, tipo, centro y contorno cuando lo hay— de
+# `catalogo_barrios`, curada offline desde el extracto de OSM y el padron
+# (`scripts/geo/catalogo_barrios_pbf.py`). Todos, sin tope: un partido con 200
+# barrios tiene 200 barrios. Un municipio sin filas ahi nace sin barrios, y la
+# bitacora dice por que; el remedio es curar el catalogo, no inventar.
+FUENTE_BARRIOS = "catalogo_barrios"
 
 # Un barrio que se llama "Norte" a secas no es un barrio: es el relleno que
 # dejaban los seeds viejos y que hacia imposible contar que municipios tienen
@@ -317,55 +319,45 @@ async def poligono_del_catalogo(db, nombre: str, pais: str,
     return fila["anillo"] if fila else None
 
 
-async def zonas_del_catalogo(db, anillo: list) -> list[dict]:
-    """Las localidades del municipio, con su contorno, desde `catalogo_zonas`.
+async def barrios_del_catalogo(db, catalogo_id: str) -> list[dict]:
+    """Los barrios del municipio, con su contorno cuando lo tienen, desde
+    `catalogo_barrios` (ver FUENTE_BARRIOS).
 
-    Es el padron: georef dice que localidades tiene cada municipio y el contorno
-    ya viene resuelto y validado. Overpass sigue haciendo falta para las CALLES
-    --- las direcciones reales de los reclamos de la demo --- pero para las zonas
-    no: pedirselas devolvia nodos, o sea puntos sin area, y encima dependia de
-    que el servicio estuviera arriba. Un municipio nacia con los nombres de sus
-    localidades y sin una sola division dibujada en el mapa.
+    Se busca por el id del catalogo de municipios —ya resuelto un paso antes,
+    junto con el contorno— y no por geometria ni por nombre: el script que
+    llena la tabla ya asigno cada barrio al municipio cuyo contorno lo
+    contiene, y repetir la busqueda aca reabriria los homonimos.
 
-    Se busca por GEOMETRIA --- la localidad cuyo centro cae dentro del contorno
-    del municipio --- y no por el nombre del municipio: el nombre ya se resolvio
-    un paso antes, al conseguir ese contorno, y repetir la busqueda por texto
-    reabre el problema de los homonimos.
+    Si la tabla todavia no existe en el ambiente (prod antes de la promocion)
+    devuelve la lista vacia: la demo nace sin barrios y la bitacora lo dice;
+    crear una demo no puede romperse por una tabla de catalogo.
     """
     from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
 
-    xs = [p[0] for p in anillo]
-    ys = [p[1] for p in anillo]
-    filas = (await db.execute(text(
-        "SELECT nombre, lat, lng, poligono FROM catalogo_zonas "
-        "WHERE lat BETWEEN :y0 AND :y1 AND lng BETWEEN :x0 AND :x1"),
-        {"x0": min(xs), "x1": max(xs), "y0": min(ys), "y1": max(ys)})).fetchall()
+    try:
+        filas = (await db.execute(text(
+            "SELECT nombre, tipo, lat, lon, poligono, fuente FROM catalogo_barrios "
+            "WHERE municipio_catalogo_id = :id ORDER BY nombre"),
+            {"id": catalogo_id})).fetchall()
+    except SQLAlchemyError as e:
+        logger.warning("catalogo_barrios no disponible (%s): la demo nace sin barrios", e)
+        return []
 
-    zonas = []
-    for nombre, la, ln, poly in filas:
+    barrios = []
+    for nombre, tipo, la, ln, poly, fuente in filas:
+        if es_cardinal(nombre):
+            continue
+        anillo = _anillo(poly)
+        if (la is None or ln is None) and anillo:
+            la, ln = _centroide(anillo)
         if la is None or ln is None:
             continue
-        if not _dentro((float(ln), float(la)), anillo):
-            continue
-        zonas.append({"nombre": nombre, "lat": float(la), "lon": float(ln),
-                      "poligono": poly})
-
-    # LOCALIDADES COMPUESTAS. El padron trae 73 aglomerados con el nombre de sus
-    # componentes pegados ("Villa Carlos Paz - San Antonio de Arredondo - Villa
-    # Rio Icho Cruz") y ADEMAS los componentes sueltos ("Villa Carlos Paz"). Las
-    # dos cosas como zonas se pisan: el aglomerado contiene al componente y la
-    # demo nacia con dos zonas superpuestas, una con nombre de tres renglones.
-    # Se descarta el compuesto SOLO cuando contiene geometricamente el centro
-    # de otra localidad del mismo padron — o sea, cuando es redundante.
-    compuestas = [z for z in zonas if " - " in z["nombre"] and _anillo(z["poligono"])]
-    if compuestas:
-        redundantes = set()
-        for z in compuestas:
-            contorno = _anillo(z["poligono"])
-            if any(o is not z and _dentro((o["lon"], o["lat"]), contorno) for o in zonas):
-                redundantes.add(z["nombre"])
-        zonas = [z for z in zonas if z["nombre"] not in redundantes]
-    return zonas
+        barrios.append({"nombre": nombre, "tipo": tipo or "suburb",
+                        "lat": float(la), "lon": float(ln),
+                        "poligono": json.dumps(anillo) if anillo else None,
+                        "fuente": fuente})
+    return barrios
 
 
 def _dentro(pt, anillo) -> bool:
@@ -753,21 +745,37 @@ def _puntos_por_localidad(nombre_municipio: str, localidades: list[dict],
     return puntos
 
 
+def barrio_de(punto: tuple[float, float], barrios: list[dict],
+              anillos: Optional[list] = None) -> Optional[dict]:
+    """A que barrio pertenece un punto: el que lo CONTIENE si tiene contorno;
+    si ninguno lo contiene, el mas cercano por centro a MAX_KM_BARRIO o menos;
+    mas lejos, ninguno (el punto no es "de" ese barrio, y se dice)."""
+    if not barrios:
+        return None
+    if anillos is None:
+        anillos = anillos_de(barrios)
+    for b, anillo in zip(barrios, anillos):
+        if anillo and _dentro((punto[1], punto[0]), anillo):
+            return b
+    return _cerca(punto, barrios, MAX_KM_BARRIO)
+
+
 def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
           centro: Optional[tuple[float, float]] = None,
-          max_zonas: int = MAX_ZONAS,
-          max_barrios: int = MAX_BARRIOS,
-          zonas_padron: Optional[list[dict]] = None,
+          barrios_catalogo: Optional[list[dict]] = None,
           poligono=None) -> dict:
-    """Zonas, barrios y puntos listos para la semilla. Todo determinista.
+    """Zona unica, barrios y puntos listos para la semilla. Todo determinista.
+
+    Aca NO se fabrica geografia (Lucas, 2026-09-03): la zona es la unica
+    (ZONA_UNICA, con el contorno del municipio), los barrios son los de
+    `barrios_catalogo` tal cual vienen —todos, con su contorno— y lo unico
+    que se GENERA son los puntos de los reclamos: direcciones reales de OSM,
+    cada una colgada del barrio que la contiene.
 
     `cantidad_puntos` es un PARAMETRO a proposito: cuando la semilla suba de 13
     a 50 reclamos no hay que tocar nada aca, y el consumidor ademas recorre la
     lista con modulo, asi que pedir de menos degrada la variedad pero nunca
     rompe.
-
-    `poligono` es el contorno del municipio: es lo que dibuja la zona unica
-    cuando no hay division (ver ZONA_UNICA).
     """
     rnd = random.Random(_slug(nombre_municipio))
     # El filtro de cardinales tambien aca: un cache viejo o una fila curada
@@ -776,65 +784,28 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
     calles = osm.get("calles") or []
     direcciones = osm.get("direcciones") or []
 
-    gruesas = [p for p in places if p["tipo"] in PLACES_ZONA]
-    finas = [p for p in places if p["tipo"] in PLACES_BARRIO]
-
-    # DESDE DONDE SE MIDE "CERCA DEL CENTRO". El punto del catalogo es el
+    # EL CENTRO DE LA ZONA UNICA ES EL CASCO. El punto del catalogo es el
     # centroide del PARTIDO, no el del casco urbano: en Lujan cae 4 km al oeste
-    # de la ciudad y con el, ordenando por cercania, Ameghino quedaba 52° de 60 y
-    # afuera del corte, mientras entraban barrios del otro extremo. El place
-    # `town` que devuelve OSM con el nombre del municipio SI es el centro de la
-    # ciudad, y ahi Ameghino sube al puesto 37 y entra --- junto con Zapiola,
-    # Juan XXIII, Universidad y Villa del Parque.
+    # de la ciudad. El place `town` de OSM con el nombre del municipio SI es el
+    # centro de la ciudad; si no esta, el centro del alta; si tampoco, el
+    # centroide del contorno (lo resuelve zona_unica).
     objetivo = _norm(nombre_municipio)
     propio = next((p for p in places
                    if p["tipo"] in PLACES_ZONA and _norm(p["nombre"]) == objetivo), None)
-    centro_ciudad = (propio["lat"], propio["lon"]) if propio else centro
-
-    def _recortar(items: list[dict], tope: int) -> list[dict]:
-        if len(items) <= tope or not centro_ciudad:
-            return items[:tope]
-        return sorted(items,
-                      key=lambda p: _km(centro_ciudad, (p["lat"], p["lon"])))[:tope]
-
-    # LA DIVISION EN ZONAS SON LAS LOCALIDADES, O NINGUNA. En un partido (Lujan,
-    # Merlo, Rafaela) el padron trae varias localidades con contorno y manda;
-    # si el padron no divide pero OSM tiene mas de una localidad adentro del
-    # contorno (`town`/`village`/`hamlet`: asentamientos reales, no barrios),
-    # esas son las zonas. Y si no hay division, hay UNA zona con el contorno
-    # entero del municipio. Los barrios son SIEMPRE barrios: la promocion a
-    # zona (Villa Carlos Paz) y las zonas con nombre de calle se sacaron el
-    # 2026-09-02 — las dos inventaban una division que el municipio no tiene,
-    # y la primera ademas dejaba la demo sin barrios y la bitacora diciendo que
-    # OSM no los tenia.
-    zp = zonas_padron or []
-    if len(zp) > 1:
-        zonas = zp
-    elif len(gruesas) > 1:
-        zonas = _recortar(gruesas, max_zonas)
-    else:
-        # El centro de la zona unica es el casco: el `town` de OSM con el nombre
-        # del municipio, o la unica localidad del padron, o el centro del alta.
-        if propio:
-            c = (propio["lat"], propio["lon"])
-        elif zp:
-            c = (zp[0]["lat"], zp[0]["lon"])
-        else:
-            c = centro or (None, None)
-        zonas = [zona_unica(c[0], c[1], poligono)]
+    c = (propio["lat"], propio["lon"]) if propio else (centro or (None, None))
+    zonas = [zona_unica(c[0], c[1], poligono)]
 
     degradacion: Optional[str] = None
     if not (places or calles or direcciones):
         degradacion = "sin_geografia_en_osm"
 
-    # Cada barrio nace sabiendo de que zona es (misma regla que los reclamos:
-    # la zona que lo contiene, o la mas cercana). Es lo que arma la jerarquia
-    # municipio -> zona -> barrio que el mapa y el ABM de zonas necesitan.
-    anillos = anillos_de(zonas)
-    barrios = []
-    for b in _recortar(finas, max_barrios):
-        z = zona_de((b["lat"], b["lon"]), zonas, anillos)
-        barrios.append({**b, "zona_nombre": z["nombre"] if z else None})
+    # Los barrios, del catalogo y completos. Todos cuelgan de la zona unica:
+    # es la jerarquia municipio -> zona -> barrio que el mapa y el ABM de
+    # zonas necesitan, y el municipio despues reparte los barrios entre las
+    # zonas que el defina.
+    barrios = [{**b, "zona_nombre": ZONA_UNICA}
+               for b in sin_cardinales(barrios_catalogo or [])]
+    anillos_barrios = anillos_de(barrios)
 
     # --- los puntos ---
     # Cada candidato YA es un elemento real de OSM dentro del poligono. Se
@@ -881,15 +852,14 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
             candidatos.append(sin_altura[ib])
             ib += 1
 
-    # Los puntos se asignan contra las zonas que van a EXISTIR en la demo —
-    # `zonas` ya es la lista definitiva, padron incluido — y con la misma regla
-    # que los barrios (contiene, o mas cercana).
+    # Cada punto cuelga de la zona unica y del barrio que lo CONTIENE (por
+    # contorno); si el barrio no tiene contorno, el mas cercano a 3 km; mas
+    # lejos, sin barrio. Nunca se le inventa uno.
     puntos = []
     for p in candidatos[:cantidad_puntos]:
-        zona = zona_de((p["lat"], p["lon"]), zonas, anillos)
-        barrio = _cerca((p["lat"], p["lon"]), barrios, MAX_KM_BARRIO)
+        barrio = barrio_de((p["lat"], p["lon"]), barrios, anillos_barrios)
         puntos.append({**p,
-                       "zona_nombre": zona["nombre"] if zona else None,
+                       "zona_nombre": ZONA_UNICA,
                        "barrio": barrio["nombre"] if barrio else None})
 
     return {
@@ -901,7 +871,8 @@ def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
         "calles_disponibles": len(calles),
         "direcciones_disponibles": len(direcciones),
         "places_disponibles": len(places),
-        "barrios_en_fuente": len(finas),
+        "barrios_en_fuente": len(barrios_catalogo or []),
+        "barrios_con_contorno": sum(1 for a in anillos_barrios if a),
     }
 
 
@@ -952,76 +923,77 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
         else:
             pz.degradado("el municipio no tiene contorno cargado en municipios_catalogo",
                          fuente=None)
-    if not anillo:
-        # Sin contorno no hay padron ni cartografia que buscar, pero el mapa
-        # no se pierde: los reclamos caen alrededor del centro con el que se
-        # creo el municipio (que salio del mismo catalogo), con el nombre del
-        # municipio como direccion. Precision honesta de "centro del pueblo".
-        # La zona unica nace igual (sin contorno): la jerarquia la necesita.
-        puntos = []
-        zonas = []
-        if lat is not None and lon is not None:
-            zonas = [zona_unica(lat, lon, None)]
-            puntos = _puntos_por_localidad(
-                nombre, [{"nombre": nombre, "lat": lat, "lon": lon, "poligono": None}],
-                cantidad_puntos)
-            for p in puntos:
-                p["zona_nombre"] = ZONA_UNICA
-        return {**vacio, "zonas": zonas, "puntos": puntos,
-                "fuente_zonas": "zona_unica",
-                "degradacion": "sin_poligono_en_catalogo"}
-
-    # --- zonas: del PADRON, no de la red ---
-    # Estan en la base, con el contorno ya resuelto y validado. Overpass las
-    # devolvia como nodos --- puntos sin area --- y ademas hay que estar
-    # esperando que conteste.
+    # --- zona: UNA, siempre, con el contorno del municipio ---
+    # La zona es un criterio del NEGOCIO (define la cuadrilla, la arma el
+    # municipio), no de la georreferencia (Lucas, 2026-09-03). La cadena es
+    # municipio -> Zona unica -> barrios, y la semilla no inventa una division
+    # que el municipio no tiene. No es degradacion: es el diseno.
     with _paso("geo:zonas") as pzz:
-        zonas_padron = await zonas_del_catalogo(db, anillo)
-        if len(zonas_padron) > 1:
-            pzz.ok(zonas=len(zonas_padron),
-                   con_contorno=sum(1 for z in zonas_padron if z["poligono"]),
-                   fuente="catalogo_zonas")
-        else:
-            # No es degradacion: un municipio de una sola localidad no tiene
-            # division oficial, y la demo nace con la zona unica a proposito.
-            pzz.ok(zonas=1, localidades_padron=len(zonas_padron),
-                   fuente="zona_unica",
-                   nota="sin division oficial: una zona con el contorno del "
-                        "municipio; el municipio arma las suyas en Zonas")
+        zonas_oficiales = [zona_unica(lat, lon, anillo)]
+        fuente_zonas = "zona_unica"
+        pzz.ok(zonas=1, fuente=fuente_zonas, con_contorno=1 if anillo else 0,
+               nota="una zona con el contorno del municipio; el municipio "
+                    "reparte los barrios en las suyas desde Zonas")
 
-    # LAS ZONAS OFICIALES: el padron si divide (2+ localidades); si no, la
-    # zona unica con el contorno del municipio, centrada en la unica localidad
-    # del padron (el casco) o en el centro del alta. `armar()` puede sumar las
-    # localidades de OSM cuando el padron no divide, pero nunca menos que esto.
-    if len(zonas_padron) > 1:
-        zonas_oficiales, fuente_zonas = zonas_padron, "catalogo_zonas"
-    else:
-        c_lat, c_lon = ((zonas_padron[0]["lat"], zonas_padron[0]["lon"])
-                        if zonas_padron else (lat, lon))
-        zonas_oficiales, fuente_zonas = [zona_unica(c_lat, c_lon, anillo)], "zona_unica"
+    # --- barrios: de la tabla curada offline, NUNCA de la red ---
+    # `catalogo_barrios` se llena con scripts/geo/catalogo_barrios_pbf.py
+    # (PBF de Geofabrik + localidades de georef). Aca se LEEN, todos, con su
+    # contorno cuando lo tienen. Sin filas, la demo nace con la zona unica y
+    # sin barrios: se avisa, no se rellena.
+    with _paso("geo:barrios") as pb:
+        barrios_catalogo = (await barrios_del_catalogo(db, fila["id"])) if fila else []
+        con_contorno = sum(1 for b in barrios_catalogo if b["poligono"])
+        if barrios_catalogo:
+            pb.ok(barrios=len(barrios_catalogo), con_contorno=con_contorno,
+                  fuente=FUENTE_BARRIOS,
+                  nombres=[b["nombre"] for b in barrios_catalogo][:15])
+        else:
+            pb.degradado("municipio sin barrios en catalogo_barrios: correr "
+                         "scripts/geo/catalogo_barrios_pbf.py para su provincia",
+                         catalogo_id=fila["id"] if fila else None, fuente=None)
+    barrios_oficiales = [{**b, "zona_nombre": ZONA_UNICA}
+                         for b in sin_cardinales(barrios_catalogo)]
 
     def _puntos_sin_calles() -> list[dict]:
-        # Reclamos con lat/lng DENTRO de las localidades reales del padron (o
-        # del contorno del municipio si el padron esta vacio), y la zona que
-        # va a existir en la demo.
-        base = zonas_padron or [{"nombre": nombre, "lat": lat, "lon": lon,
-                                 "poligono": anillo}]
-        if not (zonas_padron or (lat is not None and lon is not None)):
-            return []
-        puntos = _puntos_por_localidad(nombre, base, cantidad_puntos)
-        if fuente_zonas == "zona_unica":
+        # Reclamos con lat/lng REAL aunque no haya calles: dentro de los
+        # contornos de los barrios (o en su centro) cuando el catalogo los
+        # tiene, y si no, dentro del contorno del municipio alrededor del
+        # centro del alta. Cada punto sabe de que barrio es.
+        if barrios_oficiales:
+            puntos = _puntos_por_localidad(nombre, barrios_oficiales, cantidad_puntos)
             for p in puntos:
-                p["zona_nombre"] = ZONA_UNICA
+                p["barrio"], p["zona_nombre"] = p["zona_nombre"], ZONA_UNICA
+                p["direccion"] = f"{nombre} - {p['barrio']}"
+            return puntos
+        if lat is None or lon is None:
+            return []
+        puntos = _puntos_por_localidad(
+            nombre, [{"nombre": nombre, "lat": lat, "lon": lon, "poligono": anillo}],
+            cantidad_puntos)
+        for p in puntos:
+            p["zona_nombre"] = ZONA_UNICA
         return puntos
 
-    # --- barrios y calles: de la tabla curada, NUNCA de la red ---
     def _sin_cartografia(motivo: str) -> dict:
-        # La demo nace igual: zonas oficiales y reclamos con lat/lng dentro de
-        # ellas. Es DEGRADADO y no fallo: 'fallo' ponia la bitacora en rojo y
-        # el 2026-09-02 se leyo como "las demos fallan" cuando no fallaban.
-        return {**vacio, "zonas": zonas_oficiales, "puntos": _puntos_sin_calles(),
-                "poligono": anillo, "fuente_poligono": "municipios_catalogo",
-                "fuente_zonas": fuente_zonas, "degradacion": motivo}
+        # La demo nace igual: zona unica, los barrios del catalogo y reclamos
+        # con lat/lng dentro de ellos. Es DEGRADADO y no fallo: 'fallo' ponia
+        # la bitacora en rojo y el 2026-09-02 se leyo como "las demos fallan"
+        # cuando no fallaban.
+        return {**vacio, "zonas": zonas_oficiales, "barrios": barrios_oficiales,
+                "puntos": _puntos_sin_calles(),
+                "poligono": anillo,
+                "fuente_poligono": "municipios_catalogo" if anillo else None,
+                "fuente_zonas": fuente_zonas, "fuente_barrios": FUENTE_BARRIOS,
+                "barrios_en_fuente": len(barrios_catalogo),
+                "barrios_con_contorno": con_contorno,
+                "degradacion": motivo}
+
+    if not anillo:
+        # Sin contorno no hay cartografia de calles que buscar, pero el mapa
+        # no se pierde: zona unica sin contorno (la jerarquia la necesita),
+        # los barrios que el catalogo tenga, y los reclamos dentro de ellos o
+        # alrededor del centro del alta. Precision honesta de "centro del pueblo".
+        return _sin_cartografia("sin_poligono_en_catalogo")
 
     with _paso("geo:osm") as po:
         try:
@@ -1045,18 +1017,17 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
                   calles=len(osm.get("calles") or []),
                   direcciones=len(osm.get("direcciones") or []))
 
-    # --- zonas, barrios y puntos ---
+    # --- los puntos: lo UNICO que se genera ---
     with _paso("geo:puntos") as pp:
         centro = (lat, lon) if lat is not None and lon is not None else None
         armado = armar(nombre, osm, cantidad_puntos, centro=centro,
-                       zonas_padron=zonas_padron, poligono=anillo)
+                       barrios_catalogo=barrios_catalogo, poligono=anillo)
         detalle = {
             "zonas": len(armado["zonas"]),
             "barrios": len(armado["barrios"]),
             "puntos": len(armado["puntos"]),
             "puntos_con_altura_real": armado["con_altura_real"],
-            "nombres_zonas": [z["nombre"] for z in armado["zonas"]],
-            "nombres_barrios": [b["nombre"] for b in armado["barrios"]][:15],
+            "puntos_con_barrio": sum(1 for p in armado["puntos"] if p["barrio"]),
             "calles_ejemplo": [p["direccion"] for p in armado["puntos"][:8]],
         }
         if armado["degradacion"]:
@@ -1064,28 +1035,17 @@ async def geografia(db, nombre: str, pais: str, cantidad_puntos: int,
         else:
             pp.ok(**detalle)
 
-    # Las zonas ya vienen resueltas de `armar()` con la misma regla de arriba
-    # (padron > localidades de OSM > zona unica); aca solo se etiqueta la
-    # fuente. Cuando OSM aporto localidades que el padron no tenia, la zona
-    # unica cede: son asentamientos reales dentro del contorno, no barrios.
-    zonas = armado["zonas"]
-    if len(zonas_padron) <= 1 and len(zonas) > 1:
-        fuente_zonas = "osm_localidades"
-
     # SIN CALLES NO SE PIERDE EL MAPA (Lucas, 2026-09-03): si OSM no dio
-    # calles ni direcciones, los reclamos igual llevan lat/lng dentro de las
-    # localidades REALES del padron. NADA de esto bloquea la demo: nace con
+    # calles ni direcciones, los reclamos igual llevan lat/lng dentro de los
+    # barrios REALES del catalogo. NADA de esto bloquea la demo: nace con
     # puntos, mapa y heatmap; la precision de calle llega con la curacion
     # offline y queda avisado en la bitacora para curar a mano.
     if not armado["puntos"]:
         armado["puntos"] = _puntos_sin_calles()
-        if fuente_zonas == "osm_localidades":
-            for p in armado["puntos"]:
-                z = zona_de((p["lat"], p["lon"]), zonas)
-                p["zona_nombre"] = z["nombre"] if z else None
         armado["degradacion"] = (armado["degradacion"]
-                                 or "sin_calles_osm_reclamos_a_nivel_localidad")
+                                 or "sin_calles_osm_reclamos_a_nivel_barrio")
 
-    return {**armado, "zonas": zonas, "poligono": anillo,
+    return {**armado, "poligono": anillo,
             "fuente_poligono": "municipios_catalogo",
-            "fuente_zonas": fuente_zonas}
+            "fuente_zonas": fuente_zonas,
+            "fuente_barrios": FUENTE_BARRIOS}
