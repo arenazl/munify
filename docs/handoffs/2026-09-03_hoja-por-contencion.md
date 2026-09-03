@@ -256,3 +256,32 @@ admin**. Me delegó el cómo ("armala como vos digas que va a servir mejor").
   `catalogo_barrios_pbf.py`, fase 2 en QA, re-marcar, medir contra la línea
   base de arriba; luego BAHRA para la cola; luego 3 demos de QA de tamaños
   distintos. Prod sigue FRENADO por Lucas.
+
+## 10. Actualización 2026-09-03 (18:30 ART): la auditoría de demos deja de ser pública
+
+Orden de Lucas, textual: *"no podemos permitir más el acceso a ese listado
+sin estar logueado como super admin y dentro del contenedor de la app"*.
+Commit `c3779840` en `qa`, verificado en vivo (bundle `index-D15Avte9.js`).
+
+- **Backend:** `GET /demos/auditoria` y `POST /demos/purga` con
+  `require_super_admin` (antes la auditoría respondía 200 sin token).
+- **Pantalla:** vive en `/gestion/admin/demos` (item **Demos** del sidebar
+  Super Admin), pide por `api` con token, sin `.av2-standalone`.
+  `/demos-listado` queda como redirect para links guardados.
+- **Puerta única sin sesión:** `ProtectedRoute` y `RootRedirect` → `/login`;
+  `/login` sin municipio recordado → `/super`. `ProtectedRoute` ganó la prop
+  `superAdmin` (Demos y Territorio la usan). Todos los `navigate` que iban a
+  la grilla: flujos de vecino → `/login`, flujos del generador
+  (`DemoListo`, `demos/index`) → `/gestion/admin/demos`.
+- **Se fueron** los botones "Cambiar municipio" (`HomePublic`, `MobilePerfil`):
+  suponían un selector público que ya no existe.
+- **Verificación sin sesión (Playwright contra QA):** `/`, `/demos-listado`,
+  `/gestion/admin/demos`, `/gestion/consola`, `/login`, `/demo`,
+  `/bienvenido` → todas terminan en `/super`, grilla nunca visible;
+  `GET /api/demos/auditoria` → 401.
+- **Pendiente opcional (propuesto a Lucas):** vecino sin municipio recordado
+  hoy ve `/super`; mandarlo a la landing requiere la URL de la landing en la
+  config de marca.
+- La regla `.av2-standalone` de `abmv2.css` quedó sin uso (kit de la otra
+  sesión, no se tocó).
+
