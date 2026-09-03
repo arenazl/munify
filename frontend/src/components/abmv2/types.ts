@@ -639,13 +639,19 @@ export interface SemanticAbmPageProps<Row = unknown> {
    */
   hero?: ModuleHeroProps;
   /**
-   * [v2.5] PISTA: la banda de ayuda entre el hero y los controles ("Los plazos
-   * se cuentan en días hábiles", "El CBU es lo que habilita el pago masivo").
+   * [v2.5] PISTA: la banda de ayuda del módulo ("Los plazos se cuentan en
+   * días hábiles", "El CBU es lo que habilita el pago masivo").
    *
    * Sale del canvas de Configuración. Es distinta del hero: el hero dice CÓMO
    * VIENE la cosa (números de hoy), la pista explica CÓMO FUNCIONA (una regla
    * que no cambia). Por eso no se mezclan — y por eso la pista no lleva
    * números: si los llevara, envejecería sin que nadie la actualice.
+   *
+   * [v3] CAMBIÓ DE LUGAR: ya no va entre el hero y los controles — va ARRIBA
+   * DE TODO (el segmento de ayudas, antes de la cabecera) y SE CIERRA CON UNA
+   * CRUZ, persistida por módulo (HintBanner). Una ayuda es para leerla una
+   * vez, no para ocupar el medio de la pantalla para siempre (dueño,
+   * 2026-09-02).
    */
   pista?: { titulo: string; texto: string; accion?: Action };
   /** Borde izquierdo del hero: token CSS (`var(--pl-green)` por defecto,
@@ -654,7 +660,15 @@ export interface SemanticAbmPageProps<Row = unknown> {
 
   /* --- Toolbar --- */
   searchPlaceholder: string;
-  views: ViewKind[];
+  /**
+   * [v3] AHORA OPCIONAL — el estándar es NO declararla: con `roles` declarados
+   * el kit trae las tres vistas built-in ('table' + 'cards' + 'guided'
+   * autogeneradas desde los roles semánticos). Declararla es la EXCEPCIÓN
+   * explícita (una pantalla que de verdad no admite una vista), no el default.
+   * Why (dueño, 2026-09-02): los agentes declaraban de menos y las pantallas
+   * perdían vistas que el kit ya sabía dibujar.
+   */
+  views?: ViewKind[];
   secondaryAction?: Action;
   /** [v2.1] Ahora OPCIONAL (vistas de solo consulta) — ver ListToolbarProps. */
   primaryAction?: Action;
@@ -690,6 +704,15 @@ export interface SemanticAbmPageProps<Row = unknown> {
   /* --- Tabla --- */
   kind: ListKind;
   columns: ColumnSpec<Row>[];
+  /**
+   * [v3] Los mismos datos declarados por ROL (ver RolesSemanticos). Con esto
+   * el kit dibuja SOLO las otras vistas: la ficha mobile, la vista 'cards' y
+   * la vista 'guided' (fichas agrupadas por estado) salen de acá — la página
+   * no arma UI alternativa, declara qué rol cumple cada dato. Es la pieza que
+   * mantiene íconos, segundas líneas, píldoras y acciones SIMÉTRICOS en todas
+   * las vistas: un set de datos, un solo dibujante.
+   */
+  roles?: RolesSemanticos<Row>;
   groupBy?: 'date' | 'hour' | 'none';
   showGroupSubtotal?: boolean;
   rows: Row[];

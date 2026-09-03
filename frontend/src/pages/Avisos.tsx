@@ -31,7 +31,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
 import { EntityCell, ChipEstado } from '../components/abmv2/DataTable';
-import type { ChipTone, ColumnSpec } from '../components/abmv2/types';
+import type { ChipTone, ColumnSpec, RolesSemanticos, ViewKind } from '../components/abmv2/types';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
@@ -183,6 +183,9 @@ export default function Avisos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('todos');
+  /* [v3] La vista es estado real: las 3 vistas del estándar vienen built-in
+     del kit (cards y guiada se autogeneran de los roles semánticos). */
+  const [vista, setVista] = useState<ViewKind>('table');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editando, setEditando] = useState<Publicacion | null>(null);
   const [form, setForm] = useState<FormState>(FORM_VACIO);
@@ -311,12 +314,51 @@ export default function Avisos() {
     ] }];
   }, [items.length, pendientes, destacados.length, novedades.length, obras]);
 
+  const vencidas = useMemo(() => items.filter((i) => estadoDe(i) === 'vencido'), [items]);
+
+  /* [v3] Strip de CINCO KPIs con leyenda y veredicto — el estándar del hero
+     grande (referencia Trámites/Gastos). El kit avisa en dev si son menos. */
   const heroKpis = useMemo(() => ([
-    { etiqueta: 'En el banner', valor: String(destacados.length) },
-    { etiqueta: 'Novedades', valor: String(novedades.length) },
-    { etiqueta: 'Obras publicadas', valor: String(obras.filter((o) => o.publicada).length) },
-    { etiqueta: 'Esperan decisión', valor: String(pendientes) },
-  ]), [destacados.length, novedades.length, obras, pendientes]);
+    {
+      etiqueta: 'En el banner',
+      valor: String(destacados.length),
+      sub: destacados.length === 1 ? 'rotando arriba' : 'rotando arriba de todo',
+    },
+    { etiqueta: 'Novedades', valor: String(novedades.length), sub: 'en el feed del vecino' },
+    {
+      etiqueta: 'Obras publicadas',
+      valor: String(obras.filter((o) => o.publicada).length),
+      sub: `de ${obras.length} ${obras.length === 1 ? 'cargada' : 'cargadas'}`,
+    },
+    {
+      etiqueta: 'Esperan decisión',
+      valor: String(pendientes),
+      sub: pendientes > 0 ? 'sin publicar o sin avisar' : 'nada pendiente',
+      veredicto: pendientes > 0 ? ('advertencia' as const) : ('bueno' as const),
+    },
+    {
+      etiqueta: 'Vencidas',
+      valor: String(vencidas.length),
+      sub: vencidas.length > 0 ? 'ya no se muestran' : 'todo al aire',
+      veredicto: vencidas.length > 0 ? ('malo' as const) : undefined,
+    },
+  ]), [destacados.length, novedades.length, obras, pendientes, vencidas.length]);
+
+  /* [v3] ROLES SEMÁNTICOS: el mismo set de datos que dibujan la ficha mobile,
+     la vista de tarjetas y la guiada — un solo dibujante para icono, segunda
+     línea y píldora, en todas las vistas. */
+  const rolesPublicacion = useMemo<RolesSemanticos<Publicacion>>(() => ({
+    taxonomy: (p) => ({
+      label: TIPO_LABEL[p.tipo] || 'Novedad',
+      icon: p.origen === 'obra' ? 'Hammer' : p.tipo === 'destacado' ? 'Pin' : 'Megaphone',
+    }),
+    headline: (p) => p.titulo,
+    context: (p) => detalleDe(p),
+    state: (p) => {
+      const e = estadoDe(p);
+      return { label: ESTADO_LABEL[e], tono: ESTADO_TONE[e] };
+    },
+  }), []);
 
   const columnas = useMemo<ColumnSpec<Publicacion>[]>(() => [
     {
@@ -381,7 +423,8 @@ export default function Avisos() {
       cell: (p) => p.origen === 'obra' ? '—'
         : p.enviado_at ? `${p.enviados_count} ${p.enviados_count === 1 ? 'vecino' : 'vecinos'}` : 'todavía no',
     },
-    { id: 'acciones', header: '', width: '52px', kind: 'actions' },
+    /* [v3] La columna de acciones ya no se declara: la GARANTIZA el
+       orquestador (header rotulado, ancho estándar) cuando hay rowActions. */
   ], [zonas]);
 
   const abrirNuevo = () => {
@@ -544,9 +587,9 @@ export default function Avisos() {
             'Las obras aparecen acá solas, tomadas de los proyectos de Tesorería. Comunicación decide cuáles se publican y les pone la foto y el avance. La obra sigue siendo una sola en el sistema.',
         }}
         searchPlaceholder="Buscar por título o texto…"
-        views={['table']}
-        activeView="table"
-        onViewChange={() => {}}
+        roles={rolesPublicacion}
+        activeView={vista}
+        onViewChange={setVista}
         search={search}
         onSearchChange={setSearch}
         primaryAction={{ label: 'Nueva publicación', onClick: abrirNuevo }}

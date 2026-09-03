@@ -3134,6 +3134,30 @@ button.av2-chip:hover { opacity: 0.85; }
   align-self: center;
 }
 
+/* [v3] Variante HINT: la pista vive en el segmento de ayudas, ARRIBA de la
+   cabecera del módulo, y se cierra con una cruz (HintBanner.tsx). Sin margen
+   superior — es lo primero de la página — y con la cruz anclada a la derecha,
+   después de la acción opcional. */
+.av2-nota--hint { margin-top: 0; margin-bottom: 12px; flex-wrap: wrap; row-gap: 10px; }
+.av2-nota--hint .av2-btn-secundario { margin-left: auto; }
+.av2-nota-cerrar {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+}
+.av2-nota--hint .av2-btn-secundario + .av2-nota-cerrar { margin-left: 6px; }
+.av2-nota-cerrar:hover { background: var(--pl-surface-2); color: var(--pl-text); }
+
 .av2-nota-eyebrow {
   display: block;
   font-size: var(--pl-fs-eyebrow);
