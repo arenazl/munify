@@ -421,7 +421,7 @@
   60%, 100% { opacity: 0; transform: scale(1.35); }
 }
 
-/* --- [MOCK] Tarjeta contextual del módulo (sobre el pie) ----------- */
+/* --- Tarjeta contextual: mini tutorial de la pantalla abierta (sobre el pie) --- */
 
 .sv2-ctx {
   border-top: 1px solid var(--pl-border);
@@ -471,33 +471,11 @@
   color: var(--pl-text);
 }
 
-.sv2-ctx-cifra {
-  margin-left: auto;
-  font-size: var(--pl-fs-micro);
-  font-weight: 600;
-  color: var(--pl-green-700);
-  font-feature-settings: 'tnum';
-}
-
 .sv2-ctx-texto {
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
   color: var(--pl-text-muted);
-}
-
-/* Acción del mock: se ve como link pero todavía no navega. */
-.sv2-ctx-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--pl-green-700);
-}
-.sv2-ctx-link > svg {
-  width: 13px;
-  height: 13px;
 }
 
 @media (prefers-reduced-motion: reduce) {

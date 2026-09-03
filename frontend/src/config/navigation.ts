@@ -187,6 +187,100 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Principal',
       description: 'Ventanilla asistida — biometría + trámite presencial'
     },
+    // === Solo SUPERADMIN ===
+    // Va ANTES de los módulos del muni a propósito: el acordeón del sidebar
+    // abre el PRIMER grupo cuando la ruta no pertenece a ninguno (la consola
+    // del super admin), y estando al final quedaba plegado debajo de Reclamos
+    // y Trámites (dueño, 2026-09-03: "que venga expandido"). Sólo lo ve el
+    // super admin, así que para el resto el orden no cambia.
+    {
+      name: 'Municipios',
+      href: '/gestion/municipios',
+      icon: Building2,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Alta y gestión de municipios (cross-tenant)'
+    },
+    {
+      name: 'Suscripciones',
+      href: '/gestion/admin/suscripciones',
+      icon: Building2,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Municipios suscriptos, plan, estado y próxima facturación'
+    },
+    {
+      name: 'Módulos',
+      href: '/gestion/admin/modulos',
+      icon: Layers,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Activar/desactivar módulos por municipio (feature flags)'
+    },
+    {
+      // Regla 10 del CLAUDE.md: una sola palabra. "Semilla" es como se llama
+      // el generador de demos en todo el código; "Logs de seeding" no entra.
+      name: 'Semilla',
+      href: '/gestion/admin/seed-logs',
+      icon: Sprout,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Paso a paso de lo que hizo la semilla en cada demo creada'
+    },
+    {
+      // La auditoría de las demos generadas: qué pudo crear bien el generador
+      // y qué quedó a medias, con purga. Antes era /demos-listado pública;
+      // desde 2026-09-03 sólo se mira desde acá (dueño).
+      name: 'Demos',
+      href: '/gestion/admin/demos',
+      icon: FlaskConical,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Qué pudo crear bien el generador en cada demo y qué quedó a medias, con su score de integridad'
+    },
+    {
+      // El catálogo de cartografía offline, para mirarlo: país → provincia →
+      // municipio, con qué se llena cada uno y de dónde salió cada nombre.
+      name: 'Territorio',
+      href: '/gestion/admin/territorio',
+      icon: Globe,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Con qué se llena cada municipio cuando nace una demo: barrios, localidades o la zona sola'
+    },
+    {
+      name: 'Auditoría',
+      href: '/gestion/admin/audit-logs',
+      icon: Activity,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Consola de auditoría cross-municipio'
+    },
+    {
+      name: 'IA',
+      href: '/gestion/configuracion-ia',
+      icon: Sparkles,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Prender/apagar IA por municipio y por módulo (Tesorería, Reclamos, Trámites)'
+    },
+    {
+      name: 'Consumo',
+      href: '/gestion/admin/consumo-ia',
+      icon: Gauge,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Tokens, latencia y llamadas de IA que no devolvieron nada'
+    },
+    {
+      name: 'Sidebar',
+      href: '/gestion/sidebar-config',
+      icon: Layers,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Configurar qué items del menú ve cada municipio'
+    },
+
     // === UNIVERSO RECLAMOS (Reclamos + Mapa + Tablero + Planificación + SLA + Análisis) ===
     // Reagrupación F2/D1 (variante C): las piezas del universo reclamos quedan
     // contiguas y ANTES del bloque financiero. Antes Tablero/Planificación/SLA/
@@ -553,95 +647,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Configuración',
       description: 'Configuración del sistema'
     },
-    // === Solo SUPERADMIN ===
-    {
-      name: 'Municipios',
-      href: '/gestion/municipios',
-      icon: Building2,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Alta y gestión de municipios (cross-tenant)'
-    },
-    {
-      name: 'Suscripciones',
-      href: '/gestion/admin/suscripciones',
-      icon: Building2,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Municipios suscriptos, plan, estado y próxima facturación'
-    },
-    {
-      name: 'Módulos',
-      href: '/gestion/admin/modulos',
-      icon: Layers,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Activar/desactivar módulos por municipio (feature flags)'
-    },
-    {
-      // Regla 10 del CLAUDE.md: una sola palabra. "Semilla" es como se llama
-      // el generador de demos en todo el código; "Logs de seeding" no entra.
-      name: 'Semilla',
-      href: '/gestion/admin/seed-logs',
-      icon: Sprout,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Paso a paso de lo que hizo la semilla en cada demo creada'
-    },
-    {
-      // La auditoría de las demos generadas: qué pudo crear bien el generador
-      // y qué quedó a medias, con purga. Antes era /demos-listado pública;
-      // desde 2026-09-03 sólo se mira desde acá (dueño).
-      name: 'Demos',
-      href: '/gestion/admin/demos',
-      icon: FlaskConical,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Qué pudo crear bien el generador en cada demo y qué quedó a medias, con su score de integridad'
-    },
-    {
-      // El catálogo de cartografía offline, para mirarlo: país → provincia →
-      // municipio, con qué se llena cada uno y de dónde salió cada nombre.
-      name: 'Territorio',
-      href: '/gestion/admin/territorio',
-      icon: Globe,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Con qué se llena cada municipio cuando nace una demo: barrios, localidades o la zona sola'
-    },
-    {
-      name: 'Auditoría',
-      href: '/gestion/admin/audit-logs',
-      icon: Activity,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Consola de auditoría cross-municipio'
-    },
-    {
-      name: 'IA',
-      href: '/gestion/configuracion-ia',
-      icon: Sparkles,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Prender/apagar IA por municipio y por módulo (Tesorería, Reclamos, Trámites)'
-    },
-    {
-      name: 'Consumo',
-      href: '/gestion/admin/consumo-ia',
-      icon: Gauge,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Tokens, latencia y llamadas de IA que no devolvieron nada'
-    },
-    {
-      name: 'Sidebar',
-      href: '/gestion/sidebar-config',
-      icon: Layers,
-      show: isSuperAdmin,
-      categoria: 'Super Admin',
-      description: 'Configurar qué items del menú ve cada municipio'
-    },
-
     // === SECCIÓN VECINOS ===
     {
       name: 'Panel',

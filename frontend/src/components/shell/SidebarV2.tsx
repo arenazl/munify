@@ -3,7 +3,7 @@
  *
  * Adaptación del componente agnóstico APP_GUIDE/components/v2/SidebarV2 al
  * shell real de Munify:
- *  - 256px expandido / 72px colapsado (tokens --pl-sidebar-w*). El estado de
+ *  - 208px expandido / 68px colapsado (tokens --pl-sidebar-w*). El estado de
  *    colapso es CONTROLADO por el Layout (persiste en localStorage y de él
  *    sale el padding-left del contenido), por eso acá entra por props.
  *  - Header de marca: BrandMark en tile + nombre bicolor existente (misma
@@ -30,7 +30,7 @@
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, HelpCircle, MoveRight, Star } from 'lucide-react';
+import { ChevronDown, ChevronLeft, HelpCircle, Star } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useVecinoBadges } from '../../hooks/useVecinoBadges';
 import { useNavBadges, type NavBadges } from './useNavBadges';
@@ -683,13 +683,22 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
         )}
       </nav>
 
-      {/* [MOCK] Tarjeta contextual del módulo abierto — cifra, texto y acción
-          son datos de MUESTRA hardcodeados; acá va a vivir la info contextual
-          real del módulo (pendientes, alertas, vencimientos) cuando se cablee
-          al backend. Solo el título sigue al grupo abierto. */}
+      {/* Tarjeta contextual: un mini tutorial de la pantalla abierta — su
+          nombre y la `description` que declara en navigation.ts. Antes tenía
+          cifras de MUESTRA ("8 pendientes, 1 venció su SLA") iguales para
+          cualquier usuario; el dueño (2026-09-03) la dejó para sumarle
+          funcionalidad después, pero "que no diga fruta": explica qué hace
+          cada módulo y listo. Sin ruta activa, presenta el grupo abierto con
+          sus pantallas reales. */}
       {(() => {
+        const itemActivo = items.find(esActivo) ?? null;
         const grupoAbierto = grupos.find((g) => g.id === abiertoId) ?? null;
-        const IconoCtx = grupoAbierto?.items[0]?.icon ?? Star;
+        const IconoCtx = itemActivo?.icon ?? grupoAbierto?.items[0]?.icon ?? Star;
+        const titulo = itemActivo?.name ?? grupoAbierto?.titulo ?? 'Munify';
+        const texto = itemActivo?.description
+          ?? (grupoAbierto
+            ? `${grupoAbierto.items.length === 1 ? 'Una pantalla' : `${grupoAbierto.items.length} pantallas`}: ${grupoAbierto.items.map((it) => it.name).join(', ')}.`
+            : 'Elegí una pantalla del menú y acá te cuento qué hace.');
         return (
           <div className="sv2-ctx">
             <div className="sv2-ctx-cab">
@@ -697,14 +706,9 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
                 <IconoCtx />
                 <span className="sv2-ctx-latido" />
               </span>
-              <span className="sv2-ctx-titulo">{grupoAbierto ? grupoAbierto.titulo : 'Hoy'}</span>
-              <span className="sv2-ctx-cifra">8 pendientes</span>
+              <span className="sv2-ctx-titulo">{titulo}</span>
             </div>
-            <p className="sv2-ctx-texto">1 venció su SLA y 4 no tienen cuadrilla asignada.</p>
-            <span className="sv2-ctx-link">
-              Ver el vencido
-              <MoveRight />
-            </span>
+            <p className="sv2-ctx-texto">{texto}</p>
           </div>
         );
       })()}

@@ -55,7 +55,9 @@
   --pl-dur-sheet: 240ms;
 
   /* --- Layout --- */
-  --pl-sidebar-w: 256px;
+  /* 208px (13rem): los labels son de UNA palabra (regla 10); con 256 sobraba un
+     tercio del ancho vacío a la derecha (dueño, 2026-09-03: "hacelo más fino"). */
+  --pl-sidebar-w: 208px;
   /* 68px: el rail dejó de listar items sueltos y pasó a un icono por grupo. */
   --pl-sidebar-w-collapsed: 68px;
   --pl-drawer-w: 480px;
