@@ -1485,6 +1485,15 @@ async def seed_demo_completo(
     # `/public/{codigo}/demo-users`), así que los tres entran con un click y con
     # la misma password que el resto de los usuarios demo.
     vecinos_demo: list[User] = [vecino_demo]
+    # El email sale del NOMBRE de pila y el nombre sale de un hash: dos vecinos
+    # con el mismo nombre daban el mismo email y la semilla reventaba contra
+    # `ix_usuarios_email` sin que hubiera nada de ese municipio en la base.
+    # Caso real: "Pila" (smoke de Infra en prod, 2026-09-03) — los vecinos 2 y
+    # 3 salían los dos "Juan", el INSERT chocaba y el alta reintentaba como
+    # `pila-2` creyendo que el nombre estaba ocupado. Determinístico: le
+    # pasaba a ~1 de cada 16 códigos, siempre a los mismos. Acá el slug ya
+    # usado se desempata con el número de vecino.
+    _slugs_usados: set[str] = set()
     for _n in (2, 3):
         _hv = int(hashlib.sha1(f"{codigo}-vecino-{_n}".encode()).hexdigest(), 16)
         _sx = _hv % 2
@@ -1494,13 +1503,17 @@ async def seed_demo_completo(
         # misma demo se leen como un bug, no como dos vecinos.
         if (_nom, _ape) == (_nombre_demo, _apellido_demo):
             _ape = _APELLIDOS[((_hv >> 7) + 5) % len(_APELLIDOS)]
+        _slug_vecino = _slug_palabra(_nom)
+        if _slug_vecino in _slugs_usados:
+            _slug_vecino = f"{_slug_vecino}-{_n}"
+        _slugs_usados.add(_slug_vecino)
         _dir = None
         if geo:
             _pv = geo[(_hv + _n * 7) % len(geo)]
             _dir = _pv["direccion"] + (f", {_pv['barrio']}" if _pv.get("barrio") else "")
         _tel = str(_hv % 100_000_000).zfill(8)
         _otro = User(
-            email=f"vecino-{_slug_palabra(_nom)}@{codigo}.demo.com",
+            email=f"vecino-{_slug_vecino}@{codigo}.demo.com",
             nombre=_nom,
             apellido=_ape,
             dni=str(25_000_000 + (_hv % 23_000_000)),

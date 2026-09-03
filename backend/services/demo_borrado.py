@@ -40,6 +40,16 @@ PROFUNDIDAD_MAX = 3
 # 80 = San Pedro Norte, el único cliente productivo.
 MUNICIPIOS_INTOCABLES = {80}
 
+# Tablas con `municipio_id` que SOBREVIVEN al borrado de la demo, a propósito.
+# `demo_seed_logs` es la bitácora de lo que hizo la semilla: existe para
+# comparar demos viejas con nuevas, y perdía justo las que se borran (lo
+# detectó Infra en el smoke del 2026-09-03: 10 demos creadas y borradas en
+# prod, 0 bitácoras). El modelo ya lo decía ("sin FK: el log tiene que
+# sobrevivir al borrado"), pero el plan se deriva de information_schema por
+# COLUMNA, no por FK, y la tabla entraba igual. El `municipio_id` queda como
+# referencia histórica de un municipio que ya no existe.
+TABLAS_QUE_SOBREVIVEN = {"demo_seed_logs"}
+
 # Un usuario es "de demo" por el dominio de su email. Antes el patrón exigía
 # `@<codigo>.demo.com`, y una demo cuyo código cambió después de sembrarla
 # (prod: `moreno`, usuarios @moreno-2.demo.com) quedaba clasificada como
@@ -106,6 +116,7 @@ async def plan_borrado(db: AsyncSession) -> list[Sentencia]:
             "WHERE TABLE_SCHEMA = :s AND COLUMN_NAME = 'municipio_id'"), {"s": esquema})).fetchall()
     }
     con_muni.discard("municipios")
+    con_muni -= TABLAS_QUE_SOBREVIVEN
     fks = (await db.execute(text(
         "SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME "
         "FROM information_schema.KEY_COLUMN_USAGE "

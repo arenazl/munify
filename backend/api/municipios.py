@@ -1007,11 +1007,16 @@ async def crear_municipio_demo(
         try:
             municipio, muni_id, seed_info = await _alta(codigo)
             break
-        except IntegrityError:
+        except IntegrityError as e:
             intentos += 1
+            # QUÉ chocó, textual de MySQL ("Duplicate entry '<valor>' for key
+            # '<índice>'"): sin esto la bitácora decía "nombre ocupado" y no
+            # se podía saber si era el código del municipio o un email de la
+            # semilla (Infra, smoke 2026-09-03: sin traceback, sin detalle).
+            choque = str(getattr(e, "orig", None) or e)[:300]
             if intentos >= 3:
                 log.hito("colision", estado="fallo",
-                         motivo="tres nombres seguidos ocupados")
+                         motivo="tres nombres seguidos ocupados", error=choque)
                 await log.guardar(municipio_id=None)
                 raise HTTPException(
                     status_code=409,
@@ -1020,7 +1025,7 @@ async def crear_municipio_demo(
             suffix += 1
             codigo = f"{base_codigo}-{suffix}"
             log.hito("colision", estado="degradado",
-                     motivo=f"nombre ocupado, reintento como {codigo}")
+                     motivo=f"unicidad violada, reintento como {codigo}", error=choque)
         except Exception as e:
             # Base caida, seed roto, timeout: esto NO se reintenta — seria
             # esconder el problema y hacer esperar tres veces de gusto.
