@@ -30,7 +30,11 @@ Dos fases, como el extractor:
   (2) sqlite (+ padron) -> `catalogo_barrios`, POR PROVINCIA, en tandas de 10
       municipios con commit y avance impreso (pedido de Lucas: que nada se
       pierda a mitad de camino). Reescribe el municipio completo (DELETE +
-      INSERT), asi correrlo dos veces da lo mismo.
+      INSERT), asi correrlo dos veces da lo mismo. Antes de insertar, cada
+      municipio pasa por `_hojas.marcar_hojas`: la lista plana guarda TODO,
+      pero solo las filas `hoja = 1` se muestran (las localidades cubiertas
+      por sus barrios, las grafias repetidas y los puntos adentro de un
+      contorno dibujado quedan de respaldo con su `motivo_hoja`).
 
     DATABASE_URL_QA="..." python scripts/geo/catalogo_barrios_pbf.py --env qa \
         --pais AR --pbf ruta/argentina-latest.osm.pbf --provincia "Buenos Aires" --aplicar
@@ -58,6 +62,7 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
 from _entorno import parser_base, resolver_db  # noqa: E402
+from _hojas import asegurar_columnas, marcar_hojas  # noqa: E402
 from services import geo_ciudad  # noqa: E402
 from services.geo_demo import _norm  # noqa: E402
 from services.osm_regiones import _anillo_exterior  # noqa: E402
@@ -92,6 +97,10 @@ CREATE TABLE IF NOT EXISTS catalogo_barrios (
   vertices SMALLINT NULL,
   fuente VARCHAR(20) NOT NULL,
   osm_id VARCHAR(30) NULL,
+  -- 1 = se muestra; 0 = respaldo (localidad cubierta por sus barrios, grafia
+  -- repetida, punto adentro de un contorno dibujado). Regla en `_hojas.py`.
+  hoja TINYINT(1) NOT NULL DEFAULT 1,
+  motivo_hoja VARCHAR(120) NULL,
   actualizado_en DATETIME NOT NULL,
   UNIQUE KEY uq_cat_barrio (municipio_catalogo_id, nombre_norm),
   KEY ix_cat_barrio_pais (pais)
@@ -428,7 +437,10 @@ def _barrios_de(m: dict, sq: sqlite3.Connection, padron: list[dict], area_muni: 
                                  "lat": loc["lat"], "lon": loc["lon"], "poligono": None,
                                  "vertices": None, "fuente": FUENTE_PADRON, "osm_id": None}
 
-    return sorted(por_nombre.values(), key=lambda b: _norm(b["nombre"]))
+    barrios = sorted(por_nombre.values(), key=lambda b: _norm(b["nombre"]))
+    # Que se muestra y que queda de respaldo (deja `hoja` / `motivo_hoja` en cada dict).
+    marcar_hojas(barrios)
+    return barrios
 
 
 async def _escribir(conn, m: dict, pais: str, barrios: list[dict]) -> None:
@@ -440,12 +452,13 @@ async def _escribir(conn, m: dict, pais: str, barrios: list[dict]) -> None:
     await conn.execute(text("""
         INSERT INTO catalogo_barrios
           (municipio_catalogo_id, pais, nombre, nombre_norm, tipo, lat, lon, poligono,
-           vertices, fuente, osm_id, actualizado_en)
+           vertices, fuente, osm_id, hoja, motivo_hoja, actualizado_en)
         VALUES (:muni, :pais, :nombre, :norm, :tipo, :lat, :lon, :poligono,
-                :vertices, :fuente, :osm_id, :ahora)
+                :vertices, :fuente, :osm_id, :hoja, :motivo_hoja, :ahora)
     """), [{"muni": m["id"], "pais": pais, "nombre": b["nombre"], "norm": _norm(b["nombre"])[:120],
             "tipo": b["tipo"], "lat": b["lat"], "lon": b["lon"], "poligono": b.get("poligono"),
             "vertices": b.get("vertices"), "fuente": b["fuente"], "osm_id": b.get("osm_id"),
+            "hoja": int(b.get("hoja", True)), "motivo_hoja": b.get("motivo_hoja"),
             "ahora": ahora} for b in barrios])
 
 
@@ -480,6 +493,9 @@ async def main() -> None:
     try:
         async with engine.begin() as conn:
             await conn.execute(text(DDL))
+            if args.aplicar:
+                # La tabla puede venir de antes de la regla "hoja": se le agregan las columnas.
+                await asegurar_columnas(conn)
             municipios = await _municipios(conn, pais)
         print(f"Municipios con contorno en el catalogo ({pais}): {len(municipios)}")
 

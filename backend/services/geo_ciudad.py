@@ -328,18 +328,33 @@ async def barrios_del_catalogo(db, catalogo_id: str) -> list[dict]:
     llena la tabla ya asigno cada barrio al municipio cuyo contorno lo
     contiene, y repetir la busqueda aca reabriria los homonimos.
 
+    Solo las filas `hoja = 1`: la tabla guarda tambien las grafias repetidas,
+    los contenedores cubiertos por sus barrios y los puntos que caen adentro
+    de un contorno dibujado (`hoja = 0`, con su `motivo_hoja`), pero el mapa
+    de la demo muestra una capa sola. Quien decide que es hoja es
+    `scripts/geo/_hojas.py`, offline; aca solo se lee la marca.
+
     Si la tabla todavia no existe en el ambiente (prod antes de la promocion)
     devuelve la lista vacia: la demo nace sin barrios y la bitacora lo dice;
-    crear una demo no puede romperse por una tabla de catalogo.
+    crear una demo no puede romperse por una tabla de catalogo. Si existe la
+    tabla pero no la columna `hoja` (prod entre la copia y el ALTER) se leen
+    todas las filas, como antes de la regla.
     """
     from sqlalchemy import text
     from sqlalchemy.exc import SQLAlchemyError
 
+    consulta = ("SELECT nombre, tipo, lat, lon, poligono, fuente FROM catalogo_barrios "
+                "WHERE municipio_catalogo_id = :id{filtro} ORDER BY nombre")
     try:
-        filas = (await db.execute(text(
-            "SELECT nombre, tipo, lat, lon, poligono, fuente FROM catalogo_barrios "
-            "WHERE municipio_catalogo_id = :id ORDER BY nombre"),
-            {"id": catalogo_id})).fetchall()
+        try:
+            filas = (await db.execute(text(consulta.format(filtro=" AND hoja = 1")),
+                                      {"id": catalogo_id})).fetchall()
+        except SQLAlchemyError as e:
+            if "hoja" not in str(e):
+                raise
+            logger.warning("catalogo_barrios sin la columna hoja: se leen todas las filas")
+            filas = (await db.execute(text(consulta.format(filtro="")),
+                                      {"id": catalogo_id})).fetchall()
     except SQLAlchemyError as e:
         logger.warning("catalogo_barrios no disponible (%s): la demo nace sin barrios", e)
         return []
