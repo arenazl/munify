@@ -67,7 +67,7 @@ export default function MobileLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/demos-listado');
+    navigate('/login');
   };
 
   // Si está cargando el municipio, mostrar loader
@@ -82,8 +82,8 @@ export default function MobileLayout() {
   // Verificar que hay municipio seleccionado
   const hasMunicipio = localStorage.getItem('municipio_codigo');
   if (!hasMunicipio && !searchParams.get('municipio')) {
-    // Redirigir a landing para seleccionar municipio
-    navigate('/demos-listado', { replace: true });
+    // Sin municipio: a la puerta (la grilla de demos ya no es pública)
+    navigate('/login', { replace: true });
     return null;
   }
 

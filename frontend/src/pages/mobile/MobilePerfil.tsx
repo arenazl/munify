@@ -202,19 +202,6 @@ export default function MobilePerfil() {
             {localStorage.getItem('municipio_nombre') || 'No seleccionado'}
           </p>
         </div>
-        <button
-          onClick={() => {
-            localStorage.removeItem('municipio_codigo');
-            localStorage.removeItem('municipio_id');
-            localStorage.removeItem('municipio_nombre');
-            localStorage.removeItem('municipio_color');
-            navigate('/demos-listado');
-          }}
-          className="text-xs px-3 py-1.5 rounded-lg"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-        >
-          Cambiar
-        </button>
       </div>
 
       {zonas.length > 0 && (

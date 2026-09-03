@@ -4,6 +4,7 @@ import {
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
   History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen, Gauge, Globe,
+  FlaskConical,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -586,6 +587,17 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isSuperAdmin,
       categoria: 'Super Admin',
       description: 'Paso a paso de lo que hizo la semilla en cada demo creada'
+    },
+    {
+      // La auditoría de las demos generadas: qué pudo crear bien el generador
+      // y qué quedó a medias, con purga. Antes era /demos-listado pública;
+      // desde 2026-09-03 sólo se mira desde acá (dueño).
+      name: 'Demos',
+      href: '/gestion/admin/demos',
+      icon: FlaskConical,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Qué pudo crear bien el generador en cada demo y qué quedó a medias, con su score de integridad'
     },
     {
       // El catálogo de cartografía offline, para mirarlo: país → provincia →

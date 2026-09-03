@@ -52,8 +52,10 @@ export default function RootRedirect() {
       return;
     }
 
-    // Si no hay nada, ir a la demo
-    navigate('/demos-listado', { replace: true });
+    // Si no hay nada, a la puerta: /login decide entre la marca fija, el
+    // municipio recordado o el acceso /super. La grilla de demos ya no es
+    // pública (dueño, 2026-09-03).
+    navigate('/login', { replace: true });
   }, [user, searchParams, navigate]);
 
   // Mostrar loading mientras decide

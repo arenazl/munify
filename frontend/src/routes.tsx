@@ -178,10 +178,11 @@ export const router = createBrowserRouter([
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
-  // [2026-09-03] La VITRINA /demo tampoco va más (dueño): la entrada a las
-  // demos es /demos-listado (la auditoría). Las puertas por municipio
-  // (/demo/:codigo y /demo/:codigo/login) siguen vivas más abajo.
-  { path: '/demo', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
+  // [2026-09-03] La VITRINA /demo tampoco va más (dueño): sin marca, a la
+  // puerta. Las demos se auditan desde el panel del super admin
+  // (/gestion/admin/demos). Las puertas por municipio (/demo/:codigo y
+  // /demo/:codigo/login) siguen vivas más abajo.
+  { path: '/demo', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/login'} replace /> },
   { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
   // Puerta de DEMOS con prefijo propio (dueño, 2026-09-02): a un municipio
   // es_demo se entra por /demo/<codigo> hasta que sea facturable; la puerta
@@ -195,12 +196,14 @@ export const router = createBrowserRouter([
   { path: '/presentacion', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <PresentacionMunify /> },
   // [2026-09-03] /bienvenido NO VA MÁS (dueño): la Landing vieja quedó
   // obsoleta y solo aparecía por redirects. La ruta queda como redirect a la
-  // vitrina /demo para los deep-links guardados; los navigate internos ya
-  // apuntan a /demo directo.
-  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
-  // Auditoría pública de demos: qué pudo crear bien el generador (barrios,
-  // polígonos, zonas, seeds) con su score de integridad. Sin llave.
-  { path: '/demos-listado', element: <DemosListado /> },
+  // puerta para los deep-links guardados.
+  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/login'} replace /> },
+  // [2026-09-03] La auditoría de demos YA NO ES PÚBLICA (dueño): "no podemos
+  // permitir más el acceso a ese listado sin estar logueado como super admin
+  // y dentro del contenedor de la app". Vive en /gestion/admin/demos; esta
+  // ruta queda sólo para los links guardados — sin sesión, la protegida
+  // manda a la puerta.
+  { path: '/demos-listado', element: <Navigate to="/gestion/admin/demos" replace /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   // Handoff de captura móvil (DNI + selfie con Didit en el celu del operador)
@@ -396,7 +399,14 @@ export const router = createBrowserRouter([
         // Territorio: el catálogo de cartografía offline (país → provincia →
         // municipio), sólo lectura y cross-tenant. Mismo gate que Semilla.
         path: 'admin/territorio',
-        element: <ProtectedRoute roles={['admin']}><Territorio /></ProtectedRoute>
+        element: <ProtectedRoute roles={['admin']} superAdmin><Territorio /></ProtectedRoute>
+      },
+      {
+        // Auditoría de las demos generadas: qué pudo crear bien el generador
+        // y qué quedó a medias, con purga. Sólo super admin, adentro del
+        // shell (dueño, 2026-09-03); el backend exige lo mismo.
+        path: 'admin/demos',
+        element: <ProtectedRoute roles={['admin']} superAdmin><DemosListado /></ProtectedRoute>
       },
       {
         path: 'admin/suscripciones',

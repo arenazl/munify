@@ -14,7 +14,7 @@ export default function MunicipioHome() {
   useEffect(() => {
     const loadMunicipioData = async () => {
       if (!codigo) {
-        navigate('/demos-listado');
+        navigate('/login');
         return;
       }
 
@@ -46,8 +46,8 @@ export default function MunicipioHome() {
         console.error('Error cargando municipio:', error);
       }
 
-      // Si no se encontro el municipio, ir a bienvenido
-      navigate('/demos-listado');
+      // Si no se encontró el municipio, a la puerta
+      navigate('/login');
     };
 
     loadMunicipioData();

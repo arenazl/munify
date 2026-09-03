@@ -1,12 +1,14 @@
 /**
- * /demos-listado — AUDITORÍA de las demos generadas (dueño, 2026-09-03).
+ * /gestion/admin/demos — AUDITORÍA de las demos generadas (dueño, 2026-09-03).
  *
  * "Ahí hago yo una auditoría de lo que va creando" el generador de demos:
  * qué pudo crear bien cada una — los BARRIOS, los POLÍGONOS, las zonas, los
  * catálogos y los seeds — ordenado por un score de INTEGRIDAD.
  *
- * Pública y sin llave: son demos con datos de ejemplo; la auditoría no
- * muestra nada que la vitrina /demo no exponga ya.
+ * SÓLO SUPER ADMIN y adentro del shell (dueño, la misma noche): nació
+ * pública en /demos-listado y el navegador sin sesión caía ahí desde
+ * cualquier ruta — una grilla de la que no se podía salir. El backend exige
+ * lo mismo (require_super_admin) en la auditoría y en la purga.
  *
  * Es también una pantalla EJEMPLAR del ABM v3: SemanticAbmPage full por
  * props — roles semánticos, 3 vistas built-in, enfoque declarado por
@@ -27,7 +29,7 @@ import { ChipEstado, EntityCell } from '../components/abmv2/DataTable';
 import { MetricCell } from '../components/abmv2/Controls';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import type { Action, ChipTone, ColumnSpec, RolesSemanticos, TableGroup, ViewKind } from '../components/abmv2/types';
-import { API_URL } from '../lib/api';
+import { api } from '../lib/api';
 import { seg } from '../lib/semanticHero';
 
 interface DemoAudit {
@@ -79,19 +81,20 @@ export default function DemosListado() {
   const [vista, setVista] = useState<ViewKind>('table');
   const [orden, setOrden] = useState('integridad');
 
+  // Por `api` (axios): viaja el token de la sesión y el 401 lo resuelve el
+  // interceptor mandando a la puerta. La pantalla vive detrás de
+  // ProtectedRoute superAdmin, así que acá no hay caso "sin sesión".
   const cargar = useCallback(() => {
     setLoading(true);
-    fetch(`${API_URL}/demos/auditoria`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((data: DemoAudit[]) => setDemos(data))
+    api.get<DemoAudit[]>('/demos/auditoria')
+      .then(({ data }) => setDemos(data))
       .catch(() => setDemos([]))
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => { cargar(); }, [cargar]);
 
   /* --- PURGA (dueño, 2026-09-03): borrar una demo o el grupo entero desde
-     acá. El backend exige sesión de SUPER ADMIN — se usa el token que ya
-     tenga este navegador (entrando por /super); sin él, avisa cómo. --- */
+     acá. El backend exige sesión de SUPER ADMIN (require_super_admin). --- */
   const [aBorrar, setABorrar] = useState<{ ids: number[]; titulo: string } | null>(null);
   const [purgando, setPurgando] = useState(false);
 
@@ -99,20 +102,7 @@ export default function DemosListado() {
     if (!aBorrar) return;
     setPurgando(true);
     try {
-      const res = await fetch(`${API_URL}/demos/purga`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
-        },
-        body: JSON.stringify({ municipio_ids: aBorrar.ids }),
-      });
-      if (res.status === 401 || res.status === 403) {
-        toast.error('Borrar demos exige tu sesión de super admin: entrá por /super y volvé.');
-        return;
-      }
-      if (!res.ok) throw new Error(String(res.status));
-      const data = await res.json();
+      const { data } = await api.post('/demos/purga', { municipio_ids: aBorrar.ids });
       const rechazadas = (data.resultados as Array<{ ok: boolean; codigo?: string; motivo?: string }>)
         .filter((r) => !r.ok);
       toast.success(`${data.borradas} de ${data.total} demos eliminadas.`);
@@ -373,7 +363,7 @@ export default function DemosListado() {
   }), [rotas.length, aMedias.length, accionPurgaNivel]);
 
   return (
-    <div className="av2-standalone">
+    <>
       <SemanticAbmPage<Fila>
         moduleKey="demos-auditoria"
         eyebrow="Demos"
@@ -457,6 +447,6 @@ export default function DemosListado() {
             : ''
         }
       />
-    </div>
+    </>
   );
 }

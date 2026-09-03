@@ -9,13 +9,13 @@ en un ambiente — una métrica ausente vale 0, no tira el endpoint).
 Sin auth a pedido del dueño (2026-09-03): son demos con datos de ejemplo,
 la auditoría no expone nada que la vitrina /demo no muestre ya.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import not_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit_helpers import require_super_admin
 from core.database import get_db
-from core.security import get_current_user
 from models.user import User
 
 router = APIRouter()
@@ -72,7 +72,12 @@ _METRICAS = {
 
 
 @router.get("/auditoria")
-async def auditoria_demos(db: AsyncSession = Depends(get_db)):
+async def auditoria_demos(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    # Sólo super admin (dueño, 2026-09-03): la auditoría de demos ya no es
+    # pública — se mira desde adentro de la app, en el panel del super admin.
     munis = (
         await db.execute(text(
             "SELECT id, codigo, nombre, pais, activo, "
@@ -141,14 +146,8 @@ class PurgaRequest(BaseModel):
 async def purgar_demos(
     payload: PurgaRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_super_admin),
 ):
-    if current_user.municipio_id is not None:
-        raise HTTPException(
-            status_code=403,
-            detail="Borrar demos exige la sesión de super admin (entrá por /super).",
-        )
-
     from services.demo_borrado import (
         MUNICIPIOS_INTOCABLES,
         PATRONES_EMAIL_DEMO,

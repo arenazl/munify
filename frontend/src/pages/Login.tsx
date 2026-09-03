@@ -107,12 +107,16 @@ export default function Login() {
         setMunicipioColor(BRAND.primary);
         return;
       }
-      // Limpiar todo y redirigir
+      // Sin municipio que mostrar: se limpia y se cae al acceso /super, el
+      // único login que no necesita marca. Antes iba a la grilla de demos,
+      // que dejó de ser pública (dueño, 2026-09-03). Un usuario de tenant
+      // entra siempre por SU puerta (/<codigo> o /demo/<codigo>), que es la
+      // que deja el municipio recordado para volver acá.
       localStorage.removeItem('municipio_codigo');
       localStorage.removeItem('municipio_id');
       localStorage.removeItem('municipio_nombre');
       localStorage.removeItem('municipio_color');
-      navigate('/demos-listado');
+      navigate('/super', { replace: true });
       return;
     }
 

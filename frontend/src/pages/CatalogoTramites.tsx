@@ -44,7 +44,7 @@ export default function CatalogoTramites() {
   useEffect(() => {
     const municipioId = localStorage.getItem('municipio_actual_id');
     if (!municipioId) {
-      navigate('/demos-listado');
+      navigate('/login');
       return;
     }
     fetch(`${API_URL}/publico/tramites?municipio_id=${municipioId}`)
