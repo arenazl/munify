@@ -49,6 +49,7 @@ from .agenda_config import router as agenda_config_router
 from .tarjetas import router as tarjetas_router
 from .admin_audit import router as admin_audit_router
 from .admin_seed_logs import router as admin_seed_logs_router
+from .admin_territorio import router as admin_territorio_router
 from .tasas import router as tasas_router
 from .pagos import router as pagos_router
 from .pagos_contaduria import router as pagos_contaduria_router
@@ -138,6 +139,7 @@ api_router.include_router(validacion_identidad_router)  # Ya tiene prefix /valid
 api_router.include_router(geocoding_router, prefix="/geocoding", tags=["Geocoding"])
 api_router.include_router(admin_audit_router, tags=["Admin Audit"])  # ya tiene prefix /admin
 api_router.include_router(admin_seed_logs_router, tags=["Admin Seed Logs"])  # ya tiene prefix /admin
+api_router.include_router(admin_territorio_router, tags=["Admin Territorio"])  # ya tiene prefix /admin
 api_router.include_router(tasas_router, tags=["Tasas"])  # ya tiene prefix /tasas
 api_router.include_router(pagos_router, tags=["Pagos"])  # ya tiene prefix /pagos
 api_router.include_router(pagos_contaduria_router, tags=["Pagos - Contaduria"])  # prefix /pagos/contaduria

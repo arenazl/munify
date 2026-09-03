@@ -1,0 +1,141 @@
+/**
+ * Territorio.css — la piel del recorrido país → provincia → municipio.
+ *
+ * Hero, toolbar, tabs y tabla los pone el kit abmv2; el mapa usa el bloque
+ * `.av2-mapa` del kit. Acá viven sólo las piezas propias del CUERPO: las
+ * migas del recorrido, la leyenda del mapa, el velo de carga y el motivo del
+ * respaldo en la tabla.
+ *
+ * Regla del kit: cero hex. Todo sale de tokens `--pl-*`. Los colores de la
+ * leyenda son los MISMOS tokens que la página lee del CSS computado para los
+ * trazos de Leaflet (--pl-green / --pl-blue / --pl-amber / --pl-red /
+ * --pl-text-muted): si cambia el tema, cambian los dos juntos.
+ */
+
+.territorio-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pl-space-2);
+  min-width: 0;
+}
+
+/* ---- Migas del recorrido ---- */
+.territorio-migas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pl-space-1);
+  min-width: 0;
+}
+
+.territorio-miga {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: var(--pl-radius-md);
+  font: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-2);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.territorio-miga:hover:not(:disabled) { background: var(--pl-surface-2); color: var(--pl-text); }
+.territorio-miga:disabled,
+.territorio-miga--actual { color: var(--pl-text); cursor: default; }
+.territorio-miga-sep { color: var(--pl-text-muted); flex: 0 0 auto; }
+
+.territorio-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  appearance: none;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  padding: 5px 10px;
+  border-radius: var(--pl-radius-pill);
+  font: inherit;
+  font-size: var(--pl-fs-body-sm);
+  cursor: pointer;
+}
+.territorio-toggle:hover { color: var(--pl-text); border-color: var(--pl-text-muted); }
+
+/* ---- Mapa ---- */
+.territorio-mapa { margin-top: 0; }
+.territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 480px; }
+
+.territorio-mapa-velo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--pl-surface) 55%, transparent);
+  color: var(--pl-text-2);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 500; /* arriba de los panes de Leaflet (400), abajo de los popups */
+}
+
+/* ---- Leyenda ---- */
+.territorio-leyenda {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--pl-space-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pl-space-1) var(--pl-space-3);
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+.territorio-leyenda li { display: inline-flex; align-items: center; gap: 6px; }
+
+.territorio-leyenda-punto {
+  --pl-tono: var(--pl-text-muted);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pl-tono);
+  flex: 0 0 auto;
+}
+.territorio-leyenda-punto--barrios,
+.territorio-leyenda-punto--osm { --pl-tono: var(--pl-green); }
+.territorio-leyenda-punto--localidades,
+.territorio-leyenda-punto--padron { --pl-tono: var(--pl-blue); }
+.territorio-leyenda-punto--zona { --pl-tono: var(--pl-amber); }
+.territorio-leyenda-punto--sin_contorno { --pl-tono: var(--pl-red); }
+.territorio-leyenda-punto--respaldo { --pl-tono: var(--pl-text-muted); opacity: 0.6; }
+
+.territorio-leyenda-trazo {
+  width: 18px;
+  height: 0;
+  border-top: 2px dashed var(--pl-text);
+  flex: 0 0 auto;
+}
+
+/* ---- Motivo del respaldo en la tabla ---- */
+.territorio-motivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.territorio-motivo-texto {
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Teléfono: el mapa cede alto para que la tabla quede a un scroll ---- */
+@media (max-width: 640px) {
+  .territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 340px; min-height: 340px; }
+  .territorio-toggle { margin-left: 0; }
+}

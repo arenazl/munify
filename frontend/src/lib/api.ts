@@ -883,6 +883,99 @@ export const seedLogsApi = {
   detail: (id: number) => api.get<SeedLogDetalle>(`/admin/seed-logs/${id}`),
 };
 
+/* ============================================================
+ * Territorio — el catálogo de cartografía offline, sólo lectura (super admin)
+ * Backend: backend/api/admin_territorio.py
+ * ============================================================ */
+
+/** Cómo se llenó un municipio, con la misma regla que dibuja la semilla. */
+export type TerritorioRelleno = 'barrios' | 'localidades' | 'zona' | 'sin_contorno';
+
+/** Conteos comunes a país / provincia / municipio. */
+export interface TerritorioConteos {
+  /** Filas visibles (`hoja = 1`): lo que la demo dibuja. */
+  hojas: number;
+  hojas_poli: number;
+  hojas_osm: number;
+  hojas_padron: number;
+  /** Filas que la regla dejó afuera (`hoja = 0`), con motivo. */
+  respaldo: number;
+}
+
+export interface TerritorioAgregado extends TerritorioConteos {
+  municipios: number;
+  barrios: number;
+  localidades: number;
+  zona: number;
+  sin_contorno: number;
+  /** Municipios donde la mayoría de lo visible tiene contorno. */
+  dibujados: number;
+}
+
+export interface TerritorioPais extends TerritorioAgregado {
+  pais: string;
+}
+
+export interface TerritorioProvincia extends TerritorioAgregado {
+  provincia: string;
+}
+
+export interface TerritorioMunicipio extends TerritorioConteos {
+  id: string;
+  nombre: string;
+  pais: string;
+  provincia: string | null;
+  lat: number | null;
+  lng: number | null;
+  con_contorno: boolean;
+  filas: number;
+  hojas_loc: number;
+  relleno: TerritorioRelleno;
+}
+
+export interface TerritorioBarrio {
+  id: number;
+  nombre: string;
+  tipo: string;
+  nivel: 'barrio' | 'localidad';
+  fuente: 'osm_pbf' | 'georef' | string;
+  lat: number | null;
+  lon: number | null;
+  /** Anillo [[lon, lat], …] o null si la fuente sólo tenía el punto. */
+  poligono: [number, number][] | null;
+  vertices: number | null;
+  osm_id: string | null;
+  hoja: boolean;
+  motivo_hoja: string | null;
+}
+
+export interface TerritorioDetalle {
+  municipio: {
+    id: string;
+    nombre: string;
+    pais: string;
+    provincia: string | null;
+    lat: number | null;
+    lng: number | null;
+    osm_id: string | null;
+    poligono: [number, number][] | null;
+  };
+  resumen: TerritorioConteos & { filas: number; hojas_loc: number; relleno: TerritorioRelleno };
+  barrios: TerritorioBarrio[];
+}
+
+export const territorioApi = {
+  paises: () => api.get<{ items: TerritorioPais[] }>('/admin/territorio/paises'),
+  municipios: (pais: string) =>
+    api.get<{
+      pais: string;
+      total: TerritorioAgregado;
+      provincias: TerritorioProvincia[];
+      items: TerritorioMunicipio[];
+    }>('/admin/territorio/municipios', { params: { pais } }),
+  detalle: (id: string) => api.get<TerritorioDetalle>(`/admin/territorio/municipios/${id}`),
+};
+
 // Proveedores de pago (GIRE, MercadoPago, MODO)
 export const proveedoresPagoApi = {
   list: () => api.get<Array<{

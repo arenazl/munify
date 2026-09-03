@@ -3,7 +3,7 @@ import {
   Wrench, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, Banknote, Hammer,
-  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen, Gauge,
+  History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen, Gauge, Globe,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -586,6 +586,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isSuperAdmin,
       categoria: 'Super Admin',
       description: 'Paso a paso de lo que hizo la semilla en cada demo creada'
+    },
+    {
+      // El catálogo de cartografía offline, para mirarlo: país → provincia →
+      // municipio, con qué se llena cada uno y de dónde salió cada nombre.
+      name: 'Territorio',
+      href: '/gestion/admin/territorio',
+      icon: Globe,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Con qué se llena cada municipio cuando nace una demo: barrios, localidades o la zona sola'
     },
     {
       name: 'Auditoría',

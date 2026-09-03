@@ -82,6 +82,7 @@ import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import AuditLogs from './pages/admin/AuditLogs';
 import SeedLogs from './pages/SeedLogs';
+import Territorio from './pages/Territorio';
 import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
 import DemoListo from './pages/DemoListo';
@@ -390,6 +391,12 @@ export const router = createBrowserRouter([
         // vuelve a exigir admin SIN municipio_id (require_super_admin).
         path: 'admin/seed-logs',
         element: <ProtectedRoute roles={['admin']}><SeedLogs /></ProtectedRoute>
+      },
+      {
+        // Territorio: el catálogo de cartografía offline (país → provincia →
+        // municipio), sólo lectura y cross-tenant. Mismo gate que Semilla.
+        path: 'admin/territorio',
+        element: <ProtectedRoute roles={['admin']}><Territorio /></ProtectedRoute>
       },
       {
         path: 'admin/suscripciones',
