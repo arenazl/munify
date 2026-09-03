@@ -64,6 +64,9 @@ import { DataTable } from './DataTable';
 import { TarjetaRegistro } from './TarjetaRegistro';
 import { VistaEnfoque } from './VistaEnfoque';
 import { HintBanner } from './HintBanner';
+/* [v3] Pieza visual aún en ui/ — contrato de datos ya estable en types.ts;
+   la migración estética a la suite v2 es una pasada posterior. */
+import { DashboardIAPanel } from '../ui/DashboardIAPanel';
 import { SideModal } from './SideModal';
 import { useEmbed } from './useEmbed';
 import type { SideModalComponentProps } from './SideModal';
@@ -187,6 +190,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     viewSlots,
     aside,
     enfoque,
+    ia,
     /* tabla */
     kind,
     columns,
@@ -233,6 +237,11 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
 
   const [drawer, setDrawer] = useState<SideModalRequest<Row> | null>(null);
   const cerrarDrawer = useCallback(() => setDrawer(null), []);
+
+  /* [v3] Filtro AUTODERIVADO de taxonomía (cuando la página no declara
+     selects) y ancho del aside de IA — estado interno del orquestador. */
+  const [filtroTaxonomia, setFiltroTaxonomia] = useState('');
+  const [iaColapsada, setIaColapsada] = useState(true);
 
   /* --- [v3] Vistas efectivas: las 3 del estándar salen built-in.
          Sin `views` declaradas, se ofrecen 'table' siempre y 'cards'/'guided'
@@ -326,10 +335,45 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     ? ({ '--av2-hero-accent': accentColor } as CSSProperties)
     : undefined;
 
+  /* --- [v3] FILTROS AUTODERIVADOS: sin `selects` declarados, el kit arma el
+         combo/píldoras de TIPO desde roles.taxonomy (opciones únicas sobre el
+         universo SIN filtrar) y filtra las filas él mismo, en TODAS las
+         vistas. Declarar `selects` anula la autoderivación. --- */
+  const filasTodas = groups?.length ? groups.flatMap((g) => g.rows) : rows;
+  const autoFiltrar = (!selects || selects.length === 0) && !!roles?.taxonomy;
+  const opcionesTaxonomia = autoFiltrar
+    ? [...new Set(filasTodas.map((r) => roles!.taxonomy!(r)?.label ?? 'Sin tipo'))]
+    : [];
+  const selectsEfectivos =
+    autoFiltrar && opcionesTaxonomia.length > 1
+      ? [
+          {
+            id: '__tipo',
+            label: 'Tipo',
+            value: filtroTaxonomia,
+            options: [
+              { value: '', label: 'Todos' },
+              ...opcionesTaxonomia.map((l) => ({ value: l, label: l })),
+            ],
+            onChange: setFiltroTaxonomia,
+          },
+        ]
+      : selects ?? [];
+  const pasaFiltro = (row: Row) =>
+    !filtroTaxonomia || (roles?.taxonomy?.(row)?.label ?? 'Sin tipo') === filtroTaxonomia;
+  const filtrando = autoFiltrar && !!filtroTaxonomia;
+  const rowsVisibles = filtrando ? rows.filter(pasaFiltro) : rows;
+  const groupsVisibles =
+    filtrando && groups
+      ? groups.map((g) => ({ ...g, rows: g.rows.filter(pasaFiltro) })).filter((g) => g.rows.length)
+      : groups;
+
   /* --- [v3] Filas planas para las vistas autogeneradas (cards/enfoque):
          si la página mandó grupos precomputados, se aplanan — las vistas
          alternativas reagrupan por su propio criterio. --- */
-  const filasPlanas = groups?.length ? groups.flatMap((g) => g.rows) : rows;
+  const filasPlanas = groupsVisibles?.length
+    ? groupsVisibles.flatMap((g) => g.rows)
+    : rowsVisibles;
 
   /* --- [v3] groupBy 'taxonomy'/'state': el kit AGRUPA SOLO desde los roles
          (la página declara la palabra). Orden de grupos = primera aparición
@@ -360,7 +404,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     }
     return lista;
   })();
-  const gruposTabla = gruposAutomaticos ?? groups;
+  const gruposTabla = gruposAutomaticos ?? groupsVisibles;
 
   /* --- [v3] Vista ENFOQUE: secciones declaradas por la página o, sin
          declarar, derivadas del rol `state` (una sección por estado presente,
@@ -400,7 +444,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         roles={roles}
         groupBy={groupBy}
         showGroupSubtotal={showGroupSubtotal}
-        rows={rows}
+        rows={rowsVisibles}
         groups={gruposTabla}
         rowKey={rowKey}
         rowActions={rowActions}
@@ -466,9 +510,29 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     </div>
   );
 
+  /* --- [v3] IA CONTEXTUAL: con `ia` (y sin `aside` propio) el orquestador
+         monta el panel operativo como aside colapsable — el panel persiste su
+         colapso solo (localStorage) y acá solo se ajusta el ancho. --- */
+  const asideEfectivo =
+    aside ??
+    (ia
+      ? {
+          content: (
+            <DashboardIAPanel
+              data={ia.data}
+              loading={ia.loading}
+              title={ia.title}
+              onTipClick={ia.onTipClick}
+              onCollapsedChange={setIaColapsada}
+            />
+          ),
+          width: iaColapsada ? 52 : 300,
+        }
+      : undefined);
+
   /* --- [v2.1] Ancho runtime del aside vía style var (default en CSS). --- */
-  const estiloAside = aside?.width
-    ? ({ '--av2-aside-w': `${aside.width}px` } as CSSProperties)
+  const estiloAside = asideEfectivo?.width
+    ? ({ '--av2-aside-w': `${asideEfectivo.width}px` } as CSSProperties)
     : undefined;
 
   /* --- Spec del drawer abierto --- */
@@ -526,7 +590,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
             tarjeta de la tabla (patrón Trámites/Reclamos, canvas v2.3) — acá
             quedarían dobles. En cards/guiada siguen acá como segmented. */}
         <FilterBar
-          selects={selects}
+          selects={selectsEfectivos}
           period={period}
           onPeriodChange={onPeriodChange}
           statusTabs={activeView === 'table' && !tieneSlot ? [] : statusTabs}
@@ -540,11 +604,11 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
       {/* 5. Cuerpo: slot de la vista activa o DataTable estándar. Con `aside`
           se envuelve en el flex .av2-body (panel sticky a la derecha); sin él,
           cuerpo directo — DOM idéntico al previo a v2.1. */}
-      {aside ? (
+      {asideEfectivo ? (
         <div className="av2-body">
           <div className="av2-body-main">{cuerpo}</div>
           <aside className="av2-aside" style={estiloAside}>
-            {aside.content}
+            {asideEfectivo.content}
           </aside>
         </div>
       ) : (

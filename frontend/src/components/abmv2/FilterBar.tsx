@@ -28,6 +28,7 @@
  */
 import { ArrowRight, ArrowUpDown, Plus, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
+import { SelectorAdaptativoSpec } from './SelectorAdaptativo';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
 import { useState } from 'react';
 import { useAnchoAngosto } from './FichaRegistro';
@@ -423,8 +424,11 @@ function FilterBarCuerpo({
 
   return (
     <div className="av2-filterbar" ref={refAncho}>
+      {/* [v3] Cada filtro decide su forma: hasta ~5 opciones píldoras, más
+          combo (SelectorAdaptativo — la pieza suelta del kit). En el panel
+          angosto de arriba siguen como combos apilados. */}
       {selects.map((spec) => (
-        <Av2Select key={spec.id} spec={spec} />
+        <SelectorAdaptativoSpec key={spec.id} spec={spec} />
       ))}
 
       {haySelects && hayPeriodo && <span className="av2-divisor" aria-hidden />}

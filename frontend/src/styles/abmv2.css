@@ -4994,6 +4994,36 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-cards-ricas { margin-top: 12px; }
 
 /* ============================================================
+ * [v3] SELECTOR ADAPTATIVO (SelectorAdaptativo) — píldoras↔combo
+ * Hasta ~5 opciones: píldoras; más (o angosto): combo. El color
+ * runtime de la opción llega por --pill.
+ * ============================================================ */
+
+.av2-selad { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.av2-selad-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 32%, transparent);
+  background: color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 9%, var(--pl-surface));
+  color: var(--pl-text-2);
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.av2-selad-pill:hover {
+  background: color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 16%, var(--pl-surface));
+}
+.av2-selad-pill--activa {
+  background: color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 22%, var(--pl-surface));
+  border-color: color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 55%, transparent);
+  color: var(--pl-text);
+}
+
+/* ============================================================
  * [v3] Animación de cambio de vista: el cuerpo entra con un
  * fade + slide corto cada vez que cambia la vista activa.
  * ============================================================ */

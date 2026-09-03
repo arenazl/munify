@@ -34,6 +34,10 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { HeroFrase, HeroKpi, Veredicto } from '../../lib/semanticHero';
+/* [v3] El contrato de DATOS del panel de IA ya es estable; la pieza VISUAL
+   (DashboardIAPanel) todavía vive en ui/ y se migra a la suite v2 en una
+   pasada posterior — el contrato no va a cambiar con esa migración. */
+import type { DashboardIAData, IATip } from '../ui/DashboardIAPanel';
 
 /* ============================================================
  * Básicos compartidos
@@ -738,7 +742,13 @@ export interface SemanticAbmPageProps<Row = unknown> {
   steps?: StepsSpec;
 
   /* --- Filtros --- */
-  selects: SelectSpec[];
+  /**
+   * [v3] AHORA OPCIONAL. Sin `selects`, el kit AUTODERIVA el filtro de tipo
+   * desde `roles.taxonomy` (opciones únicas + "Todas") y filtra las filas él
+   * mismo, en todas las vistas. Declarar `selects` sigue siendo la vía para
+   * filtros del dominio (dependencia, caja, zona) — y anula la autoderivación.
+   */
+  selects?: SelectSpec[];
   /** Omitir en listas sin fecha (Personal, Inventario). Obligatorio en money. */
   period?: PeriodControlValue;
   statusTabs: StatusTab[];
@@ -768,6 +778,20 @@ export interface SemanticAbmPageProps<Row = unknown> {
    * Sin `enfoque` nI slot, la guiada degrada a secciones por estado.
    */
   enfoque?: EnfoqueSpec<Row>;
+  /**
+   * [v3] IA CONTEXTUAL opcional: con esta prop el orquestador monta el panel
+   * operativo de IA como aside colapsable (persistido por usuario). La página
+   * TRAE los datos (el kit no llama a ningún modelo — dumb) y sólo pasa `ia`
+   * cuando el municipio tiene la IA habilitada (useIaHabilitada). Excluyente
+   * en la práctica con `aside` (si vienen ambos, gana `aside`).
+   */
+  ia?: {
+    data: DashboardIAData | null;
+    loading?: boolean;
+    /** Título del panel. Default: "Panel operativo". */
+    title?: string;
+    onTipClick?: (tip: IATip) => void;
+  };
 
   /* --- Tabla --- */
   kind: ListKind;

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { AlertTriangle, Package, Pencil, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Package, Pencil, PlayCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
 import { EntityCell, ChipEstado } from '../components/abmv2/DataTable';
-import type { ColumnSpec, ViewKind } from '../components/abmv2/types';
+import type { ColumnSpec, RolesSemanticos, ViewKind } from '../components/abmv2/types';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
@@ -414,7 +414,7 @@ export default function Inventario() {
       kind: 'text',
       cell: renderEstadoCelda,
     },
-    { id: 'acciones', header: '', width: '48px', kind: 'actions' },
+    /* [v3] La columna de acciones la garantiza el orquestador. */
   ], [renderEstadoCelda]);
 
   /* Los cinco KPIs del hero. El de "en uso" y el de "bajo el mínimo" son los
@@ -428,12 +428,94 @@ export default function Inventario() {
   }, [items, tab]);
 
   const heroKpis = useMemo(() => ([
-    { etiqueta: 'Ítems', valor: String(todos.length) },
-    { etiqueta: 'Activos', valor: String(conteosNaturaleza.activo || 0) },
-    { etiqueta: 'Consumibles', valor: String(conteosNaturaleza.consumible || 0) },
-    { etiqueta: 'En uso ahora', valor: String(enUsoCount) },
-    { etiqueta: 'Bajo el mínimo', valor: String(bajoMinimoCount) },
+    { etiqueta: 'Ítems', valor: String(todos.length), sub: 'en el inventario' },
+    { etiqueta: 'Activos', valor: String(conteosNaturaleza.activo || 0), sub: 'máquinas y equipos' },
+    { etiqueta: 'Consumibles', valor: String(conteosNaturaleza.consumible || 0), sub: 'materiales e insumos' },
+    {
+      etiqueta: 'En uso ahora',
+      valor: String(enUsoCount),
+      sub: enUsoCount > 0 ? 'tomados por órdenes' : 'nada tomado',
+      ...(enUsoCount > 0 ? { veredicto: 'advertencia' as const } : {}),
+    },
+    {
+      etiqueta: 'Bajo el mínimo',
+      valor: String(bajoMinimoCount),
+      sub: bajoMinimoCount > 0 ? 'hay que reponer' : 'depósito en orden',
+      veredicto: bajoMinimoCount > 0 ? ('malo' as const) : ('bueno' as const),
+    },
   ]), [todos.length, conteosNaturaleza, enUsoCount, bajoMinimoCount]);
+
+  /* [v3] ROLES SEMÁNTICOS: la categoría del ítem trae icono y color REALES
+     de la base — el mismo set de datos dibuja tabla, boards, enfoque y ficha. */
+  const rolesInventario = useMemo<RolesSemanticos<InventarioItem>>(() => ({
+    taxonomy: (it) => ({
+      label: it.categoria_nombre || 'Sin categoría',
+      icon: it.categoria_icono || 'Package',
+      color: it.categoria_color || undefined,
+    }),
+    headline: (it) => it.nombre,
+    identity: (it) => it.identificador || null,
+    description: (it) => it.descripcion || null,
+    badges: (it) => [{ label: naturalezaLabels[it.naturaleza] ?? it.naturaleza }],
+    context: (it) => it.deposito_nombre || null,
+    amount: (it) =>
+      it.naturaleza === 'consumible'
+        ? `${it.stock_actual ?? 0}${it.unidad ? ` ${it.unidad}` : ''}`
+        : null,
+    state: (it) =>
+      it.naturaleza === 'consumible'
+        ? it.bajo_stock
+          ? { label: 'Bajo el mínimo', tono: 'red' }
+          : { label: 'Arriba del mínimo', tono: 'green' }
+        : {
+            label: estadoActivoLabel(it.estado_activo),
+            tono: it.estado_activo === 'en_uso' ? 'amber' : it.estado_activo === 'baja' ? 'gray' : 'green',
+          },
+    due: (it) =>
+      it.ocupado_por_ot_numero
+        ? { label: `Tomada por ${it.ocupado_por_ot_numero}`, veredicto: 'advertencia' }
+        : null,
+    verdict: (it) =>
+      it.bajo_stock ? 'malo' : it.estado_activo === 'en_uso' ? 'advertencia' : 'bueno',
+  }), []);
+
+  /* [v3] VISTA ENFOQUE con el criterio del módulo: primero lo que hay que
+     reponer, después lo tomado por órdenes, y al final lo sano, colapsado. */
+  const enfoqueInventario = useMemo(() => ({
+    resumen: bajoMinimoCount > 0
+      ? `${bajoMinimoCount} ${bajoMinimoCount === 1 ? 'consumible' : 'consumibles'} bajo el mínimo en el depósito`
+      : 'depósito en orden',
+    secciones: [
+      {
+        id: 'reponer',
+        titulo: 'Hay que reponer',
+        subtitulo: 'Consumibles con el stock abajo del mínimo que definió el municipio',
+        icon: AlertTriangle,
+        veredicto: 'malo' as const,
+        match: (it: InventarioItem) => it.bajo_stock,
+        ctaLabel: 'Ver el ítem',
+        emptyMessage: 'Nada bajo el mínimo — el depósito está en orden.',
+      },
+      {
+        id: 'en-uso',
+        titulo: 'En uso ahora',
+        subtitulo: 'Máquinas y herramientas tomadas por una orden de trabajo',
+        icon: PlayCircle,
+        veredicto: 'advertencia' as const,
+        match: (it: InventarioItem) => it.estado_activo === 'en_uso',
+        ctaLabel: 'Ver el ítem',
+      },
+      {
+        id: 'disponibles',
+        titulo: 'En depósito, disponibles',
+        subtitulo: 'Listos para usar o con stock sano',
+        icon: CheckCircle2,
+        veredicto: 'bueno' as const,
+        match: () => true,
+        colapsable: true,
+      },
+    ],
+  }), [bajoMinimoCount]);
 
   return (
     <>
@@ -449,7 +531,9 @@ export default function Inventario() {
             'El stock no se edita a mano desde esta lista: cambia con las entradas, salidas y ajustes del libro de Movimientos, y con lo que consume cada orden de trabajo. Así el número siempre tiene una historia que lo explica.',
         }}
         searchPlaceholder="Buscar por nombre o identificador…"
-        views={['table', 'cards']}
+        roles={rolesInventario}
+        enfoque={enfoqueInventario}
+        groupBy="taxonomy"
         activeView={vista}
         onViewChange={setVista}
         search={search}
