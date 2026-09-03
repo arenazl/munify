@@ -60,16 +60,37 @@ Filtro de cardinales (`geo_ciudad.es_cardinal`): rechaza Norte/Sur/Este/Oeste y
 compuestos, y también "Distrito Norte", "Zona Sur", "Sector Centro" (prefijos
 de reparto). Rosario pasó de 6 distritos falsos a 0.
 
-### Cobertura escrita en QA (`sugerenciasmun-qa`) al cierre de esta sesión
+### Cobertura escrita en QA (`sugerenciasmun-qa`), corrida COMPLETA del 2026-09-03 (00:00–01:15 ART)
 
-| Provincia | Municipios con barrios | Barrios | Con contorno |
-|---|---|---|---|
-| Buenos Aires | 135/135 | 4.249 | 2.634 (62%) |
-| Córdoba | 177/427 | 2.105 | 1.144 (54%) |
-| Santa Fe y 19 provincias más | **corriendo** al cierre (detached, log `scratchpad/barrios_AR_resto.log`) | — | — |
-| UY, PY, CL, BO, PE | pendientes (`PAIS=XX PBF=… --aplicar`, PBFs ya bajados) | — | — |
+| País | Municipios con barrios | Con algún contorno | Barrios | Con polígono |
+|---|---|---|---|---|
+| AR | 1.308/2.082 | 807 | 23.434 | 12.156 (52%) |
+| PY | 202/244 | 52 | 2.211 | 599 (27%) |
+| UY | 19/19 | 14 | 1.401 | 262 (19%) |
+| CL | 337/337 | 78 | 23.353 | 395 (2%) |
+| BO | 483/483 | 98 | 27.902 | 362 (1%) |
+| PE | 1.575/1.641 | 72 | 78.152 | 984 (1%) |
 
-Orden fijado por Lucas: Buenos Aires → Córdoba → Santa Fe → resto de AR → otros países.
+En CL/BO/PE la masa son `village`/`hamlet` (caseríos rurales que OSM carga como
+punto), no barrios urbanos; el polígono de barrio ahí va a salir de otra fuente
+o no va a salir. Por provincia argentina (barrios / % con polígono): Buenos
+Aires 4.249 / 61%, Santa Fe 1.470 / 74%, Río Negro 1.030 / 74%, La Pampa 75%,
+CABA 70%, Neuquén 67%, San Luis 66%, Mendoza 64%, Corrientes 63%, Córdoba
+2.105 / 54%, San Juan 2.114 / 54%, Catamarca 49%, Entre Ríos 42%, Chaco 39%,
+Misiones 2.499 / 37%, Chubut 36%, La Rioja 36%, Jujuy 29%, Salta 23%,
+**Tucumán 11%, Formosa 6%** (las dos flojas). Tierra del Fuego 86%.
+
+**El JSON de faltantes** (pedido de Lucas: *"guardamos un JSON con los faltantes
+y lo vamos curando con otras fuentes cuando se pueda"*):
+`backend/scripts/datos/faltantes_barrios.json` (3 MB), lo escribe
+`backend/scripts/geo/faltantes_barrios.py --env qa` (sólo lectura). Trae
+`resumen` por país y provincia, `municipios_sin_barrios` (882: AR 774, PE 66,
+PY 42), `municipios_sin_ningun_contorno` (2.803) y `barrios_sin_poligono`
+barrio por barrio **sólo de AR/PY/UY** (14.029 filas; con los seis países son
+141.695 filas y 26 MB, y 128.000 son los caseríos de CL/BO/PE — se regenera
+con `--detalle CL` si hace falta).
+
+Orden fijado por Lucas: Buenos Aires → Córdoba → Santa Fe → resto de AR → Paraguay → resto.
 
 ## 3. Qué hace la semilla ahora (`backend/services/geo_ciudad.py`)
 
@@ -93,9 +114,21 @@ Martín, Libertad, Mariano Acosta…); Pergamino 86 / 58 / 27 de 30; Rosario 0
 barrios porque Santa Fe todavía no había corrido — nace con Zona única, sin
 inventar.
 
-**No verificado todavía:** una demo NUEVA creada en QA después del deploy de
-`1baff58e` (mirar en la bitácora del alta el paso `geo:barrios` y en el mapa
-los polígonos). Es lo primero a hacer al retomar.
+**Verificado con una demo NUEVA en QA** después del deploy de `1baff58e`
+(revisión `munify-api-qa-00391`): `POST /api/municipios/crear-demo` Merlo →
+muni 1000175 `merlo-2`, 18,6 s, bitácora `demo_seed_logs` id 31 con 25/25
+pasos ok y 0 degradaciones; `geo:barrios` = {fuente: catalogo_barrios,
+barrios: 98, con_contorno: 10}; en la base: 1 zona ("Zona única", polígono de
+7.986 chars), 98 barrios / 10 con polígono / 98 colgados de la zona, 50/50
+reclamos con barrio y coordenadas (Parque San Martín 14, Mariano Acosta 9,
+Libertad 8…).
+
+**Fallback (Lucas, 2026-09-03):** *"cuando un municipio no tenga los polígonos
+de los barrios, pone el polígono del municipio, y listo, no tiene que romper.
+Sí tiene que cargar los barrios, el listado."* Ya es así sin código extra: la
+lista de barrios se siembra siempre (con su punto), la Zona única lleva el
+contorno del municipio y `/api/zonas/regiones_mapa` dibuja la zona y sólo los
+barrios con polígono. Con 0 polígonos el mapa muestra el contorno y los pines.
 
 ## 4. Lo que tiene que repetir Infra al promover
 
@@ -116,7 +149,14 @@ los polígonos). Es lo primero a hacer al retomar.
   barrios del catálogo y recuelgue los reclamos. Nunca tocar SPN (80).
 - `scripts/geo/sembrar_zonas.py` siembra zonas desde `catalogo_zonas` con el
   modelo viejo: hoy es LEGACY; adaptarlo o borrarlo con el script de arriba.
-- Terminar la cobertura (resto de AR + 5 países) e informar por provincia.
+- Curar `faltantes_barrios.json` con otras fuentes cuando se pueda (IGN,
+  catastros provinciales, INDEC radios censales); primero Tucumán y Formosa,
+  que tienen barrios pero casi sin polígono. Re-correr el script después de
+  cada curación para que el JSON refleje el estado real.
+- `POST /municipios/crear-demo` sigue llamando a Nominatim si el front no manda
+  lat/lng, y `POST /municipios` (super admin) usa `services/barrios_auto`
+  ("IA + Nominatim"): los dos contradicen "la cartografía no se hace online
+  nunca". Señalado, sin tocar: necesita consentimiento.
 - Los huecos del handoff anterior siguen: `contornos_osm_pbf.py --solo
   ciudad_afuera` (121 AR), `--solo sin_poligono` (316 no-AR), 68 comunas de
   Córdoba con el centro fuera de su polígono.
@@ -125,11 +165,17 @@ los polígonos). Es lo primero a hacer al retomar.
 
 - Backend: `python -m pyflakes services/geo_ciudad.py services/seed_demo.py`
   antes de pushear (ambos limpios en `1baff58e`).
-- **Corridas de más de 10 minutos van detached** (`Start-Process bash
-  script.sh` desde PowerShell): el timeout del tool las mata. Y aun detached
-  la corrida "resto de AR" murió después de Córdoba sin rastro en el log; se
-  relanzó desde Santa Fe (el script es idempotente por municipio) y el
-  wrapper ahora escribe hora y pid en cada cabecera.
+- **Corridas de más de 10 minutos van detached** (`Start-Process
+  "C:\Program Files\Git\bin\bash.exe" script.sh` desde PowerShell — con la
+  ruta completa: `bash` a secas en PowerShell es el de WSL y no arranca nada):
+  el timeout del tool las mata. Y aun detached la corrida "resto de AR" murió
+  después de Córdoba sin rastro en el log; se relanzó desde Santa Fe (el
+  script es idempotente por municipio) y el wrapper ahora escribe hora y pid
+  en cada cabecera.
+- Fuera de Argentina los ids del catálogo son `py-1704`, `uy-3443756`… y el
+  padrón georef (`catalogo_zonas`, columna INT) no existe: la fase 2 moría en
+  `int(m["id"])` en los cinco países. Corregido en `f0e2c2b6` (padrón vacío
+  afuera de AR); las fases 1 (sqlite por país) se reutilizan al relanzar.
 - Dos agentes en el mismo working tree: commitear con lista explícita de
   archivos, nunca `git add -A`, nunca `frontend/dist/`.
 - La consola de Windows muestra `�` por los acentos: es encoding de la
