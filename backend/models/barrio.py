@@ -33,6 +33,12 @@ class Barrio(Base):
     # Estado de validación
     validado = Column(Boolean, default=False)  # True si Nominatim encontró coordenadas
 
+    # La zona (unidad operativa) a la que pertenece el barrio: es la jerarquía
+    # municipio -> zona -> barrio que dibuja `api/zonas.py::regiones_mapa`. La
+    # columna ya existía en la base (QA y prod); faltaba en el modelo, y por eso
+    # los barrios de las demos nacían huérfanos de zona.
+    zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True, index=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

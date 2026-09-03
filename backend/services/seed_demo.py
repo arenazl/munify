@@ -981,18 +981,23 @@ async def _seed_barrios(
     db: AsyncSession,
     municipio_id: int,
     barrios_reales: list[dict],
+    zonas: Optional[dict[str, Zona]] = None,
 ) -> dict[str, Barrio]:
     """Los barrios REALES del municipio, o ninguno.
 
     Salen de OSM (`place=suburb|neighbourhood|quarter`) y por eso nacen
     `validado=True`: la coordenada es la que tiene mapeada OpenStreetMap, no una
-    que calculamos nosotros.
+    que calculamos nosotros. Cada uno cuelga de su zona (`zona_nombre`, que
+    `geo_ciudad.armar()` resolvio por contorno o cercania): sin eso el mapa de
+    regiones y el ABM de zonas no tenian jerarquia que mostrar.
     """
     barrios: dict[str, Barrio] = {}
+    zonas = zonas or {}
     for b in barrios_reales:
         nombre = (b.get("nombre") or "").strip()
         if not nombre or nombre in barrios:
             continue
+        zona = zonas.get(b.get("zona_nombre") or "")
         barrio = Barrio(
             municipio_id=municipio_id,
             nombre=nombre[:100],
@@ -1000,6 +1005,7 @@ async def _seed_barrios(
             longitud=b.get("lon"),
             tipo=b.get("tipo") or "suburb",
             validado=True,
+            zona_id=zona.id if zona else None,
         )
         db.add(barrio)
         barrios[nombre] = barrio
@@ -1691,23 +1697,38 @@ async def seed_demo_completo(
             zonas = {}
             _p.fallo(f"no se pudieron crear las zonas: {ex}")
         if zonas:
-            _p.ok(zonas=len(zonas), nombres=list(zonas.keys()))
+            _p.ok(zonas=len(zonas), nombres=list(zonas.keys()),
+                  fuente=geo_ctx.get("fuente_zonas"))
         else:
-            _p.degradado(
-                "sin divisiones para esta ciudad; el municipio queda sin zonas "
-                "(antes se inventaban Centro/Norte/Sur)")
+            # Solo pasa sin contorno Y sin centro: hasta la zona unica necesita
+            # un punto. Nada se inventa (antes caia a Centro/Norte/Sur).
+            _p.degradado("sin contorno ni centro para dibujar la zona unica; "
+                         "el municipio queda sin zonas")
     barrios: dict = {}
     with log.paso("barrios") as _p:
         try:
             async with db.begin_nested():
-                barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"])
+                barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"], zonas)
         except Exception as ex:
             barrios = {}
             _p.fallo(f"no se pudieron crear los barrios: {ex}")
         if barrios:
-            _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15])
+            _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15],
+                  con_zona=sum(1 for b in barrios.values() if b.zona_id))
         else:
-            _p.degradado("OSM no tiene barrios mapeados dentro del poligono")
+            # El motivo dice la VERDAD de por que no hay barrios. "OSM no tiene
+            # barrios" se decia tambien cuando SI los tenia y la promocion a
+            # zonas se los habia comido (La Paz, 2026-09-02), y cuando el
+            # municipio ni siquiera estaba curado. Ahora: si la geografia vino
+            # degradada, ese es el motivo; si vino bien y aun asi no hay
+            # barrios, es que OSM no los tiene — y se dice con el conteo.
+            motivo_geo = geo_ctx.get("degradacion")
+            if motivo_geo and motivo_geo != "sin_calles_osm_reclamos_a_nivel_localidad":
+                _p.degradado(f"sin barrios porque la cartografia vino degradada: {motivo_geo}")
+            else:
+                _p.degradado("OSM no tiene barrios mapeados dentro del poligono "
+                             f"(places tipo barrio en la fuente: "
+                             f"{geo_ctx.get('barrios_en_fuente', 0)})")
 
     # ------------------------------------------------------------------
     # 6. Empleados + Cuadrillas (personal operativo)
