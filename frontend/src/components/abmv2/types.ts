@@ -336,6 +336,64 @@ export interface RolesSemanticos<Row = unknown> {
   /** Importe, para las entidades que lo tengan. Reemplaza a `elapsed` en el
    *  slot 4 cuando ambos están declarados. */
   amount?: (row: Row) => string | null | undefined;
+
+  /* --- [v3] Roles de la TARJETA RICA (vistas board y enfoque) -----------
+     Ingeniería inversa de las cards curadas de Reclamos/Trámites: la tarjeta
+     se tiñe por VEREDICTO, lleva píldoras y cuenta el vencimiento. Todos
+     opcionales: sin ellos la tarjeta degrada a su versión mínima. */
+
+  /** El párrafo de la tarjeta (la descripción del registro), clamp 2. */
+  description?: (row: Row) => string | null | undefined;
+  /** Píldoras secundarias (canal, marca, etc.): fondo suave del color.
+   *  El color es runtime (viene de datos); omitido ⇒ neutro por tokens. */
+  badges?: (row: Row) => Array<{ label: string; color?: string }> | null | undefined;
+  /** CÓMO VIENE esta fila: tiñe el borde de la tarjeta (el sistema de los 3
+   *  veredictos de las boards de Reclamos). Omitido/null ⇒ tarjeta neutra. */
+  verdict?: (row: Row) => Veredicto | null | undefined;
+  /** Vencimiento en palabras ("Venció hace 4 d", "Vence hoy") con su
+   *  veredicto — se pinta al lado del actor, en el color del veredicto. */
+  due?: (row: Row) => { label: string; veredicto?: Veredicto } | null | undefined;
+  /** Prioridad como píldora chica ("Media", "Alta"). */
+  priority?: (row: Row) => { label: string; veredicto?: Veredicto } | null | undefined;
+}
+
+/**
+ * [v3] Sección de la VISTA ENFOQUE (la guiada curada de Reclamos): "El vecino
+ * dice que sigue el problema", "Empecemos por lo urgente"… La página declara
+ * las secciones como DATOS — título en frase, bajada, veredicto y el filtro
+ * que decide qué filas caen acá — y el kit dibuja el saludo, los chips del
+ * resumen, los encabezados y las tarjetas con su CTA. Nada de ReactNode.
+ */
+export interface EnfoqueSectionSpec<Row = unknown> {
+  id: string;
+  /** Título en FRASE ("Empecemos por lo urgente"), no la entidad. */
+  titulo: string;
+  /** Bajada de una línea (qué son estas filas y qué hacer con ellas). */
+  subtitulo?: string;
+  /** Icono lucide del encabezado. */
+  icon?: LucideIcon;
+  /** Tiñe icono, contador, borde de tarjetas y CTA de la sección. */
+  veredicto?: Veredicto;
+  /** Qué filas caen en esta sección. El ORDEN de las secciones decide en cuál
+   *  queda una fila que matchea varias (gana la primera). */
+  match: (row: Row) => boolean;
+  /** Copy cuando la sección queda vacía. Omitido ⇒ la sección no se dibuja
+   *  vacía (sólo las que celebran el vacío lo declaran). */
+  emptyMessage?: string;
+  /** Label del CTA de cada tarjeta ("Resolver ya"). Omitido ⇒ sin CTA (la
+   *  tarjeta sigue siendo clickeable si la página escucha onRowClick). */
+  ctaLabel?: string;
+  /** true ⇒ arranca colapsada (secciones largas o de archivo). */
+  colapsable?: boolean;
+}
+
+/** [v3] La vista enfoque completa: saludo contextual + chips resumen +
+ *  secciones. `saludo` va sin nombre propio (lo pone la página si quiere). */
+export interface EnfoqueSpec<Row = unknown> {
+  /** Línea del banner: "21 pendientes en tu municipio". El saludo por hora
+   *  ("Buenas noches") lo antepone el kit. Omitida ⇒ sin banner. */
+  resumen?: string;
+  secciones: EnfoqueSectionSpec<Row>[];
 }
 
 export interface ColumnSpec<Row = unknown> {
@@ -508,8 +566,11 @@ export interface DataTableProps<Row = unknown> {
    *  fichas cuando el CONTENEDOR es angosto (ver RolesSemanticos). Sin roles,
    *  el control se comporta como siempre: sólo dibuja columnas. */
   roles?: RolesSemanticos<Row>;
-  /** 'date' (money/plain con fecha) · 'hour' (schedule) · 'none'. */
-  groupBy?: 'date' | 'hour' | 'none';
+  /** 'date' (money/plain con fecha) · 'hour' (schedule) · 'none'.
+   *  [v3] Se suman 'taxonomy' y 'state': agrupar por el ROL correspondiente —
+   *  los grupos los computa el ORQUESTADOR desde `roles` (la página declara
+   *  la palabra, el kit agrupa); para el DataTable llegan como `groups`. */
+  groupBy?: 'date' | 'hour' | 'taxonomy' | 'state' | 'none';
   /** true en kind='money': subtotal por grupo en la columna del importe. */
   showGroupSubtotal?: boolean;
   /** Filas planas (groupBy 'none' u omitido). */
@@ -700,6 +761,13 @@ export interface SemanticAbmPageProps<Row = unknown> {
   viewSlots?: Partial<Record<ViewKind, ReactNode>>;
   /** [v2.1] Panel lateral sticky junto al cuerpo (ver AsideSpec). */
   aside?: AsideSpec;
+  /**
+   * [v3] VISTA ENFOQUE declarativa (ver EnfoqueSpec): saludo + chips resumen
+   * + secciones por veredicto con sus tarjetas y CTA. Reemplaza al slot
+   * 'guided' como estándar — el slot queda para vistas guiadas 100% custom.
+   * Sin `enfoque` nI slot, la guiada degrada a secciones por estado.
+   */
+  enfoque?: EnfoqueSpec<Row>;
 
   /* --- Tabla --- */
   kind: ListKind;
@@ -713,7 +781,10 @@ export interface SemanticAbmPageProps<Row = unknown> {
    * las vistas: un set de datos, un solo dibujante.
    */
   roles?: RolesSemanticos<Row>;
-  groupBy?: 'date' | 'hour' | 'none';
+  /** [v3] 'taxonomy'/'state' agrupan por el rol correspondiente y los grupos
+   *  los computa el kit (contador + punto de color). 'date'/'hour' siguen
+   *  esperando `groups` precomputados por la página (fechas formateadas). */
+  groupBy?: 'date' | 'hour' | 'taxonomy' | 'state' | 'none';
   showGroupSubtotal?: boolean;
   rows: Row[];
   /** Grupos precomputados (ver DataTableProps.groups). */

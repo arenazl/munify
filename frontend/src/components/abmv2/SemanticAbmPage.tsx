@@ -61,20 +61,21 @@ import { PageHeader } from './PageHeader';
 import { ListToolbar } from './ListToolbar';
 import { FilterBar } from './FilterBar';
 import { DataTable } from './DataTable';
-import { CardGrid } from './CardGrid';
-import { ListaDeFichas } from './FichaRegistro';
+import { TarjetaRegistro } from './TarjetaRegistro';
+import { VistaEnfoque } from './VistaEnfoque';
 import { HintBanner } from './HintBanner';
 import { SideModal } from './SideModal';
 import { useEmbed } from './useEmbed';
 import type { SideModalComponentProps } from './SideModal';
 import type {
   Action,
-  CardItem,
-  ChipTone,
   ColumnSpec,
+  EnfoqueSpec,
   SemanticAbmPageProps,
+  TableGroup,
   ViewKind,
 } from './types';
+import type { Veredicto } from '../../lib/semanticHero';
 import '../../styles/abmv2.css';
 
 /* ============================================================
@@ -135,12 +136,13 @@ export interface SemanticAbmPageComponentProps<Row> extends SemanticAbmPageProps
  *  slot correspondiente. Declarar `views` es la excepción, no el default. */
 const VISTAS_ESTANDAR: ViewKind[] = ['table', 'cards', 'guided'];
 
-const TONOS_CHIP: readonly ChipTone[] = ['blue', 'amber', 'green', 'gray', 'red'];
-
-/** El tono del rol `state` viene tipado laxo (string del dominio): acá se
- *  normaliza a la escala del kit — desconocido ⇒ gris, nunca un color inventado. */
-function aTonoChip(tono?: string): ChipTone {
-  return TONOS_CHIP.includes(tono as ChipTone) ? (tono as ChipTone) : 'gray';
+/** Tono de chip → veredicto, para el fallback de la vista enfoque cuando la
+ *  página no declaró secciones: rojo exige, ámbar avisa, verde celebra. */
+function tonoAVeredicto(tono?: string): Veredicto | undefined {
+  if (tono === 'red') return 'malo';
+  if (tono === 'amber') return 'advertencia';
+  if (tono === 'green') return 'bueno';
+  return undefined;
 }
 
 /** Columna de acciones que el orquestador GARANTIZA cuando hay `rowActions` y
@@ -184,6 +186,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     /* cuerpo */
     viewSlots,
     aside,
+    enfoque,
     /* tabla */
     kind,
     columns,
@@ -323,47 +326,64 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     ? ({ '--av2-hero-accent': accentColor } as CSSProperties)
     : undefined;
 
-  /* --- [v3] Filas planas para las vistas autogeneradas (cards/guiada):
+  /* --- [v3] Filas planas para las vistas autogeneradas (cards/enfoque):
          si la página mandó grupos precomputados, se aplanan — las vistas
          alternativas reagrupan por su propio criterio. --- */
   const filasPlanas = groups?.length ? groups.flatMap((g) => g.rows) : rows;
 
-  /* --- [v3] Una fila → una tarjeta, derivada de los ROLES (un set de datos,
-         un solo dibujante: mismo icono, misma segunda línea, misma píldora
-         que la ficha mobile). Solo se usa cuando hay `roles`. --- */
-  const cardDesdeRoles = (row: Row): CardItem => {
-    const tax = roles?.taxonomy?.(row);
-    const st = roles?.state?.(row);
-    const subLineas = [roles?.actor?.(row), roles?.context?.(row)].filter(Boolean);
-    return {
-      title: roles!.headline(row),
-      subtitle: subLineas.length ? subLineas.join(' · ') : tax?.label ?? undefined,
-      tileColor: tax?.color,
-      chip: st ? { label: st.label, tone: aTonoChip(st.tono) } : undefined,
+  /* --- [v3] groupBy 'taxonomy'/'state': el kit AGRUPA SOLO desde los roles
+         (la página declara la palabra). Orden de grupos = primera aparición
+         en las filas, que la página ya ordenó. --- */
+  const gruposAutomaticos = ((): TableGroup<Row>[] | undefined => {
+    if ((groupBy !== 'taxonomy' && groupBy !== 'state') || !roles) return undefined;
+    const etiquetaDe = (row: Row): { titulo: string; veredicto?: Veredicto } => {
+      if (groupBy === 'taxonomy') {
+        return { titulo: roles.taxonomy?.(row)?.label ?? 'Sin tipo' };
+      }
+      const st = roles.state?.(row);
+      return { titulo: st?.label ?? 'Sin estado', veredicto: tonoAVeredicto(st?.tono) };
     };
-  };
-
-  /* --- [v3] Vista GUIADA autogenerada: las fichas agrupadas por el rol
-         `state`, en el orden de los statusTabs (los labels que no matchean
-         van al final, en orden de aparición — graceful, nunca se pierden). --- */
-  const gruposGuiada = (): Array<{ titulo: string | null; filas: Row[] }> => {
-    if (!roles?.state) return [{ titulo: null, filas: filasPlanas }];
-    const porEstado = new Map<string, Row[]>();
+    const mapa = new Map<string, TableGroup<Row>>();
     for (const row of filasPlanas) {
-      const etiqueta = roles.state(row)?.label ?? 'Sin estado';
-      const lista = porEstado.get(etiqueta);
-      if (lista) lista.push(row);
-      else porEstado.set(etiqueta, [row]);
+      const { titulo, veredicto } = etiquetaDe(row);
+      let g = mapa.get(titulo);
+      if (!g) {
+        g = { key: titulo, title: titulo, label: '', veredicto, rows: [] };
+        mapa.set(titulo, g);
+      }
+      g.rows.push(row);
     }
-    const orden = statusTabs
-      .map((t) => t.label)
-      .filter((l) => porEstado.has(l));
-    const resto = [...porEstado.keys()].filter((l) => !orden.includes(l));
-    return [...orden, ...resto].map((titulo) => ({
-      titulo: `${titulo} · ${porEstado.get(titulo)!.length}`,
-      filas: porEstado.get(titulo)!,
-    }));
-  };
+    const lista = [...mapa.values()];
+    for (const g of lista) {
+      const n = g.rows.length;
+      g.label = `${n.toLocaleString('es-AR')} ${n === 1 ? 'registro' : 'registros'}`;
+    }
+    return lista;
+  })();
+  const gruposTabla = gruposAutomaticos ?? groups;
+
+  /* --- [v3] Vista ENFOQUE: secciones declaradas por la página o, sin
+         declarar, derivadas del rol `state` (una sección por estado presente,
+         teñida por su tono). El fallback mantiene la vista viva; la versión
+         curada es declarar `enfoque` con frases y CTAs. --- */
+  const enfoqueEfectivo = ((): EnfoqueSpec<Row> | null => {
+    if (enfoque) return enfoque;
+    if (!roles?.state) return null;
+    const vistos = new Map<string, Veredicto | undefined>();
+    for (const row of filasPlanas) {
+      const st = roles.state(row);
+      const label = st?.label ?? 'Sin estado';
+      if (!vistos.has(label)) vistos.set(label, tonoAVeredicto(st?.tono));
+    }
+    return {
+      secciones: [...vistos.entries()].map(([label, veredicto]) => ({
+        id: label,
+        titulo: label,
+        veredicto,
+        match: (row: Row) => (roles.state?.(row)?.label ?? 'Sin estado') === label,
+      })),
+    };
+  })();
 
   /* --- Cuerpo por vista: slot de la página > built-in del kit.
          `in` (y no `?.[activeView] ?? …`) para respetar un slot null
@@ -381,7 +401,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         groupBy={groupBy}
         showGroupSubtotal={showGroupSubtotal}
         rows={rows}
-        groups={groups}
+        groups={gruposTabla}
         rowKey={rowKey}
         rowActions={rowActions}
         onRowClick={filaClickeable ? manejarFila : undefined}
@@ -396,45 +416,55 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         reorder={reorder}
       />
     );
+  } else if (loading) {
+    /* Cards/enfoque mientras carga: esqueleto, nunca un falso vacío. */
+    cuerpo = <div className="av2-skeleton" style={{ minHeight: 220 }} aria-busy />;
   } else if (activeView === 'cards' && roles) {
-    /* [v3] Vista 'cards' built-in desde los roles — la página no la arma. */
+    /* [v3] Vista 'cards' built-in: las BOARDS curadas (TarjetaRegistro) —
+       tile de categoría, píldoras, veredicto en el borde. La página no arma
+       tarjetas: declara roles. */
+    cuerpo =
+      filasPlanas.length === 0 ? (
+        <div className="av2-fichas-vacio">{emptyMessage || 'No hay registros para mostrar.'}</div>
+      ) : (
+        <div className="av2-cards-ricas">
+          {filasPlanas.map((fila, i) => (
+            <TarjetaRegistro<Row>
+              key={rowKey(fila, i)}
+              fila={fila}
+              roles={roles}
+              onClick={filaClickeable ? manejarFila : undefined}
+            />
+          ))}
+        </div>
+      );
+  } else if (activeView === 'guided' && roles && enfoqueEfectivo) {
+    /* [v3] Vista 'guided' built-in: la VISTA ENFOQUE curada (secciones por
+       veredicto, saludo, chips, CTA) — declarada en `enfoque` o derivada. */
     cuerpo = (
-      <CardGrid<Row>
+      <VistaEnfoque<Row>
+        enfoque={enfoqueEfectivo}
+        roles={roles}
         rows={filasPlanas}
-        rowKey={(row) => rowKey(row)}
-        card={cardDesdeRoles}
-        actions={rowActions}
-        onCardClick={filaClickeable ? manejarFila : undefined}
-        loading={loading}
+        rowKey={rowKey}
+        onRowClick={filaClickeable ? manejarFila : undefined}
         emptyMessage={emptyMessage}
       />
     );
-  } else if (activeView === 'guided' && roles) {
-    /* [v3] Vista 'guided' built-in: fichas agrupadas por estado. */
-    cuerpo = loading ? (
-      <div className="av2-skeleton" style={{ minHeight: 220 }} aria-busy />
-    ) : (
-      <section className="av2-tabla av2-tabla--fichas">
-        <ListaDeFichas<Row>
-          grupos={gruposGuiada()}
-          roles={roles}
-          rowKey={rowKey}
-          onRowClick={filaClickeable ? manejarFila : undefined}
-          vacio={emptyMessage}
-        />
-      </section>
-    );
-  } else if (loading) {
-    /* Mientras `loading`, que el slot todavía no exista es normal (la página
-       lo monta recién con datos): ni warning ni cuerpo vacío — esqueleto. */
-    cuerpo = <div className="av2-skeleton" style={{ minHeight: 220 }} aria-busy />;
   } else if (import.meta.env.DEV) {
     console.warn(
       `SemanticAbmPage[${moduleKey}]: la vista '${activeView}' no tiene slot ni ` +
         'roles para autogenerarse — el cuerpo queda vacío. Declará `roles` ' +
-        '(cards/guided built-in) o el slot en `viewSlots`.',
+        '(cards/enfoque built-in) o el slot en `viewSlots`.',
     );
   }
+  /* [v3] Cambio de vista con animación: el key remonta el wrapper y el cuerpo
+     entra con fade+slide (respetando prefers-reduced-motion por CSS). */
+  cuerpo = (
+    <div key={activeView} className="av2-cuerpo-anim">
+      {cuerpo}
+    </div>
+  );
 
   /* --- [v2.1] Ancho runtime del aside vía style var (default en CSS). --- */
   const estiloAside = aside?.width

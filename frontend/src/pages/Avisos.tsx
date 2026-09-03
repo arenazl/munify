@@ -26,7 +26,7 @@
  *    lleva zonas, sólo lo ven los vecinos de esas zonas.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Hammer, ImagePlus, Loader2, Megaphone, Pencil, Pin, Send, Trash2, X } from 'lucide-react';
+import { AlertCircle, CalendarX, CheckCircle2, Hammer, ImagePlus, Loader2, Megaphone, Pencil, Pin, Send, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
@@ -344,21 +344,90 @@ export default function Avisos() {
     },
   ]), [destacados.length, novedades.length, obras, pendientes, vencidas.length]);
 
-  /* [v3] ROLES SEMÁNTICOS: el mismo set de datos que dibujan la ficha mobile,
-     la vista de tarjetas y la guiada — un solo dibujante para icono, segunda
-     línea y píldora, en todas las vistas. */
+  /* [v3] ROLES SEMÁNTICOS: el mismo set de datos dibuja la fila de la tabla,
+     la board, la tarjeta del enfoque y la ficha mobile — un solo dibujante
+     para icono, píldoras, veredicto y estado, en todas las vistas. */
   const rolesPublicacion = useMemo<RolesSemanticos<Publicacion>>(() => ({
     taxonomy: (p) => ({
       label: TIPO_LABEL[p.tipo] || 'Novedad',
       icon: p.origen === 'obra' ? 'Hammer' : p.tipo === 'destacado' ? 'Pin' : 'Megaphone',
     }),
     headline: (p) => p.titulo,
-    context: (p) => detalleDe(p),
+    description: (p) => p.descripcion,
+    /* A quién le llega: la audiencia como píldora. */
+    badges: (p) => {
+      if (!p.zona_ids.length) return [{ label: 'Todo el municipio' }];
+      const nombres = p.zona_ids
+        .map((id) => zonas.find((z) => z.id === id)?.nombre)
+        .filter(Boolean) as string[];
+      const label = nombres.length <= 2
+        ? nombres.join(' y ')
+        : `${nombres[0]} y ${nombres.length - 1} zonas más`;
+      return [{ label: label || 'Todo el municipio' }];
+    },
+    /* El CUÁNDO habla con el color del veredicto cuando ya venció. */
+    due: (p) => ({
+      label: detalleDe(p),
+      veredicto: estadoDe(p) === 'vencido' ? 'malo' : undefined,
+    }),
+    /* Cuántos vecinos fueron avisados: el dato del pie. */
+    context: (p) =>
+      p.origen === 'obra'
+        ? null
+        : p.enviado_at
+          ? `Avisados: ${p.enviados_count} ${p.enviados_count === 1 ? 'vecino' : 'vecinos'}`
+          : 'Todavía sin avisar',
     state: (p) => {
       const e = estadoDe(p);
       return { label: ESTADO_LABEL[e], tono: ESTADO_TONE[e] };
     },
-  }), []);
+    /* CÓMO VIENE cada publicación — tiñe el borde de la board (3 veredictos):
+       vencida exige, pendiente de decisión avisa, al aire celebra. */
+    verdict: (p) => {
+      if (estadoDe(p) === 'vencido') return 'malo';
+      if (sinPublicar.includes(p) || sinAvisar.includes(p)) return 'advertencia';
+      return 'bueno';
+    },
+  }), [zonas, sinPublicar, sinAvisar]);
+
+  /* [v3] VISTA ENFOQUE declarada con el criterio del módulo (patrón Reclamos):
+     primero lo que espera una decisión, después lo vencido para limpiar, y al
+     final lo que está al aire, colapsado. Secciones como DATOS, cero markup. */
+  const enfoquePublicaciones = useMemo(() => ({
+    resumen: `${pendientes + vencidas.length > 0
+      ? `${pendientes + vencidas.length} ${pendientes + vencidas.length === 1 ? 'publicación pide' : 'publicaciones piden'} una mirada`
+      : 'Comunicación al día'} en tu municipio`,
+    secciones: [
+      {
+        id: 'decision',
+        titulo: 'Esperan una decisión',
+        subtitulo: 'Obras sin publicar y novedades sin notificar al vecino',
+        icon: AlertCircle,
+        veredicto: 'advertencia' as const,
+        match: (p: Publicacion) => sinPublicar.includes(p) || sinAvisar.includes(p),
+        ctaLabel: 'Decidir ahora',
+        emptyMessage: 'Nada esperando decisión — todo lo cargado ya se publicó y avisó.',
+      },
+      {
+        id: 'vencidas',
+        titulo: 'Vencidas — ya no se muestran',
+        subtitulo: 'Renovales la vigencia o quitalas del feed',
+        icon: CalendarX,
+        veredicto: 'malo' as const,
+        match: (p: Publicacion) => estadoDe(p) === 'vencido',
+        ctaLabel: 'Revisar',
+      },
+      {
+        id: 'al-aire',
+        titulo: 'Al aire en la app del vecino',
+        subtitulo: 'Publicadas y programadas — no piden nada',
+        icon: CheckCircle2,
+        veredicto: 'bueno' as const,
+        match: () => true,
+        colapsable: true,
+      },
+    ],
+  }), [pendientes, vencidas.length, sinPublicar, sinAvisar]);
 
   const columnas = useMemo<ColumnSpec<Publicacion>[]>(() => [
     {
@@ -588,6 +657,8 @@ export default function Avisos() {
         }}
         searchPlaceholder="Buscar por título o texto…"
         roles={rolesPublicacion}
+        enfoque={enfoquePublicaciones}
+        groupBy="taxonomy"
         activeView={vista}
         onViewChange={setVista}
         search={search}

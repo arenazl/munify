@@ -23,6 +23,7 @@
  * detalle. Esa es la decisión que evita volver a la tabla apretada.
  */
 import { useEffect, useRef, useState } from 'react';
+import { Glifo } from './Glifo';
 import type { RolesSemanticos } from './types';
 
 /** Debajo de esto, el control se dibuja como fichas. Es el ancho del
@@ -108,7 +109,9 @@ export function FichaRegistro<Row>({
         style={taxonomy?.color ? { ['--tile' as string]: taxonomy.color } : undefined}
         aria-hidden
       >
-        <span className="av2-ficha-tile-glifo" />
+        {/* [v3] El tile dibuja el ICONO de la taxonomía (antes era un span
+            vacío y la ficha mostraba un cuadradito sin nada adentro). */}
+        <Glifo glifo={taxonomy?.icon} size={16} strokeWidth={1.9} />
       </span>
 
       <div className="av2-ficha-cuerpo">
