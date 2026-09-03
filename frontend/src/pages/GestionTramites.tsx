@@ -1103,7 +1103,37 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // por día de creación; 'por_vencer' → por día de vencimiento estimado, con
   // los que no tienen tiempo estimado al final. Las filas ya vienen ordenadas
   // por `filteredTramites` con el mismo criterio.
+  /* [v3] AGRUPAMIENTO elegible (dueño, 2026-09-03): el día es el default,
+     pero todo combo de filtro es una forma de agrupar — estado, dependencia
+     y categoría salen como opciones del segmented "Agrupar" del FilterBar. */
+  const [agruparPor, setAgruparPor] = useState<'dia' | 'estado' | 'dependencia' | 'categoria'>('dia');
+
   const gruposTabla = useMemo<TableGroup<Solicitud>[]>(() => {
+    if (agruparPor !== 'dia') {
+      const etiquetaDe = (t: Solicitud): string =>
+        agruparPor === 'estado'
+          ? getEstadoConfig(t.estado).label
+          : agruparPor === 'dependencia'
+            ? (t.dependencia_asignada?.nombre ?? 'Sin dependencia')
+            : (t.tramite?.categoria_tramite?.nombre ?? 'Sin categoría');
+      const mapa = new Map<string, TableGroup<Solicitud>>();
+      for (const t of visibleTramites) {
+        const titulo = etiquetaDe(t);
+        let g = mapa.get(titulo);
+        if (!g) {
+          g = { key: titulo, title: titulo, label: '', rows: [] };
+          mapa.set(titulo, g);
+        }
+        g.rows.push(t);
+      }
+      // El grupo más cargado arriba: es el que se vino a mirar.
+      const grupos = [...mapa.values()].sort((a, b) => b.rows.length - a.rows.length);
+      for (const g of grupos) {
+        const n = g.rows.length;
+        g.label = `${n} trámite${n === 1 ? '' : 's'}`;
+      }
+      return grupos;
+    }
     const grupos: TableGroup<Solicitud>[] = [];
     let actual: TableGroup<Solicitud> | null = null;
     for (const t of visibleTramites) {
@@ -1132,7 +1162,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       g.label = g.key === 'sin-fecha' ? `Sin vencimiento estimado · ${base}` : base;
     }
     return grupos;
-  }, [visibleTramites, ordenamiento]);
+  }, [visibleTramites, ordenamiento, agruparPor]);
 
   // Render de las tarjetas de la vista 'cards' (escritorio). El estado de carga
   // y la lista de teléfono los resuelve el cuerpo de la página, no esta función.
@@ -1774,6 +1804,16 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             statusTabs={activeView === 'table' ? [] : tabsEstado}
             activeStatus={filtroEstado}
             onStatusChange={(id) => setFiltroEstado(id)}
+            groupSpec={{
+              opciones: [
+                { id: 'dia', label: 'Día' },
+                { id: 'estado', label: 'Estado' },
+                { id: 'dependencia', label: 'Dependencia' },
+                { id: 'categoria', label: 'Categoría' },
+              ],
+              activo: agruparPor,
+              onGroup: (id) => setAgruparPor(id as typeof agruparPor),
+            }}
           />
         </div>
 

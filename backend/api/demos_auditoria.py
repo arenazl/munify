@@ -9,11 +9,14 @@ en un ambiente — una métrica ausente vale 0, no tira el endpoint).
 Sin auth a pedido del dueño (2026-09-03): son demos con datos de ejemplo,
 la auditoría no expone nada que la vitrina /demo no muestre ya.
 """
-from fastapi import APIRouter, Depends
-from sqlalchemy import text
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import not_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
+from core.security import get_current_user
+from models.user import User
 
 router = APIRouter()
 
@@ -116,3 +119,88 @@ async def auditoria_demos(db: AsyncSession = Depends(get_db)):
                 destino[campo] = int(fila[i + 1] or 0)
 
     return list(por_id.values())
+
+
+# ============================================================
+# PURGA desde /demos-listado (dueño, 2026-09-03): borrar una demo
+# o un grupo entero desde la pantalla, sin llave ni PIN — pero SOLO
+# con sesión de SUPER ADMIN (municipio_id None). Ver la auditoría es
+# público; borrar exige la credencial más alta: un DELETE anónimo de
+# demos es vandalismo servido (la llave por-demo del endpoint público
+# sigue vigente para el flujo del generador).
+# Reusa el cascade guiado por esquema de services/demo_borrado.py y
+# TODOS sus guards de datos: municipios intocables, usuarios reales
+# y la demo de muestra (demo_publica) no se tocan ni con super admin.
+# ============================================================
+
+class PurgaRequest(BaseModel):
+    municipio_ids: list[int] = Field(min_length=1, max_length=200)
+
+
+@router.post("/purga")
+async def purgar_demos(
+    payload: PurgaRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.municipio_id is not None:
+        raise HTTPException(
+            status_code=403,
+            detail="Borrar demos exige la sesión de super admin (entrá por /super).",
+        )
+
+    from services.demo_borrado import (
+        MUNICIPIOS_INTOCABLES,
+        PATRONES_EMAIL_DEMO,
+        borrar_municipio,
+    )
+
+    resultados = []
+    for mid in payload.municipio_ids:
+        fila = (
+            await db.execute(text(
+                "SELECT codigo, es_demo, demo_publica FROM municipios WHERE id = :id"
+            ), {"id": mid})
+        ).first()
+        if fila is None:
+            resultados.append({"id": mid, "ok": False, "motivo": "no existe"})
+            continue
+        codigo, es_demo, demo_publica = fila
+        if not es_demo or mid in MUNICIPIOS_INTOCABLES:
+            resultados.append({"id": mid, "codigo": codigo, "ok": False, "motivo": "no es demo"})
+            continue
+        if demo_publica:
+            resultados.append({
+                "id": mid, "codigo": codigo, "ok": False,
+                "motivo": "es la demo de muestra (se apaga por base, no desde acá)",
+            })
+            continue
+        # Usuarios REALES adentro ⇒ no se toca (mismo criterio que el
+        # endpoint público de borrado).
+        con_reales = (
+            await db.execute(
+                select(User.id).where(
+                    User.municipio_id == mid,
+                    not_(or_(*[User.email.like(p) for p in PATRONES_EMAIL_DEMO])),
+                ).limit(1)
+            )
+        ).first()
+        if con_reales:
+            resultados.append({
+                "id": mid, "codigo": codigo, "ok": False,
+                "motivo": "tiene usuarios reales",
+            })
+            continue
+        try:
+            filas_borradas = await borrar_municipio(db, mid)
+            await db.commit()
+            resultados.append({
+                "id": mid, "codigo": codigo, "ok": True,
+                "filas": sum(filas_borradas.values()),
+            })
+        except Exception as e:  # una demo que falla no frena la purga del resto
+            await db.rollback()
+            resultados.append({"id": mid, "codigo": codigo, "ok": False, "motivo": str(e)[:200]})
+
+    borradas = sum(1 for r in resultados if r["ok"])
+    return {"borradas": borradas, "total": len(resultados), "resultados": resultados}

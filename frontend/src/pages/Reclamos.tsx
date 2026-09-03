@@ -3240,7 +3240,35 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // formatea; el DataTable solo pinta). El criterio replica la tabla vieja:
   // 'reciente' → orden y agrupado por fecha de creación (desc);
   // 'programado' → por fecha programada (asc), los sin fecha al final.
+  /* [v3] AGRUPAMIENTO elegible (dueño, 2026-09-03): día como default, y los
+     combos de filtro como opciones — estado, dependencia y categoría. */
+  const [agruparPor, setAgruparPor] = useState<'dia' | 'estado' | 'dependencia' | 'categoria'>('dia');
+
   const gruposTabla = useMemo<TableGroup<Reclamo>[]>(() => {
+    if (agruparPor !== 'dia') {
+      const etiquetaDe = (r: Reclamo): string =>
+        agruparPor === 'estado'
+          ? (estadoLabels[r.estado] || r.estado)
+          : agruparPor === 'dependencia'
+            ? (r.dependencia_asignada?.nombre ?? 'Sin dependencia')
+            : (r.categoria?.nombre ?? 'Sin categoría');
+      const mapa = new Map<string, TableGroup<Reclamo>>();
+      for (const r of filteredReclamos) {
+        const titulo = etiquetaDe(r);
+        let g = mapa.get(titulo);
+        if (!g) {
+          g = { key: titulo, title: titulo, label: '', rows: [] };
+          mapa.set(titulo, g);
+        }
+        g.rows.push(r);
+      }
+      const grupos = [...mapa.values()].sort((a, b) => b.rows.length - a.rows.length);
+      for (const g of grupos) {
+        const n = g.rows.length;
+        g.label = `${n} reclamo${n === 1 ? '' : 's'}`;
+      }
+      return grupos;
+    }
     const filas = [...filteredReclamos].sort((a, b) => {
       if (ordenamiento === 'programado') {
         const va = a.fecha_programada ? new Date(a.fecha_programada).getTime() : Infinity;
@@ -3277,7 +3305,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       g.label = g.key === 'sin-fecha' ? `Sin fecha programada · ${base}` : base;
     }
     return grupos;
-  }, [filteredReclamos, ordenamiento]);
+  }, [filteredReclamos, ordenamiento, agruparPor]);
 
   // --- Specs del shell estándar (piloto SemanticAbmPage) ---
   const puedeCrear = !soloMisTrabajos && !soloMiArea;
@@ -3445,6 +3473,16 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             statusTabs={activeView === 'table' ? [] : tabsEstado}
             activeStatus={filtroEstado}
             onStatusChange={(id) => setFiltroEstado(id)}
+            groupSpec={{
+              opciones: [
+                { id: 'dia', label: 'Día' },
+                { id: 'estado', label: 'Estado' },
+                { id: 'dependencia', label: 'Dependencia' },
+                { id: 'categoria', label: 'Categoría' },
+              ],
+              activo: agruparPor,
+              onGroup: (id) => setAgruparPor(id as typeof agruparPor),
+            }}
             /* Un foco puesto desde el hero NUNCA queda invisible: se anuncia
                acá, y se saca desde la acción del propio hero (arriba de todo). */
             filterSummary={

@@ -211,6 +211,10 @@ export interface ListToolbarProps {
 export interface SelectOption {
   value: string;
   label: string;
+  /** [v3.1] Color runtime de la opción (categoría/área). El criterio ÚNICO:
+   *  el color vive en el PUNTO de la píldora (SelectorAdaptativo) — jamás
+   *  pinta el fondo ni el texto completos. Omitido ⇒ punto neutro. */
+  color?: string;
 }
 
 /** Select de la FilterBar (patrón Etiqueta muted + Valor 600 + chevron).
@@ -277,6 +281,21 @@ export interface SortSpec {
   onSort: (id: string) => void;
 }
 
+/**
+ * [v3] Segmented chico de AGRUPAMIENTO ("Agrupar: Día · Estado · Dependencia"):
+ * mismo lenguaje visual que el orden, al lado suyo. Why (dueño, 2026-09-03):
+ * la vista agrupada por día como única opción "es bastante molesta" — todo
+ * combo de filtro de la pantalla es candidato natural a agrupamiento. La
+ * página agrupa (computa los TableGroups según la opción); la barra pinta y
+ * notifica — presentacional puro, igual que SortSpec.
+ */
+export interface GroupSpec {
+  opciones: SortOption[];
+  /** id de la opción activa ('dia', 'estado', 'dependencia'…). */
+  activo: string;
+  onGroup: (id: string) => void;
+}
+
 export interface FilterBarProps {
   selects: SelectSpec[];
   /** Omitir en listas sin fecha (Personal, Inventario). */
@@ -288,6 +307,8 @@ export interface FilterBarProps {
   onStatusChange: (id: string) => void;
   /** [v2.1] Segmented chico de orden (ver SortSpec). Omitido ⇒ no se pinta. */
   sortSpec?: SortSpec;
+  /** [v3] Segmented chico de agrupamiento (ver GroupSpec). Omitido ⇒ no se pinta. */
+  groupSpec?: GroupSpec;
   /** Resumen del filtro aplicado, a la derecha: "50 movimientos · $ 43.048.905". */
   filterSummary?: string;
 }
@@ -389,6 +410,9 @@ export interface EnfoqueSectionSpec<Row = unknown> {
   ctaLabel?: string;
   /** true ⇒ arranca colapsada (secciones largas o de archivo). */
   colapsable?: boolean;
+  /** [v3] Acción de la SECCIÓN ENTERA en su cabecera ("Eliminar estas 88").
+   *  La página resuelve el onClick con sus propias filas (tiene el match). */
+  headerAction?: Action;
 }
 
 /** [v3] La vista enfoque completa: saludo contextual + chips resumen +
@@ -534,6 +558,9 @@ export interface TableGroup<Row = unknown> {
   veredicto?: Veredicto;
   /** Subtotal YA formateado; se muestra si showGroupSubtotal (kind='money'). */
   subtotal?: string;
+  /** [v3] Acción del GRUPO ENTERO en su cabecera ("Eliminar estas 12") —
+   *  operar la agrupación sin abrir nada. Se tiñe con el veredicto. */
+  action?: Action;
   rows: Row[];
 }
 
@@ -752,6 +779,8 @@ export interface SemanticAbmPageProps<Row = unknown> {
   statusTabs: StatusTab[];
   /** [v2.1] Segmented chico de orden (ver SortSpec). Pass-through a FilterBar. */
   sortSpec?: SortSpec;
+  /** [v3] Segmented chico de agrupamiento (ver GroupSpec). Pass-through. */
+  groupSpec?: GroupSpec;
   filterSummary?: string;
 
   /* --- Cuerpo --- */
@@ -807,6 +836,13 @@ export interface SemanticAbmPageProps<Row = unknown> {
    *  los computa el kit (contador + punto de color). 'date'/'hour' siguen
    *  esperando `groups` precomputados por la página (fechas formateadas). */
   groupBy?: 'date' | 'hour' | 'taxonomy' | 'state' | 'none';
+  /**
+   * [v3] Acción por GRUPO de la tabla ("Eliminar estas 12"): el kit computa
+   * los grupos (groupBy 'taxonomy'/'state') y le pregunta a la página qué
+   * acción lleva cada cabecera. Devolver null ⇒ ese grupo sin acción.
+   * También aplica sobre `groups` precomputados que no traigan `action`.
+   */
+  groupAction?: (grupo: TableGroup<Row>) => Action | null;
   showGroupSubtotal?: boolean;
   rows: Row[];
   /** Grupos precomputados (ver DataTableProps.groups). */

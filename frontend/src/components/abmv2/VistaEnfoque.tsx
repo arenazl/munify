@@ -120,6 +120,21 @@ export function VistaEnfoque<Row>({
                 </span>
                 {s.subtitulo && <span className="av2-enf-sub">{s.subtitulo}</span>}
               </span>
+              {/* [v3] Acción de la sección entera ("Eliminar estas 88"):
+                  operar el grupo sin abrir nada — la resuelve la página. */}
+              {s.headerAction && filas.length > 0 && (
+                <button
+                  type="button"
+                  className={`av2-enf-accion${s.veredicto ? ` av2-vered-${s.veredicto}` : ''}`}
+                  onClick={s.headerAction.onClick}
+                  title={s.headerAction.label}
+                >
+                  {s.headerAction.icon && (
+                    <s.headerAction.icon size={13} strokeWidth={1.9} aria-hidden />
+                  )}
+                  {s.headerAction.label}
+                </button>
+              )}
               {s.colapsable && filas.length > 0 && (
                 <button
                   type="button"

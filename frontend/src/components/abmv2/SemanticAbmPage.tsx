@@ -177,6 +177,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     searchPlaceholder,
     views,
     roles,
+    groupAction,
     secondaryAction,
     primaryAction,
     steps,
@@ -185,6 +186,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     period,
     statusTabs,
     sortSpec,
+    groupSpec,
     filterSummary,
     /* cuerpo */
     viewSlots,
@@ -341,9 +343,16 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
          vistas. Declarar `selects` anula la autoderivación. --- */
   const filasTodas = groups?.length ? groups.flatMap((g) => g.rows) : rows;
   const autoFiltrar = (!selects || selects.length === 0) && !!roles?.taxonomy;
-  const opcionesTaxonomia = autoFiltrar
-    ? [...new Set(filasTodas.map((r) => roles!.taxonomy!(r)?.label ?? 'Sin tipo'))]
-    : [];
+  const opcionesTaxonomia = (() => {
+    if (!autoFiltrar) return [] as Array<{ label: string; color?: string }>;
+    const vistos = new Map<string, string | undefined>();
+    for (const r of filasTodas) {
+      const t = roles!.taxonomy!(r);
+      const label = t?.label ?? 'Sin tipo';
+      if (!vistos.has(label)) vistos.set(label, t?.color);
+    }
+    return [...vistos.entries()].map(([label, color]) => ({ label, color }));
+  })();
   const selectsEfectivos =
     autoFiltrar && opcionesTaxonomia.length > 1
       ? [
@@ -353,7 +362,9 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
             value: filtroTaxonomia,
             options: [
               { value: '', label: 'Todos' },
-              ...opcionesTaxonomia.map((l) => ({ value: l, label: l })),
+              /* El color viaja con la opción: el SelectorAdaptativo lo pone
+                 en el PUNTO de la píldora (criterio único v3.1). */
+              ...opcionesTaxonomia.map((o) => ({ value: o.label, label: o.label, color: o.color })),
             ],
             onChange: setFiltroTaxonomia,
           },
@@ -404,7 +415,13 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     }
     return lista;
   })();
-  const gruposTabla = gruposAutomaticos ?? groupsVisibles;
+  const gruposBase = gruposAutomaticos ?? groupsVisibles;
+  /* [v3] Acción por grupo: el kit computó los grupos, la página decide qué
+     acción lleva cada cabecera ("Eliminar estas 12"). */
+  const gruposTabla =
+    groupAction && gruposBase
+      ? gruposBase.map((g) => ({ ...g, action: g.action ?? groupAction(g) ?? undefined }))
+      : gruposBase;
 
   /* --- [v3] Vista ENFOQUE: secciones declaradas por la página o, sin
          declarar, derivadas del rol `state` (una sección por estado presente,
@@ -597,6 +614,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
           activeStatus={activeStatus}
           onStatusChange={onStatusChange}
           sortSpec={sortSpec}
+          groupSpec={groupSpec}
           filterSummary={filterSummary}
         />
       </div>

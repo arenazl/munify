@@ -19,12 +19,14 @@
  *   trámites 7 · noticias 5 · usuarios 5.
  * Niveles: 75+ íntegra (verde) · 40-74 a medias (ámbar) · <40 rota (rojo).
  */
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, Wrench } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Trash2, Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
-import { ChipEstado } from '../components/abmv2/DataTable';
+import { ChipEstado, EntityCell } from '../components/abmv2/DataTable';
 import { MetricCell } from '../components/abmv2/Controls';
-import type { ChipTone, ColumnSpec, RolesSemanticos, ViewKind } from '../components/abmv2/types';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import type { Action, ChipTone, ColumnSpec, RolesSemanticos, TableGroup, ViewKind } from '../components/abmv2/types';
 import { API_URL } from '../lib/api';
 import { seg } from '../lib/semanticHero';
 
@@ -77,13 +79,54 @@ export default function DemosListado() {
   const [vista, setVista] = useState<ViewKind>('table');
   const [orden, setOrden] = useState('integridad');
 
-  useEffect(() => {
+  const cargar = useCallback(() => {
+    setLoading(true);
     fetch(`${API_URL}/demos/auditoria`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: DemoAudit[]) => setDemos(data))
       .catch(() => setDemos([]))
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  /* --- PURGA (dueño, 2026-09-03): borrar una demo o el grupo entero desde
+     acá. El backend exige sesión de SUPER ADMIN — se usa el token que ya
+     tenga este navegador (entrando por /super); sin él, avisa cómo. --- */
+  const [aBorrar, setABorrar] = useState<{ ids: number[]; titulo: string } | null>(null);
+  const [purgando, setPurgando] = useState(false);
+
+  const purgar = async () => {
+    if (!aBorrar) return;
+    setPurgando(true);
+    try {
+      const res = await fetch(`${API_URL}/demos/purga`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ municipio_ids: aBorrar.ids }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        toast.error('Borrar demos exige tu sesión de super admin: entrá por /super y volvé.');
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      const rechazadas = (data.resultados as Array<{ ok: boolean; codigo?: string; motivo?: string }>)
+        .filter((r) => !r.ok);
+      toast.success(`${data.borradas} de ${data.total} demos eliminadas.`);
+      for (const r of rechazadas.slice(0, 3)) {
+        toast.info(`${r.codigo ?? 'demo'}: ${r.motivo}`);
+      }
+      cargar();
+    } catch {
+      toast.error('No se pudo completar la purga. Probá de nuevo.');
+    } finally {
+      setPurgando(false);
+      setABorrar(null);
+    }
+  };
 
   const conScore = useMemo(
     () =>
@@ -188,12 +231,22 @@ export default function DemosListado() {
         : null;
     },
     amount: (d) => `${d.score}%`,
-    state: (d) => ({ label: `${NIVEL_LABEL[d.nivel]} · ${d.score}%`, tono: NIVEL_TONO[d.nivel] }),
+    /* Sin el % en el label: agruparía por "A medias · 55%" y fragmentaría
+       los grupos por score — el % ya vive en la columna Integridad. */
+    state: (d) => ({ label: NIVEL_LABEL[d.nivel], tono: NIVEL_TONO[d.nivel] }),
     verdict: (d) => NIVEL_VEREDICTO[d.nivel],
   }), []);
 
   const columnas = useMemo<ColumnSpec<Fila>[]>(() => [
-    { id: 'demo', header: 'Demo', width: 'minmax(200px, 1.6fr)', kind: 'entity' },
+    {
+      id: 'demo',
+      header: 'Demo',
+      width: 'minmax(200px, 1.6fr)',
+      kind: 'entity',
+      cell: (d) => (
+        <EntityCell icon={undefined} title={d.nombre} subtitle={`${d.codigo} · ${PAIS_LABEL[d.pais] ?? d.pais}`} />
+      ),
+    },
     {
       id: 'barrios',
       header: 'Barrios',
@@ -265,6 +318,21 @@ export default function DemosListado() {
     },
   ], []);
 
+  const purgarNivel = useCallback((nivel: Nivel) => {
+    const filas = conScore.filter((d) => d.nivel === nivel);
+    if (filas.length === 0) return;
+    setABorrar({
+      ids: filas.map((d) => d.id),
+      titulo: `las ${filas.length} demos "${NIVEL_LABEL[nivel]}"`,
+    });
+  }, [conScore]);
+
+  const accionPurgaNivel = useCallback((nivel: Nivel): Action => ({
+    label: `Eliminar ${conScore.filter((d) => d.nivel === nivel).length}`,
+    icon: Trash2,
+    onClick: () => purgarNivel(nivel),
+  }), [conScore, purgarNivel]);
+
   const enfoque = useMemo(() => ({
     resumen:
       rotas.length + aMedias.length > 0
@@ -280,6 +348,7 @@ export default function DemosListado() {
         match: (d: Fila) => d.nivel === 'rota',
         ctaLabel: 'Abrir la demo',
         emptyMessage: 'Ninguna demo rota.',
+        headerAction: accionPurgaNivel('rota'),
       },
       {
         id: 'a_medias',
@@ -289,6 +358,7 @@ export default function DemosListado() {
         veredicto: 'advertencia' as const,
         match: (d: Fila) => d.nivel === 'a_medias',
         ctaLabel: 'Abrir la demo',
+        headerAction: accionPurgaNivel('a_medias'),
       },
       {
         id: 'integra',
@@ -300,7 +370,7 @@ export default function DemosListado() {
         colapsable: true,
       },
     ],
-  }), [rotas.length, aMedias.length]);
+  }), [rotas.length, aMedias.length, accionPurgaNivel]);
 
   return (
     <div className="av2-standalone">
@@ -345,7 +415,27 @@ export default function DemosListado() {
         rowKey={(d) => d.codigo}
         rowActions={[
           { id: 'abrir', label: 'Abrir la demo', icon: ExternalLink, onClick: abrirDemo },
+          {
+            id: 'del',
+            label: 'Eliminar la demo',
+            icon: Trash2,
+            danger: true,
+            onClick: (d: Fila) => setABorrar({ ids: [d.id], titulo: `la demo "${d.nombre}"` }),
+          },
         ]}
+        groupAction={(g: TableGroup<Fila>) =>
+          g.rows.length > 0
+            ? {
+                label: `Eliminar estas ${g.rows.length}`,
+                icon: Trash2,
+                onClick: () =>
+                  setABorrar({
+                    ids: g.rows.map((d) => d.id),
+                    titulo: `las ${g.rows.length} demos "${g.title ?? g.key}"`,
+                  }),
+              }
+            : null
+        }
         onRowClick={abrirDemo}
         loading={loading}
         emptyMessage={
@@ -354,6 +444,18 @@ export default function DemosListado() {
             : 'No hay demos generadas todavía. Se crean desde la landing comercial o la vitrina /demo.'
         }
         footer={{ showing: `Mostrando ${visibles.length} de ${conScore.length}` }}
+      />
+
+      <ConfirmModal
+        isOpen={aBorrar !== null}
+        onClose={() => setABorrar(null)}
+        onConfirm={purgar}
+        title="Eliminar demos"
+        message={
+          aBorrar
+            ? `Se ${aBorrar.ids.length === 1 ? 'elimina' : 'eliminan'} ${aBorrar.titulo} con TODOS sus datos (borrado guiado por el esquema, sin vuelta atrás). La demo de muestra y los municipios con usuarios reales quedan protegidos por el backend.${purgando ? ' Purgando…' : ''}`
+            : ''
+        }
       />
     </div>
   );

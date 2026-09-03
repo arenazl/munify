@@ -605,6 +605,23 @@ export function DataTable<Row>({
           {g.badge && <Insignia top={g.badge.top} bottom={g.badge.bottom} veredicto={g.veredicto} />}
           <GrupoTexto g={g} />
           <span className="av2-tabla-grupo-linea" aria-hidden="true" />
+          {/* [v3] Acción del GRUPO ENTERO ("Eliminar estas 12") — pedida por
+              el dueño para /demos-listado: operar la agrupación sin abrir
+              nada. Declarativa: viene en TableGroup.action. */}
+          {g.action && (
+            <button
+              type="button"
+              className={`av2-tabla-grupo-accion${g.veredicto ? ` av2-vered-${g.veredicto}` : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                g.action?.onClick?.();
+              }}
+              title={g.action.label}
+            >
+              {g.action.icon && <g.action.icon size={13} strokeWidth={1.9} aria-hidden />}
+              {g.action.label}
+            </button>
+          )}
         </div>
         {g.rows.map(renderFila)}
       </div>

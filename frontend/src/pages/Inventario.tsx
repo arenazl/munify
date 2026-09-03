@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SemanticAbmPage } from '../components/abmv2/SemanticAbmPage';
-import { EntityCell, ChipEstado } from '../components/abmv2/DataTable';
+import { EntityCell, ChipEstado, DotCell } from '../components/abmv2/DataTable';
 import type { ColumnSpec, RolesSemanticos, ViewKind } from '../components/abmv2/types';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -334,7 +334,9 @@ export default function Inventario() {
   ], [depositos]);
 
   const categoriaFiltroOptions: SelectOption[] = useMemo(() =>
-    categorias.map(c => ({ value: String(c.id), label: c.nombre })),
+    /* [v3.1] El color viaja con la opción: el SelectorAdaptativo lo pone en
+       el PUNTO de la píldora — mismo color que la categoría en la grilla. */
+    categorias.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
   [categorias]);
 
   const inputStyle = { backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` };
@@ -385,8 +387,12 @@ export default function Inventario() {
       id: 'categoria',
       header: 'Categoría',
       width: 'minmax(120px, 0.9fr)',
-      kind: 'text',
-      cell: (it) => it.categoria_nombre || '—',
+      /* [v3.1] Criterio único: el color de la categoría en el PUNTO, texto
+         neutro — el mismo color que la píldora del filtro. */
+      kind: 'dot',
+      cell: (it) => (
+        <DotCell label={it.categoria_nombre || '—'} dotColor={it.categoria_color || undefined} />
+      ),
     },
     {
       id: 'deposito',

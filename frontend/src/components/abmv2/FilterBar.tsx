@@ -26,7 +26,7 @@
  * Presentacional puro: todo estado controlado por props. Cero colores fijos —
  * clases `av2-*` + tokens `--pl-*`.
  */
-import { ArrowRight, ArrowUpDown, Plus, X } from 'lucide-react';
+import { ArrowRight, ArrowUpDown, Layers, Plus, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
 import { SelectorAdaptativoSpec } from './SelectorAdaptativo';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
@@ -311,17 +311,19 @@ export function FilterBar({
   activeStatus,
   onStatusChange,
   sortSpec,
+  groupSpec,
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
   const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
+  const hayAgrupar = !!groupSpec && groupSpec.opciones.length > 0;
 
   /* [v2.2] Toolbar y filtros son UNA tarjeta partida: una barra vacía se vería
      como una franja muerta pegada abajo. Sin nada que filtrar no se renderiza
      y el CSS le devuelve las 4 esquinas a la toolbar (`:last-child`). */
-  if (!haySelects && !hayPeriodo && !hayTabs && !hayOrden && !filterSummary) return null;
+  if (!haySelects && !hayPeriodo && !hayTabs && !hayOrden && !hayAgrupar && !filterSummary) return null;
 
   return (
     <FilterBarCuerpo
@@ -332,6 +334,7 @@ export function FilterBar({
       activeStatus={activeStatus}
       onStatusChange={onStatusChange}
       sortSpec={sortSpec}
+      groupSpec={groupSpec}
       filterSummary={filterSummary}
     />
   );
@@ -353,12 +356,14 @@ function FilterBarCuerpo({
   activeStatus,
   onStatusChange,
   sortSpec,
+  groupSpec,
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
   const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
+  const hayAgrupar = !!groupSpec && groupSpec.opciones.length > 0;
 
   /* [proyección mobile] En angosto los filtros NO viven en el flujo de la
      pantalla: viven en un panel que se abre con un botón.
@@ -462,6 +467,29 @@ function FilterBarCuerpo({
                 {tab.count !== undefined && (
                   <span className="av2-estado-conteo">{tab.count.toLocaleString('es-AR')}</span>
                 )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* [v3] Segmented chico de AGRUPAMIENTO — la página agrupa (computa
+          los TableGroups según la opción); acá se pinta y se notifica. */}
+      {hayAgrupar && groupSpec && (
+        <div className="av2-orden" role="group" aria-label="Agrupar por">
+          <Layers size={12} strokeWidth={2} className="av2-orden-icono" aria-hidden />
+          {groupSpec.opciones.map((op) => {
+            const activo = op.id === groupSpec.activo;
+            return (
+              <button
+                key={op.id}
+                type="button"
+                className={activo ? 'av2-orden-tab av2-orden-tab--activo' : 'av2-orden-tab'}
+                onClick={() => groupSpec.onGroup(op.id)}
+                aria-pressed={activo}
+                title={`Agrupar por ${op.label.toLowerCase()}`}
+              >
+                {op.label}
               </button>
             );
           })}
