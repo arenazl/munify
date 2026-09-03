@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { ZoomRuedaDeAUno } from '../mapa/piezasLeaflet';
 import { useTheme } from '../../contexts/ThemeContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -193,8 +194,6 @@ export function MapPicker({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
@@ -202,6 +201,7 @@ export function MapPicker({
         style={{ height: '100%', width: '100%' }}
         ref={mapRef}
       >
+        <ZoomRuedaDeAUno />
         <TileLayer
           key={tileProvider}
           attribution={provider.attribution}
@@ -282,14 +282,13 @@ export function MapView({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
       >
+        <ZoomRuedaDeAUno />
         <TileLayer
           key={tileProvider}
           attribution={provider.attribution}

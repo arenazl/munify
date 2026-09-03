@@ -6,6 +6,7 @@ import {
   Users, Plus, AlertTriangle, CheckCircle2, MinusCircle,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import { ZoomRuedaDeAUno } from '../components/mapa/piezasLeaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
@@ -832,10 +833,9 @@ export default function TesoreriaMapa() {
               }
             `}</style>
             <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1} center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+              <ZoomRuedaDeAUno />
               <TileLayer
                 key={tileProvider}
                 attribution={tile.attribution}
@@ -1030,8 +1030,6 @@ export default function TesoreriaMapa() {
                 style={{ height: 140, border: `1px solid ${theme.border}` }}
               >
                 <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
                   center={[selected.latitud, selected.longitud]}

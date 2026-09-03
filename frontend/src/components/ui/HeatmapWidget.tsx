@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, useMap, CircleMarker, Tooltip } from 'react-leaflet';
+import { ZoomRuedaDeAUno } from '../mapa/piezasLeaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
@@ -595,8 +596,6 @@ export default function HeatmapWidget({
       style={{ height: '100%', width: '100%' }}
     >
       <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
         center={mapCenter}
@@ -605,6 +604,7 @@ export default function HeatmapWidget({
         zoomControl={false}
         attributionControl={false}
       >
+        <ZoomRuedaDeAUno />
         <TileLayer
           url={tileUrl}
           attribution={BASEMAP_ATTR}

@@ -87,6 +87,7 @@ import {
   type PoiRecalcularResponse,
 } from '../types';
 import L from 'leaflet';
+import { InvalidarAlRedimensionar, ZoomRuedaDeAUno } from '../components/mapa/piezasLeaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import jsPDF from 'jspdf';
@@ -746,78 +747,6 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
     layerRef.current?.setLatLngs(puntos);
   }, [puntos]);
 
-  return null;
-}
-
-/**
- * El lienzo del mapa es ELÁSTICO (toma el alto libre del viewport). Leaflet
- * no se entera solo de que su contenedor cambió: sin `invalidateSize()` deja
- * tiles a medio dibujar y el fitBounds queda descentrado. Un ResizeObserver
- * sobre el contenedor cubre TODOS los casos (resize de ventana, colapso del
- * sidebar, cambio del alto calculado), no sólo el `window.resize`.
- */
-function InvalidarAlRedimensionar() {
-  const map = useMap();
-  useEffect(() => {
-    const contenedor = map.getContainer();
-    const ro = new ResizeObserver(() => {
-      map.invalidateSize({ animate: false });
-    });
-    ro.observe(contenedor);
-    return () => ro.disconnect();
-  }, [map]);
-  return null;
-}
-
-/**
- * Un gesto de rueda = un nivel de zoom.
- *
- * El zoom por rueda de Leaflet ACUMULA píxeles: `wheelPxPerZoomLevel` divide el
- * desplazamiento y devuelve cuántos niveles saltar de una. Con una rueda de alta
- * resolución --- o un trackpad, que manda decenas de eventos por gesto --- un
- * empujoncito se convierte en varios niveles y el mapa se va de viaje. Subir el
- * umbral sólo corre el problema de lugar: sigue dependiendo de cuántos píxeles
- * reporte el dispositivo.
- *
- * Acá el zoom deja de ser proporcional al desplazamiento y pasa a ser discreto:
- * cada gesto mueve exactamente un nivel, y los eventos que llegan pegados dentro
- * de la misma ventana se ignoran. `setZoomAround` mantiene bajo el cursor el
- * punto que estabas mirando, igual que el zoom nativo.
- */
-function ZoomRuedaDeAUno() {
-  const map = useMap();
-  useEffect(() => {
-    map.scrollWheelZoom.disable();
-    const contenedor = map.getContainer();
-    // Se cuenta el GESTO, no el tiempo. Un tope de milisegundos entre zooms no
-    // alcanza: un solo golpe de rueda dispara eventos durante medio segundo o
-    // mas --- las ruedas modernas y los trackpads mandan decenas con inercia ---
-    // asi que con 140 ms de tope entraban cinco o seis niveles por golpe. Acá
-    // el primer evento hace el zoom y los siguientes quedan ignorados hasta que
-    // haya SILENCIO: mientras sigan llegando, es el mismo gesto.
-    let enGesto = false;
-    let finGesto: ReturnType<typeof setTimeout> | null = null;
-    const alGirar = (e: WheelEvent) => {
-      e.preventDefault();
-      if (finGesto) clearTimeout(finGesto);
-      finGesto = setTimeout(() => { enGesto = false; }, 260);
-      if (enGesto) return;                // sigue el mismo golpe de rueda
-      enGesto = true;
-      const paso = e.deltaY > 0 ? -1 : 1;
-      const destino = Math.min(
-        map.getMaxZoom(),
-        Math.max(map.getMinZoom(), map.getZoom() + paso),
-      );
-      if (destino !== map.getZoom()) {
-        map.setZoomAround(map.mouseEventToContainerPoint(e), destino);
-      }
-    };
-    contenedor.addEventListener('wheel', alGirar, { passive: false });
-    return () => {
-      contenedor.removeEventListener('wheel', alGirar);
-      if (finGesto) clearTimeout(finGesto);
-    };
-  }, [map]);
   return null;
 }
 
@@ -3895,8 +3824,6 @@ export default function Mapa() {
           style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
         >
           <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
             center={getMapCenter()}
@@ -4364,8 +4291,6 @@ export default function Mapa() {
               style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
             >
               <MapContainer
-        wheelPxPerZoomLevel={180}
-        wheelDebounceTime={60}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
                 center={getPoiCenter()}

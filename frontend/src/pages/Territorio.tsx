@@ -34,6 +34,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Eye, EyeOff, Landmark, MapPin, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { CircleMarker, MapContainer, Polygon, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { ZoomRuedaDeAUno } from '../components/mapa/piezasLeaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
@@ -674,12 +675,11 @@ export default function Territorio() {
           center={[-34.6, -58.4]}
           zoom={5}
           preferCanvas
-          wheelPxPerZoomLevel={180}
-          wheelDebounceTime={60}
           maxZoom={BASEMAP_MAX_ZOOM}
           zoomSnap={1}
           style={{ height: '100%', width: '100%' }}
         >
+          <ZoomRuedaDeAUno />
           <TileLayer url={BASEMAP} attribution={BASEMAP_ATTR} maxZoom={BASEMAP_MAX_ZOOM} />
           <Encuadre bounds={bounds} foco={foco} />
           {capasPuntos}
