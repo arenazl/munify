@@ -9,31 +9,41 @@ Esta regla elige UNA lista coherente por municipio y la marca en la columna
 `hoja` (1 = se muestra / 0 = respaldo, con el porque en `motivo_hoja`). No se
 borra nada: el respaldo sigue ahi para revisar o para otra regla mañana.
 
-La regla (variante "E", elegida el 2026-09-03 despues de simular cuatro
-—A/B/D/E— sobre los 6 paises y cotejar una muestra al azar contra Wikipedia):
+La regla (variante "E6", 2026-09-03; nacio como "E" simulando A/B/D/E sobre
+los 6 paises, y se cerro con la auditoria de Argentina entera: E dejaba
+2.012 pares padre/hijo dibujados a la vez en 185 municipios —Gran Salta con
+sus 72 barrios adentro, Rosario 45 oficiales + 122 sub-barrios— y E6 los
+lleva a cero):
 
   1. DUPLICADOS DE GRAFIA. Dos filas del mismo municipio a menos de 1 km con
-     el mismo nombre normalizado ("Benavidez" / "Barrio Benavidez"), o una
+     el mismo nombre normalizado ("Benavidez" / "Barrio Benavidez" / "B°
+     Benavidez"; el sufijo del padron "(Est. Bolivar)" no cuenta), o una
      que es prefijo de la otra con particula "de" ("Remedios de Escalada" /
      "... de San Martin"), o casi iguales (Fischer / Fisher). Difieren en un
      numeral o un cardinal => son lugares DISTINTOS ("Bancario 2" y "3",
      "Ramos Mejia" y "Ramos Mejia Sur"). Pierde la que no tiene contorno;
      entre dos contornos, la de menos vertices. Dos contornos de distinto
      nivel (localidad vs barrio) NUNCA se deduplican: eso lo decide (2).
-  2. CONTENEDORES. Un contorno deja de ser hoja solo si los contornos mas
-     chicos que tiene adentro (cada uno con >= 50% de su area dentro) cubren
-     entre todos >= 50% de su area: la localidad "Lanus Este" con 12 barrios
-     adentro sale, los barrios quedan. Si lo que tiene adentro es poco (un
-     loteo dentro del barrio oficial "Villa Constitucion") se queda y los dos
-     conviven anidados; la semilla ubica cada reclamo en el contorno MAS
-     CHICO que lo contiene, asi que el anidado no molesta.
+  2. CONTENEDORES: NUNCA padre e hijo dibujados a la vez. Del contorno mas
+     grande al mas chico: si tiene contornos adentro (cada uno con >= 50% de
+     su area dentro), o sale el, o salen ellos. Sale el contenedor cuando lo
+     de adentro es MAYORIA —cubre >= 50% de su area ("Lanus Este" con 12
+     barrios), o es >= 50% de los contornos vivos del municipio (los
+     poligonos de localidad vienen inflados con campo: el pueblo de Bolivar
+     tiene 43 barrios que cubren el 44%)— o cuando se llama division
+     administrativa ("Gran Salta", "Seccional 10a", "Comisaria 2da"). Si lo
+     de adentro es poco (un loteo dentro de "Villa Constitucion", una
+     "116 Viviendas" dentro de su barrio) queda el y los de adentro salen
+     "absorbido": una localidad del conurbano no desaparece por un barrio
+     del 1% (Burzaco, Caseros, Villa Elisa).
   3. PUNTOS. Una fila sin contorno cuyo centro cae adentro de una hoja
      dibujada sale ("absorbido"): ya esta representada. Los puntos sobreviven
      solo donde nadie dibujo nada (parajes rurales, pueblos chicos).
 
-Lo que la regla NO hace, a proposito: no elige por conteo (#localidades vs
-#barrios, descartado por arbitrario), no baja contornos por puntos sueltos
-(un punto nunca destrona un dibujo) y no inventa contornos.
+Lo que la regla NO hace, a proposito: no elige un NIVEL por conteo
+(#localidades vs #barrios, descartado por arbitrario; la mayoria de (2) es
+por contenedor, no por nivel), no baja contornos por puntos sueltos (un
+punto nunca destrona un dibujo) y no inventa contornos.
 
 Uso: `marcar_hojas(barrios)` sobre la lista de dicts de un municipio
 (nombre, tipo, lat, lon, poligono JSON, fuente). Deja `hoja` y `motivo_hoja`
@@ -43,6 +53,7 @@ scripts, nunca en el backend.
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from collections import Counter
 from difflib import SequenceMatcher
@@ -72,10 +83,21 @@ PARECIDO_MIN = 0.88
 LARGO_MIN_PARECIDO = 6
 # Un contorno mas chico "esta adentro" de otro si al menos esta fraccion de su
 # area cae dentro; el grande deja de ser hoja si los de adentro cubren esta
-# fraccion del suyo.
+# fraccion del suyo, o si son esta fraccion de los contornos vivos del municipio.
 FRACCION_ADENTRO = 0.5
 FRACCION_CUBIERTO = 0.5
+FRACCION_MAYORIA = 0.5
 LARGO_MOTIVO = 120
+# Sufijo del padron INDEC/BAHRA: "San Carlos de Bolivar (Est. Bolivar)" es la
+# misma localidad que "San Carlos de Bolivar" (tambien "Ap." apeadero y "Emb."
+# embarcadero). Otros parentesis quedan: "Parque La Gruta (Este)" y "(Oeste)"
+# son dos barrios.
+_SUFIJO_PADRON = re.compile(r"\((?:est|estacion|estación|ap|apeadero|emb|embarcadero)\.?\s[^)]*\)", re.I)
+# "Barrio X", "B° X", "Bo. X", "Barrio Barrio X" (asi vino de OSM) -> "X".
+_PREFIJO_BARRIO = re.compile(r"^(?:(?:barrio|bo|b)\s+)+")
+# Un contorno cuyo nombre empieza asi es una division administrativa o un
+# aglomerado, no un barrio: si tiene barrios adentro, sale el.
+DIVISIONES = frozenset({"gran", "comisaria", "seccional", "seccion", "circunscripcion", "distrito", "jurisdiccion"})
 
 
 def _norm(s: str) -> str:
@@ -85,8 +107,12 @@ def _norm(s: str) -> str:
 
 
 def _comparable(s: str) -> str:
-    s = _norm(s)
-    return s[7:] if s.startswith("barrio ") else s
+    return _PREFIJO_BARRIO.sub("", _norm(_SUFIJO_PADRON.sub(" ", s or "")))
+
+
+def es_division(nombre: str) -> bool:
+    toks = _norm(nombre).split()
+    return bool(toks) and toks[0] in DIVISIONES
 
 
 def parecidos(a: str, b: str) -> bool:
@@ -196,16 +222,25 @@ def marcar_hojas(barrios: list[dict]) -> dict:
             if pierde is a:
                 break
 
-    # (2) contenedores: sale el contorno que esta mayormente cubierto por los de adentro
+    # (2) contenedores, del mas grande al mas chico: nunca padre e hijo dibujados a la vez.
+    # Sale el contenedor si lo de adentro es mayoria (por area o por cantidad) o si es
+    # una division administrativa; si no, salen los de adentro (absorbidos).
     vivos = [r for r in filas if r["estado"] == "hoja"]
-    polis = [r for r in vivos if r["P"] is not None]
+    polis = sorted((r for r in vivos if r["P"] is not None), key=lambda r: -r["area"])
     for p in polis:
-        adentro = [q["P"] for q in polis if q is not p and _adentro(q, p)]
-        if not adentro:
+        if p["estado"] == "fuera":
             continue
-        cubierto = unary_union(adentro).intersection(p["P"]).area / p["area"]
-        if cubierto >= FRACCION_CUBIERTO:
-            _fuera(p, f"contenedor:{len(adentro)} ({cubierto:.0%})")
+        vivos_poli = [q for q in polis if q["estado"] == "hoja"]
+        hijos = [q for q in vivos_poli if q is not p and _adentro(q, p)]
+        if not hijos:
+            continue
+        cubierto = unary_union([q["P"] for q in hijos]).intersection(p["P"]).area / p["area"]
+        mayoria = len(hijos) >= FRACCION_MAYORIA * (len(vivos_poli) - 1)
+        if cubierto >= FRACCION_CUBIERTO or mayoria or es_division(p["b"]["nombre"]):
+            _fuera(p, f"contenedor:{len(hijos)} ({cubierto:.0%})")
+        else:
+            for q in hijos:
+                _fuera(q, "absorbido:" + p["b"]["nombre"])
 
     # (3) puntos adentro de una hoja dibujada
     hojas_poli = [r for r in polis if r["estado"] == "hoja"]

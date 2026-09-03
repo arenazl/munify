@@ -198,3 +198,15 @@ las filas (el fallback), no se rompen.
   servicio es `mysql-aiven` y `avn` exige `--project`.
 - Dos agentes en el mismo working tree: commit con lista explícita, nunca
   `git add -A`, nunca `frontend/dist/`.
+
+## 8. Actualización 2026-09-03 (tarde): auditoría de Argentina y regla E6
+
+Lucas pidió verificar que no hubieran quedado "dos niveles a la vez" y un chequeo de nombres repetidos, AR entero (no muestreo):
+
+- **Anidados dibujados con E:** 2.012 pares padre/hijo ambos `hoja` en 185 municipios (1.925 con el hijo 90-100 % adentro). Causa: E dejaba convivir anidados cuando los de adentro cubrían < 50 % (Gran Salta + 72 barrios; Rosario 45 oficiales + 122 sub-barrios; Goya "Comisaría 2da" + 18; Bolívar pueblo + 43).
+- **Nombres repetidos entre hojas:** 345 pares parecidos; 139 a > 3 km son lugares distintos; de los 206 cercanos, 8 fugas reales: 6 por el sufijo del padrón `(Est. X)`/`(Ap. X)`, `Barrio Barrio Smith` (Paraná), `B° Iprodha` (El Soberbio). El resto son distintos de verdad (Chacra 223/223C, Este/Oeste…).
+- **Variantes simuladas:** E2/E5 "localidad con barrio adentro siempre sale" mata 50 localidades del conurbano por un barrio del 1 % (Burzaco, Caseros, Villa Elisa); E7 "sólo área" colapsa Bolívar 50 → 11 y Coronel Rosales 19 → 7. **Elegida E6** (con el "dale" de Lucas): del más grande al más chico, el contenedor sale si lo de adentro es mayoría —≥ 50 % de su área o ≥ 50 % de los contornos vivos del municipio— o si se llama división (`Gran`, `Seccional`, `Comisaría`, `Sección`, `Circunscripción`, `Distrito`, `Jurisdicción`); si no, absorbe a los de adentro. Nunca los dos. Dedupe: ignora el sufijo del padrón y los prefijos `B°/Bo./Barrio` repetidos. Residuo aceptado: ~11 localidades chicas que salen por pocos barrios (Béccar, Villa San Agustín) y ~25 que absorben 5+ (Ciudad de Maipú 34, Km 3 de Comodoro 17).
+- **QA re-marcada (AR):** 23.434 filas → 17.714 hoja, 10.766 con contorno (61 %), 218 munis 100 % dibujados, 555 mitad+, **0 anidados**; 1.576 filas cambiaron, 0,4 min. Salta 78 → 157 hojas, Rosario 167 → 45, Lanús 43 → 41. Los otros 5 países siguen con la marca E (re-marcar con `--pais PY,UY,CL,BO,PE` cuando se toquen).
+- Scripts de la auditoría en el scratchpad de la sesión (`audit_hojas.py`, `audit2-7.py`); la regla vive en `scripts/geo/_hojas.py`.
+- **Prod: FRENADO por Lucas** ("no quiero subir nada a prod todavía"); Infra avisada por SendMessage. La F1 del paquete se re-avisa cuando él lo diga.
+- Siguiente: pantalla de sólo lectura en Munify para recorrer país → provincia → municipio y ver qué tiene el catálogo (pedido de Lucas); después `landuse=residential` del PBF y BAHRA para completar nombres de AR.
