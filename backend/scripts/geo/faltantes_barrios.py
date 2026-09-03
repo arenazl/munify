@@ -15,6 +15,12 @@ local. Tres listas, de más grave a más fina:
   2. `municipios_sin_ningun_contorno` — tienen barrios, pero todos como punto.
   3. `barrios_sin_poligono`           — el detalle: cada barrio que hoy es un
                                         punto, con su municipio, tipo y fuente.
+                                        SÓLO para los países de `--detalle`
+                                        (default AR, PY, UY: los de la grilla).
+                                        Con los seis países el detalle son
+                                        141.000 filas / 26 MB, y 128.000 de
+                                        ellas son caseríos rurales de CL/BO/PE
+                                        (`village`/`hamlet`), no barrios a curar.
 
 Y un `resumen` por país y provincia con los mismos números que imprime
 `catalogo_barrios_pbf.py`, para comparar corridas.
@@ -23,6 +29,7 @@ Uso (desde la raíz del repo; la URL viaja por entorno, nunca en el código):
 
     DATABASE_URL_QA="..." python backend/scripts/geo/faltantes_barrios.py --env qa
     # --pais AR         sólo un país (default: todos los que tengan contorno)
+    # --detalle CL,BO   países con detalle barrio por barrio (default AR,PY,UY)
     # --salida ruta     default backend/scripts/datos/faltantes_barrios.json
 """
 from __future__ import annotations
@@ -38,7 +45,7 @@ BACKEND = os.path.dirname(os.path.dirname(AQUI))
 sys.path.insert(0, BACKEND)
 sys.path.insert(0, os.path.dirname(AQUI))
 
-from sqlalchemy import text  # noqa: E402
+from sqlalchemy import bindparam, text  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
 from _entorno import parser_base, resolver_db  # noqa: E402
@@ -49,6 +56,8 @@ SALIDA_DEFAULT = os.path.join(BACKEND, "scripts", "datos", "faltantes_barrios.js
 def _args():
     p = parser_base("Escribe el JSON de faltantes del catálogo de barrios (sólo lectura).")
     p.add_argument("--pais", default="", help="ISO-2; vacío = todos los países con contorno")
+    p.add_argument("--detalle", default="AR,PY,UY",
+                   help="ISO-2 separados por coma con detalle barrio por barrio (default AR,PY,UY)")
     p.add_argument("--salida", default=SALIDA_DEFAULT, help="Ruta del JSON de salida")
     return p.parse_args()
 
@@ -59,6 +68,11 @@ async def main() -> None:
     engine = create_async_engine(cfg.url)
     filtro_pais = " AND c.pais = :pais" if args.pais else ""
     params = {"pais": args.pais.upper()} if args.pais else {}
+    detalle = sorted({x.strip().upper() for x in args.detalle.split(",") if x.strip()})
+    if args.pais:
+        detalle = [p for p in detalle if p == args.pais.upper()]
+    filtro_detalle = " AND c.pais IN :detalle" if detalle else " AND 1 = 0"
+    params_detalle = {**params, "detalle": tuple(detalle)} if detalle else params
 
     async with engine.connect() as conn:
         # Un renglón por municipio con contorno: cuántos barrios y cuántos con polígono.
@@ -72,14 +86,17 @@ async def main() -> None:
             ORDER BY c.pais, c.provincia, c.nombre
         """), params)).mappings().all()
 
-        barrios = (await conn.execute(text(f"""
+        consulta = text(f"""
             SELECT b.municipio_catalogo_id AS municipio_id, c.nombre AS municipio,
                    c.pais, c.provincia, b.nombre, b.tipo, b.fuente, b.lat, b.lon
             FROM catalogo_barrios b
             JOIN municipios_catalogo c ON c.id = b.municipio_catalogo_id
-            WHERE b.poligono IS NULL{filtro_pais}
+            WHERE b.poligono IS NULL{filtro_pais}{filtro_detalle}
             ORDER BY c.pais, c.provincia, c.nombre, b.nombre
-        """), params)).mappings().all()
+        """)
+        if detalle:
+            consulta = consulta.bindparams(bindparam("detalle", expanding=True))
+        barrios = (await conn.execute(consulta, params_detalle)).mappings().all()
     await engine.dispose()
 
     sin_barrios, sin_contorno = [], []
@@ -102,6 +119,7 @@ async def main() -> None:
             d["con_algun_contorno"] += 1 if con else 0
             d["barrios"] += n
             d["barrios_con_poligono"] += con
+            d["barrios_como_punto"] = d["barrios"] - d["barrios_con_poligono"]
 
     salida = {
         "generado": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
@@ -109,6 +127,7 @@ async def main() -> None:
         "que_es": ("Huecos del catálogo de barrios (catalogo_barrios vs municipios_catalogo con "
                    "contorno). Nada de esto rompe una demo: sin polígono de barrio se dibuja el "
                    "del municipio. Es la lista de qué buscar en otras fuentes."),
+        "detalle_paises": detalle,
         "resumen": resumen,
         "municipios_sin_barrios": sin_barrios,
         "municipios_sin_ningun_contorno": sin_contorno,
