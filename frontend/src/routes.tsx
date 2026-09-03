@@ -84,7 +84,6 @@ import AuditLogs from './pages/admin/AuditLogs';
 import SeedLogs from './pages/SeedLogs';
 import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
-import Demo from './pages/Demo';
 import DemoListo from './pages/DemoListo';
 import PresentacionMunify from './pages/PresentacionMunify';
 import MunicipioAcceso from './pages/MunicipioAcceso';
@@ -178,7 +177,10 @@ export const router = createBrowserRouter([
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
-  { path: '/demo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Demo /> },
+  // [2026-09-03] La VITRINA /demo tampoco va más (dueño): la entrada a las
+  // demos es /demos-listado (la auditoría). Las puertas por municipio
+  // (/demo/:codigo y /demo/:codigo/login) siguen vivas más abajo.
+  { path: '/demo', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
   { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
   // Puerta de DEMOS con prefijo propio (dueño, 2026-09-02): a un municipio
   // es_demo se entra por /demo/<codigo> hasta que sea facturable; la puerta
@@ -194,7 +196,7 @@ export const router = createBrowserRouter([
   // obsoleta y solo aparecía por redirects. La ruta queda como redirect a la
   // vitrina /demo para los deep-links guardados; los navigate internos ya
   // apuntan a /demo directo.
-  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demo'} replace /> },
+  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
   // Auditoría pública de demos: qué pudo crear bien el generador (barrios,
   // polígonos, zonas, seeds) con su score de integridad. Sin llave.
   { path: '/demos-listado', element: <DemosListado /> },

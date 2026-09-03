@@ -208,7 +208,7 @@ export default function MobilePerfil() {
             localStorage.removeItem('municipio_id');
             localStorage.removeItem('municipio_nombre');
             localStorage.removeItem('municipio_color');
-            navigate('/demo');
+            navigate('/demos-listado');
           }}
           className="text-xs px-3 py-1.5 rounded-lg"
           style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}

@@ -33,7 +33,7 @@ export default function DemoListo() {
       <div>
         <p className="text-white/80">No se recibió el código del municipio</p>
         <button
-          onClick={() => navigate('/demo')}
+          onClick={() => navigate('/demos-listado')}
           className="mt-4 px-4 py-2 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20"
         >
           Crear otra demo
