@@ -19,14 +19,14 @@
  *   toggle ("Todos los períodos") vuelve a "todos". `unit`/`from`/`to`
  *   conservan mientras tanto la propuesta de aterrizaje (contrato en types).
  * - Segmented de estados con conteo: count 0 ⇒ apagado y NO clickeable.
- * - [v2.1] `sortSpec`: segmented CHICO de orden al final de la barra, antes
- *   del resumen. Es ORDEN, no filtro: la página ordena; la barra notifica.
+ * - [v3.2] Orden y agrupamiento YA NO viven acá: subieron a la PRIMERA línea
+ *   (ListToolbar) por pedido del dueño — abajo quedan SOLO los filtros.
  * - `filterSummary` opcional dockeado a la derecha.
  *
  * Presentacional puro: todo estado controlado por props. Cero colores fijos —
  * clases `av2-*` + tokens `--pl-*`.
  */
-import { ArrowRight, ArrowUpDown, Layers, Plus, X } from 'lucide-react';
+import { ArrowRight, Plus, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
 import { SelectorAdaptativoSpec } from './SelectorAdaptativo';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
@@ -310,20 +310,15 @@ export function FilterBar({
   statusTabs = [],
   activeStatus,
   onStatusChange,
-  sortSpec,
-  groupSpec,
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
-  const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
-  const hayAgrupar = !!groupSpec && groupSpec.opciones.length > 0;
-
   /* [v2.2] Toolbar y filtros son UNA tarjeta partida: una barra vacía se vería
      como una franja muerta pegada abajo. Sin nada que filtrar no se renderiza
      y el CSS le devuelve las 4 esquinas a la toolbar (`:last-child`). */
-  if (!haySelects && !hayPeriodo && !hayTabs && !hayOrden && !hayAgrupar && !filterSummary) return null;
+  if (!haySelects && !hayPeriodo && !hayTabs && !filterSummary) return null;
 
   return (
     <FilterBarCuerpo
@@ -333,8 +328,6 @@ export function FilterBar({
       statusTabs={statusTabs}
       activeStatus={activeStatus}
       onStatusChange={onStatusChange}
-      sortSpec={sortSpec}
-      groupSpec={groupSpec}
       filterSummary={filterSummary}
     />
   );
@@ -355,15 +348,11 @@ function FilterBarCuerpo({
   statusTabs = [],
   activeStatus,
   onStatusChange,
-  sortSpec,
-  groupSpec,
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
-  const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
-  const hayAgrupar = !!groupSpec && groupSpec.opciones.length > 0;
 
   /* [proyección mobile] En angosto los filtros NO viven en el flujo de la
      pantalla: viven en un panel que se abre con un botón.
@@ -467,52 +456,6 @@ function FilterBarCuerpo({
                 {tab.count !== undefined && (
                   <span className="av2-estado-conteo">{tab.count.toLocaleString('es-AR')}</span>
                 )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* [v3] Segmented chico de AGRUPAMIENTO — la página agrupa (computa
-          los TableGroups según la opción); acá se pinta y se notifica. */}
-      {hayAgrupar && groupSpec && (
-        <div className="av2-orden" role="group" aria-label="Agrupar por">
-          <Layers size={12} strokeWidth={2} className="av2-orden-icono" aria-hidden />
-          {groupSpec.opciones.map((op) => {
-            const activo = op.id === groupSpec.activo;
-            return (
-              <button
-                key={op.id}
-                type="button"
-                className={activo ? 'av2-orden-tab av2-orden-tab--activo' : 'av2-orden-tab'}
-                onClick={() => groupSpec.onGroup(op.id)}
-                aria-pressed={activo}
-                title={`Agrupar por ${op.label.toLowerCase()}`}
-              >
-                {op.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* [v2.1] Segmented chico de orden — ORDEN, no filtro (la página
-          ordena; acá solo se pinta el criterio activo y se notifica). */}
-      {hayOrden && sortSpec && (
-        <div className="av2-orden" role="group" aria-label="Ordenar por">
-          <ArrowUpDown size={12} strokeWidth={2} className="av2-orden-icono" aria-hidden />
-          {sortSpec.opciones.map((op) => {
-            const activo = op.id === sortSpec.activo;
-            return (
-              <button
-                key={op.id}
-                type="button"
-                className={activo ? 'av2-orden-tab av2-orden-tab--activo' : 'av2-orden-tab'}
-                onClick={() => sortSpec.onSort(op.id)}
-                aria-pressed={activo}
-                title={`Ordenar por ${op.label.toLowerCase()}`}
-              >
-                {op.label}
               </button>
             );
           })}

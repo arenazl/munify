@@ -389,6 +389,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* [2026-09-03] Las PANTALLAS van indentadas respecto del header de su
+     módulo (dueño): el icono del grupo marcó la columna y los items cuelgan
+     un paso adentro — se lee la jerarquía módulo → pantallas de un vistazo. */
+  padding-left: 14px;
 }
 
 /* Números siempre tabulares (design system): los badges no bailan al

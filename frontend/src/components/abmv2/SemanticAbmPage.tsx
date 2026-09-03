@@ -391,19 +391,29 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
          en las filas, que la página ya ordenó. --- */
   const gruposAutomaticos = ((): TableGroup<Row>[] | undefined => {
     if ((groupBy !== 'taxonomy' && groupBy !== 'state') || !roles) return undefined;
-    const etiquetaDe = (row: Row): { titulo: string; veredicto?: Veredicto } => {
+    const etiquetaDe = (row: Row): { titulo: string; veredicto?: Veredicto; glifo?: TableGroup<Row>['glifo'] } => {
       if (groupBy === 'taxonomy') {
-        return { titulo: roles.taxonomy?.(row)?.label ?? 'Sin tipo' };
+        const t = roles.taxonomy?.(row);
+        return {
+          titulo: t?.label ?? 'Sin tipo',
+          /* [v3.2] La cabecera lleva la insignia del ICONO real de la
+             categoría — mismo ritmo que el calendario de la vista por día. */
+          glifo: t?.icon ? { icon: t.icon, color: t.color } : { icon: 'Tag' },
+        };
       }
       const st = roles.state?.(row);
-      return { titulo: st?.label ?? 'Sin estado', veredicto: tonoAVeredicto(st?.tono) };
+      return {
+        titulo: st?.label ?? 'Sin estado',
+        veredicto: tonoAVeredicto(st?.tono),
+        glifo: { icon: 'CircleDot' },
+      };
     };
     const mapa = new Map<string, TableGroup<Row>>();
     for (const row of filasPlanas) {
-      const { titulo, veredicto } = etiquetaDe(row);
+      const { titulo, veredicto, glifo } = etiquetaDe(row);
       let g = mapa.get(titulo);
       if (!g) {
-        g = { key: titulo, title: titulo, label: '', veredicto, rows: [] };
+        g = { key: titulo, title: titulo, label: '', veredicto, glifo, rows: [] };
         mapa.set(titulo, g);
       }
       g.rows.push(row);
@@ -598,6 +608,10 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
           views={viewsEfectivas}
           activeView={activeView}
           onViewChange={onViewChange}
+          /* [v3.2] Orden (botón ciclador) y agrupamiento viven en la PRIMERA
+             línea; abajo quedan solo los filtros. */
+          sortSpec={sortSpec}
+          groupSpec={groupSpec}
           secondaryAction={secondaryAction}
           primaryAction={primarioEfectivo}
           steps={steps}
@@ -613,8 +627,6 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
           statusTabs={activeView === 'table' && !tieneSlot ? [] : statusTabs}
           activeStatus={activeStatus}
           onStatusChange={onStatusChange}
-          sortSpec={sortSpec}
-          groupSpec={groupSpec}
           filterSummary={filterSummary}
         />
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, CheckCircle, XCircle, Clock, Eye, User, FileCheck, AlertTriangle, AlertCircle, Building2, Camera, Sparkles, Loader2, Wrench, ExternalLink, ArrowUpDown, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star, RotateCcw, ChevronLeft, ChevronRight, X, Check, MoveRight } from 'lucide-react';
+import { MapPin, Calendar, CheckCircle, XCircle, Clock, Eye, User, FileCheck, AlertTriangle, AlertCircle, Building2, Camera, Sparkles, Loader2, Wrench, ExternalLink, PauseCircle, PlayCircle, Inbox, ThumbsDown, Star, RotateCcw, ChevronLeft, ChevronRight, X, Check, MoveRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, dashboardApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi, calificacionesApi, poiApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -979,7 +979,11 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
       if (resetPage) {
         setLoadingMore(false);
-        setLoading(true);
+        /* [v3.1] Sin skeleton cuando YA hay filas en pantalla (dueño: "la v1
+           no lo hacía y ya tiene los datos"): al cambiar de estado/filtro la
+           lista vieja queda visible y se reemplaza cuando llega la nueva —
+           el skeleton es solo para la PRIMERA carga. */
+        if (reclamos.length === 0) setLoading(true);
       } else {
         setLoadingMore(true);
       }
@@ -3246,18 +3250,21 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
   const gruposTabla = useMemo<TableGroup<Reclamo>[]>(() => {
     if (agruparPor !== 'dia') {
-      const etiquetaDe = (r: Reclamo): string =>
+      const etiquetaDe = (r: Reclamo): { titulo: string; glifo: TableGroup<Reclamo>['glifo'] } =>
         agruparPor === 'estado'
-          ? (estadoLabels[r.estado] || r.estado)
+          ? { titulo: estadoLabels[r.estado] || r.estado, glifo: { icon: 'CircleDot' } }
           : agruparPor === 'dependencia'
-            ? (r.dependencia_asignada?.nombre ?? 'Sin dependencia')
-            : (r.categoria?.nombre ?? 'Sin categoría');
+            ? { titulo: r.dependencia_asignada?.nombre ?? 'Sin dependencia', glifo: { icon: 'Building2', color: r.dependencia_asignada?.color || undefined } }
+            : {
+                titulo: r.categoria?.nombre ?? 'Sin categoría',
+                glifo: { icon: r.categoria?.icono || 'Tag', color: r.categoria?.color || undefined },
+              };
       const mapa = new Map<string, TableGroup<Reclamo>>();
       for (const r of filteredReclamos) {
-        const titulo = etiquetaDe(r);
+        const { titulo, glifo } = etiquetaDe(r);
         let g = mapa.get(titulo);
         if (!g) {
-          g = { key: titulo, title: titulo, label: '', rows: [] };
+          g = { key: titulo, title: titulo, label: '', glifo, rows: [] };
           mapa.set(titulo, g);
         }
         g.rows.push(r);
@@ -3425,10 +3432,25 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             views={['table', 'cards', 'guided']}
             activeView={activeView}
             onViewChange={cambiarVista}
-            secondaryAction={{
-              label: ordenamiento === 'reciente' ? 'Más recientes' : 'Por vencer',
-              icon: ordenamiento === 'reciente' ? ArrowUpDown : Calendar,
-              onClick: () => setOrdenamiento(ordenamiento === 'reciente' ? 'programado' : 'reciente'),
+            /* [v3.2] Orden como botón ciclador del kit + agrupamiento en la
+               primera línea (abajo quedan solo los filtros). */
+            sortSpec={{
+              opciones: [
+                { id: 'reciente', label: 'Más recientes' },
+                { id: 'programado', label: 'Por vencer' },
+              ],
+              activo: ordenamiento,
+              onSort: (id) => setOrdenamiento(id as typeof ordenamiento),
+            }}
+            groupSpec={{
+              opciones: [
+                { id: 'dia', label: 'Día' },
+                { id: 'estado', label: 'Estado' },
+                { id: 'dependencia', label: 'Dependencia' },
+                { id: 'categoria', label: 'Categoría' },
+              ],
+              activo: agruparPor,
+              onGroup: (id) => setAgruparPor(id as typeof agruparPor),
             }}
             primaryAction={puedeCrear
               ? { label: 'Nuevo reclamo', onClick: openWizard }
@@ -3473,16 +3495,6 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
             statusTabs={activeView === 'table' ? [] : tabsEstado}
             activeStatus={filtroEstado}
             onStatusChange={(id) => setFiltroEstado(id)}
-            groupSpec={{
-              opciones: [
-                { id: 'dia', label: 'Día' },
-                { id: 'estado', label: 'Estado' },
-                { id: 'dependencia', label: 'Dependencia' },
-                { id: 'categoria', label: 'Categoría' },
-              ],
-              activo: agruparPor,
-              onGroup: (id) => setAgruparPor(id as typeof agruparPor),
-            }}
             /* Un foco puesto desde el hero NUNCA queda invisible: se anuncia
                acá, y se saca desde la acción del propio hero (arriba de todo). */
             filterSummary={
@@ -3496,7 +3508,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         {/* 5. Cuerpo por vista (tabla estándar / tarjetas / guiada) + panel IA */}
         <div className={panelIA ? 'lg:flex lg:gap-4' : undefined}>
           <div className={panelIA ? 'flex-1 min-w-0' : undefined}>
-            {loading ? (
+            {/* [v3.2] El skeleton de la PRIMERA carga es el de la vista activa
+                (dueño): en tabla lo pintan las filas fantasma del DataTable. */}
+            {loading && activeView !== 'table' ? (
               <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
@@ -3541,6 +3555,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
                 groupBy="date"
                 groups={gruposTabla}
                 rows={[]}
+                loading={loading}
                 rowKey={(r) => r.id}
                 rowActions={accionesFila}
                 onRowClick={(r) => openViewSheet(r)}

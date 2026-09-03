@@ -48,6 +48,7 @@ import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom';
 import { GripVertical, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Glifo } from './Glifo';
 import { estadoLabel } from '../../lib/enums/reclamo';
 import type { Veredicto } from '../../lib/semanticHero';
 import type {
@@ -603,6 +604,17 @@ export function DataTable<Row>({
           aria-label={g.title || g.label}
         >
           {g.badge && <Insignia top={g.badge.top} bottom={g.badge.bottom} veredicto={g.veredicto} />}
+          {/* [v3.2] Sin fecha, la cabecera lleva su insignia de ICONO — el
+              mismo ritmo visual que el calendario de la vista por día. */}
+          {!g.badge && g.glifo && (
+            <span
+              className="av2-tabla-grupo-tile"
+              style={g.glifo.color ? ({ ['--tile' as string]: g.glifo.color } as CSSProperties) : undefined}
+              aria-hidden
+            >
+              <Glifo glifo={g.glifo.icon} size={17} strokeWidth={1.9} />
+            </span>
+          )}
           <GrupoTexto g={g} />
           <span className="av2-tabla-grupo-linea" aria-hidden="true" />
           {/* [v3] Acción del GRUPO ENTERO ("Eliminar estas 12") — pedida por

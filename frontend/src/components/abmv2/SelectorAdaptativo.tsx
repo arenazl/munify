@@ -26,8 +26,8 @@ export interface SelectorAdaptativoProps {
   value: string;
   onChange: (value: string) => void;
   options: OpcionAdaptativa[];
-  /** Tope de opciones para dibujar píldoras (default 5). Más ⇒ combo. La
-   *  opción "todas" (value '') no cuenta para el tope. */
+  /** Tope de BOTONES para dibujar píldoras (default 4, "Todos" incluido —
+   *  regla del dueño 2026-09-03: hasta 4 pills, más va a combo). */
   maxPildoras?: number;
 }
 
@@ -36,15 +36,14 @@ export function SelectorAdaptativo({
   value,
   onChange,
   options,
-  maxPildoras = 5,
+  maxPildoras = 4,
 }: SelectorAdaptativoProps) {
   /* GOTCHA (bug pagado 2026-09-03): NO medir el propio contenedor con
      useAnchoAngosto — este selector es shrink-to-fit, su ancho es el del
      combo y siempre se cree "angosto" (las píldoras no salían NUNCA). La
      forma la decide la CANTIDAD; el caso mobile lo resuelve el FilterBar,
      que en angosto usa su panel de combos apilados. */
-  const reales = options.filter((o) => o.value !== '');
-  const comoPildoras = reales.length > 0 && reales.length <= maxPildoras;
+  const comoPildoras = options.length > 1 && options.length <= maxPildoras;
 
   if (!comoPildoras) {
     return (

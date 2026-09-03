@@ -4938,25 +4938,45 @@ button.av2-chip:hover { opacity: 0.85; }
   color: var(--pl-text-2);
 }
 .av2-enf-saludo-txt strong { color: var(--pl-text); font-weight: 600; }
-.av2-enf-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+/* [v3.2] Los chips del resumen TAMBIÉN en cápsula segmented (dueño: "este
+   estilo siempre — las pills sueltas quedan horrendas"). El veredicto tiñe
+   el punto; el texto queda neutro (criterio único de color). */
+.av2-enf-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-pill);
+  margin-left: auto;
+}
 .av2-enf-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--pl-border);
-  background: var(--pl-surface);
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
   color: var(--pl-text-2);
+  font-family: inherit;
   font-size: var(--pl-fs-caption);
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-enf-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pl-text-3);
+  flex: 0 0 auto;
 }
 .av2-enf-chip:hover { background: var(--pl-surface-hover); }
-.av2-enf-chip--malo { color: var(--pl-red-700); border-color: color-mix(in srgb, var(--pl-red) 35%, transparent); }
-.av2-enf-chip--advertencia { color: var(--pl-amber-700); border-color: color-mix(in srgb, var(--pl-amber-strong) 40%, transparent); }
-.av2-enf-chip--bueno { color: var(--pl-green-700); border-color: color-mix(in srgb, var(--pl-green) 35%, transparent); }
+.av2-enf-chip--malo::before { background: var(--pl-red); }
+.av2-enf-chip--advertencia::before { background: var(--pl-amber-strong); }
+.av2-enf-chip--bueno::before { background: var(--pl-green); }
 
 .av2-enf-seccion { display: flex; flex-direction: column; gap: 10px; }
 .av2-enf-cab { display: flex; align-items: flex-start; gap: 10px; }
@@ -4996,6 +5016,30 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-enf-seccion--advertencia .av2-enf-conteo { background: color-mix(in srgb, var(--pl-amber-strong) 14%, var(--pl-surface)); color: var(--pl-amber-700); }
 .av2-enf-seccion--bueno .av2-enf-conteo { background: color-mix(in srgb, var(--pl-green) 12%, var(--pl-surface)); color: var(--pl-green-700); }
 .av2-enf-sub { font-size: var(--pl-fs-body-sm); color: var(--pl-text-muted); }
+
+/* [v3.2] PRIMERA LÍNEA (dueño): search acotado (no gigante) + vistas +
+   orden-botón + agrupador + … + Nuevo SIEMPRE al final. El av2-orden dentro
+   de la toolbar no se dockea solo (eso era de la FilterBar). */
+.av2-toolbar-buscador { flex: 0 1 460px; min-width: 200px; }
+.av2-toolbar-derecha { flex: 1 1 auto; }
+.av2-toolbar-derecha .av2-orden { margin-left: 0; }
+.av2-toolbar-derecha .av2-btn-primario { margin-left: auto; }
+
+/* [v3.2] Insignia de ICONO de la cabecera de grupo (agrupamientos sin
+   fecha): mismo footprint que la insignia del día. El color runtime de la
+   categoría llega por --tile. */
+.av2-tabla-grupo-tile {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--tile, var(--pl-text-2));
+  background: color-mix(in srgb, var(--tile, var(--pl-text-3)) 13%, var(--pl-surface));
+  border: 1px solid color-mix(in srgb, var(--tile, var(--pl-text-3)) 22%, var(--pl-border));
+}
 
 /* [v3] Acción de grupo/sección entera ("Eliminar estas 88"): botón chico
    anclado a la derecha de la cabecera, teñido por el veredicto vía
@@ -5069,21 +5113,35 @@ button.av2-chip:hover { opacity: 0.85; }
    si una pantalla se ve distinta, está overrideando estilos. El color de la
    categoría vive en el PUNTO (y apenas en el fondo al activarse), no pinta
    la píldora entera. */
-.av2-selad { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+/* [v3.2] Las píldoras van DENTRO de una cápsula segmented — el mismo
+   lenguaje que "Agrupar"/"Ordenar" (dueño: "no así sueltas"). El color de
+   datos sigue viviendo en el PUNTO; la activa se eleva sobre el track. */
+.av2-selad {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-pill);
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.av2-selad .av2-select-etiqueta { margin: 0 4px 0 9px; }
 .av2-selad-pill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--pl-border);
-  background: var(--pl-surface-2);
+  padding: 4px 11px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
   color: var(--pl-text-2);
-  font-size: var(--pl-fs-caption);
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--pl-dur-ui) var(--pl-ease), color var(--pl-dur-ui) var(--pl-ease);
 }
 .av2-selad-pill::before {
   content: '';
@@ -5095,9 +5153,10 @@ button.av2-chip:hover { opacity: 0.85; }
 }
 .av2-selad-pill:hover { background: var(--pl-surface-hover); }
 .av2-selad-pill--activa {
-  background: color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 12%, var(--pl-surface));
-  border-color: color-mix(in srgb, var(--pill, var(--pl-accent, var(--pl-green))) 30%, transparent);
+  background: var(--pl-surface);
   color: var(--pl-text);
+  font-weight: 600;
+  box-shadow: var(--pl-shadow-card);
 }
 
 /* ============================================================

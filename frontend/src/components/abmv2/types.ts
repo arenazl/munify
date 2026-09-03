@@ -188,6 +188,14 @@ export interface ListToolbarProps {
   views: ViewKind[];
   activeView: ViewKind;
   onViewChange: (view: ViewKind) => void;
+  /**
+   * [v3.2] El ORDEN vive en la PRIMERA línea como UN botón que cicla las
+   * opciones (dueño: "el orden solo con botón") — ya no es un segmented de
+   * la FilterBar. El label muestra el criterio activo.
+   */
+  sortSpec?: SortSpec;
+  /** [v3.2] El AGRUPAMIENTO también sube a la primera línea (segmented). */
+  groupSpec?: GroupSpec;
   /** Botón secundario del módulo ("Proyección", "Pago masivo"…). */
   secondaryAction?: Action;
   /**
@@ -305,11 +313,9 @@ export interface FilterBarProps {
   /** id del StatusTab activo. */
   activeStatus: string;
   onStatusChange: (id: string) => void;
-  /** [v2.1] Segmented chico de orden (ver SortSpec). Omitido ⇒ no se pinta. */
-  sortSpec?: SortSpec;
-  /** [v3] Segmented chico de agrupamiento (ver GroupSpec). Omitido ⇒ no se pinta. */
-  groupSpec?: GroupSpec;
-  /** Resumen del filtro aplicado, a la derecha: "50 movimientos · $ 43.048.905". */
+  /** Resumen del filtro aplicado, a la derecha: "50 movimientos · $ 43.048.905".
+   *  [v3.2] Orden y agrupamiento se MUDARON a ListToolbarProps (primera
+   *  línea) — abajo quedan sólo los filtros. */
   filterSummary?: string;
 }
 
@@ -543,6 +549,11 @@ export interface TableGroup<Row = unknown> {
   key: string;
   /** Insignia 42×38: día sobre mes ("15"/"OCT") u hora ("09"/"HS"). */
   badge?: { top: string; bottom: string };
+  /** [v3.2] Insignia de ICONO para los agrupamientos sin fecha (estado,
+   *  dependencia, categoría): el tile le da a la cabecera el mismo ritmo
+   *  que el calendario de la vista por día. `icon` = nombre lucide o path
+   *  SVG (lo resuelve Glifo); `color` runtime tiñe el tile. */
+  glifo?: { icon: string; color?: string };
   /** Renglón fuerte del grupo: la fecha escrita entera ("15 de octubre",
    *  "Lunes 3"). Opcional — sin él la cabecera queda de UNA línea, como
    *  siempre, y no se toca ninguna pantalla existente. */
