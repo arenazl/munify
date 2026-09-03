@@ -302,15 +302,17 @@
   font-weight: 700;
   letter-spacing: 0.09em;
   color: var(--pl-text-faint);
-  padding: 0 10px 8px;
+  padding: 0 8px 6px;
 }
 
+/* `align-items: flex-start`: cuando el label se parte en dos renglones, el
+   contador queda alineado con el primero, no flotando en el medio. */
 .config-riel-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 36px;
-  padding: 7px 10px;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 8px;
   border: 0;
   border-radius: var(--pl-radius-md);
   background: transparent;
@@ -342,6 +344,7 @@
 
 .config-riel-n {
   margin-left: auto;
+  line-height: calc(var(--pl-fs-body) * 1.35);
   font-size: var(--pl-fs-caption);
   font-weight: 600;
   color: var(--pl-text-muted);
@@ -355,13 +358,15 @@
 
 /* El riel es NAVEGACIÓN, no contenido: se lleva lo mínimo y todo lo que sobra
    va al panel. Con 236px fijos + gap, en pantallas medianas la tabla del panel
-   perdía la última columna. `clamp` lo deja encogerse hasta 168px antes de que
-   el contenido empiece a sufrir, y no lo deja pasar de 212px por más ancho que
-   haya — un riel de tres ítems no gana nada siendo más ancho. */
+   perdía la última columna; con 168-212px seguía ocupando "mucho espacio"
+   (dueño, 2026-09-02). Ahora es angosto a propósito: un label largo ("Tipos de
+   punto de interés") se parte en dos renglones —`text-wrap: pretty` en el
+   label— en vez de pedir ancho. Un riel de tres ítems no gana nada siendo más
+   ancho. */
 .config-cuerpo {
   display: grid;
-  grid-template-columns: clamp(168px, 15vw, 212px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: clamp(120px, 11vw, 152px) minmax(0, 1fr);
+  gap: 12px;
   padding: 18px 20px 40px;
   align-items: start;
 }

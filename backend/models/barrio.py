@@ -4,7 +4,7 @@ Se llenan automáticamente con IA al crear el municipio.
 Usado para métricas y análisis.
 """
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import deferred, relationship
 from sqlalchemy.sql import func
 from core.database import Base
 
@@ -38,6 +38,13 @@ class Barrio(Base):
     # columna ya existía en la base (QA y prod); faltaba en el modelo, y por eso
     # los barrios de las demos nacían huérfanos de zona.
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True, index=True)
+
+    # Contorno del barrio ([[lat, lng], ...] en JSON) y su id en OSM. Los
+    # escribe el alta de la demo (paquete offline) y los lee
+    # `api/zonas.py::regiones_mapa` por SQL. `deferred`: el polígono pesa y el
+    # listado de barrios no lo necesita — se carga sólo si alguien lo pide.
+    osm_id = Column(String(40), nullable=True)
+    poligono = deferred(Column(Text, nullable=True))
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

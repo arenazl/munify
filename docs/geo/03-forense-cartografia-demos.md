@@ -84,10 +84,75 @@ esos municipios.
 `demo_seed_logs` (ya existe) como tablero de cobertura: qué municipio está
 curado, con cuántos barrios, de qué fecha.
 
-## 5. Estado de verificación
+## 5. Estado de verificación (actualizado 2026-09-02 20:45 ART)
 
-- Fixes 1-4: en `qa` hasta `27b49690`; Rafaela verificada EN LOCAL contra la
-  fuente (0 → 33 barrios). Verificación end-to-end en QA desplegado: en
-  curso (se actualiza acá). Prod: espera la promoción de Infra.
-- Este informe: avisado en `CANAL_AGENTES.md` según el acuerdo con Infra
-  (archivo = handoff; canal = línea de aviso).
+**Etapas A y B: HECHAS y verificadas en QA desplegado** (`5b5fe1ca` +
+`214d97b0`, revisión `munify-api-qa-00372-8rl`). Diferencia con lo propuesto
+en §4: una sola tabla `catalogo_geo_osm` (PK `municipio_catalogo_id`, paquete
+`{places, calles, direcciones}` en LONGTEXT) en vez de dos — el alta consume
+el paquete entero de un solo SELECT (29 ms medidos).
+
+| Prueba en QA (API deployada) | Resultado |
+|---|---|
+| Rafaela, curada en la tabla | `geo:osm` **ok** desde `catalogo_geo_osm` en 29 ms; 33 barrios, 12 zonas; 50 reclamos con dirección real (44 puntos distintos) |
+| Sunchales, sin curar | `geo:osm` = `sin_cartografia_curada` (motivo honesto en la bitácora); la demo nace igual: 1 zona del padrón, 50 puntos dentro del contorno de la localidad |
+| Overpass desde el alta | **cero llamadas** (`GEO_OSM_EN_VIVO=False`); el alta ya no depende de internet |
+
+Regla nueva que entró con esto (Lucas, 2026-09-02): **no existen barrios ni
+zonas "Norte/Sur/Este/Oeste"**. `es_cardinal` filtra en la entrada,
+`limpiar_barrios_cardinales.py` los borró de las demos de QA, y el paquete de
+promoción (sección D) los borra de las dos demos de prod que los tenían
+(Concordia, Necochea). SPN conserva sus 4 zonas cardinales: decisión de
+producto, no limpieza.
+
+**Etapa C (F3): HECHA en QA** (`f5b00bac`). El geojson de georef era la
+versión simplificada para mapa chico (2 MB; mediana **11** vértices, 76% con
+<20). Se reemplazó la fuente de `contornos_municipios.py` por el **WFS del
+IGN** (capa `municipio`, 64 MB, límite completo): 2.081/2.082 emparejan por
+código INDEC (`in1` = id del catálogo), cero por nombre, cero sospechosos.
+Mediana en QA después del batch: **279** vértices (tope `--puntos 300`).
+Los 269 que siguen con <20 son ejidos chicos cuya forma real tiene pocos
+vértices — dato, no defecto. Hallazgo lateral: 68 municipios (3%, casi
+todos comunas de Córdoba) tienen el centro del catálogo FUERA de su
+polígono IGN, hasta 21 km (Pozo Nuevo); tampoco caían dentro del polígono
+viejo (sólo 6). Pendiente: recentrar `lat/lng` al centroide del polígono
+para esos 68 — no se tocó porque no se pudo verificar cuál de las dos
+fuentes miente.
+
+**Curación masiva de AR: HECHA en QA, 2.082/2.082 (100%), el 2026-09-02 a la
+noche.** No fue por Overpass: con `overpass-api.de` caído y los mirrors
+saturados, los dos workers iban a ~1,6 min por municipio (55 horas para el
+país). Se reemplazó el camino por el **extracto de Geofabrik** leído con
+pyosmium (`scripts/geo/extraer_osm_pbf.py`): una pasada por el `.osm.pbf`
+del país (AR: 430 MB, 249 s), cada elemento asignado al municipio cuyo
+contorno lo contiene (STRtree de shapely), y el paquete armado con el MISMO
+`_parsear` del camino Overpass. La escritura a Aiven es lo lento (0,6 s por
+fila; AR 23 min). Diferencias a favor: sin cupos, sin topes por salida (en
+Rafaela el set de barrios es idéntico; en las ciudades donde Overpass cortaba
+en 4.000 elementos, acá entra todo) y entran las direcciones puestas sobre el
+edificio, no sólo sobre nodos. La columna `fuente` distingue las filas
+(`FUENTE_PBF`). El batch Overpass (`curar_geo_catalogo.py`) queda como camino
+secundario para retoques puntuales.
+
+Resultado AR: `ok=2.027` (con barrios 733, con calles 1.880), `sin_datos_osm=55`.
+Los 1.294 `ok` sin barrios son en su mayoría comunas chicas donde OSM no tiene
+`place=suburb/neighbourhood`: el alta degrada a zonas por calles principales
+(nombres reales, nunca cardinales). Lectura de cobertura:
+`SELECT pais, estado, COUNT(*), SUM(barrios>0), SUM(calles>0) FROM catalogo_geo_osm GROUP BY pais, estado`.
+Los otros países del catálogo (UY, PY, BO, CL, PE) se curan con la misma
+herramienta y sus extractos; los municipios SIN contorno (BO 56, CL 9, PE 232,
+PY 19) quedan afuera de este camino hasta que tengan polígono.
+
+Hallazgo que abre la etapa siguiente: hay contornos IGN que **no contienen a
+su propia ciudad** — Centenario (Neuquén) e Inriville (Córdoba) dan
+`sin_datos_osm` teniendo la ciudad mapeada entera, porque el polígono cae a
+5-19 km del casco. La medición sistemática (cabecera homónima de OSM dentro o
+fuera del contorno) y su corrección están en el handoff
+`docs/handoffs/2026-09-02_cartografia-offline-pbf.md`.
+
+**Prod:** todo en manos de Infra desde `MSG-20260902-1925-01` (corte
+`214d97b0` + sección D) con el OK de Lucas relevado en
+`MSG-20260902-1922-01`. Los datos curados se copian de QA a prod con el
+`mysqldump --replace` del paquete, repetible cuando la cobertura crezca.
+
+**Etapa D:** sin empezar.

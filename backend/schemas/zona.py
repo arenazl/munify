@@ -32,6 +32,9 @@ class ZonaResponse(BaseModel):
     # cual quedo sin equipo. None = no se calculo.
     reclamos_count: Optional[int] = None
     cuadrillas_count: Optional[int] = None
+    # Barrios que cuelgan de la zona (barrios.zona_id). Desde 2026-09-02 las
+    # demos nacen con una sola zona y todos sus barrios adentro.
+    barrios_count: Optional[int] = None
 
     class Config:
         from_attributes = True

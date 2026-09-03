@@ -7,6 +7,7 @@ from typing import List
 from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.zona import Zona
+from models.barrio import Barrio
 from models.reclamo import Reclamo
 from models.cuadrilla import Cuadrilla
 from models.user import User
@@ -49,9 +50,16 @@ async def get_zonas(
             .group_by(Cuadrilla.zona_id)
         )
         por_cuadrillas = dict(cua.all())
+        bar = await db.execute(
+            select(Barrio.zona_id, func.count(Barrio.id))
+            .where(Barrio.zona_id.in_(ids))
+            .group_by(Barrio.zona_id)
+        )
+        por_barrios = dict(bar.all())
         for z in zonas:
             z.reclamos_count = por_reclamos.get(z.id, 0)
             z.cuadrillas_count = por_cuadrillas.get(z.id, 0)
+            z.barrios_count = por_barrios.get(z.id, 0)
 
     return zonas
 

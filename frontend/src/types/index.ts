@@ -424,6 +424,8 @@ export interface Reclamo {
   updated_at?: string;
   categoria: { id: number; nombre: string; icono?: string; color?: string };
   zona?: { id: number; nombre: string; codigo?: string };
+  /** El barrio (nivel fino, adentro de la zona). Lo expone la API desde 2026-09-02. */
+  barrio?: { id: number; nombre: string; latitud?: number | null; longitud?: number | null; validado?: boolean | null } | null;
   creador: { id: number; nombre: string; apellido: string; email: string; telefono?: string };
   dependencia_asignada?: { id: number; dependencia_id: number; nombre?: string; color?: string; icono?: string };
   documentos: Documento[];
