@@ -1288,93 +1288,20 @@ async def eliminar_municipio_demo(
                 detail="Esta demo está protegida: hace falta el PIN para eliminarla",
             )
 
-    muni_id = municipio.id
-    await db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+    # El cascade lo deriva `services/demo_borrado.py` del esquema real (antes
+    # era una lista fija a la que le faltaban 32 tablas y tragaba errores).
+    from services.demo_borrado import borrar_municipio
+    try:
+        borrado = await borrar_municipio(db, municipio.id)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
-    # Primero borrar tablas intermedias sin municipio_id via JOIN
-    # (para que el loop plano de abajo no falle en borrar el padre)
-    for join_sql in [
-        # Historiales + tablas hijas de reclamos/solicitudes/tramites
-        "DELETE hr FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id WHERE r.municipio_id = :mid",
-        "DELETE hs FROM historial_solicitudes hs JOIN solicitudes s ON hs.solicitud_id = s.id WHERE s.municipio_id = :mid",
-        "DELETE td FROM tramite_documentos_requeridos td JOIN tramites t ON td.tramite_id = t.id WHERE t.municipio_id = :mid",
-        "DELETE sv FROM sla_violaciones sv JOIN reclamos r ON sv.reclamo_id = r.id WHERE r.municipio_id = :mid",
-        # Calificaciones del vecino (cuelgan del reclamo; el seed demo ya las
-        # crea sobre los reclamos cerrados)
-        "DELETE ca FROM calificaciones ca JOIN reclamos r ON ca.reclamo_id = r.id WHERE r.municipio_id = :mid",
-        # Intermedias de empleados (via JOIN con empleados.municipio_id)
-        "DELETE ec FROM empleado_cuadrillas ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE ec FROM empleado_categorias ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE ea FROM empleado_ausencias ea JOIN empleados e ON ea.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE eh FROM empleado_horarios eh JOIN empleados e ON eh.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE em FROM empleado_metricas em JOIN empleados e ON em.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE ec FROM empleado_capacitaciones ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
-        # Intermedia de cuadrillas
-        "DELETE cc FROM cuadrilla_categorias cc JOIN cuadrillas c ON cc.cuadrilla_id = c.id WHERE c.municipio_id = :mid",
-        # Ordenes de trabajo (pivot N:M con reclamos)
-        "DELETE otr FROM orden_trabajo_reclamos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
-        # Recursos de OT (cuelgan de la OT y del item de inventario)
-        "DELETE otr FROM orden_trabajo_recursos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
-        # Mapeo tramite → dependencia (cuelga de municipio_dependencias)
-        "DELETE mdt FROM municipio_dependencia_tramites mdt JOIN municipio_dependencias md ON mdt.municipio_dependencia_id = md.id WHERE md.municipio_id = :mid",
-        # Tasas: deudas/pagos cuelgan de partidas
-        "DELETE d FROM tasas_deudas d JOIN tasas_partidas p ON d.partida_id = p.id WHERE p.municipio_id = :mid",
-        "DELETE tp FROM tasas_pagos tp JOIN tasas_partidas p ON tp.partida_id = p.id WHERE p.municipio_id = :mid",
-        # Tesoreria: cuotas cuelgan de gastos
-        "DELETE gc FROM gastos_cuotas gc JOIN gastos g ON gc.gasto_id = g.id WHERE g.municipio_id = :mid",
-    ]:
-        try:
-            await db.execute(text(join_sql), {"mid": muni_id})
-        except Exception:
-            pass
-
-    # Cascade delete de todas las tablas con municipio_id
-    tables_with_muni = [
-        "historial_reclamos", "reclamo_personas", "historial_solicitudes",
-        "solicitudes", "reclamos", "tramite_documentos_requeridos",
-        "tramites", "categorias_reclamo", "categorias_tramite",
-        "municipio_dependencia_categorias", "municipio_dependencias",
-        "notificaciones", "push_subscriptions", "barrios", "zonas",
-        "badges_usuarios", "puntos_usuarios", "historial_puntos",
-        "email_validations",
-        # Nuevos (seed demo completo)
-        "cuadrillas", "empleados", "sla_config",
-        # Turnero + campo (2026-07)
-        "turnos", "ordenes_trabajo", "municipio_modulos",
-        "agenda_configs", "agenda_excepciones",
-        # Inventario demo (seed_inventario) — quedaban huerfanos al borrar.
-        # ORDEN: primero lo que apunta a los items (lineas de compra y
-        # movimientos), despues los items, y al final depositos y categorias.
-        # Al reves, las FK con RESTRICT frenan el borrado.
-        "inventario_orden_compra_lineas", "inventario_movimientos",
-        "inventario_ordenes_compra",
-        "inventario_items", "inventario_categorias", "inventario_depositos",
-        # Tasas demo
-        "tasas_partidas",
-        # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)
-        "tesoreria_movimientos_caja", "tesoreria_pagos_programados",
-        "tesoreria_premios", "tesoreria_cajas", "tesoreria_parajes",
-        "tesoreria_conceptos", "tesoreria_tipos_concepto", "tesoreria_tipos_empleado",
-        "tesoreria_conceptos_liquidacion", "proyectos",
-        "gasto_proyectos", "gastos", "contactos", "ordenes_pago",
-        "salesbot_configs", "configuraciones",
-    ]
-    for t in tables_with_muni:
-        try:
-            await db.execute(text(f"DELETE FROM {t} WHERE municipio_id = :mid"), {"mid": muni_id})
-        except Exception:
-            pass
-
-    # Usuarios
-    await db.execute(text("DELETE FROM usuarios WHERE municipio_id = :mid"), {"mid": muni_id})
-
-    # Municipio
-    await db.execute(text("DELETE FROM municipios WHERE id = :mid"), {"mid": muni_id})
-
-    await db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-    await db.commit()
-
-    return {"message": f"Municipio demo '{codigo}' eliminado correctamente"}
+    return {
+        "message": f"Municipio demo '{codigo}' eliminado correctamente",
+        "filas_borradas": borrado,
+    }
 
 
 @router.post("/{municipio_id}/branding", response_model=MunicipioDetalle)
