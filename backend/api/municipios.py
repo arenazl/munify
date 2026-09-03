@@ -324,13 +324,10 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # LA PUERTA DE ATRAS. Sacar el boton "Entrar" de la grilla no alcanza:
-    # esta lista ES el acceso (son los perfiles del quick-login, sin password).
-    # Si quedaba abierta, el link personal era decorativo — se entraba por
-    # /login?muni=<codigo> y listo. Ahora la botonera sale solo si la demo es
-    # de muestra o si viene la llave. Cliente productivo: nunca (salvo el clon
-    # de tenant en QA, que ademas gatea cada perfil con el PIN).
-    if not _demo_acceso_ok(municipio, t):
+    # La botonera sale para TODA demo, con o sin llave. Cliente productivo:
+    # nunca (salvo el clon de tenant en QA, que ademas gatea cada perfil con
+    # el PIN). Ver `_botonera_visible` por que la llave `t` ya no cuenta aca.
+    if not _botonera_visible(municipio):
         return []
 
     # Buscar usuarios de prueba con tres patrones:
@@ -443,8 +440,8 @@ async def obtener_usuarios_dependencias(
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
     # Misma puerta que demo-users: los accesos rapidos por dependencia son
-    # otra forma de entrar, asi que piden la misma llave.
-    if not _demo_acceso_ok(municipio, t):
+    # otra forma de entrar, asi que siguen la misma regla.
+    if not _botonera_visible(municipio):
         return []
 
     # Buscar usuarios con municipio_dependencia_id asignado
@@ -683,8 +680,25 @@ class MunicipioDemoResponse(BaseModel):
     demo_token: Optional[str] = None
 
 
+def _botonera_visible(municipio: Municipio) -> bool:
+    """Si el login de este municipio muestra los perfiles preseteados.
+
+    Toda DEMO los muestra, tenga o no la llave el que entra: las demos son
+    paginas de prueba y cualquiera con el link `/demo/<codigo>` tiene que
+    poder entrar — ningun municipal va a tener anotadas las catorce claves
+    en un archivo. Lo "no publico" es otra cosa: la grilla de la landing no
+    da entrada, y las demos con PIN siguen pidiendo el PIN por perfil.
+    (Dueño, 2026-09-02: "que no sea publico" se habia leido como "gatear la
+    botonera con la llave" — no era eso.)
+
+    Cliente productivo: nunca, salvo el clon de tenant en QA
+    (`demo_protegido`), que ademas gatea cada perfil con el PIN.
+    """
+    return bool(municipio.es_demo or municipio.demo_protegido)
+
+
 def _demo_acceso_ok(municipio: Municipio, token: Optional[str]) -> bool:
-    """Si el que golpea la puerta puede ENTRAR a esta demo.
+    """Si el que golpea la puerta es el DUEÑO de esta demo (borrarla, etc.).
 
     Tres casos, en orden:
       - No es demo: es un cliente productivo. Solo pasa el clon de tenant en
@@ -693,7 +707,8 @@ def _demo_acceso_ok(municipio: Municipio, token: Optional[str]) -> bool:
       - Demo de alguien: solo con la llave que se emitio al crearla.
 
     Las demos viejas (sin `demo_token`) quedan cerradas a proposito: nadie
-    entra a una demo con los datos que cargo otro (dueño, 2026-09-02).
+    borra una demo con los datos que cargo otro (dueño, 2026-09-02). Para
+    VER la botonera de perfiles la llave no hace falta: `_botonera_visible`.
     """
     if not municipio.es_demo:
         return bool(municipio.demo_protegido)
