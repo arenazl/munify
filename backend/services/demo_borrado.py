@@ -40,7 +40,12 @@ PROFUNDIDAD_MAX = 3
 # 80 = San Pedro Norte, el único cliente productivo.
 MUNICIPIOS_INTOCABLES = {80}
 
-PATRONES_EMAIL_DEMO = ("%@{codigo}.demo.com", "%@{codigo}.test.com", "%@demo.com")
+# Un usuario es "de demo" por el dominio de su email. Antes el patrón exigía
+# `@<codigo>.demo.com`, y una demo cuyo código cambió después de sembrarla
+# (prod: `moreno`, usuarios @moreno-2.demo.com) quedaba clasificada como
+# tenant real e imborrable. Ningún tenant productivo usa `.demo.com` (SPN
+# tiene 7 usuarios así, y está protegido por id, no por el patrón).
+PATRONES_EMAIL_DEMO = ("%.demo.com", "%@demo.com", "%.test.com")
 
 
 @dataclass
@@ -185,7 +190,7 @@ async def describir_municipio(db: AsyncSession, municipio_id: int, codigo: str) 
         "demo_protegido, created_at FROM municipios WHERE id = :mid"), {"mid": municipio_id})).mappings().first()
     if not fila:
         return {"existe": False, "id": municipio_id, "codigo": codigo}
-    patrones = [p.format(codigo=codigo) for p in PATRONES_EMAIL_DEMO]
+    patrones = list(PATRONES_EMAIL_DEMO)
     cond_demo = " OR ".join(f"email LIKE :p{i}" for i in range(len(patrones)))
     params = {"mid": municipio_id, **{f"p{i}": p for i, p in enumerate(patrones)}}
     usuarios = (await db.execute(text(

@@ -1232,19 +1232,16 @@ async def eliminar_municipio_demo(
 
     # Verificar que es un municipio demo: rechazar solo si hay usuarios "reales"
     # (cualquiera que NO matchee los patrones de demo). Un muni sin usuarios o
-    # con solo users demo se considera borrable.
+    # con solo users demo se considera borrable. El patrón vive con el cascade.
     from sqlalchemy import or_, not_
+    from services.demo_borrado import MUNICIPIOS_INTOCABLES, PATRONES_EMAIL_DEMO
     non_demo_check = await db.execute(
         select(User).where(
             User.municipio_id == municipio.id,
-            not_(or_(
-                User.email.like(f"%@{codigo}.demo.com"),
-                User.email.like(f"%@{codigo}.test.com"),
-                User.email.like("%@demo.com"),
-            )),
+            not_(or_(*[User.email.like(p) for p in PATRONES_EMAIL_DEMO])),
         )
     )
-    if non_demo_check.scalars().first():
+    if municipio.id in MUNICIPIOS_INTOCABLES or non_demo_check.scalars().first():
         raise HTTPException(
             status_code=403,
             detail="Solo se pueden eliminar municipios de demo",
