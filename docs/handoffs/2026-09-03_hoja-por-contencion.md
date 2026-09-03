@@ -210,3 +210,49 @@ Lucas pidió verificar que no hubieran quedado "dos niveles a la vez" y un chequ
 - Scripts de la auditoría en el scratchpad de la sesión (`audit_hojas.py`, `audit2-7.py`); la regla vive en `scripts/geo/_hojas.py`.
 - **Prod: FRENADO por Lucas** ("no quiero subir nada a prod todavía"); Infra avisada por SendMessage. La F1 del paquete se re-avisa cuando él lo diga.
 - Siguiente: pantalla de sólo lectura en Munify para recorrer país → provincia → municipio y ver qué tiene el catálogo (pedido de Lucas); después `landuse=residential` del PBF y BAHRA para completar nombres de AR.
+
+## 9. Actualización 2026-09-03 (noche): pantalla Territorio (super admin)
+
+Pedido de Lucas: "una pantallita… para ver esto de forma tangible, recorriendo
+país, provincia, municipio… en qué municipio se llenó con barrio, en cuál con
+localidad, en cuál zona… no para curar desde ahí", **en el panel de super
+admin**. Me delegó el cómo ("armala como vos digas que va a servir mejor").
+
+- **Backend:** `backend/api/admin_territorio.py` (gate `require_super_admin`,
+  cross-tenant a propósito, `text()` porque el catálogo no tiene ORM).
+  `GET /admin/territorio/paises` (8 s en QA, se llama una vez),
+  `GET /admin/territorio/municipios?pais=AR` (0,9 s, 2.082 filas, 567 KB:
+  con eso el front dibuja el país y arma las provincias sin volver a pedir),
+  `GET /admin/territorio/municipios/{id}` (contorno + TODAS las filas, con
+  `hoja` y `motivo_hoja`). "Relleno" con la MISMA regla que la semilla:
+  `sin_contorno` / `zona` / `localidades` (hojas_loc·2 > hojas) / `barrios`.
+- **Front:** `frontend/src/pages/Territorio.tsx` + `.css`, ruta
+  `/gestion/admin/territorio`, ítem "Territorio" (icono Globe) en Super Admin.
+  `SemanticAbmPage` con `views=['table']` y `viewSlots.table` = migas + UN
+  mapa Leaflet a tres zooms (país: puntos por municipio coloreados por relleno;
+  provincia: los mismos encuadrados; municipio: contorno punteado = Zona
+  única, polígonos/puntos por fuente, respaldo prendible en gris con el motivo
+  en el tooltip) + `DataTable` de apoyo (provincias → municipios → barrios;
+  click baja un nivel o encuadra el barrio). Hero de 5 KPIs con frases en
+  prosa por nivel; tabs = relleno (o Se dibujan / Respaldo adentro de un
+  municipio). Colores de los trazos leídos de los tokens `--pl-*` computados
+  (cero hex), `preferCanvas` para los 2.000 puntos.
+- **Números de QA al momento del push (AR):** 2.082 munis → 542 barrios /
+  766 localidades / 774 zona / 0 sin contorno; 17.714 hojas, 10.766 con
+  contorno, 15.923 OSM + 1.791 padrón, 5.720 respaldo, 555 "dibujados".
+- Commit `794561f7` en `qa`. Verificado: tipos, eslint de los archivos
+  tocados (los 5 errores de `api.ts` son viejos, no del bloque), build Vite,
+  pyflakes; API probada contra QA por script. **La pantalla renderizada con
+  sesión de super admin la mira Lucas** (no hay credencial de super admin de
+  prueba para automatizarlo; ver el bug de abajo).
+- **Bug encontrado al paso (no tocado, es de la sesión de demos):** sin
+  sesión y sin `municipio_codigo` en localStorage, `/login` y toda ruta
+  protegida rebotan a `/demos-listado` (`Login.tsx:115`,
+  `ProtectedRoute.tsx:22`) y la grilla no tiene botón de ingreso: al borrar
+  caché quedás atrapado. Salida: `/super`. Propuesto: "Ingresar" en la grilla
+  + rutas protegidas sin sesión → login.
+- **Siguiente (aprobado, "después el escaneo que falta"):** `landuse=residential`
+  + name del PBF de AR (ya en el scratchpad) en fase 1 de
+  `catalogo_barrios_pbf.py`, fase 2 en QA, re-marcar, medir contra la línea
+  base de arriba; luego BAHRA para la cola; luego 3 demos de QA de tamaños
+  distintos. Prod sigue FRENADO por Lucas.
