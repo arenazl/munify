@@ -33,10 +33,12 @@
  * todo token `--pl-*` — cero colores fijos.
  */
 import {
+  ArrowUpDown,
   CalendarDays,
   CalendarRange,
   Check,
   FolderTree,
+  Layers,
   LayoutGrid,
   ListChecks,
   Plus,
@@ -102,10 +104,21 @@ export function ListToolbar({
   views,
   activeView,
   onViewChange,
+  sortSpec,
+  groupSpec,
   secondaryAction,
   primaryAction,
   steps,
 }: ListToolbarProps) {
+  /* [v3.2] El orden es UN botón que CICLA las opciones (dueño): el label
+     muestra el criterio activo; el click pasa al siguiente. */
+  const idxOrden = sortSpec ? sortSpec.opciones.findIndex((o) => o.id === sortSpec.activo) : -1;
+  const ordenActivo = sortSpec && idxOrden >= 0 ? sortSpec.opciones[idxOrden] : sortSpec?.opciones[0];
+  const ciclarOrden = () => {
+    if (!sortSpec || sortSpec.opciones.length === 0) return;
+    const siguiente = sortSpec.opciones[(Math.max(idxOrden, 0) + 1) % sortSpec.opciones.length];
+    sortSpec.onSort(siguiente.id);
+  };
   /* [v2.1] Índice del paso activo. -1 (id desconocido) ⇒ todos pendientes. */
   const idxPasoActivo = steps ? steps.items.findIndex((p) => p.id === steps.activo) : -1;
 
@@ -156,6 +169,41 @@ export function ListToolbar({
                   aria-pressed={activa}
                 >
                   <IconoVista size={15} strokeWidth={2} aria-hidden />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* [v3.2] Orden como UN botón que cicla el criterio. */}
+        {sortSpec && ordenActivo && !compacto && (
+          <button
+            type="button"
+            className="av2-btn-secundario"
+            onClick={ciclarOrden}
+            title={`Ordenar por ${ordenActivo.label.toLowerCase()} (click: siguiente criterio)`}
+          >
+            <ArrowUpDown size={14} strokeWidth={2} aria-hidden />
+            {ordenActivo.label}
+          </button>
+        )}
+
+        {/* [v3.2] Agrupamiento en la primera línea, segmented. */}
+        {groupSpec && groupSpec.opciones.length > 0 && !compacto && (
+          <div className="av2-orden" role="group" aria-label="Agrupar por">
+            <Layers size={12} strokeWidth={2} className="av2-orden-icono" aria-hidden />
+            {groupSpec.opciones.map((op) => {
+              const activo = op.id === groupSpec.activo;
+              return (
+                <button
+                  key={op.id}
+                  type="button"
+                  className={activo ? 'av2-orden-tab av2-orden-tab--activo' : 'av2-orden-tab'}
+                  onClick={() => groupSpec.onGroup(op.id)}
+                  aria-pressed={activo}
+                  title={`Agrupar por ${op.label.toLowerCase()}`}
+                >
+                  {op.label}
                 </button>
               );
             })}

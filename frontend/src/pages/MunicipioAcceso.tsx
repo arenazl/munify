@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
-import { saveMunicipio } from '../utils/municipioStorage';
+import { saveMunicipio, clearMunicipio } from '../utils/municipioStorage';
 import { BrandMark } from '../brands/BrandMark';
 import Login from './Login';
 
@@ -48,13 +48,18 @@ export default function MunicipioAcceso(
   // con la URL intacta; sólo el acceso pelado `/<codigo>` navega (a su /login).
   const quedaEnElLugar = esRutaDeMarca || enLogin;
   const [municipioListo, setMunicipioListo] = useState(false);
+  // ¿Entró por la puerta de demos (/demo/<codigo>)? Las demos viven bajo ese
+  // prefijo hasta ser facturables (dueño, 2026-09-02); la ruta ademas despega
+  // la marca pegada de la pestaña (RUTAS_DE_MUNIFY en brands/index.ts).
+  const { pathname } = useLocation();
+  const enDemo = pathname.startsWith('/demo/');
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
       if (!codigo) {
-        navigate('/demo', { replace: true });
+        navigate('/demos-listado', { replace: true });
         return;
       }
       // Retry con backoff: con el backend frío (cold start de Cloud Run) el
@@ -66,6 +71,23 @@ export default function MunicipioAcceso(
           const { data } = await municipiosApi.getPublicByCodigo(codigo);
           if (cancelled) return;
 
+          // SESIÓN AJENA FUERA (dueño, 2026-09-02): si este navegador tiene
+          // la sesión de OTRO municipio (Bartolo en San Pedro abriendo la
+          // demo recién creada de Sampacho), esa sesión pisaba la puerta —
+          // el redirect por "usuario logueado" lo devolvía a SU tenant. La
+          // puerta de un municipio distinto cierra la sesión anterior. Se
+          // limpia a mano (no con logout() del contexto: su identidad cambia
+          // por render y rompería las deps del efecto) y se ESPERA el
+          // clearMunicipio, que es async y sin await pisaba el save de abajo.
+          // El user en memoria del AuthContext se corrige al próximo login.
+          let sesion: { municipio_id?: number } | null = null;
+          try { sesion = JSON.parse(localStorage.getItem('user') || 'null'); } catch { sesion = null; }
+          if (sesion?.municipio_id && String(sesion.municipio_id) !== String(data.id)) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            await clearMunicipio();
+          }
+
           await saveMunicipio({
             id: String(data.id),
             codigo: data.codigo,
@@ -76,8 +98,15 @@ export default function MunicipioAcceso(
           localStorage.setItem('municipio_actual_id', String(data.id));
 
           if (!cancelled) {
-            if (quedaEnElLugar) setMunicipioListo(true);
-            else navigate(`/${data.codigo}/login`, { replace: true });
+            // Las demos entran por /demo/<codigo> y los facturables por
+            // /<codigo>: la puerta equivocada redirige a la correcta. El
+            // QUERY viaja SIEMPRE en el salto: ahí va la llave `?t=` del
+            // acceso por link — este navigate la tiraba y el dueño de una
+            // demo recién creada quedaba afuera de la suya.
+            const base = data.es_demo && !esRutaDeMarca ? '/demo' : '';
+            const prefijoOk = esRutaDeMarca || (data.es_demo ? enDemo : !enDemo);
+            if (quedaEnElLugar && prefijoOk) setMunicipioListo(true);
+            else navigate(`${base}/${data.codigo}/login${window.location.search}`, { replace: true });
           }
           return;
         } catch (e) {
@@ -91,14 +120,14 @@ export default function MunicipioAcceso(
       }
       if (cancelled) return;
       setError(true);
-      setTimeout(() => navigate('/demo', { replace: true }), 1800);
+      setTimeout(() => navigate('/demos-listado', { replace: true }), 1800);
     };
 
     void run();
     return () => {
       cancelled = true;
     };
-  }, [codigo, navigate, quedaEnElLugar]);
+  }, [codigo, navigate, quedaEnElLugar, enDemo, esRutaDeMarca]);
 
   // Municipio cargado y ruta de marca: el login se rinde ACÁ, con la URL
   // intacta (ver la nota de arriba sobre el start_url de la PWA en iOS).

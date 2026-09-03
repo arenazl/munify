@@ -50,7 +50,7 @@ export default function DemosIndex() {
       {/* Header */}
       <header className="border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <Link to="/bienvenido" className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+          <Link to="/demos-listado" className="p-2 hover:bg-white/10 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5 text-white" />
           </Link>
           <h1 className="text-white font-semibold">Demos de Diseño</h1>

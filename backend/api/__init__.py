@@ -5,6 +5,7 @@ from .categorias_reclamo import router as categorias_reclamo_router
 from .categorias_reclamo_sugeridas import router as categorias_reclamo_sugeridas_router
 from .categorias_tramite import router as categorias_tramite_router
 from .zonas import router as zonas_router
+from .barrios import router as barrios_router
 from .empleados import router as empleados_router
 from .reclamos import router as reclamos_router
 from .configuracion import router as configuracion_router
@@ -92,6 +93,7 @@ api_router.include_router(categorias_reclamo_router, prefix="/categorias-reclamo
 api_router.include_router(categorias_reclamo_sugeridas_router, prefix="/categorias-reclamo-sugeridas", tags=["Categorías Reclamo Sugeridas"])
 api_router.include_router(categorias_tramite_router, prefix="/categorias-tramite", tags=["Categorías Trámite"])
 api_router.include_router(zonas_router, prefix="/zonas", tags=["Zonas"])
+api_router.include_router(barrios_router, prefix="/barrios", tags=["Barrios"])
 api_router.include_router(empleados_router, prefix="/empleados", tags=["Empleados"])
 api_router.include_router(empleados_gestion_router, prefix="/empleados-gestion", tags=["Gestion Empleados"])
 api_router.include_router(reclamos_router, prefix="/reclamos", tags=["Reclamos"])

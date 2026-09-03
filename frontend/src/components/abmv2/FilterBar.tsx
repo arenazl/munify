@@ -19,15 +19,16 @@
  *   toggle ("Todos los períodos") vuelve a "todos". `unit`/`from`/`to`
  *   conservan mientras tanto la propuesta de aterrizaje (contrato en types).
  * - Segmented de estados con conteo: count 0 ⇒ apagado y NO clickeable.
- * - [v2.1] `sortSpec`: segmented CHICO de orden al final de la barra, antes
- *   del resumen. Es ORDEN, no filtro: la página ordena; la barra notifica.
+ * - [v3.2] Orden y agrupamiento YA NO viven acá: subieron a la PRIMERA línea
+ *   (ListToolbar) por pedido del dueño — abajo quedan SOLO los filtros.
  * - `filterSummary` opcional dockeado a la derecha.
  *
  * Presentacional puro: todo estado controlado por props. Cero colores fijos —
  * clases `av2-*` + tokens `--pl-*`.
  */
-import { ArrowRight, ArrowUpDown, X } from 'lucide-react';
+import { ArrowRight, Plus, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
+import { SelectorAdaptativoSpec } from './SelectorAdaptativo';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
 import { useState } from 'react';
 import { useAnchoAngosto } from './FichaRegistro';
@@ -197,8 +198,11 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
         ? { anio: p.anio, mes: 0 }
         : { anio: p.anio, mes: p.anio === hoy.getFullYear() ? hoy.getMonth() : 0 };
     const base: PeriodControlValue = { unit, from: aIso(unit, convertir(propuesta)) };
-    /* Dentro de "todos", el switch solo convierte la propuesta (no sale). */
-    emitir(conTodos(hasta ? { ...base, to: aIso(unit, convertir(hasta)) } : base, enTodos));
+    /* Tocar Mes/Año SIEMPRE acota (dueño, 2026-09-02): antes, dentro de
+       "todos" sólo convertía la propuesta sin salir — un click sin efecto
+       visible. Ahora el gesto tiene un solo significado: "quiero filtrar
+       por esta unidad", y aterriza en el período en curso. */
+    emitir(conTodos(hasta ? { ...base, to: aIso(unit, convertir(hasta)) } : base, false));
   };
 
   const abrirRango = () => {
@@ -250,13 +254,15 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
       {/* Rango "→ Hasta": no aplica en "todos" (no hay período que extender). */}
       {!enTodos &&
         (!rangoAbierto ? (
+          /* El "+" es el gesto que GENERA el between (dueño, 2026-09-02):
+             agregar el segundo extremo, no "ir" a ningún lado. */
           <button
             type="button"
             className="av2-period-hasta"
             onClick={abrirRango}
-            title="Extender a un rango de períodos"
+            title="Agregar un hasta: filtrar entre dos períodos"
           >
-            <ArrowRight size={14} strokeWidth={2} aria-hidden />
+            <Plus size={14} strokeWidth={2} aria-hidden />
             Hasta
           </button>
         ) : (
@@ -304,18 +310,15 @@ export function FilterBar({
   statusTabs = [],
   activeStatus,
   onStatusChange,
-  sortSpec,
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
-  const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
-
   /* [v2.2] Toolbar y filtros son UNA tarjeta partida: una barra vacía se vería
      como una franja muerta pegada abajo. Sin nada que filtrar no se renderiza
      y el CSS le devuelve las 4 esquinas a la toolbar (`:last-child`). */
-  if (!haySelects && !hayPeriodo && !hayTabs && !hayOrden && !filterSummary) return null;
+  if (!haySelects && !hayPeriodo && !hayTabs && !filterSummary) return null;
 
   return (
     <FilterBarCuerpo
@@ -325,7 +328,6 @@ export function FilterBar({
       statusTabs={statusTabs}
       activeStatus={activeStatus}
       onStatusChange={onStatusChange}
-      sortSpec={sortSpec}
       filterSummary={filterSummary}
     />
   );
@@ -346,13 +348,11 @@ function FilterBarCuerpo({
   statusTabs = [],
   activeStatus,
   onStatusChange,
-  sortSpec,
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
-  const hayOrden = !!sortSpec && sortSpec.opciones.length > 0;
 
   /* [proyección mobile] En angosto los filtros NO viven en el flujo de la
      pantalla: viven en un panel que se abre con un botón.
@@ -418,8 +418,11 @@ function FilterBarCuerpo({
 
   return (
     <div className="av2-filterbar" ref={refAncho}>
+      {/* [v3] Cada filtro decide su forma: hasta ~5 opciones píldoras, más
+          combo (SelectorAdaptativo — la pieza suelta del kit). En el panel
+          angosto de arriba siguen como combos apilados. */}
       {selects.map((spec) => (
-        <Av2Select key={spec.id} spec={spec} />
+        <SelectorAdaptativoSpec key={spec.id} spec={spec} />
       ))}
 
       {haySelects && hayPeriodo && <span className="av2-divisor" aria-hidden />}
@@ -453,29 +456,6 @@ function FilterBarCuerpo({
                 {tab.count !== undefined && (
                   <span className="av2-estado-conteo">{tab.count.toLocaleString('es-AR')}</span>
                 )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* [v2.1] Segmented chico de orden — ORDEN, no filtro (la página
-          ordena; acá solo se pinta el criterio activo y se notifica). */}
-      {hayOrden && sortSpec && (
-        <div className="av2-orden" role="group" aria-label="Ordenar por">
-          <ArrowUpDown size={12} strokeWidth={2} className="av2-orden-icono" aria-hidden />
-          {sortSpec.opciones.map((op) => {
-            const activo = op.id === sortSpec.activo;
-            return (
-              <button
-                key={op.id}
-                type="button"
-                className={activo ? 'av2-orden-tab av2-orden-tab--activo' : 'av2-orden-tab'}
-                onClick={() => sortSpec.onSort(op.id)}
-                aria-pressed={activo}
-                title={`Ordenar por ${op.label.toLowerCase()}`}
-              >
-                {op.label}
               </button>
             );
           })}

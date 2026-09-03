@@ -95,6 +95,15 @@ class Settings(BaseSettings):
     # NUNCA activar en producción.
     VENTANILLA_SKIP_DIDIT: bool = False
 
+    # ---- Cartografia de las demos ----
+    # La cartografia fina (barrios + calles de OSM) se sirve SIEMPRE desde la
+    # tabla precargada `catalogo_geo_osm`; NUNCA se consulta Overpass durante
+    # el alta de una demo (Lucas, 2026-09-03: en vivo nunca funciono, por
+    # delays y caidas). Este flag existe solo para el batch de curacion y para
+    # depurar: con False, un municipio no curado nace sin barrios ni calles
+    # —con sus localidades y puntos igual— y queda avisado en la bitacora.
+    GEO_OSM_EN_VIVO: bool = False
+
     # ---- Gateway de pagos (Fase 2 bundle) ----
     # Provider global por defecto ('mock' sigue funcionando para dev).
     # La resolucion real es por muni (ver services/pagos/__init__.py).

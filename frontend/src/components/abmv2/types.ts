@@ -34,6 +34,10 @@
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import type { HeroFrase, HeroKpi, Veredicto } from '../../lib/semanticHero';
+/* [v3] El contrato de DATOS del panel de IA ya es estable; la pieza VISUAL
+   (DashboardIAPanel) todavía vive en ui/ y se migra a la suite v2 en una
+   pasada posterior — el contrato no va a cambiar con esa migración. */
+import type { DashboardIAData, IATip } from '../ui/DashboardIAPanel';
 
 /* ============================================================
  * Básicos compartidos
@@ -184,6 +188,14 @@ export interface ListToolbarProps {
   views: ViewKind[];
   activeView: ViewKind;
   onViewChange: (view: ViewKind) => void;
+  /**
+   * [v3.2] El ORDEN vive en la PRIMERA línea como UN botón que cicla las
+   * opciones (dueño: "el orden solo con botón") — ya no es un segmented de
+   * la FilterBar. El label muestra el criterio activo.
+   */
+  sortSpec?: SortSpec;
+  /** [v3.2] El AGRUPAMIENTO también sube a la primera línea (segmented). */
+  groupSpec?: GroupSpec;
   /** Botón secundario del módulo ("Proyección", "Pago masivo"…). */
   secondaryAction?: Action;
   /**
@@ -207,6 +219,10 @@ export interface ListToolbarProps {
 export interface SelectOption {
   value: string;
   label: string;
+  /** [v3.1] Color runtime de la opción (categoría/área). El criterio ÚNICO:
+   *  el color vive en el PUNTO de la píldora (SelectorAdaptativo) — jamás
+   *  pinta el fondo ni el texto completos. Omitido ⇒ punto neutro. */
+  color?: string;
 }
 
 /** Select de la FilterBar (patrón Etiqueta muted + Valor 600 + chevron).
@@ -273,6 +289,21 @@ export interface SortSpec {
   onSort: (id: string) => void;
 }
 
+/**
+ * [v3] Segmented chico de AGRUPAMIENTO ("Agrupar: Día · Estado · Dependencia"):
+ * mismo lenguaje visual que el orden, al lado suyo. Why (dueño, 2026-09-03):
+ * la vista agrupada por día como única opción "es bastante molesta" — todo
+ * combo de filtro de la pantalla es candidato natural a agrupamiento. La
+ * página agrupa (computa los TableGroups según la opción); la barra pinta y
+ * notifica — presentacional puro, igual que SortSpec.
+ */
+export interface GroupSpec {
+  opciones: SortOption[];
+  /** id de la opción activa ('dia', 'estado', 'dependencia'…). */
+  activo: string;
+  onGroup: (id: string) => void;
+}
+
 export interface FilterBarProps {
   selects: SelectSpec[];
   /** Omitir en listas sin fecha (Personal, Inventario). */
@@ -282,9 +313,9 @@ export interface FilterBarProps {
   /** id del StatusTab activo. */
   activeStatus: string;
   onStatusChange: (id: string) => void;
-  /** [v2.1] Segmented chico de orden (ver SortSpec). Omitido ⇒ no se pinta. */
-  sortSpec?: SortSpec;
-  /** Resumen del filtro aplicado, a la derecha: "50 movimientos · $ 43.048.905". */
+  /** Resumen del filtro aplicado, a la derecha: "50 movimientos · $ 43.048.905".
+   *  [v3.2] Orden y agrupamiento se MUDARON a ListToolbarProps (primera
+   *  línea) — abajo quedan sólo los filtros. */
   filterSummary?: string;
 }
 
@@ -336,6 +367,67 @@ export interface RolesSemanticos<Row = unknown> {
   /** Importe, para las entidades que lo tengan. Reemplaza a `elapsed` en el
    *  slot 4 cuando ambos están declarados. */
   amount?: (row: Row) => string | null | undefined;
+
+  /* --- [v3] Roles de la TARJETA RICA (vistas board y enfoque) -----------
+     Ingeniería inversa de las cards curadas de Reclamos/Trámites: la tarjeta
+     se tiñe por VEREDICTO, lleva píldoras y cuenta el vencimiento. Todos
+     opcionales: sin ellos la tarjeta degrada a su versión mínima. */
+
+  /** El párrafo de la tarjeta (la descripción del registro), clamp 2. */
+  description?: (row: Row) => string | null | undefined;
+  /** Píldoras secundarias (canal, marca, etc.): fondo suave del color.
+   *  El color es runtime (viene de datos); omitido ⇒ neutro por tokens. */
+  badges?: (row: Row) => Array<{ label: string; color?: string }> | null | undefined;
+  /** CÓMO VIENE esta fila: tiñe el borde de la tarjeta (el sistema de los 3
+   *  veredictos de las boards de Reclamos). Omitido/null ⇒ tarjeta neutra. */
+  verdict?: (row: Row) => Veredicto | null | undefined;
+  /** Vencimiento en palabras ("Venció hace 4 d", "Vence hoy") con su
+   *  veredicto — se pinta al lado del actor, en el color del veredicto. */
+  due?: (row: Row) => { label: string; veredicto?: Veredicto } | null | undefined;
+  /** Prioridad como píldora chica ("Media", "Alta"). */
+  priority?: (row: Row) => { label: string; veredicto?: Veredicto } | null | undefined;
+}
+
+/**
+ * [v3] Sección de la VISTA ENFOQUE (la guiada curada de Reclamos): "El vecino
+ * dice que sigue el problema", "Empecemos por lo urgente"… La página declara
+ * las secciones como DATOS — título en frase, bajada, veredicto y el filtro
+ * que decide qué filas caen acá — y el kit dibuja el saludo, los chips del
+ * resumen, los encabezados y las tarjetas con su CTA. Nada de ReactNode.
+ */
+export interface EnfoqueSectionSpec<Row = unknown> {
+  id: string;
+  /** Título en FRASE ("Empecemos por lo urgente"), no la entidad. */
+  titulo: string;
+  /** Bajada de una línea (qué son estas filas y qué hacer con ellas). */
+  subtitulo?: string;
+  /** Icono lucide del encabezado. */
+  icon?: LucideIcon;
+  /** Tiñe icono, contador, borde de tarjetas y CTA de la sección. */
+  veredicto?: Veredicto;
+  /** Qué filas caen en esta sección. El ORDEN de las secciones decide en cuál
+   *  queda una fila que matchea varias (gana la primera). */
+  match: (row: Row) => boolean;
+  /** Copy cuando la sección queda vacía. Omitido ⇒ la sección no se dibuja
+   *  vacía (sólo las que celebran el vacío lo declaran). */
+  emptyMessage?: string;
+  /** Label del CTA de cada tarjeta ("Resolver ya"). Omitido ⇒ sin CTA (la
+   *  tarjeta sigue siendo clickeable si la página escucha onRowClick). */
+  ctaLabel?: string;
+  /** true ⇒ arranca colapsada (secciones largas o de archivo). */
+  colapsable?: boolean;
+  /** [v3] Acción de la SECCIÓN ENTERA en su cabecera ("Eliminar estas 88").
+   *  La página resuelve el onClick con sus propias filas (tiene el match). */
+  headerAction?: Action;
+}
+
+/** [v3] La vista enfoque completa: saludo contextual + chips resumen +
+ *  secciones. `saludo` va sin nombre propio (lo pone la página si quiere). */
+export interface EnfoqueSpec<Row = unknown> {
+  /** Línea del banner: "21 pendientes en tu municipio". El saludo por hora
+   *  ("Buenas noches") lo antepone el kit. Omitida ⇒ sin banner. */
+  resumen?: string;
+  secciones: EnfoqueSectionSpec<Row>[];
 }
 
 export interface ColumnSpec<Row = unknown> {
@@ -457,6 +549,11 @@ export interface TableGroup<Row = unknown> {
   key: string;
   /** Insignia 42×38: día sobre mes ("15"/"OCT") u hora ("09"/"HS"). */
   badge?: { top: string; bottom: string };
+  /** [v3.2] Insignia de ICONO para los agrupamientos sin fecha (estado,
+   *  dependencia, categoría): el tile le da a la cabecera el mismo ritmo
+   *  que el calendario de la vista por día. `icon` = nombre lucide o path
+   *  SVG (lo resuelve Glifo); `color` runtime tiñe el tile. */
+  glifo?: { icon: string; color?: string };
   /** Renglón fuerte del grupo: la fecha escrita entera ("15 de octubre",
    *  "Lunes 3"). Opcional — sin él la cabecera queda de UNA línea, como
    *  siempre, y no se toca ninguna pantalla existente. */
@@ -472,6 +569,9 @@ export interface TableGroup<Row = unknown> {
   veredicto?: Veredicto;
   /** Subtotal YA formateado; se muestra si showGroupSubtotal (kind='money'). */
   subtotal?: string;
+  /** [v3] Acción del GRUPO ENTERO en su cabecera ("Eliminar estas 12") —
+   *  operar la agrupación sin abrir nada. Se tiñe con el veredicto. */
+  action?: Action;
   rows: Row[];
 }
 
@@ -483,12 +583,10 @@ export interface DataTableFooter {
   /** Acción del pie en listas sin importes ("Cargar más"). */
   action?: Action;
   /**
-   * [v2.5] La REGLA de la entidad, al pie de la tarjeta: "El empleado con
-   * reclamos asignados no se puede borrar: primero hay que reasignarlos".
-   *
-   * Sale del canvas de Configuración, donde cada ABM cierra con la suya. Va
-   * acá y no en un tooltip del botón porque explica por qué el sistema va a
-   * decir que no ANTES de que el usuario lo intente — que es cuando sirve.
+   * @deprecated [v3] YA NO SE DIBUJA (dueño, 2026-09-03: rompía el estilo —
+   * el ABM termina en el "Mostrando N de M"). La regla de la entidad va en la
+   * `pista` de arriba (HintBanner) o en el drawer. Queda tipada solo para no
+   * romper las páginas que aún la pasan; se limpia en la barrida.
    */
   note?: string;
 }
@@ -508,8 +606,11 @@ export interface DataTableProps<Row = unknown> {
    *  fichas cuando el CONTENEDOR es angosto (ver RolesSemanticos). Sin roles,
    *  el control se comporta como siempre: sólo dibuja columnas. */
   roles?: RolesSemanticos<Row>;
-  /** 'date' (money/plain con fecha) · 'hour' (schedule) · 'none'. */
-  groupBy?: 'date' | 'hour' | 'none';
+  /** 'date' (money/plain con fecha) · 'hour' (schedule) · 'none'.
+   *  [v3] Se suman 'taxonomy' y 'state': agrupar por el ROL correspondiente —
+   *  los grupos los computa el ORQUESTADOR desde `roles` (la página declara
+   *  la palabra, el kit agrupa); para el DataTable llegan como `groups`. */
+  groupBy?: 'date' | 'hour' | 'taxonomy' | 'state' | 'none';
   /** true en kind='money': subtotal por grupo en la columna del importe. */
   showGroupSubtotal?: boolean;
   /** Filas planas (groupBy 'none' u omitido). */
@@ -639,13 +740,19 @@ export interface SemanticAbmPageProps<Row = unknown> {
    */
   hero?: ModuleHeroProps;
   /**
-   * [v2.5] PISTA: la banda de ayuda entre el hero y los controles ("Los plazos
-   * se cuentan en días hábiles", "El CBU es lo que habilita el pago masivo").
+   * [v2.5] PISTA: la banda de ayuda del módulo ("Los plazos se cuentan en
+   * días hábiles", "El CBU es lo que habilita el pago masivo").
    *
    * Sale del canvas de Configuración. Es distinta del hero: el hero dice CÓMO
    * VIENE la cosa (números de hoy), la pista explica CÓMO FUNCIONA (una regla
    * que no cambia). Por eso no se mezclan — y por eso la pista no lleva
    * números: si los llevara, envejecería sin que nadie la actualice.
+   *
+   * [v3] CAMBIÓ DE LUGAR: ya no va entre el hero y los controles — va ARRIBA
+   * DE TODO (el segmento de ayudas, antes de la cabecera) y SE CIERRA CON UNA
+   * CRUZ, persistida por módulo (HintBanner). Una ayuda es para leerla una
+   * vez, no para ocupar el medio de la pantalla para siempre (dueño,
+   * 2026-09-02).
    */
   pista?: { titulo: string; texto: string; accion?: Action };
   /** Borde izquierdo del hero: token CSS (`var(--pl-green)` por defecto,
@@ -654,7 +761,15 @@ export interface SemanticAbmPageProps<Row = unknown> {
 
   /* --- Toolbar --- */
   searchPlaceholder: string;
-  views: ViewKind[];
+  /**
+   * [v3] AHORA OPCIONAL — el estándar es NO declararla: con `roles` declarados
+   * el kit trae las tres vistas built-in ('table' + 'cards' + 'guided'
+   * autogeneradas desde los roles semánticos). Declararla es la EXCEPCIÓN
+   * explícita (una pantalla que de verdad no admite una vista), no el default.
+   * Why (dueño, 2026-09-02): los agentes declaraban de menos y las pantallas
+   * perdían vistas que el kit ya sabía dibujar.
+   */
+  views?: ViewKind[];
   secondaryAction?: Action;
   /** [v2.1] Ahora OPCIONAL (vistas de solo consulta) — ver ListToolbarProps. */
   primaryAction?: Action;
@@ -663,12 +778,20 @@ export interface SemanticAbmPageProps<Row = unknown> {
   steps?: StepsSpec;
 
   /* --- Filtros --- */
-  selects: SelectSpec[];
+  /**
+   * [v3] AHORA OPCIONAL. Sin `selects`, el kit AUTODERIVA el filtro de tipo
+   * desde `roles.taxonomy` (opciones únicas + "Todas") y filtra las filas él
+   * mismo, en todas las vistas. Declarar `selects` sigue siendo la vía para
+   * filtros del dominio (dependencia, caja, zona) — y anula la autoderivación.
+   */
+  selects?: SelectSpec[];
   /** Omitir en listas sin fecha (Personal, Inventario). Obligatorio en money. */
   period?: PeriodControlValue;
   statusTabs: StatusTab[];
   /** [v2.1] Segmented chico de orden (ver SortSpec). Pass-through a FilterBar. */
   sortSpec?: SortSpec;
+  /** [v3] Segmented chico de agrupamiento (ver GroupSpec). Pass-through. */
+  groupSpec?: GroupSpec;
   filterSummary?: string;
 
   /* --- Cuerpo --- */
@@ -686,11 +809,51 @@ export interface SemanticAbmPageProps<Row = unknown> {
   viewSlots?: Partial<Record<ViewKind, ReactNode>>;
   /** [v2.1] Panel lateral sticky junto al cuerpo (ver AsideSpec). */
   aside?: AsideSpec;
+  /**
+   * [v3] VISTA ENFOQUE declarativa (ver EnfoqueSpec): saludo + chips resumen
+   * + secciones por veredicto con sus tarjetas y CTA. Reemplaza al slot
+   * 'guided' como estándar — el slot queda para vistas guiadas 100% custom.
+   * Sin `enfoque` nI slot, la guiada degrada a secciones por estado.
+   */
+  enfoque?: EnfoqueSpec<Row>;
+  /**
+   * [v3] IA CONTEXTUAL opcional: con esta prop el orquestador monta el panel
+   * operativo de IA como aside colapsable (persistido por usuario). La página
+   * TRAE los datos (el kit no llama a ningún modelo — dumb) y sólo pasa `ia`
+   * cuando el municipio tiene la IA habilitada (useIaHabilitada). Excluyente
+   * en la práctica con `aside` (si vienen ambos, gana `aside`).
+   */
+  ia?: {
+    data: DashboardIAData | null;
+    loading?: boolean;
+    /** Título del panel. Default: "Panel operativo". */
+    title?: string;
+    onTipClick?: (tip: IATip) => void;
+  };
 
   /* --- Tabla --- */
   kind: ListKind;
   columns: ColumnSpec<Row>[];
-  groupBy?: 'date' | 'hour' | 'none';
+  /**
+   * [v3] Los mismos datos declarados por ROL (ver RolesSemanticos). Con esto
+   * el kit dibuja SOLO las otras vistas: la ficha mobile, la vista 'cards' y
+   * la vista 'guided' (fichas agrupadas por estado) salen de acá — la página
+   * no arma UI alternativa, declara qué rol cumple cada dato. Es la pieza que
+   * mantiene íconos, segundas líneas, píldoras y acciones SIMÉTRICOS en todas
+   * las vistas: un set de datos, un solo dibujante.
+   */
+  roles?: RolesSemanticos<Row>;
+  /** [v3] 'taxonomy'/'state' agrupan por el rol correspondiente y los grupos
+   *  los computa el kit (contador + punto de color). 'date'/'hour' siguen
+   *  esperando `groups` precomputados por la página (fechas formateadas). */
+  groupBy?: 'date' | 'hour' | 'taxonomy' | 'state' | 'none';
+  /**
+   * [v3] Acción por GRUPO de la tabla ("Eliminar estas 12"): el kit computa
+   * los grupos (groupBy 'taxonomy'/'state') y le pregunta a la página qué
+   * acción lleva cada cabecera. Devolver null ⇒ ese grupo sin acción.
+   * También aplica sobre `groups` precomputados que no traigan `action`.
+   */
+  groupAction?: (grupo: TableGroup<Row>) => Action | null;
   showGroupSubtotal?: boolean;
   rows: Row[];
   /** Grupos precomputados (ver DataTableProps.groups). */

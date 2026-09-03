@@ -129,7 +129,7 @@ def bajar_georef():
     return todas
 
 
-def nominatim(q, viewbox=None):
+def nominatim(q, viewbox=None, ft="settlement"):
     """Busca un asentamiento, acotado a la zona del municipio.
 
     Las dos cosas que hacen la diferencia son `featureType=settlement` y el
@@ -140,7 +140,12 @@ def nominatim(q, viewbox=None):
     del municipio, la respuesta correcta suele ser la unica.
     """
     p = {"q": q, "format": "json", "polygon_geojson": 1, "limit": 8,
-         "countrycodes": "ar", "featureType": "settlement"}
+         "countrycodes": "ar"}
+    # `featureType=settlement` ordena cuando se busca una LOCALIDAD, pero deja
+    # afuera a los barrios --- "Barrio Don Orione" no es un settlement y con el
+    # filtro puesto no aparece. Por eso la cascada lo apaga en sus variantes.
+    if ft:
+        p["featureType"] = ft
     if viewbox:
         p.update({"viewbox": viewbox, "bounded": 1})
     u = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(p)
@@ -160,6 +165,109 @@ def reverse(lat, lon, zoom):
 
 def parecido(a, b):
     return difflib.SequenceMatcher(None, norm(a), norm(b)).ratio()
+
+
+async def cascada(engine, args):
+    """Tercer pase: varias formas de preguntar por el MISMO lugar.
+
+    La leccion la dejo escrita el sondeo de OSM sobre Chubut: con un solo
+    intento, Trelew y Rawson figuraban sin contornos teniendo 62 y 32. Nominatim
+    devuelve el NODO de la ciudad y el area vive en una relacion que se llama
+    distinto --- "Municipio de Trelew". Lo mismo pasa un nivel mas abajo: "Don
+    Orione" no da nada y "Barrio Don Orione" da 34 puntos.
+
+    Y el `viewbox` que ayuda cuando el nombre es ambiguo, estorba cuando no lo
+    es: "Los Talas" aparece sin el y se pierde con el. Por eso la cascada
+    empieza SIN recuadro y usa el centroide oficial para validar, que es el
+    filtro que de verdad decide.
+    """
+    async with engine.connect() as c:
+        filas = (await c.execute(text(
+            "SELECT cz.id, cz.nombre, cz.lat, cz.lng, cz.municipio_catalogo_id mid, "
+            "       mc.nombre muni, mc.provincia "
+            "FROM catalogo_zonas cz "
+            "LEFT JOIN municipios_catalogo mc "
+            "       ON mc.id = LPAD(cz.municipio_catalogo_id, 6, '0') "
+            "WHERE cz.poligono IS NULL AND cz.lat IS NOT NULL"))).mappings().all()
+    print(f"sin contorno: {len(filas)}")
+
+    async def volcar(lote):
+        if args.dry_run or not lote:
+            return
+        async with engine.begin() as c:
+            for zid, ring, fuente in lote:
+                await c.execute(text(
+                    "UPDATE catalogo_zonas SET poligono=:g, osm_id=:o, "
+                    "fuente='osm', updated_at=NOW() WHERE id=:id"),
+                    {"g": json.dumps(ring), "o": fuente[:32], "id": zid})
+
+    hallados, pendientes, por_via = [], [], {}
+    for i, f in enumerate(filas, 1):
+        if args.limit and i > args.limit:
+            break
+        pt = (float(f["lng"]), float(f["lat"]))
+        ctx = ", ".join(x for x in (f["muni"], f["provincia"], "Argentina") if x)
+        intentos = [
+            ("nombre", f"{f['nombre']}, {ctx}", "settlement"),
+            ("nombre-libre", f"{f['nombre']}, {ctx}", None),
+            ("barrio", f"Barrio {f['nombre']}, {ctx}", None),
+            ("municipio-de", f"Municipio de {f['nombre']}, {ctx}", None),
+        ]
+        elegido = via = None
+        for etiqueta, consulta, ft in intentos:
+            try:
+                for cand in nominatim(consulta, ft=ft):
+                    rs = anillos(cand.get("geojson"))
+                    if not rs:
+                        continue
+                    r = max(rs, key=len)
+                    # el centroide OFICIAL adentro: es lo que separa el lugar
+                    # que buscamos de cualquier otro que se llame parecido
+                    if dentro(pt, r):
+                        elegido = r
+                        via = f"osm:{cand['osm_type']}/{cand['osm_id']}"
+                        break
+            except Exception as ex:
+                print(f"  [red] {f['nombre']}: {ex}", flush=True)
+            time.sleep(PAUSA)
+            if elegido:
+                por_via[etiqueta] = por_via.get(etiqueta, 0) + 1
+                break
+
+        if not elegido:                      # 4) por posicion, el ultimo recurso
+            for zoom in (14, 13):
+                try:
+                    d = reverse(f["lat"], f["lng"], zoom)
+                except Exception:
+                    time.sleep(PAUSA)
+                    continue
+                time.sleep(PAUSA)
+                rs = anillos(d.get("geojson"))
+                if not rs:
+                    continue
+                nom = (d.get("name") or d.get("display_name", "")).split(",")[0]
+                if parecido(nom, f["nombre"]) < 0.82:
+                    continue
+                elegido = max(rs, key=len)
+                via = f"osm:{d.get('osm_type')}/{d.get('osm_id')}"
+                por_via["posicion"] = por_via.get("posicion", 0) + 1
+                break
+
+        if elegido:
+            hallados.append((f["id"], f["nombre"], f["muni"]))
+            pendientes.append((f["id"], elegido, via))
+            if len(pendientes) >= 20:
+                await volcar(pendientes)
+                pendientes = []
+        if i % 25 == 0:
+            print(f"  {i}/{len(filas)} | recuperadas {len(hallados)} {por_via}", flush=True)
+
+    await volcar(pendientes)
+    print(f"\nrecuperadas {len(hallados)} de {min(len(filas), args.limit or 10**9)}")
+    print(f"  por via: {por_via}")
+    for _, nom, muni in hallados[:20]:
+        print(f"    {nom[:28]:28s} en {muni}")
+    await engine.dispose()
 
 
 async def rellenar(engine, args):
@@ -276,6 +384,8 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--provincia", help="solo esta provincia")
     ap.add_argument("--limit", type=int, help="cortar despues de N localidades")
+    ap.add_argument("--cascada", action="store_true",
+                    help="tercer pase: varias formas de preguntar por el mismo lugar")
     ap.add_argument("--rellenar", action="store_true",
                     help="segundo pase: busca por posicion las que quedaron sin contorno")
     ap.add_argument("--dry-run", action="store_true")
@@ -287,6 +397,8 @@ async def main():
         url = url.rsplit("/", 1)[0] + "/" + args.db
     engine = create_async_engine(url, pool_pre_ping=True)
 
+    if args.cascada:
+        return await cascada(engine, args)
     if args.rellenar:
         return await rellenar(engine, args)
 

@@ -14,7 +14,7 @@ export default function MunicipioHome() {
   useEffect(() => {
     const loadMunicipioData = async () => {
       if (!codigo) {
-        navigate('/bienvenido');
+        navigate('/demos-listado');
         return;
       }
 
@@ -47,7 +47,7 @@ export default function MunicipioHome() {
       }
 
       // Si no se encontro el municipio, ir a bienvenido
-      navigate('/bienvenido');
+      navigate('/demos-listado');
     };
 
     loadMunicipioData();

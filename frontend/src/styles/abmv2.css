@@ -446,13 +446,25 @@
   cursor: default;
 }
 
+/* [v3.1] El CONTADOR del tab como chip moderno (dueño, 2026-09-03): misma
+   familia tipográfica, tabular, con su propia cápsula suave y aire respecto
+   del label — nada de números pegados en otra fuente. */
 .av2-ttab-n {
-  font-size: 11.5px;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pl-surface-3);
+  font-family: inherit;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--pl-text-faint);
+  color: var(--pl-text-2);
   font-feature-settings: 'tnum';
 }
-.av2-ttab--cero .av2-ttab-n { color: var(--pl-text-disabled); }
+.av2-ttab--activo .av2-ttab-n {
+  background: color-mix(in srgb, var(--pl-accent, var(--pl-green)) 12%, var(--pl-surface));
+  color: var(--pl-text);
+}
+.av2-ttab--cero .av2-ttab-n { background: transparent; color: var(--pl-text-disabled); }
 
 /* ============================================================
    [SHEET DETALLE v2.2] — chips de contexto, banner de zona y pie
@@ -3134,6 +3146,57 @@ button.av2-chip:hover { opacity: 0.85; }
   align-self: center;
 }
 
+/* [v3] Variante HINT: la pista vive en el segmento de ayudas, ARRIBA de la
+   cabecera del módulo, y se cierra con una cruz (HintBanner.tsx). Sin margen
+   superior — es lo primero de la página — y con la cruz anclada a la derecha,
+   después de la acción opcional. */
+.av2-nota--hint {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  /* UNA sola fila: tile + texto flexible + acción/cruz. El wrap partía el
+     banner en dos alturas con el tile huérfano arriba (bug 2026-09-03). */
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-left-width: 4px;
+  box-shadow: var(--pl-shadow-card);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--pl-tono, var(--pl-green)) 12%, var(--pl-surface)) 0%,
+    var(--pl-surface) 55%
+  );
+}
+.av2-nota--hint .av2-nota-txt { flex: 1 1 auto; }
+.av2-hint-tile {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--pl-tono, var(--pl-green));
+  background: color-mix(in srgb, var(--pl-tono, var(--pl-green)) 14%, var(--pl-surface));
+}
+.av2-nota--hint .av2-btn-secundario { margin-left: auto; }
+.av2-nota-cerrar {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--pl-text-3);
+  cursor: pointer;
+}
+.av2-nota--hint .av2-btn-secundario + .av2-nota-cerrar { margin-left: 6px; }
+.av2-nota-cerrar:hover { background: var(--pl-surface-2); color: var(--pl-text); }
+
 .av2-nota-eyebrow {
   display: block;
   font-size: var(--pl-fs-eyebrow);
@@ -4708,4 +4771,417 @@ button.av2-chip:hover { opacity: 0.85; }
   justify-content: flex-end;
   gap: 8px;
   margin: 0 0 12px;
+}
+
+/* ============================================================
+ * [v3] TARJETA RICA (TarjetaRegistro) — boards por veredicto
+ * Ingeniería inversa de las cards curadas de Reclamos/Trámites.
+ * El color RUNTIME de categoría/badge llega por --tile / --pill.
+ * ============================================================ */
+
+.av2-tarj {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-left: 3px solid var(--pl-border-strong);
+  border-radius: 12px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.av2-tarj--click { cursor: pointer; }
+.av2-tarj--click:hover {
+  box-shadow: var(--pl-shadow-float);
+  transform: translateY(-2px);
+}
+/* Los 3 veredictos tiñen el borde izquierdo (el color señala, no grita). */
+.av2-tarj--bueno { border-left-color: var(--pl-green); }
+.av2-tarj--advertencia { border-left-color: var(--pl-amber-strong); }
+.av2-tarj--malo { border-left-color: var(--pl-red); }
+
+.av2-tarj-cab { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.av2-tarj-tile {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--tile, var(--pl-text-2));
+  background: color-mix(in srgb, var(--tile, var(--pl-text-3)) 14%, var(--pl-surface));
+}
+.av2-tarj-titulo {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--pl-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.av2-tarj-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.av2-tarj-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  color: var(--pill, var(--pl-text-2));
+  background: color-mix(in srgb, var(--pill, var(--pl-text-3)) 12%, var(--pl-surface));
+  border: 1px solid color-mix(in srgb, var(--pill, var(--pl-text-3)) 28%, transparent);
+}
+.av2-tarj-pill--suave { border-color: transparent; }
+
+.av2-tarj-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+.av2-tarj-due { font-weight: 600; }
+.av2-vered-bueno { color: var(--pl-green-700); }
+.av2-vered-advertencia { color: var(--pl-amber-700); }
+.av2-vered-malo { color: var(--pl-red-700); }
+
+.av2-tarj-desc {
+  margin: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.5;
+  color: var(--pl-text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.av2-tarj-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pl-border);
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+  min-width: 0;
+}
+.av2-tarj-contexto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.av2-tarj-pie-der { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.av2-tarj-id {
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--pl-surface-2);
+  color: var(--pl-text-2);
+}
+
+.av2-tarj-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-2);
+  color: var(--pl-text);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.av2-tarj-cta:hover { background: var(--pl-surface-hover); }
+.av2-tarj-cta--malo {
+  border-color: color-mix(in srgb, var(--pl-red) 35%, transparent);
+  background: color-mix(in srgb, var(--pl-red) 8%, var(--pl-surface));
+  color: var(--pl-red-700);
+}
+.av2-tarj-cta--advertencia {
+  border-color: color-mix(in srgb, var(--pl-amber-strong) 35%, transparent);
+  background: color-mix(in srgb, var(--pl-amber-strong) 10%, var(--pl-surface));
+  color: var(--pl-amber-700);
+}
+.av2-tarj-cta--bueno {
+  border-color: color-mix(in srgb, var(--pl-green) 35%, transparent);
+  background: color-mix(in srgb, var(--pl-green) 8%, var(--pl-surface));
+  color: var(--pl-green-700);
+}
+
+/* ============================================================
+ * [v3] VISTA ENFOQUE (VistaEnfoque) — la guiada curada
+ * ============================================================ */
+
+.av2-enf { display: flex; flex-direction: column; gap: 18px; margin-top: 12px; }
+
+.av2-enf-saludo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--pl-border);
+  background: var(--pl-surface-2);
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-2);
+}
+.av2-enf-saludo-txt strong { color: var(--pl-text); font-weight: 600; }
+/* [v3.2] Los chips del resumen TAMBIÉN en cápsula segmented (dueño: "este
+   estilo siempre — las pills sueltas quedan horrendas"). El veredicto tiñe
+   el punto; el texto queda neutro (criterio único de color). */
+.av2-enf-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-pill);
+  margin-left: auto;
+}
+.av2-enf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
+  color: var(--pl-text-2);
+  font-family: inherit;
+  font-size: var(--pl-fs-caption);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-enf-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pl-text-3);
+  flex: 0 0 auto;
+}
+.av2-enf-chip:hover { background: var(--pl-surface-hover); }
+.av2-enf-chip--malo::before { background: var(--pl-red); }
+.av2-enf-chip--advertencia::before { background: var(--pl-amber-strong); }
+.av2-enf-chip--bueno::before { background: var(--pl-green); }
+
+.av2-enf-seccion { display: flex; flex-direction: column; gap: 10px; }
+.av2-enf-cab { display: flex; align-items: flex-start; gap: 10px; }
+.av2-enf-ico {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--pl-text-2);
+  background: var(--pl-surface-2);
+}
+.av2-enf-seccion--malo .av2-enf-ico { color: var(--pl-red-700); background: color-mix(in srgb, var(--pl-red) 10%, var(--pl-surface)); }
+.av2-enf-seccion--advertencia .av2-enf-ico { color: var(--pl-amber-700); background: color-mix(in srgb, var(--pl-amber-strong) 12%, var(--pl-surface)); }
+.av2-enf-seccion--bueno .av2-enf-ico { color: var(--pl-green-700); background: color-mix(in srgb, var(--pl-green) 10%, var(--pl-surface)); }
+
+.av2-enf-cab-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.av2-enf-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  color: var(--pl-text);
+}
+.av2-enf-conteo {
+  font-size: var(--pl-fs-caption);
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--pl-surface-3);
+  color: var(--pl-text-2);
+}
+.av2-enf-seccion--malo .av2-enf-conteo { background: color-mix(in srgb, var(--pl-red) 12%, var(--pl-surface)); color: var(--pl-red-700); }
+.av2-enf-seccion--advertencia .av2-enf-conteo { background: color-mix(in srgb, var(--pl-amber-strong) 14%, var(--pl-surface)); color: var(--pl-amber-700); }
+.av2-enf-seccion--bueno .av2-enf-conteo { background: color-mix(in srgb, var(--pl-green) 12%, var(--pl-surface)); color: var(--pl-green-700); }
+.av2-enf-sub { font-size: var(--pl-fs-body-sm); color: var(--pl-text-muted); }
+
+/* [v3.2] PRIMERA LÍNEA (dueño): search acotado (no gigante) + vistas +
+   orden-botón + agrupador + … + Nuevo SIEMPRE al final. El av2-orden dentro
+   de la toolbar no se dockea solo (eso era de la FilterBar). */
+.av2-toolbar-buscador { flex: 0 1 460px; min-width: 200px; }
+.av2-toolbar-derecha { flex: 1 1 auto; }
+.av2-toolbar-derecha .av2-orden { margin-left: 0; }
+.av2-toolbar-derecha .av2-btn-primario { margin-left: auto; }
+
+/* [v3.2] Insignia de ICONO de la cabecera de grupo (agrupamientos sin
+   fecha): mismo footprint que la insignia del día. El color runtime de la
+   categoría llega por --tile. */
+.av2-tabla-grupo-tile {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--tile, var(--pl-text-2));
+  background: color-mix(in srgb, var(--tile, var(--pl-text-3)) 13%, var(--pl-surface));
+  border: 1px solid color-mix(in srgb, var(--tile, var(--pl-text-3)) 22%, var(--pl-border));
+}
+
+/* [v3] Acción de grupo/sección entera ("Eliminar estas 88"): botón chico
+   anclado a la derecha de la cabecera, teñido por el veredicto vía
+   .av2-vered-*. Compartido por la tabla y la vista enfoque. */
+.av2-tabla-grupo-accion,
+.av2-enf-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--pl-border);
+  border-radius: 8px;
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  font-size: var(--pl-fs-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.av2-tabla-grupo-accion:hover,
+.av2-enf-accion:hover { background: var(--pl-surface-hover); }
+.av2-tabla-grupo-accion { margin-left: 10px; }
+.av2-enf-accion { margin-left: auto; align-self: center; }
+.av2-enf-accion + .av2-enf-toggle { margin-left: 6px; }
+
+.av2-enf-toggle {
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--pl-border);
+  border-radius: 8px;
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.15s ease;
+}
+.av2-enf-toggle:hover { background: var(--pl-surface-hover); }
+.av2-enf-toggle--abierta { transform: rotate(180deg); }
+
+.av2-enf-vacia {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--pl-border);
+  border-radius: 10px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+}
+
+.av2-enf-grid,
+.av2-cards-ricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+.av2-cards-ricas { margin-top: 12px; }
+
+/* ============================================================
+ * [v3] SELECTOR ADAPTATIVO (SelectorAdaptativo) — píldoras↔combo
+ * Hasta ~5 opciones: píldoras; más (o angosto): combo. El color
+ * runtime de la opción llega por --pill.
+ * ============================================================ */
+
+/* [v3.1] REDISEÑO por feedback del dueño (2026-09-03): "el colorinche no
+   quedó bien". El criterio ÚNICO es el chip v2 de la grilla — punto de color
+   + fondo suave + texto neutro — y ese criterio ES el default del control:
+   si una pantalla se ve distinta, está overrideando estilos. El color de la
+   categoría vive en el PUNTO (y apenas en el fondo al activarse), no pinta
+   la píldora entera. */
+/* [v3.2] Las píldoras van DENTRO de una cápsula segmented — el mismo
+   lenguaje que "Agrupar"/"Ordenar" (dueño: "no así sueltas"). El color de
+   datos sigue viviendo en el PUNTO; la activa se eleva sobre el track. */
+.av2-selad {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--pl-track);
+  border-radius: var(--pl-radius-pill);
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.av2-selad .av2-select-etiqueta { margin: 0 4px 0 9px; }
+.av2-selad-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: var(--pl-radius-pill);
+  background: transparent;
+  color: var(--pl-text-2);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-selad-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pill, var(--pl-text-3));
+  flex: 0 0 auto;
+}
+.av2-selad-pill:hover { background: var(--pl-surface-hover); }
+.av2-selad-pill--activa {
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  font-weight: 600;
+  box-shadow: var(--pl-shadow-card);
+}
+
+/* ============================================================
+ * [v3] Página STANDALONE: un ABM v3 fuera del shell de gestión
+ * (/demos-listado). Fondo propio y ancho acotado — nada más.
+ * ============================================================ */
+
+.av2-standalone {
+  min-height: 100vh;
+  background: var(--pl-bg, var(--pl-surface-2));
+  padding: 24px clamp(16px, 4vw, 48px) 64px;
+}
+.av2-standalone > .av2-page { max-width: 1280px; margin: 0 auto; }
+
+/* ============================================================
+ * [v3] Animación de cambio de vista: el cuerpo entra con un
+ * fade + slide corto cada vez que cambia la vista activa.
+ * ============================================================ */
+
+@keyframes av2EntradaCuerpo {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.av2-cuerpo-anim { animation: av2EntradaCuerpo 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .av2-cuerpo-anim { animation: none; }
+  .av2-tarj--click:hover { transform: none; }
 }

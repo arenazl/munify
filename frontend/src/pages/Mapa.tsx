@@ -49,7 +49,8 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { estadoColor, estadoLabel, estadoColors, estadoLabels } from '../lib/enums/reclamo';
-import { reclamosApi, poiApi, modulosApi, zonasApi } from '../lib/api';
+import { reclamosApi, poiApi, modulosApi, zonasApi, barriosApi } from '../lib/api';
+import type { BarrioMunicipio } from '../lib/api';
 // Suite del estándar v2: la cabecera de módulo va ARRIBA DE TODO y la barra
 // de controles es la tarjeta partida (toolbar + filtros). Reemplaza al
 // StickyPageHeader viejo, que metía el título DEBAJO del hero.
@@ -469,10 +470,17 @@ interface CambioBarrio {
 }
 
 /** Conteo por barrio. Los reclamos sin zona NO entran: no se inventa un barrio. */
+/** El lugar fino de un reclamo: su barrio y, si no lo tiene, su zona. Los
+ *  reclamos anteriores a `barrio_id` sólo saben la zona, y con «Zona única»
+ *  contar por zona daba siempre "1 de 1 barrios". */
+function lugarDe(r: Reclamo): string | undefined {
+  return r.barrio?.nombre?.trim() || r.zona?.nombre?.trim() || undefined;
+}
+
 function contarPorBarrio(lista: Reclamo[]): Map<string, number> {
   const conteo = new Map<string, number>();
   for (const r of lista) {
-    const nombre = r.zona?.nombre?.trim();
+    const nombre = lugarDe(r);
     if (!nombre) continue;
     conteo.set(nombre, (conteo.get(nombre) || 0) + 1);
   }
@@ -1395,6 +1403,31 @@ export default function Mapa() {
       .catch(() => setZonasMunicipio([]));
   }, []);
 
+  // Los BARRIOS del municipio (GET /barrios). Desde 2026-09-02 el territorio
+  // es municipio -> zona -> barrio y una ciudad nace con UNA zona: contar
+  // zonas como barrios decía "1 de 1 barrios" con 40 barrios cargados. El
+  // nivel fino es el barrio; las zonas quedan de fallback para munis sin
+  // barrios (nunca un denominador inventado).
+  const [barriosMunicipio, setBarriosMunicipio] = useState<BarrioMunicipio[]>([]);
+  useEffect(() => {
+    barriosApi
+      .getAll()
+      .then((r) => setBarriosMunicipio(r.data || []))
+      .catch(() => setBarriosMunicipio([]));
+  }, []);
+  const lugaresMunicipio = useMemo<ZonaMunicipio[]>(
+    () =>
+      barriosMunicipio.length > 0
+        ? barriosMunicipio.map((b) => ({
+            id: b.id,
+            nombre: b.nombre,
+            latitud_centro: b.latitud,
+            longitud_centro: b.longitud,
+          }))
+        : zonasMunicipio,
+    [barriosMunicipio, zonasMunicipio],
+  );
+
   // =================================================================
   // Lienzo elástico: el mapa toma el alto libre del viewport
   // =================================================================
@@ -1568,6 +1601,11 @@ export default function Mapa() {
   }>({ distritos: [], barrios: [] });
   const [verRegiones, setVerRegiones] = useState(true);
   const [distritoSel, setDistritoSel] = useState<number | null>(null);
+  /** Barrio elegido (nivel fino). Con una sola zona es el único lugar que se
+   *  puede elegir; con varias, aparece después de elegir la zona. */
+  const [barrioSel, setBarrioSel] = useState<number | null>(null);
+  // Al cambiar de zona el barrio elegido puede quedar afuera: se suelta.
+  useEffect(() => { setBarrioSel(null); }, [distritoSel]);
 
   useEffect(() => {
     zonasApi.regionesMapa()
@@ -1587,13 +1625,28 @@ export default function Mapa() {
    * de los dos puntos —donde la oración pasa a explicar la pregunta— o, si no
    * los hay, antes del punto final.
    */
+  /** Barrios que se pueden elegir: los de la zona elegida, o todos si la
+   *  única zona es el municipio entero. Con varias zonas y ninguna elegida
+   *  no se ofrece barrio: primero se elige la zona. */
+  const barriosElegibles = useMemo(() => {
+    if (regiones.distritos.length > 1) {
+      return distritoSel == null ? [] : barriosMunicipio.filter((b) => b.zona_id === distritoSel);
+    }
+    return barriosMunicipio;
+  }, [barriosMunicipio, regiones.distritos.length, distritoSel]);
+
   const preguntasConLugar = useMemo(() => {
-    if (regiones.distritos.length <= 1) return PREGUNTAS;
+    const hayLugar = regiones.distritos.length > 1;
+    const hayBarrio = barriosElegibles.length > 1;
+    if (!hayLugar && !hayBarrio) return PREGUNTAS;
+    // Un marcador sin combo se vería como "{barrio}" en la oración: sólo se
+    // inserta el de los combos que efectivamente están.
+    const marca = hayLugar && hayBarrio ? ', en {lugar}, {barrio}' : hayLugar ? ', en {lugar}' : ', en {barrio}';
     const conLugar = (t: string) => (t.includes(':')
-      ? t.replace(':', ', en {lugar}:')
-      : t.replace(/\.$/, ', en {lugar}.'));
+      ? t.replace(':', `${marca}:`)
+      : t.replace(/\.$/, `${marca}.`));
     return PREGUNTAS.map((q) => ({ ...q, plantilla: conLugar(q.plantilla) }));
-  }, [regiones.distritos.length]);
+  }, [regiones.distritos.length, barriosElegibles.length]);
 
   /** Color de cada distrito: estable por su posición en la lista. */
   const colorDistrito = useCallback((zonaId: number | null | undefined) => {
@@ -1723,9 +1776,11 @@ export default function Mapa() {
   //    municipio entero. Si recortara sólo el dibujo, la pantalla afirmaría una
   //    cosa mientras muestra otra.
   const reclamosPorLugar = useMemo(() => {
-    if (distritoSel == null) return reclamosPorDependencia;
-    return reclamosPorDependencia.filter((r) => r.zona?.id === distritoSel);
-  }, [reclamosPorDependencia, distritoSel]);
+    let l = reclamosPorDependencia;
+    if (distritoSel != null) l = l.filter((r) => r.zona?.id === distritoSel);
+    if (barrioSel != null) l = l.filter((r) => r.barrio?.id === barrioSel);
+    return l;
+  }, [reclamosPorDependencia, distritoSel, barrioSel]);
 
 
   // 3) ALCANCE DE LA PREGUNTA (sin mirar el tiempo). Es lo que reemplaza al
@@ -1840,7 +1895,7 @@ export default function Mapa() {
       }
     }
     if (!ultimo) return null;
-    const lugar = ultimo.direccion?.trim() || ultimo.zona?.nombre?.trim();
+    const lugar = ultimo.direccion?.trim() || lugarDe(ultimo);
     const que = ultimo.categoria?.nombre?.trim();
     return [que, lugar].filter(Boolean).join(' — ') || null;
   }, [ventanaTimelapse, reclamosFiltrados]);
@@ -1888,7 +1943,7 @@ export default function Mapa() {
    * podría cambiar a otro.
    */
   const universoSin = useCallback(
-    (excluir: 'categoria' | 'dependencia' | 'lugar' | 'periodo') => {
+    (excluir: 'categoria' | 'dependencia' | 'lugar' | 'barrio' | 'periodo') => {
       let l = reclamos;
       if (excluir !== 'categoria' && filtroCategoria) {
         l = l.filter((r) => String(r.categoria?.id ?? 'otros') === filtroCategoria);
@@ -1899,11 +1954,14 @@ export default function Mapa() {
       if (excluir !== 'lugar' && distritoSel != null) {
         l = l.filter((r) => r.zona?.id === distritoSel);
       }
+      if (excluir !== 'barrio' && barrioSel != null) {
+        l = l.filter((r) => r.barrio?.id === barrioSel);
+      }
       // La pregunta NO se excluye nunca: es el marco, no un filtro más.
       l = aplicarAlcance(l);
       return excluir === 'periodo' ? l : aplicarTiempo(l);
     },
-    [reclamos, filtroCategoria, filtroDependencia, distritoSel, aplicarAlcance, aplicarTiempo],
+    [reclamos, filtroCategoria, filtroDependencia, distritoSel, barrioSel, aplicarAlcance, aplicarTiempo],
   );
 
   /** Cuántos reclamos tiene cada área bajo el resto de los filtros. */
@@ -1921,6 +1979,16 @@ export default function Mapa() {
     const m = new Map<number, number>();
     for (const r of universoSin('lugar')) {
       const id = r.zona?.id;
+      if (id != null) m.set(id, (m.get(id) || 0) + 1);
+    }
+    return m;
+  }, [universoSin]);
+
+  /** Cuántos reclamos tiene cada barrio (por id) bajo el resto de los filtros. */
+  const conteoPorBarrioId = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const r of universoSin('barrio')) {
+      const id = r.barrio?.id;
       if (id != null) m.set(id, (m.get(id) || 0) + 1);
     }
     return m;
@@ -2142,7 +2210,7 @@ export default function Mapa() {
   const zonasCalientesItems = useMemo<RankedListItem[]>(() => {
     const u = resolverUmbrales();
     return hotspots.map((h) => {
-      const barrio = masRepetido(h.reclamos.map((r) => r.zona?.nombre));
+      const barrio = masRepetido(h.reclamos.map((r) => lugarDe(r)));
       const categoria = masRepetido(h.reclamos.map((r) => r.categoria?.nombre));
       const detalle = [barrio, categoria].filter(Boolean).join(' · ');
       return {
@@ -2162,7 +2230,7 @@ export default function Mapa() {
   const barriosAlcanzados = useMemo(() => {
     const set = new Set<string>();
     for (const r of reclamosFiltrados) {
-      const n = r.zona?.nombre?.trim();
+      const n = lugarDe(r);
       if (n) set.add(n);
     }
     return set;
@@ -2177,14 +2245,14 @@ export default function Mapa() {
    */
   const centrosBarrio = useMemo(() => {
     const centros = new Map<string, { lat: number; lng: number }>();
-    for (const z of zonasMunicipio) {
+    for (const z of lugaresMunicipio) {
       if (z.latitud_centro != null && z.longitud_centro != null) {
         centros.set(z.nombre.trim(), { lat: z.latitud_centro, lng: z.longitud_centro });
       }
     }
     const acum = new Map<string, { lat: number; lng: number; n: number }>();
     for (const r of reclamos) {
-      const nombre = r.zona?.nombre?.trim();
+      const nombre = lugarDe(r);
       if (!nombre || centros.has(nombre) || r.latitud == null || r.longitud == null) continue;
       const a = acum.get(nombre) || { lat: 0, lng: 0, n: 0 };
       a.lat += r.latitud;
@@ -2194,7 +2262,7 @@ export default function Mapa() {
     }
     for (const [nombre, a] of acum) centros.set(nombre, { lat: a.lat / a.n, lng: a.lng / a.n });
     return centros;
-  }, [reclamos, zonasMunicipio]);
+  }, [reclamos, lugaresMunicipio]);
 
   /**
    * Barrios del catálogo que NO aparecen en lo que se está mirando, con su
@@ -2203,10 +2271,10 @@ export default function Mapa() {
    * respuesta, los rótulos del mapa y el ranking de abajo.
    */
   const barriosSinCobertura = useMemo(() => {
-    if (zonasMunicipio.length === 0) return [];
+    if (lugaresMunicipio.length === 0) return [];
     const historico = new Map<string, { total: number; ultimo: number }>();
     for (const r of reclamos) {
-      const nombre = r.zona?.nombre?.trim();
+      const nombre = lugarDe(r);
       if (!nombre) continue;
       const t = new Date(r.created_at).getTime();
       const h = historico.get(nombre);
@@ -2217,7 +2285,7 @@ export default function Mapa() {
         historico.set(nombre, { total: 1, ultimo: t });
       }
     }
-    return zonasMunicipio
+    return lugaresMunicipio
       .map((z) => {
         const nombre = z.nombre.trim();
         const h = historico.get(nombre);
@@ -2230,7 +2298,7 @@ export default function Mapa() {
       })
       .filter((z) => !barriosAlcanzados.has(z.nombre))
       .sort((a, b) => b.total - a.total);
-  }, [zonasMunicipio, reclamos, centrosBarrio, barriosAlcanzados]);
+  }, [lugaresMunicipio, reclamos, centrosBarrio, barriosAlcanzados]);
 
   // Barrio que más creció: se parte el rango de fechas OBSERVADO en el filtro
   // por la mitad y se compara cuántos reclamos tuvo cada barrio en cada mitad.
@@ -2238,7 +2306,7 @@ export default function Mapa() {
   // La cuenta en sí es `compararBarrios`, compartida con el remate del
   // time-lapse (que le pasa la primera ventana contra la última).
   const barrioQueMasCrecio = useMemo(() => {
-    const conFecha = reclamosFiltrados.filter((r) => r.zona?.nombre);
+    const conFecha = reclamosFiltrados.filter((r) => lugarDe(r));
     if (conFecha.length < 4) return null;
     const ts = conFecha.map((r) => new Date(r.created_at).getTime());
     const min = Math.min(...ts);
@@ -2266,7 +2334,7 @@ export default function Mapa() {
         .slice(0, 8)
         .map((r) => {
           const dias = diasDesde(r.created_at);
-          const detalle = [r.direccion || r.zona?.nombre, r.categoria?.nombre]
+          const detalle = [r.direccion || lugarDe(r), r.categoria?.nombre]
             .filter(Boolean)
             .join(' · ');
           return {
@@ -2305,7 +2373,7 @@ export default function Mapa() {
 
     if (conTiempo.length > 0) {
       return conTiempo.map(({ r, dias }) => {
-        const detalle = [r.direccion || r.zona?.nombre, r.categoria?.nombre]
+        const detalle = [r.direccion || lugarDe(r), r.categoria?.nombre]
           .filter(Boolean)
           .join(' · ');
         return {
@@ -2392,8 +2460,8 @@ export default function Mapa() {
         return {
           titulo: 'Barrios sin atención',
           caption:
-            zonasMunicipio.length > 0
-              ? `sobre los ${zonasMunicipio.length} barrios del municipio`
+            lugaresMunicipio.length > 0
+              ? `sobre los ${lugaresMunicipio.length} barrios del municipio`
               : 'el municipio no tiene barrios cargados',
           icono: MapPinOff,
           tono: 'advertencia' as const,
@@ -2416,7 +2484,7 @@ export default function Mapa() {
     resueltosItems,
     sinCoberturaItems,
     zonasCalientesItems,
-    zonasMunicipio.length,
+    lugaresMunicipio.length,
   ]);
 
   // =================================================================
@@ -2562,7 +2630,7 @@ export default function Mapa() {
         return tramos;
       }
       case 'sinllegar': {
-        if (zonasMunicipio.length === 0) {
+        if (lugaresMunicipio.length === 0) {
           return [
             {
               texto: 'El municipio todavía no tiene barrios cargados',
@@ -2575,7 +2643,7 @@ export default function Mapa() {
         if (sin === 0) {
           return [
             {
-              texto: `Los ${zonasMunicipio.length} barrios del municipio registran reclamos`,
+              texto: `Los ${lugaresMunicipio.length} barrios del municipio registran reclamos`,
               tono: 'bueno',
             },
             { texto: ' en el período.' },
@@ -2584,7 +2652,7 @@ export default function Mapa() {
         const nunca = barriosSinCobertura.filter((b) => b.total === 0).length;
         const tramos: ConsultaSegmento[] = [
           {
-            texto: `${sin} de ${zonasMunicipio.length} barrios sin ningún reclamo en el período`,
+            texto: `${sin} de ${lugaresMunicipio.length} barrios sin ningún reclamo en el período`,
             tono: veredictoMasEsPeor(sin, u.sinAsignar) ?? 'advertencia',
           },
         ];
@@ -2601,11 +2669,11 @@ export default function Mapa() {
         const tramos: ConsultaSegmento[] = [
           { texto: `${total} ${total === 1 ? 'reclamo' : 'reclamos'} sobre el mapa` },
         ];
-        if (zonasMunicipio.length > 0) {
+        if (lugaresMunicipio.length > 0) {
           tramos.push({ texto: ', repartidos en ' });
           tramos.push({
-            texto: `${barriosAlcanzados.size} de ${zonasMunicipio.length} barrios`,
-            tono: barriosAlcanzados.size === zonasMunicipio.length ? 'bueno' : 'advertencia',
+            texto: `${barriosAlcanzados.size} de ${lugaresMunicipio.length} barrios`,
+            tono: barriosAlcanzados.size === lugaresMunicipio.length ? 'bueno' : 'advertencia',
           });
         }
         tramos.push({ texto: '.' });
@@ -2620,7 +2688,7 @@ export default function Mapa() {
     reclamosFiltrados,
     hotspots,
     enZonasCalientes,
-    zonasMunicipio.length,
+    lugaresMunicipio.length,
     barriosSinCobertura,
     barriosAlcanzados,
   ]);
@@ -2890,12 +2958,12 @@ export default function Mapa() {
       seg(`${reclamosFiltrados.length} ${reclamosFiltrados.length === 1 ? 'reclamo' : 'reclamos'}`),
       seg(' sobre el mapa'),
     ];
-    if (barriosAlcanzados.size > 0 && zonasMunicipio.length > 0) {
+    if (barriosAlcanzados.size > 0 && lugaresMunicipio.length > 0) {
       segmentosA.push(
         seg(', repartidos en '),
         seg(
-          `${barriosAlcanzados.size} de ${zonasMunicipio.length} barrios`,
-          barriosAlcanzados.size === zonasMunicipio.length ? 'bueno' : 'advertencia',
+          `${barriosAlcanzados.size} de ${lugaresMunicipio.length} barrios`,
+          barriosAlcanzados.size === lugaresMunicipio.length ? 'bueno' : 'advertencia',
         ),
       );
     }
@@ -2967,7 +3035,7 @@ export default function Mapa() {
     hotspots.length,
     enZonasCalientes,
     barriosAlcanzados.size,
-    zonasMunicipio.length,
+    lugaresMunicipio.length,
     barrioQueMasCrecio,
     sinCoordenada,
     irAZonasCalientes,
@@ -3006,11 +3074,11 @@ export default function Mapa() {
 
     // 2) Cobertura territorial: dónde NO estamos llegando. Sólo si el muni
     //    tiene zonas cargadas — sin catálogo no hay denominador honesto.
-    if (zonasMunicipio.length > 0) {
-      const sinReclamos = Math.max(0, zonasMunicipio.length - barriosAlcanzados.size);
+    if (lugaresMunicipio.length > 0) {
+      const sinReclamos = Math.max(0, lugaresMunicipio.length - barriosAlcanzados.size);
       kpis.push({
         etiqueta: 'Barrios alcanzados',
-        valor: `${barriosAlcanzados.size} de ${zonasMunicipio.length}`,
+        valor: `${barriosAlcanzados.size} de ${lugaresMunicipio.length}`,
         sub:
           sinReclamos === 0
             ? 'todo el municipio con reclamos'
@@ -3052,7 +3120,7 @@ export default function Mapa() {
     reclamosFiltrados,
     totalCargados,
     sinCoordenada,
-    zonasMunicipio.length,
+    lugaresMunicipio.length,
     barriosAlcanzados.size,
     barrioQueMasCrecio,
   ]);
@@ -3410,6 +3478,16 @@ export default function Mapa() {
         detalle: `Coordenadas: ${drawnBBox.minLat.toFixed(5)}, ${drawnBBox.minLng.toFixed(5)} → ${drawnBBox.maxLat.toFixed(5)}, ${drawnBBox.maxLng.toFixed(5)}`,
       };
     }
+    // El barrio es más fino que el distrito: si hay uno elegido, el informe es de él.
+    if (barrioSel != null) {
+      const b = barriosMunicipio.find((x) => x.id === barrioSel);
+      return {
+        tipo: 'barrio' as const,
+        reclamos: reclamosFiltrados,
+        nombre: b?.nombre ?? 'el barrio',
+        detalle: `Barrio: ${b?.nombre ?? '—'}${b?.zona_nombre ? ` · Zona: ${b.zona_nombre}` : ''}`,
+      };
+    }
     if (distritoSel != null) {
       const d = regiones.distritos.find((x) => x.id === distritoSel);
       return {
@@ -3420,7 +3498,7 @@ export default function Mapa() {
       };
     }
     return null;
-  }, [drawnBBox, reclamosEnBBox, distritoSel, regiones.distritos, reclamosFiltrados]);
+  }, [drawnBBox, reclamosEnBBox, barrioSel, barriosMunicipio, distritoSel, regiones.distritos, reclamosFiltrados]);
 
   // =================================================================
   // Export PDF de zona dibujada
@@ -3438,7 +3516,7 @@ export default function Mapa() {
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text(
-      ambitoInforme.tipo === 'distrito'
+      ambitoInforme.tipo !== 'area'
         ? `Reporte de ${ambitoInforme.nombre} — Mapa de Reclamos`
         : 'Reporte de Zona — Mapa de Reclamos',
       margin, y,
@@ -3652,6 +3730,26 @@ export default function Mapa() {
       ],
       onChange: (v: string) => setDistritoSel(v === '' ? null : Number(v)),
     } satisfies ConsultaFiltro] : []),
+    // El BARRIO es el nivel fino. Con una sola zona es el único lugar que se
+    // puede elegir (y el combo de zona no aparece); con varias, aparece recién
+    // cuando hay una zona elegida y lista sólo los barrios de esa zona.
+    ...(barriosElegibles.length > 1 ? [{
+      id: 'barrio',
+      etiqueta: 'Barrio',
+      valor: barrioSel == null ? '' : String(barrioSel),
+      anchoMin: 180,
+      buscable: barriosElegibles.length > 6,
+      opciones: [
+        { value: '', label: regiones.distritos.length > 1 ? 'todos sus barrios' : 'todo el municipio' },
+        ...barriosElegibles
+          .filter((b) => (conteoPorBarrioId.get(b.id) || 0) > 0 || b.id === barrioSel)
+          .map((b) => ({
+            value: String(b.id),
+            label: `${b.nombre} (${conteoPorBarrioId.get(b.id) || 0})`,
+          })),
+      ],
+      onChange: (v: string) => setBarrioSel(v === '' ? null : Number(v)),
+    } satisfies ConsultaFiltro] : []),
     {
       id: 'periodo',
       etiqueta: 'Período',
@@ -3839,6 +3937,52 @@ export default function Mapa() {
                 />
               );
             })()}
+
+            {/* El BARRIO elegido en un municipio con distritos: su contorno,
+                si la cartografía lo trajo, adentro del distrito ya dibujado. */}
+            {barrioSel != null && regiones.distritos.length > 1 && (() => {
+              const b = regiones.barrios.find((x) => x.id === barrioSel);
+              if (!b?.poligono?.length) return null;
+              const color = colorDistrito(b.zona_id);
+              return (
+                <Polygon
+                  key={`barrio-elegido-${b.id}`}
+                  positions={b.poligono}
+                  pathOptions={{ color, weight: 3, opacity: 0.95, fillColor: color, fillOpacity: 0.14 }}
+                  interactive={false}
+                />
+              );
+            })()}
+
+            {/* Con UNA sola zona no hay distritos que dibujar: la división que
+                se ve son los barrios, como contorno fino de un solo color (un
+                catastro, no un mosaico de 40 colores). Se clickean para elegir. */}
+            {verRegiones && regiones.distritos.length <= 1 && regiones.barrios.map((b) => {
+              if (!b.poligono?.length) return null;
+              const elegido = barrioSel === b.id;
+              const densidad = dibujoMapa === 'densidad';
+              const color = colorDistrito(b.zona_id);
+              return (
+                <Polygon
+                  key={`barrio-${b.id}`}
+                  positions={b.poligono}
+                  pathOptions={{
+                    color,
+                    weight: elegido ? 2.5 : 1,
+                    opacity: elegido ? 0.95 : 0.45,
+                    fillColor: color,
+                    fillOpacity: densidad ? 0 : (elegido ? 0.18 : 0.04),
+                  }}
+                  eventHandlers={{
+                    click: () => setBarrioSel((x) => (x === b.id ? null : b.id)),
+                  }}
+                >
+                  <Tooltip sticky>
+                    <div className="font-medium text-sm" style={{ color }}>{b.nombre}</div>
+                  </Tooltip>
+                </Polygon>
+              );
+            })}
 
             {/* LOS 6 DISTRITOS, no los 57 barrios. Seis áreas grandes se
                 leen de un vistazo; cincuenta y siete manchitas de colores no

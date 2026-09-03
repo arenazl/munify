@@ -10,10 +10,15 @@
  * OpenStreetMap por tarjeta) al kit v2.
  *
  * Los números del hero salen de datos REALES que el listado ahora trae:
- * `reclamos_count` y `cuadrillas_count`, dos COUNT agrupados que se agregaron
- * al endpoint. El canvas pedía además "barrios cubiertos"; en el modelo un
- * barrio no cuelga de una zona, así que ese KPI no se dibuja en vez de
- * inventarlo — cuando exista la relación, entra sin tocar el layout.
+ * `reclamos_count`, `cuadrillas_count` y `barrios_count`, tres COUNT agrupados
+ * que se agregaron al endpoint. "Barrios" entró el 2026-09-02, cuando la
+ * relación barrio -> zona (`barrios.zona_id`) llegó al modelo.
+ *
+ * [2026-09-02] Modelo de territorio: municipio -> zona -> barrio. La zona es la
+ * unidad OPERATIVA y la define el municipio, no el mapa: una ciudad nueva nace
+ * con una sola zona, «Zona única», y todos sus barrios adentro. Esta pantalla
+ * lo explica en el hero cuando ése es el caso, y al crear la segunda zona
+ * sugiere renombrar la primera (a esa altura «Zona única» ya no describe nada).
  *
  * Se conserva lo que la pantalla vieja hacía bien: la validación de duplicados
  * con IA al escribir el nombre de una zona nueva.
@@ -46,7 +51,13 @@ interface ValidacionDuplicado {
 interface ZonaConPeso extends Zona {
   reclamos_count?: number | null;
   cuadrillas_count?: number | null;
+  barrios_count?: number | null;
 }
+
+/** Nombre con el que nace la única zona de una ciudad nueva (ver services/geo_ciudad.py). */
+const ZONA_UNICA = 'Zona única';
+const esNombreZonaUnica = (nombre: string) =>
+  nombre.trim().toLocaleLowerCase('es') === ZONA_UNICA.toLocaleLowerCase('es');
 
 const FORM_VACIO = {
   nombre: '',
@@ -158,6 +169,9 @@ export default function Zonas() {
       longitud_centro: formData.longitud_centro ? parseFloat(formData.longitud_centro) : null,
     };
 
+    // Si hasta acá había una sola zona, la que trae el alta, al crear la
+    // segunda su nombre deja de describir algo: se sugiere renombrarla.
+    const primeraZona = !selectedZona ? zonaUnica : null;
     try {
       if (selectedZona) {
         await zonasApi.update(selectedZona.id, payload);
@@ -169,6 +183,12 @@ export default function Zonas() {
       await fetchZonas();
       setSheetOpen(false);
       setSelectedZona(null);
+      if (primeraZona) {
+        toast.info(`Ahora hay dos zonas: «${ZONA_UNICA}» ya no describe nada. Ponele un nombre propio.`, {
+          duration: 10000,
+          action: { label: 'Renombrar', onClick: () => openSheet(primeraZona) },
+        });
+      }
     } catch (error) {
       toast.error('Error al guardar la zona');
       console.error('Error:', error);
@@ -225,6 +245,17 @@ export default function Zonas() {
     if (!hayPeso || zonas.length === 0) return null;
     return zonas.slice().sort((a, b) => (b.reclamos_count ?? 0) - (a.reclamos_count ?? 0))[0];
   }, [zonas, hayPeso]);
+  const hayBarrios = zonas.some((z) => typeof z.barrios_count === 'number');
+  const totalBarrios = useMemo(
+    () => zonas.reduce((acc, z) => acc + (z.barrios_count ?? 0), 0),
+    [zonas],
+  );
+  const zonasConBarrios = useMemo(
+    () => zonas.filter((z) => (z.barrios_count ?? 0) > 0).length,
+    [zonas],
+  );
+  /** Todo el municipio es una sola zona, la que trae el alta: hay que explicarlo. */
+  const zonaUnica = zonas.length === 1 && esNombreZonaUnica(zonas[0].nombre) ? zonas[0] : null;
 
   const heroKpis = useMemo<HeroKpi[]>(() => {
     if (loading || zonas.length === 0) return [];
@@ -242,17 +273,26 @@ export default function Zonas() {
         veredicto: sinCuadrilla > 0 ? 'advertencia' : undefined,
       },
       {
-        etiqueta: 'Reclamos',
-        valor: hayPeso ? totalReclamos : '—',
-        sub: hayPeso ? 'repartidos en el territorio' : 'sin dato de la API',
+        etiqueta: 'Barrios',
+        valor: hayBarrios ? totalBarrios : '—',
+        sub: !hayBarrios
+          ? 'sin dato de la API'
+          : totalBarrios === 0
+            ? 'ninguno colgado de una zona'
+            : `en ${zonasConBarrios} zona${zonasConBarrios === 1 ? '' : 's'}`,
       },
       {
         etiqueta: 'Más cargada',
         valor: masCargada ? (masCargada.reclamos_count ?? 0) : '—',
-        sub: masCargada ? masCargada.nombre : 'sin dato de la API',
+        sub: masCargada
+          ? `${masCargada.nombre} · ${totalReclamos} en total`
+          : 'sin dato de la API',
       },
     ];
-  }, [loading, zonas, conCuadrilla, sinCuadrilla, hayPeso, totalReclamos, masCargada]);
+  }, [
+    loading, zonas, conCuadrilla, sinCuadrilla, totalReclamos, masCargada,
+    hayBarrios, totalBarrios, zonasConBarrios,
+  ]);
 
   const heroFrases = useMemo<HeroFrase[]>(() => {
     if (loading) return [];
@@ -266,6 +306,35 @@ export default function Zonas() {
           acciones: [{ label: 'Crear la primera zona', onClick: () => openSheet(), primaria: true }],
         },
       ];
+    }
+
+    if (zonaUnica) {
+      const barrios = zonaUnica.barrios_count ?? 0;
+      const frasesUnica: HeroFrase[] = [
+        {
+          segmentos: [
+            seg('Todo el municipio es una sola zona', 'bueno'),
+            seg(
+              barrios > 0
+                ? `, «${ZONA_UNICA}», con ${barrios} barrio${barrios === 1 ? '' : 's'} adentro.`
+                : `, «${ZONA_UNICA}».`,
+            ),
+            seg(
+              ' Las zonas son la unidad operativa y las define el municipio, no el mapa: cuando quieras repartir el trabajo entre equipos, creá la segunda zona y movele barrios.',
+            ),
+          ],
+          acciones: [{ label: 'Crear la segunda zona', onClick: () => openSheet(), primaria: true }],
+        },
+      ];
+      if (sinCuadrilla > 0) {
+        frasesUnica.push({
+          segmentos: [
+            seg('La zona no tiene cuadrilla', 'advertencia'),
+            seg(': los reclamos entran y no se despachan solos.'),
+          ],
+        });
+      }
+      return frasesUnica;
     }
 
     const frases: HeroFrase[] = [
@@ -300,7 +369,7 @@ export default function Zonas() {
       });
     }
     return frases;
-  }, [loading, zonas, conCuadrilla, sinCuadrilla, masCargada, sinReclamos]);
+  }, [loading, zonas, conCuadrilla, sinCuadrilla, masCargada, sinReclamos, zonaUnica]);
 
   const visibles = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -394,9 +463,10 @@ export default function Zonas() {
           kpis: heroKpis,
         }}
         pista={{
-          titulo: 'Las zonas se dibujan en el mapa',
-          texto:
-            'Acá se editan el nombre, el código y el estado. El área de cada zona se ajusta sobre el mapa, no en esta grilla.',
+          titulo: zonaUnica ? 'Las zonas las define el municipio' : 'Las zonas se dibujan en el mapa',
+          texto: zonaUnica
+            ? 'Ninguna cartografía trae zonas: son el reparto operativo que decide cada municipio (por cuadrilla, por delegación, por corredor). Los barrios sí vienen del mapa, y se mueven de una zona a otra.'
+            : 'Acá se editan el nombre, el código y el estado. El área de cada zona se ajusta sobre el mapa, no en esta grilla.',
           accion: embedded ? undefined : { label: 'Abrir el mapa', to: '/gestion/mapa' },
         }}
         searchPlaceholder="Buscar zona, código o descripción…"

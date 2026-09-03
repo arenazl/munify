@@ -112,7 +112,7 @@ export default function Login() {
       localStorage.removeItem('municipio_id');
       localStorage.removeItem('municipio_nombre');
       localStorage.removeItem('municipio_color');
-      navigate('/bienvenido');
+      navigate('/demos-listado');
       return;
     }
 

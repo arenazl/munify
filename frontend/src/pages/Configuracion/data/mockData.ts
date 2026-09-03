@@ -30,6 +30,7 @@ export class MockDataService {
         { id: 'dependencias', label: 'Dependencias', tipo: 'abm', n: '11' },
         { id: 'asignacion', label: 'Asignaciones', tipo: 'asignacion', n: '11' },
         { id: 'zonas', label: 'Zonas', tipo: 'abm', n: '18' },
+        { id: 'barrios', label: 'Barrios', tipo: 'abm', n: '40' },
         { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
         { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
       ] },

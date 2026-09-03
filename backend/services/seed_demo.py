@@ -965,9 +965,9 @@ async def _seed_zonas(
             codigo=codigo,
             latitud_centro=z.get("lat"),
             longitud_centro=z.get("lon"),
-            # El contorno viene del padron (`catalogo_zonas`). Sin esto la zona
-            # nacia siendo un punto y el mapa del municipio no tenia una sola
-            # division que dibujar --- que es de lo unico que habla el mapa.
+            # El contorno de la zona unica es el del municipio
+            # (`municipios_catalogo`). Sin esto la zona nacia siendo un punto y
+            # el mapa no tenia una sola division que dibujar.
             poligono=z.get("poligono"),
             activo=True,
         )
@@ -981,25 +981,33 @@ async def _seed_barrios(
     db: AsyncSession,
     municipio_id: int,
     barrios_reales: list[dict],
+    zonas: Optional[dict[str, Zona]] = None,
 ) -> dict[str, Barrio]:
     """Los barrios REALES del municipio, o ninguno.
 
-    Salen de OSM (`place=suburb|neighbourhood|quarter`) y por eso nacen
-    `validado=True`: la coordenada es la que tiene mapeada OpenStreetMap, no una
-    que calculamos nosotros.
+    Salen de `catalogo_barrios` (curado offline desde el PBF de OSM y las
+    localidades de georef, por scripts/geo/catalogo_barrios_pbf.py), TODOS y
+    con su contorno cuando lo tienen; por eso nacen `validado=True`: la
+    coordenada y el poligono son los mapeados, no calculados aca. Cada uno
+    cuelga de la zona unica (`zona_nombre`): el municipio los reparte despues
+    entre las zonas que defina.
     """
     barrios: dict[str, Barrio] = {}
+    zonas = zonas or {}
     for b in barrios_reales:
         nombre = (b.get("nombre") or "").strip()
         if not nombre or nombre in barrios:
             continue
+        zona = zonas.get(b.get("zona_nombre") or "")
         barrio = Barrio(
             municipio_id=municipio_id,
-            nombre=nombre[:100],
+            nombre=nombre[:200],
             latitud=b.get("lat"),
             longitud=b.get("lon"),
             tipo=b.get("tipo") or "suburb",
+            poligono=b.get("poligono"),
             validado=True,
+            zona_id=zona.id if zona else None,
         )
         db.add(barrio)
         barrios[nombre] = barrio
@@ -1203,12 +1211,15 @@ async def seed_demo_completo(
     # escriben una sola vez y los scripts no necesitan saber que existe.
     log = log or SeedLog(muni.nombre if muni else codigo, codigo=codigo)
 
-    # LA GEOGRAFIA DE ESTA CIUDAD, EN VIVO Y SIN CACHE PREVIO.
-    # Poligono oficial desde `municipios_catalogo` + UNA consulta a Overpass
-    # (cacheada en disco para la proxima demo de la misma ciudad). De ahi salen
-    # las zonas, los barrios y los puntos con direccion real. Si algo no esta
-    # disponible, `geografia` degrada y lo explica en `degradacion` --- nunca
-    # levanta y nunca inventa nombres.
+    # LA GEOGRAFIA DE ESTA CIUDAD, TODA DESDE LA BASE (nada online), y la
+    # semilla ya NO fabrica nada de ella (Lucas, 2026-09-03): LEE el poligono
+    # oficial de `municipios_catalogo`, arma la zona unica con ese contorno,
+    # LEE los barrios con su poligono de `catalogo_barrios` (curado offline por
+    # `scripts/geo/catalogo_barrios_pbf.py`) y saca calles de `catalogo_geo_osm`.
+    # Lo unico que GENERA son los puntos de los reclamos. Si al municipio le
+    # falta curacion, `geografia` degrada —la demo nace con la zona unica, los
+    # barrios que haya y puntos dentro de ellos— y lo explica en
+    # `degradacion`: nunca levanta y nunca inventa nombres.
     geo_ctx = await geo_ciudad.geografia(
         db,
         nombre=muni.nombre if muni else codigo,
@@ -1652,9 +1663,20 @@ async def seed_demo_completo(
             ))
 
         await db.flush()
-    log.hito("tasas", tipos_de_tasa=len(tipos_map),
-             motivo=None if tipos_map else "catalogo global de tipos de tasa vacio",
-             estado="ok" if tipos_map else "degradado")
+    # El apagado DELIBERADO (SEMBRAR_TASAS=False, decision de producto) reporta
+    # OK con su verdad: registrarlo como "degradado: catalogo vacio" era un
+    # motivo FALSO que teñia TODAS las altas — desde el 29/08 ninguna demo
+    # llegaba a estado ok y la bitacora gritaba un problema que no existia.
+    # "degradado" queda para lo unico que lo es: catalogo global realmente
+    # vacio con la siembra prendida.
+    if not SEMBRAR_TASAS:
+        log.hito("tasas", tipos_de_tasa=0,
+                 motivo="tasas apagadas por decision de producto (SEMBRAR_TASAS=False)",
+                 estado="ok")
+    else:
+        log.hito("tasas", tipos_de_tasa=len(tipos_map),
+                 motivo=None if tipos_map else "catalogo global de tipos de tasa vacio",
+                 estado="ok" if tipos_map else "degradado")
 
     # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)
@@ -1678,23 +1700,37 @@ async def seed_demo_completo(
             zonas = {}
             _p.fallo(f"no se pudieron crear las zonas: {ex}")
         if zonas:
-            _p.ok(zonas=len(zonas), nombres=list(zonas.keys()))
+            _p.ok(zonas=len(zonas), nombres=list(zonas.keys()),
+                  fuente=geo_ctx.get("fuente_zonas"))
         else:
-            _p.degradado(
-                "sin divisiones para esta ciudad; el municipio queda sin zonas "
-                "(antes se inventaban Centro/Norte/Sur)")
+            # Solo pasa sin contorno Y sin centro: hasta la zona unica necesita
+            # un punto. Nada se inventa (antes caia a Centro/Norte/Sur).
+            _p.degradado("sin contorno ni centro para dibujar la zona unica; "
+                         "el municipio queda sin zonas")
     barrios: dict = {}
     with log.paso("barrios") as _p:
         try:
             async with db.begin_nested():
-                barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"])
+                barrios = await _seed_barrios(db, municipio_id, geo_ctx["barrios"], zonas)
         except Exception as ex:
             barrios = {}
             _p.fallo(f"no se pudieron crear los barrios: {ex}")
         if barrios:
-            _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15])
+            _p.ok(barrios=len(barrios), nombres=list(barrios.keys())[:15],
+                  con_zona=sum(1 for b in barrios.values() if b.zona_id),
+                  con_contorno=geo_ctx.get("barrios_con_contorno", 0),
+                  fuente=geo_ctx.get("fuente_barrios"))
         else:
-            _p.degradado("OSM no tiene barrios mapeados dentro del poligono")
+            # El motivo dice la VERDAD de por que no hay barrios: los barrios
+            # ya no dependen de la cartografia de calles ni de la red — salen
+            # de `catalogo_barrios`, curado offline. Si no hay, es que el
+            # municipio todavia no paso por la curacion (o su provincia no
+            # tiene barrios mapeados), y eso es lo que se dice.
+            _p.degradado("sin barrios en catalogo_barrios para este municipio "
+                         "(curar con scripts/geo/catalogo_barrios_pbf.py); "
+                         "la demo nace con la zona unica y sin barrios, "
+                         f"nada inventado (filas en catalogo: "
+                         f"{geo_ctx.get('barrios_en_fuente', 0)})")
 
     # ------------------------------------------------------------------
     # 6. Empleados + Cuadrillas (personal operativo)

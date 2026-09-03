@@ -25,6 +25,8 @@ import ConfiguracionTesoreria from '../ConfiguracionTesoreria';
 import TesoreriaContactos from '../TesoreriaContactos';
 import TarjetasCredito from '../TarjetasCredito';
 import Empleados from '../Empleados';
+import Zonas from '../Zonas';
+import Barrios from '../Barrios';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
 import { MockData } from './data/mockData';
 import { ABM_SPEC, DESCRIPCION_AJUSTE } from '../../config/canvasAbmSpec';
@@ -369,6 +371,11 @@ export default function Configuracion() {
     contactos: <TesoreriaContactos />,
     tarjetas: <TarjetasCredito />,
     empleados: <Empleados />,
+    // Territorio (2026-09-02): la pantalla real de Zonas, porque es la que
+    // explica «Zona única»; y Barrios, que hasta hoy no tenía pantalla — con
+    // el modelo municipio -> zona -> barrio quedaban invisibles en toda la app.
+    zonas: <Zonas />,
+    barrios: <Barrios />,
   };
   const pantallaEmbebida = EMBEBIDO[hijoId];
 

@@ -324,13 +324,10 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # LA PUERTA DE ATRAS. Sacar el boton "Entrar" de la grilla no alcanza:
-    # esta lista ES el acceso (son los perfiles del quick-login, sin password).
-    # Si quedaba abierta, el link personal era decorativo — se entraba por
-    # /login?muni=<codigo> y listo. Ahora la botonera sale solo si la demo es
-    # de muestra o si viene la llave. Cliente productivo: nunca (salvo el clon
-    # de tenant en QA, que ademas gatea cada perfil con el PIN).
-    if not _demo_acceso_ok(municipio, t):
+    # La botonera sale para TODA demo, con o sin llave. Cliente productivo:
+    # nunca (salvo el clon de tenant en QA, que ademas gatea cada perfil con
+    # el PIN). Ver `_botonera_visible` por que la llave `t` ya no cuenta aca.
+    if not _botonera_visible(municipio):
         return []
 
     # Buscar usuarios de prueba con tres patrones:
@@ -443,8 +440,8 @@ async def obtener_usuarios_dependencias(
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
     # Misma puerta que demo-users: los accesos rapidos por dependencia son
-    # otra forma de entrar, asi que piden la misma llave.
-    if not _demo_acceso_ok(municipio, t):
+    # otra forma de entrar, asi que siguen la misma regla.
+    if not _botonera_visible(municipio):
         return []
 
     # Buscar usuarios con municipio_dependencia_id asignado
@@ -683,8 +680,25 @@ class MunicipioDemoResponse(BaseModel):
     demo_token: Optional[str] = None
 
 
+def _botonera_visible(municipio: Municipio) -> bool:
+    """Si el login de este municipio muestra los perfiles preseteados.
+
+    Toda DEMO los muestra, tenga o no la llave el que entra: las demos son
+    paginas de prueba y cualquiera con el link `/demo/<codigo>` tiene que
+    poder entrar — ningun municipal va a tener anotadas las catorce claves
+    en un archivo. Lo "no publico" es otra cosa: la grilla de la landing no
+    da entrada, y las demos con PIN siguen pidiendo el PIN por perfil.
+    (Dueño, 2026-09-02: "que no sea publico" se habia leido como "gatear la
+    botonera con la llave" — no era eso.)
+
+    Cliente productivo: nunca, salvo el clon de tenant en QA
+    (`demo_protegido`), que ademas gatea cada perfil con el PIN.
+    """
+    return bool(municipio.es_demo or municipio.demo_protegido)
+
+
 def _demo_acceso_ok(municipio: Municipio, token: Optional[str]) -> bool:
-    """Si el que golpea la puerta puede ENTRAR a esta demo.
+    """Si el que golpea la puerta es el DUEÑO de esta demo (borrarla, etc.).
 
     Tres casos, en orden:
       - No es demo: es un cliente productivo. Solo pasa el clon de tenant en
@@ -693,7 +707,8 @@ def _demo_acceso_ok(municipio: Municipio, token: Optional[str]) -> bool:
       - Demo de alguien: solo con la llave que se emitio al crearla.
 
     Las demos viejas (sin `demo_token`) quedan cerradas a proposito: nadie
-    entra a una demo con los datos que cargo otro (dueño, 2026-09-02).
+    borra una demo con los datos que cargo otro (dueño, 2026-09-02). Para
+    VER la botonera de perfiles la llave no hace falta: `_botonera_visible`.
     """
     if not municipio.es_demo:
         return bool(municipio.demo_protegido)
@@ -1217,19 +1232,16 @@ async def eliminar_municipio_demo(
 
     # Verificar que es un municipio demo: rechazar solo si hay usuarios "reales"
     # (cualquiera que NO matchee los patrones de demo). Un muni sin usuarios o
-    # con solo users demo se considera borrable.
+    # con solo users demo se considera borrable. El patrón vive con el cascade.
     from sqlalchemy import or_, not_
+    from services.demo_borrado import MUNICIPIOS_INTOCABLES, PATRONES_EMAIL_DEMO
     non_demo_check = await db.execute(
         select(User).where(
             User.municipio_id == municipio.id,
-            not_(or_(
-                User.email.like(f"%@{codigo}.demo.com"),
-                User.email.like(f"%@{codigo}.test.com"),
-                User.email.like("%@demo.com"),
-            )),
+            not_(or_(*[User.email.like(p) for p in PATRONES_EMAIL_DEMO])),
         )
     )
-    if non_demo_check.scalars().first():
+    if municipio.id in MUNICIPIOS_INTOCABLES or non_demo_check.scalars().first():
         raise HTTPException(
             status_code=403,
             detail="Solo se pueden eliminar municipios de demo",
@@ -1273,93 +1285,20 @@ async def eliminar_municipio_demo(
                 detail="Esta demo está protegida: hace falta el PIN para eliminarla",
             )
 
-    muni_id = municipio.id
-    await db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+    # El cascade lo deriva `services/demo_borrado.py` del esquema real (antes
+    # era una lista fija a la que le faltaban 32 tablas y tragaba errores).
+    from services.demo_borrado import borrar_municipio
+    try:
+        borrado = await borrar_municipio(db, municipio.id)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
-    # Primero borrar tablas intermedias sin municipio_id via JOIN
-    # (para que el loop plano de abajo no falle en borrar el padre)
-    for join_sql in [
-        # Historiales + tablas hijas de reclamos/solicitudes/tramites
-        "DELETE hr FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id WHERE r.municipio_id = :mid",
-        "DELETE hs FROM historial_solicitudes hs JOIN solicitudes s ON hs.solicitud_id = s.id WHERE s.municipio_id = :mid",
-        "DELETE td FROM tramite_documentos_requeridos td JOIN tramites t ON td.tramite_id = t.id WHERE t.municipio_id = :mid",
-        "DELETE sv FROM sla_violaciones sv JOIN reclamos r ON sv.reclamo_id = r.id WHERE r.municipio_id = :mid",
-        # Calificaciones del vecino (cuelgan del reclamo; el seed demo ya las
-        # crea sobre los reclamos cerrados)
-        "DELETE ca FROM calificaciones ca JOIN reclamos r ON ca.reclamo_id = r.id WHERE r.municipio_id = :mid",
-        # Intermedias de empleados (via JOIN con empleados.municipio_id)
-        "DELETE ec FROM empleado_cuadrillas ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE ec FROM empleado_categorias ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE ea FROM empleado_ausencias ea JOIN empleados e ON ea.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE eh FROM empleado_horarios eh JOIN empleados e ON eh.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE em FROM empleado_metricas em JOIN empleados e ON em.empleado_id = e.id WHERE e.municipio_id = :mid",
-        "DELETE ec FROM empleado_capacitaciones ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
-        # Intermedia de cuadrillas
-        "DELETE cc FROM cuadrilla_categorias cc JOIN cuadrillas c ON cc.cuadrilla_id = c.id WHERE c.municipio_id = :mid",
-        # Ordenes de trabajo (pivot N:M con reclamos)
-        "DELETE otr FROM orden_trabajo_reclamos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
-        # Recursos de OT (cuelgan de la OT y del item de inventario)
-        "DELETE otr FROM orden_trabajo_recursos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
-        # Mapeo tramite → dependencia (cuelga de municipio_dependencias)
-        "DELETE mdt FROM municipio_dependencia_tramites mdt JOIN municipio_dependencias md ON mdt.municipio_dependencia_id = md.id WHERE md.municipio_id = :mid",
-        # Tasas: deudas/pagos cuelgan de partidas
-        "DELETE d FROM tasas_deudas d JOIN tasas_partidas p ON d.partida_id = p.id WHERE p.municipio_id = :mid",
-        "DELETE tp FROM tasas_pagos tp JOIN tasas_partidas p ON tp.partida_id = p.id WHERE p.municipio_id = :mid",
-        # Tesoreria: cuotas cuelgan de gastos
-        "DELETE gc FROM gastos_cuotas gc JOIN gastos g ON gc.gasto_id = g.id WHERE g.municipio_id = :mid",
-    ]:
-        try:
-            await db.execute(text(join_sql), {"mid": muni_id})
-        except Exception:
-            pass
-
-    # Cascade delete de todas las tablas con municipio_id
-    tables_with_muni = [
-        "historial_reclamos", "reclamo_personas", "historial_solicitudes",
-        "solicitudes", "reclamos", "tramite_documentos_requeridos",
-        "tramites", "categorias_reclamo", "categorias_tramite",
-        "municipio_dependencia_categorias", "municipio_dependencias",
-        "notificaciones", "push_subscriptions", "barrios", "zonas",
-        "badges_usuarios", "puntos_usuarios", "historial_puntos",
-        "email_validations",
-        # Nuevos (seed demo completo)
-        "cuadrillas", "empleados", "sla_config",
-        # Turnero + campo (2026-07)
-        "turnos", "ordenes_trabajo", "municipio_modulos",
-        "agenda_configs", "agenda_excepciones",
-        # Inventario demo (seed_inventario) — quedaban huerfanos al borrar.
-        # ORDEN: primero lo que apunta a los items (lineas de compra y
-        # movimientos), despues los items, y al final depositos y categorias.
-        # Al reves, las FK con RESTRICT frenan el borrado.
-        "inventario_orden_compra_lineas", "inventario_movimientos",
-        "inventario_ordenes_compra",
-        "inventario_items", "inventario_categorias", "inventario_depositos",
-        # Tasas demo
-        "tasas_partidas",
-        # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)
-        "tesoreria_movimientos_caja", "tesoreria_pagos_programados",
-        "tesoreria_premios", "tesoreria_cajas", "tesoreria_parajes",
-        "tesoreria_conceptos", "tesoreria_tipos_concepto", "tesoreria_tipos_empleado",
-        "tesoreria_conceptos_liquidacion", "proyectos",
-        "gasto_proyectos", "gastos", "contactos", "ordenes_pago",
-        "salesbot_configs", "configuraciones",
-    ]
-    for t in tables_with_muni:
-        try:
-            await db.execute(text(f"DELETE FROM {t} WHERE municipio_id = :mid"), {"mid": muni_id})
-        except Exception:
-            pass
-
-    # Usuarios
-    await db.execute(text("DELETE FROM usuarios WHERE municipio_id = :mid"), {"mid": muni_id})
-
-    # Municipio
-    await db.execute(text("DELETE FROM municipios WHERE id = :mid"), {"mid": muni_id})
-
-    await db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
-    await db.commit()
-
-    return {"message": f"Municipio demo '{codigo}' eliminado correctamente"}
+    return {
+        "message": f"Municipio demo '{codigo}' eliminado correctamente",
+        "filas_borradas": borrado,
+    }
 
 
 @router.post("/{municipio_id}/branding", response_model=MunicipioDetalle)

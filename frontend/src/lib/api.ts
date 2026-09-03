@@ -483,6 +483,35 @@ export const zonasApi = {
   }>('/zonas/regiones-mapa'),
 };
 
+// Barrios: el nivel fino del territorio (municipio -> zona -> barrio). Los
+// trae la cartografia offline; la zona a la que pertenecen la decide el
+// municipio, por eso hay un `mover` en lote.
+export interface BarrioMunicipio {
+  id: number;
+  nombre: string;
+  tipo?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  validado?: boolean | null;
+  zona_id: number | null;
+  zona_nombre?: string | null;
+  reclamos_count?: number | null;
+  tiene_contorno?: boolean | null;
+  created_at?: string | null;
+}
+export const barriosApi = {
+  getAll: (zona_id?: number | null) =>
+    api.get<BarrioMunicipio[]>('/barrios', { params: zona_id != null ? { zona_id } : {} }),
+  create: (data: Record<string, unknown>) =>
+    api.post<BarrioMunicipio>('/barrios', data).then(res => { invalidateCache('/barrios'); return res; }),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put<BarrioMunicipio>(`/barrios/${id}`, data).then(res => { invalidateCache('/barrios'); return res; }),
+  mover: (barrio_ids: number[], zona_id: number | null) =>
+    api.put<BarrioMunicipio[]>('/barrios/mover', { barrio_ids, zona_id }).then(res => { invalidateCache('/barrios'); return res; }),
+  delete: (id: number) =>
+    api.delete(`/barrios/${id}`).then(res => { invalidateCache('/barrios'); return res; }),
+};
+
 // Dependencias (nuevo modelo desacoplado)
 export const dependenciasApi = {
   // Catálogo global

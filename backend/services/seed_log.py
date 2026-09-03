@@ -136,6 +136,16 @@ class SeedLog:
         self.error_message = "".join(
             traceback.format_exception_only(type(exc), exc)).strip()[:1000]
 
+    def _motivo_de_fallo(self) -> Optional[str]:
+        """El POR QUE en una columna consultable. Un alta puede quedar en
+        'fallo' sin excepcion (un paso fallo pero la demo se creo igual) y el
+        motivo vivia SOLO adentro del JSON de `pasos`: Infra diagnostico a
+        ciegas el 2026-09-02 porque `error_message` venia NULL. Ahora el fallo
+        por paso sube aca y se resuelve mirando una fila."""
+        malos = [f"{p.nombre}: {p.motivo}" for p in self.pasos
+                 if p.estado == "fallo" and p.motivo]
+        return ("; ".join(malos))[:1000] if malos else None
+
     # --- lecturas ---
     @property
     def estado(self) -> str:
@@ -176,7 +186,7 @@ class SeedLog:
             "duracion_ms": int((time.perf_counter() - self._t0) * 1000),
             "pasos": [p.a_dict() for p in self.pasos],
             "resumen": self.resumen(),
-            "error_message": self.error_message,
+            "error_message": self.error_message or self._motivo_de_fallo(),
         }
 
     async def guardar(self, municipio_id: Optional[int] = None) -> Optional[int]:

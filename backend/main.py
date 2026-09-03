@@ -125,6 +125,12 @@ app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 # ============ RUTAS API ============
 app.include_router(api_router, prefix="/api")
 
+# Auditoría pública de demos (/demos-listado). Registrado ACÁ y no en
+# api/__init__.py a propósito: ese archivo está en edición en otra rama de
+# trabajo (barrios) y sumarlo allá arrastraría cambios ajenos al commit.
+from api.demos_auditoria import router as demos_auditoria_router  # noqa: E402
+app.include_router(demos_auditoria_router, prefix="/api/demos", tags=["Demos"])
+
 # ============ LANDING PAGE ============
 # DESACTIVADO - Landing page comentada temporalmente
 # if landing_path.exists():

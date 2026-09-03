@@ -137,13 +137,15 @@ async def buscar_barrios_municipio(
     Returns:
         Lista de dicts con: nombre, lat, lng, validado
     """
-    # 1. Obtener sugerencias de la IA
-    barrios_sugeridos = await sugerir_barrios_con_ia(nombre_municipio, provincia)
+    # 1. Obtener sugerencias de la IA. Sin sugerencias, la lista queda VACIA:
+    #    un municipio sin barrios se tiene que poder consultar como tal
+    #    (Lucas, 2026-09-03). Los cardinales genericos ensuciaban esa cuenta.
+    from services.geo_ciudad import sin_cardinales
+    barrios_sugeridos = sin_cardinales(await sugerir_barrios_con_ia(nombre_municipio, provincia))
 
     if not barrios_sugeridos:
-        # Fallback: barrios genéricos
-        barrios_sugeridos = ["Centro", "Norte", "Sur", "Este", "Oeste"]
-        print(f"[BARRIOS] Usando barrios genéricos para {nombre_municipio}")
+        print(f"[BARRIOS] Sin barrios para {nombre_municipio}: queda sin barrios, no se inventan")
+        return []
 
     # 2. Validar cada barrio con Nominatim (con rate limiting)
     resultados = []

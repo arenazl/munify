@@ -67,7 +67,7 @@ export default function MobileLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/bienvenido');
+    navigate('/demos-listado');
   };
 
   // Si está cargando el municipio, mostrar loader
@@ -83,7 +83,7 @@ export default function MobileLayout() {
   const hasMunicipio = localStorage.getItem('municipio_codigo');
   if (!hasMunicipio && !searchParams.get('municipio')) {
     // Redirigir a landing para seleccionar municipio
-    navigate('/bienvenido', { replace: true });
+    navigate('/demos-listado', { replace: true });
     return null;
   }
 

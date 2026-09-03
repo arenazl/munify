@@ -48,6 +48,7 @@ import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom';
 import { GripVertical, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Glifo } from './Glifo';
 import { estadoLabel } from '../../lib/enums/reclamo';
 import type { Veredicto } from '../../lib/semanticHero';
 import type {
@@ -603,8 +604,36 @@ export function DataTable<Row>({
           aria-label={g.title || g.label}
         >
           {g.badge && <Insignia top={g.badge.top} bottom={g.badge.bottom} veredicto={g.veredicto} />}
+          {/* [v3.2] Sin fecha, la cabecera lleva su insignia de ICONO — el
+              mismo ritmo visual que el calendario de la vista por día. */}
+          {!g.badge && g.glifo && (
+            <span
+              className="av2-tabla-grupo-tile"
+              style={g.glifo.color ? ({ ['--tile' as string]: g.glifo.color } as CSSProperties) : undefined}
+              aria-hidden
+            >
+              <Glifo glifo={g.glifo.icon} size={17} strokeWidth={1.9} />
+            </span>
+          )}
           <GrupoTexto g={g} />
           <span className="av2-tabla-grupo-linea" aria-hidden="true" />
+          {/* [v3] Acción del GRUPO ENTERO ("Eliminar estas 12") — pedida por
+              el dueño para /demos-listado: operar la agrupación sin abrir
+              nada. Declarativa: viene en TableGroup.action. */}
+          {g.action && (
+            <button
+              type="button"
+              className={`av2-tabla-grupo-accion${g.veredicto ? ` av2-vered-${g.veredicto}` : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                g.action?.onClick?.();
+              }}
+              title={g.action.label}
+            >
+              {g.action.icon && <g.action.icon size={13} strokeWidth={1.9} aria-hidden />}
+              {g.action.label}
+            </button>
+          )}
         </div>
         {g.rows.map(renderFila)}
       </div>
@@ -731,9 +760,10 @@ export function DataTable<Row>({
         {!footer.total && footer.action && renderPieAccion(footer.action)}
       </div>
 
-      {/* [v2.5] La regla de la entidad: por qué el sistema va a decir que no.
-          Renglón propio bajo el pie, para que no compita con el conteo. */}
-      {footer.note && <p className="av2-tabla-regla">{footer.note}</p>}
+      {/* [v3] footer.note YA NO SE DIBUJA (dueño, 2026-09-03: "esa línea rompe
+          todo el estilo — el ABM termina en el Mostrando N de M"). La regla de
+          la entidad vive en la `pista` de arriba o en el drawer, no acá. La
+          prop queda en el contrato solo por compatibilidad de tipos. */}
     </section>
   );
 }

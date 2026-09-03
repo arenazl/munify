@@ -14,7 +14,7 @@ import { BRAND, ACCESOS_DE_MARCA, rutaDeAcceso } from './brands';
 const BRAND_HOME = BRAND.municipioCodigo ? (rutaDeAcceso(BRAND) as string) : '/login';
 
 // Pages
-import Landing from './pages/Landing';
+import DemosListado from './pages/DemosListado';
 import HomePublic from './pages/HomePublic';
 import Login from './pages/Login';
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -84,7 +84,6 @@ import AuditLogs from './pages/admin/AuditLogs';
 import SeedLogs from './pages/SeedLogs';
 import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
-import Demo from './pages/Demo';
 import DemoListo from './pages/DemoListo';
 import PresentacionMunify from './pages/PresentacionMunify';
 import MunicipioAcceso from './pages/MunicipioAcceso';
@@ -178,13 +177,29 @@ export const router = createBrowserRouter([
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
-  { path: '/demo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Demo /> },
+  // [2026-09-03] La VITRINA /demo tampoco va más (dueño): la entrada a las
+  // demos es /demos-listado (la auditoría). Las puertas por municipio
+  // (/demo/:codigo y /demo/:codigo/login) siguen vivas más abajo.
+  { path: '/demo', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
   { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
+  // Puerta de DEMOS con prefijo propio (dueño, 2026-09-02): a un municipio
+  // es_demo se entra por /demo/<codigo> hasta que sea facturable; la puerta
+  // pelada /<codigo> redirige acá según la ficha (y al revés). Cuelga de
+  // /demo a propósito: esas rutas despegan la marca pegada de la pestaña
+  // (RUTAS_DE_MUNIFY), así el picker de una demo nunca se pinta de otra
+  // marca. '/demo/listo' le gana por ser estática — el ranking del router.
+  { path: '/demo/:codigo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <MunicipioAcceso /> },
+  { path: '/demo/:codigo/login', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <MunicipioAcceso enLogin /> },
   // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
   { path: '/presentacion', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <PresentacionMunify /> },
-  // Marca mono-tenant: /bienvenido (selector de municipios de Munify) NUNCA se
-  // muestra — logout y deep-links caen en el acceso cerrado de la marca.
-  { path: '/bienvenido', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <Landing /> },
+  // [2026-09-03] /bienvenido NO VA MÁS (dueño): la Landing vieja quedó
+  // obsoleta y solo aparecía por redirects. La ruta queda como redirect a la
+  // vitrina /demo para los deep-links guardados; los navigate internos ya
+  // apuntan a /demo directo.
+  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
+  // Auditoría pública de demos: qué pudo crear bien el generador (barrios,
+  // polígonos, zonas, seeds) con su score de integridad. Sin llave.
+  { path: '/demos-listado', element: <DemosListado /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   // Handoff de captura móvil (DNI + selfie con Didit en el celu del operador)

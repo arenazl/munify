@@ -22,7 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
-  ArrowUpDown,
+
   Calendar,
   PlayCircle,
   LayoutList,
@@ -1103,7 +1103,40 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // por día de creación; 'por_vencer' → por día de vencimiento estimado, con
   // los que no tienen tiempo estimado al final. Las filas ya vienen ordenadas
   // por `filteredTramites` con el mismo criterio.
+  /* [v3] AGRUPAMIENTO elegible (dueño, 2026-09-03): el día es el default,
+     pero todo combo de filtro es una forma de agrupar — estado, dependencia
+     y categoría salen como opciones del segmented "Agrupar" del FilterBar. */
+  const [agruparPor, setAgruparPor] = useState<'dia' | 'estado' | 'dependencia' | 'categoria'>('dia');
+
   const gruposTabla = useMemo<TableGroup<Solicitud>[]>(() => {
+    if (agruparPor !== 'dia') {
+      const etiquetaDe = (t: Solicitud): { titulo: string; glifo: TableGroup<Solicitud>['glifo'] } =>
+        agruparPor === 'estado'
+          ? { titulo: getEstadoConfig(t.estado).label, glifo: { icon: 'CircleDot' } }
+          : agruparPor === 'dependencia'
+            ? { titulo: t.dependencia_asignada?.nombre ?? 'Sin dependencia', glifo: { icon: 'Building2', color: t.dependencia_asignada?.color || undefined } }
+            : {
+                titulo: t.tramite?.categoria_tramite?.nombre ?? 'Sin categoría',
+                glifo: { icon: t.tramite?.categoria_tramite?.icono || 'Tag', color: t.tramite?.categoria_tramite?.color || undefined },
+              };
+      const mapa = new Map<string, TableGroup<Solicitud>>();
+      for (const t of visibleTramites) {
+        const { titulo, glifo } = etiquetaDe(t);
+        let g = mapa.get(titulo);
+        if (!g) {
+          g = { key: titulo, title: titulo, label: '', glifo, rows: [] };
+          mapa.set(titulo, g);
+        }
+        g.rows.push(t);
+      }
+      // El grupo más cargado arriba: es el que se vino a mirar.
+      const grupos = [...mapa.values()].sort((a, b) => b.rows.length - a.rows.length);
+      for (const g of grupos) {
+        const n = g.rows.length;
+        g.label = `${n} trámite${n === 1 ? '' : 's'}`;
+      }
+      return grupos;
+    }
     const grupos: TableGroup<Solicitud>[] = [];
     let actual: TableGroup<Solicitud> | null = null;
     for (const t of visibleTramites) {
@@ -1132,7 +1165,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       g.label = g.key === 'sin-fecha' ? `Sin vencimiento estimado · ${base}` : base;
     }
     return grupos;
-  }, [visibleTramites, ordenamiento]);
+  }, [visibleTramites, ordenamiento, agruparPor]);
 
   // Render de las tarjetas de la vista 'cards' (escritorio). El estado de carga
   // y la lista de teléfono los resuelve el cuerpo de la página, no esta función.
@@ -1731,11 +1764,25 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             views={['table', 'cards', 'guided']}
             activeView={activeView}
             onViewChange={cambiarVista}
-            secondaryAction={{
-              label: ordenamiento === 'reciente' ? 'Más recientes' : 'Por vencer',
-              icon: ordenamiento === 'reciente' ? ArrowUpDown : Calendar,
-              onClick: () =>
-                setOrdenamiento(ordenamiento === 'reciente' ? 'por_vencer' : 'reciente'),
+            /* [v3.2] Orden como botón ciclador del kit + agrupamiento en la
+               primera línea (abajo quedan solo los filtros). */
+            sortSpec={{
+              opciones: [
+                { id: 'reciente', label: 'Más recientes' },
+                { id: 'por_vencer', label: 'Por vencer' },
+              ],
+              activo: ordenamiento,
+              onSort: (id) => setOrdenamiento(id as typeof ordenamiento),
+            }}
+            groupSpec={{
+              opciones: [
+                { id: 'dia', label: 'Día' },
+                { id: 'estado', label: 'Estado' },
+                { id: 'dependencia', label: 'Dependencia' },
+                { id: 'categoria', label: 'Categoría' },
+              ],
+              activo: agruparPor,
+              onGroup: (id) => setAgruparPor(id as typeof agruparPor),
             }}
             primaryAction={{ label: 'Nuevo trámite', onClick: () => setWizardOpen(true) }}
           />
@@ -1780,7 +1827,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         {/* 5. Cuerpo por vista (tabla estándar / tarjetas / guiada) + panel IA */}
         <div className={panelIA ? 'lg:flex lg:gap-4' : undefined}>
           <div className={panelIA ? 'flex-1 min-w-0' : undefined}>
-            {loading ? (
+            {/* [v3.2] El skeleton de la PRIMERA carga es el de la vista activa
+                (dueño): en tabla lo pinta el DataTable (filas fantasma), acá
+                solo cae el de tarjetas para cards/guiada. */}
+            {loading && activeView !== 'table' ? (
               <div className={`grid grid-cols-1 md:grid-cols-2 ${panelIA ? '' : 'lg:grid-cols-3'} gap-3 sm:gap-5 mt-3`}>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
@@ -1828,6 +1878,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 activeStatus={filtroEstado}
                 onStatusChange={(id) => setFiltroEstado(id)}
                 emptyMessage={mensajeVacio}
+                loading={loading}
                 footer={{
                   showing: `Mostrando ${visibleTramites.length.toLocaleString('es-AR')} de ${filteredTramites.length.toLocaleString('es-AR')}`,
                   action: hayMasLocal || hasMore

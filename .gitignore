@@ -112,6 +112,8 @@ frontend/check_imports.py
 backend/_old_*.py
 backend/backend/
 backend/scripts/_*.py
+# ...menos el helper de ambientes, que importan purgar_demos.py y scripts/geo/*
+!backend/scripts/_entorno.py
 
 # Dumps de planillas de clientes: datos personales (nombres, sueldos, situacion laboral)
 docs/clientes/**/_*.txt
