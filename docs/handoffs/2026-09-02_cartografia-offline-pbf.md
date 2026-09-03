@@ -10,7 +10,7 @@
 
 | Tema | Estado | Dónde |
 |---|---|---|
-| Cartografía de las demos **offline** (barrios + calles + direcciones por municipio) | AR **2.082/2.082** curados en QA (`ok` 2.027 · `sin_datos_osm` 55) | tabla `catalogo_geo_osm`; `backend/scripts/geo/extraer_osm_pbf.py` |
+| Cartografía de las demos **offline** (barrios + calles + direcciones por municipio) | **Los 6 países**, todo municipio con contorno: 4.806/4.806 curados en QA (`ok` 4.746 · `sin_datos_osm` 60); AR 2.082/2.082 | tabla `catalogo_geo_osm`; `backend/scripts/geo/extraer_osm_pbf.py` |
 | El alta de demos ya no sale a internet | `GEO_OSM_EN_VIVO=False`; sin fila curada → `sin_cartografia_curada`, la demo nace igual | `backend/services/geo_ciudad.py` |
 | Barrios/zonas cardinales ("Norte", "Sur"…) | Prohibidos: filtro en la entrada + limpieza en QA; prod los pierde con la sección D del paquete | `geo_ciudad.es_cardinal`, `scripts/geo/limpiar_barrios_cardinales.py` |
 | Una ciudad = **"Zona única"**; los barrios cuelgan de la zona (`barrios.zona_id`) y ya no ascienden a zonas | Hecho (`4a7e3c06`) | `backend/models/barrio.py`, seed de demos |
@@ -49,11 +49,23 @@ SELECT pais, estado, COUNT(*), SUM(barrios>0), SUM(calles>0)
 FROM catalogo_geo_osm GROUP BY pais, estado;
 ```
 
-**Cobertura hoy:** AR 100 % curado. De los 2.027 `ok`, 733 tienen barrios y
-1.880 calles; los 1.294 sin barrios son comunas chicas donde OSM no tiene
+**Cobertura hoy (QA, medida el 2026-09-02 22:55 ART):**
+
+| país | catálogo | con contorno | `ok` | `sin_datos_osm` | sin curar (= sin contorno) | ok con barrios | ok con calles |
+|---|---|---|---|---|---|---|---|
+| AR | 2.082 | 2.082 | 2.027 | 55 | 0 | 733 | 1.880 |
+| PE | 1.873 | 1.641 | 1.636 | 5 | 232 | 369 | 1.044 |
+| BO | 539 | 483 | 483 | 0 | 56 | 184 | 455 |
+| CL | 346 | 337 | 337 | 0 | 9 | 292 | 334 |
+| PY | 263 | 244 | 244 | 0 | 19 | 111 | 224 |
+| UY | 19 | 19 | 19 | 0 | 0 | 18 | 19 |
+
+Todo municipio **con contorno** está curado; los 316 sin curar son exactamente
+los que no tienen polígono (no hay forma de asignarles elementos del PBF). Los
+`ok` sin barrios son en su mayoría comunas chicas donde OSM no tiene
 `place=suburb/neighbourhood` — el alta degrada a zonas por calles principales
-(nombres reales, nunca cardinales). **UY, PY, BO, CL, PE: sin curar**; misma
-herramienta con su extracto (`--pais UY --pbf uruguay-latest.osm.pbf`).
+(nombres reales, nunca cardinales). Cada país tardó entre 1,5 min (UY) y 20
+min (PE) de escritura; los logs quedaron en el scratchpad de la sesión.
 
 ## 3. Barrios visibles en toda la app (lo de este commit)
 
@@ -94,8 +106,8 @@ cortan en los ABM nuevos.
 ## 4. Lo que tiene que repetir Infra al promover
 
 1. Copiar `catalogo_geo_osm` de QA a prod con el `mysqldump --replace` de la
-   sección D del paquete — **cada vez que la cobertura crezca** (hoy AR; cuando
-   entren UY/PY/… se avisa por `CANAL_AGENTES.md`).
+   sección D del paquete — la tabla ya tiene los 6 países (4.806 filas); se
+   repite **cada vez que la cobertura crezca** (se avisa por `CANAL_AGENTES.md`).
 2. Ejecutar la purga de demos legacy en prod (`backend/scripts/purgar_demos.py`, de `44832bf3`) — la app
    no la corre; queda en manos de Infra con el OK de Lucas en su sesión
    (`MSG-20260902-2215-01`).
@@ -118,8 +130,16 @@ cortan en los ABM nuevos.
   polígono IGN: recentrar al centroide, pendiente de decidir qué fuente miente.
 - Barrios `landuse=residential` como fuente adicional donde OSM no tiene
   `place=*`: idea, sin medir.
-- Sembrar reclamos de demo con `barrio_id` **y** contorno del barrio para que
-  el punto caiga adentro (hoy cae dentro del contorno de la localidad).
+- **Polígonos de barrio**: el extractor PBF guarda de cada `place` way/relation
+  sólo el centro del bbox (como el `out center` de Overpass), así que los
+  barrios de las demos nuevas nacen como PUNTO (Rosario: 0 de 40 con contorno;
+  en QA hay 50 de 297 con polígono, de demos anteriores). Para que el mapa
+  dibuje barrios de verdad hay que guardar el anillo exterior de los
+  `place=suburb/neighbourhood` que son áreas y de los `admin_level 9|10` en el
+  paquete (`places[].poligono`) y que el seed lo copie a `barrios.poligono`.
+  Es el siguiente paso natural del foco "polígonos en el mapa".
+- Sembrar reclamos de demo dentro del contorno de su barrio cuando exista (hoy
+  caen dentro del contorno de la localidad).
 
 ## 6. Gates y trampas pagadas
 

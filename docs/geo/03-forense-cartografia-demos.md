@@ -139,9 +139,11 @@ Los 1.294 `ok` sin barrios son en su mayoría comunas chicas donde OSM no tiene
 `place=suburb/neighbourhood`: el alta degrada a zonas por calles principales
 (nombres reales, nunca cardinales). Lectura de cobertura:
 `SELECT pais, estado, COUNT(*), SUM(barrios>0), SUM(calles>0) FROM catalogo_geo_osm GROUP BY pais, estado`.
-Los otros países del catálogo (UY, PY, BO, CL, PE) se curan con la misma
-herramienta y sus extractos; los municipios SIN contorno (BO 56, CL 9, PE 232,
-PY 19) quedan afuera de este camino hasta que tengan polígono.
+Los otros países del catálogo se curaron la misma noche con la misma
+herramienta y sus extractos: UY 19/19, PY 244/244, BO 483/483, CL 337/337,
+PE 1.641/1.641 (5 `sin_datos_osm`) — todo municipio con contorno. Los 316 SIN
+contorno (PE 232, BO 56, PY 19, CL 9) quedan afuera de este camino hasta que
+tengan polígono (`contornos_osm_pbf.py --solo sin_poligono`).
 
 Hallazgo que abre la etapa siguiente: hay contornos IGN que **no contienen a
 su propia ciudad** — Centenario (Neuquén) e Inriville (Córdoba) dan
