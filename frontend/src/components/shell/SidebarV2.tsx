@@ -623,6 +623,10 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
           // Plegado, la cabecera resume los badges de sus items (suma); al
           // abrirse el detalle queda a la vista y el agregado sobra.
           const nGrupo = abierto ? 0 : grupo.items.reduce((acc, it) => acc + badgeDe(it).n, 0);
+          // [2026-09-03] El header del MÓDULO lleva su icono también en la
+          // vista expandida (dueño): antes el icono de grupo solo vivía en el
+          // rail colapsado y la cabecera era texto pelado.
+          const IconoGrupo = grupo.icono;
           return (
             <Fragment key={grupo.id}>
               <button
@@ -631,6 +635,7 @@ export function SidebarV2({ items, colapsado, onToggleColapsado }: SidebarV2Prop
                 aria-expanded={abierto}
                 onClick={(e) => toggleGrupo(grupo.id, e.currentTarget)}
               >
+                {IconoGrupo && <IconoGrupo className="sv2-grupo-ico" aria-hidden />}
                 <span className="sv2-grupo-titulo">{grupo.titulo}</span>
                 {nGrupo > 0 && (
                   <span className="sv2-badge sv2-badge--grupo">{nGrupo > 99 ? '99+' : nGrupo}</span>

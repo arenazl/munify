@@ -323,6 +323,19 @@
   text-align: left;
 }
 
+/* [2026-09-03] Icono del MÓDULO también en expandido (antes solo en el
+   rail): mismo gris que el título, acento cuando el grupo está abierto. */
+.sv2-grupo-ico {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--pl-text-muted);
+  transition: color var(--pl-dur-ui) var(--pl-ease);
+}
+.sv2-grupo-cab:not(.sv2-grupo-cab--cerrado) .sv2-grupo-ico {
+  color: var(--pl-green);
+}
+
 .sv2-grupo-titulo {
   font-family: var(--pl-font-display);
   font-size: var(--pl-fs-eyebrow);

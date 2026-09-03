@@ -12,9 +12,9 @@ import { rutaDeAccesoInstalada } from '../brands';
  *
  * Lógica:
  * 1. Si hay usuario logueado → redirigir según su rol a /gestion
- * 2. Si hay ?municipio=xxx en URL → ir a /bienvenido con el municipio
- * 3. Si hay municipio guardado en localStorage → ir a /bienvenido
- * 4. Si no hay nada → ir a /bienvenido (landing de selección)
+ * 2. Si hay ?municipio=xxx en URL → ir a /demo con el municipio
+ * 3. Si hay municipio guardado en localStorage → ir a /demo
+ * 4. Si no hay nada → ir a /demo (vitrina de demos)
  */
 export default function RootRedirect() {
   const navigate = useNavigate();

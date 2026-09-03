@@ -54,7 +54,9 @@ export function HintBanner({ storageKey, titulo, texto, accion }: HintBannerProp
 
   return (
     <div className="av2-nota av2-nota--ok av2-nota--hint" role="note">
-      <Sparkles className="av2-nota-ico" aria-hidden />
+      <span className="av2-hint-tile" aria-hidden>
+        <Sparkles size={15} strokeWidth={1.9} />
+      </span>
       <span className="av2-nota-txt">
         <span className="av2-nota-eyebrow">{titulo}</span>
         {texto}

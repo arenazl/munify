@@ -213,7 +213,7 @@ export default function HomePublic() {
   useEffect(() => {
     if (!municipioLoaded) return;
     if (!municipioId) {
-      navigate('/bienvenido');
+      navigate('/demo');
       return;
     }
     fetchData();
@@ -823,7 +823,7 @@ export default function HomePublic() {
           <div className="flex items-center justify-between text-sm" style={{ color: theme.textSecondary }}>
             <p>Sistema de Reclamos Municipales</p>
             <div className="flex items-center gap-4">
-              <button onClick={() => navigate('/bienvenido')} className="hover:underline">
+              <button onClick={() => navigate('/demo')} className="hover:underline">
                 Cambiar Municipio
               </button>
             </div>

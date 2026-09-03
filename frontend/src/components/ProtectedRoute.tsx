@@ -19,7 +19,7 @@ export default function ProtectedRoute({ children, roles }: Props) {
   }
 
   if (!user) {
-    return <Navigate to="/bienvenido" replace />;
+    return <Navigate to="/demo" replace />;
   }
 
   if (roles && !roles.includes(user.rol)) {

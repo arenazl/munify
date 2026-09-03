@@ -165,7 +165,7 @@ export default function CapturaMovil() {
                   y reclamos — sin volver al municipio.
                 </p>
                 <a
-                  href="/bienvenido"
+                  href="/demo"
                   className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600"
                 >
                   Usar {BRAND.name} en mi celular
