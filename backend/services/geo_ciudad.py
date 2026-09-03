@@ -754,10 +754,27 @@ def barrio_de(punto: tuple[float, float], barrios: list[dict],
         return None
     if anillos is None:
         anillos = anillos_de(barrios)
-    for b, anillo in zip(barrios, anillos):
-        if anillo and _dentro((punto[1], punto[0]), anillo):
-            return b
+    # Si lo contienen varios (una localidad de georef que envuelve a un barrio
+    # de OSM), gana el MAS CHICO: es el mas especifico.
+    contienen = [(b, anillo) for b, anillo in zip(barrios, anillos)
+                 if anillo and _dentro((punto[1], punto[0]), anillo)]
+    if contienen:
+        return min(contienen, key=lambda ba: _area(ba[1]))[0]
     return _cerca(punto, barrios, MAX_KM_BARRIO)
+
+
+def _area(anillo) -> float:
+    """Area (en grados cuadrados, solo para comparar) por la formula del
+    zapatero. No hace falta proyectar: se compara entre anillos vecinos."""
+    n = len(anillo)
+    if n < 3:
+        return 0.0
+    s = 0.0
+    for i in range(n):
+        x1, y1 = anillo[i][0], anillo[i][1]
+        x2, y2 = anillo[(i + 1) % n][0], anillo[(i + 1) % n][1]
+        s += x1 * y2 - x2 * y1
+    return abs(s) / 2.0
 
 
 def armar(nombre_municipio: str, osm: dict, cantidad_puntos: int,
