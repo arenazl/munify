@@ -515,10 +515,14 @@ async def main() -> None:
             tanda.clear()
 
         for i, m in enumerate(pendientes, 1):
-            async with engine.connect() as conn:
-                padron = _padron((await conn.execute(text("""
-                    SELECT nombre, lat, lng, poligono FROM catalogo_zonas
-                    WHERE municipio_catalogo_id = :id"""), {"id": int(m["id"])})).fetchall())
+            # El padron (georef) existe solo para Argentina: ids INDEC numericos.
+            # Afuera (py-1704, uy-3443756, ...) no hay padron y la columna es INT.
+            padron: list[dict] = []
+            if str(m["id"]).isdigit():
+                async with engine.connect() as conn:
+                    padron = _padron((await conn.execute(text("""
+                        SELECT nombre, lat, lng, poligono FROM catalogo_zonas
+                        WHERE municipio_catalogo_id = :id"""), {"id": int(m["id"])})).fetchall())
             barrios = _barrios_de(m, sq, padron, _poligono(m["anillo"]).area)
             con_poli = sum(1 for b in barrios if b.get("poligono"))
             tot_b += len(barrios)
