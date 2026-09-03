@@ -46,7 +46,7 @@
 import { isValidElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { GripVertical, MoreHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronsUpDown, GripVertical, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Glifo } from './Glifo';
 import { estadoLabel } from '../../lib/enums/reclamo';
@@ -60,6 +60,7 @@ import type {
   EntityCellData,
   MetricCellData,
   RowAction,
+  SortState,
   TableGroup,
 } from './types';
 import { toneDeEstado } from './estadoTonos';
@@ -275,6 +276,45 @@ function celdaPorDefecto<Row>(col: ColumnSpec<Row>, row: Row): ReactNode {
 }
 
 /* ============================================================
+ * [v3.3] Orden por cabecera — helpers
+ * ============================================================ */
+
+type ValorOrden = string | number | boolean | null | undefined;
+
+/** Por qué valor ordena una columna: el `sortValue` declarado o, sin él, el
+ *  campo `row[id]` cuando es un primitivo (o el texto de una celda tipada). */
+function valorDeOrden<Row>(col: ColumnSpec<Row>, row: Row): ValorOrden {
+  if (col.sortValue) return col.sortValue(row);
+  const v = (row as Record<string, unknown>)[col.id];
+  if (v == null) return null;
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v;
+  if (typeof v === 'object') {
+    const o = v as { value?: unknown; label?: unknown; title?: unknown };
+    const t = o.value ?? o.label ?? o.title;
+    return typeof t === 'string' || typeof t === 'number' ? t : null;
+  }
+  return null;
+}
+
+/** Números como números; texto con el collator del idioma (acentos, "10"
+ *  después de "9"). Los vacíos van SIEMPRE al final, suba o baje el orden. */
+const COLADOR = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
+function compararValores(a: ValorOrden, b: ValorOrden): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (typeof a === 'boolean' && typeof b === 'boolean') return Number(a) - Number(b);
+  return COLADOR.compare(String(a), String(b));
+}
+const esVacio = (v: ValorOrden) => v == null || v === '';
+
+/** Una columna es ordenable si lo declara, si tiene `sortValue`, o si en una
+ *  fila de muestra `row[id]` da un valor. Acciones nunca. */
+function esOrdenable<Row>(col: ColumnSpec<Row>, muestra: Row | undefined): boolean {
+  if (col.sortable === false || col.kind === 'actions') return false;
+  if (col.sortable || col.sortValue) return true;
+  return muestra !== undefined && !esVacio(valorDeOrden(col, muestra));
+}
+
+/* ============================================================
  * Menú "…" de acciones desbordadas (a partir de la 3ra)
  * Posicionado FIXED desde el rect del botón para escapar del
  * clip del scroller horizontal. Cierra con click afuera, Esc,
@@ -380,8 +420,14 @@ export function DataTable<Row>({
   activeStatus,
   onStatusChange,
   reorder,
+  sort,
+  onSortChange,
+  defaultSort,
 }: DataTableProps<Row>) {
   const [menu, setMenu] = useState<MenuAbierto | null>(null);
+  /* [v3.3] Orden por cabecera: controlado si viene `sort`, interno si no.
+     Hook acá arriba, antes de cualquier return condicional. */
+  const [ordenInterno, setOrdenInterno] = useState<SortState | null>(defaultSort ?? null);
   const cerrarMenu = useCallback(() => setMenu(null), []);
 
   /* [proyección mobile] El control tiene DOS renderers y el ancho de SU
@@ -427,6 +473,37 @@ export function DataTable<Row>({
   const usarGrupos = groupBy !== 'none' && !!groups?.length;
   const totalFilas = usarGrupos ? groups!.reduce((n, g) => n + g.rows.length, 0) : rows.length;
 
+  /* --- [v3.3] ORDEN POR CABECERA. En modo "Reordenar" se apaga: el arrastre
+         necesita el orden natural de la lista. Con grupos, ordena ADENTRO de
+         cada grupo y respeta el orden de los grupos (que ya decidió la página
+         o el orquestador). Estable: a igual valor manda el orden de llegada. */
+  const orden: SortState | null = reordenActivo ? null : sort !== undefined ? sort : ordenInterno;
+  const cambiarOrden = (id: string) => {
+    const siguiente: SortState | null =
+      orden?.id !== id ? { id, dir: 'asc' } : orden.dir === 'asc' ? { id, dir: 'desc' } : null;
+    if (sort === undefined) setOrdenInterno(siguiente);
+    onSortChange?.(siguiente);
+  };
+  const columnaOrden = orden ? columns.find((c) => c.id === orden.id) : undefined;
+  const ordenar = (lista: Row[]): Row[] => {
+    if (!orden || !columnaOrden) return lista;
+    const signo = orden.dir === 'asc' ? 1 : -1;
+    return lista
+      .map((row, i) => ({ row, i, v: valorDeOrden(columnaOrden, row) }))
+      .sort((a, b) => {
+        const va = esVacio(a.v);
+        const vb = esVacio(b.v);
+        if (va && vb) return a.i - b.i;
+        if (va) return 1;
+        if (vb) return -1;
+        return compararValores(a.v, b.v) * signo || a.i - b.i;
+      })
+      .map((x) => x.row);
+  };
+  const filasOrdenadas = usarGrupos ? rows : ordenar(rows);
+  const gruposOrdenados = usarGrupos ? groups!.map((g) => ({ ...g, rows: ordenar(g.rows) })) : groups;
+  const filaMuestra: Row | undefined = usarGrupos ? groups![0]?.rows[0] : rows[0];
+
   /* --- RENDERER DE FICHAS ---------------------------------------------
      Contenedor angosto + roles declarados ⇒ el control se dibuja como lista
      de fichas. Se RETORNA acá: la grilla no se esconde con display:none, no
@@ -435,8 +512,8 @@ export function DataTable<Row>({
      grilla de siempre y no hace saltar la lista. */
   if (angosto === true && roles) {
     const gruposFichas = usarGrupos
-      ? groups!.map((g) => ({ titulo: g.title ?? g.key ?? null, filas: g.rows }))
-      : [{ titulo: null, filas: rows }];
+      ? gruposOrdenados!.map((g) => ({ titulo: g.title ?? g.key ?? null, filas: g.rows }))
+      : [{ titulo: null, filas: filasOrdenadas }];
     return (
       <section className="av2-tabla av2-tabla--fichas" ref={refAncho}>
         {loading ? (
@@ -720,17 +797,42 @@ export function DataTable<Row>({
       <div className="av2-tabla-scroll" role="table" aria-busy={loading || undefined} style={estiloGrid}>
         {/* Encabezado eyebrow */}
         <div className="av2-tabla-grid av2-tabla-encabezado" role="row">
-          {columns.map((col) => (
-            <span
-              key={col.id}
-              role="columnheader"
-              className={`av2-eyebrow ${clasePorAlineado(
-                col.align ?? (col.kind === 'money' || col.kind === 'actions' ? 'right' : 'left'),
-              )}`}
-            >
-              {col.header}
-            </span>
-          ))}
+          {columns.map((col) => {
+            const ordenable = esOrdenable(col, filaMuestra);
+            const activa = !!orden && orden.id === col.id;
+            const Flecha = activa ? (orden!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
+            return (
+              <span
+                key={col.id}
+                role="columnheader"
+                aria-sort={activa ? (orden!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+                className={`av2-eyebrow ${clasePorAlineado(
+                  col.align ?? (col.kind === 'money' || col.kind === 'actions' ? 'right' : 'left'),
+                )}`}
+              >
+                {/* [v3.3] Cabecera ORDENABLE: un botón con la flecha del
+                    sentido; click asc → desc → sin orden. Las fijas siguen
+                    siendo texto pelado. */}
+                {ordenable ? (
+                  <button
+                    type="button"
+                    className={`av2-tabla-orden${activa ? ' av2-tabla-orden--activo' : ''}`}
+                    onClick={() => cambiarOrden(col.id)}
+                    title={
+                      activa && orden!.dir === 'desc'
+                        ? 'Quitar el orden'
+                        : `Ordenar por ${col.header.toLowerCase()}${activa ? ' (descendente)' : ''}`
+                    }
+                  >
+                    {col.header}
+                    <Flecha size={11} strokeWidth={2.2} aria-hidden />
+                  </button>
+                ) : (
+                  col.header
+                )}
+              </span>
+            );
+          })}
         </div>
 
         {/* Cuerpo: skeleton (loading) > grupos o filas planas > vacío.
@@ -742,9 +844,9 @@ export function DataTable<Row>({
             {emptyMessage ?? MENSAJE_VACIO}
           </div>
         ) : usarGrupos ? (
-          groups!.map(renderGrupo)
+          gruposOrdenados!.map(renderGrupo)
         ) : (
-          rows.map(renderFila)
+          filasOrdenadas.map(renderFila)
         )}
       </div>
 

@@ -5185,3 +5185,149 @@ button.av2-chip:hover { opacity: 0.85; }
   .av2-cuerpo-anim { animation: none; }
   .av2-tarj--click:hover { transform: none; }
 }
+
+
+/* ============================================================
+   [v3.3] Cabeceras ORDENABLES, solapas de vista, pantalla completa
+   del bloque controles + cuerpo y sugerencias del buscador
+   (Territorio, 2026-09-03). Todo sobre tokens --pl-*.
+   ============================================================ */
+
+/* --- Cabecera ordenable: un botón que hereda el eyebrow. La flecha del
+   sentido sólo se ve en hover o cuando la columna manda el orden. --- */
+.av2-tabla-orden {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  cursor: pointer;
+  transition: color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tabla-orden > svg {
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tabla-orden:hover { color: var(--pl-text-2); }
+.av2-tabla-orden:hover > svg,
+.av2-tabla-orden--activo > svg { opacity: 1; }
+.av2-tabla-orden--activo { color: var(--pl-green-700); }
+.av2-tabla-orden:focus-visible {
+  outline: 2px solid var(--pl-green-200);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- Segmented de vistas como SOLAPAS (dos vistas): icono + label. --- */
+.av2-seg-vista--con-label {
+  width: auto;
+  padding: 0 11px 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.av2-seg-vista-label {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Botón secundario de SÓLO icono (pantalla completa). --- */
+.av2-btn-icono {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+.av2-btn-icono--activo {
+  color: var(--pl-green-700);
+  border-color: var(--pl-green-200);
+  background: var(--pl-green-050);
+}
+.av2-btn-icono--activo svg { color: inherit; }
+
+/* --- Sugerencias del buscador. El wrapper toma el flex del buscador y
+   sostiene el panel; el panel flota por encima del cuerpo (los controles de
+   Leaflet llegan a z 1000 y no crean contexto propio). --- */
+.av2-buscador-wrap {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+}
+.av2-buscador-wrap > .av2-toolbar-buscador { flex: 1 1 auto; }
+
+.av2-sugerencias {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-card);
+  z-index: 1100;
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.av2-sugerencia {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text);
+  cursor: pointer;
+  min-width: 0;
+}
+.av2-sugerencia > svg {
+  flex: 0 0 auto;
+  color: var(--pl-text-muted);
+}
+.av2-sugerencia--activa { background: var(--pl-surface-hover); }
+.av2-sugerencia-label {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av2-sugerencia-hint {
+  margin-left: auto;
+  flex: 0 1 auto;
+  color: var(--pl-text-muted);
+  font-size: var(--pl-fs-micro);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av2-sugerencia--vacia {
+  color: var(--pl-text-muted);
+  cursor: default;
+}
+
+/* --- Pantalla completa del bloque: el cuerpo (y su animación de vista)
+   tienen que ESTIRARSE para que el mapa tome todo el alto libre. --- */
+.av2-mapa-full:fullscreen .av2-cuerpo-anim,
+.av2-mapa-full--expandido .av2-cuerpo-anim,
+.av2-mapa-full:fullscreen .av2-body,
+.av2-mapa-full--expandido .av2-body,
+.av2-mapa-full:fullscreen .av2-body-main,
+.av2-mapa-full--expandido .av2-body-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

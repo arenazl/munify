@@ -59,7 +59,10 @@ export type ListKind = 'plain' | 'money' | 'schedule' | 'board';
 /** Vistas del segmented de la toolbar. 'day'/'week' solo en kind='schedule'. */
 /** 'arbol': jerarquía expandible (categoría → trámite → requisitos). El cuerpo
  *  lo pone la página por `viewSlots.arbol` — el kit trae `AccordionTree`. */
-export type ViewKind = 'cards' | 'table' | 'guided' | 'day' | 'week' | 'arbol';
+/** [v3.3] 'map': el mismo universo dibujado en un mapa (Territorio, Mapa).
+ *  El cuerpo lo pone la página por `viewSlots.map`; el kit trae el segmented
+ *  con su icono/label y la pantalla completa de controles + cuerpo. */
+export type ViewKind = 'cards' | 'table' | 'guided' | 'day' | 'week' | 'arbol' | 'map';
 
 /** Tonos semánticos de chips/estados (paleta StatusPill del estándar):
  *  azul = recibido/completado · ámbar = en curso/pendiente ·
@@ -179,6 +182,30 @@ export interface StepsSpec {
  * Queda: buscador (flex-grow) + segmented de vistas + steps + secundario +
  * CTA, todo dentro de la MISMA tarjeta que la FilterBar (ver abmv2.css).
  */
+/** [v3.3] Una sugerencia bajo el buscador: lo que se elige, con su pista. */
+export interface SearchSuggestion {
+  id: string;
+  label: string;
+  /** Renglón chico a la derecha ("Buenos Aires · se llena con barrios"). */
+  hint?: string;
+  icon?: LucideIcon;
+}
+
+/**
+ * [v3.3] SUGERENCIAS del buscador (autocomplete). La página las computa con
+ * sus datos (máximo ~8, ya ordenadas) y el kit las dibuja bajo el input:
+ * flechas para moverse, Enter/click para elegir, Esc para cerrar. Elegir
+ * dispara `onPick(id)` — la página decide qué hacer (navegar, filtrar). Why
+ * (dueño, Territorio 2026-09-03): "el buscador tiene que ser con autocomplete
+ * para cualquiera de estos niveles" — y no había pieza del kit para eso.
+ */
+export interface SearchSuggestionsSpec {
+  items: SearchSuggestion[];
+  onPick: (id: string) => void;
+  /** Copy cuando hay texto y ninguna sugerencia. Omitido ⇒ el panel no se abre vacío. */
+  emptyMessage?: string;
+}
+
 export interface ListToolbarProps {
   searchPlaceholder: string;
   /** Valor controlado del buscador. */
@@ -210,6 +237,15 @@ export interface ListToolbarProps {
    *  las acciones. Compatibles con `primaryAction` pero en flujos tipo
    *  Mostrador lo usual es steps SIN CTA (el avance ES la acción). */
   steps?: StepsSpec;
+  /** [v3.3] Label por vista para el segmented ("Información" en vez de
+   *  "Tabla"). Con DOS vistas el segmented se lee como SOLAPAS y muestra
+   *  icono + label; con tres o más sigue sólo icono (el ancho manda). */
+  viewLabels?: Partial<Record<ViewKind, string>>;
+  /** [v3.3] Botón de pantalla completa al final de la toolbar (Maximize /
+   *  Minimize). Lo cablea el orquestador con `usePantallaCompleta`. */
+  pantallaCompleta?: { activa: boolean; onToggle: () => void };
+  /** [v3.3] Sugerencias bajo el buscador (ver SearchSuggestionsSpec). */
+  searchSuggestions?: SearchSuggestionsSpec;
 }
 
 /* ============================================================
@@ -450,6 +486,23 @@ export interface ColumnSpec<Row = unknown> {
   /** Render custom de la celda. Sin `cell`, el DataTable resuelve un render
    *  por defecto según `kind` (los agentes de Tabla lo documentan). */
   cell?: (row: Row) => ReactNode;
+  /**
+   * [v3.3] Valor por el que ORDENA la columna al tocar su cabecera. Sin él,
+   * el DataTable usa `row[id]` cuando es un primitivo (o el `value`/`label`/
+   * `title` de una celda tipada); si no encuentra nada, la cabecera queda
+   * fija. Declararlo es obligatorio cuando la celda es custom y el id no es
+   * un campo de la fila. `sortable: false` la deja fija aunque haya valor.
+   * Why (dueño, 2026-09-03): "todas las columnas tienen que ser ordenables".
+   */
+  sortValue?: (row: Row) => string | number | boolean | null | undefined;
+  sortable?: boolean;
+}
+
+/** [v3.3] Orden activo por cabecera. */
+export interface SortState {
+  /** id de la ColumnSpec. */
+  id: string;
+  dir: 'asc' | 'desc';
 }
 
 /** [v2.1] Datos de la celda kind='dot': punto de color + texto neutro.
@@ -648,6 +701,17 @@ export interface DataTableProps<Row = unknown> {
    * existentes no cambian ni un píxel.
    */
   reorder?: ReorderSpec<Row>;
+  /**
+   * [v3.3] Orden por CABECERA. Controlado si viene `sort` (con `onSortChange`
+   * para tablas que ordenan en el servidor); omitido ⇒ el DataTable lo maneja
+   * solo, arrancando en `defaultSort` o sin orden. El click cicla
+   * asc → desc → sin orden. Convive con `sortSpec` (criterios semánticos de
+   * la toolbar: urgencia, vencimiento): la página que usa los dos decide cuál
+   * manda al recibir `onSortChange`.
+   */
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
+  defaultSort?: SortState;
 }
 
 /* ============================================================
@@ -880,6 +944,23 @@ export interface SemanticAbmPageProps<Row = unknown> {
   onPeriodChange?: (value: PeriodControlValue) => void;
   rowKey: (row: Row, index?: number) => string | number;
   onRowClick?: (row: Row) => void;
+
+  /* --- [v3.3] Vistas con solapas, pantalla completa, sugerencias, orden --- */
+  /** Label por vista del segmented (pass-through a ListToolbar). */
+  viewLabels?: Partial<Record<ViewKind, string>>;
+  /**
+   * Vistas que ofrecen PANTALLA COMPLETA. En ellas la toolbar muestra el
+   * botón y, al activarlo, se maximiza el BLOQUE controles + cuerpo (nunca el
+   * cuerpo solo: un mapa grande sin sus filtros no se puede manejar). Sin la
+   * prop el DOM es idéntico al de siempre.
+   */
+  pantallaCompleta?: ViewKind[];
+  /** Sugerencias bajo el buscador (pass-through a ListToolbar). */
+  searchSuggestions?: SearchSuggestionsSpec;
+  /** Orden por cabecera de la tabla (pass-through a DataTable). */
+  sort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
+  defaultSort?: SortState;
 }
 
 /* ============================================================

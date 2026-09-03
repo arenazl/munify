@@ -1,10 +1,11 @@
 /**
  * Territorio.css — la piel del recorrido país → provincia → municipio.
  *
- * Hero, toolbar, tabs y tabla los pone el kit abmv2; el mapa usa el bloque
- * `.av2-mapa` del kit. Acá viven sólo las piezas propias del CUERPO: las
- * migas del recorrido, la leyenda del mapa, el velo de carga y el motivo del
- * respaldo en la tabla.
+ * Hero, toolbar (buscador con sugerencias, solapas, pantalla completa),
+ * combos, tabs y tabla ordenable los pone el kit abmv2; el mapa usa el bloque
+ * `.av2-mapa` del kit y su pantalla completa (`.av2-mapa-full`). Acá viven
+ * sólo las piezas propias del CUERPO: la barra de leyenda + respaldo sobre el
+ * mapa, el velo de carga y el motivo del respaldo en la tabla.
  *
  * Regla del kit: cero hex. Todo sale de tokens `--pl-*`. Los colores de la
  * leyenda son los MISMOS tokens que la página lee del CSS computado para los
@@ -19,35 +20,15 @@
   min-width: 0;
 }
 
-/* ---- Migas del recorrido ---- */
-.territorio-migas {
+/* ---- Barra sobre el mapa: leyenda a la izquierda, respaldo a la derecha ---- */
+.territorio-barra {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--pl-space-1);
+  gap: var(--pl-space-1) var(--pl-space-2);
   min-width: 0;
+  padding: 2px var(--pl-space-1) 0;
 }
-
-.territorio-miga {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 4px 6px;
-  border-radius: var(--pl-radius-md);
-  font: inherit;
-  font-size: var(--pl-fs-body-sm);
-  font-weight: 600;
-  color: var(--pl-text-2);
-  cursor: pointer;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.territorio-miga:hover:not(:disabled) { background: var(--pl-surface-2); color: var(--pl-text); }
-.territorio-miga:disabled,
-.territorio-miga--actual { color: var(--pl-text); cursor: default; }
-.territorio-miga-sep { color: var(--pl-text-muted); flex: 0 0 auto; }
 
 .territorio-toggle {
   margin-left: auto;
@@ -68,7 +49,7 @@
 
 /* ---- Mapa ---- */
 .territorio-mapa { margin-top: 0; }
-.territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 480px; }
+.territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 520px; }
 
 .territorio-mapa-velo {
   position: absolute;
@@ -83,18 +64,30 @@
   z-index: 500; /* arriba de los panes de Leaflet (400), abajo de los popups */
 }
 
+/* ---- Pantalla completa (kit: .av2-mapa-full). El cuerpo de la solapa Mapa
+   se estira y el lienzo toma todo el alto que queda bajo la barra. ---- */
+.av2-mapa-full:fullscreen .territorio-cuerpo--mapa,
+.av2-mapa-full--expandido .territorio-cuerpo--mapa {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.av2-mapa-full:fullscreen .territorio-barra,
+.av2-mapa-full--expandido .territorio-barra { flex: 0 0 auto; }
+
 /* ---- Leyenda ---- */
 .territorio-leyenda {
   list-style: none;
   margin: 0;
-  padding: 0 var(--pl-space-1);
+  padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--pl-space-1) var(--pl-space-3);
   font-size: var(--pl-fs-body-sm);
   color: var(--pl-text-2);
+  min-width: 0;
 }
 .territorio-leyenda li { display: inline-flex; align-items: center; gap: 6px; }
+.territorio-leyenda-nota { color: var(--pl-text-muted); }
 
 .territorio-leyenda-punto {
   --pl-tono: var(--pl-text-muted);
@@ -134,8 +127,9 @@
   white-space: nowrap;
 }
 
-/* ---- Teléfono: el mapa cede alto para que la tabla quede a un scroll ---- */
+/* ---- Teléfono: el mapa cede alto; la leyenda deja de competir con el botón ---- */
 @media (max-width: 640px) {
-  .territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 340px; min-height: 340px; }
+  .territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 360px; min-height: 360px; }
   .territorio-toggle { margin-left: 0; }
+  .territorio-leyenda-nota { display: none; }
 }

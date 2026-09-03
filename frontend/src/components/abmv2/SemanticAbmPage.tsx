@@ -69,6 +69,7 @@ import { HintBanner } from './HintBanner';
 import { DashboardIAPanel } from '../ui/DashboardIAPanel';
 import { SideModal } from './SideModal';
 import { useEmbed } from './useEmbed';
+import { usePantallaCompleta } from './usePantallaCompleta';
 import type { SideModalComponentProps } from './SideModal';
 import type {
   Action,
@@ -215,6 +216,13 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     onPeriodChange,
     rowKey,
     onRowClick,
+    /* [v3.3] solapas, pantalla completa, sugerencias, orden por cabecera */
+    viewLabels,
+    pantallaCompleta,
+    searchSuggestions,
+    sort,
+    onSortChange,
+    defaultSort,
     /* drawer */
     sideModal,
     primaryOpensCreate = false,
@@ -244,6 +252,17 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
      selects) y ancho del aside de IA — estado interno del orquestador. */
   const [filtroTaxonomia, setFiltroTaxonomia] = useState('');
   const [iaColapsada, setIaColapsada] = useState(true);
+
+  /* [v3.3] Pantalla completa del BLOQUE controles + cuerpo (ver el hook).
+     Siempre se llama (orden de hooks); sólo se cablea si la página declaró
+     `pantallaCompleta` y la vista activa está en la lista. */
+  const {
+    ref: refCompleta,
+    activa: completaActiva,
+    alternar: alternarCompleta,
+    clase: claseCompleta,
+  } = usePantallaCompleta<HTMLDivElement>();
+  const ofreceCompleta = !!pantallaCompleta && pantallaCompleta.includes(activeView);
 
   /* --- [v3] Vistas efectivas: las 3 del estándar salen built-in.
          Sin `views` declaradas, se ofrecen 'table' siempre y 'cards'/'guided'
@@ -297,7 +316,10 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
           'built-in (y la ficha mobile). Ver types.ts § RolesSemanticos.',
       );
     }
-    if (views && views.length < VISTAS_ESTANDAR.length) {
+    /* Sólo tiene sentido avisar cuando el kit PODRÍA dibujar las otras
+       (hay roles): sin roles, una pantalla de dos vistas declaradas (tabla +
+       mapa, por caso) no está degradada — es lo que es. */
+    if (views && roles && views.length < VISTAS_ESTANDAR.length) {
       console.warn(
         `SemanticAbmPage[${moduleKey}]: \`views\` declara ${views.length} vista(s) — ` +
           'el estándar trae las 3 sin declararlas (con `roles`). Declarar menos es ' +
@@ -485,6 +507,9 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         loading={loading}
         emptyMessage={emptyMessage}
         reorder={reorder}
+        sort={sort}
+        onSortChange={onSortChange}
+        defaultSort={defaultSort}
       />
     );
   } else if (loading) {
@@ -565,6 +590,59 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
   /* --- Spec del drawer abierto --- */
   const specDrawer = sideModal && drawer ? sideModal(drawer) : null;
 
+  /* --- 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. --- */
+  const controles = (
+    <div className="av2-controles">
+      <ListToolbar
+        searchPlaceholder={searchPlaceholder}
+        search={search}
+        onSearchChange={onSearchChange}
+        views={viewsEfectivas}
+        activeView={activeView}
+        onViewChange={onViewChange}
+        /* [v3.2] Orden (botón ciclador) y agrupamiento viven en la PRIMERA
+           línea; abajo quedan solo los filtros. */
+        sortSpec={sortSpec}
+        groupSpec={groupSpec}
+        secondaryAction={secondaryAction}
+        primaryAction={primarioEfectivo}
+        steps={steps}
+        viewLabels={viewLabels}
+        searchSuggestions={searchSuggestions}
+        pantallaCompleta={
+          ofreceCompleta ? { activa: completaActiva, onToggle: alternarCompleta } : undefined
+        }
+      />
+
+      {/* [v3] En vista TABLA los tabs de estado se mudan al tope de la
+          tarjeta de la tabla (patrón Trámites/Reclamos, canvas v2.3) — acá
+          quedarían dobles. En cards/guiada siguen acá como segmented. */}
+      <FilterBar
+        selects={selectsEfectivos}
+        period={period}
+        onPeriodChange={onPeriodChange}
+        statusTabs={activeView === 'table' && !tieneSlot ? [] : statusTabs}
+        activeStatus={activeStatus}
+        onStatusChange={onStatusChange}
+        filterSummary={filterSummary}
+      />
+    </div>
+  );
+
+  /* --- 5. Cuerpo: slot de la vista activa o DataTable estándar. Con `aside`
+         se envuelve en el flex .av2-body (panel sticky a la derecha); sin él,
+         cuerpo directo — DOM idéntico al previo a v2.1. --- */
+  const cuerpoConAside = asideEfectivo ? (
+    <div className="av2-body">
+      <div className="av2-body-main">{cuerpo}</div>
+      <aside className="av2-aside" style={estiloAside}>
+        {asideEfectivo.content}
+      </aside>
+    </div>
+  ) : (
+    cuerpo
+  );
+
   return (
     <div className={`av2-page ${embebida ? 'av2-page--embebida' : ''}`} data-module={moduleKey}>
       {/* 0. [v3] PISTA en el segmento de ayudas: ARRIBA DE TODO, cerrable con
@@ -599,50 +677,21 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         </div>
       )}
 
-      {/* 3+4. Toolbar y filtros: UNA sola tarjeta partida por una línea. */}
-      <div className="av2-controles">
-        <ListToolbar
-          searchPlaceholder={searchPlaceholder}
-          search={search}
-          onSearchChange={onSearchChange}
-          views={viewsEfectivas}
-          activeView={activeView}
-          onViewChange={onViewChange}
-          /* [v3.2] Orden (botón ciclador) y agrupamiento viven en la PRIMERA
-             línea; abajo quedan solo los filtros. */
-          sortSpec={sortSpec}
-          groupSpec={groupSpec}
-          secondaryAction={secondaryAction}
-          primaryAction={primarioEfectivo}
-          steps={steps}
-        />
-
-        {/* [v3] En vista TABLA los tabs de estado se mudan al tope de la
-            tarjeta de la tabla (patrón Trámites/Reclamos, canvas v2.3) — acá
-            quedarían dobles. En cards/guiada siguen acá como segmented. */}
-        <FilterBar
-          selects={selectsEfectivos}
-          period={period}
-          onPeriodChange={onPeriodChange}
-          statusTabs={activeView === 'table' && !tieneSlot ? [] : statusTabs}
-          activeStatus={activeStatus}
-          onStatusChange={onStatusChange}
-          filterSummary={filterSummary}
-        />
-      </div>
-
-      {/* 5. Cuerpo: slot de la vista activa o DataTable estándar. Con `aside`
-          se envuelve en el flex .av2-body (panel sticky a la derecha); sin él,
-          cuerpo directo — DOM idéntico al previo a v2.1. */}
-      {asideEfectivo ? (
-        <div className="av2-body">
-          <div className="av2-body-main">{cuerpo}</div>
-          <aside className="av2-aside" style={estiloAside}>
-            {asideEfectivo.content}
-          </aside>
+      {/* 3+4+5. Controles y cuerpo. [v3.3] Con `pantallaCompleta` declarada
+          van adentro del bloque maximizable (`.av2-mapa-full`, que en reposo
+          es display: contents y no genera caja); sin ella, sueltos como
+          siempre. Lo que se maximiza es el bloque ENTERO —filtros y cuerpo—,
+          nunca el cuerpo solo. */}
+      {pantallaCompleta ? (
+        <div ref={refCompleta} className={claseCompleta}>
+          {controles}
+          {cuerpoConAside}
         </div>
       ) : (
-        cuerpo
+        <>
+          {controles}
+          {cuerpoConAside}
+        </>
       )}
 
       {/* 6. SideModal (si la página delegó el estado en el orquestador) */}

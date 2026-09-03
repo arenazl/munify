@@ -13,28 +13,32 @@
  * con eso se dibuja el mapa de puntos y se arman las provincias sin volver
  * a pedir) y el detalle de un municipio (contorno + todas sus filas).
  *
- * UNA SOLA METÁFORA: EL MAPA A TRES ZOOMS
- * ---------------------------------------
- * El dueño quiere gráficos antes que tablas y el dato es geográfico, así que
- * el cuerpo es un mapa Leaflet (el que ya usa la app) que cambia de nivel:
- *   país       → un punto por municipio, coloreado por CÓMO SE LLENA
- *   provincia  → los mismos puntos, encuadrados en la provincia
- *   municipio  → el contorno (la Zona única) y adentro lo que se dibuja:
- *                polígonos y puntos coloreados por FUENTE; el respaldo
- *                (hoja = 0) se puede prender en gris para ver POR QUÉ quedó
- *                afuera (duplicado, contenedor, absorbido, sin coordenada)
- * La tabla de abajo es el apoyo del mapa: provincias → municipios → barrios,
- * y el click en una fila baja un nivel (o encuadra el barrio).
+ * REWORK (dueño, 2026-09-03, textual): "hay que trabajar un montón la
+ * pantalla, no quedó intuitiva". Lo que pidió y cómo quedó:
+ *  - "combo de país, de provincia, de municipios": los tres son `selects`
+ *    del kit, siempre a la vista. El de municipio aparece al elegir una
+ *    provincia ("Todos" vuelve a la provincia).
+ *  - "el buscador tiene que ser con autocomplete para cualquiera de estos
+ *    niveles": `searchSuggestions` del kit — sugiere provincias, municipios
+ *    o barrios según dónde estés; elegir uno navega.
+ *  - "dos solapas: una con la información del contexto (país, provincia o
+ *    municipio) y al lado el mapa de ese mismo contexto": `views` table +
+ *    map con label ("Información" / "Mapa"), mismo hero, mismos filtros.
+ *  - "botón de full screen: los filtros y el mapa en pantalla completa":
+ *    `pantallaCompleta={['map']}` — el kit maximiza controles + cuerpo.
+ *  - "todas las columnas ordenables, la grilla más dúctil": cabeceras
+ *    ordenables de la `DataTable` v3.3 (`sortValue` donde la celda es custom).
+ *  - El zoom del mapa: `ZoomRuedaDeAUno` (pieza común, un gesto = un nivel).
  *
  * Cero hex inline: los colores de los trazos de Leaflet (que necesitan un
  * string concreto) se leen de los tokens `--pl-*` del CSS computado, mismo
  * patrón que Mapa.tsx y PagosProgramados.tsx.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Eye, EyeOff, Landmark, MapPin, Search } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, Landmark, Map as MapIcon, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { CircleMarker, MapContainer, Polygon, TileLayer, Tooltip, useMap } from 'react-leaflet';
-import { ZoomRuedaDeAUno } from '../components/mapa/piezasLeaflet';
+import { InvalidarAlRedimensionar, ZoomRuedaDeAUno } from '../components/mapa/piezasLeaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
@@ -53,7 +57,14 @@ import { ChipEstado, DataTable, EntityCell } from '../components/abmv2/DataTable
 import { MetricCell } from '../components/abmv2/Controls';
 import { seg } from '../lib/semanticHero';
 import type { HeroFrase, HeroKpi, Veredicto } from '../lib/semanticHero';
-import type { ChipTone, ColumnSpec, StatusTab, ViewKind } from '../components/abmv2/types';
+import type {
+  ChipTone,
+  ColumnSpec,
+  SearchSuggestion,
+  SelectSpec,
+  StatusTab,
+  ViewKind,
+} from '../components/abmv2/types';
 import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM, claseBasemap } from '../lib/basemaps';
 import './Territorio.css';
 
@@ -98,8 +109,17 @@ function explicarMotivo(motivo: string | null): string {
 const fmt = (n: number) => n.toLocaleString('es-AR');
 const pct = (parte: number, total: number) => (total ? `${Math.round((parte / total) * 100)}%` : '—');
 const nombrePais = (codigo: string) => NOMBRE_PAIS[codigo] || codigo;
+/** Sin acentos ni mayúsculas: "Cordoba" encuentra "Córdoba". */
+const normalizar = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
 
 type Nivel = 'pais' | 'provincia' | 'municipio';
+
+/** Tope de sugerencias del buscador: lo que entra sin scrollear. */
+const MAX_SUGERENCIAS = 8;
 
 /* ============================================================
  * Mapa: helpers
@@ -217,30 +237,31 @@ export default function Territorio() {
   }, [muniId]);
 
   // Cambiar de nivel resetea lo que sólo tiene sentido en el nivel anterior.
+  // La vista (Información / Mapa) se conserva: el dueño recorre municipio por
+  // municipio mirando el mapa, y cambiar de municipio no lo tiene que sacar.
+  const limpiarNivel = () => {
+    setTab('todos');
+    setBusqueda('');
+    setFoco(null);
+    setBarrioSel(null);
+  };
   const irAPais = (codigo: string) => {
     setPais(codigo);
     setProvincia(null);
     setMuniId(null);
-    setTab('todos');
-    setBusqueda('');
-    setFoco(null);
-    setBarrioSel(null);
+    limpiarNivel();
   };
   const irAProvincia = (nombre: string | null) => {
     setProvincia(nombre);
     setMuniId(null);
-    setTab('todos');
-    setBusqueda('');
-    setFoco(null);
-    setBarrioSel(null);
+    limpiarNivel();
   };
-  const irAMunicipio = (m: TerritorioMunicipio) => {
+  const irAMunicipio = (id: string) => {
+    const m = datosPais?.items.find((x) => x.id === id);
+    if (!m) return;
     setProvincia(m.provincia);
     setMuniId(m.id);
-    setTab('todos');
-    setBusqueda('');
-    setFoco(null);
-    setBarrioSel(null);
+    limpiarNivel();
   };
 
   /* ---------- Colores de los trazos (tokens, no hex) ---------- */
@@ -268,7 +289,7 @@ export default function Territorio() {
   })();
 
   /* ---------- Derivados ---------- */
-  const munisDelNivel = useMemo(() => {
+  const munisDeLaProvincia = useMemo(() => {
     const todos = datosPais?.items ?? [];
     return provincia ? todos.filter((m) => m.provincia === provincia) : todos;
   }, [datosPais, provincia]);
@@ -280,22 +301,22 @@ export default function Territorio() {
     return p ?? null;
   }, [datosPais, provincia]);
 
-  const q = busqueda.trim().toLowerCase();
+  const q = normalizar(busqueda.trim());
 
   // Municipios que pasan el tab (relleno) y la búsqueda: alimentan el mapa de
   // puntos y la tabla de municipios.
   const munisVisibles = useMemo(
     () =>
-      munisDelNivel.filter(
+      munisDeLaProvincia.filter(
         (m) =>
           (tab === 'todos' || m.relleno === tab) &&
-          (!q || m.nombre.toLowerCase().includes(q) || (m.provincia || '').toLowerCase().includes(q)),
+          (!q || normalizar(m.nombre).includes(q) || normalizar(m.provincia || '').includes(q)),
       ),
-    [munisDelNivel, tab, q],
+    [munisDeLaProvincia, tab, q],
   );
 
   const provinciasVisibles = useMemo(
-    () => (datosPais?.provincias ?? []).filter((p) => !q || p.provincia.toLowerCase().includes(q)),
+    () => (datosPais?.provincias ?? []).filter((p) => !q || normalizar(p.provincia).includes(q)),
     [datosPais, q],
   );
 
@@ -304,7 +325,7 @@ export default function Territorio() {
     return todos.filter(
       (b) =>
         (tab === 'todos' || (tab === 'dibujan' ? b.hoja : !b.hoja)) &&
-        (!q || b.nombre.toLowerCase().includes(q)),
+        (!q || normalizar(b.nombre).includes(q)),
     );
   }, [detalle, tab, q]);
 
@@ -325,13 +346,32 @@ export default function Territorio() {
       return b;
     }
     const b = L.latLngBounds([]);
-    munisDelNivel.forEach((m) => {
+    munisDeLaProvincia.forEach((m) => {
       if (m.lat != null && m.lng != null) b.extend([m.lat, m.lng]);
     });
     return b;
     // Se encuadra por NIVEL, no por filtro: filtrar por tab no mueve el mapa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nivel, detalle, pais, provincia]);
+
+  /* ---------- Ir al mapa ---------- */
+  const enfocarBarrio = (b: TerritorioBarrio) => {
+    setBarrioSel(b.id);
+    if (b.poligono) {
+      const bb = L.latLngBounds(anilloALatLng(b.poligono));
+      setFoco([bb.getCenter().lat, bb.getCenter().lng]);
+    } else if (b.lat != null && b.lon != null) {
+      setFoco([b.lat, b.lon]);
+    } else {
+      toast.message(`${b.nombre} no tiene coordenada: no se puede ubicar en el mapa.`);
+      return;
+    }
+    setVista('map');
+  };
+  const verMunicipioEnMapa = (m: TerritorioMunicipio) => {
+    irAMunicipio(m.id);
+    setVista('map');
+  };
 
   /* ---------- Hero ---------- */
   const { heroKpis, heroFrases, etiqueta } = useMemo((): {
@@ -369,7 +409,15 @@ export default function Territorio() {
           ...(r.respaldo ? [seg('duplicados, contenedores o sin coordenada', 'advertencia'), seg('.')] : []),
         ],
         acciones: r.respaldo
-          ? [{ label: verRespaldo ? 'Ocultar respaldo' : 'Ver respaldo en el mapa', onClick: () => setVerRespaldo((v) => !v) }]
+          ? [
+              {
+                label: verRespaldo ? 'Ocultar respaldo' : 'Ver respaldo en el mapa',
+                onClick: () => {
+                  setVerRespaldo((v) => !v);
+                  setVista('map');
+                },
+              },
+            ]
           : undefined,
       };
       return {
@@ -439,12 +487,117 @@ export default function Territorio() {
     ];
   }, [nivel, detalle, agregado]);
 
-  /* ---------- Columnas ---------- */
+  /* ---------- Combos: país · provincia · municipio (dueño: "dos combos,
+     sencillo; el municipio que me lo liste o que me deje escribirlo") ---------- */
+  const selects: SelectSpec[] = useMemo(() => {
+    const lista: SelectSpec[] = [
+      {
+        id: 'pais',
+        label: 'País',
+        value: pais,
+        options: (paises.length ? paises : [{ pais, municipios: 0 } as TerritorioPais]).map((p) => ({
+          value: p.pais,
+          label: p.municipios ? `${nombrePais(p.pais)} (${fmt(p.municipios)})` : nombrePais(p.pais),
+        })),
+        onChange: irAPais,
+      },
+      {
+        id: 'provincia',
+        label: 'Provincia',
+        value: provincia ?? '',
+        options: [
+          { value: '', label: 'Todas' },
+          ...(datosPais?.provincias ?? []).map((p) => ({
+            value: p.provincia,
+            label: `${p.provincia} (${fmt(p.municipios)})`,
+          })),
+        ],
+        onChange: (v) => irAProvincia(v || null),
+      },
+    ];
+    if (provincia) {
+      lista.push({
+        id: 'municipio',
+        label: 'Municipio',
+        value: muniId ?? '',
+        options: [
+          { value: '', label: 'Todos' },
+          ...munisDeLaProvincia.map((m) => ({ value: m.id, label: m.nombre })),
+        ],
+        onChange: (v) => (v ? irAMunicipio(v) : irAProvincia(provincia)),
+      });
+    }
+    return lista;
+    // irA* son estables en la práctica (sólo setters); se omiten a propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pais, paises, provincia, muniId, datosPais, munisDeLaProvincia]);
+
+  /* ---------- Sugerencias del buscador (autocomplete por nivel) ----------
+     Lo que se escribe sugiere lo que se puede ELEGIR desde donde estás:
+     en un país, provincias y municipios; en una provincia, sus municipios;
+     adentro de un municipio, sus barrios. Elegir navega (o ubica en el mapa). */
+  const sugerencias: SearchSuggestion[] = useMemo(() => {
+    if (!q) return [];
+    const empiezan = (nombre: string) => (normalizar(nombre).startsWith(q) ? 0 : 1);
+    if (nivel === 'municipio') {
+      return (detalle?.barrios ?? [])
+        .filter((b) => normalizar(b.nombre).includes(q))
+        .sort((a, b) => empiezan(a.nombre) - empiezan(b.nombre) || a.nombre.localeCompare(b.nombre, 'es'))
+        .slice(0, MAX_SUGERENCIAS)
+        .map((b) => ({
+          id: `b:${b.id}`,
+          label: b.nombre,
+          hint: `${b.nivel === 'localidad' ? 'Localidad' : 'Barrio'} · ${b.hoja ? 'se dibuja' : 'respaldo'}`,
+          icon: b.nivel === 'localidad' ? Landmark : MapPin,
+        }));
+    }
+    const provs: SearchSuggestion[] = provincia
+      ? []
+      : (datosPais?.provincias ?? [])
+          .filter((p) => normalizar(p.provincia).includes(q))
+          .sort((a, b) => empiezan(a.provincia) - empiezan(b.provincia))
+          .slice(0, 3)
+          .map((p) => ({
+            id: `p:${p.provincia}`,
+            label: p.provincia,
+            hint: `Provincia · ${fmt(p.municipios)} municipios`,
+            icon: Landmark,
+          }));
+    const munis: SearchSuggestion[] = munisDeLaProvincia
+      .filter((m) => normalizar(m.nombre).includes(q))
+      .sort((a, b) => empiezan(a.nombre) - empiezan(b.nombre) || a.nombre.localeCompare(b.nombre, 'es'))
+      .slice(0, MAX_SUGERENCIAS - provs.length)
+      .map((m) => ({
+        id: `m:${m.id}`,
+        label: m.nombre,
+        hint: `${provincia ? '' : `${m.provincia || '—'} · `}${RELLENO[m.relleno].label.toLowerCase()}`,
+        icon: MapPin,
+      }));
+    return [...provs, ...munis];
+  }, [q, nivel, provincia, datosPais, munisDeLaProvincia, detalle]);
+
+  const elegirSugerencia = (id: string) => {
+    const [tipo, ...resto] = id.split(':');
+    const valor = resto.join(':');
+    if (tipo === 'p') irAProvincia(valor);
+    else if (tipo === 'm') irAMunicipio(valor);
+    else if (tipo === 'b') {
+      const b = detalle?.barrios.find((x) => String(x.id) === valor);
+      setBusqueda('');
+      if (b) enfocarBarrio(b);
+    }
+  };
+
+  /* ---------- Columnas (todas ordenables: sortValue donde la celda es custom) ---------- */
   const columnasProvincias: ColumnSpec<TerritorioProvincia>[] = useMemo(
     () => [
       {
         id: 'provincia', header: 'Provincia', width: 'minmax(180px, 1.6fr)', kind: 'entity',
         cell: (p) => <EntityCell icon={Landmark} title={p.provincia} subtitle={`${fmt(p.municipios)} municipios`} />,
+      },
+      {
+        id: 'municipios', header: 'Municipios', width: 'minmax(90px, 0.7fr)', align: 'right', kind: 'metric',
+        cell: (p) => <MetricCell value={fmt(p.municipios)} />,
       },
       {
         id: 'barrios', header: 'Con barrios', width: 'minmax(96px, 0.8fr)', align: 'right', kind: 'metric',
@@ -470,6 +623,7 @@ export default function Territorio() {
     () => [
       {
         id: 'municipio', header: 'Municipio', width: 'minmax(200px, 1.8fr)', kind: 'entity',
+        sortValue: (m) => m.nombre,
         cell: (m) => (
           <EntityCell
             icon={MapPin}
@@ -481,6 +635,7 @@ export default function Territorio() {
       },
       {
         id: 'relleno', header: 'Se llena con', width: 'minmax(120px, 0.9fr)', kind: 'chip',
+        sortValue: (m) => ORDEN_RELLENO.indexOf(m.relleno),
         cell: (m) => <ChipEstado label={RELLENO[m.relleno].label} tone={RELLENO[m.relleno].tone} />,
       },
       {
@@ -495,7 +650,12 @@ export default function Territorio() {
         ),
       },
       {
+        id: 'hojas_poli', header: 'Con contorno', width: 'minmax(100px, 0.8fr)', align: 'right', kind: 'metric',
+        cell: (m) => <MetricCell value={fmt(m.hojas_poli)} note={m.hojas ? pct(m.hojas_poli, m.hojas) : undefined} muted={!m.hojas_poli} />,
+      },
+      {
         id: 'fuentes', header: 'Fuentes', width: 'minmax(130px, 1fr)', kind: 'text',
+        sortValue: (m) => m.hojas_osm,
         cell: (m) => (m.hojas ? `${fmt(m.hojas_osm)} OSM · ${fmt(m.hojas_padron)} padrón` : '—'),
       },
       {
@@ -525,10 +685,12 @@ export default function Territorio() {
       },
       {
         id: 'fuente', header: 'Fuente', width: 'minmax(120px, 0.9fr)', kind: 'text',
+        sortValue: (b) => FUENTE[b.fuente]?.label ?? b.fuente,
         cell: (b) => FUENTE[b.fuente]?.label ?? b.fuente,
       },
       {
         id: 'contorno', header: 'Contorno', width: 'minmax(110px, 0.8fr)', align: 'right', kind: 'metric',
+        sortValue: (b) => (b.poligono ? b.vertices ?? b.poligono.length : b.lat == null ? -1 : 0),
         cell: (b) =>
           b.poligono ? (
             <MetricCell value={fmt(b.vertices ?? b.poligono.length)} note="vértices" />
@@ -538,6 +700,7 @@ export default function Territorio() {
       },
       {
         id: 'estado', header: 'En la demo', width: 'minmax(160px, 1.2fr)', kind: 'chip',
+        sortValue: (b) => (b.hoja ? 'Se dibuja' : `Respaldo · ${explicarMotivo(b.motivo_hoja)}`),
         cell: (b) =>
           b.hoja ? (
             <ChipEstado label="Se dibuja" tone="green" />
@@ -552,47 +715,58 @@ export default function Territorio() {
     [colores],
   );
 
-  /* ---------- Cuerpo: migas + mapa + tabla ---------- */
-  const enfocarBarrio = (b: TerritorioBarrio) => {
-    setBarrioSel(b.id);
-    if (b.poligono) {
-      const bb = L.latLngBounds(anilloALatLng(b.poligono));
-      setFoco([bb.getCenter().lat, bb.getCenter().lng]);
-    } else if (b.lat != null && b.lon != null) {
-      setFoco([b.lat, b.lon]);
-    } else {
-      toast.message(`${b.nombre} no tiene coordenada: no se puede ubicar en el mapa.`);
-    }
-  };
+  /* ---------- Solapa INFORMACIÓN: la tabla del contexto ----------
+     Los statusTabs los pinta la FilterBar (el cuerpo es un slot), por eso la
+     tabla no los repite. */
+  const tabla =
+    nivel === 'municipio' ? (
+      <DataTable<TerritorioBarrio>
+        kind="plain"
+        columns={columnasBarrios}
+        rows={barriosVisibles}
+        rowKey={(b) => b.id}
+        rowActions={[{ id: 'ubicar', label: 'Ubicar en el mapa', icon: MapIcon, onClick: enfocarBarrio }]}
+        onRowClick={enfocarBarrio}
+        loading={cargandoDetalle}
+        emptyMessage={
+          q || tab !== 'todos'
+            ? 'Ningún nombre coincide con lo que estás filtrando.'
+            : 'El catálogo no tiene ningún nombre para este municipio: la demo nace con la zona sola.'
+        }
+        footer={{
+          showing: detalle ? `Mostrando ${fmt(barriosVisibles.length)} de ${fmt(detalle.resumen.filas)} nombres` : 'Leyendo el catálogo…',
+        }}
+      />
+    ) : nivel === 'pais' && !q ? (
+      <DataTable<TerritorioProvincia>
+        kind="plain"
+        columns={columnasProvincias}
+        rows={provinciasVisibles}
+        rowKey={(p) => p.provincia}
+        rowActions={[{ id: 'entrar', label: 'Ver la provincia', icon: ChevronRight, onClick: (p) => irAProvincia(p.provincia) }]}
+        onRowClick={(p) => irAProvincia(p.provincia)}
+        loading={cargando}
+        emptyMessage="El catálogo no tiene municipios de este país."
+        footer={{ showing: datosPais ? `${fmt(provinciasVisibles.length)} provincias · ${fmt(datosPais.total.municipios)} municipios` : 'Leyendo el catálogo…' }}
+      />
+    ) : (
+      <DataTable<TerritorioMunicipio>
+        kind="plain"
+        columns={columnasMunicipios}
+        rows={munisVisibles}
+        rowKey={(m) => m.id}
+        rowActions={[
+          { id: 'entrar', label: 'Ver el municipio', icon: ChevronRight, onClick: (m) => irAMunicipio(m.id) },
+          { id: 'mapa', label: 'Ver en el mapa', icon: MapIcon, onClick: verMunicipioEnMapa },
+        ]}
+        onRowClick={(m) => irAMunicipio(m.id)}
+        loading={cargando}
+        emptyMessage="Ningún municipio coincide con lo que estás filtrando."
+        footer={{ showing: `Mostrando ${fmt(munisVisibles.length)} de ${fmt(munisDeLaProvincia.length)} municipios` }}
+      />
+    );
 
-  const migas = (
-    <nav className="territorio-migas" aria-label="Recorrido">
-      <button type="button" className="territorio-miga" onClick={() => irAPais(pais)} disabled={nivel === 'pais'}>
-        {nombrePais(pais)}
-      </button>
-      {provincia && (
-        <>
-          <ChevronRight size={14} className="territorio-miga-sep" />
-          <button type="button" className="territorio-miga" onClick={() => irAProvincia(provincia)} disabled={nivel === 'provincia'}>
-            {provincia}
-          </button>
-        </>
-      )}
-      {muniActual && (
-        <>
-          <ChevronRight size={14} className="territorio-miga-sep" />
-          <span className="territorio-miga territorio-miga--actual">{muniActual.nombre}</span>
-        </>
-      )}
-      {nivel === 'municipio' && (detalle?.resumen.respaldo ?? 0) > 0 && (
-        <button type="button" className="territorio-toggle" onClick={() => setVerRespaldo((v) => !v)}>
-          {verRespaldo ? <EyeOff size={14} /> : <Eye size={14} />}
-          {verRespaldo ? 'Ocultar respaldo' : 'Mostrar respaldo'}
-        </button>
-      )}
-    </nav>
-  );
-
+  /* ---------- Solapa MAPA: el mismo contexto, dibujado ---------- */
   const leyenda =
     nivel === 'municipio' ? (
       <ul className="territorio-leyenda">
@@ -608,6 +782,7 @@ export default function Territorio() {
             <i className={`territorio-leyenda-punto territorio-leyenda-punto--${r}`} /> {RELLENO[r].label}
           </li>
         ))}
+        <li className="territorio-leyenda-nota">Tocá un punto para entrar al municipio</li>
       </ul>
     );
 
@@ -660,7 +835,7 @@ export default function Territorio() {
           center={[m.lat as number, m.lng as number]}
           radius={nivel === 'pais' ? 3.5 : 6}
           pathOptions={{ color: colores.relleno[m.relleno], weight: 1, fillColor: colores.relleno[m.relleno], fillOpacity: 0.75 }}
-          eventHandlers={{ click: () => irAMunicipio(m) }}
+          eventHandlers={{ click: () => irAMunicipio(m.id) }}
         >
           <Tooltip>
             {`${m.nombre} · ${RELLENO[m.relleno].label}${m.hojas ? ` · ${fmt(m.hojas)} nombres (${fmt(m.hojas_poli)} con contorno)` : ''}`}
@@ -669,78 +844,36 @@ export default function Territorio() {
       ));
 
   const mapa = (
-    <div className="av2-mapa territorio-mapa">
-      <div className={`av2-mapa-lienzo ${claseBasemap(isDarkTheme)}`}>
-        <MapContainer
-          center={[-34.6, -58.4]}
-          zoom={5}
-          preferCanvas
-          maxZoom={BASEMAP_MAX_ZOOM}
-          zoomSnap={1}
-          style={{ height: '100%', width: '100%' }}
-        >
-          <ZoomRuedaDeAUno />
-          <TileLayer url={BASEMAP} attribution={BASEMAP_ATTR} maxZoom={BASEMAP_MAX_ZOOM} />
-          <Encuadre bounds={bounds} foco={foco} />
-          {capasPuntos}
-          {capasMunicipio}
-        </MapContainer>
+    <div className="territorio-cuerpo territorio-cuerpo--mapa">
+      <div className="territorio-barra">
+        {leyenda}
+        {nivel === 'municipio' && (detalle?.resumen.respaldo ?? 0) > 0 && (
+          <button type="button" className="territorio-toggle" onClick={() => setVerRespaldo((v) => !v)}>
+            {verRespaldo ? <EyeOff size={14} /> : <Eye size={14} />}
+            {verRespaldo ? 'Ocultar respaldo' : 'Mostrar respaldo'}
+          </button>
+        )}
       </div>
-      {(cargando || cargandoDetalle) && <div className="territorio-mapa-velo">Leyendo el catálogo…</div>}
-    </div>
-  );
-
-  const tabla =
-    nivel === 'municipio' ? (
-      <DataTable<TerritorioBarrio>
-        kind="plain"
-        columns={columnasBarrios}
-        rows={barriosVisibles}
-        rowKey={(b) => b.id}
-        rowActions={[{ id: 'ubicar', label: 'Ubicar en el mapa', icon: Search, onClick: enfocarBarrio }]}
-        onRowClick={enfocarBarrio}
-        loading={cargandoDetalle}
-        emptyMessage={
-          q || tab !== 'todos'
-            ? 'Ningún nombre coincide con lo que estás filtrando.'
-            : 'El catálogo no tiene ningún nombre para este municipio: la demo nace con la zona sola.'
-        }
-        footer={{
-          showing: detalle ? `Mostrando ${fmt(barriosVisibles.length)} de ${fmt(detalle.resumen.filas)} nombres` : 'Leyendo el catálogo…',
-        }}
-      />
-    ) : nivel === 'pais' && !q ? (
-      <DataTable<TerritorioProvincia>
-        kind="plain"
-        columns={columnasProvincias}
-        rows={provinciasVisibles}
-        rowKey={(p) => p.provincia}
-        rowActions={[{ id: 'entrar', label: 'Ver la provincia', icon: ChevronRight, onClick: (p) => irAProvincia(p.provincia) }]}
-        onRowClick={(p) => irAProvincia(p.provincia)}
-        loading={cargando}
-        emptyMessage="El catálogo no tiene municipios de este país."
-        footer={{ showing: datosPais ? `${fmt(provinciasVisibles.length)} provincias · ${fmt(datosPais.total.municipios)} municipios` : 'Leyendo el catálogo…' }}
-      />
-    ) : (
-      <DataTable<TerritorioMunicipio>
-        kind="plain"
-        columns={columnasMunicipios}
-        rows={munisVisibles}
-        rowKey={(m) => m.id}
-        rowActions={[{ id: 'entrar', label: 'Ver el municipio', icon: ChevronRight, onClick: irAMunicipio }]}
-        onRowClick={irAMunicipio}
-        loading={cargando}
-        emptyMessage="Ningún municipio coincide con lo que estás filtrando."
-        footer={{ showing: `Mostrando ${fmt(munisVisibles.length)} de ${fmt(munisDelNivel.length)} municipios` }}
-      />
-    );
-
-  const cuerpo = (
-    <div className="territorio-cuerpo">
-      {migas}
-      {mapa}
-      {leyenda}
-      {tabla}
+      <div className="av2-mapa territorio-mapa">
+        <div className={`av2-mapa-lienzo ${claseBasemap(isDarkTheme)}`}>
+          <MapContainer
+            center={[-34.6, -58.4]}
+            zoom={5}
+            preferCanvas
+            maxZoom={BASEMAP_MAX_ZOOM}
+            zoomSnap={1}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <ZoomRuedaDeAUno />
+            <InvalidarAlRedimensionar />
+            <TileLayer url={BASEMAP} attribution={BASEMAP_ATTR} maxZoom={BASEMAP_MAX_ZOOM} />
+            <Encuadre bounds={bounds} foco={foco} />
+            {capasPuntos}
+            {capasMunicipio}
+          </MapContainer>
+        </div>
+        {(cargando || cargandoDetalle) && <div className="territorio-mapa-velo">Leyendo el catálogo…</div>}
+      </div>
     </div>
   );
 
@@ -751,12 +884,19 @@ export default function Territorio() {
         ? 'Buscar un municipio de la provincia…'
         : 'Buscar un municipio o una provincia…';
 
+  const filtroResumen =
+    nivel === 'municipio'
+      ? undefined
+      : tab !== 'todos'
+        ? `${fmt(munisVisibles.length)} municipios que se llenan con ${RELLENO[tab as TerritorioRelleno]?.label.toLowerCase() ?? tab}`
+        : undefined;
+
   return (
     <SemanticAbmPage<TerritorioMunicipio>
       moduleKey="territorio"
       eyebrow="Super admin · Territorio"
       title="Con qué se llena cada municipio cuando nace una demo"
-      description="El catálogo de cartografía offline, recorrido país → provincia → municipio. El mapa muestra cómo se llena cada lugar (barrios, localidades o la zona sola) y, adentro de un municipio, de dónde salió cada nombre y por qué se dibuja o queda de respaldo. Es para mirar: la curación sigue siendo por scripts."
+      description="El catálogo de cartografía offline, recorrido país → provincia → municipio con los combos y el buscador. La solapa Información lista lo que hay en el nivel elegido; la solapa Mapa dibuja ese mismo contexto (y se agranda a pantalla completa con sus filtros). Es para mirar: la curación sigue siendo por scripts."
       hero={heroKpis.length ? { etiqueta, frases: heroFrases, kpis: heroKpis } : undefined}
       pista={{
         titulo: 'La zona es del negocio; los barrios son del mapa',
@@ -764,35 +904,25 @@ export default function Territorio() {
           'Toda demo nace con una Zona única (el contorno del municipio) y adentro se dibuja lo que el catálogo tiene marcado con hoja: barrios donde el mapa los trae, localidades donde no, y nada donde el catálogo sigue vacío. El respaldo son nombres que existen pero la regla de contención dejó afuera: duplicados, contenedores de otros, absorbidos o sin coordenada.',
       }}
       searchPlaceholder={placeholderBusqueda}
-      views={['table']}
-      activeView={vista}
-      onViewChange={setVista}
       search={busqueda}
       onSearchChange={setBusqueda}
-      selects={
-        paises.length > 1
-          ? [
-              {
-                id: 'pais',
-                label: 'País',
-                value: pais,
-                options: paises.map((p) => ({ value: p.pais, label: `${nombrePais(p.pais)} (${fmt(p.municipios)})` })),
-                onChange: irAPais,
-              },
-            ]
-          : []
-      }
+      searchSuggestions={{
+        items: sugerencias,
+        onPick: elegirSugerencia,
+        emptyMessage: 'Nada con ese nombre en este nivel.',
+      }}
+      /* Dos solapas del MISMO contexto (dueño): Información y Mapa. */
+      views={['table', 'map']}
+      viewLabels={{ table: 'Información', map: 'Mapa' }}
+      activeView={vista}
+      onViewChange={setVista}
+      pantallaCompleta={['map']}
+      selects={selects}
       statusTabs={statusTabs}
       activeStatus={tab}
       onStatusChange={setTab}
-      filterSummary={
-        nivel === 'municipio'
-          ? undefined
-          : tab !== 'todos'
-            ? `${fmt(munisVisibles.length)} municipios que se llenan con ${RELLENO[tab as TerritorioRelleno]?.label.toLowerCase() ?? tab}`
-            : undefined
-      }
-      viewSlots={{ table: cuerpo }}
+      filterSummary={filtroResumen}
+      viewSlots={{ table: <div className="territorio-cuerpo">{tabla}</div>, map: mapa }}
       kind="plain"
       columns={columnasMunicipios}
       rows={munisVisibles}
