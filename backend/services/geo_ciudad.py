@@ -166,8 +166,14 @@ ZONA_UNICA = "Zona única"
 # Un barrio que se llama "Norte" a secas no es un barrio: es el relleno que
 # dejaban los seeds viejos y que hacia imposible contar que municipios tienen
 # cartografia y cuales no. Se filtran donde entran (OSM, IA) y en la limpieza
-# de la base. "Barrio Norte" o "Villa Sur" son nombres reales y pasan.
-NOMBRES_CARDINALES = frozenset({"norte", "sur", "este", "oeste"})
+# de la base. "Barrio Norte" o "Villa Sur" son nombres reales y pasan; "Distrito
+# Norte" o "Zona Suroeste" (los distritos descentralizados de Rosario y afines)
+# son un reparto administrativo con nombre cardinal, no un barrio, y no pasan.
+NOMBRES_CARDINALES = frozenset({
+    "norte", "sur", "este", "oeste",
+    "noreste", "noroeste", "sureste", "suroeste", "sudeste", "sudoeste",
+})
+PREFIJOS_REPARTO = ("distrito ", "zona ", "region ", "sector ", "area ")
 
 # Cuanto se guarda por municipio en `catalogo_geo_osm`. El alta usa un pool
 # deduplicado por calle (ver armar()), asi que guardar 2.400 tramos de Lujan
@@ -184,7 +190,13 @@ FUENTE_PBF = "OpenStreetMap (extracto Geofabrik) -- ODbL"
 
 
 def es_cardinal(nombre: str) -> bool:
-    return _norm(nombre or "") in NOMBRES_CARDINALES
+    n = _norm(nombre or "")
+    for prefijo in PREFIJOS_REPARTO:
+        if n.startswith(prefijo):
+            # "Centro" solo es un barrio real; "Distrito Centro" es el reparto.
+            resto = n[len(prefijo):].strip()
+            return resto in NOMBRES_CARDINALES or resto == "centro"
+    return n in NOMBRES_CARDINALES
 
 
 def sin_cardinales(nombres: list) -> list:
