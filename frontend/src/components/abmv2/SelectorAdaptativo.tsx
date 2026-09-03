@@ -14,7 +14,6 @@
  * píldora por tokens con color-mix, nunca un hex de tinta hardcodeado.
  */
 import { ModernSelect } from '../ui/ModernSelect';
-import { useAnchoAngosto } from './FichaRegistro';
 import type { SelectOption, SelectSpec } from './types';
 
 export interface OpcionAdaptativa extends SelectOption {
@@ -39,13 +38,17 @@ export function SelectorAdaptativo({
   options,
   maxPildoras = 5,
 }: SelectorAdaptativoProps) {
-  const { ref, angosto } = useAnchoAngosto<HTMLDivElement>();
+  /* GOTCHA (bug pagado 2026-09-03): NO medir el propio contenedor con
+     useAnchoAngosto — este selector es shrink-to-fit, su ancho es el del
+     combo y siempre se cree "angosto" (las píldoras no salían NUNCA). La
+     forma la decide la CANTIDAD; el caso mobile lo resuelve el FilterBar,
+     que en angosto usa su panel de combos apilados. */
   const reales = options.filter((o) => o.value !== '');
-  const comoPildoras = !angosto && reales.length > 0 && reales.length <= maxPildoras;
+  const comoPildoras = reales.length > 0 && reales.length <= maxPildoras;
 
   if (!comoPildoras) {
     return (
-      <div className="av2-select-grupo" ref={ref}>
+      <div className="av2-select-grupo">
         <span className="av2-select-etiqueta">{label}</span>
         <ModernSelect
           value={value}
@@ -60,7 +63,7 @@ export function SelectorAdaptativo({
   }
 
   return (
-    <div className="av2-selad" ref={ref} role="group" aria-label={label}>
+    <div className="av2-selad" role="group" aria-label={label}>
       <span className="av2-select-etiqueta">{label}</span>
       {options.map((o) => {
         const activa = value === o.value;

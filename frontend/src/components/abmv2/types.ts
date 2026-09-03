@@ -545,12 +545,10 @@ export interface DataTableFooter {
   /** Acción del pie en listas sin importes ("Cargar más"). */
   action?: Action;
   /**
-   * [v2.5] La REGLA de la entidad, al pie de la tarjeta: "El empleado con
-   * reclamos asignados no se puede borrar: primero hay que reasignarlos".
-   *
-   * Sale del canvas de Configuración, donde cada ABM cierra con la suya. Va
-   * acá y no en un tooltip del botón porque explica por qué el sistema va a
-   * decir que no ANTES de que el usuario lo intente — que es cuando sirve.
+   * @deprecated [v3] YA NO SE DIBUJA (dueño, 2026-09-03: rompía el estilo —
+   * el ABM termina en el "Mostrando N de M"). La regla de la entidad va en la
+   * `pista` de arriba (HintBanner) o en el drawer. Queda tipada solo para no
+   * romper las páginas que aún la pasan; se limpia en la barrida.
    */
   note?: string;
 }

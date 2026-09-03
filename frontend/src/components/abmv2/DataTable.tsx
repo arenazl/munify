@@ -731,9 +731,10 @@ export function DataTable<Row>({
         {!footer.total && footer.action && renderPieAccion(footer.action)}
       </div>
 
-      {/* [v2.5] La regla de la entidad: por qué el sistema va a decir que no.
-          Renglón propio bajo el pie, para que no compita con el conteo. */}
-      {footer.note && <p className="av2-tabla-regla">{footer.note}</p>}
+      {/* [v3] footer.note YA NO SE DIBUJA (dueño, 2026-09-03: "esa línea rompe
+          todo el estilo — el ABM termina en el Mostrando N de M"). La regla de
+          la entidad vive en la `pista` de arriba o en el drawer, no acá. La
+          prop queda en el contrato solo por compatibilidad de tipos. */}
     </section>
   );
 }
