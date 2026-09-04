@@ -29,6 +29,10 @@ export interface SelectorAdaptativoProps {
   /** Tope de BOTONES para dibujar píldoras (default 4, "Todos" incluido —
    *  regla del dueño 2026-09-03: hasta 4 pills, más va a combo). */
   maxPildoras?: number;
+  /** [v3.3] Apagado: se dibuja SIEMPRE como combo deshabilitado, en su lugar
+   *  (cascadas país → provincia → municipio). Ver SelectSpec.disabled. */
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export function SelectorAdaptativo({
@@ -37,17 +41,22 @@ export function SelectorAdaptativo({
   onChange,
   options,
   maxPildoras = 4,
+  disabled = false,
+  disabledReason,
 }: SelectorAdaptativoProps) {
   /* GOTCHA (bug pagado 2026-09-03): NO medir el propio contenedor con
      useAnchoAngosto — este selector es shrink-to-fit, su ancho es el del
      combo y siempre se cree "angosto" (las píldoras no salían NUNCA). La
      forma la decide la CANTIDAD; el caso mobile lo resuelve el FilterBar,
      que en angosto usa su panel de combos apilados. */
-  const comoPildoras = options.length > 1 && options.length <= maxPildoras;
+  const comoPildoras = !disabled && options.length > 1 && options.length <= maxPildoras;
 
   if (!comoPildoras) {
     return (
-      <div className="av2-select-grupo">
+      <div
+        className={`av2-select-grupo${disabled ? ' av2-select-grupo--off' : ''}`}
+        title={disabled ? disabledReason : undefined}
+      >
         <span className="av2-select-etiqueta">{label}</span>
         <ModernSelect
           value={value}
@@ -55,6 +64,7 @@ export function SelectorAdaptativo({
           options={options}
           placeholder={label}
           searchable={options.length > 8}
+          disabled={disabled}
           className="av2-select-modern"
         />
       </div>
@@ -91,6 +101,8 @@ export function SelectorAdaptativoSpec({ spec }: { spec: SelectSpec }) {
       value={spec.value}
       onChange={spec.onChange}
       options={spec.options}
+      disabled={spec.disabled}
+      disabledReason={spec.disabledReason}
     />
   );
 }

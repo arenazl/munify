@@ -5370,3 +5370,12 @@ button.av2-recorrido-miga:hover {
   color: var(--pl-text);
 }
 .av2-recorrido-miga--actual { color: var(--pl-text); }
+
+/* --- [v3.3] Filtro presente pero apagado (cascadas): en su lugar, atenuado,
+   con el motivo en el title. --- */
+.av2-select-grupo--off {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.av2-select-grupo--off:hover,
+.av2-select-grupo--off:focus-within { border-color: var(--pl-border-strong); }

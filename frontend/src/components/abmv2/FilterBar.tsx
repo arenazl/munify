@@ -45,7 +45,10 @@ import type {
 
 function Av2Select({ spec }: { spec: SelectSpec }) {
   return (
-    <div className="av2-select-grupo">
+    <div
+      className={`av2-select-grupo${spec.disabled ? ' av2-select-grupo--off' : ''}`}
+      title={spec.disabled ? spec.disabledReason : undefined}
+    >
       <span className="av2-select-etiqueta">{spec.label}</span>
       <ModernSelect
         value={spec.value}
@@ -53,6 +56,7 @@ function Av2Select({ spec }: { spec: SelectSpec }) {
         options={spec.options}
         placeholder={spec.label}
         searchable={spec.options.length > 8}
+        disabled={spec.disabled}
         className="av2-select-modern"
       />
     </div>

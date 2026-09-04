@@ -16,8 +16,8 @@
  * REWORK (dueño, 2026-09-03, textual): "hay que trabajar un montón la
  * pantalla, no quedó intuitiva". Lo que pidió y cómo quedó:
  *  - "combo de país, de provincia, de municipios": los tres son `selects`
- *    del kit, siempre a la vista. El de municipio aparece al elegir una
- *    provincia ("Todos" vuelve a la provincia).
+ *    del kit, siempre a la vista. El de municipio está en su lugar desde el
+ *    principio, apagado, y se carga al elegir provincia ("Todos" vuelve).
  *  - "cuando voy entrando en los nodos no tengo manera de ir para atrás…
  *    una flecha y una miga de pan": `trail` del kit — flecha volver + migas
  *    al lado del buscador (País › Provincia › Municipio).
@@ -519,18 +519,31 @@ export default function Territorio() {
         onChange: (v) => irAProvincia(v || null),
       },
     ];
-    if (provincia) {
-      lista.push({
-        id: 'municipio',
-        label: 'Municipio',
-        value: muniId ?? '',
-        options: [
-          { value: '', label: 'Todos' },
-          ...munisDeLaProvincia.map((m) => ({ value: m.id, label: m.nombre })),
-        ],
-        onChange: (v) => (v ? irAMunicipio(v) : irAProvincia(provincia)),
-      });
-    }
+    // El combo de municipio está SIEMPRE en su lugar ("que no se corra la
+    // interfaz", dueño) y se carga recién al elegir provincia: el listado
+    // entero del país (~2.000) no tiene sentido en un combo.
+    lista.push(
+      provincia
+        ? {
+            id: 'municipio',
+            label: 'Municipio',
+            value: muniId ?? '',
+            options: [
+              { value: '', label: 'Todos' },
+              ...munisDeLaProvincia.map((m) => ({ value: m.id, label: m.nombre })),
+            ],
+            onChange: (v) => (v ? irAMunicipio(v) : irAProvincia(provincia)),
+          }
+        : {
+            id: 'municipio',
+            label: 'Municipio',
+            value: '',
+            options: [{ value: '', label: 'Elegí una provincia' }],
+            onChange: () => undefined,
+            disabled: true,
+            disabledReason: 'Elegí una provincia para listar sus municipios',
+          },
+    );
     return lista;
     // irA* son estables en la práctica (sólo setters); se omiten a propósito.
     // eslint-disable-next-line react-hooks/exhaustive-deps

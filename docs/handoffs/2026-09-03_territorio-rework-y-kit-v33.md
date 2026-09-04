@@ -76,8 +76,10 @@ ordenar por columna, el botón (`sortSpec`) para criterios semánticos.
 
 Pedido textual: "hay que trabajar un montón la pantalla, no quedó intuitiva".
 
-- **Combos** País · Provincia · Municipio (`selects` del kit; el de municipio
-  aparece al elegir provincia, "Todos" vuelve).
+- **Combos** País · Provincia · Municipio (`selects` del kit). El de municipio
+  está SIEMPRE en su lugar ("que no se corra la interfaz"), apagado con el
+  motivo en el title (`SelectSpec.disabled` + `disabledReason`, kit v3.3), y se
+  carga con los municipios de la provincia al elegirla; "Todos" vuelve.
 - **Recorrido** (`trail`): flecha volver + migas País › Provincia › Municipio
   al lado del buscador; tocar una miga sube a ese nivel. (Primero se habían
   sacado las migas; el dueño las pidió de vuelta al entrar por la grilla.)
@@ -106,6 +108,12 @@ OK  390px sin desborde horizontal · 0 errores consola · 0 requests 4xx/5xx
 ```
 
 Capturas en el scratchpad de la sesión (`_terr_info/orden/sugerencias/mapa/full/movil.png`).
+
+Recorrido (`_verif_trail.mjs`, bundle `index-B__DMSOi`, 21:57 ART): raíz
+"Argentina" con la flecha deshabilitada → click en la fila Buenos Aires →
+"Argentina › Buenos Aires" → click en la primera fila → "… › 25 de Mayo" →
+flecha vuelve a la provincia → miga "Argentina" vuelve al país; en 390 px
+queda flecha + "Buenos Aires" sin desborde. 6/6 OK.
 **No verificado**: el dueño todavía no lo miró con sus ojos.
 
 ## 5. Demos (D) — hallazgos del smoke de Infra en prod

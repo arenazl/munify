@@ -293,6 +293,15 @@ export interface SelectSpec {
   value: string;
   options: SelectOption[];
   onChange: (value: string) => void;
+  /**
+   * [v3.3] Filtro presente pero APAGADO: para cascadas (país → provincia →
+   * municipio) donde el combo hijo tiene que estar en su lugar desde el
+   * principio —"que no se corra la interfaz" (dueño)— y cargarse recién al
+   * elegir el padre. Regla del estándar: nunca un control muerto sin decir
+   * qué falta ⇒ `disabledReason` se pinta como title.
+   */
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 /** Tab del segmented de estados. count 0 ⇒ se pinta `--pl-text-disabled`
