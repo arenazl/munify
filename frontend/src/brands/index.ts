@@ -292,12 +292,17 @@ export function rutaDeAccesoInstalada(): string | null {
 }
 
 /**
- * Accesos que el router tiene que registrar a mano: los de ruta propia. El
- * `/:codigo` genérico sólo matchea UN tramo, así que `/py/asuncion` no le
- * llega. Cada entrada dice qué municipio abrir, independiente del path.
+ * Accesos que el router tiene que registrar a mano: TODA marca con municipio.
+ * Los de ruta propia porque el `/:codigo` genérico sólo matchea UN tramo y
+ * `/py/asuncion` no le llega; y los de un tramo (`/asuncion`, Paraguay Limpio)
+ * porque si caen en el genérico el municipio, que es demo, sale disparado a
+ * `/demo/asuncion/login`, ruta que la marca rechaza y devuelve a su home:
+ * un bucle infinito de "Ingresando..." (visto en pylimpio.munify.com.ar,
+ * 2026-09-04). Cada entrada dice qué municipio abrir, independiente del path,
+ * y con eso el login se rinde EN EL LUGAR, con la marca en la URL.
  */
 export const ACCESOS_DE_MARCA: Array<{ ruta: string; codigo: string }> = Object.values(BRANDS)
-  .filter((b) => b.rutaAcceso && b.municipioCodigo)
+  .filter((b) => b.municipioCodigo)
   .map((b) => ({ ruta: rutaDeAcceso(b) as string, codigo: b.municipioCodigo as string }));
 
 /**
