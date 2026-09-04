@@ -66,6 +66,7 @@ import type {
   SearchSuggestion,
   SelectSpec,
   StatusTab,
+  TildeSpec,
   TrailSpec,
   ViewKind,
 } from '../components/abmv2/types';
@@ -113,6 +114,21 @@ function explicarMotivo(motivo: string | null): string {
 const fmt = (n: number) => n.toLocaleString('es-AR');
 const pct = (parte: number, total: number) => (total ? `${Math.round((parte / total) * 100)}%` : '—');
 const nombrePais = (codigo: string) => NOMBRE_PAIS[codigo] || codigo;
+
+/* Recortes combinables del catálogo (TildesAditivas del kit). Cada uno es
+   una condición sobre lo que el municipio tiene precargado. */
+const TILDES_TERRITORIO: { id: string; label: string; title: string; aplica: (m: TerritorioMunicipio) => boolean }[] = [
+  { id: 'sin_contorno', label: 'Sin contorno', title: 'El municipio no tiene su forma', aplica: (m) => !m.con_contorno },
+  { id: 'sin_barrios', label: 'Sin barrios', title: 'Ninguna fila que se dibuje', aplica: (m) => m.hojas === 0 },
+  {
+    id: 'barrios_sin_poligono',
+    label: 'Barrios sin polígono',
+    title: 'Dibuja barrios pero alguno sin su forma',
+    aplica: (m) => m.hojas > 0 && m.hojas_poli < m.hojas,
+  },
+  { id: 'solo_localidades', label: 'Sólo localidades', title: 'Se rellena con localidades, no con barrios', aplica: (m) => m.relleno === 'localidades' },
+  { id: 'sin_osm', label: 'Sin OSM', title: 'Nada vino del mapa abierto: todo del padrón', aplica: (m) => m.hojas_osm === 0 },
+];
 /** Sin acentos ni mayúsculas: "Cordoba" encuentra "Córdoba". */
 const normalizar = (s: string) =>
   s
@@ -181,6 +197,10 @@ export default function Territorio() {
   /* ---------- Controles ---------- */
   const [busqueda, setBusqueda] = useState('');
   const [tab, setTab] = useState('todos');
+  /* Tildes ADITIVAS (dueño, 2026-09-04, "se lo podés agregar a Territorio
+     también"): recortes del catálogo que se combinan con AND. Sólo en los
+     niveles país y provincia, donde se listan municipios. */
+  const [tildes, setTildes] = useState<string[]>([]);
   const [vista, setVista] = useState<ViewKind>('table');
   const [verRespaldo, setVerRespaldo] = useState(false);
   const [foco, setFoco] = useState<[number, number] | null>(null);
@@ -307,16 +327,33 @@ export default function Territorio() {
 
   const q = normalizar(busqueda.trim());
 
-  // Municipios que pasan el tab (relleno) y la búsqueda: alimentan el mapa de
-  // puntos y la tabla de municipios.
+  // Municipios que pasan el tab (relleno), las tildes y la búsqueda: alimentan
+  // el mapa de puntos y la tabla de municipios.
   const munisVisibles = useMemo(
     () =>
       munisDeLaProvincia.filter(
         (m) =>
           (tab === 'todos' || m.relleno === tab) &&
+          tildes.every((id) => TILDES_TERRITORIO.find((t) => t.id === id)?.aplica(m) ?? true) &&
           (!q || normalizar(m.nombre).includes(q) || normalizar(m.provincia || '').includes(q)),
       ),
-    [munisDeLaProvincia, tab, q],
+    [munisDeLaProvincia, tab, tildes, q],
+  );
+
+  const tildesSpec = useMemo(
+    () => ({
+      label: 'Sólo',
+      opciones: TILDES_TERRITORIO.map<TildeSpec>((t) => ({
+        id: t.id,
+        label: t.label,
+        title: t.title,
+        count: munisDeLaProvincia.filter(t.aplica).length,
+        veredicto: 'advertencia' as const,
+      })),
+      activas: tildes,
+      onChange: setTildes,
+    }),
+    [munisDeLaProvincia, tildes],
   );
 
   const provinciasVisibles = useMemo(
@@ -954,6 +991,7 @@ export default function Territorio() {
       onViewChange={setVista}
       pantallaCompleta={['map']}
       selects={selects}
+      tildes={nivel === 'municipio' ? undefined : tildesSpec}
       statusTabs={statusTabs}
       activeStatus={tab}
       onStatusChange={setTab}
