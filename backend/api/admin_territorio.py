@@ -22,6 +22,15 @@ semilla para dibujar (solo filas `hoja = 1`):
   - `zona`         no hay nada que dibujar: la demo nace con la zona unica sola
   - `sin_contorno` el catalogo no tiene el contorno del municipio (no se puede
                    sembrar nada adentro)
+
+Aparte del relleno, cada municipio trae `cartografiado` (0/1) con su
+`motivo_cartografiado`: la decision del dueño del 2026-09-03 de dibujar los
+barrios SOLO cuando estan casi todos ("no sirve mostrar veinte barrios, cuatro
+bien dibujados y el resto no"). La calcula offline
+`scripts/geo/marcar_cartografiado.py` (85 % de las filas hoja con contorno y
+5+ filas) y la guarda en `municipios_catalogo`; aca solo se lee. El detalle de
+un municipio en 0 devuelve los barrios SIN contorno, para que la solapa Mapa
+dibuje el contorno del municipio con pines adentro y no un dibujo a medias.
 """
 import json
 from typing import Optional
@@ -52,6 +61,7 @@ _FUENTES_OF_SQL = "(" + ", ".join(f"'{f}'" for f in FUENTES_OFICIALES) + ")"
 _CONTEOS_SQL = """
 SELECT c.id, c.nombre, c.pais, c.provincia, c.lat, c.lng,
        (c.poligono IS NOT NULL) AS con_contorno,
+       c.cartografiado, c.motivo_cartografiado,
        COALESCE(b.filas, 0)        AS filas,
        COALESCE(b.hojas, 0)        AS hojas,
        COALESCE(b.hojas_poli, 0)   AS hojas_poli,
@@ -94,6 +104,8 @@ def _fila_municipio(r) -> dict:
         "lat": float(r.lat) if r.lat is not None else None,
         "lng": float(r.lng) if r.lng is not None else None,
         "con_contorno": bool(r.con_contorno),
+        "cartografiado": bool(r.cartografiado),
+        "motivo_cartografiado": r.motivo_cartografiado,
         "filas": int(r.filas),
         "hojas": hojas,
         "hojas_poli": int(r.hojas_poli),
@@ -125,10 +137,11 @@ def _agregar(municipios: list[dict]) -> dict:
         "municipios": len(municipios),
         "barrios": 0, "localidades": 0, "zona": 0, "sin_contorno": 0,
         "hojas": 0, "hojas_poli": 0, "hojas_osm": 0, "hojas_padron": 0, "respaldo": 0,
-        "dibujados": 0,
+        "dibujados": 0, "cartografiados": 0,
     }
     for m in municipios:
         agg[m["relleno"]] += 1
+        agg["cartografiados"] += int(m["cartografiado"])
         for k in ("hojas", "hojas_poli", "hojas_osm", "hojas_padron", "respaldo"):
             agg[k] += m[k]
         # "dibujado": la mayoria de lo que se muestra tiene contorno.
@@ -198,12 +211,20 @@ async def detalle_municipio(
 ):
     """Un municipio con su contorno y TODAS sus filas del catalogo: las que se
     dibujan (`hoja = 1`) y las de respaldo con el motivo por el que la regla
-    las dejo afuera. Es la pantalla donde el dueno compara con la realidad."""
+    las dejo afuera. Es la pantalla donde el dueno compara con la realidad.
+
+    Si el municipio NO esta cartografiado, los barrios viajan SIN `poligono`
+    (nombre y punto se conservan) y la solapa Mapa dibuja el contorno del
+    municipio con pines adentro. El `resumen` NO cambia: sigue contando los
+    contornos que el catalogo tiene de verdad, y `motivo_cartografiado`
+    explica por que no se dibujan."""
     m = (await db.execute(text(
-        "SELECT id, nombre, pais, provincia, lat, lng, poligono, osm_id "
+        "SELECT id, nombre, pais, provincia, lat, lng, poligono, osm_id, "
+        "cartografiado, motivo_cartografiado "
         "FROM municipios_catalogo WHERE id = :id"), {"id": municipio_id})).fetchone()
     if not m:
         raise HTTPException(status_code=404, detail="Municipio no encontrado en el catalogo")
+    cartografiado = bool(m.cartografiado)
 
     filas = (await db.execute(text(
         "SELECT id, nombre, tipo, fuente, lat, lon, poligono, vertices, osm_id, hoja, motivo_hoja "
@@ -213,6 +234,7 @@ async def detalle_municipio(
     barrios = []
     for f in filas:
         nivel = "localidad" if (f.fuente in FUENTES_OFICIALES or f.tipo in TIPOS_LOCALIDAD) else "barrio"
+        anillo = _anillo(f.poligono)
         barrios.append({
             "id": f.id,
             "nombre": f.nombre,
@@ -221,7 +243,12 @@ async def detalle_municipio(
             "fuente": f.fuente,
             "lat": float(f.lat) if f.lat is not None else None,
             "lon": float(f.lon) if f.lon is not None else None,
-            "poligono": _anillo(f.poligono),
+            # Sin la marca no se dibuja NADA de adentro: o casi todos los
+            # barrios tienen contorno, o el mapa muestra solo el del municipio.
+            # `contorno_real` dice si el catalogo LO TIENE (lo usa el resumen,
+            # que sigue contando la verdad de la tabla aunque no se dibuje).
+            "poligono": anillo if cartografiado else None,
+            "contorno_real": anillo is not None,
             "vertices": f.vertices,
             "osm_id": f.osm_id,
             "hoja": bool(f.hoja),
@@ -239,17 +266,21 @@ async def detalle_municipio(
             "lng": float(m.lng) if m.lng is not None else None,
             "osm_id": m.osm_id,
             "poligono": _anillo(m.poligono),
+            "cartografiado": cartografiado,
+            "motivo_cartografiado": m.motivo_cartografiado,
         },
         "resumen": {
             "filas": len(barrios),
             "hojas": len(hojas),
-            "hojas_poli": sum(1 for b in hojas if b["poligono"]),
+            "hojas_poli": sum(1 for b in hojas if b["contorno_real"]),
             "hojas_loc": sum(1 for b in hojas if b["nivel"] == "localidad"),
             "hojas_osm": sum(1 for b in hojas if b["fuente"] == "osm_pbf"),
             "hojas_padron": sum(1 for b in hojas if b["fuente"] in FUENTES_OFICIALES),
             "respaldo": len(barrios) - len(hojas),
             "relleno": _relleno(m.poligono is not None, len(hojas),
                                 sum(1 for b in hojas if b["nivel"] == "localidad")),
+            "cartografiado": cartografiado,
+            "motivo_cartografiado": m.motivo_cartografiado,
         },
         "barrios": barrios,
     }

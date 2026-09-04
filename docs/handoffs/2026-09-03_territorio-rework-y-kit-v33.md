@@ -330,3 +330,77 @@ repetirse con la tabla nueva; prod sigue en HOLD hasta el OK del dueño.
    zona 774 / localidades 766 / barrios 542), después BAHRA, después las 3
    demos de QA.
 4. Opcional: vecino sin municipio recordado → landing en vez de `/super`.
+## 8. Columna `cartografiado` (2026-09-03, 23:30 ART)
+
+**Decision del dueño, textual:** *"O tenemos el cien por ciento del municipio
+con poligonos o mostramos solamente el contorno del municipio... asi de
+restrictivo. No sirve mostrar en un mapa que tenes veinte barrios, cuatro bien
+dibujados y el resto no"*. Refinada: *"que vos veas casi todo cartografiado: si
+le falta uno y son tres, no; si le faltan dos y son catorce, si"*. Y pidio
+*"una columna"* para que la pantalla sepa que dibujar, en vez de recontarlo.
+
+**La regla** (constantes en UN solo lugar, arriba de
+`backend/scripts/geo/marcar_cartografiado.py`): sobre las filas `hoja = 1` del
+municipio, con `n` = cantidad y `con_poligono` = las que tienen contorno,
+
+    cartografiado = 1  <=>  n >= MIN_BARRIOS (5)  Y  con_poligono / n >= PCT_MINIMO (0.85)
+
+`motivo_cartografiado` guarda el porque en texto llano — `"38/47 dibujados
+(81 %)"`, `"sin barrios"`, `"4/4 dibujados, menos de 5 barrios"` — para que la
+pantalla lo muestre sin recalcular nada.
+
+Casos de control verificados en QA: Funes (Santa Fe) 88/89 → 1; Rio Cuarto
+(Cordoba) 54/55 → 1; Lanus 40/41 → 1; Pocito (San Juan) 38/47 → **0** (81 %);
+Chichinales (Rio Negro) 4/4 → **0** (menos de 5); los de 1/2 → 0.
+
+**Numeros en QA** (corrida completa, 33 s de escritura, `@@read_only` = 0
+antes y despues; **165** municipios cartografiados sobre 5.122):
+
+| pais | municipios | dibuja barrios | solo contorno | sin barrios | menos de 5 | bajo 85 % |
+|---|---:|---:|---:|---:|---:|---:|
+| AR | 2.082 | **147** | 1.935 | 455 | 994 | 486 |
+| PE | 1.873 | 1 | 1.872 | 298 | 254 | 1.320 |
+| BO | 539 | 2 | 537 | 56 | 20 | 461 |
+| CL | 346 | 0 | 346 | 9 | 9 | 328 |
+| PY | 263 | 15 | 248 | 61 | 95 | 92 |
+| UY | 19 | 0 | 19 | 0 | 0 | 19 |
+
+AR por provincia (las 5 primeras): Buenos Aires 46 de 135, Santa Fe 28 de 363,
+Cordoba 15 de 427, Rio Negro 11 de 39, Corrientes 9 de 74 (Neuquen tambien 9,
+de 57). El grueso del "no" no es calidad de dibujo sino falta de material: 994
+municipios de AR tienen menos de 5 filas hoja (muchos son los que BAHRA lleno
+con 1-3 localidades sin contorno).
+
+**Que obedece el tilde** (todo backend; el front ya sabe dibujar "contorno +
+pines" cuando no le llegan poligonos):
+
+| Consumidor | Que hace ahora |
+|---|---|
+| `services/geo_ciudad.barrios_del_catalogo` (semilla de demos) | Si el municipio esta en 0, los barrios salen SIN poligono; nombre y punto se conservan. Nuevo helper `_municipio_cartografiado`, con el mismo fallback que `hoja`: si falta la columna (prod vieja) dibuja como hasta ahora |
+| `GET /api/admin/territorio/municipios` y `/paises` | Cada fila trae `cartografiado` y `motivo_cartografiado`; el agregado suma `cartografiados` (clave nueva, no cambia ninguna existente) |
+| `GET /api/admin/territorio/municipios/{id}` (solapa Mapa) | Con `cartografiado = 0` los barrios viajan con `poligono: null` (queda `contorno_real` para el resumen). El `resumen` NO cambio de valores: sigue contando los contornos reales del catalogo, y ahora lleva `cartografiado` + `motivo_cartografiado` para explicarlo |
+| `GET /api/zonas/regiones-mapa` (mapa del tenant) | **NO se toco**: dibuja `barrios.poligono` de las tablas del TENANT, no del catalogo. La semilla ya no le va a dar poligonos a los municipios en 0 |
+
+**Pendientes que deja esto:**
+- **Las demos YA sembradas quedan como estan** (Lanus, Merlo, las 22 de QA):
+  sus `barrios.poligono` ya se copiaron al tenant antes de la regla. Si alguna
+  esta en un municipio con `cartografiado = 0` va a seguir mostrando el dibujo
+  a medias hasta que se resiembre.
+- `municipios_catalogo` no tiene modelo ORM y las dos columnas nuevas se leen
+  con `text()`. Si algun dia se le arma modelo, hay que sumarlas.
+- El front no usa todavia `motivo_cartografiado` para explicarlo en el hero de
+  Territorio; hoy solo deja de recibir poligonos.
+
+**Que tiene que hacer Infra al promover** (ademas de lo ya avisado):
+1. La migracion `backend/alembic/versions/20260905_cartografiado.py` (o el
+   ALTER equivalente: `cartografiado TINYINT(1) NOT NULL DEFAULT 0` +
+   `motivo_cartografiado VARCHAR(120) NULL`). Es requisito de
+   `api/admin_territorio.py`, que ya consulta las dos columnas.
+2. Y **una de dos**: copiar `municipios_catalogo` desde QA ya marcada (junto
+   con la copia de `catalogo_barrios` de F1), o correr en prod
+   `python scripts/geo/marcar_cartografiado.py --env prod --aplicar` DESPUES de
+   copiar `catalogo_barrios` (la marca se calcula sobre las filas `hoja = 1`,
+   asi que sola no sirve si la tabla de barrios de prod es la vieja).
+   El default de la columna es 0 = "dibujar solo el contorno": el ambiente sin
+   marcar es conservador, no se rompe.
+

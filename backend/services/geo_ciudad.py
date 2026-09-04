@@ -319,6 +319,30 @@ async def poligono_del_catalogo(db, nombre: str, pais: str,
     return fila["anillo"] if fila else None
 
 
+async def _municipio_cartografiado(db, catalogo_id: str) -> bool:
+    """¿Se dibujan los barrios de este municipio, o solo su contorno?
+
+    Lee `municipios_catalogo.cartografiado`, que calcula y escribe
+    `scripts/geo/marcar_cartografiado.py` (85 % de las filas hoja con contorno
+    y al menos 5 filas). Si la columna todavia no existe en el ambiente (prod
+    antes de la migracion) se dibuja como hasta ahora: la marca nueva no puede
+    apagar mapas que hoy funcionan.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    try:
+        valor = (await db.execute(text(
+            "SELECT cartografiado FROM municipios_catalogo WHERE id = :id"),
+            {"id": catalogo_id})).scalar()
+    except SQLAlchemyError as e:
+        if "cartografiado" not in str(e):
+            raise
+        logger.warning("municipios_catalogo sin la columna cartografiado: se dibuja todo")
+        return True
+    return bool(valor)
+
+
 async def barrios_del_catalogo(db, catalogo_id: str) -> list[dict]:
     """Los barrios del municipio, con su contorno cuando lo tienen, desde
     `catalogo_barrios` (ver FUENTE_BARRIOS).
@@ -334,15 +358,25 @@ async def barrios_del_catalogo(db, catalogo_id: str) -> list[dict]:
     de la demo muestra una capa sola. Quien decide que es hoja es
     `scripts/geo/_hojas.py`, offline; aca solo se lee la marca.
 
+    Si el municipio NO esta cartografiado (`municipios_catalogo.cartografiado
+    = 0`) los barrios salen SIN contorno: el nombre y el punto se conservan,
+    pero el mapa dibuja el contorno del municipio y pines adentro. Es la
+    decision del dueño del 2026-09-03: *"o tenemos el cien por ciento del
+    municipio con poligonos o mostramos solamente el contorno... no sirve
+    mostrar veinte barrios, cuatro bien dibujados y el resto no"*. Quien pone
+    la marca es `scripts/geo/marcar_cartografiado.py`, offline; aca solo se lee.
+
     Si la tabla todavia no existe en el ambiente (prod antes de la promocion)
     devuelve la lista vacia: la demo nace sin barrios y la bitacora lo dice;
     crear una demo no puede romperse por una tabla de catalogo. Si existe la
     tabla pero no la columna `hoja` (prod entre la copia y el ALTER) se leen
-    todas las filas, como antes de la regla.
+    todas las filas, como antes de la regla; si falta `cartografiado`, se
+    dibuja como hasta ahora.
     """
     from sqlalchemy import text
     from sqlalchemy.exc import SQLAlchemyError
 
+    cartografiado = await _municipio_cartografiado(db, catalogo_id)
     consulta = ("SELECT nombre, tipo, lat, lon, poligono, fuente FROM catalogo_barrios "
                 "WHERE municipio_catalogo_id = :id{filtro} ORDER BY nombre")
     try:
@@ -370,7 +404,7 @@ async def barrios_del_catalogo(db, catalogo_id: str) -> list[dict]:
             continue
         barrios.append({"nombre": nombre, "tipo": tipo or "suburb",
                         "lat": float(la), "lon": float(ln),
-                        "poligono": json.dumps(anillo) if anillo else None,
+                        "poligono": json.dumps(anillo) if (anillo and cartografiado) else None,
                         "fuente": fuente})
     return barrios
 
