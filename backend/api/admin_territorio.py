@@ -42,7 +42,12 @@ router = APIRouter()
 # `expanding=True` y no suma nada aca).
 TIPOS_LOCALIDAD = ("town", "city", "village", "hamlet", "localidad")
 FUENTE_PADRON = "georef"
+# Padrones oficiales offline: `georef` (padron censal) y `bahra` (Base de
+# Asentamientos Humanos del IGN/INDEC, los parajes que OSM no tiene). Cuentan
+# en el mismo cubo: no son dibujos de OSM, son nombres de una fuente oficial.
+FUENTES_OFICIALES = (FUENTE_PADRON, "bahra")
 _TIPOS_LOC_SQL = "(" + ", ".join(f"'{t}'" for t in TIPOS_LOCALIDAD) + ")"
+_FUENTES_OF_SQL = "(" + ", ".join(f"'{f}'" for f in FUENTES_OFICIALES) + ")"
 
 _CONTEOS_SQL = """
 SELECT c.id, c.nombre, c.pais, c.provincia, c.lat, c.lng,
@@ -59,9 +64,9 @@ LEFT JOIN (
            COUNT(*)                                            AS filas,
            SUM(hoja)                                           AS hojas,
            SUM(hoja AND poligono IS NOT NULL)                  AS hojas_poli,
-           SUM(hoja AND (fuente = :padron OR tipo IN {tipos_loc})) AS hojas_loc,
+           SUM(hoja AND (fuente IN {fuentes_of} OR tipo IN {tipos_loc})) AS hojas_loc,
            SUM(hoja AND fuente = 'osm_pbf')                    AS hojas_osm,
-           SUM(hoja AND fuente = :padron)                      AS hojas_padron
+           SUM(hoja AND fuente IN {fuentes_of})                AS hojas_padron
     FROM catalogo_barrios
     {filtro_barrios}
     GROUP BY municipio_catalogo_id
@@ -103,10 +108,11 @@ def _fila_municipio(r) -> dict:
 async def _conteos(db: AsyncSession, pais: Optional[str]) -> list[dict]:
     sql = _CONTEOS_SQL.format(
         tipos_loc=_TIPOS_LOC_SQL,
+        fuentes_of=_FUENTES_OF_SQL,
         filtro_barrios="WHERE pais = :pais" if pais else "",
         filtro_munis="WHERE c.pais = :pais" if pais else "",
     )
-    params = {"padron": FUENTE_PADRON}
+    params: dict = {}
     if pais:
         params["pais"] = pais
     filas = (await db.execute(text(sql), params)).fetchall()
@@ -206,7 +212,7 @@ async def detalle_municipio(
 
     barrios = []
     for f in filas:
-        nivel = "localidad" if (f.fuente == FUENTE_PADRON or f.tipo in TIPOS_LOCALIDAD) else "barrio"
+        nivel = "localidad" if (f.fuente in FUENTES_OFICIALES or f.tipo in TIPOS_LOCALIDAD) else "barrio"
         barrios.append({
             "id": f.id,
             "nombre": f.nombre,
@@ -240,7 +246,7 @@ async def detalle_municipio(
             "hojas_poli": sum(1 for b in hojas if b["poligono"]),
             "hojas_loc": sum(1 for b in hojas if b["nivel"] == "localidad"),
             "hojas_osm": sum(1 for b in hojas if b["fuente"] == "osm_pbf"),
-            "hojas_padron": sum(1 for b in hojas if b["fuente"] == FUENTE_PADRON),
+            "hojas_padron": sum(1 for b in hojas if b["fuente"] in FUENTES_OFICIALES),
             "respaldo": len(barrios) - len(hojas),
             "relleno": _relleno(m.poligono is not None, len(hojas),
                                 sum(1 for b in hojas if b["nivel"] == "localidad")),

@@ -246,6 +246,81 @@ que cubre los municipios que sigan en zona sola después del paso 1.
 (`structure-*`) que la copia qa→prod de `catalogo_barrios` (F1) tiene que
 repetirse con la tabla nueva; prod sigue en HOLD hasta el OK del dueño.
 
+**Resultado del paso 1 (residential) — 2026-09-03 23:05 ART: NO SE APLICÓ.**
+Se corrió la fase 1 con `landuse=residential` (47 s): 46.836 candidatos contra
+35.526 antes, 42.843 asignados, +10.584 filas `residential` (10.579 con
+contorno). Pero el **53,5 % era ruido**: 45,4 % manzanas (`Manzana 38`,
+`B° Solidaridad - Mza 416 "A"`), 7,7 % códigos (`1201A`, `C5 SE casa L`) y
+0,4 % genéricos. El ruido está concentrado: Rawson (San Juan, `660063`)
+aportaba 2.231 filas de manzana, y 6 municipios juntaban ~4.400. Del otro lado,
+el beneficio real era chico: **20 municipios** salían de zona sola (774 → 754),
+porque el filtro `clave == objetivo` descarta el barrio homónimo del pueblo y
+189 de los 209 municipios candidatos sólo ganaban esa fila. El dueño decidió
+saltearlo. Queda en el repo `_es_ruido_residential()` (probada: 20/20 ruido
+detectado, 18/18 nombres buenos conservados; deja 4.595 de las 10.584 filas),
+**sin aplicar en QA**.
+Pendiente si algún día se retoma: **colapsar manzanas a barrio** — 3.022 filas
+`B° X - Mza N` que serían ~274 barrios reales en 6 municipios (Rawson SJ 2.231).
+
+**Resultado del paso 2 (BAHRA) — 2026-09-03 23:05 ART: APLICADO en QA.**
+
+- **Fuente:** BAHRA (Base de Asentamientos Humanos de la República Argentina,
+  IGN/INDEC), por el derivado de georef en datos.gob.ar:
+  `https://infra.datos.gob.ar/georef/asentamientos.json` (5,0 MB, bajado el
+  03/09/2026). **14.466 asentamientos**, todos con punto: 10.425 parajes,
+  3.098 localidades simples, 678 entidades, 252 componentes, 13 bases
+  antárticas. El 80,9 % trae `gobierno_local.id`, que es el código INDEC y
+  matchea directo contra `municipios_catalogo.id`. El archivo quedó en
+  `backend/scripts/datos/asentamientos.json`.
+- **Script nuevo:** `backend/scripts/geo/catalogo_barrios_bahra.py`. Alcance:
+  sólo los municipios con CERO filas en `catalogo_barrios` (se calcula contra la
+  base en el momento). Filas `fuente='bahra'`, `tipo='localidad'`, sin polígono,
+  con el punto del dataset; se descarta el homónimo del municipio y los
+  cardinales; dedupe por `nombre_norm`; `marcar_hojas` al escribir. Idempotente:
+  borra sólo las filas `fuente='bahra'` del municipio y reinserta, en tandas de 25.
+  Los 2.758 asentamientos sin `gobierno_local` se ubican por contención del punto
+  en el contorno (aporta poco: 68 caen dentro de algún municipio, y rescatan 3).
+
+| | antes | después |
+|---|---|---|
+| **zona sola** | **774** | **455** |
+| con localidades | 766 | 1.085 |
+| con barrios | 542 | 542 |
+| sin contorno | 0 | 0 |
+| hojas | 17.714 | 18.408 |
+| hojas con contorno | 10.766 | 10.766 |
+| de OSM / oficial (padrón + BAHRA) | 15.923 / 1.791 | 15.923 / 2.485 |
+
+Zona sola por provincia: Córdoba 250 → 191, Santa Fe 204 → 86, Entre Ríos
+125 → 81, La Pampa 41 → 23, San Luis 36 → 26.
+
+- **319 municipios** recibieron localidades, **694 filas** (todas hoja, ninguna
+  con contorno: BAHRA da nombre y punto, no dibujo). Distribución: 158 con un
+  solo nombre, 141 con 2 a 5, 17 con 6 o más.
+- **Quedan 455 vacíos**, y es lo esperado: 423 tienen entradas en BAHRA pero
+  sólo la homónima del propio pueblo, que se descarta por decisión del dueño
+  ("va a quedar horrible con uno solo ahí adentro"); los otros 32 no tienen
+  nada en BAHRA.
+- **Duración:** descarga + inspección ~1 min; seco 0,3 min; aplicar ~2 min
+  (2.082 municipios recorridos, 319 escritos). `@@read_only` = 0 antes y después.
+- **Verificados** (SQL + pantalla): Pampa del Infierno (Chaco) 10 nombres,
+  San Francisco del Chañar (Córdoba) 5, Gobernador Costa (Chubut) 3 — todos
+  `tipo=localidad`, `fuente=bahra`, `hoja=1`, sin contorno. Captura de la solapa
+  Mapa en QA para Gobernador Costa: el hero dice "se llena con localidades: 3
+  nombres se dibujan, 0 con contorno", 0 errores de consola y 0 requests 4xx.
+- **Un cambio mínimo de backend:** `api/admin_territorio.py` contaba el cubo
+  "del padrón" como `fuente = 'georef'` a secas, así que las 694 filas de BAHRA
+  quedaban fuera del desglose (la clasificación zona/localidades/barrios no
+  dependía de eso y ya salía bien, porque va por `tipo`). Ahora hay
+  `FUENTES_OFICIALES = ('georef', 'bahra')` y el cubo las suma a las dos.
+  `barrios_del_catalogo` de la semilla lee `hoja = 1` sin mirar la fuente:
+  verificado, no necesita cambios.
+
+**Lo que sigue:** los 455 que quedan son pueblos de una sola localidad, por
+decisión de producto — no hay un paso 3 que los llene. Sí queda pendiente
+avisarle a Infra que la copia `qa` → `prod` de `catalogo_barrios` (F1) tiene que
+repetirse con la tabla nueva; prod sigue en HOLD hasta el OK del dueño.
+
 ## 7-bis. Qué sigue (resto)
 
 1. El dueño mira Territorio en QA y dice qué ajustar.
