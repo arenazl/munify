@@ -54,8 +54,11 @@ Notas que evitan diagnósticos errados:
 - **OJO con el `gcloud config` default:** suele estar parado en `tasar-prod` (OTRA app del
   user). Por eso **todo comando lleva `--project=munify-api` explícito**.
 - **`calls` es OTRO repo.** La página de `calls.munify.com.ar` vive en
-  `github.com/arenazl/munify-calls` (branch único `main`). Tocar
-  `frontend/public/calls/` en este repo **no la publica**.
+  `github.com/arenazl/munify-calls` (branch único `main`), con su propio
+  `CLAUDE.md`. De este repo se borró toda su copia el 2026-09-04
+  (`scripts/calls/`, `frontend/public/calls/`, `docs/calls/`): estaba
+  desactualizada y confundía. Acá queda **sólo el backend** que la página
+  consume (`backend/api/calls*.py`, `backend/models/calls*.py`).
 
 ## Frontend
 
@@ -133,7 +136,7 @@ curl -s https://munify-api-qa-vmpxsxe7ra-uk.a.run.app/openapi.json | head -c 400
 | `gcloud run deploy` / `gcloud builds submit` a mano | El CD del backend es de Infra. |
 | Pushear sin `npm run build` local | El error de TS rompe el build y queda publicado el bundle viejo. |
 | Deducir "no se publicó" de que no hubo build | Puede ser el filtro `frontend/**` / `backend/**`. Mirar el filtro antes. |
-| Editar `frontend/public/calls/` esperando verlo en calls.munify.com.ar | Es otro repo (`munify-calls`). |
+| Buscar la página de calls en este repo | No está: se fue entera a `munify-calls`. Acá sólo vive su backend. |
 | Confiar en el `gcloud` default | Suele estar en `tasar-prod` (otra app). Siempre `--project=munify-api`. |
 
 ## Troubleshooting

@@ -1,5 +1,12 @@
 # Pasamanos · 26-27 de agosto de 2026
 
+> **Desactualizado en lo que toca a `calls` (nota del 2026-09-04).** La página
+> se mudó a `d:\Code\munify-calls` (repo `arenazl/munify-calls`, branch `main`)
+> y su copia en este repo se borró. Las rutas `scripts/calls/` y
+> `frontend/public/calls/` que se nombran abajo **ya no existen acá**; el
+> resto del handoff sigue valiendo.
+
+
 Sesión larga. Tres frentes que quedaron **pusheados a `qa`** y uno cortado a
 medias. Esto es lo que hay que saber para retomar sin releer nada.
 

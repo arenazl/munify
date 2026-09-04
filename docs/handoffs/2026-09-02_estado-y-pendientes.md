@@ -1,5 +1,12 @@
 # HANDOFF — 2026-09-02 · IA a Groq, login de /calls, telemetría y el módulo Patrimonio
 
+> **Desactualizado en lo que toca a `calls` (nota del 2026-09-04).** La página
+> se mudó a `d:\Code\munify-calls` (repo `arenazl/munify-calls`, branch `main`)
+> y su copia en este repo se borró. Las rutas `scripts/calls/` y
+> `frontend/public/calls/` que se nombran abajo **ya no existen acá**; el
+> resto del handoff sigue valiendo.
+
+
 > ## ACTUALIZACIÓN de la sesión siguiente (2026-09-02, tarde)
 >
 > **Infra promovió anoche**: `origin/master` = contenido de qa del 01-09

@@ -1,5 +1,12 @@
 # Handoff — 2026-09-01 · localidades con contorno, mapa y calls
 
+> **Desactualizado en lo que toca a `calls` (nota del 2026-09-04).** La página
+> se mudó a `d:\Code\munify-calls` (repo `arenazl/munify-calls`, branch `main`)
+> y su copia en este repo se borró. Las rutas `scripts/calls/` y
+> `frontend/public/calls/` que se nombran abajo **ya no existen acá**; el
+> resto del handoff sigue valiendo.
+
+
 Estado al cerrar la sesión. Todo pusheado a `qa` (repos `sugerenciasMun` y
 `landing`, cada uno a su rama `qa`). `master` no se tocó.
 
