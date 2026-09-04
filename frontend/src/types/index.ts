@@ -38,6 +38,9 @@ export interface User {
   // de campos verificados (DNI/nombre/apellido) en los wizards.
   nivel_verificacion?: number;
   cuenta_verificada?: boolean;
+  // Preferencias de INTERFAZ por usuario (backend, PATCH /auth/me/preferencias):
+  // por ejemplo `{ ui: { pistas_cerradas: ['demos-auditoria'] } }`.
+  preferencias?: Record<string, unknown> | null;
 }
 
 // =====================================================================

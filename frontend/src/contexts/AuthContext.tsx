@@ -6,6 +6,7 @@ import api from '../lib/api';
 import { useMunicipioFromUrl, buildMunicipioUrl } from '../hooks/useSubdomain';
 import { subscribeToPush, isPushSupported } from '../lib/pushNotifications';
 import { saveMunicipio, clearMunicipio } from '../utils/municipioStorage';
+import { sincronizarPistasUsuario } from '../lib/pistasUsuario';
 
 export interface Municipio {
   id: number;
@@ -164,6 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       loadMunicipios();
     }
+  }, [user]);
+
+  // Pistas del kit cerradas POR USUARIO (preferencias.ui): con o sin usuario,
+  // el kit siempre sabe a quién preguntarle (ver lib/pistasUsuario.ts).
+  useEffect(() => {
+    sincronizarPistasUsuario(user);
   }, [user]);
 
   const login = async (email: string, password: string) => {

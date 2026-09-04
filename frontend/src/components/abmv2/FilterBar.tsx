@@ -29,6 +29,7 @@
 import { ArrowRight, Plus, X } from 'lucide-react';
 import { ModernSelect } from '../ui/ModernSelect';
 import { SelectorAdaptativoSpec } from './SelectorAdaptativo';
+import { TildesAditivas } from './TildesAditivas';
 import { PeriodNavigator } from '../ui/PeriodNavigator';
 import { useState } from 'react';
 import { useAnchoAngosto } from './FichaRegistro';
@@ -309,6 +310,7 @@ export function FilterBar({
   // pantalla entera vía ErrorBoundary. Una pieza del kit no puede romperse
   // porque el consumidor omitió algo que su contrato marca opcional.
   selects = [],
+  tildes,
   period,
   onPeriodChange,
   statusTabs = [],
@@ -317,16 +319,18 @@ export function FilterBar({
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
+  const hayTildes = (tildes?.opciones.length ?? 0) > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
   /* [v2.2] Toolbar y filtros son UNA tarjeta partida: una barra vacía se vería
      como una franja muerta pegada abajo. Sin nada que filtrar no se renderiza
      y el CSS le devuelve las 4 esquinas a la toolbar (`:last-child`). */
-  if (!haySelects && !hayPeriodo && !hayTabs && !filterSummary) return null;
+  if (!haySelects && !hayTildes && !hayPeriodo && !hayTabs && !filterSummary) return null;
 
   return (
     <FilterBarCuerpo
       selects={selects}
+      tildes={tildes}
       period={period}
       onPeriodChange={onPeriodChange}
       statusTabs={statusTabs}
@@ -347,6 +351,7 @@ export function FilterBar({
  */
 function FilterBarCuerpo({
   selects = [],
+  tildes,
   period,
   onPeriodChange,
   statusTabs = [],
@@ -355,6 +360,7 @@ function FilterBarCuerpo({
   filterSummary,
 }: FilterBarProps) {
   const haySelects = selects.length > 0;
+  const hayTildes = (tildes?.opciones.length ?? 0) > 0;
   const hayPeriodo = period !== undefined;
   const hayTabs = statusTabs.length > 0;
 
@@ -374,6 +380,7 @@ function FilterBarCuerpo({
   // cuenta como uno: es el filtro que más recorta y el que más se olvida.
   const activos =
     selects.filter((s) => s.value && s.value !== '' && s.value !== 'todos').length +
+    (tildes?.activas.length ?? 0) +
     (activeStatus && activeStatus !== 'todos' ? 1 : 0);
 
   if (angosto === true) {
@@ -394,6 +401,7 @@ function FilterBarCuerpo({
             {selects.map((spec) => (
               <Av2Select key={spec.id} spec={spec} />
             ))}
+            {hayTildes && tildes && <TildesAditivas {...tildes} />}
             {period && <PeriodControl value={period} onChange={onPeriodChange} />}
             {hayTabs && (
               <div className="av2-filtros-estados">
@@ -429,11 +437,15 @@ function FilterBarCuerpo({
         <SelectorAdaptativoSpec key={spec.id} spec={spec} />
       ))}
 
-      {haySelects && hayPeriodo && <span className="av2-divisor" aria-hidden />}
+      {/* [v3.4] Tildes aditivas: después de los selects, con su divisor. */}
+      {haySelects && hayTildes && <span className="av2-divisor" aria-hidden />}
+      {hayTildes && tildes && <TildesAditivas {...tildes} />}
+
+      {(haySelects || hayTildes) && hayPeriodo && <span className="av2-divisor" aria-hidden />}
 
       {period && <PeriodControl value={period} onChange={onPeriodChange} />}
 
-      {(haySelects || hayPeriodo) && hayTabs && <span className="av2-divisor" aria-hidden />}
+      {(haySelects || hayTildes || hayPeriodo) && hayTabs && <span className="av2-divisor" aria-hidden />}
 
       {hayTabs && (
         <div className="av2-estados" role="group" aria-label="Filtrar por estado">

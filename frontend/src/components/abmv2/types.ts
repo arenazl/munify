@@ -304,6 +304,30 @@ export interface SelectSpec {
   disabledReason?: string;
 }
 
+/**
+ * [v3.4] Píldora ADITIVA (TildesAditivas): se tilda y se destilda sin
+ * afectar a las demás — para recortes que se COMBINAN ("sin barrios" Y
+ * "sin contorno"). El SelectorAdaptativo sigue siendo el EXCLUYENTE.
+ * count 0 ⇒ apagada y no clickeable, como los StatusTab.
+ */
+export interface TildeSpec {
+  id: string;
+  label: string;
+  count?: number;
+  /** Tiñe la tilde activa. Omitido ⇒ verde del theme. */
+  veredicto?: Veredicto;
+  /** Tooltip: qué recorta exactamente. */
+  title?: string;
+}
+
+export interface TildesSpec {
+  /** Etiqueta muted a la izquierda ("Mostrar sólo"). */
+  label?: string;
+  opciones: TildeSpec[];
+  activas: string[];
+  onChange: (activas: string[]) => void;
+}
+
 /** Tab del segmented de estados. count 0 ⇒ se pinta `--pl-text-disabled`
  *  y NO es clickeable. count ausente ⇒ el conteo no se conoce: el tab queda
  *  clickeable y SIN número (nunca un número inventado al lado de datos
@@ -374,6 +398,8 @@ export interface GroupSpec {
 
 export interface FilterBarProps {
   selects: SelectSpec[];
+  /** [v3.4] Píldoras aditivas, a la derecha de los selects. */
+  tildes?: TildesSpec;
   /** Omitir en listas sin fecha (Personal, Inventario). */
   period?: PeriodControlValue;
   onPeriodChange?: (value: PeriodControlValue) => void;
@@ -881,6 +907,8 @@ export interface SemanticAbmPageProps<Row = unknown> {
    * filtros del dominio (dependencia, caja, zona) — y anula la autoderivación.
    */
   selects?: SelectSpec[];
+  /** [v3.4] Píldoras ADITIVAS (ver TildesSpec). Pass-through a FilterBar. */
+  tildes?: TildesSpec;
   /** Omitir en listas sin fecha (Personal, Inventario). Obligatorio en money. */
   period?: PeriodControlValue;
   statusTabs: StatusTab[];

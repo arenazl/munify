@@ -103,6 +103,11 @@ class User(Base):
 
     # Preferencias de notificaciones push (JSON con booleanos para cada tipo)
     notificacion_preferencias = Column(JSON, default=DEFAULT_NOTIFICATION_PREFERENCES)
+    # Preferencias de INTERFAZ por usuario, en cualquier dispositivo: por
+    # ejemplo `{"ui": {"pistas_cerradas": ["demos-auditoria"]}}`. La columna
+    # existía en la base sin uso; el kit abmv2 la lee para que una pista
+    # cerrada no vuelva a aparecer en otro navegador (dueño, 2026-09-03).
+    preferencias = Column(JSON, nullable=True)
 
     # Relacion con empleado (si es usuario empleado) - DEPRECATED
     empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)

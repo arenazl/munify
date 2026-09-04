@@ -204,6 +204,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     # Construir respuesta con info de dependencia si existe
     user_response = UserResponse(
         id=user.id,
+        preferencias=user.preferencias,
         municipio_id=user.municipio_id,
         email=user.email,
         nombre=user.nombre,
@@ -231,6 +232,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
     # Construir respuesta con info de dependencia si existe
     return UserResponse(
         id=current_user.id,
+        preferencias=current_user.preferencias,
         municipio_id=current_user.municipio_id,
         email=current_user.email,
         nombre=current_user.nombre,
@@ -402,6 +404,7 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
     # Construir respuesta
     user_response = UserResponse(
         id=user.id,
+        preferencias=user.preferencias,
         municipio_id=user.municipio_id,
         email=user.email,
         nombre=user.nombre,
@@ -603,6 +606,7 @@ async def registrar_con_didit(
 
     user_response = UserResponse(
         id=user.id,
+        preferencias=user.preferencias,
         municipio_id=user.municipio_id,
         email=user.email,
         nombre=user.nombre,
@@ -621,3 +625,35 @@ async def registrar_con_didit(
     )
 
     return Token(access_token=access_token, user=user_response)
+
+
+# ============================================================
+# Preferencias de INTERFAZ por usuario (dueño, 2026-09-03)
+# ============================================================
+# El kit abmv2 guarda acá lo que antes vivía sólo en localStorage — por
+# ejemplo qué pistas cerró el usuario — para que una pista cerrada en el
+# teléfono no vuelva a aparecer en la tablet. Un solo JSON, clave por
+# ámbito (`ui`), fusión superficial por ámbito: mandar `{"ui": {...}}`
+# reemplaza SÓLO las claves que vienen adentro de `ui`.
+
+class PreferenciasPatch(BaseModel):
+    ui: Optional[dict] = None
+
+
+@router.patch("/me/preferencias")
+async def actualizar_preferencias(
+    data: PreferenciasPatch,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    actuales = dict(current_user.preferencias or {})
+    if data.ui is not None:
+        ui = dict(actuales.get("ui") or {})
+        ui.update(data.ui)
+        actuales["ui"] = ui
+    # Reasignar el dict entero: el JSON de SQLAlchemy no detecta mutaciones
+    # in-place, y un `.update()` sobre el mismo objeto no se persistiría.
+    current_user.preferencias = actuales
+    db.add(current_user)
+    await db.commit()
+    return {"preferencias": actuales}

@@ -77,6 +77,8 @@ class UserResponse(BaseModel):
     # El frontend lo usa para bloquear edicion de campos verificados.
     nivel_verificacion: int = 0
     cuenta_verificada: bool = False
+    # Preferencias de interfaz (ver models.user.preferencias).
+    preferencias: Optional[dict] = None
 
     class Config:
         from_attributes = True

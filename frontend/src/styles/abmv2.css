@@ -5379,3 +5379,79 @@ button.av2-recorrido-miga:hover {
 }
 .av2-select-grupo--off:hover,
 .av2-select-grupo--off:focus-within { border-color: var(--pl-border-strong); }
+
+
+/* ============================================================
+ * [v3.4] TildesAditivas — píldoras que se COMBINAN (una no saca la otra).
+ * Hermana del SelectorAdaptativo (excluyente). Tilde cuadrada a la
+ * izquierda: se lee como checkbox, no como tab.
+ * ============================================================ */
+.av2-tildes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.av2-tildes .av2-select-etiqueta { margin: 0 4px 0 2px; }
+.av2-tilde {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 7px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-surface);
+  color: var(--pl-text-2);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--pl-dur-ui) var(--pl-ease), border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-tilde:hover { background: var(--pl-surface-hover); }
+.av2-tilde-marca {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--pl-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pl-surface);
+  flex: 0 0 auto;
+}
+.av2-tilde--activa {
+  border-color: var(--pl-green-700);
+  background: var(--pl-green-050);
+  color: var(--pl-text);
+  font-weight: 600;
+}
+.av2-tilde--activa .av2-tilde-marca {
+  background: var(--pl-green-700);
+  border-color: var(--pl-green-700);
+}
+.av2-tilde--advertencia.av2-tilde--activa { border-color: var(--pl-amber-700); }
+.av2-tilde--advertencia.av2-tilde--activa .av2-tilde-marca {
+  background: var(--pl-amber-700);
+  border-color: var(--pl-amber-700);
+}
+.av2-tilde--malo.av2-tilde--activa { border-color: var(--pl-red-700); }
+.av2-tilde--malo.av2-tilde--activa .av2-tilde-marca {
+  background: var(--pl-red-700);
+  border-color: var(--pl-red-700);
+}
+.av2-tilde--cero {
+  color: var(--pl-text-disabled);
+  cursor: default;
+  pointer-events: none;
+}
+.av2-tilde-conteo {
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-text-3);
+}
+.av2-tilde--activa .av2-tilde-conteo { color: inherit; }
+/* En el panel angosto se apilan como el resto de los filtros. */
+.av2-filtros-panel .av2-tildes { flex-wrap: wrap; }

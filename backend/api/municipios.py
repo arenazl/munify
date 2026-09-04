@@ -12,6 +12,7 @@ import cloudinary
 import cloudinary.uploader
 
 from core.database import get_db
+from core.ambiente import es_qa
 from core.security import get_current_user, require_roles, get_password_hash
 from core.config import settings
 from models.municipio import Municipio
@@ -40,6 +41,8 @@ class MunicipioPublic(BaseModel):
     codigo: str
     # ISO-3166 alpha-2: en que pais busca direcciones el autocomplete.
     pais: str = "AR"
+    # Provincia / departamento del catálogo (texto), si el alta la conoció.
+    provincia: Optional[str] = None
     latitud: float
     longitud: float
     radio_km: float
@@ -849,6 +852,11 @@ async def crear_municipio_demo(
             status_code=400,
             detail="El PIN debe ser numérico, de 4 a 8 dígitos",
         )
+    # En QA las demos nacen SIN PIN (dueño, 2026-09-03: "sacá el PIN numérico
+    # para QA"): prueba desde el celular y la tablet, y el modal por perfil
+    # sólo estorba. En producción el PIN sigue vigente tal cual.
+    if demo_pin and await es_qa(db):
+        demo_pin = None
 
     # Normalizar código. Si ya existe, sufijar con -2, -3... hasta encontrar
     # uno libre. Así el prospecto puede tipear "Pergamino" dos veces y se
@@ -933,6 +941,7 @@ async def crear_municipio_demo(
             nombre=nombre_limpio,
             codigo=codigo_actual,
             pais=(data.pais or "AR").upper(),
+            provincia=(data.provincia or "").strip() or None,
             latitud=lat,
             longitud=lng,
             radio_km=10.0,
@@ -1205,6 +1214,15 @@ async def eliminar_municipio(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
+    # Blindadas (ver services/demo_borrado.CODIGOS_INTOCABLES): tampoco se
+    # desactivan — apagar la demo de venta es sacarla de circulación.
+    from services.demo_borrado import es_intocable
+    if es_intocable(municipio.id, municipio.codigo):
+        raise HTTPException(
+            status_code=403,
+            detail="Este municipio está blindado: no se desactiva ni se elimina",
+        )
+
     municipio.activo = False
     await db.commit()
 
@@ -1239,14 +1257,21 @@ async def eliminar_municipio_demo(
     # (cualquiera que NO matchee los patrones de demo). Un muni sin usuarios o
     # con solo users demo se considera borrable. El patrón vive con el cascade.
     from sqlalchemy import or_, not_
-    from services.demo_borrado import MUNICIPIOS_INTOCABLES, PATRONES_EMAIL_DEMO
+    from services.demo_borrado import PATRONES_EMAIL_DEMO, es_intocable
+    # Blindadas por el dueño (asuncion, merlo) y SPN: 403 antes de cualquier
+    # otra regla, con la llave o sin ella.
+    if es_intocable(municipio.id, municipio.codigo):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta demo está blindada: no se elimina desde ningún proceso",
+        )
     non_demo_check = await db.execute(
         select(User).where(
             User.municipio_id == municipio.id,
             not_(or_(*[User.email.like(p) for p in PATRONES_EMAIL_DEMO])),
         )
     )
-    if municipio.id in MUNICIPIOS_INTOCABLES or non_demo_check.scalars().first():
+    if non_demo_check.scalars().first():
         raise HTTPException(
             status_code=403,
             detail="Solo se pueden eliminar municipios de demo",

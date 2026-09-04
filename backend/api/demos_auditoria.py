@@ -78,10 +78,12 @@ async def auditoria_demos(
 ):
     # Sólo super admin (dueño, 2026-09-03): la auditoría de demos ya no es
     # pública — se mira desde adentro de la app, en el panel del super admin.
+    from services.demo_borrado import es_intocable
+
     munis = (
         await db.execute(text(
-            "SELECT id, codigo, nombre, pais, activo, "
-            "(limites_geojson IS NOT NULL) AS con_contorno "
+            "SELECT id, codigo, nombre, pais, provincia, activo, demo_protegido, "
+            "demo_publica, created_at, (limites_geojson IS NOT NULL) AS con_contorno "
             "FROM municipios WHERE es_demo = 1"
         ))
     ).mappings().all()
@@ -92,7 +94,14 @@ async def auditoria_demos(
             "codigo": m["codigo"],
             "nombre": m["nombre"],
             "pais": m["pais"],
+            "provincia": m["provincia"],
             "activo": bool(m["activo"]),
+            "con_pin": bool(m["demo_protegido"]),
+            "de_muestra": bool(m["demo_publica"]),
+            # Blindada por código (services/demo_borrado.CODIGOS_INTOCABLES):
+            # la pantalla no le ofrece el tacho y la purga la rechaza.
+            "intocable": es_intocable(m["id"], m["codigo"]),
+            "created_at": m["created_at"],
             "con_contorno": bool(m["con_contorno"]),
             # Toda métrica arranca en 0: una tabla ausente no rompe la fila.
             "barrios_total": 0,
@@ -132,7 +141,22 @@ async def auditoria_demos(
     for d in por_id.values():
         d["con_contorno"] = bool(d["con_contorno"]) or d["zonas_con_poligono"] > 0
 
-    return list(por_id.values())
+    # Cobertura del CATÁLOGO por país y provincia: cuántos municipios enumera
+    # y cuántos tienen contorno oficial. El dueño lo quiere en la pantalla,
+    # por país, no como dato suelto en una conversación (2026-09-03).
+    try:
+        catalogo = [
+            {"pais": r[0], "provincia": r[1], "total": int(r[2] or 0), "con_contorno": int(r[3] or 0)}
+            for r in (await db.execute(text(
+                "SELECT pais, provincia, COUNT(*), "
+                "SUM(poligono IS NOT NULL AND poligono <> '') "
+                "FROM municipios_catalogo GROUP BY pais, provincia"
+            ))).all()
+        ]
+    except Exception:
+        catalogo = []
+
+    return {"demos": list(por_id.values()), "catalogo": catalogo}
 
 
 # ============================================================
@@ -158,9 +182,9 @@ async def purgar_demos(
     _: User = Depends(require_super_admin),
 ):
     from services.demo_borrado import (
-        MUNICIPIOS_INTOCABLES,
         PATRONES_EMAIL_DEMO,
         borrar_municipio,
+        es_intocable,
     )
 
     resultados = []
@@ -174,7 +198,13 @@ async def purgar_demos(
             resultados.append({"id": mid, "ok": False, "motivo": "no existe"})
             continue
         codigo, es_demo, demo_publica = fila
-        if not es_demo or mid in MUNICIPIOS_INTOCABLES:
+        if es_intocable(mid, codigo):
+            resultados.append({
+                "id": mid, "codigo": codigo, "ok": False,
+                "motivo": "blindada: no se borra desde ningún proceso",
+            })
+            continue
+        if not es_demo:
             resultados.append({"id": mid, "codigo": codigo, "ok": False, "motivo": "no es demo"})
             continue
         if demo_publica:

@@ -23,6 +23,10 @@ class Municipio(Base):
     # buscar en el pais equivocado: con 'ar' fijo, en Asuncion no devolvia
     # NADA y el vecino no podia cargar la direccion de su reclamo.
     pais = Column(String(2), nullable=False, default="AR", server_default="AR")
+    # Provincia / departamento del catálogo (texto tal cual lo enumera
+    # `municipios_catalogo`). Lo escribe el alta de demo; sirve para filtrar
+    # la auditoría de demos por país y provincia (dueño, 2026-09-03).
+    provincia = Column(String(150), nullable=True)
     latitud = Column(Float, nullable=False)  # Centro del municipio
     longitud = Column(Float, nullable=False)
     radio_km = Column(Float, default=10.0)  # Radio aproximado de cobertura en km

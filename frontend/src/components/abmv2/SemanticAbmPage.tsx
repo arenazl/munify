@@ -184,6 +184,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     steps,
     /* filtros */
     selects,
+    tildes,
     period,
     statusTabs,
     sortSpec,
@@ -621,6 +622,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
           quedarían dobles. En cards/guiada siguen acá como segmented. */}
       <FilterBar
         selects={selectsEfectivos}
+        tildes={tildes}
         period={period}
         onPeriodChange={onPeriodChange}
         statusTabs={activeView === 'table' && !tieneSlot ? [] : statusTabs}

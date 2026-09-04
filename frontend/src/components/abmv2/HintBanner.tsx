@@ -15,9 +15,10 @@
  * Sin números adentro (regla de la pista): una ayuda con cifras envejece sin
  * que nadie la actualice. Estilos por clases av2-* sobre tokens --pl-*.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles, X } from 'lucide-react';
+import { cerrarPista, pistaCerrada, suscribirPistas } from './pistas';
 import type { Action } from './types';
 
 export interface HintBannerProps {
@@ -28,27 +29,25 @@ export interface HintBannerProps {
   accion?: Action;
 }
 
-const PREFIJO = 'av2_hint_';
-
-function yaCerrada(key: string): boolean {
-  try {
-    return localStorage.getItem(PREFIJO + key) === '1';
-  } catch {
-    return false;
-  }
-}
-
 export function HintBanner({ storageKey, titulo, texto, accion }: HintBannerProps) {
-  const [visible, setVisible] = useState(() => !yaCerrada(storageKey));
+  /* [v3.4] La persistencia vive en ./pistas.ts: localStorage por defecto y,
+     si la app enchufó un adaptador, POR USUARIO (cerrada en el teléfono,
+     cerrada en la tablet). Si el adaptador llega después del primer render,
+     la suscripción retira la pista que ya estaba cerrada. */
+  const [visible, setVisible] = useState(() => !pistaCerrada(storageKey));
+
+  useEffect(
+    () =>
+      suscribirPistas(() => {
+        if (pistaCerrada(storageKey)) setVisible(false);
+      }),
+    [storageKey],
+  );
 
   if (!visible) return null;
 
   const cerrar = () => {
-    try {
-      localStorage.setItem(PREFIJO + storageKey, '1');
-    } catch {
-      /* sin storage (modo privado) la ayuda vuelve la próxima vez — aceptable */
-    }
+    cerrarPista(storageKey);
     setVisible(false);
   };
 
