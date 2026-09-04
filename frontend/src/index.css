@@ -54,7 +54,9 @@ body {
   color: var(--text-primary);
   margin: 0;
   min-height: 100vh;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  /* Sin transición al cambiar de tema: el cambio es instantáneo (dueño,
+     2026-09-03). Con 0.3s acá y en el contenedor del Layout, el fondo tardaba
+     ~350-480 ms en llegar aunque ya no hubiera saltos. */
 }
 
 #root {

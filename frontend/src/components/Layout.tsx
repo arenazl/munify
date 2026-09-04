@@ -414,7 +414,7 @@ export default function Layout() {
     // `visible` = hay topbar dibujándola (en mobile no hay: el header mobile
     // muestra el municipio, no la pantalla).
     <MigasProvider items={navigation} visible={!isMobile}>
-    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme.contentBackground, overflowX: 'clip' }}>
+    <div className="min-h-screen" style={{ backgroundColor: theme.contentBackground, overflowX: 'clip' }}>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div

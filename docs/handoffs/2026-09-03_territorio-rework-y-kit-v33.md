@@ -146,6 +146,39 @@ promover `fa4065a5` juntos: mismas 10 demos, 344 barrios en prod contra 130 en
 QA (La Matanza 214 → 24). Sigue el HOLD hasta el OK del dueño en la sesión de
 Infra.
 
+## 5-bis. Cambio de tema oscuro/claro (E) — "stuttering… super lento"
+
+Causa: `styles/animations.css` tenía desde 02/2026 un `* { transition:
+background-color, border-color, color .3s }`. Con las grillas del kit, cambiar
+de tema animaba TODOS los nodos a la vez. Encima `body` (index.css) y el
+contenedor del Layout (`transition-colors duration-300`) tenían su propia
+transición de 0.3 s. Se sacaron las tres; las transiciones útiles quedan
+declaradas en cada componente.
+
+Medición en QA (Territorio, 1440×900, `_medir_tema.mjs`: ms hasta que el
+fondo del body se estabiliza; frames > 50 ms en el segundo posterior):
+
+| | ida oscuro→claro | vuelta | frame más largo |
+|---|---|---|---|
+| antes (`index-C8BCjHSK`) | 684 ms, 3 frames largos | 391 ms, 2 | 217 ms / 150 ms |
+| sin la transición universal (`index-GEKKIJax`, commit `986f509e`) | 477 ms, 1 | 348 ms, 1 | 50 ms / 50 ms |
+| sin body/Layout (este commit) | pendiente de medir al salir el bundle | | |
+
+Los saltos desaparecen con el primer commit (frame máximo 50 ms); lo que
+quedaba de demora eran las transiciones de body y del Layout.
+
+## 5-ter. Dónde mirar la cola del CD de QA (dato de Infra)
+
+Los triggers de QA están en Cloud Build **`southamerica-east1`**:
+`deploy-munify-front-qa` (path `frontend/**`, publica Pages + la Function del
+proxy) y `deploy-munify-api-qa` (hoy sin filtro de paths: cada push de front
+redeploya también el backend; Infra lo va a filtrar). `deploy-munify-front` de
+us-east4 es el de PRODUCCIÓN. Cola: `gcloud builds list --project=munify-api
+--region=southamerica-east1 --limit=10`. Versión viva:
+`curl -s https://qa.munify.com.ar/version.json`. El build de `986f509e` FALLÓ
+en el paso de publicar por un error interno de Cloudflare ("Failed to publish
+your Function"); Infra lo redisparó y salió limpio.
+
 ## 6. Otras cosas del día (fuera del paquete)
 
 - Super admin: UN usuario por ambiente con la clave que dictó el dueño. QA
