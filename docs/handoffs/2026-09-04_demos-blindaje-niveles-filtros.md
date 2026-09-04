@@ -93,7 +93,18 @@ archivo Alembic). Infra corre el mismo script contra prod.
   final es el generador del proxy, que exige `BACKEND_ORIGIN` del CD). ESLint
   limpio en todo lo nuevo; los 3 errores de `AuthContext.tsx` son de líneas
   preexistentes.
-- Verificación en vivo (QA): pendiente del CD al momento de escribir esto.
+- Verificación en vivo en QA (2026-09-04, 23:35 ART, con sesión de super admin
+  por API, sin navegador): auditoría devuelve `{demos, catalogo}` con 22 demos,
+  18 con contorno, 19 con provincia, 0 con PIN; `asuncion` y `merlo` vienen
+  `intocable=true`; la purga de ambas responde "blindada" y el DELETE público
+  403; `public/lanus` ya sin PIN; `PATCH /auth/me/preferencias` persiste y
+  `/auth/me` lo devuelve; el front de QA sirve el bundle nuevo
+  (`index-7DDSE12R.js`, con "Casi íntegra", tildes y pista).
+- GOTCHA de deploy: la respuesta de `/demos/auditoria` cambió de lista a
+  objeto y, durante los minutos entre el deploy del backend y el del front, la
+  pantalla vieja rompió con "e.map is not a function". La próxima vez que se
+  cambie la forma de una respuesta, dejarla compatible un deploy (campo nuevo
+  al lado del viejo) o desplegar el front primero.
 
 ## Pendiente / ideas que NO se hicieron
 - Volcar el contorno del catálogo a las 4 demos viejas sin zona con polígono.
