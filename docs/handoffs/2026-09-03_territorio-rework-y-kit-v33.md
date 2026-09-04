@@ -198,7 +198,55 @@ your Function"); Infra lo redisparó y salió limpio.
   Infra. F1 (copiar `catalogo_barrios` marcada) + promover `fa4065a5` van
   juntos.
 
-## 7. Qué sigue
+## 7. ARRANQUE DE LA PRÓXIMA SESIÓN — completar los barrios de Argentina
+
+Decisión del dueño (2026-09-03, textual): *"barrio y localidad son sinónimos
+para nosotros: lo que se considere mejor en cuanto a la obtención de
+polígonos… me gustaría tener cubierta la mayoría de los barrios de Argentina,
+más allá de que tengamos polígonos o no"*. Y: nada de buscar barrio por
+barrio con IA o web (tokens + regla de no inventar). Todo sale de fuentes
+offline/oficiales, en una pasada.
+
+**Línea base AR en QA (API de Territorio, 22:20 ART):** 2.082 municipios →
+542 con barrios / 766 con localidades / **774 con zona sola** / 0 sin
+contorno; 17.714 hojas, 10.766 con contorno, 15.923 de OSM, 1.791 del padrón,
+5.720 de respaldo. Provincias con más zona sola: Córdoba 250/427, Santa Fe
+204/363, Entre Ríos 125/269, La Pampa 41/80, San Luis 36/67.
+
+**Paso 1 — escaneo `landuse=residential` con nombre (YA PROGRAMADO, sin correr).**
+`backend/scripts/geo/catalogo_barrios_pbf.py` suma los ways cerrados y las
+relaciones `landuse=residential` CON nombre como tipo `residential` (áreas con
+polígono; prioridad 4.5 en `PRIORIDAD` y en `_hojas.PRIORIDAD_TIPO`: pierden
+contra un `place` homónimo). El PBF de Argentina (428 MB) está en el
+scratchpad de la sesión del 03/09 (`…/24267f16-…/scratchpad/pbf/argentina-latest.osm.pbf`);
+si no está, se baja de Geofabrik (`argentina-latest.osm.pbf`).
+
+```bash
+cd backend
+# fase 1 (rehacer el sqlite con el filtro nuevo) + EN SECO; mirar el stat "residential"
+DATABASE_URL_QA="$(gcloud secrets versions access latest --secret=DATABASE_URL_QA --project=munify-api)"   python scripts/geo/catalogo_barrios_pbf.py --env qa --pais AR --pbf <ruta>/argentina-latest.osm.pbf --rehacer
+# fase 2 en QA (reescribe cada municipio, tandas de 10 con commit; ya marca hojas)
+DATABASE_URL_QA="..." python scripts/geo/catalogo_barrios_pbf.py --env qa --pais AR --pbf <ruta>/argentina-latest.osm.pbf --aplicar
+```
+(`DATABASE_URL` del `backend/.env` también sirve si es la de QA: `_entorno`
+exige que termine en `-qa`.)
+
+Medir después con la misma API (`GET /api/admin/territorio/municipios?pais=AR`,
+token de `superadmin@test.com`): la cifra que importa es **zona sola 774 → ?**
+y cuántas hojas nuevas traen contorno. Verificar 2-3 municipios chicos de
+Córdoba/Santa Fe en la pantalla Territorio (solapa Mapa).
+
+**Paso 2 — BAHRA** (Base de Asentamientos Humanos de la República Argentina,
+IGN/INDEC): nombres + punto de localidades y parajes que OSM no tiene. Entran
+como hoja tipo `localidad`, fuente nueva (p. ej. `bahra`), sin polígono. Es lo
+que cubre los municipios que sigan en zona sola después del paso 1.
+
+**Paso 3 —** lo que quede sin nada queda como zona sola, honesto. Después: las
+3 demos de QA (Córdoba, Santa Fe, Buenos Aires interior) y avisar a Infra
+(`structure-*`) que la copia qa→prod de `catalogo_barrios` (F1) tiene que
+repetirse con la tabla nueva; prod sigue en HOLD hasta el OK del dueño.
+
+## 7-bis. Qué sigue (resto)
 
 1. El dueño mira Territorio en QA y dice qué ajustar.
 2. Infra corre el smoke en QA y compara contra prod.

@@ -12,6 +12,11 @@ municipio, en una lista plana (sin niveles intermedios):
   - nodos `place` city/town/village/hamlet/suburb/neighbourhood/quarter (punto);
   - ways cerrados y relaciones `place` suburb/neighbourhood/quarter (AREA);
   - relaciones `boundary=administrative` admin_level 9|10 (AREA);
+  - ways cerrados y relaciones `landuse=residential` CON nombre (AREA): los
+    loteos y barrios que OSM dibuja como uso del suelo y no como `place`.
+    Es lo que llena los pueblos del interior (Cordoba, Santa Fe, Entre Rios),
+    donde el municipio ES el pueblo y no hay `place=suburb` (Lucas, 2026-09-03:
+    "barrio y localidad son sinonimos: lo que mejor consiga poligonos");
   - las localidades del padron (`catalogo_zonas`) que ya tienen contorno: entran
     como barrio con poligono, o le prestan el poligono al nodo homonimo de OSM.
 Se excluyen: los cardinales sueltos ("Norte"), el homonimo del municipio (la
@@ -70,6 +75,8 @@ from services.osm_regiones import _anillo_exterior  # noqa: E402
 PLACES_NODO = frozenset(geo_ciudad.PLACES_ZONA + geo_ciudad.PLACES_BARRIO)
 PLACES_AREA = frozenset(geo_ciudad.PLACES_BARRIO)
 ADMIN_BARRIO = frozenset({"9", "10"})
+# Uso del suelo que cuenta como barrio si tiene nombre (tipo `residential`).
+LANDUSE_BARRIO = frozenset({"residential"})
 FUENTE_PBF = "osm_pbf"
 FUENTE_PADRON = "georef"
 # Un area que cubre mas que esto del municipio no es un barrio: es la ciudad.
@@ -88,7 +95,7 @@ CREATE TABLE IF NOT EXISTS catalogo_barrios (
   nombre VARCHAR(120) NOT NULL,
   nombre_norm VARCHAR(120) NOT NULL,
   -- suburb | neighbourhood | quarter | city | town | village | hamlet |
-  -- admin9 | admin10 | localidad
+  -- admin9 | admin10 | localidad | residential (landuse con nombre)
   tipo VARCHAR(20) NOT NULL,
   lat DOUBLE NULL,
   lon DOUBLE NULL,
@@ -177,6 +184,8 @@ def _rol_relacion(tags: dict) -> str | None:
         return tags["place"]
     if tags.get("boundary") == "administrative" and tags.get("admin_level") in ADMIN_BARRIO:
         return "admin" + tags["admin_level"]
+    if tags.get("landuse") in LANDUSE_BARRIO:
+        return "residential"
     return None
 
 
@@ -186,7 +195,7 @@ def _relaciones(pbf: str) -> dict:
 
     quiero: dict[int, tuple[str, str, list[tuple[int, str]]]] = {}
     fp = (osmium.FileProcessor(pbf, osmium.osm.RELATION)
-          .with_filter(osmium.filter.KeyFilter("place", "boundary")))
+          .with_filter(osmium.filter.KeyFilter("place", "boundary", "landuse")))
     for r in fp:
         tags = {t.k: t.v for t in r.tags}
         tipo = _rol_relacion(tags)
@@ -265,7 +274,7 @@ def extraer(pbf: str, sqlite_path: str, municipios: list[dict]) -> dict:
 
     fp = (osmium.FileProcessor(pbf, osmium.osm.NODE | osmium.osm.WAY)
           .with_locations()
-          .with_filter(osmium.filter.KeyFilter("place"))
+          .with_filter(osmium.filter.KeyFilter("place", "landuse"))
           .handler_for_filtered(_Miembros()))
     n = 0
     for obj in fp:
@@ -283,20 +292,25 @@ def extraer(pbf: str, sqlite_path: str, municipios: list[dict]) -> dict:
                     candidatos.append(("node", obj.id, nombre, place, loc.lon, loc.lat, None))
                     stats["nodos"] += 1
             continue
-        # way
+        # way: `place` de area, o `landuse=residential` con nombre (tipo
+        # `residential`). Un residential SIN nombre no es un barrio, es suelo.
         pts = _coords(obj)
         if obj.id in ways_de_relacion:
             coords_ways[obj.id] = pts
-        if not (nombre and place in PLACES_AREA) or not pts:
+        tipo_way = place if place in PLACES_AREA else (
+            "residential" if tags.get("landuse") in LANDUSE_BARRIO else None)
+        if not (nombre and tipo_way) or not pts:
             continue
         if obj.is_closed() and len(pts) >= 4:
-            candidatos.append(("way", obj.id, nombre, place, None, None,
+            candidatos.append(("way", obj.id, nombre, tipo_way, None, None,
                                [[x, y] for x, y in pts]))
             stats["areas_way"] += 1
+            if tipo_way == "residential":
+                stats["residential"] = stats.get("residential", 0) + 1
         else:
             lon = (min(p[0] for p in pts) + max(p[0] for p in pts)) / 2
             lat = (min(p[1] for p in pts) + max(p[1] for p in pts)) / 2
-            candidatos.append(("way", obj.id, nombre, place, lon, lat, None))
+            candidatos.append(("way", obj.id, nombre, tipo_way, lon, lat, None))
             stats["nodos"] += 1
 
     # Las relaciones: se encadenan sus ways; si el anillo no cierra, punto.
@@ -365,6 +379,7 @@ def extraer(pbf: str, sqlite_path: str, municipios: list[dict]) -> dict:
 
 # A igual nombre gana el que tiene contorno; entre contornos, el oficial.
 PRIORIDAD = {"admin10": 0, "admin9": 1, "suburb": 2, "quarter": 3, "neighbourhood": 4,
+             "residential": 4.5,  # el uso del suelo pierde contra un `place` homonimo
              "localidad": 5, "city": 6, "town": 7, "village": 8, "hamlet": 9}
 
 

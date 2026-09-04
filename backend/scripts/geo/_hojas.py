@@ -77,7 +77,7 @@ CALIFICADORES = frozenset({
 # catalogo_barrios_pbf.PRIORIDAD): "Villa Fisher" (admin9) antes que "Villa
 # Fischer" (quarter).
 PRIORIDAD_TIPO = {"admin10": 0, "admin9": 1, "suburb": 2, "quarter": 3, "neighbourhood": 4,
-                  "localidad": 5, "city": 6, "town": 7, "village": 8, "hamlet": 9}
+                  "residential": 4.5, "localidad": 5, "city": 6, "town": 7, "village": 8, "hamlet": 9}
 RADIO_DUP_KM = 1.0
 PARECIDO_MIN = 0.88
 LARGO_MIN_PARECIDO = 6
