@@ -162,10 +162,16 @@ fondo del body se estabiliza; frames > 50 ms en el segundo posterior):
 |---|---|---|---|
 | antes (`index-C8BCjHSK`) | 684 ms, 3 frames largos | 391 ms, 2 | 217 ms / 150 ms |
 | sin la transición universal (`index-GEKKIJax`, commit `986f509e`) | 477 ms, 1 | 348 ms, 1 | 50 ms / 50 ms |
-| sin body/Layout (este commit) | pendiente de medir al salir el bundle | | |
+| sin body/Layout (`index-B4EN_3WD`, commit `3c029864`) | 172 ms, 1 | 134 ms, 0 | 67 ms / 50 ms |
 
 Los saltos desaparecen con el primer commit (frame máximo 50 ms); lo que
-quedaba de demora eran las transiciones de body y del Layout.
+quedaba de demora eran las transiciones de body y del Layout: de 684/391 ms a
+172/134 ms (lo que tarda React en re-renderizar el árbol con el tema nuevo).
+
+Combo de municipio apagado (`_verif_combo.mjs`, mismo bundle): en la raíz
+presente y apagado con el title "Elegí una provincia para listar sus
+municipios"; al entrar a Buenos Aires se activa con "Todos"; la barra de
+filtros no cambia de alto (61 → 61 px). 3/3 OK.
 
 ## 5-ter. Dónde mirar la cola del CD de QA (dato de Infra)
 
