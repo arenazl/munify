@@ -53,6 +53,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sqlite3
 import sys
 import time
@@ -293,12 +294,17 @@ def extraer(pbf: str, sqlite_path: str, municipios: list[dict]) -> dict:
                     stats["nodos"] += 1
             continue
         # way: `place` de area, o `landuse=residential` con nombre (tipo
-        # `residential`). Un residential SIN nombre no es un barrio, es suelo.
-        pts = _coords(obj)
-        if obj.id in ways_de_relacion:
-            coords_ways[obj.id] = pts
+        # `residential`). Un residential SIN nombre no es un barrio, es suelo:
+        # se descarta ANTES de leer sus coordenadas (el filtro `landuse` deja
+        # pasar cientos de miles de ways de campo/monte sin nombre).
         tipo_way = place if place in PLACES_AREA else (
             "residential" if tags.get("landuse") in LANDUSE_BARRIO else None)
+        en_relacion = obj.id in ways_de_relacion
+        if not en_relacion and not (nombre and tipo_way):
+            continue
+        pts = _coords(obj)
+        if en_relacion:
+            coords_ways[obj.id] = pts
         if not (nombre and tipo_way) or not pts:
             continue
         if obj.is_closed() and len(pts) >= 4:
@@ -382,6 +388,38 @@ PRIORIDAD = {"admin10": 0, "admin9": 1, "suburb": 2, "quarter": 3, "neighbourhoo
              "residential": 4.5,  # el uso del suelo pierde contra un `place` homonimo
              "localidad": 5, "city": 6, "town": 7, "village": 8, "hamlet": 9}
 
+# `landuse=residential` con nombre trae barrios de verdad, pero tambien la
+# grilla de manzanas/lotes que algunos municipios cargaron en OSM con el MISMO
+# tag (Rawson SJ solo aporta 2.231 filas "B X - Mza N"). Medido sobre el PBF de
+# 2026-09: 53,5% de las 10.584 filas `residential` era ruido de este tipo.
+# Se compara contra `_norm(nombre)` (minusculas, sin acentos, sin puntuacion).
+RUIDO_RESIDENTIAL = (
+    # manzana / lote / parcela, sola o como sufijo: "Manzana 38", "Mz.1057a",
+    # "B Solidaridad - Mza 416 A", "B Limache - Et 03 - Mza 03".
+    r"\b(mz|mza|mzna|manz|manzana|lote|lotes|parcela|parcelas)\b",
+    # unidad de vivienda con su codigo: "casa L", "Torre 3", "Sector 15".
+    r"\b(casa|casas|torre|torres|tira|tiras|bloque|bloques|sector|etapa)\s*\d+\b",
+    r"\b(casa|casas|torre|torres|tira|tiras|bloque|bloques|sector|etapa)\s+[a-z]\b",
+    # planes de vivienda contados: "80 viviendas", "Comunidad Indigena 15 Viviendas".
+    r"\b\d+\s*viviendas?\b",
+    # el nombre entero es un codigo: "1201A", "C5", "S-12", "34", "D".
+    r"^[a-z]{0,3}[\s\-]?\d+\s*[a-z]?$",
+    r"^[a-z]{1,2}$",
+    r"^[\W\d_]+$",
+    # generico SOLO (no "Arminda Residencial", que es un barrio real).
+    r"^(barrio|barrios|residencial|loteo|country|municipal|zona urbana|zona|sector|crear)\s*\d*$",
+)
+_RUIDO_RESIDENTIAL_RE = tuple(re.compile(p) for p in RUIDO_RESIDENTIAL)
+
+
+def _es_ruido_residential(nombre: str) -> bool:
+    """True si un `landuse=residential` con este nombre es una manzana/lote/codigo
+    y no un barrio. Funcion pura: solo mira el nombre normalizado."""
+    clave = _norm(nombre or "")
+    if not clave:
+        return True
+    return any(rx.search(clave) for rx in _RUIDO_RESIDENTIAL_RE)
+
 
 def _padron(conn_rows: list) -> list[dict]:
     out = []
@@ -403,6 +441,9 @@ def _barrios_de(m: dict, sq: sqlite3.Connection, padron: list[dict], area_muni: 
     def _considerar(b: dict) -> None:
         clave = _norm(b["nombre"])
         if not clave or clave == objetivo or geo_ciudad.es_cardinal(b["nombre"]):
+            return
+        # El `landuse` trae la grilla de manzanas mezclada con los barrios.
+        if b["tipo"] == "residential" and _es_ruido_residential(b["nombre"]):
             return
         if b.get("poligono"):
             poli = _poligono(json.loads(b["poligono"]))
