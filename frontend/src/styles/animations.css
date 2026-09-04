@@ -5,12 +5,15 @@
   --animation-timing: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Smooth transitions for theme changes */
-* {
-  transition: background-color var(--animation-duration) var(--animation-timing),
-              border-color var(--animation-duration) var(--animation-timing),
-              color var(--animation-duration) var(--animation-timing);
-}
+/* Cambio de tema: INSTANTÁNEO, sin transición global.
+   Acá había un `* { transition: background-color, border-color, color .3s }`
+   (desde 02/2026). Con la app de hoy —grillas del kit con cientos de celdas,
+   sidebar, hero, mapas— cambiar de oscuro a claro obligaba a animar TODOS los
+   nodos a la vez: el navegador recalculaba estilos y pintaba cada frame
+   durante 300 ms y el cambio se veía a saltos ("stuttering… super lento",
+   dueño 2026-09-03). Un selector universal con transición es un costo fijo
+   en cada cambio de clase/hover de cualquier elemento, no sólo del tema. Las
+   transiciones que valen la pena quedan declaradas en cada componente. */
 
 /* Glass morphism base */
 .glass {
