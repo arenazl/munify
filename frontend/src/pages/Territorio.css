@@ -127,6 +127,27 @@
   white-space: nowrap;
 }
 
+/* ---- Municipio: la píldora de cartografía con su motivo entero, arriba de la
+   tabla de nombres (la misma decisión que la columna Mapa del listado) ---- */
+.territorio-cartografia {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pl-space-1) var(--pl-space-2);
+  min-width: 0;
+  padding: 2px var(--pl-space-1) 0;
+}
+.territorio-cartografia-label {
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-2);
+}
+.territorio-cartografia-texto {
+  font-size: var(--pl-fs-body-sm);
+  color: var(--pl-text-muted);
+  min-width: 0;
+}
+
 /* ---- Teléfono: el mapa cede alto; la leyenda deja de competir con el botón ---- */
 @media (max-width: 640px) {
   .territorio-mapa .av2-mapa-lienzo { --av2-mapa-alto: 360px; min-height: 360px; }

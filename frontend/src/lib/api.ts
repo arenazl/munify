@@ -930,6 +930,10 @@ export interface TerritorioMunicipio extends TerritorioConteos {
   lat: number | null;
   lng: number | null;
   con_contorno: boolean;
+  /** `true` = el mapa dibuja los barrios; `false` = sólo el contorno del municipio. */
+  cartografiado: boolean;
+  /** Por qué se decidió eso, en texto llano ("38/47 dibujados (81 %)", "sin barrios"). */
+  motivo_cartografiado: string | null;
   filas: number;
   hojas_loc: number;
   relleno: TerritorioRelleno;
@@ -961,6 +965,8 @@ export interface TerritorioDetalle {
     lng: number | null;
     osm_id: string | null;
     poligono: [number, number][] | null;
+    cartografiado: boolean;
+    motivo_cartografiado: string | null;
   };
   resumen: TerritorioConteos & { filas: number; hojas_loc: number; relleno: TerritorioRelleno };
   barrios: TerritorioBarrio[];

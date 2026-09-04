@@ -693,6 +693,19 @@ export default function Territorio() {
         cell: (m) => <ChipEstado label={RELLENO[m.relleno].label} tone={RELLENO[m.relleno].tone} />,
       },
       {
+        /* Qué hace el mapa con este municipio: dibuja sus barrios o sólo el
+           contorno (los barrios quedan como pines). El motivo viene del
+           marcador en texto llano, así que va como texto secundario + title. */
+        id: 'cartografia', header: 'Mapa', width: 'minmax(150px, 1.1fr)', kind: 'chip',
+        sortValue: (m) => (m.cartografiado ? 0 : 1),
+        cell: (m) => (
+          <span className="territorio-motivo" title={m.motivo_cartografiado ?? undefined}>
+            <ChipEstado label={m.cartografiado ? 'Dibuja barrios' : 'Sólo contorno'} tone={m.cartografiado ? 'green' : 'gray'} />
+            {m.motivo_cartografiado && <span className="territorio-motivo-texto">{m.motivo_cartografiado}</span>}
+          </span>
+        ),
+      },
+      {
         id: 'hojas', header: 'Nombres', width: 'minmax(110px, 0.9fr)', align: 'right', kind: 'metric',
         cell: (m) => (
           <MetricCell
@@ -768,6 +781,23 @@ export default function Territorio() {
     ],
     [colores],
   );
+
+  /* ---------- Municipio: la misma píldora de la columna Mapa, con el motivo
+     entero, arriba de la tabla de nombres ---------- */
+  const cartografiaMuni = detalle?.municipio ?? muniActual;
+  const fichaCartografia =
+    nivel === 'municipio' && cartografiaMuni ? (
+      <div className="territorio-cartografia">
+        <span className="territorio-cartografia-label">Mapa</span>
+        <ChipEstado
+          label={cartografiaMuni.cartografiado ? 'Dibuja barrios' : 'Sólo contorno'}
+          tone={cartografiaMuni.cartografiado ? 'green' : 'gray'}
+        />
+        {cartografiaMuni.motivo_cartografiado && (
+          <span className="territorio-cartografia-texto">{cartografiaMuni.motivo_cartografiado}</span>
+        )}
+      </div>
+    ) : null;
 
   /* ---------- Solapa INFORMACIÓN: la tabla del contexto ----------
      Los statusTabs los pinta la FilterBar (el cuerpo es un slot), por eso la
@@ -996,7 +1026,15 @@ export default function Territorio() {
       activeStatus={tab}
       onStatusChange={setTab}
       filterSummary={filtroResumen}
-      viewSlots={{ table: <div className="territorio-cuerpo">{tabla}</div>, map: mapa }}
+      viewSlots={{
+        table: (
+          <div className="territorio-cuerpo">
+            {fichaCartografia}
+            {tabla}
+          </div>
+        ),
+        map: mapa,
+      }}
       kind="plain"
       columns={columnasMunicipios}
       rows={munisVisibles}
