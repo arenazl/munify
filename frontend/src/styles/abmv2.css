@@ -5331,3 +5331,42 @@ button.av2-chip:hover { opacity: 0.85; }
   display: flex;
   flex-direction: column;
 }
+
+/* --- [v3.3] Recorrido por niveles: flecha volver + migas antes del buscador.
+   Las migas ceden ancho (min-width 0 + elipsis); el buscador sigue siendo el
+   flex-grow de la fila. --- */
+.av2-recorrido {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42%;
+}
+.av2-recorrido-volver { flex: 0 0 36px; }
+.av2-recorrido-sep {
+  flex: 0 0 auto;
+  color: var(--pl-text-faint);
+}
+.av2-recorrido-miga {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 180px;
+}
+button.av2-recorrido-miga { cursor: pointer; }
+button.av2-recorrido-miga:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+.av2-recorrido-miga--actual { color: var(--pl-text); }

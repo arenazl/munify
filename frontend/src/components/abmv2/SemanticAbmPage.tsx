@@ -220,6 +220,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
     viewLabels,
     pantallaCompleta,
     searchSuggestions,
+    trail,
     sort,
     onSortChange,
     defaultSort,
@@ -609,6 +610,7 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
         steps={steps}
         viewLabels={viewLabels}
         searchSuggestions={searchSuggestions}
+        trail={trail}
         pantallaCompleta={
           ofreceCompleta ? { activa: completaActiva, onToggle: alternarCompleta } : undefined
         }

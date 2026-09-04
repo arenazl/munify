@@ -56,6 +56,7 @@ Pendiente que NO entra acá: en touch (pinch) no se midió nada.
 | `ViewKind 'map'` + `viewLabels` | Con DOS vistas el segmented muestra icono + label (solapas); con 3+ sólo icono | `ListToolbar.tsx` |
 | `pantallaCompleta: ViewKind[]` | El orquestador maximiza el BLOQUE controles + cuerpo (`.av2-mapa-full`), nunca el cuerpo solo. Hook `usePantallaCompleta` en modo CSS por defecto: la Fullscreen API nativa tapa los portales (ModernSelect, SideModal) | `SemanticAbmPage.tsx`, `usePantallaCompleta.ts` |
 | `searchSuggestions` | Autocomplete bajo el buscador: `{ items, onPick, emptyMessage? }`; flechas, Enter, Esc; sin efectos ni setState en render | `ListToolbar.tsx` |
+| `trail` | Recorrido por niveles: flecha "volver" + migas ANTES del buscador (`{ items, onBack, onGo? }`); en el raíz la flecha queda deshabilitada; en angosto sólo flecha + nivel actual. Pedido del dueño al probar Territorio: "no tengo manera de ir para atrás" | `ListToolbar.tsx` |
 | Aviso dev de "views de menos" | Sólo cuando hay `roles` (sin roles el kit no puede dibujar las otras) | `SemanticAbmPage.tsx` |
 
 CSS: sección `[v3.3]` al final de `styles/abmv2.css`.
@@ -76,7 +77,10 @@ ordenar por columna, el botón (`sortSpec`) para criterios semánticos.
 Pedido textual: "hay que trabajar un montón la pantalla, no quedó intuitiva".
 
 - **Combos** País · Provincia · Municipio (`selects` del kit; el de municipio
-  aparece al elegir provincia, "Todos" vuelve). Se fueron las migas.
+  aparece al elegir provincia, "Todos" vuelve).
+- **Recorrido** (`trail`): flecha volver + migas País › Provincia › Municipio
+  al lado del buscador; tocar una miga sube a ese nivel. (Primero se habían
+  sacado las migas; el dueño las pidió de vuelta al entrar por la grilla.)
 - **Buscador con autocomplete** por nivel: en el país sugiere provincias (3)
   y municipios; en la provincia, municipios; adentro del municipio, barrios.
   Elegir navega (o ubica en el mapa). Sin acentos ("cord" → Córdoba).

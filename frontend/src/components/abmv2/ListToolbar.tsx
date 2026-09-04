@@ -33,10 +33,12 @@
  * todo token `--pl-*` — cero colores fijos.
  */
 import {
+  ArrowLeft,
   ArrowUpDown,
   CalendarDays,
   CalendarRange,
   Check,
+  ChevronRight,
   FolderTree,
   Layers,
   LayoutGrid,
@@ -48,7 +50,7 @@ import {
   Rows3,
   Search,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useAnchoAngosto } from './FichaRegistro';
 import type { LucideIcon } from 'lucide-react';
@@ -118,6 +120,7 @@ export function ListToolbar({
   viewLabels,
   pantallaCompleta,
   searchSuggestions,
+  trail,
 }: ListToolbarProps) {
   /* [v3.3] Con DOS vistas el segmented se lee como SOLAPAS: icono + label.
      Con tres o más, sólo icono (el ancho de la fila manda). */
@@ -190,6 +193,52 @@ export function ListToolbar({
 
   return (
     <div className="av2-toolbar" ref={refAncho}>
+      {/* [v3.3] Recorrido por niveles: flecha "volver" + migas, ANTES del
+          buscador. En el raíz la flecha queda deshabilitada; en angosto sólo
+          flecha + nivel actual (las migas completas no entran). */}
+      {trail && trail.items.length > 0 && (() => {
+        const ultimo = trail.items[trail.items.length - 1];
+        const enRaiz = trail.items.length < 2;
+        return (
+          <nav className="av2-recorrido" aria-label="Recorrido">
+            <button
+              type="button"
+              className="av2-btn-secundario av2-btn-icono av2-recorrido-volver"
+              onClick={trail.onBack}
+              disabled={enRaiz}
+              title={enRaiz ? 'Estás en el nivel más alto' : 'Volver un nivel'}
+              aria-label="Volver un nivel"
+            >
+              <ArrowLeft size={15} strokeWidth={2} aria-hidden />
+            </button>
+            {compacto ? (
+              <span className="av2-recorrido-miga av2-recorrido-miga--actual">{ultimo.label}</span>
+            ) : (
+              trail.items.map((it, i) => {
+                const esUltimo = i === trail.items.length - 1;
+                return (
+                  <Fragment key={it.id}>
+                    {i > 0 && <ChevronRight size={12} strokeWidth={2} className="av2-recorrido-sep" aria-hidden />}
+                    {esUltimo || !trail.onGo ? (
+                      <span
+                        className={`av2-recorrido-miga${esUltimo ? ' av2-recorrido-miga--actual' : ''}`}
+                        aria-current={esUltimo ? 'location' : undefined}
+                      >
+                        {it.label}
+                      </span>
+                    ) : (
+                      <button type="button" className="av2-recorrido-miga" onClick={() => trail.onGo?.(it.id)}>
+                        {it.label}
+                      </button>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+          </nav>
+        );
+      })()}
+
       {/* label como wrapper: click en cualquier parte enfoca el input.
           [v3.3] Con sugerencias, el label va dentro de un wrapper relativo
           que sostiene el panel; sin ellas el DOM es el de siempre. */}

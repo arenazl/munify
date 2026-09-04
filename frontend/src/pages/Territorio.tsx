@@ -18,6 +18,9 @@
  *  - "combo de país, de provincia, de municipios": los tres son `selects`
  *    del kit, siempre a la vista. El de municipio aparece al elegir una
  *    provincia ("Todos" vuelve a la provincia).
+ *  - "cuando voy entrando en los nodos no tengo manera de ir para atrás…
+ *    una flecha y una miga de pan": `trail` del kit — flecha volver + migas
+ *    al lado del buscador (País › Provincia › Municipio).
  *  - "el buscador tiene que ser con autocomplete para cualquiera de estos
  *    niveles": `searchSuggestions` del kit — sugiere provincias, municipios
  *    o barrios según dónde estés; elegir uno navega.
@@ -63,6 +66,7 @@ import type {
   SearchSuggestion,
   SelectSpec,
   StatusTab,
+  TrailSpec,
   ViewKind,
 } from '../components/abmv2/types';
 import { BASEMAP, BASEMAP_ATTR, BASEMAP_MAX_ZOOM, claseBasemap } from '../lib/basemaps';
@@ -877,6 +881,24 @@ export default function Territorio() {
     </div>
   );
 
+  /* ---------- Recorrido: flecha volver + migas (dueño: "cuando voy entrando
+     en los nodos no tengo manera de ir para atrás") ---------- */
+  const recorrido: TrailSpec = {
+    items: [
+      { id: 'pais', label: nombrePais(pais) },
+      ...(provincia ? [{ id: 'provincia', label: provincia }] : []),
+      ...(muniActual ? [{ id: 'municipio', label: muniActual.nombre }] : []),
+    ],
+    onBack: () => {
+      if (muniId) irAProvincia(provincia);
+      else if (provincia) irAProvincia(null);
+    },
+    onGo: (id) => {
+      if (id === 'pais') irAProvincia(null);
+      else if (id === 'provincia') irAProvincia(provincia);
+    },
+  };
+
   const placeholderBusqueda =
     nivel === 'municipio'
       ? 'Buscar un barrio o localidad…'
@@ -906,6 +928,7 @@ export default function Territorio() {
       searchPlaceholder={placeholderBusqueda}
       search={busqueda}
       onSearchChange={setBusqueda}
+      trail={recorrido}
       searchSuggestions={{
         items: sugerencias,
         onPick: elegirSugerencia,

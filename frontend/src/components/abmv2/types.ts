@@ -206,6 +206,27 @@ export interface SearchSuggestionsSpec {
   emptyMessage?: string;
 }
 
+/**
+ * [v3.3] RECORRIDO de una pantalla que se navega por niveles (país →
+ * provincia → municipio; dependencia → área → puesto): flecha "volver" +
+ * migas al lado del buscador. Why (dueño, Territorio 2026-09-03): "cuando
+ * voy entrando en los nodos no tengo manera de ir para atrás; una flecha y
+ * que te vaya mostrando como una miga de pan el nivel". `items` va del raíz
+ * al nivel actual; en el raíz la flecha queda deshabilitada. En contenedor
+ * angosto se dibujan la flecha y el nivel actual solamente.
+ */
+export interface TrailItem {
+  id: string;
+  label: string;
+}
+export interface TrailSpec {
+  items: TrailItem[];
+  /** Un nivel arriba. */
+  onBack: () => void;
+  /** Saltar a un nivel tocando su miga. Omitido ⇒ migas sólo informativas. */
+  onGo?: (id: string) => void;
+}
+
 export interface ListToolbarProps {
   searchPlaceholder: string;
   /** Valor controlado del buscador. */
@@ -246,6 +267,8 @@ export interface ListToolbarProps {
   pantallaCompleta?: { activa: boolean; onToggle: () => void };
   /** [v3.3] Sugerencias bajo el buscador (ver SearchSuggestionsSpec). */
   searchSuggestions?: SearchSuggestionsSpec;
+  /** [v3.3] Recorrido por niveles: flecha volver + migas (ver TrailSpec). */
+  trail?: TrailSpec;
 }
 
 /* ============================================================
@@ -957,6 +980,8 @@ export interface SemanticAbmPageProps<Row = unknown> {
   pantallaCompleta?: ViewKind[];
   /** Sugerencias bajo el buscador (pass-through a ListToolbar). */
   searchSuggestions?: SearchSuggestionsSpec;
+  /** Recorrido por niveles: flecha volver + migas (pass-through a ListToolbar). */
+  trail?: TrailSpec;
   /** Orden por cabecera de la tabla (pass-through a DataTable). */
   sort?: SortState | null;
   onSortChange?: (sort: SortState | null) => void;
