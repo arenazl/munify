@@ -158,8 +158,10 @@ const HOST_TO_BRAND: Record<string, string> = {
   // como la marca sale del host, un solo deploy sirve a las dos y Paraguay
   // Limpio nunca queda en una version distinta de la app.
   'pylimpio.munify.com.ar': 'paraguay-limpio',
-  // El de Netlify queda hasta que se dé de baja ese site (sirve un build
-  // congelado del 27/08 por los créditos agotados de la cuenta).
+  // El de Netlify sigue RESPONDIENDO (verificado 2026-09-03: http 200) con un
+  // build congelado del 27/08 — la plataforma salio de uso pero el site no se
+  // dio de baja. Se deja mapeado para que, si alguien entra por ahi, al menos
+  // vea la marca correcta. Darlo de baja es tarea de Infra.
   'paraguay-limpio.netlify.app': 'paraguay-limpio',
 };
 
@@ -301,7 +303,7 @@ export const ACCESOS_DE_MARCA: Array<{ ruta: string; codigo: string }> = Object.
 /**
  * Qué marca mostrar. En orden, de lo más explícito a lo más general:
  *
- *   1. HOST propio de la marca (paraguay-limpio.netlify.app).
+ *   1. HOST propio de la marca (pylimpio.munify.com.ar).
  *   2. RUTA de entrada — `/asuncion` abre Paraguay Limpio y `/py/asuncion` la
  *      demo con marca Munify, en CUALQUIER dominio. Es la vía que pidió el
  *      dueño: el dominio pelado lleva al acceso de siempre y sólo la ruta de

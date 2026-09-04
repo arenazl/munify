@@ -1,119 +1,163 @@
 # Deploy · Munify
 
-Pipeline canónico de deploy. **Reglas duras en [`CLAUDE.md`](../../CLAUDE.md) §15** — esto es la versión expandida.
+Pipeline canónico de deploy. **Reglas duras en [`CLAUDE.md`](../../CLAUDE.md) §15** — esto
+es la versión expandida. Todo lo de acá está **verificado contra los triggers reales**
+(`gcloud builds triggers describe`, 2026-09-03), no contra memoria.
 
-> **HEROKU ESTÁ MUERTO.** No existe más para este proyecto. Nunca `git push heroku`.
-> El backend vive en **Google Cloud Run**. Si ves `Procfile` o el remote `heroku`, es legacy.
+> **Dos plataformas muertas para este proyecto — no existen más:**
+> - **HEROKU.** Nunca `git push heroku`. Si ves un `Procfile` o el remote `heroku`, es legacy.
+> - **NETLIFY** (dueño, 2026-09-03). Todos los fronts están en **Cloudflare Pages**.
+>   Cualquier mención a `munify-qa.netlify.app`, `paraguay-limpio.netlify.app`,
+>   `netlify.toml`, `netlify deploy` o a site IDs de Netlify es legacy.
 
-## Arquitectura de prod
+## Arquitectura real
 
 ```
-┌──────────────────┐       ┌────────────────────────┐       ┌──────────────────┐
-│     Netlify      │──────▶│   Google Cloud Run     │──────▶│   Aiven MySQL    │
-│  app.munify...   │       │  proyecto: munify-api  │       │  (cloud-managed) │
-│  (frontend)      │       │  servicio: munify-api  │       │                  │
-└──────────────────┘       └────────────────────────┘       └──────────────────┘
-        │                            │
-        └── git push origin ─────────┴── gcloud builds submit + gcloud run deploy
+  repo munify           Cloud Build (munify-api, us-east4)        destino
+  -----------           ---------------------------------        -------
+  push a qa     --+-->  deploy-munify-front-qa (frontend/**) -->  Pages munify-qa
+                  +-->  deploy-munify-api-qa   (backend/**)  -->  Cloud Run munify-api-qa
+  push a master --+-->  deploy-munify-front    (frontend/**) -->  Pages munify
+                  +-->  deploy-munify-api-us   (backend/**)  -->  Cloud Run munify-api
+
+  repo landing
+  push a qa/master  -->  deploy-munify-landing[-qa]  -->  Pages munify-landing[-qa]
+
+  repo munify-calls
+  push a main       -->  deploy-munify-calls         -->  Pages munify-calls
 ```
 
-| Componente | Producto | URL / id | Cómo deploya |
-|---|---|---|---|
-| App frontend | Netlify | `app.munify.com.ar` | `git push origin master` → auto-build |
-| Landing | Netlify (otro site) | `munify.com.ar` | `master` del repo separado `landing/` |
-| Backend API | **Google Cloud Run** | proyecto `munify-api`, región `southamerica-east1`, servicio `munify-api` | `gcloud builds submit` + `gcloud run deploy` |
-| Base de datos | Aiven MySQL | (privada) | — |
+| Trigger | Repo | Branch | Sólo si cambia | Publica en |
+|---|---|---|---|---|
+| `deploy-munify-front` | `munify` | `master` | `frontend/**` | Pages `munify` → **app.munify.com.ar** |
+| `deploy-munify-front-qa` | `munify` | `qa` | `frontend/**` | Pages `munify-qa` → **app-qa.munify.com.ar** |
+| `deploy-munify-api-us` | `munify` | `master` | `backend/**` | Cloud Run `munify-api` |
+| `deploy-munify-api-qa` | `munify` | `qa` | `backend/**` | Cloud Run `munify-api-qa` |
+| `deploy-munify-landing` | `landing` | `master` | — | Pages `munify-landing` → munify.com.ar |
+| `deploy-munify-landing-qa` | `landing` | `qa` | — | Pages `munify-landing-qa` |
+| `deploy-munify-calls` | **`munify-calls`** | `main` | — | Pages `munify-calls` → **calls.munify.com.ar** |
 
-- **URL del backend que usa el frontend:** `https://munify-api-1060106389361.southamerica-east1.run.app/api` **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: https://munify-api-vmpxsxe7ra-uk.a.run.app/api]**
-- Site IDs Netlify: App `edff37c1-2c43-4c01-ba71-d6c59f5cdc85` · Landing `522eac1f-fa1f-43d1-86ca-128e5467a27d`
-- **OJO:** el `gcloud config` default suele estar parado en `tasar-prod` (OTRA app del user). Por eso **todo comando lleva `--project=munify-api` explícito**.
+Base de datos: **Aiven MySQL** — `munify_prod` (prod) y `sugerenciasmun-qa` (QA).
 
-## Frontend (Netlify)
+Notas que evitan diagnósticos errados:
 
-### 1. Antes de pushear — build local
+- **El filtro de archivos importa.** Un commit que sólo toca `backend/` NO republica el
+  front, y uno que sólo toca `docs/` no dispara nada. Que no haya build **no** significa
+  que el CD esté roto.
+- **El front NO usa `VITE_API_URL`.** Pega a `/api` same-origin y el proxy lo hace una
+  **Pages Function** (`functions/_middleware.js`) contra la variable `BACKEND_ORIGIN` que
+  el trigger inyecta en el build: prod `https://munify-api-vmpxsxe7ra-uk.a.run.app`,
+  QA `https://munify-api-qa-vmpxsxe7ra-uk.a.run.app`. Un ambiente que setea `VITE_API_URL`
+  a una URL sin `/api` rompe TODO el front.
+- **Región única `us-east4`.** No existe más `southamerica-east1` (Brasil/São Paulo, dada
+  de baja). Cualquier URL `*.southamerica-east1.run.app` en docs o código es legacy.
+- **OJO con el `gcloud config` default:** suele estar parado en `tasar-prod` (OTRA app del
+  user). Por eso **todo comando lleva `--project=munify-api` explícito**.
+- **`calls` es OTRO repo.** La página de `calls.munify.com.ar` vive en
+  `github.com/arenazl/munify-calls` (branch único `main`). Tocar
+  `frontend/public/calls/` en este repo **no la publica**.
+
+## Frontend
+
+### 1. Antes de pushear — build local (sin excepciones)
+
 ```bash
 cd frontend && npm run build
 ```
-Si `tsc -b` falla, **Netlify también falla** y prod queda con el bundle viejo *silenciosamente*. **Sin excepciones.**
+
+Si `tsc -b` falla, el build de Cloud Build también falla y queda publicado el bundle
+viejo *silenciosamente*.
 
 ### 2. Push
+
 ```bash
-git push origin master    # Netlify rebuildea automático (integración nativa de GitHub, NO el workflow CI roto/legacy)
+git push origin qa       # dispara deploy-munify-front-qa
 ```
 
-### 3. Verificar
+`master` es exclusivo de Infra. El workflow `.github/workflows/cd.yml` está roto/legacy:
+el CD **no** pasa por GitHub Actions.
+
+### 3. Verificar (no asumir desde el commit)
+
 ```bash
-curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'   # comparar contra frontend/dist/index.html local
+# que build corrio y con que SHA
+gcloud builds list --project=munify-api --region=us-east4 \
+  --filter="substitutions.TRIGGER_NAME=deploy-munify-front-qa" --limit=3 \
+  --format="table(status,createTime,substitutions.SHORT_SHA)"
+
+# que bundle esta vivo
+curl -s https://app-qa.munify.com.ar/ | grep -oE "index-[A-Za-z0-9_-]+\.js"
 ```
 
-## Backend (Google Cloud Run)
+## Backend
 
-El user hace ~10 deploys/día con su flujo. **Claude NO deploya backend sin "dale" explícito** (es prod, outward-facing).
+**Claude NO deploya backend.** El CD lo gestiona Infra: el push a `qa` dispara
+`deploy-munify-api-qa`, que corre `gcloud run deploy munify-api-qa --source backend`.
+Nunca correr `gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update`
+a mano.
 
-Pipeline real (desde `backend/`):
+### Verificar que llegó
+
 ```bash
-# 1. Build de la imagen en Cloud Build → Artifact Registry
-gcloud builds submit --region=southamerica-east1 \
-  --tag=southamerica-east1-docker.pkg.dev/munify-api/munify/api:latest \
-  --project=munify-api .
+gcloud builds list --project=munify-api --region=us-east4 \
+  --filter="substitutions.TRIGGER_NAME=deploy-munify-api-qa" --limit=3 \
+  --format="table(status,createTime,substitutions.SHORT_SHA)"
 
-# 2. Deploy a Cloud Run
-gcloud run deploy munify-api \
-  --image=southamerica-east1-docker.pkg.dev/munify-api/munify/api:latest \
-  --region=southamerica-east1 --allow-unauthenticated --port=8080 \
-  --memory=512Mi --cpu=1 --min-instances=0 --max-instances=10 --timeout=300 \
-  --env-vars-file=env.yaml \
-  --set-secrets=DATABASE_URL=DATABASE_URL:latest,SECRET_KEY=SECRET_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,GROK_API_KEY=GROK_API_KEY:latest,SMTP_PASSWORD=SMTP_PASSWORD:latest,CLOUDINARY_API_SECRET=CLOUDINARY_API_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,DIDIT_API_KEY=DIDIT_API_KEY:latest,VAPID_PRIVATE_KEY=VAPID_PRIVATE_KEY:latest \
-  --project=munify-api
-```
+gcloud run revisions list --service=munify-api-qa --region=us-east4 --project=munify-api
 
-### Verificar que llegó (NO asumir desde commits)
-Un `git push origin master` versiona pero **NO deploya el backend**. Para saber qué está realmente vivo:
-```bash
-curl -s https://munify-api-1060106389361.southamerica-east1.run.app/openapi.json | python -m json.tool | grep -i "ruta o schema que esperás"
+curl -s https://munify-api-qa-vmpxsxe7ra-uk.a.run.app/openapi.json | head -c 400
 ```
-**[DESCONTINUADO 2026-07-11]** URL SP aislada → usar us-east4: `https://munify-api-vmpxsxe7ra-uk.a.run.app/openapi.json`
-Que un commit exista en master **no** significa que esté deployado en Cloud Run.
 
 ## Variables de entorno
 
-### Backend
-- **Públicas:** `backend/env.yaml` (ENVIRONMENT, FRONTEND_URL, CORS_ORIGINS, GEMINI_MODEL, CLOUDINARY_CLOUD_NAME/API_KEY, SMTP_HOST/PORT/USER, VAPID_PUBLIC_KEY, etc.).
-- **Secretas:** Google **Secret Manager** (proyecto `munify-api`), inyectadas con `--set-secrets`. Las 9:
-  `DATABASE_URL`, `SECRET_KEY`, `GEMINI_API_KEY`, `GROK_API_KEY`, `SMTP_PASSWORD`, `CLOUDINARY_API_SECRET`, `GOOGLE_CLIENT_SECRET`, `DIDIT_API_KEY`, `VAPID_PRIVATE_KEY`.
-  - Ver/actualizar: `gcloud secrets versions access latest --secret=NOMBRE --project=munify-api` / `gcloud secrets versions add NOMBRE --data-file=- --project=munify-api`.
-- **Nunca** pegar valores literales en docs ni código. Valores de referencia en `d:/Code/APP_GUIDE/.env.master`.
-
-### Frontend (Netlify — Site settings → Environment variables)
-| Variable | Para qué |
-|---|---|
-| `VITE_API_URL` | URL del backend en Cloud Run (`https://munify-api-1060106389361.southamerica-east1.run.app/api`) **[DESCONTINUADO 2026-07-11, SP aislado → usar us-east4: `https://munify-api-vmpxsxe7ra-uk.a.run.app/api`]** |
+- **Públicas del backend:** van en el propio trigger (`--set-env-vars`), no en un archivo
+  del repo. Ahí viven `ENVIRONMENT`, `FRONTEND_URL`, `CORS_ORIGINS`, `AI_PROVIDER_ORDER`,
+  `GEMINI_MODEL`, `GROQ_MODEL`, `CLOUDINARY_CLOUD_NAME`/`API_KEY`, `SMTP_*`, `VAPID_PUBLIC_KEY`.
+- **Secretas:** Google **Secret Manager** (proyecto `munify-api`), inyectadas con
+  `--set-secrets`. QA usa las variantes `*_QA` para `DATABASE_URL` y `SECRET_KEY`.
+  - Leer: `gcloud secrets versions access latest --secret=NOMBRE --project=munify-api`
+  - Nueva versión: `gcloud secrets versions add NOMBRE --data-file=- --project=munify-api`
+- **Reparto:** los secretos **de la app** (Gemini, Groq, Brevo, client IDs) los carga la
+  app; los de **acceso a datos** (`DATABASE_URL`, `SECRET_KEY`) y las credenciales de
+  **cuenta** (token de Cloudflare, SA de GCP) son de Infra. Detalle:
+  `base-compartida/20-REPARTO-SECRETOS-Y-PLATAFORMA.md`.
+- **Nunca** pegar valores literales en docs ni código.
 
 ## Lo que NO hay que hacer
 
 | Anti-patrón | Por qué |
 |---|---|
-| `git push heroku` | Heroku está MUERTO. No deploya nada, da falsa sensación de deploy. Causó un desastre real. |
-| `netlify deploy --prod --dir dist` desde CLI | Rompe trazabilidad (deploy sin commit). Pipeline es `git push` → auto-build. |
-| Pushear sin `npm run build` local | El error de TS te lo come Netlify y prod queda con bundle viejo. |
-| Asumir deploy de backend desde un push a git | El push NO deploya Cloud Run; verificar el OpenAPI vivo. |
+| `git push heroku` | Heroku está MUERTO. No deploya nada y da falsa sensación de deploy. |
+| `netlify deploy` / buscar el dashboard de Netlify | Netlify no se usa más. Los fronts están en Cloudflare Pages. |
+| `wrangler pages deploy` a mano | Rompe la trazabilidad commit → deploy. El CD lo hace solo con el push. |
+| `gcloud run deploy` / `gcloud builds submit` a mano | El CD del backend es de Infra. |
+| Pushear sin `npm run build` local | El error de TS rompe el build y queda publicado el bundle viejo. |
+| Deducir "no se publicó" de que no hubo build | Puede ser el filtro `frontend/**` / `backend/**`. Mirar el filtro antes. |
+| Editar `frontend/public/calls/` esperando verlo en calls.munify.com.ar | Es otro repo (`munify-calls`). |
 | Confiar en el `gcloud` default | Suele estar en `tasar-prod` (otra app). Siempre `--project=munify-api`. |
 
 ## Troubleshooting
 
-### Backend: ver logs / estado
-```bash
-gcloud run services logs read munify-api --region=southamerica-east1 --project=munify-api --limit=50
-gcloud run services describe munify-api --region=southamerica-east1 --project=munify-api
-```
+### Un push no publicó nada
 
-### Bundle viejo en prod después de push (frontend)
-El build de Netlify falló silencioso → mirar Netlify dashboard → builds. Arreglar el error de TS local, `npm run build`, push de nuevo.
+1. ¿El commit tocó archivos que el trigger filtra? (`frontend/**` / `backend/**`)
+2. ¿Hay build?
+   ```bash
+   gcloud builds list --project=munify-api --region=us-east4 --limit=10 \
+     --format="table(status,createTime,substitutions.TRIGGER_NAME,substitutions.SHORT_SHA)"
+   ```
+3. ¿Falló? `gcloud builds log <BUILD_ID> --project=munify-api --region=us-east4`
+
+### Backend: logs y estado
+
+```bash
+gcloud run services logs read munify-api-qa --region=us-east4 --project=munify-api --limit=50
+gcloud run services describe munify-api-qa --region=us-east4 --project=munify-api
+```
 
 ## Landing (repo separado)
 
-La landing comercial vive en su propio repo (`d:/Code/sugerenciasMun/landing/` → `github.com/arenazl/landing.git`). Mismo pipeline:
-```bash
-cd landing && git add . && git commit -m "..." && git push origin master
-```
-Netlify rebuildea sola. **No `netlify deploy --prod` acá tampoco.**
+Vive en su propio repo (`d:/Code/sugerenciasMun/landing/` → `github.com/arenazl/landing`,
+ignorado por el git de este repo). Mismo mecanismo: push a `qa` dispara
+`deploy-munify-landing-qa`; `master` lo publica Infra. **Un push desde la raíz de este
+repo NO sube la landing** — hay que pushear cada uno por su lado.

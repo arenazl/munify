@@ -83,16 +83,23 @@ Antes de pushear, mínimo:
 Después de pushear:
 
 ```bash
-# 1. Hash del bundle en prod vs local
-curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'
-# Comparar contra dist/index.html local. Si difieren, el build de Netlify falló.
+# 1. El build corrio? (el push a qa dispara los triggers de Cloud Build)
+gcloud builds list --project=munify-api --region=us-east4 --limit=5   --format="table(status,createTime,substitutions.TRIGGER_NAME,substitutions.SHORT_SHA)"
 
-# 2. Backend Heroku vivo
-curl https://munify-backend.herokuapp.com/health   # o equivalente
+# 2. Hash del bundle vivo en QA vs el local
+curl -s https://app-qa.munify.com.ar/ | grep -oE "index-[A-Za-z0-9_-]+\.js"
+# Comparar contra frontend/dist/index.html local.
 
-# 3. Logs si algo huele mal
-heroku logs --tail -a munify-backend
+# 3. Backend de QA vivo
+curl -s https://munify-api-qa-vmpxsxe7ra-uk.a.run.app/health
+
+# 4. Logs si algo huele mal
+gcloud run services logs read munify-api-qa --region=us-east4 --project=munify-api --limit=50
 ```
+
+> Ni Heroku ni Netlify existen para este proyecto. Fronts en **Cloudflare Pages**,
+> backend en **Cloud Run** (`us-east4`), todo publicado por triggers de Cloud Build.
+> Mapa completo en [`02-deploy.md`](02-deploy.md).
 
 ## Lo que NO es vivo acá
 

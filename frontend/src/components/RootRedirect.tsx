@@ -8,7 +8,7 @@ import { rutaDeAccesoInstalada } from '../brands';
 /**
  * Componente que maneja la redirección inteligente en la ruta raíz.
  *
- * Funciona con Netlify usando query params: tuapp.netlify.app/?municipio=merlo
+ * Funciona con query params en cualquier host: app-qa.munify.com.ar/?municipio=merlo
  *
  * Lógica:
  * 1. Si hay usuario logueado → redirigir según su rol a /gestion

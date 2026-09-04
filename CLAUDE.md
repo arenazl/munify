@@ -1,5 +1,22 @@
 # Instrucciones para Claude — reglas duras
 
+> ### OJO: hay un SUBPROYECTO hermano — `munify-calls`
+>
+> La página de llamados comerciales (`calls.munify.com.ar`) **ya no vive acá**: tiene
+> repo propio en `d:\Code\munify-calls` (`github.com/arenazl/munify-calls`, branch
+> único **`main`**), con **su propio `CLAUDE.md`**. Los dos proyectos están
+> relacionados y ninguno se entiende solo:
+>
+> - la **página** está allá; el **backend que consume** está acá
+>   (`backend/api/calls.py`, `calls_ia.py`, `calls_push.py`, montados en
+>   `/api/public/calls`) y usa la **base de QA**;
+> - un cambio de ruta o de payload casi nunca es de un solo lado.
+>
+> Si estás trabajando en la página de llamados, la doc que manda es
+> `d:\Code\munify-calls\CLAUDE.md` y esta es la auxiliar. **Pushear a `qa` acá NO
+> publica calls** — calls publica con push a `main` de su repo.
+
+
 ## REGLA PRINCIPAL
 
 **ANTES de tocar UNA SOLA línea de código en este repo, leer `BUILD_GUIDE.md`** (en
@@ -189,7 +206,7 @@ Si el user duda de un resultado o pregunta "¿esto es real?", ejecutar query/scr
 contra la fuente real (DB, API, código), no responder con hipótesis.
 
 ### 14. CLIs primero, dashboard después
-El user tiene `gh`, `gcloud`, `netlify`, `git`, `npm`, `node`, `python`, `docker`
+El user tiene `gh`, `gcloud`, `wrangler`, `git`, `npm`, `node`, `python`, `docker`
 autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI.
 
 ### 15. Deploy — DÓNDE VIVE CADA COSA (fuente única, leer antes de deployar)
@@ -199,30 +216,49 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 > ignorarlo. Un push a Heroku NO deploya nada (el servicio está inactivo) y da
 > la falsa sensación de haber deployado. Esto ya causó un desastre real.
 
-**Arquitectura de producción:**
+> **NETLIFY TAMPOCO EXISTE MÁS** (dueño, 2026-09-03). **Todos** los fronts del
+> ecosistema Munify están en **Cloudflare Pages**. Cualquier mención en docs, código
+> o memoria a `munify-qa.netlify.app`, `paraguay-limpio.netlify.app`, `netlify.toml`,
+> `netlify deploy` o a site IDs de Netlify es **legacy**: ignorarla o corregirla.
 
-| Capa | Dónde corre | Cómo se deploya |
-|---|---|---|
-| **Frontend** | Netlify (`app.munify.com.ar`) | `git push origin master` → Netlify auto-build |
-| **Backend** | **Google Cloud Run**, proyecto `munify-api`, región **`us-east4`** (única — ver nota abajo) | `git push origin master` → CD gestionado por Infra |
-| **DB** | MySQL en Aiven | — |
+**Arquitectura REAL (verificada contra los triggers de Cloud Build, 2026-09-03):**
 
-- **Servicio Cloud Run:** `munify-api`, región `us-east4`. URL que usa el frontend:
-  `https://munify-api-1060106389361.us-east4.run.app/api`.
-- **Región única: `us-east4`.** No existe más `southamerica-east1` (era la región vieja,
-  Brasil/São Paulo — quedó zombie y se dio de baja). Cualquier referencia a
-  `southamerica-east1` en código/docs/URLs es legacy: ignorarla o corregirla.
+Todo el CD son triggers de **Cloud Build** (proyecto GCP `munify-api`, región
+`us-east4`). Ninguno se dispara a mano: los dispara el push al branch que filtran.
+
+| Trigger | Repo | Branch | Sólo si cambia | Publica en |
+|---|---|---|---|---|
+| `deploy-munify-front` | `munify` | `master` | `frontend/**` | Pages `munify` → **app.munify.com.ar** |
+| `deploy-munify-front-qa` | `munify` | `qa` | `frontend/**` | Pages `munify-qa` → **app-qa.munify.com.ar** |
+| `deploy-munify-api-us` | `munify` | `master` | `backend/**` | Cloud Run `munify-api` |
+| `deploy-munify-api-qa` | `munify` | `qa` | `backend/**` | Cloud Run `munify-api-qa` |
+| `deploy-munify-landing` | `landing` | `master` | — | Pages `munify-landing` → munify.com.ar |
+| `deploy-munify-landing-qa` | `landing` | `qa` | — | Pages `munify-landing-qa` |
+| `deploy-munify-calls` | **`munify-calls`** | `main` | — | Pages `munify-calls` → **calls.munify.com.ar** |
+
+- **DB:** MySQL en Aiven — `munify_prod` (prod) y `sugerenciasmun-qa` (QA).
+- **El front no lleva `VITE_API_URL`:** usa `/api` same-origin y el proxy lo hace una
+  **Pages Function** (`functions/_middleware.js`) contra la variable `BACKEND_ORIGIN`
+  del build. Prod → `munify-api-vmpxsxe7ra-uk.a.run.app`; QA → `munify-api-qa-vmpxsxe7ra-uk.a.run.app`.
+- **El filtro `frontend/**` importa:** un commit que sólo toca `backend/` NO republica
+  el front, y viceversa. Que no haya build no significa que el CD esté roto.
+- **Región única: `us-east4`.** No existe más `southamerica-east1` (Brasil/São Paulo,
+  dada de baja). Cualquier referencia a esa región es legacy.
 - **OJO con el `gcloud config` default:** suele estar parado en otro proyecto del
   user (`tasar-prod`, que es OTRA app). Por eso **TODO comando de Munify lleva
   `--project=munify-api` explícito**. Nunca confiar en el proyecto default.
 
-**Frontend (Netlify):**
+**Frontend:**
 1. **Antes de pushear front**, correr `cd frontend && npm run build` **localmente**. Si falla
-   `tsc -b`, Netlify también falla y la versión vieja queda en prod silenciosamente. **Sin excepciones.**
-2. `git push origin master` → Netlify reconstruye vía su integración nativa de GitHub
-   (NO GitHub Actions; el workflow `.github/workflows/cd.yml` está roto/legacy — ignorarlo).
-3. Verificar: `curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'` vs `dist/index.html` local.
-4. NUNCA `netlify deploy --prod --dir dist` directo (rompe trazabilidad). Solo `git push` → auto-build.
+   `tsc -b`, el build de Cloud Build también falla y la versión vieja queda publicada
+   silenciosamente. **Sin excepciones.**
+2. `git push origin qa` → dispara `deploy-munify-front-qa`. (El workflow
+   `.github/workflows/cd.yml` está roto/legacy — ignorarlo, el CD no pasa por GitHub Actions.)
+3. Verificar qué build corrió:
+   `gcloud builds list --project=munify-api --region=us-east4 --filter="substitutions.TRIGGER_NAME=deploy-munify-front-qa" --limit=3 --format="table(status,createTime,substitutions.SHORT_SHA)"`
+   y el bundle vivo: `curl -s https://app-qa.munify.com.ar/ | grep -oE 'index-\w+\.js'`.
+4. NUNCA un deploy manual (`wrangler pages deploy`, `netlify deploy`): rompe la
+   trazabilidad commit → deploy. Sólo `git push`.
 
 **Backend (Cloud Run):** **Claude NO deploya — el CD lo gestiona Infra.** Nunca correr
 `gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update` manualmente para
@@ -269,9 +305,11 @@ Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 > Sigue vedado SIEMPRE para la app: ejecutar contra la base de producción y
 > promover qa→prod. Y ninguna sesión autoriza por otra (regla 4 del doc).
 >
-> Nota de plataforma (mismo doc): **el front de QA vive en Cloudflare Pages**
-> (`app-qa.munify.com.ar`, CD por push vía Cloud Build de Infra); Netlify es
-> plataforma SALIENTE — prod sigue ahí hasta que Infra la migre.
+> Nota de plataforma: **los fronts viven en Cloudflare Pages** — QA en
+> `app-qa.munify.com.ar` y prod en `app.munify.com.ar`, ambos con CD por push
+> vía Cloud Build de Infra. **Netlify NO SE USA MÁS en este proyecto**
+> (dueño, 2026-09-03): cualquier mención a `munify-qa.netlify.app`, a
+> `netlify deploy` o a site IDs de Netlify en docs o scripts es legacy.
 
 **VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero el deploy a
 Cloud Run lo dispara Infra por su cuenta (puede no ser instantáneo). Para saber qué está
@@ -284,12 +322,12 @@ significa que ya esté deployado en Cloud Run.
 **Notas:**
 - **El user trabaja local** (desde 2026-08-06). Levantar la app localmente para ver un cambio
   funcionando es la vía normal, no una excepción.
-- Netlify production branch: `master` (→ prod). **`qa` NO es un preview: es un ambiente COMPLETO**
-  (backend `munify-api-qa` + DB `sugerenciasmun-qa` + front `munify-qa.netlify.app`). Flujo de
-  trabajo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. `qa` queda **sólo para
-  pruebas, cuando el user lo pide** — Claude no lo actualiza por su cuenta. **El camino
-  `qa`→`master` (a producción) es exclusivo de Infra.**
-- Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
+- **`qa` NO es un preview: es un ambiente COMPLETO** (backend `munify-api-qa` +
+  DB `sugerenciasmun-qa` + front `app-qa.munify.com.ar` en Cloudflare Pages).
+  Flujo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. El camino
+  `qa`→`master` (a producción) es exclusivo de Infra.
+- Proyectos de Cloudflare Pages: `munify` (prod, `app.munify.com.ar`), `munify-qa`
+  (QA, `app-qa.munify.com.ar`) y `munify-calls` (`calls.munify.com.ar`, repo aparte).
 
 **Carpeta compartida:** tu carpeta propia es `base-compartida/munify/` (= tu `id`). Ahí viven tus
 docs de coordinación con Infra (ej. `AMBIENTES.md`). La raíz de `base-compartida/` es solo

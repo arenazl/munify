@@ -33,8 +33,9 @@ export function getSubdomainMunicipio(): string | null {
     return null;
   }
 
-  // Ignorar dominios de hosting (Netlify, Heroku, Vercel, etc.)
-  const hostingDomains = ['netlify.app', 'herokuapp.com', 'vercel.app', 'render.com', 'railway.app'];
+  // Ignorar dominios de hosting. `pages.dev` es el de Cloudflare Pages, donde vive
+  // HOY el front (munify-qa.pages.dev): sin el, se leia "munify-qa" como municipio.
+  const hostingDomains = ['pages.dev', 'netlify.app', 'herokuapp.com', 'vercel.app', 'render.com', 'railway.app'];
   if (hostingDomains.some(domain => hostname.endsWith(domain))) {
     return null;
   }
@@ -47,8 +48,11 @@ export function getSubdomainMunicipio(): string | null {
   if (parts.length > 2) {
     const subdomain = parts[0].toLowerCase();
 
-    // Ignorar subdominios comunes que no son municipios
-    const ignoredSubdomains = ['www', 'api', 'admin', 'app', 'demo', 'staging', 'test'];
+    // Ignorar subdominios comunes que no son municipios. Los de la plataforma
+    // ('app-qa', 'qa', 'calls') son la razon por la que esto fallaba SOLO en QA:
+    // 'app' estaba y 'app-qa' no, asi que app-qa.munify.com.ar devolvia "app-qa"
+    // como codigo de municipio y le ganaba al ?municipio= de la URL.
+    const ignoredSubdomains = ['www', 'api', 'admin', 'app', 'app-qa', 'qa', 'calls', 'demo', 'staging', 'test'];
     if (ignoredSubdomains.includes(subdomain)) {
       return null;
     }

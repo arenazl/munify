@@ -9,7 +9,9 @@ const getApiUrl = () => {
   }
 
   // SIEMPRE same-origin, en todos los ambientes (framework-first):
-  //  - Netlify proxea /api/* al backend del ambiente (gen-redirects).
+  //  - En Cloudflare Pages, la Function functions/_middleware.js proxea /api/*
+  //    al backend del ambiente (variable BACKEND_ORIGIN del build). Netlify y
+  //    sus _redirects ya no se usan.
   //  - Dev local (vite): el proxy de vite.config.ts manda /api al backend QA
   //    real ("siempre contra la base de qa" — regla del dueño 2026-07-31).
   //  - ¿Backend local? SOLO con override explícito VITE_API_URL completo.
