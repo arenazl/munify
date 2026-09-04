@@ -123,6 +123,15 @@ async def auditoria_demos(
             for i, campo in enumerate(campos):
                 destino[campo] = int(fila[i + 1] or 0)
 
+    # El CONTORNO del municipio vive en el polígono de la zona única: la
+    # semilla lo copia desde `municipios_catalogo` (la zona ES el municipio).
+    # `municipios.limites_geojson` no lo escribe ningún proceso — leído solo,
+    # daba "Falta" en las 22 demos de QA y las 6 de prod (dueño, 2026-09-03:
+    # "esto es falso"). Se mantiene como fuente alternativa por si algún día
+    # se llena, pero la verdad operativa es la zona con polígono.
+    for d in por_id.values():
+        d["con_contorno"] = bool(d["con_contorno"]) or d["zonas_con_poligono"] > 0
+
     return list(por_id.values())
 
 
