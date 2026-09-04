@@ -40,13 +40,16 @@ export function applyBrand(): void {
     ? `/${BRAND.iconPath}/icon-96x96.png`
     : BRAND.logoSrc || null;
   if (faviconHref) {
-    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.head.appendChild(link);
-    }
+    // Se BORRAN todos los <link rel="icon"> del index antes de poner el de la
+    // marca. Pisar sólo el primero no alcanza: el index declara el SVG y el
+    // .ico de Munify, y el navegador se queda con el SVG (lo prefiere sobre
+    // cualquier PNG), así que la pestaña de la marca white-label seguiría
+    // mostrando el isotipo de Munify.
+    document.querySelectorAll('link[rel="icon"]').forEach((l) => l.remove());
+    const link = document.createElement('link');
+    link.rel = 'icon';
     link.type = 'image/png';
     link.href = faviconHref;
+    document.head.appendChild(link);
   }
 }

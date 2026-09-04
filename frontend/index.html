@@ -2,9 +2,13 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <!-- Iconos. TODOS salen de `node scripts/generar-iconos.mjs` (ver el
+         encabezado de ese archivo): mismo isotipo, mismo fondo y centrado por
+         masa. Si hace falta cambiar la marca, se cambia el SVG y se regenera —
+         no se recorta un PNG a mano, que es de donde venía el descentrado. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <!-- Viewport de PWA (estándar de base-compartida/11-FIX-VIEWPORT-PWA.md).
          `maximum-scale=1, user-scalable=no` mata el zoom al tocar un input y el

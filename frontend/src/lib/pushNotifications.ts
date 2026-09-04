@@ -201,8 +201,10 @@ export async function isSubscribed(): Promise<boolean> {
 export function showLocalNotification(title: string, options?: NotificationOptions): void {
   if (Notification.permission === 'granted') {
     new Notification(title, {
-      icon: '/icon-notification.png',
-      badge: '/icon-notification.png',
+      // Mismo criterio que el service worker: el tile para `icon`, la silueta
+      // blanca sobre transparente para `badge` (Android lo enmascara).
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-badge-96x96.png',
       ...options
     });
   }

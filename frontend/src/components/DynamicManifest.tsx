@@ -51,15 +51,27 @@ export default function DynamicManifest() {
       activeManifestUrl = manifestUrl;
     };
 
+    /**
+     * Set de iconos de un manifest. Los `any` y el `maskable` son archivos
+     * DISTINTOS y eso no es un detalle: declarar el mismo PNG con
+     * `purpose: 'any maskable'` (como estaba acá) hace que Android lo trate
+     * como maskable y le recorte el 20 % del borde — con el logo al 60 % del
+     * lado se comía el tilde. El maskable propio viene generado al 52 %
+     * justamente para sobrevivir a ese recorte.
+     * Los tres juegos de iconos (`/icons`, `brand/munify-py`,
+     * `brand/paraguay-limpio`) tienen los mismos nombres de archivo, así que
+     * esta función sirve para todos.
+     */
     const iconSet = (base: string) => [
-      { src: `${base}/icon-72x72.png`, sizes: '72x72', type: 'image/png' },
-      { src: `${base}/icon-96x96.png`, sizes: '96x96', type: 'image/png' },
-      { src: `${base}/icon-128x128.png`, sizes: '128x128', type: 'image/png' },
-      { src: `${base}/icon-144x144.png`, sizes: '144x144', type: 'image/png' },
-      { src: `${base}/icon-152x152.png`, sizes: '152x152', type: 'image/png' },
-      { src: `${base}/icon-192x192.png`, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: `${base}/icon-384x384.png`, sizes: '384x384', type: 'image/png' },
-      { src: `${base}/icon-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+      { src: `${base}/icon-72x72.png`, sizes: '72x72', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-96x96.png`, sizes: '96x96', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-128x128.png`, sizes: '128x128', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-144x144.png`, sizes: '144x144', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-152x152.png`, sizes: '152x152', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-192x192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-384x384.png`, sizes: '384x384', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: `${base}/icon-maskable-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ];
 
     const applyMunicipio = () => {
@@ -106,10 +118,7 @@ export default function DynamicManifest() {
           // La app es responsive (verificado en 390, 834 y 1440), así que no
           // hay motivo para pelearse con cómo el usuario tiene el aparato.
           orientation: 'any',
-          icons: [
-            { src: `${base}/icon-maskable-512x512.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-            ...iconSet(base),
-          ],
+          icons: iconSet(base),
           categories: ['government', 'utilities'],
           lang: 'es-AR',
           dir: 'ltr',
@@ -183,10 +192,10 @@ export default function DynamicManifest() {
         // Ver la nota de arriba: orientación libre para no forzar el giro
         // en tablets.
         orientation: 'any',
-        icons: [
-          { src: `${origin}/icon-notification.png`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-          ...iconSet(`${origin}/icons`),
-        ],
+        // `icon-notification.png` NO va acá: es el arte de las notificaciones
+        // push, no el icono de la app (y encima estaba declarado como
+        // `any maskable` en 512, así que Android instalaba la PWA con eso).
+        icons: iconSet(`${origin}/icons`),
         categories: ['government', 'utilities'],
         lang: 'es-AR',
         dir: 'ltr',

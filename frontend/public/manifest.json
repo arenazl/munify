@@ -4,7 +4,7 @@
   "description": "Sistema de gestion municipal",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e1e1e",
+  "background_color": "#0b1626",
   "theme_color": "#3b82f6",
   "orientation": "any",
   "icons": [

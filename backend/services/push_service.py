@@ -126,7 +126,10 @@ async def send_push_to_user(
     payload = {
         "title": title,
         "body": body,
-        "icon": icon or "/icon-notification.png",
+        # Arte por defecto de la notificacion: el icono generado de la marca
+        # (frontend/scripts/generar-iconos.mjs). Antes apuntaba a
+        # /icon-notification.png, que es un logo legacy ajeno a Munify.
+        "icon": icon or "/icons/icon-192x192.png",
         "url": url or "/",
         "data": data or {}
     }

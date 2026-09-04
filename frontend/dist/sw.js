@@ -6,7 +6,7 @@
 // Esto garantiza que el browser detecte un sw.js byte-diferente en cada
 // deploy y dispare el flujo de "Nueva version disponible" del ServiceWorkerUpdater.
 const SW_VERSION = '2.5.0';
-const SW_BUILD = '1788032379709-gddr';
+const SW_BUILD = '1788543802637-2713';
 const CACHE_NAME = `app-cache-v${SW_VERSION}-${SW_BUILD}`;
 
 // Handler de mensajes desde la app. Permite que el componente
@@ -24,8 +24,12 @@ self.addEventListener('push', function(event) {
   let title = 'Sistema de Reclamos';
   const options = {
     body: 'Tienes una nueva notificación',
-    icon: '/icon-notification.png',
-    badge: '/icon-notification.png',
+    // Arte de la notificacion, del mismo juego generado por
+    // scripts/generar-iconos.mjs. `icon` se dibuja tal cual (tile con fondo);
+    // `badge` lo usa Android como SILUETA (se queda solo con el alfa), por eso
+    // es un PNG blanco sobre transparente y no el tile opaco.
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-badge-96x96.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),

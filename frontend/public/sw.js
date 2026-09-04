@@ -24,8 +24,12 @@ self.addEventListener('push', function(event) {
   let title = 'Sistema de Reclamos';
   const options = {
     body: 'Tienes una nueva notificación',
-    icon: '/icon-notification.png',
-    badge: '/icon-notification.png',
+    // Arte de la notificacion, del mismo juego generado por
+    // scripts/generar-iconos.mjs. `icon` se dibuja tal cual (tile con fondo);
+    // `badge` lo usa Android como SILUETA (se queda solo con el alfa), por eso
+    // es un PNG blanco sobre transparente y no el tile opaco.
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-badge-96x96.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
