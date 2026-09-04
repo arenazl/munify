@@ -106,6 +106,12 @@ archivo Alembic). Infra corre el mismo script contra prod.
   cambie la forma de una respuesta, dejarla compatible un deploy (campo nuevo
   al lado del viejo) o desplegar el front primero.
 
+### Territorio (`/gestion/admin/territorio`, commit `67646857`)
+- Ya tenía país (default AR) → provincia → municipio. Se le agregaron las
+  mismas tildes aditivas del kit, sobre el catálogo: Sin contorno, Sin
+  barrios, Barrios sin polígono, Sólo localidades, Sin OSM. Sólo en los
+  niveles país y provincia; adentro de un municipio no aplican. Sin backend.
+
 ## Pendiente / ideas que NO se hicieron
 - Volcar el contorno del catálogo a las 4 demos viejas sin zona con polígono.
 - Las tildes son single-page; si otra pantalla las necesita multi-criterio
