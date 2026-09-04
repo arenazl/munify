@@ -391,6 +391,16 @@ pines" cuando no le llegan poligonos):
 - El front no usa todavia `motivo_cartografiado` para explicarlo en el hero de
   Territorio; hoy solo deja de recibir poligonos.
 
+**Verificado en vivo** (QA, revision `munify-api-qa-00417-jmp`, 23:50 ART):
+`GET /api/admin/territorio/municipios/820189` (Funes) devuelve
+`cartografiado: true` y 88 poligonos; `.../700070` (Pocito) devuelve
+`cartografiado: false`, **0 poligonos** y los 47 nombres con su punto; el
+listado `?pais=AR` trae 147 cartografiados sobre 2.082. En la pantalla
+(Playwright sobre `app-qa.munify.com.ar`, solapa Mapa a pantalla completa):
+Funes dibuja sus barrios adentro del contorno; **Pocito dibuja el contorno del
+municipio con los barrios como pines**. 0 errores de consola, 0 requests 4xx.
+Capturas en el scratchpad de la sesion (`_cart_funes.png`, `_cart_pocito.png`).
+
 **Que tiene que hacer Infra al promover** (ademas de lo ya avisado):
 1. La migracion `backend/alembic/versions/20260905_cartografiado.py` (o el
    ALTER equivalente: `cartografiado TINYINT(1) NOT NULL DEFAULT 0` +
