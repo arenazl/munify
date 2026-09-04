@@ -12,10 +12,15 @@
  *
  * POR QUE EXISTE
  * --------------
- * Los íconos viejos estaban corridos ~3,5 % a la derecha en TODOS los
- * tamaños: el error venía del archivo original y el reescalado lo
- * propagó. Alguien lo había compensado a ojo moviendo la caja, que es
- * justo lo que hace que el problema no se pueda arreglar de raíz.
+ * Lo que había antes, medido (2026-09-04): los diez PNG de /icons tenían
+ * la CAJA centrada (dx ~0) pero la MASA corrida 6,5 % a la izquierda, el
+ * mismo número en todos los tamaños — el error venía del original y el
+ * reescalado lo propagó. Encima el dibujo ocupaba 99-100 % del lienzo,
+ * sin aire y con el tilde cortado en el vértice. El único distinto era
+ * el apple-touch-icon: alguien lo había empujado a ojo (caja +3,6 %)
+ * para compensar, y así quedó suelto del resto del juego. Compensar a
+ * mano es justo lo que impide arreglarlo de raíz: se arregla un archivo
+ * y el próximo reescalado vuelve a traer el error.
  *
  * LAS TRES REGLAS QUE IMPLEMENTA
  * ------------------------------
