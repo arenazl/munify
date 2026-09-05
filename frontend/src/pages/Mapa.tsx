@@ -942,6 +942,50 @@ function MapController({ target }: { target: { lat: number; lng: number; zoom?: 
   return null;
 }
 
+/**
+ * Click en cualquier punto del mapa -> elegir el barrio de ESE punto.
+ *
+ * El click sobre un poligono de barrio ya lo resuelve el propio poligono; esto
+ * es la RED que atrapa lo que se le escapa: los barrios que el municipio tiene
+ * cargados SIN contorno (en Villa Carlos Paz son 5 de 45) no tienen poligono
+ * que clickear, y ahi el mapa quedaba mudo justo donde el heatmap dice "4
+ * reclamos". Se resuelve por el reclamo mas cercano al click: si hay uno a
+ * menos de `radioMetros`, se elige SU barrio; si no hay nada cerca, el click
+ * es en el vacio y suelta la seleccion.
+ *
+ * `yaAtendido` evita el doble manejo: Leaflet propaga al mapa el click que ya
+ * atendio un poligono o un pin, y sin esto la seleccion del poligono se pisaba
+ * a si misma un instante despues.
+ */
+function ClickEnElMapaEligeBarrio({
+  reclamos,
+  yaAtendido,
+  onElegir,
+  radioMetros = 400,
+}: {
+  reclamos: Reclamo[];
+  yaAtendido: { current: number };
+  onElegir: (barrioId: number | null) => void;
+  radioMetros?: number;
+}) {
+  useMapEvents({
+    click: (e) => {
+      if ((e.originalEvent?.detail ?? 1) > 1) return;      // doble-click = zoom
+      if (Date.now() - yaAtendido.current < 150) return;   // lo atendio un poligono/pin
+      const { lat, lng } = e.latlng;
+      let mejorId: number | null = null;
+      let mejorDist = Infinity;
+      for (const r of reclamos) {
+        if (r.latitud == null || r.longitud == null || r.barrio?.id == null) continue;
+        const d = L.latLng(lat, lng).distanceTo(L.latLng(r.latitud, r.longitud));
+        if (d < mejorDist) { mejorDist = d; mejorId = r.barrio.id; }
+      }
+      onElegir(mejorDist <= radioMetros ? mejorId : null);
+    },
+  });
+  return null;
+}
+
 // Click en el mapa (modo Puntos) -> crear POI en esas coords.
 function PoiClickHandler({ onPick }: { onPick: (lat: number, lng: number) => void }) {
   useMapEvents({
@@ -1529,6 +1573,10 @@ export default function Mapa() {
     }>;
   }>({ distritos: [], barrios: [] });
   const [verRegiones, setVerRegiones] = useState(true);
+  /** Momento del ultimo click que YA atendio un poligono o un pin. Lo lee el
+   *  handler de click del mapa para no volver a resolver lo mismo. */
+  const clickAtendidoRef = useRef(0);
+
   const [distritoSel, setDistritoSel] = useState<number | null>(null);
   /** Barrio elegido (nivel fino). Con una sola zona es el único lugar que se
    *  puede elegir; con varias, aparece después de elegir la zona. */
@@ -1912,6 +1960,11 @@ export default function Mapa() {
     }
     return m;
   }, [universoSin]);
+
+  /** El universo con el que se resuelve un click en el mapa: todo lo que entra
+   *  en la consulta MENOS el recorte por barrio (si no, al tener un barrio
+   *  elegido no se podria tocar otro). */
+  const universoParaClick = useMemo(() => universoSin('barrio'), [universoSin]);
 
   /** Cuántos reclamos tiene cada barrio (por id) bajo el resto de los filtros. */
   const conteoPorBarrioId = useMemo(() => {
@@ -3132,6 +3185,7 @@ export default function Mapa() {
   // Handlers
   // =================================================================
   const handleMarkerClick = (r: Reclamo) => {
+    clickAtendidoRef.current = Date.now();
     setSelected(r);
     setSidebarOpen(true);
   };
@@ -3846,7 +3900,12 @@ export default function Mapa() {
                 no se veía DÓNDE: cambiaba el dato y no el lugar. Es sólo su
                 contorno —un trazo, sin relleno— así que no compite ni con el
                 heatmap ni con los pines. */}
-            {distritoSel != null && (() => {
+            {/* EL DISTRITO ELEGIDO SIEMPRE SE MARCA, en cualquier modo. Sin
+                esto, al elegir un distrito el mapa de calor se recortaba pero
+                no se veia DONDE: cambiaba el dato y no el lugar. Es solo su
+                contorno --un trazo, sin relleno-- asi que no compite ni con el
+                heatmap ni con los pines. */}
+            {distritoSel != null && regiones.distritos.length > 1 && (() => {
               const d = regiones.distritos.find((x) => x.id === distritoSel);
               if (!d?.poligono) return null;
               return (
@@ -3866,7 +3925,7 @@ export default function Mapa() {
             })()}
 
             {/* El BARRIO elegido en un municipio con distritos: su contorno,
-                si la cartografía lo trajo, adentro del distrito ya dibujado. */}
+                si la cartografia lo trajo, adentro del distrito ya dibujado. */}
             {barrioSel != null && regiones.distritos.length > 1 && (() => {
               const b = regiones.barrios.find((x) => x.id === barrioSel);
               if (!b?.poligono?.length) return null;
@@ -3881,52 +3940,112 @@ export default function Mapa() {
               );
             })()}
 
-            {/* Con UNA sola zona no hay distritos que dibujar: la división que
+            {/* EL CONTORNO DEL MUNICIPIO, cuando la unica "zona" es el municipio
+                entero. NO es una division del territorio: es el borde de la
+                ciudad, y por eso NO SE CLICKEA.
+
+                Bug real (dueno, 2026-09-05, Villa Carlos Paz): este poligono se
+                dibujaba DESPUES de los barrios --o sea, encima-- y era
+                interactivo. Cubre todo el municipio, asi que se tragaba TODOS
+                los clicks: tocar cualquier punto del mapa seleccionaba "la zona
+                unica" y pintaba el contorno de la ciudad en vez del barrio que
+                se habia tocado. Los 40 barrios con contorno cargados no recibian
+                un solo click. Va primero (queda debajo) y con
+                interactive en false: el que manda el click es el barrio. */}
+            {verRegiones && regiones.distritos.length === 1 && regiones.distritos[0].poligono && (
+              <Polygon
+                key={`contorno-municipio-${regiones.distritos[0].id}`}
+                positions={regiones.distritos[0].poligono!}
+                pathOptions={{
+                  color: colorDistrito(regiones.distritos[0].id),
+                  weight: 2,
+                  opacity: 0.7,
+                  fill: false,
+                  dashArray: '6 4',
+                }}
+                interactive={false}
+              />
+            )}
+
+            {/* Con UNA sola zona no hay distritos que dibujar: la division que
                 se ve son los barrios, como contorno fino de un solo color (un
-                catastro, no un mosaico de 40 colores). Se clickean para elegir. */}
+                catastro, no un mosaico de 40 colores). Se clickean para elegir:
+                son la ULTIMA capa de areas del JSX a proposito, para quedar
+                arriba de todo y recibir el click. */}
             {verRegiones && regiones.distritos.length <= 1 && regiones.barrios.map((b) => {
               if (!b.poligono?.length) return null;
               const elegido = barrioSel === b.id;
               const densidad = dibujoMapa === 'densidad';
               const color = colorDistrito(b.zona_id);
+              const cuantos = conteoPorBarrioId.get(b.id) ?? 0;
               return (
                 <Polygon
                   key={`barrio-${b.id}`}
                   positions={b.poligono}
                   pathOptions={{
                     color,
-                    weight: elegido ? 2.5 : 1,
-                    opacity: elegido ? 0.95 : 0.45,
+                    weight: elegido ? 3 : 1,
+                    opacity: elegido ? 1 : 0.55,
                     fillColor: color,
-                    fillOpacity: densidad ? 0 : (elegido ? 0.18 : 0.04),
+                    // El barrio ELEGIDO se rellena SIEMPRE, tambien sobre el
+                    // mapa de calor: si al tocarlo no se pinta, el click no
+                    // tuvo respuesta visible y la pantalla parece rota. Los
+                    // demas quedan en contorno para no tapar la mancha.
+                    fillOpacity: elegido ? 0.2 : (densidad ? 0 : 0.04),
                   }}
                   eventHandlers={{
-                    click: () => setBarrioSel((x) => (x === b.id ? null : b.id)),
+                    click: () => {
+                      clickAtendidoRef.current = Date.now();
+                      setBarrioSel((x) => (x === b.id ? null : b.id));
+                    },
                   }}
                 >
-                  <Tooltip sticky>
-                    <div className="font-medium text-sm" style={{ color }}>{b.nombre}</div>
+                  {/* UN solo tooltip, dos modos. Al pasar el mouse dice QUE
+                      barrio es y CUANTOS reclamos tiene bajo la consulta -- el
+                      nombre solo no contesta nada, el numero es la razon por la
+                      que uno pasa el mouse. Al elegirlo, el mismo rotulo queda
+                      FIJO en el centro: es la respuesta a "que toque".
+
+                      Es uno y no dos porque Leaflet permite UN tooltip por
+                      capa (`bindTooltip` reemplaza al anterior), y `permanent`
+                      es opcion de construccion: por eso la `key` cambia con
+                      `elegido`, para que react-leaflet lo remonte. */}
+                  <Tooltip
+                    key={elegido ? `fijo-${b.id}` : `hover-${b.id}`}
+                    permanent={elegido}
+                    sticky={!elegido}
+                    direction={elegido ? 'center' : 'auto'}
+                    className={elegido ? 'av2-rotulo' : undefined}
+                  >
+                    <div className="font-medium text-sm" style={elegido ? undefined : { color }}>
+                      {b.nombre}
+                    </div>
+                    <div className={elegido ? 'text-xs' : 'text-xs text-gray-500'}>
+                      {cuantos === 0
+                        ? 'sin reclamos en esta consulta'
+                        : `${cuantos} ${cuantos === 1 ? 'reclamo' : 'reclamos'}`}
+                    </div>
                   </Tooltip>
                 </Polygon>
               );
             })}
 
-            {/* LOS 6 DISTRITOS, no los 57 barrios. Seis áreas grandes se
+            {/* LOS 6 DISTRITOS, no los 57 barrios. Seis areas grandes se
                 leen de un vistazo; cincuenta y siete manchitas de colores no
                 dicen nada y encima tapan los pines. El barrio sigue estando en
-                el dato —cada reclamo sabe el suyo— pero no se dibuja: no es lo
+                el dato --cada reclamo sabe el suyo-- pero no se dibuja: no es lo
                 que se mira desde la altura del municipio.
 
                 En modo densidad NO se pintan: el heatmap ya contesta y el
-                relleno lo taparía. Ahí sólo queda el contorno del elegido. */}
-            {verRegiones && regiones.distritos.map((d) => {
+                relleno lo taparia. Ahi solo queda el contorno del elegido. */}
+            {verRegiones && regiones.distritos.length > 1 && regiones.distritos.map((d) => {
               if (!d.poligono) return null;
               const elegido = distritoSel === d.id;
               const densidad = dibujoMapa === 'densidad';
               // En densidad se dibujan LOS SEIS igual, como contorno punteado y
-              // sin relleno: son la referencia de dónde cae el calor. Antes se
-              // dibujaba sólo el elegido, así que sin elección el mapa quedaba
-              // sin ninguna división a la vista.
+              // sin relleno: son la referencia de donde cae el calor. Antes se
+              // dibujaba solo el elegido, asi que sin eleccion el mapa quedaba
+              // sin ninguna division a la vista.
               const color = colorDistrito(d.id);
               return (
                 <Polygon
@@ -3941,7 +4060,10 @@ export default function Mapa() {
                     dashArray: densidad ? '6 4' : undefined,
                   }}
                   eventHandlers={{
-                    click: () => setDistritoSel((x) => (x === d.id ? null : d.id)),
+                    click: () => {
+                      clickAtendidoRef.current = Date.now();
+                      setDistritoSel((x) => (x === d.id ? null : d.id));
+                    },
                   }}
                 >
                   <Tooltip sticky>
@@ -4029,6 +4151,16 @@ export default function Mapa() {
                 el mapa (los tooltips permanentes no se reciclan bien cuando
                 cambia todo el conjunto). */}
             <RotulosLayer key={`rotulos-${pregunta || 'todo'}`} rotulos={rotulos} />
+
+            {/* El click en el mapa elige barrio. Va DESPUES de las capas de
+                areas: si el click cayo en un poligono, este handler se calla. */}
+            {!drawMode && regiones.distritos.length <= 1 && (
+              <ClickEnElMapaEligeBarrio
+                reclamos={universoParaClick}
+                yaAtendido={clickAtendidoRef}
+                onElegir={setBarrioSel}
+              />
+            )}
 
             {/* Drawn rectangle */}
             {drawnBBox && (
