@@ -817,11 +817,28 @@ OT_POR_CIRCUITO = {
     "pospuesto": "bloqueada",
 }
 
+# (motivo_pausa del enum, lo que el supervisor deja escrito)
+#
+# Van EN PARES, igual que MOTIVOS_RECHAZO, desde que existe `motivo_pausa`
+# (2026-09-05). Antes era solo la frase: perfecta para leer el detalle de un
+# reclamo e inservible para contestar "cuantos estan frenados por materiales",
+# que obligaba a recorrer todos los reclamos leyendo prosa. El motivo tipificado
+# hace de esa pregunta un GROUP BY; la frase sigue estando porque es lo que se
+# lee en el historial.
+#
+# La lista arranca por lo que mas frena a un municipio de verdad --la compra que
+# no llega-- y por eso aparece dos veces: repartir los motivos en partes iguales
+# daria una demo donde el clima frena tanto como los materiales, que no es lo
+# que pasa en ningun lado.
 MOTIVOS_POSPUESTO = [
-    "Se difiere hasta la próxima licitación de materiales.",
-    "Frenado por el temporal: la cuadrilla no puede intervenir con esta lluvia.",
-    "Depende de una obra de la empresa de agua que todavía no tiene fecha.",
-    "Se pospone hasta terminar el bacheo del corredor, para no romper dos veces.",
+    ("materiales", "Falta el material: se pidió a compras y todavía no llegó."),
+    ("presupuesto", "Se difiere hasta la próxima licitación de materiales."),
+    ("clima", "Frenado por el temporal: la cuadrilla no puede intervenir con esta lluvia."),
+    ("tercero", "Depende de una obra de la empresa de agua que todavía no tiene fecha."),
+    ("materiales", "Se pidieron las luminarias al proveedor y están demoradas."),
+    ("otra_obra", "Se pospone hasta terminar el bacheo del corredor, para no romper dos veces."),
+    ("personal", "No hay cuadrilla disponible: la dotación está afectada a otra zona."),
+    ("sin_acceso", "No se pudo entrar al lugar: el portón estaba cerrado y no atendió nadie."),
 ]
 
 # (motivo_rechazo del enum, descripción para el vecino)
@@ -1975,7 +1992,7 @@ async def seed_demo_completo(
 
         elif circuito == "pospuesto":
             dias_circuito = rnd.randint(2, 9)
-            motivo = MOTIVOS_POSPUESTO[i % len(MOTIVOS_POSPUESTO)]
+            motivo_pausa, texto_pausa = MOTIVOS_POSPUESTO[i % len(MOTIVOS_POSPUESTO)]
             pasos.append({
                 "accion": "Asignado a la dependencia",
                 "estado_anterior": EstadoReclamo.RECIBIDO,
@@ -1988,8 +2005,12 @@ async def seed_demo_completo(
                 "accion": "Trabajo diferido",
                 "estado_anterior": EstadoReclamo.EN_CURSO,
                 "estado_nuevo": EstadoReclamo.POSPUESTO,
-                "comentario": motivo, "usuario": supervisor,
+                "comentario": texto_pausa, "usuario": supervisor,
             })
+            # El motivo viaja al reclamo, no solo al historial: en el historial
+            # queda LO QUE PASO, en el reclamo queda lo que pasa AHORA, que es
+            # lo que se puede agrupar sin leer la traza de nadie.
+            extra = {"motivo_pausa": motivo_pausa, "pausa": True}
 
         elif circuito == "en_curso_cuadrilla":
             dias_circuito = rnd.randint(1, 5)
@@ -2108,6 +2129,12 @@ async def seed_demo_completo(
             resolucion=extra.get("resolucion"),
             motivo_rechazo=extra.get("motivo_rechazo"),
             descripcion_rechazo=extra.get("descripcion_rechazo"),
+            # POR QUE esta frenado y desde cuando. `pausado_desde` es la fecha
+            # del paso que lo difirio --el ultimo del circuito--, no la del alta:
+            # lo que interesa medir es cuanto lleva FRENADO, no cuanto lleva
+            # abierto.
+            motivo_pausa=extra.get("motivo_pausa"),
+            pausado_desde=(fechas[-1] if extra.get("pausa") else None),
             confirmado_vecino=(True if extra.get("confirmado")
                                else (False if extra.get("disputa") else None)),
             fecha_confirmacion_vecino=(fechas[-1] if extra.get("confirmado")

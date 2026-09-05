@@ -858,6 +858,9 @@ def _ciclo_de_vida(item: dict, hoy: date, ahora: datetime, sla: dict) -> dict:
     dado = item["q_destino"]
 
     estado, f_res, resolucion, motivo, desc_rechazo = None, None, None, None, None
+    # Junto al resto: solo la rama de la cola abierta llega a pausar, pero
+    # el return es UNO para las tres y necesita las variables definidas.
+    motivo_pausa = texto_pausa = None
 
     if dado < p_fin:
         # Iba a resolverse: cuanto tardo depende de si cumplio el SLA de su categoria.
@@ -892,6 +895,7 @@ def _ciclo_de_vida(item: dict, hoy: date, ahora: datetime, sla: dict) -> dict:
             estado = "recibido"
         elif edad_dias > 240 and _u("posp", cod) < 0.35:
             estado = "pospuesto"
+            motivo_pausa, texto_pausa = PAUSAS[int(_u("pausa", cod) * len(PAUSAS)) % len(PAUSAS)]
         else:
             estado = "en_curso" if _u("abierto", cod) < 0.78 else "recibido"
 
@@ -905,11 +909,36 @@ def _ciclo_de_vida(item: dict, hoy: date, ahora: datetime, sla: dict) -> dict:
         "resolucion": resolucion,
         "motivo_rechazo": motivo,
         "descripcion_rechazo": desc_rechazo,
+        # `pausado_desde` es la fecha en la que se difirio (20 dias despues del
+        # alta, el mismo momento que registra el historial de mas abajo), no la
+        # del alta: lo que se mide es cuanto lleva FRENADO, no cuanto abierto.
+        "motivo_pausa": motivo_pausa,
+        "pausado_desde": (creado + timedelta(days=20)) if estado == "pospuesto" else None,
+        "texto_pausa": texto_pausa,
         "fecha_recibido": f_recibido,
         "fecha_estimada": creado + timedelta(hours=reso_h),
         "estimado_dias": reso_h // 24,
         "estimado_horas": reso_h % 24,
     }
+
+
+# POR QUE queda frenado, tipificado (motivo_pausa) + lo que se deja escrito.
+#
+# El volumen de este modulo es justamente el que hace util al desglose: con
+# doce pospuestos no se ve nada, con doscientos se ve que la compra de
+# materiales frena tres veces mas que el clima. El reparto es despareja a
+# proposito --materiales repetido-- porque en un municipio de verdad lo que
+# mas frena es lo que no llega, no la lluvia.
+PAUSAS = [
+    ("materiales", "Falta el material: se pidió a compras y todavía no llegó."),
+    ("materiales", "Se pidieron las luminarias al proveedor y están demoradas."),
+    ("presupuesto", "Se difiere hasta la próxima licitación de materiales."),
+    ("personal", "No hay cuadrilla disponible: la dotación está afectada a otra zona."),
+    ("tercero", "Depende de una obra de la empresa de agua que todavía no tiene fecha."),
+    ("otra_obra", "Se pospone hasta terminar el bacheo del corredor, para no romper dos veces."),
+    ("clima", "Frenado por el temporal: la cuadrilla no puede intervenir con esta lluvia."),
+    ("sin_acceso", "No se pudo entrar al lugar: el portón estaba cerrado y no atendió nadie."),
+]
 
 
 # ===========================================================================
@@ -931,13 +960,13 @@ INSERT INTO reclamos
   referencia, categoria_id, zona_id, barrio_id, creador_id, canal, municipio_dependencia_id,
   empleado_id, tiempo_estimado_dias, tiempo_estimado_horas, fecha_estimada_resolucion,
   fecha_recibido, motivo_rechazo, descripcion_rechazo, resolucion, fecha_resolucion,
-  created_at, updated_at)
+  motivo_pausa, pausado_desde, created_at, updated_at)
 VALUES
  (:municipio_id, :titulo, :descripcion, :estado, 3, :direccion, :latitud, :longitud,
   :referencia, :categoria_id, :zona_id, :barrio_id, :creador_id, :canal, :dep_id,
   :empleado_id, :est_dias, :est_horas, :fecha_estimada,
   :fecha_recibido, :motivo_rechazo, :descripcion_rechazo, :resolucion, :fecha_resolucion,
-  :created_at, :updated_at)
+  :motivo_pausa, :pausado_desde, :created_at, :updated_at)
 """)
 
 SQL_INSERT_HIST = text("""
@@ -1053,9 +1082,13 @@ def _historial_de(fila: dict, vida: dict, supervisor_id: int) -> list[dict]:
     elif estado == "pospuesto":
         eventos.append({
             "usuario_id": supervisor_id, "estado_anterior": "en_curso", "estado_nuevo": "pospuesto",
-            "accion": "cambio_estado",
-            "created_at": vida["creado"] + timedelta(days=20),
-            "comentario": "Trabajo diferido a la espera de cuadrilla y materiales.",
+            "accion": "Trabajo diferido",
+            "created_at": vida.get("pausado_desde") or (vida["creado"] + timedelta(days=20)),
+            # La MISMA frase que corresponde al motivo tipificado del reclamo.
+            # Antes era un texto fijo para todos, asi que el historial decia
+            # "a la espera de cuadrilla y materiales" incluso donde el motivo
+            # era la lluvia.
+            "comentario": vida.get("texto_pausa") or "Trabajo diferido.",
         })
     return eventos
 
@@ -1147,6 +1180,13 @@ async def _escribir_cobertura(conn, plan: list[dict], hoy: date, ahora: datetime
             "fecha_estimada": creado + timedelta(hours=reso_h),
             "fecha_recibido": f_recibido,
             "motivo_rechazo": None, "descripcion_rechazo": None,
+            # Si el plan lo dejo pospuesto, POR QUE. Sin esto el insert falla
+            # por parametro faltante y, peor, se sembraria una cola de frenados
+            # sin razon: exactamente el dato que la columna vino a dar.
+            "motivo_pausa": (PAUSAS[int(_u("pausa", item["codigo"]) * len(PAUSAS)) % len(PAUSAS)][0]
+                             if item["estado"] == "pospuesto" else None),
+            "pausado_desde": (creado + timedelta(days=20)
+                              if item["estado"] == "pospuesto" else None),
             "resolucion": _elegir(RESOLUCIONES, "resol", item["codigo"]) if f_res else None,
             "fecha_resolucion": f_res,
             "created_at": creado, "updated_at": f_res or creado,
@@ -1304,6 +1344,11 @@ async def _escribir(plan: list[dict], hoy: date, osm: dict) -> dict:
                     "fecha_recibido": vida["fecha_recibido"],
                     "motivo_rechazo": vida["motivo_rechazo"],
                     "descripcion_rechazo": vida["descripcion_rechazo"],
+                    # POR QUE quedo frenado: lo resuelve `_ciclo_de_vida` junto
+                    # con el estado, para que el motivo y la frase del historial
+                    # sean SIEMPRE el mismo par.
+                    "motivo_pausa": vida.get("motivo_pausa"),
+                    "pausado_desde": vida.get("pausado_desde"),
                     "resolucion": vida["resolucion"],
                     "fecha_resolucion": vida["fecha_resolucion"],
                     "created_at": vida["creado"],
