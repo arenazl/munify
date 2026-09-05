@@ -114,6 +114,25 @@ GUION = {
     ],
 }
 
+# POR QUE queda frenado un trabajo: el motivo tipificado y como se cuenta en el
+# comentario. Los dos juntos, porque en la vida real van juntos --el que
+# pospone elige de la lista Y escribe que paso-- y porque un motivo sin su
+# frase no se puede leer en el detalle del reclamo.
+PAUSAS = [
+    ("materiales",  "Falta el material: se pidió a compras y todavía no llegó.", 26),
+    ("presupuesto", "Se difiere hasta la próxima licitación de materiales.", 14),
+    ("tercero",     "Depende de una obra de la empresa de agua que todavía no tiene fecha.", 14),
+    ("otra_obra",   "Se pospone hasta terminar el bacheo del corredor, para no romper dos veces.", 12),
+    ("personal",    "No hay cuadrilla disponible: la dotación está afectada a otra zona.", 12),
+    ("clima",       "Frenado por el temporal: la cuadrilla no puede intervenir con esta lluvia.", 10),
+    ("sin_acceso",  "No se pudo entrar al lugar: el portón estaba cerrado y no atendió nadie.", 8),
+    ("otro",        "Diferido por disposición de la Secretaría.", 4),
+]
+# Se repite cada motivo segun su peso: en un municipio los materiales frenan
+# mucho mas seguido que un porton cerrado, y un reparto parejo diria lo
+# contrario de lo que pasa.
+PAUSAS_POOL = [p for p in PAUSAS for _ in range(p[2])]
+
 CANALES = ["app", "app", "app", "whatsapp", "whatsapp", "ventanilla_asistida", "telefono"]
 
 
@@ -248,9 +267,13 @@ async def main():
                 {"m": MUNI})).scalar()
             print("reclamos de demo previos: %d" % n)
             if args.aplicar and n:
+                # El historial primero: cuelga del reclamo y quedaria huerfano.
+                await c.execute(text(
+                    """DELETE h FROM historial_reclamos h JOIN reclamos r ON r.id=h.reclamo_id
+                       WHERE r.municipio_id=:m AND r.referencia='seed-demo-cbapaz'"""), {"m": MUNI})
                 await c.execute(text(
                     "DELETE FROM reclamos WHERE municipio_id=:m AND referencia='seed-demo-cbapaz'"), {"m": MUNI})
-                print("  borrados.")
+                print("  borrados (con su historial).")
 
         # ---- reparto de los 200 entre los barrios ----
         pool = []
@@ -296,8 +319,19 @@ async def main():
                 if resol > HASTA:
                     resol = HASTA - timedelta(hours=rnd.randint(1, 40))
 
+            # Si quedo diferido, POR QUE. `pausado_desde` no es la fecha de alta:
+            # es cuando se freno, en algun punto entre que entro y hoy --por eso
+            # se sortea dentro de esa ventana y no se copia `creado`--.
+            motivo = coment_pausa = None
+            pausado = None
+            if estado == "pospuesto":
+                motivo, coment_pausa, _ = PAUSAS_POOL[rnd.randrange(len(PAUSAS_POOL))]
+                margen = (HASTA - creado).days
+                pausado = creado + timedelta(days=rnd.randint(1, max(margen - 1, 1)))
+
             filas.append({
                 "m": MUNI, "tit": titulo, "desc": desc, "estado": estado, "prio": prio,
+                "motivo_pausa": motivo, "pausado": pausado, "coment_pausa": coment_pausa,
                 "dir": "%s %d" % (b["nombre"], rnd.randrange(100, 3000, 10)),
                 "lat": lat, "lng": lng, "ref": "seed-demo-cbapaz",
                 "cat": cat["id"], "zona": ZONA, "barrio": b["id"],
@@ -334,13 +368,52 @@ async def main():
             INSERT INTO reclamos
                 (municipio_id, titulo, descripcion, estado, prioridad, direccion, latitud, longitud,
                  referencia, categoria_id, zona_id, barrio_id, creador_id, empleado_id,
-                 municipio_dependencia_id, canal, created_at, updated_at, fecha_recibido, fecha_resolucion)
+                 municipio_dependencia_id, canal, created_at, updated_at, fecha_recibido, fecha_resolucion,
+                 motivo_pausa, pausado_desde)
             VALUES
                 (:m, :tit, :desc, :estado, :prio, :dir, :lat, :lng,
                  :ref, :cat, :zona, :barrio, :creador, :empleado,
-                 :md, :canal, :creado, :creado, :recibido, :resol)
+                 :md, :canal, :creado, :creado, :recibido, :resol,
+                 :motivo_pausa, :pausado)
         """), filas)
         print("\nINSERTADOS %d reclamos en Villa Carlos Paz (QA)." % len(filas))
+
+        # ---- EL HISTORIAL ----
+        # Sin esto los reclamos entran mudos: consultar "cuantos atrasados no
+        # tuvo nadie encima" contaba los 200 del seed y daba un numero falso.
+        # Un reclamo sin recorrido no es un reclamo, es una fila.
+        ids = (await c.execute(text(
+            """SELECT id, estado, created_at, fecha_recibido, fecha_resolucion, pausado_desde,
+                      motivo_pausa, empleado_id
+               FROM reclamos WHERE municipio_id=:m AND referencia='seed-demo-cbapaz'"""),
+            {"m": MUNI})).mappings().all()
+        coment_por_motivo = {p[0]: p[1] for p in PAUSAS}
+        eventos = []
+        admin = vecinos[0]
+        for r in ids:
+            eventos.append({"rid": r["id"], "uid": admin, "ant": None, "nue": "recibido",
+                            "acc": "Reclamo creado", "com": "Ingresado por el vecino.",
+                            "cuando": r["created_at"]})
+            if r["empleado_id"] is not None and r["fecha_recibido"]:
+                eventos.append({"rid": r["id"], "uid": admin, "ant": "recibido", "nue": "asignado",
+                                "acc": "Asignado a la dependencia",
+                                "com": "Derivado al area que corresponde.",
+                                "cuando": r["fecha_recibido"]})
+            if r["estado"] == "pospuesto" and r["pausado_desde"]:
+                eventos.append({"rid": r["id"], "uid": admin, "ant": "asignado", "nue": "pospuesto",
+                                "acc": "Trabajo diferido",
+                                "com": coment_por_motivo.get(r["motivo_pausa"], "Diferido."),
+                                "cuando": r["pausado_desde"]})
+            if r["fecha_resolucion"]:
+                eventos.append({"rid": r["id"], "uid": admin, "ant": "en_curso", "nue": r["estado"],
+                                "acc": "Reclamo finalizado", "com": "Trabajo completado.",
+                                "cuando": r["fecha_resolucion"]})
+        await c.execute(text("""
+            INSERT INTO historial_reclamos
+                (reclamo_id, usuario_id, estado_anterior, estado_nuevo, accion, comentario, created_at)
+            VALUES (:rid, :uid, :ant, :nue, :acc, :com, :cuando)
+        """), eventos)
+        print("INSERTADOS %d movimientos de historial." % len(eventos))
 
     async with eng.connect() as c:
         tot = (await c.execute(text(

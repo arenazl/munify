@@ -30,6 +30,33 @@ class MotivoRechazo(str, enum.Enum):
     OTRO = "otro"
 
 
+class MotivoPausa(str, enum.Enum):
+    """POR QUE un trabajo quedo diferido. El companero de MotivoRechazo.
+
+    `pospuesto` ya encuadra todo --"no lo pude resolver"-- y por eso no se
+    agregan estados: lo que cambia no es la situacion sino la RAZON, y la razon
+    es un atributo, igual que en los rechazos.
+
+    Existe tipificado y no como comentario libre porque un motivo escrito en
+    prosa no se puede contar. Hoy la razon esta en el historial en frases como
+    "se difiere hasta la proxima licitacion de materiales": perfecta para leer
+    UN reclamo, inservible para contestar "cuantos estan frenados por
+    materiales" sin recorrer todos los reclamos en cada consulta (dueno,
+    2026-09-05). Con el motivo tipificado eso es un GROUP BY.
+
+    La lista es corta a proposito: si hay veinte motivos, el que carga elige
+    "otro" siempre y el dato se muere.
+    """
+    MATERIALES = "materiales"          # falta comprar, o no llego
+    CLIMA = "clima"                    # no se puede intervenir
+    TERCERO = "tercero"                # empresa de agua, gas, cooperativa
+    OTRA_OBRA = "otra_obra"            # para no romper dos veces
+    PERSONAL = "personal"              # no hay cuadrilla disponible
+    SIN_ACCESO = "sin_acceso"          # no se pudo entrar al lugar
+    PRESUPUESTO = "presupuesto"        # necesita partida o licitacion
+    OTRO = "otro"
+
+
 class EstadoOrdenTrabajo(str, enum.Enum):
     """Ciclo de vida de una orden de trabajo (OT) de campo.
 

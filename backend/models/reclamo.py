@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, T
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
-from .enums import EstadoReclamo, MotivoRechazo
+from .enums import EstadoReclamo, MotivoRechazo, MotivoPausa
 
 
 class Reclamo(Base):
@@ -86,6 +86,13 @@ class Reclamo(Base):
     # Rechazo
     motivo_rechazo = Column(Enum(MotivoRechazo, values_callable=lambda x: [e.value for e in x]), nullable=True)
     descripcion_rechazo = Column(Text, nullable=True)
+
+    # Pausa: POR QUE quedo diferido, y desde cuando.
+    # `pausado_desde` no es decorativo: es lo que separa "se pospuso ayer" de
+    # "hace cuatro meses que espera una compra". Sin esa fecha, el motivo dice
+    # que pasa pero no cuanto duele.
+    motivo_pausa = Column(Enum(MotivoPausa, values_callable=lambda x: [e.value for e in x]), nullable=True, index=True)
+    pausado_desde = Column(DateTime(timezone=True), nullable=True)
 
     # Resolución
     resolucion = Column(Text, nullable=True)

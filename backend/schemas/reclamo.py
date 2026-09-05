@@ -1,7 +1,7 @@
 from pydantic import BaseModel, model_validator
 from typing import Optional, List
 from datetime import datetime, date, time
-from models.enums import EstadoReclamo, MotivoRechazo
+from models.enums import EstadoReclamo, MotivoRechazo, MotivoPausa
 
 class ReclamoCreate(BaseModel):
     titulo: str
@@ -200,6 +200,10 @@ class ReclamoResponse(BaseModel):
     longitud: Optional[float]
     referencia: Optional[str]
     motivo_rechazo: Optional[MotivoRechazo]
+    # POR QUE esta frenado, y desde cuando. Viajan juntos: el motivo dice que
+    # pasa y la fecha cuanto duele.
+    motivo_pausa: Optional[MotivoPausa] = None
+    pausado_desde: Optional[datetime] = None
     descripcion_rechazo: Optional[str]
     resolucion: Optional[str]
     fecha_resolucion: Optional[datetime]

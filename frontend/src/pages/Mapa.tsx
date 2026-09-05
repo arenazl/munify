@@ -749,12 +749,31 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
   // La capa se crea UNA vez (y sólo se rehace si cambia el mapa o la rampa: el
   // gradiente es opción de construcción de leaflet.heat, no se puede mutar).
   useEffect(() => {
+    // UN PANE PROPIO, DEBAJO de todo lo demás.
+    //
+    // leaflet.heat cuelga su canvas del overlayPane, que es donde también viven
+    // los polígonos y las burbujas (SVG). Como se agrega después, quedaba
+    // ENCIMA: la mancha tapaba las burbujas y sus rótulos, justo lo que hay que
+    // leer. En un pane propio con z-index menor la mancha hace de FONDO —que es
+    // el papel que le toca: pone la textura de dónde hay actividad, y el dato
+    // fino lo dan las burbujas de arriba.
+    let pane = map.getPane('calor');
+    if (!pane) {
+      map.createPane('calor');
+      pane = map.getPane('calor')!;
+      pane.style.zIndex = '380';        // overlayPane es 400
+      pane.style.pointerEvents = 'none'; // no se roba los clicks del mapa
+    }
+
     const heat = L.heatLayer([], {
       radius: 28,
       blur: 22,
       maxZoom: 17,
       max: 3,
-      minOpacity: 0.45,
+      // Más tenue que antes: ahora es fondo y no la respuesta. Con la opacidad
+      // vieja (0.45) le competía el color a las burbujas, que llevan la misma
+      // escala de veredicto.
+      minOpacity: 0.28,
       gradient: {
         0.0: rampa.baja,
         0.55: rampa.media,
@@ -762,6 +781,12 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
       },
     });
     heat.addTo(map);
+    // El canvas se muda al pane de atrás. Se busca por su clase porque el
+    // handle del canvas es privado de leaflet.heat; si algún día cambia, la
+    // capa sigue funcionando, sólo vuelve a quedar arriba.
+    const canvas = map.getContainer().querySelector('canvas.leaflet-heatmap-layer');
+    if (canvas && pane) pane.appendChild(canvas);
+
     layerRef.current = heat;
     return () => {
       map.removeLayer(heat);
@@ -1634,14 +1659,19 @@ export default function Mapa() {
     }>;
   }>({ distritos: [], barrios: [] });
   const [verRegiones, setVerRegiones] = useState(true);
-  /** La mancha de calor, APAGADA por default.
+  /** La mancha de calor, ENCENDIDA por default y de fondo.
    *
-   *  No se borro al llegar las burbujas porque contesta otra cosa: la burbuja
-   *  compara barrios entre si ("en estos tenes problemas"), la mancha muestra
-   *  la concentracion fina adentro de una zona --que esquina repite--, que es
-   *  lo unico para lo que un heatmap es mejor que contar. Como es una segunda
-   *  lectura y no la principal, se enciende cuando se la busca. */
-  const [verCalor, setVerCalor] = useState(false);
+   *  Las dos capas no compiten: se reparten el trabajo. La mancha muestra la
+   *  concentracion fina --que esquina repite, cosa para la que un heatmap es
+   *  mejor que contar-- y pone de un vistazo donde hay actividad; las burbujas
+   *  de arriba dicen QUE barrio, CUANTOS y si esta bien o mal. Una da la
+   *  textura, la otra el dato.
+   *
+   *  Va prendida porque, ademas de servir, es lo que se entiende sin que nadie
+   *  lo explique cuando se muestra la pantalla por primera vez (dueno,
+   *  2026-09-05: "comercialmente el mapa de calor es imbatible"). El boton de
+   *  la llama la apaga para mirar las burbujas solas. */
+  const [verCalor, setVerCalor] = useState(true);
 
   /** Momento del ultimo click que YA atendio un poligono o un pin. Lo lee el
    *  handler de click del mapa para no volver a resolver lo mismo. */
@@ -2737,13 +2767,22 @@ export default function Mapa() {
             { texto: `: los ${total} están dispersos por el municipio.` },
           ];
         }
-        const deCada10 = Math.round((enZonasCalientes / total) * 10);
+        // "X de cada 10" se cae solo cuando la parte es chica: 10 sobre 250
+        // redondea a CERO y la frase termina diciendo "0 de cada 10", que es
+        // un numero vacio --y encima falso, porque justo se acaba de decir que
+        // hay 10--. Debajo de media decima se dice en palabras (dueno,
+        // 2026-09-05: "0 de cada 10 es cualquier cosa").
+        const parte = enZonasCalientes / total;
+        const deCada10 = Math.round(parte * 10);
+        const proporcion = deCada10 === 0
+          ? 'menos de 1 de cada 10'
+          : `${deCada10} de cada 10`;
         return [
           {
             texto: `${hotspots.length} ${hotspots.length === 1 ? 'esquina concentra' : 'esquinas concentran'} ${enZonasCalientes} ${enZonasCalientes === 1 ? 'reclamo' : 'reclamos'}`,
             tono: veredictoMasEsPeor(hotspots.length, u.slaRiesgo) ?? 'neutro',
           },
-          { texto: `: ${deCada10} de cada 10 de los que estás viendo.` },
+          { texto: `: ${proporcion} de los que estás viendo.` },
         ];
       }
       case 'atrasado': {

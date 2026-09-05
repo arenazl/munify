@@ -1063,11 +1063,21 @@ async def cambiar_estado_reclamo_drag(
     request: Request,
     nuevo_estado: str = Query(..., description="Nuevo estado del reclamo"),
     comentario: Optional[str] = Query(None, description="Observación del cambio de estado"),
+    motivo_pausa: Optional[str] = Query(
+        None,
+        description=(
+            "Al posponer: POR QUE queda diferido (materiales, clima, tercero, "
+            "otra_obra, personal, sin_acceso, presupuesto, otro). Se ignora en "
+            "cualquier otro destino."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
     """Cambiar el estado de un reclamo (usado por drag & drop en tablero Kanban)."""
     from datetime import datetime
+
+    from models.enums import MotivoPausa
 
     # Convertir string a enum
     try:
@@ -1114,6 +1124,33 @@ async def cambiar_estado_reclamo_drag(
     # Manejar fechas según el estado
     if estado_destino in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
         reclamo.fecha_resolucion = datetime.now(timezone.utc)
+
+    # ---- POR QUE quedo diferido ----
+    # `pospuesto` encuadra todo ("no lo pude resolver"), asi que la causa no es
+    # un estado sino un atributo --el mismo trato que ya tienen los rechazos con
+    # `motivo_rechazo`--. Sin esto la razon queda en prosa dentro del comentario
+    # y contestar "cuantos hay frenados por materiales" obliga a leer todos los
+    # reclamos en cada consulta.
+    if estado_destino == EstadoReclamo.POSPUESTO:
+        if motivo_pausa:
+            try:
+                reclamo.motivo_pausa = MotivoPausa(motivo_pausa.lower())
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Motivo de pausa inválido: {motivo_pausa}",
+                )
+        # La fecha se pone SOLO al entrar en pausa: si se re-pospone algo que ya
+        # estaba pospuesto, se pisaria el reloj y un trabajo frenado hace cuatro
+        # meses pareceria de hoy.
+        if reclamo.pausado_desde is None:
+            reclamo.pausado_desde = datetime.now(timezone.utc)
+    elif estado_anterior == EstadoReclamo.POSPUESTO:
+        # Salio de la pausa: el motivo y el reloj dejan de ser vigentes. La traza
+        # de que estuvo frenado y por que queda en el historial, que es donde va
+        # lo que paso; estas dos columnas son el estado de AHORA.
+        reclamo.motivo_pausa = None
+        reclamo.pausado_desde = None
 
     # Generar comentario para historial
     comentario_historial = comentario if comentario else f"Estado cambiado de {estado_anterior.value} a {estado_destino.value}"
