@@ -78,6 +78,11 @@ import {
 } from '../components/ui/ConsultaGuiada';
 import type { RankedListItem } from '../components/ui/RankedList';
 import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
+// LA lectura por barrio del kit: un circulo por barrio, del tamano de
+// cuantos reclamos tiene y del color de como esta. Reemplaza a la mancha de
+// calor como respuesta a "donde": la mancha dice que hay muchos, la burbuja
+// dice QUE barrio, CUANTOS y si esta bien o mal.
+import BurbujasBarrio, { type BurbujaBarrio } from '../components/mapa/BurbujasBarrio';
 import {
   Reclamo,
   type PuntoInteres,
@@ -1629,6 +1634,15 @@ export default function Mapa() {
     }>;
   }>({ distritos: [], barrios: [] });
   const [verRegiones, setVerRegiones] = useState(true);
+  /** La mancha de calor, APAGADA por default.
+   *
+   *  No se borro al llegar las burbujas porque contesta otra cosa: la burbuja
+   *  compara barrios entre si ("en estos tenes problemas"), la mancha muestra
+   *  la concentracion fina adentro de una zona --que esquina repite--, que es
+   *  lo unico para lo que un heatmap es mejor que contar. Como es una segunda
+   *  lectura y no la principal, se enciende cuando se la busca. */
+  const [verCalor, setVerCalor] = useState(false);
+
   /** Momento del ultimo click que YA atendio un poligono o un pin. Lo lee el
    *  handler de click del mapa para no volver a resolver lo mismo. */
   const clickAtendidoRef = useRef(0);
@@ -1907,14 +1921,13 @@ export default function Mapa() {
   );
 
   /**
-   * CUANTOS reclamos hacen falta para que una mancha de calor signifique algo.
+   * CUANTOS reclamos hacen falta para que agrupar por barrio signifique algo.
    *
-   * El heatmap se dibuja con un radio de 28px y 22 de desenfoque: con cuatro
-   * puntos no hay densidad que mostrar, hay cuatro borrones que ademas se
-   * corren del lugar exacto por el propio desenfoque. El dueno lo vio al elegir
-   * un barrio (2026-09-05): "ahora pinta Santa Rita pero no se ven los puntos"
-   * --sus 4 reclamos estaban BIEN ubicados, dentro del poligono; lo que fallaba
-   * era dibujarlos como mancha.
+   * Debajo de esto no hay nada que agregar: con cuatro reclamos, cuatro
+   * burbujas de "1" dicen menos que cuatro pines, que ademas traen el titulo,
+   * el area y la fecha. El dueno lo vio al elegir un barrio (2026-09-05):
+   * "ahora pinta Santa Rita pero no se ven los puntos" --sus 4 reclamos estaban
+   * BIEN ubicados; lo que fallaba era resumirlos en vez de mostrarlos.
    */
   const MINIMO_PARA_MANCHA = 15;
 
@@ -1927,9 +1940,9 @@ export default function Mapa() {
    * los controles que se adaptan al espacio: aca el dibujo se adapta al VOLUMEN
    * de datos en vez de obedecer una preferencia que ya no aplica.
    */
-  const dibujoMapa: 'densidad' | 'puntos' =
+  const dibujoMapa: 'barrios' | 'puntos' =
     preguntaConfig?.dibujo === 'densidad' && reclamosFiltrados.length >= MINIMO_PARA_MANCHA
-      ? 'densidad'
+      ? 'barrios'
       : 'puntos';
 
   /**
@@ -2080,6 +2093,75 @@ export default function Mapa() {
     }
     return m;
   }, [universoSin]);
+
+  /**
+   * LA LECTURA POR BARRIO: cada barrio como una burbuja parada en su punto.
+   *
+   * Se arma sobre `barriosMunicipio` --el catalogo, que tiene coordenada en
+   * 2.026 de 2.028 barrios-- y no sobre los contornos, que son 349. El contorno
+   * es un lujo (dueno, 2026-09-05); el punto es lo que siempre hay, y con el
+   * punto alcanza para contestar "en estos barrios tenes problemas, en estos
+   * no", que es lo que se mira desde la altura del municipio.
+   *
+   * El COLOR sale de comparar los barrios ENTRE SI, no contra un numero
+   * absoluto inventado: el peor tercio va en rojo, el del medio en ambar y el
+   * resto en verde. Un umbral fijo ("mas de 10 es malo") no significa lo mismo
+   * en un barrio de 300 casas que en uno de 5.000; el orden relativo, si.
+   *
+   * Y el sentido se DA VUELTA segun la pregunta: en "que resolvimos" tener
+   * muchos es lo bueno. Sin esa vuelta, el barrio que mas cerro se pintaria de
+   * rojo, que es exactamente al reves de lo que paso.
+   */
+  const burbujasBarrio = useMemo<BurbujaBarrio[]>(() => {
+    if (dibujoMapa !== 'barrios') return [];
+    const porBarrio = new Map<number, Reclamo[]>();
+    for (const r of reclamosFiltrados) {
+      const id = r.barrio?.id;
+      if (id == null) continue;
+      const lista = porBarrio.get(id);
+      if (lista) lista.push(r); else porBarrio.set(id, [r]);
+    }
+    if (porBarrio.size === 0) return [];
+
+    const masEsMejor = pregunta === 'resolvimos';
+    const valores = Array.from(porBarrio.values(), (l) => l.length);
+    const max = Math.max(...valores);
+
+    const salida: BurbujaBarrio[] = [];
+    for (const [id, lista] of porBarrio) {
+      const b = barriosMunicipio.find((x) => x.id === id);
+      if (!b || b.latitud == null || b.longitud == null) continue;
+      const n = lista.length;
+      const proporcion = n / max;
+      // Tercios sobre el maximo observado. `masEsMejor` invierte los extremos,
+      // no los corta: el del medio sigue siendo el del medio.
+      const grave = proporcion > 0.66;
+      const medio = proporcion > 0.33;
+      const color = medio
+        ? (grave
+            ? (masEsMejor ? rampaDensidad.baja : rampaDensidad.alta)
+            : rampaDensidad.media)
+        : (masEsMejor ? rampaDensidad.alta : rampaDensidad.baja);
+
+      // El detalle contesta "y esto que tan grave es", con el dato REAL del
+      // barrio: lo mas viejo que tiene sin cerrar. Si esta todo cerrado no se
+      // escribe nada --no se rellena con una frase de compromiso--.
+      const abiertos = lista.filter((r) => isAbierto(r.estado));
+      let detalle: string | undefined;
+      if (abiertos.length > 0) {
+        const dias = Math.max(...abiertos.map((r) => diasDesde(r.created_at)));
+        detalle = `el más viejo hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
+      }
+
+      salida.push({
+        id, nombre: b.nombre, lat: b.latitud, lng: b.longitud,
+        valor: n, color,
+        etiqueta: `${n} ${n === 1 ? 'reclamo' : 'reclamos'}`,
+        detalle,
+      });
+    }
+    return salida;
+  }, [dibujoMapa, reclamosFiltrados, barriosMunicipio, pregunta, rampaDensidad]);
 
   // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
   // La ventana móvil recorta sobre esto y el remate compara la primera ventana
@@ -4091,7 +4173,7 @@ export default function Mapa() {
             {verRegiones && regiones.distritos.length <= 1 && regiones.barrios.map((b) => {
               if (!b.poligono?.length) return null;
               const elegido = barrioSel === b.id;
-              const densidad = dibujoMapa === 'densidad';
+              const resumido = dibujoMapa === 'barrios';
               const color = colorDistrito(b.zona_id);
               const cuantos = conteoPorBarrioId.get(b.id) ?? 0;
               return (
@@ -4107,7 +4189,7 @@ export default function Mapa() {
                     // mapa de calor: si al tocarlo no se pinta, el click no
                     // tuvo respuesta visible y la pantalla parece rota. Los
                     // demas quedan en contorno para no tapar la mancha.
-                    fillOpacity: elegido ? 0.2 : (densidad ? 0 : 0.04),
+                    fillOpacity: elegido ? 0.2 : (resumido ? 0 : 0.04),
                   }}
                   eventHandlers={{
                     // Click adentro = QUEDARSE en ese barrio, nunca soltarlo.
@@ -4200,14 +4282,14 @@ export default function Mapa() {
                 el dato --cada reclamo sabe el suyo-- pero no se dibuja: no es lo
                 que se mira desde la altura del municipio.
 
-                En modo densidad NO se pintan: el heatmap ya contesta y el
-                relleno lo taparia. Ahi solo queda el contorno del elegido. */}
+                Con la lectura por barrio NO se rellenan: la burbuja ya contesta
+                y el relleno le competiria. Ahi queda solo el contorno. */}
             {verRegiones && regiones.distritos.length > 1 && regiones.distritos.map((d) => {
               if (!d.poligono) return null;
               const elegido = distritoSel === d.id;
-              const densidad = dibujoMapa === 'densidad';
-              // En densidad se dibujan LOS SEIS igual, como contorno punteado y
-              // sin relleno: son la referencia de donde cae el calor. Antes se
+              const resumido = dibujoMapa === 'barrios';
+              // Se dibujan LOS SEIS igual, como contorno punteado y sin
+              // relleno: son la referencia de donde caen las burbujas. Antes se
               // dibujaba solo el elegido, asi que sin eleccion el mapa quedaba
               // sin ninguna division a la vista.
               const color = colorDistrito(d.id);
@@ -4220,8 +4302,8 @@ export default function Mapa() {
                     weight: elegido ? 3 : 1.5,
                     opacity: elegido ? 0.95 : 0.6,
                     fillColor: color,
-                    fillOpacity: densidad ? 0 : (elegido ? 0.22 : 0.08),
-                    dashArray: densidad ? '6 4' : undefined,
+                    fillOpacity: resumido ? 0 : (elegido ? 0.22 : 0.08),
+                    dashArray: resumido ? '6 4' : undefined,
                   }}
                   eventHandlers={{
                     click: () => {
@@ -4283,8 +4365,20 @@ export default function Mapa() {
                 combo con nombres técnicos: lo decide la pregunta.
                   · densidad → la mancha, para ver dónde se amontona;
                   · puntos   → un reclamo por pin, con su color. */}
-            {dibujoMapa === 'densidad' && (
+            {/* La mancha, DEBAJO de todo lo demas y solo si se la pidio. */}
+            {verCalor && reclamosFiltrados.length > 0 && (
               <HeatLayer reclamos={reclamosFiltrados} rampa={rampaDensidad} />
+            )}
+
+            {dibujoMapa === 'barrios' && (
+              <BurbujasBarrio
+                burbujas={burbujasBarrio}
+                elegidoId={barrioSel}
+                onElegir={(id) => {
+                  clickAtendidoRef.current = Date.now();
+                  setBarrioSel(id);
+                }}
+              />
             )}
 
             {dibujoMapa === 'puntos' &&
@@ -4383,6 +4477,16 @@ export default function Mapa() {
           )}
           <button
             type="button"
+            className={`av2-mapa-ctrl${verCalor ? ' av2-mapa-ctrl--activo' : ''}`}
+            onClick={() => setVerCalor((v) => !v)}
+            aria-pressed={verCalor}
+            title={verCalor ? 'Ocultar el mapa de calor' : 'Ver la concentración como mapa de calor'}
+            aria-label={verCalor ? 'Ocultar el mapa de calor' : 'Ver la concentración como mapa de calor'}
+          >
+            <Flame size={16} strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
             className="av2-mapa-ctrl"
             onClick={() => setFitSignal((s) => s + 1)}
             title="Centrar el mapa"
@@ -4421,12 +4525,24 @@ export default function Mapa() {
             los MISMOS que pinta el heatmap, así la leyenda no miente.
             No se rotula "1 · 10+": la intensidad de leaflet.heat está
             normalizada, no equivale a una cantidad de reclamos. */}
-        {dibujoMapa === 'densidad' && reclamosFiltrados.length > 0 && (
+        {/* La leyenda dice QUE significa el color, que ya no es "densidad"
+            sino el orden entre barrios --y se da vuelta en "qué resolvimos",
+            donde tener muchos es lo bueno. Una leyenda fija diria lo contrario
+            de lo que muestra el mapa en esa pregunta. */}
+        {dibujoMapa === 'barrios' && burbujasBarrio.length > 0 && (
           <div className="av2-mapa-leyenda">
-            <span className="av2-mapa-leyenda-titulo">Densidad</span>
-            <span className="av2-mapa-leyenda-extremo">menos</span>
-            <span className="av2-mapa-leyenda-rampa" aria-hidden />
-            <span className="av2-mapa-leyenda-extremo">más</span>
+            <span className="av2-mapa-leyenda-titulo">Por barrio</span>
+            <span className="av2-mapa-leyenda-extremo">
+              {pregunta === 'resolvimos' ? 'menos resueltos' : 'mejor'}
+            </span>
+            <span
+              className="av2-mapa-leyenda-rampa"
+              style={pregunta === 'resolvimos' ? { transform: 'scaleX(-1)' } : undefined}
+              aria-hidden
+            />
+            <span className="av2-mapa-leyenda-extremo">
+              {pregunta === 'resolvimos' ? 'más resueltos' : 'peor'}
+            </span>
           </div>
         )}
 
