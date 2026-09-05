@@ -673,17 +673,42 @@ const ESTADO_COLORS_LISTA: Record<string, string> = Object.fromEntries(
 // =====================================================================
 // Componentes auxiliares dentro del mapa
 // =====================================================================
-function FitBoundsToMarkers({ reclamos, signal }: { reclamos: Reclamo[]; signal: number }) {
+/**
+ * Encuadre del mapa sobre lo que se esta dibujando.
+ *
+ * `respaldo` son los puntos del TERRITORIO (el contorno del municipio, o los de
+ * sus barrios). Se usa cuando la consulta no devolvio ni un reclamo: sin el, el
+ * mapa se quedaba clavado donde hubiera estado —a veces a veinte kilometros del
+ * municipio— y el usuario veia un lugar cualquiera. Que no haya reclamos que
+ * dibujar no significa que no haya nada que mostrar.
+ */
+function FitBoundsToMarkers({
+  reclamos,
+  signal,
+  respaldo,
+}: {
+  reclamos: Reclamo[];
+  signal: number;
+  respaldo?: Array<[number, number]>;
+}) {
   const map = useMap();
   const lastSignal = useRef(-1);
 
   useEffect(() => {
     if (signal === lastSignal.current) return;
     lastSignal.current = signal;
-    if (reclamos.length === 0) return;
     const timer = setTimeout(() => {
       const valid = reclamos.filter(r => r.latitud != null && r.longitud != null);
-      if (valid.length === 0) return;
+      if (valid.length === 0) {
+        if (respaldo && respaldo.length >= 2) {
+          map.invalidateSize();
+          map.fitBounds(L.latLngBounds(respaldo.map((p) => L.latLng(p[0], p[1]))), {
+            padding: [40, 40],
+            maxZoom: 14,
+          });
+        }
+        return;
+      }
       map.invalidateSize();
       if (valid.length === 1) {
         map.setView([valid[0].latitud!, valid[0].longitud!], 15);
@@ -693,7 +718,7 @@ function FitBoundsToMarkers({ reclamos, signal }: { reclamos: Reclamo[]; signal:
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [reclamos, map, signal]);
+  }, [reclamos, map, signal, respaldo]);
 
   return null;
 }
@@ -930,6 +955,42 @@ function DrawHandler({ active, onComplete, onCancel }: DrawHandlerProps) {
     };
   }, [active, map, onComplete, onCancel]);
 
+  return null;
+}
+
+/**
+ * EL MAPA SIGUE AL BARRIO ELEGIDO.
+ *
+ * Al elegir un barrio —del combo o tocandolo en el mapa— el lienzo se queda
+ * quieto: se recortaban los datos pero no se iba al lugar, asi que el usuario
+ * elegia "Los Algarrobos" y seguia mirando Saldan, a veinte kilometros (dueno,
+ * 2026-09-05: "hoy se queda quieto", "eso es super molesto").
+ *
+ * Con contorno se encuadra la forma; sin contorno se vuela a su centro. Es la
+ * misma distincion de `barrioDelPunto`: la forma cuando existe, el punto cuando
+ * es lo unico que hay.
+ */
+function EncuadrarBarrio({
+  encuadre,
+}: {
+  encuadre: { id: number; poligono: [number, number][] | null; centro: [number, number] | null } | null;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (!encuadre) return;
+    const t = setTimeout(() => {
+      map.invalidateSize();
+      if (encuadre.poligono && encuadre.poligono.length >= 3) {
+        map.fitBounds(L.latLngBounds(encuadre.poligono.map((p) => L.latLng(p[0], p[1]))), {
+          padding: [50, 50],
+          maxZoom: 16,
+        });
+      } else if (encuadre.centro) {
+        map.flyTo(encuadre.centro, 15, { duration: 0.6 });
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [encuadre, map]);
   return null;
 }
 
@@ -1692,7 +1753,6 @@ export default function Mapa() {
 
   /** Con qué se dibuja el lienzo. Sin pregunta ("ver todo") se muestran los
    *  reclamos uno por uno: es la vista donde se va a buscar un caso puntual. */
-  const dibujoMapa: 'densidad' | 'puntos' = preguntaConfig?.dibujo ?? 'puntos';
 
   /**
    * Color de cada pin. Por defecto el del ESTADO (el SSoT de lib/enums), pero
@@ -1847,6 +1907,32 @@ export default function Mapa() {
   );
 
   /**
+   * CUANTOS reclamos hacen falta para que una mancha de calor signifique algo.
+   *
+   * El heatmap se dibuja con un radio de 28px y 22 de desenfoque: con cuatro
+   * puntos no hay densidad que mostrar, hay cuatro borrones que ademas se
+   * corren del lugar exacto por el propio desenfoque. El dueno lo vio al elegir
+   * un barrio (2026-09-05): "ahora pinta Santa Rita pero no se ven los puntos"
+   * --sus 4 reclamos estaban BIEN ubicados, dentro del poligono; lo que fallaba
+   * era dibujarlos como mancha.
+   */
+  const MINIMO_PARA_MANCHA = 15;
+
+  /**
+   * COMO se dibuja, que no es lo mismo que como lo pidio la pregunta.
+   *
+   * La pregunta propone (densidad para "donde se amontona"), pero con pocos
+   * reclamos --y elegir un barrio casi siempre deja pocos-- el dibujo degrada a
+   * puntos: cada reclamo con su pin, su color y su tooltip. Es la misma idea de
+   * los controles que se adaptan al espacio: aca el dibujo se adapta al VOLUMEN
+   * de datos en vez de obedecer una preferencia que ya no aplica.
+   */
+  const dibujoMapa: 'densidad' | 'puntos' =
+    preguntaConfig?.dibujo === 'densidad' && reclamosFiltrados.length >= MINIMO_PARA_MANCHA
+      ? 'densidad'
+      : 'puntos';
+
+  /**
    * El último reclamo que entró, escrito para leerse al pasar.
    *
    * Es lo que le da sentido al recorrido: sin esto aparecen puntos de colores
@@ -1955,6 +2041,35 @@ export default function Mapa() {
     }
     return m;
   }, [universoSin]);
+
+  /** A donde llevar el mapa cuando se elige un barrio: su forma si la tiene,
+   *  su centro si no. Memoizado por `barrioSel` para que el encuadre se dispare
+   *  al ELEGIR y no en cada render. */
+  const encuadreBarrio = useMemo(() => {
+    if (barrioSel == null) return null;
+    const conForma = regiones.barrios.find((b) => b.id === barrioSel);
+    if (conForma?.poligono?.length) {
+      return { id: barrioSel, poligono: conForma.poligono, centro: null };
+    }
+    const b = barriosMunicipio.find((x) => x.id === barrioSel);
+    if (b?.latitud != null && b?.longitud != null) {
+      return { id: barrioSel, poligono: null, centro: [b.latitud, b.longitud] as [number, number] };
+    }
+    return null;
+  }, [barrioSel, regiones.barrios, barriosMunicipio]);
+
+  /** El TERRITORIO como puntos: contorno del municipio, o el de sus barrios, o
+   *  sus centros. Es el encuadre de respaldo cuando no hay reclamos que dibujar. */
+  const puntosTerritorio = useMemo<Array<[number, number]>>(() => {
+    const conForma = regiones.distritos.find((d) => d.poligono?.length);
+    if (conForma?.poligono?.length) return conForma.poligono;
+    const pts: Array<[number, number]> = [];
+    for (const b of regiones.barrios) if (b.poligono?.length) pts.push(...b.poligono);
+    if (pts.length >= 2) return pts;
+    return barriosMunicipio
+      .filter((b) => b.latitud != null && b.longitud != null)
+      .map((b) => [b.latitud!, b.longitud!] as [number, number]);
+  }, [regiones.distritos, regiones.barrios, barriosMunicipio]);
 
   /** Cuántos reclamos tiene cada barrio (por id) bajo el resto de los filtros. */
   const conteoPorBarrioId = useMemo(() => {
@@ -3576,6 +3691,12 @@ export default function Mapa() {
     setFitSignal(s => s + 1);
   }, [pregunta, filtroCategoria, filtroDependencia, filtroEstado, timePreset]);
 
+  // Al SOLTAR el barrio el mapa vuelve a abrirse sobre todo lo que quedo a la
+  // vista. Sin esto se quedaba clavado en el ultimo barrio mirado.
+  useEffect(() => {
+    if (barrioSel == null) setFitSignal(s => s + 1);
+  }, [barrioSel]);
+
   // En modo Puntos no bloqueamos por la carga de reclamos (el panel de POIs
   // tiene su propio loading). El spinner global es solo para el modo Reclamos.
   if (loading && !isPuntos) {
@@ -3876,7 +3997,12 @@ export default function Mapa() {
           >
             <TileLayer attribution={BASEMAP_ATTR} url={tileUrl} />
 
-            <FitBoundsToMarkers reclamos={reclamosFiltrados} signal={fitSignal} />
+            <FitBoundsToMarkers
+              reclamos={reclamosFiltrados}
+              signal={fitSignal}
+              respaldo={puntosTerritorio}
+            />
+            <EncuadrarBarrio encuadre={encuadreBarrio} />
             <MapController target={mapTarget} />
             <InvalidarAlRedimensionar />
             <ZoomRuedaDeAUno />
@@ -4298,24 +4424,46 @@ export default function Mapa() {
           </div>
         )}
 
-        {/* Vacío: sin esto el mapa queda mudo y parece roto. */}
+        {/* SIN RECLAMOS QUE DIBUJAR — un aviso al pie, no una cortina.
+            Antes esto era una card tendida sobre todo el lienzo (`inset: 0` mas
+            un velo) que tapaba el mapa entero para anunciar un cero. El dueno
+            la marco el 2026-09-05: "aparece a cada rato", "es super molesto",
+            "siempre hay algo para dibujar mas alla de si esta el contorno o no".
+
+            Y tiene razon: el territorio no depende de la consulta. El contorno
+            del municipio, los barrios y sus nombres se siguen viendo; lo unico
+            que falta son los reclamos. El aviso baja al pie y ofrece la salida
+            que corresponde a la causa --si lo que vacio la consulta fue el
+            barrio elegido, la salida es soltarlo, no "volver a empezar". */}
         {reclamosFiltrados.length === 0 && (
-          <div className="av2-mapa-vacio">
-            <div className="av2-mapa-vacio-card">
-              <MapPinOff size={26} strokeWidth={1.6} aria-hidden />
-              <p className="av2-mapa-vacio-titulo">Nada que dibujar para esta consulta</p>
-              <p className="av2-mapa-vacio-texto">
-                {reclamos.length > 0
-                  ? `Hay ${reclamos.length.toLocaleString('es-AR')} reclamos ubicados en el mapa, pero ninguno entra en lo que preguntaste.`
-                  : 'Todavía no hay reclamos con coordenada para dibujar en el mapa.'}
-              </p>
-              {reclamos.length > 0 && (
+          <div className="av2-mapa-aviso" role="status">
+            <MapPinOff size={16} strokeWidth={1.8} aria-hidden />
+            {barrioSel != null ? (
+              <>
+                <p className="av2-mapa-aviso-texto">
+                  En <strong>{barriosMunicipio.find((b) => b.id === barrioSel)?.nombre ?? 'el barrio elegido'}</strong>
+                  {' '}no hay reclamos que contesten esto.
+                </p>
+                <button type="button" className="av2-btn-secundario" onClick={() => setBarrioSel(null)}>
+                  Ver todo el municipio
+                </button>
+              </>
+            ) : reclamos.length > 0 ? (
+              <>
+                <p className="av2-mapa-aviso-texto">
+                  Ninguno de los <strong>{reclamos.length.toLocaleString('es-AR')}</strong> reclamos
+                  ubicados entra en lo que preguntaste.
+                </p>
                 <button type="button" className="av2-btn-secundario" onClick={handleClearAllFiltros}>
                   <Eraser size={14} strokeWidth={2} aria-hidden />
                   Volver a empezar
                 </button>
-              )}
-            </div>
+              </>
+            ) : (
+              <p className="av2-mapa-aviso-texto">
+                Todavía no hay reclamos con coordenada. El mapa muestra el territorio del municipio.
+              </p>
+            )}
           </div>
         )}
 

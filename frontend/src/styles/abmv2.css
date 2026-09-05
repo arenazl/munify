@@ -2710,47 +2710,73 @@ button.av2-chip:hover { opacity: 0.85; }
 /* --- Vacío: si el filtro no deja nada, el mapa mudo parece roto. Se
    explica qué pasó y cómo salir, sin bloquear el paneo (el scrim no
    recibe punteros; sólo la tarjeta). --- */
-.av2-mapa-vacio {
+/* --- AVISO al pie del mapa ---
+   Reemplaza a la card `.av2-mapa-vacio`, que se tendia sobre TODO el lienzo
+   (inset:0 + fondo semitransparente) y lo tapaba.
+
+   Regla del dueno (2026-09-05): "siempre hay algo para dibujar, mas alla de si
+   esta el contorno o no". Que la consulta no devuelva reclamos no deja al mapa
+   sin nada que mostrar: el territorio --el contorno del municipio, los barrios,
+   sus nombres-- sigue estando, y taparlo para anunciar un cero era esconder lo
+   unico que quedaba en pantalla. El aviso baja al pie, ocupa una banda y deja
+   el mapa a la vista.
+
+   `pointer-events` en none sobre la banda y auto sobre el boton: la banda flota
+   encima del lienzo pero no se come el arrastre del mapa por debajo. */
+.av2-mapa-aviso {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
   z-index: 650;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: color-mix(in srgb, var(--pl-surface) 72%, transparent);
-  pointer-events: none;
-}
-.av2-mapa-vacio-card {
-  pointer-events: auto;
-  max-width: 380px;
+  max-width: min(560px, calc(100% - 24px));
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 20px 22px;
-  text-align: center;
+  gap: 10px;
+  padding: 9px 14px;
   background: var(--pl-surface);
   border: 1px solid var(--pl-border);
-  border-radius: var(--pl-radius-lg);
+  border-radius: var(--pl-radius-pill);
   box-shadow: var(--pl-shadow-float);
+  pointer-events: none;
 }
-.av2-mapa-vacio-card > svg { color: var(--pl-text-muted); }
-.av2-mapa-vacio-titulo {
-  margin: 4px 0 0;
-  font-family: var(--pl-font-display);
-  font-size: var(--pl-fs-card-title);
-  font-weight: 700;
-  letter-spacing: var(--pl-tracking-display);
-  color: var(--pl-text);
+.av2-mapa-aviso > svg {
+  flex: none;
+  color: var(--pl-text-muted);
 }
-.av2-mapa-vacio-texto {
+.av2-mapa-aviso-texto {
+  min-width: 0;
   margin: 0;
   font-size: var(--pl-fs-body-sm);
-  line-height: 1.5;
+  line-height: 1.35;
   color: var(--pl-text-muted);
   text-wrap: pretty;
 }
-.av2-mapa-vacio-card .av2-btn-secundario { margin-top: 8px; }
+.av2-mapa-aviso-texto strong {
+  font-weight: 700;
+  color: var(--pl-text);
+}
+.av2-mapa-aviso .av2-btn-secundario {
+  flex: none;
+  pointer-events: auto;
+  padding: 5px 11px;
+  font-size: var(--pl-fs-micro);
+}
+
+/* En pantallas angostas la banda se apila y se pega a los bordes: una pildora
+   centrada de 560px no entra en un telefono. */
+@media (max-width: 560px) {
+  .av2-mapa-aviso {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    border-radius: var(--pl-radius-lg);
+    text-align: center;
+  }
+}
 
 /* ============================================================
    [PANEL] — card genérica de sección con cabecera
