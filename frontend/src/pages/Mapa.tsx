@@ -770,10 +770,11 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
       blur: 22,
       maxZoom: 17,
       max: 3,
-      // Más tenue que antes: ahora es fondo y no la respuesta. Con la opacidad
-      // vieja (0.45) le competía el color a las burbujas, que llevan la misma
-      // escala de veredicto.
-      minOpacity: 0.28,
+      // Fondo, pero fondo VISIBLE. A 0.28 sobre el basemap claro la mancha
+      // practicamente no se veia y la capa parecia rota; a 0.45 le competia el
+      // color a las burbujas, que llevan la misma escala de veredicto. 0.4 se
+      // lee sin discutirle el protagonismo a lo de arriba.
+      minOpacity: 0.4,
       gradient: {
         0.0: rampa.baja,
         0.55: rampa.media,
@@ -789,6 +790,18 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
 
     layerRef.current = heat;
     return () => {
+      // DEVOLVER EL CANVAS A SU PANE ANTES DE SACAR LA CAPA.
+      //
+      // leaflet.heat hace `overlayPane.removeChild(canvas)` en su onRemove, sin
+      // fijarse donde esta el canvas realmente. Como lo mudamos al pane de
+      // atras, ese removeChild tiraba NotFoundError ("The node to be removed is
+      // not a child of this node") y el error subia hasta React, que volteaba
+      // la pantalla entera con su pantalla de error. Se lo devuelve a su lugar
+      // y recien ahi se remueve la capa.
+      const canvasVivo = pane?.querySelector('canvas.leaflet-heatmap-layer');
+      if (canvasVivo) {
+        map.getPanes().overlayPane.appendChild(canvasVivo);
+      }
       map.removeLayer(heat);
       layerRef.current = null;
     };
