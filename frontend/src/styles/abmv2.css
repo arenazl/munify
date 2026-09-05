@@ -2644,6 +2644,53 @@ button.av2-chip:hover { opacity: 0.85; }
     color var(--pl-dur-ui) var(--pl-ease);
 }
 .av2-mapa-ctrl:hover { background: var(--pl-surface-hover); color: var(--pl-text); }
+/* --- El +/- del zoom, con la piel del kit ---
+   Leaflet los dibuja como una barra pegada, cuadrada y con su propio borde
+   gris: al lado de los controles del lienzo (superficie, borde fino, sombra
+   flotante) desentonaban. El dueno lo marco el 2026-09-05: "arregla el mas
+   menos que se ve feo".
+
+   Se los trata como lo que son --dos controles del canvas mas-- reusando las
+   medidas y los tokens de `.av2-mapa-ctrl`: mismo 34px, misma superficie,
+   mismo radio, misma sombra. Separados en vez de pegados, porque asi es como
+   estan los de la derecha. */
+.av2-mapa-lienzo .leaflet-control-zoom {
+  border: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.av2-mapa-lienzo .leaflet-control-zoom a {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-family: var(--pl-font-sans);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--pl-text-3);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  box-shadow: var(--pl-shadow-float);
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-mapa-lienzo .leaflet-control-zoom a:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+/* Leaflet marca el boton agotado (zoom al tope) con su propio gris. */
+.av2-mapa-lienzo .leaflet-control-zoom a.leaflet-disabled {
+  color: var(--pl-text-muted);
+  background: var(--pl-surface);
+  opacity: 0.5;
+  cursor: default;
+}
+
 .av2-mapa-ctrl--activo,
 .av2-mapa-ctrl--activo:hover {
   background: var(--pl-green-100);

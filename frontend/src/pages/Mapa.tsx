@@ -4110,9 +4110,15 @@ export default function Mapa() {
                     fillOpacity: elegido ? 0.2 : (densidad ? 0 : 0.04),
                   }}
                   eventHandlers={{
+                    // Click adentro = QUEDARSE en ese barrio, nunca soltarlo.
+                    // Era un toggle y despintaba el barrio que estabas mirando
+                    // al tocarlo de nuevo (dueno, 2026-09-05: "me despinta
+                    // santa rita"). Para soltarlo estan el combo y el boton
+                    // del aviso; tocar adentro de lo que ya elegiste no puede
+                    // significar "salir".
                     click: () => {
                       clickAtendidoRef.current = Date.now();
-                      setBarrioSel((x) => (x === b.id ? null : b.id));
+                      setBarrioSel(b.id);
                     },
                   }}
                 >

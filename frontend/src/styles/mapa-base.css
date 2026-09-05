@@ -37,10 +37,6 @@
 }
 .mapa-neutro--oscuro .leaflet-control-attribution a { color: #7ba7d0; }
 
-/* Los controles de zoom, con la misma piel que el resto de la app. */
-.mapa-neutro--oscuro .leaflet-bar a {
-  background: #1a2635;
-  color: #e8eef6;
-  border-color: #2b3b4e;
-}
-.mapa-neutro--oscuro .leaflet-bar a:hover { background: #213040; }
+/* Los controles de zoom se visten en abmv2.css [MAPA], con los tokens --pl-*
+   y la misma piel que los demas controles del lienzo. Aca no van colores: este
+   archivo se ocupa del BASEMAP (desaturar el tile), no de la UI de encima. */
