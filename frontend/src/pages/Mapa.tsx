@@ -100,6 +100,7 @@ import {
   isAbierto,
   computeKPIs,
   topZonas,
+  barrioDelPunto,
   Hotspot,
   BBox,
 } from '../lib/mapaUtils';
@@ -945,42 +946,36 @@ function MapController({ target }: { target: { lat: number; lng: number; zoom?: 
 /**
  * Click en cualquier punto del mapa -> elegir el barrio de ESE punto.
  *
- * El click sobre un poligono de barrio ya lo resuelve el propio poligono; esto
- * es la RED que atrapa lo que se le escapa: los barrios que el municipio tiene
- * cargados SIN contorno (en Villa Carlos Paz son 5 de 45) no tienen poligono
- * que clickear, y ahi el mapa quedaba mudo justo donde el heatmap dice "4
- * reclamos". Se resuelve por el reclamo mas cercano al click: si hay uno a
- * menos de `radioMetros`, se elige SU barrio; si no hay nada cerca, el click
- * es en el vacio y suelta la seleccion.
+ * PINTAR e IDENTIFICAR son cosas distintas (dueno, 2026-09-05). Pintar necesita
+ * el contorno; decir donde tocaste, no. En la base de QA hay 2.028 barrios y
+ * solo 349 tienen contorno, pero 2.026 tienen su centro cargado: si el mapa
+ * solo contestara donde hay poligono, quedaria mudo en el 83% del territorio.
+ *
+ * Por eso `barrioDelPunto` responde en dos niveles —dentro de un contorno (un
+ * hecho) o por el centro mas cercano (una deduccion)— y la pantalla los muestra
+ * distinto: el primero se pinta, el segundo se rotula sin inventarle una forma.
  *
  * `yaAtendido` evita el doble manejo: Leaflet propaga al mapa el click que ya
  * atendio un poligono o un pin, y sin esto la seleccion del poligono se pisaba
  * a si misma un instante despues.
  */
 function ClickEnElMapaEligeBarrio({
-  reclamos,
+  contornos,
+  conCentro,
   yaAtendido,
   onElegir,
-  radioMetros = 400,
 }: {
-  reclamos: Reclamo[];
+  contornos: Array<{ id: number; poligono: [number, number][] }>;
+  conCentro: BarrioMunicipio[];
   yaAtendido: { current: number };
   onElegir: (barrioId: number | null) => void;
-  radioMetros?: number;
 }) {
   useMapEvents({
     click: (e) => {
       if ((e.originalEvent?.detail ?? 1) > 1) return;      // doble-click = zoom
       if (Date.now() - yaAtendido.current < 150) return;   // lo atendio un poligono/pin
-      const { lat, lng } = e.latlng;
-      let mejorId: number | null = null;
-      let mejorDist = Infinity;
-      for (const r of reclamos) {
-        if (r.latitud == null || r.longitud == null || r.barrio?.id == null) continue;
-        const d = L.latLng(lat, lng).distanceTo(L.latLng(r.latitud, r.longitud));
-        if (d < mejorDist) { mejorDist = d; mejorId = r.barrio.id; }
-      }
-      onElegir(mejorDist <= radioMetros ? mejorId : null);
+      const hit = barrioDelPunto(e.latlng.lat, e.latlng.lng, contornos, conCentro);
+      onElegir(hit?.id ?? null);
     },
   });
   return null;
@@ -1960,11 +1955,6 @@ export default function Mapa() {
     }
     return m;
   }, [universoSin]);
-
-  /** El universo con el que se resuelve un click en el mapa: todo lo que entra
-   *  en la consulta MENOS el recorte por barrio (si no, al tener un barrio
-   *  elegido no se podria tocar otro). */
-  const universoParaClick = useMemo(() => universoSin('barrio'), [universoSin]);
 
   /** Cuántos reclamos tiene cada barrio (por id) bajo el resto de los filtros. */
   const conteoPorBarrioId = useMemo(() => {
@@ -4030,6 +4020,48 @@ export default function Mapa() {
               );
             })}
 
+            {/* EL BARRIO SIN CONTORNO, senalado igual.
+                PINTAR necesita el poligono; DECIR DONDE TOCASTE no. En la base
+                los contornos son la excepcion (349 de 2.028 barrios en QA) y el
+                centro lo tienen casi todos, asi que cuando el barrio elegido no
+                tiene forma se planta su centro con el rotulo: no se le inventa
+                un contorno --seria dibujar un dato que no existe-- pero la
+                pantalla contesta igual que barrio es y cuantos reclamos tiene.
+                El punto va hueco y punteado justamente para leerse como "por
+                aca", no como un limite. */}
+            {verRegiones && barrioSel != null && !regiones.barrios.some((b) => b.id === barrioSel) && (() => {
+              const b = barriosMunicipio.find((x) => x.id === barrioSel);
+              if (!b || b.latitud == null || b.longitud == null) return null;
+              const color = colorDistrito(b.zona_id);
+              const cuantos = conteoPorBarrioId.get(b.id) ?? 0;
+              return (
+                <CircleMarker
+                  key={`barrio-sin-contorno-${b.id}`}
+                  center={[b.latitud, b.longitud]}
+                  radius={9}
+                  interactive={false}
+                  pathOptions={{
+                    color,
+                    weight: 2,
+                    opacity: 0.95,
+                    fillColor: color,
+                    fillOpacity: 0.15,
+                    dashArray: '3 3',
+                  }}
+                >
+                  <Tooltip permanent direction="top" offset={[0, -10]} className="av2-rotulo">
+                    <div className="font-medium text-sm">{b.nombre}</div>
+                    <div className="text-xs">
+                      {cuantos === 0
+                        ? 'sin reclamos en esta consulta'
+                        : `${cuantos} ${cuantos === 1 ? 'reclamo' : 'reclamos'}`}
+                      {' · sin contorno cargado'}
+                    </div>
+                  </Tooltip>
+                </CircleMarker>
+              );
+            })()}
+
             {/* LOS 6 DISTRITOS, no los 57 barrios. Seis areas grandes se
                 leen de un vistazo; cincuenta y siete manchitas de colores no
                 dicen nada y encima tapan los pines. El barrio sigue estando en
@@ -4156,7 +4188,8 @@ export default function Mapa() {
                 areas: si el click cayo en un poligono, este handler se calla. */}
             {!drawMode && regiones.distritos.length <= 1 && (
               <ClickEnElMapaEligeBarrio
-                reclamos={universoParaClick}
+                contornos={regiones.barrios}
+                conCentro={barriosMunicipio}
                 yaAtendido={clickAtendidoRef}
                 onElegir={setBarrioSel}
               />

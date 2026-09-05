@@ -359,3 +359,83 @@ export function distribucionEstados(reclamos: Reclamo[]): Array<{ estado: string
     .map(([estado, count]) => ({ estado, count }))
     .sort((a, b) => b.count - a.count);
 }
+
+// =====================================================================
+// GEOMETRIA: en que barrio cayo un click
+// =====================================================================
+/**
+ * Ray casting: cuenta cuantas veces un rayo horizontal que sale del punto
+ * cruza los lados del poligono. Impar = adentro.
+ *
+ * El anillo viene en el orden de Leaflet ([lat, lng]) porque es el mismo que
+ * ya usan los <Polygon> de la pantalla: convertirlo aca seria pedirle al que
+ * llama que se acuerde de un orden distinto al que tiene a mano.
+ */
+export function puntoEnPoligono(
+  lat: number,
+  lng: number,
+  anillo: Array<[number, number]>,
+): boolean {
+  let dentro = false;
+  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+    const [latI, lngI] = anillo[i];
+    const [latJ, lngJ] = anillo[j];
+    const cruza = (lngI > lng) !== (lngJ > lng)
+      && lat < ((latJ - latI) * (lng - lngI)) / (lngJ - lngI) + latI;
+    if (cruza) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/**
+ * El barrio de un punto del mapa, con DOS niveles de certeza:
+ *
+ *   'contorno' — el punto cae adentro de un contorno cargado. Es un hecho.
+ *   'cercania' — no hay contorno que lo contenga, asi que se toma el barrio
+ *                cuyo centro esta mas cerca. Es una deduccion.
+ *
+ * La distincion existe porque en la base los contornos son la excepcion (349
+ * de 2.028 barrios en QA) pero el centro lo tienen casi todos (2.026). Sin el
+ * segundo nivel el mapa quedaria mudo en el 83% del territorio; sin la etiqueta
+ * de certeza, una deduccion se mostraria como si fuera un dato.
+ *
+ * `limiteKm` es la red de seguridad para el click que cae en el medio de la
+ * nada: sin el, tocar el mar devolveria el barrio costero mas cercano.
+ */
+export interface BarrioConCentro {
+  id: number;
+  nombre: string;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
+export function barrioDelPunto(
+  lat: number,
+  lng: number,
+  contornos: Array<{ id: number; poligono: Array<[number, number]> }>,
+  conCentro: BarrioConCentro[],
+  limiteKm = 3,
+): { id: number; certeza: 'contorno' | 'cercania' } | null {
+  for (const c of contornos) {
+    if (c.poligono.length >= 3 && puntoEnPoligono(lat, lng, c.poligono)) {
+      return { id: c.id, certeza: 'contorno' };
+    }
+  }
+  // Distancia en grados corregida por la latitud: a -31 grados un grado de
+  // longitud mide ~0.85 de uno de latitud, y sin la correccion el barrio "mas
+  // cercano" se corre hacia el este/oeste. No hace falta Haversine para
+  // comparar distancias cortas entre si.
+  const kmPorGradoLat = 111.32;
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  let mejor: number | null = null;
+  let mejorKm = Infinity;
+  for (const b of conCentro) {
+    if (b.latitud == null || b.longitud == null) continue;
+    const dLat = b.latitud - lat;
+    const dLng = (b.longitud - lng) * cosLat;
+    const km = Math.sqrt(dLat * dLat + dLng * dLng) * kmPorGradoLat;
+    if (km < mejorKm) { mejorKm = km; mejor = b.id; }
+  }
+  if (mejor == null || mejorKm > limiteKm) return null;
+  return { id: mejor, certeza: 'cercania' };
+}
