@@ -11,6 +11,7 @@ No se cuelga del `users` de la app a proposito: aquel es multi-tenant y
 municipal, y esto son dos personas del equipo comercial. Un JWT propio con
 scope `calls`, firmado con la misma SECRET_KEY.
 """
+import json
 from datetime import date, datetime, timedelta
 from typing import Dict, Optional
 
@@ -18,14 +19,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.database import get_db
 from core.rate_limit import limiter
 from core.security import create_access_token, verify_password
-from models.calls import CallsEvento, CallsRegistro, CallsUsuario
+from models.calls import CallsEvento, CallsMunicipio, CallsRegistro, CallsUsuario
 
 router = APIRouter()
 
@@ -57,6 +58,9 @@ class RegistroIn(BaseModel):
     notas: Optional[str] = None
     quien: Optional[str] = Field(default=None, max_length=120)
     proximo: Optional[str] = None  # 'YYYY-MM-DD' o '' para limpiar
+    # Lo que el vendedor corrigio a mano: {"telefono curado": "el que anda"}.
+    # Vive en SU registro y no en la ficha, porque la ficha es de la curaduria.
+    telefonos_corregidos: Optional[Dict[str, str]] = None
     # Eventos que la pagina quiere dejar asentados (llamada, nota, estado...).
     eventos: list[dict] = Field(default_factory=list, max_length=10)
 
@@ -116,6 +120,7 @@ def _a_dict(r: CallsRegistro) -> dict:
         "notas": r.notas or "",
         "quien": r.quien or "",
         "proximo": r.proximo.isoformat() if r.proximo else "",
+        "telFix": json.loads(r.telefonos_corregidos) if r.telefonos_corregidos else {},
         "por": r.actualizado_por or "",
         "en": r.actualizado_en.isoformat() if r.actualizado_en else "",
     }
@@ -173,6 +178,11 @@ async def guardar_registro(
             fila.proximo = date.fromisoformat(data.proximo) if data.proximo else None
         except ValueError:
             raise HTTPException(status_code=400, detail="Fecha invalida")
+    if data.telefonos_corregidos is not None:
+        # Se acumulan: el que corrige un numero no borra la correccion del otro.
+        actual = json.loads(fila.telefonos_corregidos) if fila.telefonos_corregidos else {}
+        actual.update({str(k)[:40]: str(v)[:40] for k, v in data.telefonos_corregidos.items()})
+        fila.telefonos_corregidos = json.dumps({k: v for k, v in actual.items() if v}, ensure_ascii=False)
 
     fila.actualizado_por = u.nombre
     fila.actualizado_en = datetime.utcnow()
@@ -241,3 +251,138 @@ async def importar(
         creados += 1
     await db.commit()
     return {"ok": True, "importados": creados, "salteados": len(data.db) - creados}
+
+
+# --------------------------------------------------------------------------- #
+# LAS FICHAS, desde la base (2026-09-05)
+#
+# Antes viajaban embebidas en el html. Ahora la pagina las pide aca y recibe la
+# ficha curada CON el trabajo del equipo aplicado encima: el estado, la nota, el
+# proximo llamado, y los telefonos que alguien corrigio a mano. Es lo que hace
+# que tres vendedores vean lo mismo.
+# --------------------------------------------------------------------------- #
+def _json(txt, x=None):
+    try:
+        return json.loads(txt) if txt else x
+    except Exception:  # noqa: BLE001
+        return x
+
+
+def _ficha(m: CallsMunicipio, reg: Optional[dict]) -> dict:
+    """La ficha como la espera la pagina. Las correcciones del equipo se aplican
+    ENCIMA de los telefonos curados, sin perder cual era el original."""
+    tel = _json(m.telefonos, []) or []
+    fix = (reg or {}).get("telFix") or {}
+    tel_final = [fix.get(t, t) for t in tel]
+    return {
+        "id": m.muni_key,
+        "municipio": m.municipio,
+        "provincia": m.provincia,
+        "pais": m.pais,
+        "tipo_gobierno": m.tipo_gobierno or "",
+        "telefonos": tel_final,
+        "telefonos_curados": tel,
+        "direccion": m.direccion or "",
+        "direccion_fuente": m.direccion_fuente or "",
+        "web": m.web or "",
+        "habitantes": m.habitantes or "",
+        "intendente": m.intendente or "",
+        "cargo": m.cargo or "",
+        "partido": m.partido or "",
+        "confianza": m.confianza or "",
+        "fuente": m.fuente or "",
+        "nota": m.nota or "",
+        "senal": m.senal or "",
+        "llamar_desde": m.llamar_desde or "",
+        "revalidar_el": m.revalidar_el or "",
+        "economia": m.economia or "",
+        "digital": m.digital or "",
+        "estructura": m.estructura or "",
+        "color": m.color or "",
+        "etiquetas": _json(m.etiquetas, []) or [],
+        "ranking": _json(m.ranking, {}) or {},
+        "calidad": _json(m.calidad, {}) or {},
+        "origen": _json(m.origen, []) or [],
+        "verificado_el": m.verificado_el or "",
+    }
+
+
+@router.get("/fichas")
+async def fichas(db: AsyncSession = Depends(get_db), _: CallsUsuario = Depends(usuario_calls)):
+    """Las fichas curadas + el pipeline del equipo, en una sola llamada.
+
+    La pagina arranca con esto y ya sabe todo: a quien llamar, en que orden, que
+    paso con cada uno y quien lo atendio. Son ~180 fichas: entra comodo en una
+    respuesta y evita que la pagina tenga que cruzar dos listas."""
+    munis = (await db.execute(
+        select(CallsMunicipio).order_by(CallsMunicipio.ranking_score.desc(),
+                                        CallsMunicipio.municipio.asc())
+    )).scalars().all()
+    registros = (await db.execute(select(CallsRegistro))).scalars().all()
+    eventos = (await db.execute(
+        select(CallsEvento).order_by(CallsEvento.creado.asc())
+    )).scalars().all()
+
+    db_out: Dict[str, dict] = {r.muni_key: _a_dict(r) for r in registros}
+    for e in eventos:
+        db_out.setdefault(e.muni_key, {"estado": "", "notas": "", "quien": "",
+                                       "proximo": "", "telFix": {}})
+        db_out[e.muni_key].setdefault("hist", []).append({
+            "t": e.creado.isoformat(), "tipo": e.tipo, "txt": e.texto, "autor": e.autor,
+        })
+
+    return {
+        "fichas": [_ficha(m, db_out.get(m.muni_key)) for m in munis],
+        "db": db_out,
+        "importado_en": max([m.importado_en for m in munis if m.importado_en],
+                            default=datetime.utcnow()).isoformat(),
+    }
+
+
+@router.get("/ranking")
+async def ranking(db: AsyncSession = Depends(get_db), _: CallsUsuario = Depends(usuario_calls)):
+    """Como viene cada vendedor. Sale de los eventos, que son los que llevan
+    autor: llamadas hechas, municipios tocados, y cierres con detalle (los que
+    ademas dejaron nota o con quien hablaron, que es lo que sirve al que sigue).
+
+    Se cuenta por AUTOR y no por usuario logueado a proposito: el historial
+    guarda el nombre con el que se anoto, y esa es la unidad que el dueno quiere
+    ver en la pantalla de competencia."""
+    filas = (await db.execute(
+        select(CallsEvento.autor, CallsEvento.tipo,
+               func.count(CallsEvento.id), func.count(func.distinct(CallsEvento.muni_key)),
+               func.max(CallsEvento.creado))
+        .group_by(CallsEvento.autor, CallsEvento.tipo)
+    )).all()
+
+    por_autor: Dict[str, dict] = {}
+    for autor, tipo, n, munis, ultimo in filas:
+        a = por_autor.setdefault(autor or "sin autor", {
+            "autor": autor or "sin autor", "llamadas": 0, "cierres": 0,
+            "municipios": 0, "ultimo": None,
+        })
+        if tipo == "llamada":
+            a["llamadas"] += n
+        if tipo == "estado":
+            a["cierres"] += n
+        a["municipios"] = max(a["municipios"], munis)
+        iso = ultimo.isoformat() if ultimo else None
+        if iso and (a["ultimo"] is None or iso > a["ultimo"]):
+            a["ultimo"] = iso
+
+    # Los cierres CON DETALLE salen del registro, que es donde vive la nota.
+    con_detalle = (await db.execute(
+        select(CallsRegistro.actualizado_por, func.count(CallsRegistro.id))
+        .where(CallsRegistro.estado != "")
+        .where((CallsRegistro.notas.isnot(None)) | (CallsRegistro.quien.isnot(None)))
+        .group_by(CallsRegistro.actualizado_por)
+    )).all()
+    for autor, n in con_detalle:
+        if autor in por_autor:
+            por_autor[autor]["con_detalle"] = n
+
+    tabla = sorted(por_autor.values(), key=lambda x: (-x["llamadas"], -x["municipios"]))
+    for i, a in enumerate(tabla, 1):
+        a["puesto"] = i
+        a.setdefault("con_detalle", 0)
+    return {"ranking": tabla}
