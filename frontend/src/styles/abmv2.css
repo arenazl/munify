@@ -2757,6 +2757,83 @@ button.av2-chip:hover { opacity: 0.85; }
 /* --- Vacío: si el filtro no deja nada, el mapa mudo parece roto. Se
    explica qué pasó y cómo salir, sin bloquear el paneo (el scrim no
    recibe punteros; sólo la tarjeta). --- */
+/* --- SEGUNDA LINEA DEL MAPA: en que andan los reclamos ---
+   Chips de estado que hacen dos trabajos a la vez: prenden y apagan lo que se
+   dibuja, y SON la leyenda del color de las burbujas. El punto de cada chip es
+   exactamente el color que se ve en el mapa, asi que no hace falta mirar a otro
+   lado para entenderlo.
+
+   El color entra por `--av2-estado-color`, que lo pone el padre desde
+   `estadoColors` (el SSoT visual de la app): aca no se decide ningun color. */
+.av2-mapa-estados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.av2-mapa-estados-titulo {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.av2-mapa-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    border-color var(--pl-dur-ui) var(--pl-ease),
+    color var(--pl-dur-ui) var(--pl-ease),
+    opacity var(--pl-dur-ui) var(--pl-ease);
+}
+/* Apagado NO se esconde: se atenua. Un chip que desaparece deja al usuario sin
+   saber que existe ese estado ni como volver a verlo. */
+.av2-mapa-estado:not(.av2-mapa-estado--on) {
+  opacity: 0.45;
+}
+.av2-mapa-estado:hover { background: var(--pl-surface-hover); }
+.av2-mapa-estado--on {
+  color: var(--pl-text);
+  border-color: color-mix(in srgb, var(--av2-estado-color) 55%, transparent);
+  background: color-mix(in srgb, var(--av2-estado-color) 10%, var(--pl-surface));
+}
+.av2-mapa-estado-punto {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--av2-estado-color);
+}
+.av2-mapa-estado-n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--pl-text-3);
+}
+.av2-mapa-estados-todos {
+  padding: 4px 8px;
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  color: var(--pl-text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.av2-mapa-estados-todos:hover { color: var(--pl-text); }
+
 /* --- AVISO al pie del mapa ---
    Reemplaza a la card `.av2-mapa-vacio`, que se tendia sobre TODO el lienzo
    (inset:0 + fondo semitransparente) y lo tapaba.

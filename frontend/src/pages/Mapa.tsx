@@ -83,6 +83,9 @@ import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
 // calor como respuesta a "donde": la mancha dice que hay muchos, la burbuja
 // dice QUE barrio, CUANTOS y si esta bien o mal.
 import BurbujasBarrio, { type BurbujaBarrio } from '../components/mapa/BurbujasBarrio';
+// La segunda linea: EN QUE ANDAN los reclamos. Es la que le da sentido al
+// color de las burbujas y, de paso, es su leyenda.
+import FiltroEstadoMapa, { type GrupoEstado } from '../components/mapa/FiltroEstadoMapa';
 import {
   Reclamo,
   type PuntoInteres,
@@ -114,6 +117,40 @@ import MapaTimelapseBanda, {
   type VelocidadTimelapse,
   type ComparacionVentana,
 } from '../components/mapa/MapaTimelapseBanda';
+
+/**
+ * EN QUE ANDA un reclamo, en los cuatro grupos que le importan a un municipio.
+ *
+ * Los diez estados de la base son el detalle de la gestion; para mirar un mapa
+ * alcanza con saber si el trabajo esta esperando, trabado, hecho o descartado.
+ * "Con inconveniente" es el que el dueno pidio por su nombre (2026-09-05) y es
+ * exactamente `pospuesto`: el que no se pudo resolver y tiene un `motivo_pausa`
+ * que lo explica.
+ *
+ * `rechazado` entra como cuarto grupo aunque solo se pidieron tres: dejarlo
+ * afuera haria desaparecer reclamos del mapa sin que nadie pueda explicarse
+ * por que, que es peor que un boton de mas.
+ *
+ * El COLOR sale de `estadoColors` --el SSoT visual de la app-- y no de una
+ * paleta propia: el naranja del mapa tiene que ser el mismo naranja de la
+ * pantalla de Reclamos.
+ */
+const GRUPOS_ESTADO: Array<{ id: string; label: string; estados: string[]; colorDe: string }> = [
+  {
+    id: 'pendiente',
+    label: 'Pendientes',
+    estados: ['nuevo', 'recibido', 'asignado', 'en_proceso', 'en_curso', 'pendiente_confirmacion'],
+    colorDe: 'recibido',
+  },
+  { id: 'inconveniente', label: 'Con inconveniente', estados: ['pospuesto'], colorDe: 'pospuesto' },
+  { id: 'finalizado', label: 'Finalizados', estados: ['finalizado', 'resuelto'], colorDe: 'finalizado' },
+  { id: 'rechazado', label: 'Rechazados', estados: ['rechazado'], colorDe: 'rechazado' },
+];
+
+/** De un estado de la base al grupo que le toca. Se arma una vez. */
+const GRUPO_DE_ESTADO: Record<string, string> = Object.fromEntries(
+  GRUPOS_ESTADO.flatMap((g) => g.estados.map((e) => [e, g.id])),
+);
 
 /** Preset del filtro de período (días, o "todo"). */
 type TimePreset = '7' | '30' | '90' | '365' | 'all';
@@ -766,15 +803,22 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
     }
 
     const heat = L.heatLayer([], {
-      radius: 28,
-      blur: 22,
+      // EL MAPA DE CALOR ES LA RESPUESTA A "DONDE HAY MAS", y por eso se ve.
+      //
+      // Venia apagandose de a poco para no taparle el color a las burbujas,
+      // hasta quedar en algo que "no se ve" (dueno, 2026-09-05: "tiene que
+      // estar mas fuerte... lamentablemente hay que hacer el heatmap mas
+      // profundo"). El conflicto se resolvio de raiz cuando las burbujas
+      // dejaron de hablar de cantidad: ahora dicen ESTADO, asi que la mancha
+      // puede ocuparse sola de la cantidad y pisar fuerte.
+      //
+      // Radio mas grande y menos desenfoque = manchas mas solidas y menos
+      // corridas del punto real, que era la otra queja.
+      radius: 34,
+      blur: 18,
       maxZoom: 17,
       max: 3,
-      // Fondo, pero fondo VISIBLE. A 0.28 sobre el basemap claro la mancha
-      // practicamente no se veia y la capa parecia rota; a 0.45 le competia el
-      // color a las burbujas, que llevan la misma escala de veredicto. 0.4 se
-      // lee sin discutirle el protagonismo a lo de arriba.
-      minOpacity: 0.4,
+      minOpacity: 0.62,
       gradient: {
         0.0: rampa.baja,
         0.55: rampa.media,
@@ -1672,6 +1716,23 @@ export default function Mapa() {
     }>;
   }>({ distritos: [], barrios: [] });
   const [verRegiones, setVerRegiones] = useState(true);
+  /** Que grupos de estado se estan mirando. Arrancan TODOS: el mapa no
+   *  esconde nada hasta que alguien lo pida. */
+  const [estadosVisibles, setEstadosVisibles] = useState<Set<string>>(
+    () => new Set(GRUPOS_ESTADO.map((g) => g.id)),
+  );
+  const alternarGrupoEstado = useCallback((id: string) => {
+    setEstadosVisibles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const verTodosLosEstados = useCallback(
+    () => setEstadosVisibles(new Set(GRUPOS_ESTADO.map((g) => g.id))),
+    [],
+  );
+
   /** La mancha de calor, ENCENDIDA por default y de fondo.
    *
    *  Las dos capas no compiten: se reparten el trabajo. La mancha muestra la
@@ -1958,10 +2019,40 @@ export default function Mapa() {
   );
 
   // Lo que finalmente se dibuja.
-  const reclamosFiltrados = useMemo(
+  /** Lo que la consulta trajo, ANTES del recorte por estado. Es el universo con
+   *  el que se cuentan los botones: si el conteo se hiciera sobre lo ya
+   *  filtrado, apagar "Finalizados" pondria su contador en cero y no habria
+   *  forma de saber cuantos hay para volver a prenderlos. */
+  const reclamosDeLaConsulta = useMemo(
     () => aplicarTiempo(reclamosAlcance),
     [aplicarTiempo, reclamosAlcance],
   );
+
+  /** Cuantos hay en cada grupo de estado, con su color y su nombre. */
+  const gruposEstado = useMemo<GrupoEstado[]>(() => {
+    const cuenta = new Map<string, number>();
+    for (const r of reclamosDeLaConsulta) {
+      const g = GRUPO_DE_ESTADO[r.estado];
+      if (g) cuenta.set(g, (cuenta.get(g) || 0) + 1);
+    }
+    return GRUPOS_ESTADO.map((g) => ({
+      id: g.id,
+      label: g.label,
+      color: estadoColors[g.colorDe] || estadoColors.default,
+      cuantos: cuenta.get(g.id) || 0,
+    }));
+  }, [reclamosDeLaConsulta]);
+
+  /** Lo que se dibuja: la consulta, recortada por los estados encendidos. */
+  const reclamosFiltrados = useMemo(() => {
+    if (estadosVisibles.size === GRUPOS_ESTADO.length) return reclamosDeLaConsulta;
+    return reclamosDeLaConsulta.filter((r) => {
+      const g = GRUPO_DE_ESTADO[r.estado];
+      // Un estado que no cae en ningun grupo se MUESTRA. Esconder un reclamo
+      // porque su estado es desconocido seria perder un dato sin avisar.
+      return g == null || estadosVisibles.has(g);
+    });
+  }, [reclamosDeLaConsulta, estadosVisibles]);
 
   /**
    * CUANTOS reclamos hacen falta para que agrupar por barrio signifique algo.
@@ -2166,35 +2257,42 @@ export default function Mapa() {
     }
     if (porBarrio.size === 0) return [];
 
-    const masEsMejor = pregunta === 'resolvimos';
-    const valores = Array.from(porBarrio.values(), (l) => l.length);
-    const max = Math.max(...valores);
-
     const salida: BurbujaBarrio[] = [];
     for (const [id, lista] of porBarrio) {
       const b = barriosMunicipio.find((x) => x.id === id);
       if (!b || b.latitud == null || b.longitud == null) continue;
       const n = lista.length;
-      const proporcion = n / max;
-      // Tercios sobre el maximo observado. `masEsMejor` invierte los extremos,
-      // no los corta: el del medio sigue siendo el del medio.
-      const grave = proporcion > 0.66;
-      const medio = proporcion > 0.33;
-      const color = medio
-        ? (grave
-            ? (masEsMejor ? rampaDensidad.baja : rampaDensidad.alta)
-            : rampaDensidad.media)
-        : (masEsMejor ? rampaDensidad.alta : rampaDensidad.baja);
 
-      // El detalle contesta "y esto que tan grave es", con el dato REAL del
-      // barrio: lo mas viejo que tiene sin cerrar. Si esta todo cerrado no se
-      // escribe nada --no se rellena con una frase de compromiso--.
-      const abiertos = lista.filter((r) => isAbierto(r.estado));
-      let detalle: string | undefined;
-      if (abiertos.length > 0) {
-        const dias = Math.max(...abiertos.map((r) => diasDesde(r.created_at)));
-        detalle = `el más viejo hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
+      // EL COLOR DICE EL ESTADO QUE MANDA EN EL BARRIO, no su posicion en un
+      // ranking. Antes pintaba el tercio peor del municipio: un concepto que
+      // nadie puede adivinar mirando un circulo, y que ademas exageraba
+      // diferencias irrelevantes --un barrio con 4 reclamos nuevos salia rojo
+      // por tener uno mas que el de al lado--. Ahora contesta la pregunta que
+      // la gente le hace al color: "¿estos estan resueltos o no?".
+      //
+      // La CANTIDAD ya la contesta el tamano de la burbuja y, sobre todo, el
+      // mapa de calor debajo: son dos preguntas y cada capa se ocupa de una.
+      const porGrupo = new Map<string, number>();
+      for (const r of lista) {
+        const g = GRUPO_DE_ESTADO[r.estado];
+        if (g) porGrupo.set(g, (porGrupo.get(g) || 0) + 1);
       }
+      let grupoTop = 'pendiente';
+      let topN = -1;
+      for (const [g, c] of porGrupo) {
+        if (c > topN) { topN = c; grupoTop = g; }
+      }
+      const defTop = GRUPOS_ESTADO.find((g) => g.id === grupoTop);
+      const color = estadoColors[defTop?.colorDe ?? 'recibido'] || estadoColors.default;
+
+      // El detalle nombra el color: cuantos son del estado que manda. Sin esto
+      // el circulo tiene un color y el rotulo un numero que no se hablan entre
+      // si. Se escribe solo si ese estado no es TODO el barrio --"5 reclamos,
+      // 5 pendientes" es decir dos veces lo mismo--.
+      const etiquetaGrupo = defTop?.label.toLowerCase() ?? '';
+      const detalle = topN > 0 && topN < n
+        ? `${topN} ${etiquetaGrupo}`
+        : (etiquetaGrupo ? `todos ${etiquetaGrupo}` : undefined);
 
       salida.push({
         id, nombre: b.nombre, lat: b.latitud, lng: b.longitud,
@@ -2204,7 +2302,7 @@ export default function Mapa() {
       });
     }
     return salida;
-  }, [dibujoMapa, reclamosFiltrados, barriosMunicipio, pregunta, rampaDensidad]);
+  }, [dibujoMapa, reclamosFiltrados, barriosMunicipio]);
 
   // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
   // La ventana móvil recorta sobre esto y el remate compara la primera ventana
@@ -4106,6 +4204,19 @@ export default function Mapa() {
           />
         )}
 
+        {/* LA SEGUNDA LINEA: en que andan. Va pegada abajo de la consulta
+            porque es otra pregunta sobre lo mismo --la primera elige QUE mirar,
+            esta EN QUE ANDA-- y porque es, ademas, la leyenda del color de las
+            burbujas: el punto de cada boton es el color que se ve en el mapa. */}
+        {reclamosDeLaConsulta.length > 0 && (
+          <FiltroEstadoMapa
+            grupos={gruposEstado}
+            activos={estadosVisibles}
+            onToggle={alternarGrupoEstado}
+            onTodos={verTodosLosEstados}
+          />
+        )}
+
 
       </div>
 
@@ -4426,6 +4537,11 @@ export default function Mapa() {
               <BurbujasBarrio
                 burbujas={burbujasBarrio}
                 elegidoId={barrioSel}
+                /* NINGUN rotulo fijo: molestaban y tapaban el mapa (dueno,
+                   2026-09-05, "esos cartelitos son molestos"). El nombre
+                   aparece al pasar el mouse, y queda escrito solo en el barrio
+                   que se elige --que es el unico que uno esta mirando--. */
+                rotulosFijos={0}
                 onElegir={(id) => {
                   clickAtendidoRef.current = Date.now();
                   setBarrioSel(id);
@@ -4577,24 +4693,16 @@ export default function Mapa() {
             los MISMOS que pinta el heatmap, así la leyenda no miente.
             No se rotula "1 · 10+": la intensidad de leaflet.heat está
             normalizada, no equivale a una cantidad de reclamos. */}
-        {/* La leyenda dice QUE significa el color, que ya no es "densidad"
-            sino el orden entre barrios --y se da vuelta en "qué resolvimos",
-            donde tener muchos es lo bueno. Una leyenda fija diria lo contrario
-            de lo que muestra el mapa en esa pregunta. */}
-        {dibujoMapa === 'barrios' && burbujasBarrio.length > 0 && (
+        {/* LEYENDA DEL MAPA DE CALOR. La del color de las burbujas ya no vive
+            aca: es la botonera de arriba, donde cada estado se prende con su
+            propio color al lado. Una leyenda separada del control obligaba a
+            mirar dos lugares para entender uno solo. */}
+        {verCalor && reclamosFiltrados.length > 0 && (
           <div className="av2-mapa-leyenda">
-            <span className="av2-mapa-leyenda-titulo">Por barrio</span>
-            <span className="av2-mapa-leyenda-extremo">
-              {pregunta === 'resolvimos' ? 'menos resueltos' : 'mejor'}
-            </span>
-            <span
-              className="av2-mapa-leyenda-rampa"
-              style={pregunta === 'resolvimos' ? { transform: 'scaleX(-1)' } : undefined}
-              aria-hidden
-            />
-            <span className="av2-mapa-leyenda-extremo">
-              {pregunta === 'resolvimos' ? 'más resueltos' : 'peor'}
-            </span>
+            <span className="av2-mapa-leyenda-titulo">Concentración</span>
+            <span className="av2-mapa-leyenda-extremo">pocos</span>
+            <span className="av2-mapa-leyenda-rampa" aria-hidden />
+            <span className="av2-mapa-leyenda-extremo">muchos</span>
           </div>
         )}
 
