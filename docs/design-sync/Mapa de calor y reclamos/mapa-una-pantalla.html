@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de reclamos — una sola pantalla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+:root{
+  --primary:#00B37E; --primary-dark:#008F63; --accent:#FFB800; --danger:#E5484D;
+  --bg-0:#0B120F; --bg-1:#111A17; --bg-2:#1A2421; --bg-3:#222E2A;
+  --fg-1:#EAF0ED; --fg-2:#9BA9A4; --fg-3:#8A9994;
+  --border:rgba(234,240,237,.10); --border-2:rgba(234,240,237,.06);
+  --heat-1:#7C5CD6; --heat-4:#D62F8F;
+  --shadow-float:0 6px 20px rgba(0,0,0,.42), 0 2px 6px rgba(0,0,0,.3);
+  --ease:cubic-bezier(0.2,0.8,0.2,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  font-family:Inter,system-ui,sans-serif;background:var(--bg-0);color:var(--fg-1);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
+}
+a{color:var(--primary);text-decoration:none}
+a:hover{color:var(--primary);text-decoration:underline}
+button{font-family:inherit}
+
+.app{display:grid;grid-template-rows:56px 1fr;height:100%}
+
+/* ── topbar: identidad + período + KPIs de cabecera ────────────── */
+.top{
+  display:flex;align-items:center;gap:20px;padding:0 16px;
+  background:var(--bg-1);border-bottom:1px solid var(--border);
+}
+.crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-3);flex:none}
+.mark{width:24px;height:24px;border-radius:7px;background:var(--primary);display:grid;place-items:center;
+  font-family:Sora,sans-serif;font-weight:700;font-size:14px;color:#04140F}
+.crumb b{color:var(--fg-1);font-weight:600}
+.kpis{display:flex;gap:2px;margin-left:4px;flex:1;min-width:0}
+.kpi{padding:0 16px;border-left:1px solid var(--border-2);line-height:1.1;flex:none}
+.kpi:first-child{border-left:0}
+.kpi-n{font-family:Sora,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.02em}
+.kpi-l{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-3);font-weight:600;margin-top:3px}
+.seg{display:flex;gap:3px;background:var(--bg-2);padding:3px;border-radius:9px;flex:none}
+.seg button{border:0;background:transparent;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);
+  padding:7px 12px;border-radius:7px;cursor:pointer;transition:all 150ms var(--ease)}
+.seg button:hover{color:var(--fg-1)}
+.seg button[aria-pressed="true"]{background:var(--bg-3);color:var(--fg-1);font-weight:600}
+.avatar{width:30px;height:30px;border-radius:999px;background:var(--bg-3);display:grid;place-items:center;
+  font-size:11px;font-weight:600;color:var(--fg-2);flex:none}
+
+/* ── body ───────────────────────────────────────────────────────── */
+.body{display:grid;grid-template-columns:1fr 372px;min-height:0}
+.map-wrap{position:relative;min-width:0}
+#map{position:absolute;inset:0}
+.leaflet-container{background:#0E1512;font-family:Inter,sans-serif}
+.leaflet-tile-pane{filter:invert(1) grayscale(1) brightness(.82) contrast(1.05)}
+.leaflet-control-attribution{background:rgba(11,18,15,.72)!important;color:var(--fg-3)!important;font-size:10px}
+.leaflet-control-attribution a{color:var(--fg-2)!important}
+.leaflet-bar a{background:var(--bg-2)!important;color:var(--fg-1)!important;border-color:var(--border)!important}
+.heat-canvas{position:absolute;pointer-events:none;transition:opacity 150ms var(--ease)}
+
+/* toolbar flotante */
+.tools{position:absolute;top:12px;left:12px;right:12px;z-index:500;display:flex;gap:8px;align-items:center;pointer-events:none;flex-wrap:wrap}
+.tools>*{pointer-events:auto}
+.float{background:rgba(17,26,23,.88);backdrop-filter:blur(16px);border:1px solid var(--border);
+  border-radius:999px;box-shadow:var(--shadow-float);display:flex;align-items:center;gap:2px;padding:4px}
+.float .lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);font-weight:600;padding:0 8px 0 10px}
+.float button{border:0;background:transparent;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);
+  padding:8px 13px;border-radius:999px;cursor:pointer;transition:all 150ms var(--ease)}
+.float button:hover{color:var(--fg-1)}
+.float button[aria-pressed="true"]{background:var(--fg-1);color:var(--bg-0);font-weight:600}
+.sw{display:flex;align-items:center;gap:9px;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);padding:6px 14px 6px 8px;cursor:pointer}
+.sw input{appearance:none;width:32px;height:19px;border-radius:999px;background:var(--bg-3);position:relative;
+  cursor:pointer;transition:background 150ms var(--ease);margin:0;flex:none}
+.sw input::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:999px;
+  background:var(--fg-2);transition:all 150ms var(--ease)}
+.sw input:checked{background:var(--primary)}
+.sw input:checked::after{transform:translateX(13px);background:#04140F}
+.spacer{flex:1;min-width:0;pointer-events:none}
+.ghost{background:rgba(17,26,23,.88);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:999px;
+  box-shadow:var(--shadow-float);color:var(--fg-1);font:600 12px/1 Inter,sans-serif;padding:11px 16px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;transition:background 150ms var(--ease)}
+.ghost:hover{background:rgba(26,36,33,.95)}
+.ghost svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* filtros: popover, colapsado por defecto */
+.pop-panel{
+  position:absolute;top:60px;left:12px;z-index:600;width:268px;background:var(--bg-1);
+  border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-float);padding:16px;display:none;
+}
+.pop-panel.on{display:block}
+.pp-t{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);font-weight:600;margin:0 0 10px}
+.pp-t+.pp-t{margin-top:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--border);background:transparent;border-radius:999px;padding:6px 11px;
+  font:500 11.5px/1 Inter,sans-serif;color:var(--fg-2);cursor:pointer;transition:all 150ms var(--ease)}
+.chip:hover{background:var(--bg-2);color:var(--fg-1)}
+.chip[aria-pressed="true"]{background:var(--fg-1);border-color:var(--fg-1);color:var(--bg-0)}
+.stlist{display:flex;flex-direction:column;gap:1px}
+.stlist button{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;
+  padding:7px 6px;border-radius:8px;cursor:pointer;text-align:left;transition:background 150ms var(--ease)}
+.stlist button:hover{background:var(--bg-2)}
+.stlist button[aria-pressed="false"]{opacity:.4}
+.dot{width:9px;height:9px;border-radius:999px;flex:none}
+.stlist .n{font:500 12.5px/1 Inter,sans-serif;flex:1}
+.stlist .v{font:600 12.5px/1 Inter,sans-serif;color:var(--fg-2)}
+
+/* leyenda */
+.legend{
+  position:absolute;bottom:14px;left:12px;z-index:500;background:rgba(17,26,23,.88);backdrop-filter:blur(16px);
+  border:1px solid var(--border);border-radius:999px;padding:8px 14px;display:flex;align-items:center;gap:10px;
+  box-shadow:var(--shadow-float);
+}
+.legend .t{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);font-weight:600}
+.legend .r{width:76px;height:7px;border-radius:999px;background:linear-gradient(90deg,rgba(124,92,214,.25),var(--heat-1),#C43FAE,var(--heat-4))}
+.legend .s{font-size:11px;color:var(--fg-2)}
+.legend .est{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--fg-2)}
+
+/* ── panel derecho: UN card con pestañas ───────────────────────── */
+.panel{background:var(--bg-1);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.insight{padding:14px 16px;border-bottom:1px solid var(--border);font-size:12.5px;line-height:1.5;color:var(--fg-2)}
+.insight b{color:var(--fg-1);font-weight:600}
+.insight .h{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;margin-bottom:7px}
+.insight .h i{width:6px;height:6px;border-radius:999px;background:var(--accent);display:block}
+
+.tabs{display:flex;gap:0;padding:8px 8px 0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:transparent;color:var(--fg-3);font:500 12px/1 Inter,sans-serif;
+  padding:10px 8px 12px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;
+  transition:all 150ms var(--ease);margin-bottom:-1px}
+.tabs button:hover{color:var(--fg-2)}
+.tabs button[aria-pressed="true"]{color:var(--fg-1);font-weight:600;border-bottom-color:var(--primary)}
+
+.tab-head{padding:14px 16px 2px}
+.tab-head h2{font-family:Sora,sans-serif;font-size:14.5px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px}
+.tab-head p{font-size:11.5px;color:var(--fg-3);margin:0;line-height:1.45}
+.list{flex:1;overflow-y:auto;padding:8px 10px 14px;min-height:0}
+.list::-webkit-scrollbar{width:9px}
+.list::-webkit-scrollbar-thumb{background:rgba(234,240,237,.14);border-radius:999px;border:3px solid var(--bg-1)}
+
+.row{display:grid;grid-template-columns:1fr 56px 34px;gap:10px;align-items:center;width:100%;text-align:left;
+  border:0;background:transparent;padding:7px 6px;border-radius:8px;cursor:pointer;transition:background 150ms var(--ease)}
+.row:hover{background:var(--bg-2)}
+.row .n{font:500 13px/1.3 Inter,sans-serif;color:var(--fg-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .n em{font-style:normal;color:var(--fg-3);font-weight:400}
+.row .v{font:600 13px/1 Inter,sans-serif;color:var(--fg-1);text-align:right}
+.row .bar{height:4px;border-radius:999px;display:flex;overflow:hidden;background:var(--bg-3)}
+.row .bar i{display:block;height:100%}
+.rank{width:17px;height:17px;border-radius:5px;background:var(--bg-3);color:var(--fg-2);font-size:10px;
+  font-weight:600;display:inline-grid;place-items:center;margin-right:7px;vertical-align:1px}
+
+/* markers */
+.donut{border-radius:999px;display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 0 0 2px var(--bg-0),0 3px 10px rgba(0,0,0,.5);transition:transform 150ms var(--ease)}
+.donut:hover{transform:scale(1.08)}
+.donut span{background:var(--bg-1);border-radius:999px;display:grid;place-items:center;
+  font-family:Sora,sans-serif;font-weight:700;color:var(--fg-1)}
+.leaflet-marker-icon.dwrap{background:none;border:0}
+.pop .leaflet-popup-content-wrapper{background:var(--bg-1);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow-float);padding:0;color:var(--fg-1)}
+.pop .leaflet-popup-content{margin:0;width:212px!important}
+.pop .leaflet-popup-tip{background:var(--bg-1)}
+.p-in{padding:13px 15px 11px}
+.p-t{font-family:Sora,sans-serif;font-size:14.5px;font-weight:700;margin:0 0 2px}
+.p-s{font-size:11.5px;color:var(--fg-3);margin:0 0 11px}
+.p-r{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;color:var(--fg-2)}
+.p-r b{margin-left:auto;color:var(--fg-1);font-weight:600}
+.p-f{border-top:1px solid var(--border);padding:8px 15px;font-size:11px;color:var(--fg-3);background:var(--bg-2);border-radius:0 0 12px 12px}
+
+@media (max-width:1280px){ .kpi.opt{display:none} }
+@media (max-width:1080px){ .body{grid-template-columns:1fr 320px} }
+@media (max-height:740px){
+  .insight{padding:11px 16px;font-size:12px}
+  .tab-head{padding:11px 16px 0}
+  .row{padding:6px 6px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="crumb"><div class="mark">m</div>Villa Carlos Paz&nbsp;/&nbsp;<b>Mapa</b></div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-n" id="kTot">—</div><div class="kpi-l">Reclamos</div></div>
+      <div class="kpi"><div class="kpi-n" id="kPct" style="color:var(--primary)">—</div><div class="kpi-l">Finalizados</div></div>
+      <div class="kpi"><div class="kpi-n" id="kPend" style="color:var(--accent)">—</div><div class="kpi-l">Pendientes</div></div>
+      <div class="kpi opt"><div class="kpi-n" id="kViejo" style="color:var(--danger)">—</div><div class="kpi-l">+15 días</div></div>
+      <div class="kpi opt"><div class="kpi-n" id="kDias">—</div><div class="kpi-l">Días a cerrar</div></div>
+    </div>
+    <div class="seg" id="segPeriod">
+      <button data-d="7">7 días</button>
+      <button data-d="30" aria-pressed="true">30 días</button>
+      <button data-d="90">90 días</button>
+    </div>
+    <div class="avatar">AD</div>
+  </header>
+
+  <div class="body">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="tools">
+        <div class="float">
+          <span class="lbl">Capa</span>
+          <button data-layer="heat" aria-pressed="true">Concentración</button>
+          <button data-layer="status">Estado</button>
+          <button data-layer="both">Ambas</button>
+        </div>
+        <div class="float"><label class="sw"><input type="checkbox" id="groupToggle" checked>Agrupar por zona</label></div>
+        <button class="ghost" id="filtBtn">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filtros <span id="filtN" style="color:var(--fg-3);font-weight:500"></span>
+        </button>
+        <div class="spacer"></div>
+        <button class="ghost" id="pdfBtn">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+          Informe del área
+        </button>
+      </div>
+      <div class="pop-panel" id="filtPanel">
+        <p class="pp-t">Tipo de reclamo</p>
+        <div class="chips" id="chips"></div>
+        <p class="pp-t">Estado</p>
+        <div class="stlist" id="stList"></div>
+      </div>
+      <div class="legend">
+        <span class="t">Concentración</span>
+        <span class="s">pocos</span><span class="r"></span><span class="s">muchos</span>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="insight">
+        <div class="h"><i></i>Lo que más frena</div>
+        <span id="insightTxt">—</span>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button data-t="zonas" aria-pressed="true">Zonas</button>
+        <button data-t="rubros">Rubros</button>
+        <button data-t="repite">Se repite</button>
+        <button data-t="semanas">Semanas</button>
+        <button data-t="frenos">Frenos</button>
+      </nav>
+      <div class="tab-head"><h2 id="tabT">—</h2><p id="tabS">—</p></div>
+      <div class="list" id="tabList"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ── datos de muestra sobre la geografía real de Villa Carlos Paz ──
+   Reemplazar ZONES / RUBROS / FRENOS por la consulta al sistema. */
+const ZONES = [
+  {n:"Centro",                      c:[-31.4213,-64.4968], w:1.00, mix:[.52,.34,.14], dias:7},
+  {n:"Villa del Lago",              c:[-31.4046,-64.4918], w:0.66, mix:[.40,.50,.10], dias:12},
+  {n:"Costa Azul",                  c:[-31.3934,-64.4826], w:0.60, mix:[.62,.29,.09], dias:8},
+  {n:"Santa Rita del Lago",         c:[-31.3884,-64.4756], w:0.50, mix:[.60,.31,.09], dias:9},
+  {n:"Sol y Lago",                  c:[-31.4104,-64.4874], w:0.34, mix:[.58,.33,.09], dias:6},
+  {n:"Carlos Paz Sierras",          c:[-31.4332,-64.5152], w:0.46, mix:[.57,.33,.10], dias:11},
+  {n:"Miguel Muñoz B",              c:[-31.4322,-64.5044], w:0.52, mix:[.42,.45,.13], dias:14},
+  {n:"Domingo Faustino Sarmiento",  c:[-31.4472,-64.4934], w:0.62, mix:[.36,.49,.15], dias:16},
+  {n:"Los Prados",                  c:[-31.4618,-64.5038], w:0.44, mix:[.39,.47,.14], dias:15},
+  {n:"Villa Suiza",                 c:[-31.4392,-64.5148], w:0.30, mix:[.49,.39,.12], dias:12}
+];
+const RUBROS = ["Plagas y control","Recolección de residuos","Arbolado y espacios verdes","Ruidos y convivencia","Bacheo y calles","Alumbrado público"];
+const RW =     [1.00,             0.88,                    0.76,                        0.72,                 0.60,             0.52];
+const STATES = [
+  {k:"finalizado", n:"Finalizados", c:"#00B37E"},
+  {k:"pendiente",  n:"Pendientes",  c:"#FFB800"},
+  {k:"rechazado",  n:"Rechazados",  c:"#E5484D"}
+];
+const SC = {finalizado:"#00B37E", pendiente:"#FFB800", rechazado:"#E5484D"};
+const FRENOS = [
+  {n:"Falta de cuadrilla",   trabajos:7, dias:118},
+  {n:"Compra de materiales", trabajos:5, dias:79},
+  {n:"Sin acceso",           trabajos:3, dias:57},
+  {n:"Otra obra en el lugar",trabajos:4, dias:19}
+];
+const CALLES = ["Florida","La Rioja","Cárcano","San Martín","Belgrano","Los Álamos","Uruguay","Sarmiento"];
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20260905);
+const pick = w => {const s=w.reduce((a,b)=>a+b,0);let r=rnd()*s;for(let i=0;i<w.length;i++){r-=w[i];if(r<=0)return i}return 0};
+
+const ALL = (()=>{
+  const out=[];
+  ZONES.forEach((z,zi)=>{
+    const count = Math.round(24 + z.w*52);
+    for(let i=0;i<count;i++){
+      const sp = 0.0050 + z.w*0.0026;
+      const r=rnd();
+      out.push({
+        zi,
+        lat: z.c[0] + (rnd()+rnd()+rnd()-1.5)/1.5*sp,
+        lng: z.c[1] + (rnd()+rnd()+rnd()-1.5)/1.5*sp*1.15,
+        est: r<z.mix[0] ? "finalizado" : r<z.mix[0]+z.mix[1] ? "pendiente" : "rechazado",
+        rubro: RUBROS[pick(RW)],
+        calle: CALLES[Math.floor(rnd()*CALLES.length)]+" "+(Math.floor(rnd()*3)+1),
+        edad: Math.floor(rnd()*90)+1,
+        cierre: Math.max(1, Math.round(z.dias + (rnd()-.5)*z.dias*1.1))
+      });
+    }
+  });
+  return out;
+})();
+
+const F = {dias:30, rubros:new Set(RUBROS), estados:new Set(["finalizado","pendiente","rechazado"]), layer:"heat", group:true, tab:"zonas"};
+const filtered = ()=> ALL.filter(p=> p.edad<=F.dias && F.rubros.has(p.rubro) && F.estados.has(p.est));
+const topOf = (list,key)=>{
+  if(!list.length) return "—";
+  const c={}; list.forEach(p=>c[p[key]]=(c[p[key]]||0)+1);
+  return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
+};
+
+/* ── mapa ───────────────────────────────────────────────────────── */
+const map = L.map('map',{
+  center:[-31.4245,-64.4985], zoom:13, minZoom:12, maxZoom:17,
+  zoomControl:false, maxBounds:[[-31.505,-64.585],[-31.358,-64.425]], maxBoundsViscosity:1
+});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+
+const LUT = (()=>{
+  const c=document.createElement('canvas');c.width=1;c.height=256;
+  const x=c.getContext('2d'), g=x.createLinearGradient(0,0,0,256);
+  g.addColorStop(0.00,'rgba(124,92,214,0)');
+  g.addColorStop(0.18,'rgba(124,92,214,0.52)');
+  g.addColorStop(0.42,'rgba(162,79,200,0.76)');
+  g.addColorStop(0.68,'rgba(196,63,174,0.90)');
+  g.addColorStop(1.00,'rgba(214,47,143,0.98)');
+  x.fillStyle=g;x.fillRect(0,0,1,256);
+  return x.getImageData(0,0,1,256).data;
+})();
+
+const HeatLayer = L.Layer.extend({
+  initialize(){this._pts=[];this._dim=false},
+  setPoints(p){this._pts=p;if(this._canvas)this._draw()},
+  setDim(d){this._dim=d;if(this._canvas)this._canvas.style.opacity=d?0.5:1},
+  onAdd(m){
+    this._map=m;
+    this._canvas=L.DomUtil.create('canvas','heat-canvas');
+    m.getPanes().overlayPane.appendChild(this._canvas);
+    m.on('move resize',this._draw,this);
+    m.on('zoomstart',this._hide,this); m.on('zoomend',this._show,this);
+    this._draw();
+  },
+  onRemove(m){
+    m.off('move resize',this._draw,this);
+    m.off('zoomstart',this._hide,this); m.off('zoomend',this._show,this);
+    L.DomUtil.remove(this._canvas); this._canvas=null;
+  },
+  _hide(){this._canvas.style.opacity=0},
+  _show(){this._canvas.style.opacity=this._dim?0.5:1;this._draw()},
+  _draw(){
+    if(!this._canvas)return;
+    const m=this._map, size=m.getSize(), cv=this._canvas;
+    if(cv.width!==size.x||cv.height!==size.y){cv.width=size.x;cv.height=size.y}
+    L.DomUtil.setPosition(cv, m.containerPointToLayerPoint([0,0]));
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,size.x,size.y);
+    const r = 24*Math.pow(2, m.getZoom()-13);
+    for(const p of this._pts){
+      const pt=m.latLngToContainerPoint([p.lat,p.lng]);
+      if(pt.x<-r||pt.y<-r||pt.x>size.x+r||pt.y>size.y+r) continue;
+      const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,r);
+      g.addColorStop(0,'rgba(0,0,0,0.52)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(pt.x,pt.y,r,0,6.2832); ctx.fill();
+    }
+    const img=ctx.getImageData(0,0,size.x,size.y), d=img.data;
+    for(let i=3;i<d.length;i+=4){
+      const a=d[i]; if(!a) continue; const o=a*4;
+      d[i-3]=LUT[o]; d[i-2]=LUT[o+1]; d[i-1]=LUT[o+2]; d[i]=LUT[o+3];
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+const heat = new HeatLayer();
+const markers = L.layerGroup().addTo(map);
+
+/* ── render ─────────────────────────────────────────────────────── */
+function render(){
+  const pts = filtered();
+  const by = {finalizado:0,pendiente:0,rechazado:0};
+  pts.forEach(p=>by[p.est]++);
+  const cerr = pts.filter(p=>p.est==='finalizado');
+
+  document.getElementById('kTot').textContent  = pts.length.toLocaleString('es-AR');
+  document.getElementById('kPct').textContent  = pts.length ? Math.round(by.finalizado/pts.length*100)+'%' : '—';
+  document.getElementById('kPend').textContent = by.pendiente.toLocaleString('es-AR');
+  document.getElementById('kViejo').textContent= pts.filter(p=>p.est==='pendiente'&&p.edad>15).length;
+  document.getElementById('kDias').textContent = cerr.length ? (cerr.reduce((s,p)=>s+p.cierre,0)/cerr.length).toFixed(1) : '—';
+
+  const base = ALL.filter(p=>p.edad<=F.dias && F.rubros.has(p.rubro));
+  document.querySelectorAll('#stList button').forEach(b=>{
+    b.querySelector('.v').textContent = base.filter(p=>p.est===b.dataset.k).length.toLocaleString('es-AR');
+    b.setAttribute('aria-pressed', F.estados.has(b.dataset.k));
+  });
+  const nf = (RUBROS.length-F.rubros.size)+(3-F.estados.size);
+  document.getElementById('filtN').textContent = nf ? '· '+nf : '';
+
+  const f1=FRENOS[0], f2=FRENOS[1];
+  document.getElementById('insightTxt').innerHTML =
+    `Lo que más tiempo lleva es la <b>${f1.n.toLowerCase()}</b>: ${f1.dias} días.
+     Lo que más trabajos frena es la <b>${f2.n.toLowerCase()}</b>: ${f2.trabajos} trabajos, ${f2.dias} días esperando.`;
+
+  /* capas */
+  const showHeat = F.layer!=='status';
+  if(showHeat && !map.hasLayer(heat)) heat.addTo(map);
+  if(!showHeat && map.hasLayer(heat)) map.removeLayer(heat);
+  heat.setDim(F.layer==='both'); heat.setPoints(pts);
+
+  markers.clearLayers();
+  if(F.layer!=='heat'){
+    if(F.group){
+      const agg=new Map();
+      pts.forEach(p=>{
+        if(!agg.has(p.zi)) agg.set(p.zi,{finalizado:0,pendiente:0,rechazado:0,tot:0,cierre:[],items:[]});
+        const a=agg.get(p.zi); a[p.est]++; a.tot++; a.items.push(p);
+        if(p.est==='finalizado') a.cierre.push(p.cierre);
+      });
+      const max=Math.max(...[...agg.values()].map(a=>a.tot),1);
+      agg.forEach((a,zi)=>{
+        const z=ZONES[zi], s=Math.round(34+26*Math.sqrt(a.tot/max));
+        let acc=0; const st=[];
+        STATES.forEach(x=>{const f=a[x.k]/a.tot; if(f<=0)return; st.push(`${x.c} ${(acc*100).toFixed(2)}% ${((acc+f)*100).toFixed(2)}%`); acc+=f});
+        const html=`<div class="donut" style="width:${s}px;height:${s}px;background:conic-gradient(${st.join(',')})">
+          <span style="width:${s-15}px;height:${s-15}px;font-size:${s>50?14:12}px">${a.tot}</span></div>`;
+        L.marker(z.c,{icon:L.divIcon({html,className:'dwrap',iconSize:[s,s],iconAnchor:[s/2,s/2]})})
+          .bindPopup(popup(z,a),{className:'pop',offset:[0,-4],closeButton:false}).addTo(markers);
+      });
+    } else {
+      pts.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:5,weight:1.5,color:'#0B120F',fillColor:SC[p.est],fillOpacity:.95})
+        .bindTooltip(`${p.calle} · ${p.rubro} · hace ${p.edad} d`,{direction:'top'}).addTo(markers));
+    }
+  }
+  renderTab(pts);
+}
+
+function popup(z,a){
+  const prom = a.cierre.length ? (a.cierre.reduce((s,v)=>s+v,0)/a.cierre.length).toFixed(1)+' días' : 'sin datos';
+  return `<div class="p-in"><p class="p-t">${z.n}</p>
+    <p class="p-s">${a.tot} reclamos · sobre todo ${topOf(a.items,'rubro').toLowerCase()}</p>
+    ${STATES.map(x=>`<div class="p-r"><span class="dot" style="background:${x.c}"></span>${x.n}<b>${a[x.k]}</b></div>`).join('')}
+    </div><div class="p-f">Cierre promedio: ${prom}</div>`;
+}
+
+const TABMETA = {
+  zonas:  {t:"Dónde se concentra", s:"Las zonas con más de lo que estás mirando. Tocá una y el mapa va."},
+  rubros: {t:"Categorías del recorte", s:"De mayor a menor sobre los reclamos filtrados."},
+  repite: {t:"Dónde más se repite", s:"Direcciones con varios reclamos en un radio de 80 m."},
+  semanas:{t:"Entradas por semana", s:"Ingresados y cuántos de ésos ya cerraron."},
+  frenos: {t:"Lo que más frena", s:"Motivos de demora, ordenados por días acumulados de espera."}
+};
+
+function renderTab(pts){
+  const el=document.getElementById('tabList');
+  document.getElementById('tabT').textContent=TABMETA[F.tab].t;
+  document.getElementById('tabS').textContent=TABMETA[F.tab].s;
+
+  if(F.tab==='zonas'){
+    const rows = ZONES.map((z,i)=>{
+      const zp=pts.filter(p=>p.zi===i);
+      return {z,i,tot:zp.length,top:topOf(zp,'rubro'),
+        finalizado:zp.filter(p=>p.est==='finalizado').length,
+        pendiente:zp.filter(p=>p.est==='pendiente').length,
+        rechazado:zp.filter(p=>p.est==='rechazado').length};
+    }).filter(r=>r.tot).sort((a,b)=>b.pendiente-a.pendiente);
+    el.innerHTML = rows.map(r=>`<button class="row" data-zi="${r.i}" title="${r.z.n} · ${r.pendiente} pendientes · sobre todo ${r.top.toLowerCase()}">
+      <span class="n">${r.z.n}</span>
+      <span class="bar">
+        <i style="width:${r.finalizado/r.tot*100}%;background:${SC.finalizado}"></i>
+        <i style="width:${r.pendiente/r.tot*100}%;background:${SC.pendiente}"></i>
+        <i style="width:${r.rechazado/r.tot*100}%;background:${SC.rechazado}"></i>
+      </span>
+      <span class="v">${r.tot}</span></button>`).join('') || empty();
+    el.querySelectorAll('.row').forEach(b=>b.onclick=()=>map.flyTo(ZONES[+b.dataset.zi].c,15,{duration:.6}));
+  }
+
+  if(F.tab==='rubros'){
+    const c={}; pts.forEach(p=>c[p.rubro]=(c[p.rubro]||0)+1);
+    const rows=Object.entries(c).sort((a,b)=>b[1]-a[1]);
+    const max=rows.length?rows[0][1]:1;
+    el.innerHTML = rows.map(([n,v],i)=>`<div class="row" style="cursor:default" title="${n}">
+      <span class="n"><span class="rank">${i+1}</span>${n}</span>
+      <span class="bar"><i style="width:${v/max*100}%;background:var(--heat-4)"></i></span>
+      <span class="v">${v}</span></div>`).join('') || empty();
+  }
+
+  if(F.tab==='repite'){
+    const c={};
+    pts.forEach(p=>{
+      const k=p.calle+'||'+p.zi;
+      if(!c[k]) c[k]={calle:p.calle,zi:p.zi,items:[]};
+      c[k].items.push(p);
+    });
+    const rows=Object.values(c).filter(x=>x.items.length>=3).sort((a,b)=>b.items.length-a.items.length).slice(0,12);
+    el.innerHTML = rows.map((r,i)=>`<button class="row" data-zi="${r.zi}" title="${r.calle} · ${ZONES[r.zi].n} · ${topOf(r.items,'rubro').toLowerCase()}">
+      <span class="n"><span class="rank">${i+1}</span>${r.calle} <em>· ${ZONES[r.zi].n}</em></span>
+      <span class="bar" style="background:transparent"></span>
+      <span class="v">${r.items.length}</span></button>`).join('') || empty('Ninguna dirección repite 3 o más con estos filtros.');
+    el.querySelectorAll('.row').forEach(b=>b.onclick=()=>map.flyTo(ZONES[+b.dataset.zi].c,16,{duration:.6}));
+  }
+
+  if(F.tab==='semanas'){
+    const w=Math.max(1,Math.round(F.dias/7));
+    const b=Array.from({length:w},()=>({tot:0,res:0}));
+    pts.forEach(p=>{
+      const i=Math.min(w-1,Math.floor((p.edad-1)/7));
+      b[i].tot++; if(p.est==='finalizado') b[i].res++;
+    });
+    const max=Math.max(...b.map(x=>x.tot),1);
+    const lbl=i=>i===0?'Esta semana':`Hace ${i} semana${i>1?'s':''}`;
+    el.innerHTML = b.map((x,i)=>`<div class="row" style="cursor:default" title="${x.tot} ingresados · ${x.res} ya cerrados">
+      <span class="n">${lbl(i)}</span>
+      <span class="bar">
+        <i style="width:${x.res/max*100}%;background:${SC.finalizado}"></i>
+        <i style="width:${(x.tot-x.res)/max*100}%;background:var(--bg-3)"></i>
+      </span>
+      <span class="v">${x.tot}</span></div>`).join('') || empty();
+  }
+
+  if(F.tab==='frenos'){
+    const max=Math.max(...FRENOS.map(f=>f.dias));
+    el.innerHTML = FRENOS.slice().sort((a,b)=>b.dias-a.dias).map(f=>`<div class="row" style="cursor:default" title="${f.trabajos} trabajos esperando">
+      <span class="n">${f.n} <em>· ${f.trabajos} trabajos</em></span>
+      <span class="bar"><i style="width:${f.dias/max*100}%;background:var(--accent)"></i></span>
+      <span class="v">${f.dias}d</span></div>`).join('');
+  }
+}
+const empty = (msg="No hay reclamos con estos filtros.")=>
+  `<p style="padding:22px 8px;font-size:12.5px;color:var(--fg-3);margin:0;line-height:1.5">${msg}</p>`;
+
+/* ── controles ──────────────────────────────────────────────────── */
+document.getElementById('chips').innerHTML =
+  RUBROS.map(r=>`<button class="chip" data-r="${r}" aria-pressed="true">${r}</button>`).join('');
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+  const r=b.dataset.r;
+  if(F.rubros.has(r)&&F.rubros.size>1){F.rubros.delete(r);b.setAttribute('aria-pressed','false')}
+  else {F.rubros.add(r);b.setAttribute('aria-pressed','true')}
+  render();
+});
+document.getElementById('stList').innerHTML = STATES.map(x=>`
+  <button data-k="${x.k}" aria-pressed="true"><span class="dot" style="background:${x.c}"></span>
+  <span class="n">${x.n}</span><span class="v">—</span></button>`).join('');
+document.querySelectorAll('#stList button').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k;
+  if(F.estados.has(k)&&F.estados.size>1) F.estados.delete(k); else F.estados.add(k);
+  render();
+});
+document.querySelectorAll('#segPeriod button').forEach(b=>b.onclick=()=>{
+  F.dias=+b.dataset.d;
+  document.querySelectorAll('#segPeriod button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  render();
+});
+document.querySelectorAll('[data-layer]').forEach(b=>b.onclick=()=>{
+  F.layer=b.dataset.layer;
+  document.querySelectorAll('[data-layer]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  render();
+});
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+  F.tab=b.dataset.t;
+  document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  renderTab(filtered());
+});
+document.getElementById('groupToggle').onchange=e=>{F.group=e.target.checked;render()};
+document.getElementById('filtBtn').onclick=()=>document.getElementById('filtPanel').classList.toggle('on');
+document.getElementById('pdfBtn').onclick=()=>alert('Marcá un área del mapa y descargás el detalle de esos reclamos en PDF.');
+
+render();
+</script>
+</body>
+</html>

@@ -43,6 +43,8 @@ import {
   Play,
   AlarmClock,
   CheckCircle2,
+  PanelRightClose,
+  PanelRightOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -84,7 +86,6 @@ import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
 // dice QUE barrio, CUANTOS y si esta bien o mal.
 // La segunda linea: EN QUE ANDAN los reclamos. Es la que le da sentido al
 // color de las burbujas y, de paso, es su leyenda.
-import FiltroEstadoMapa, { type GrupoEstado } from '../components/mapa/FiltroEstadoMapa';
 // Las franjas de los costados: donde vive lo que el mapa no puede decir
 // dibujando (y, de paso, el margen por donde scrollear sin pisarlo).
 // La zona como ANILLO: cuantos hay y como se reparten por estado, sin tener
@@ -117,6 +118,7 @@ import {
   BBox,
 } from '../lib/mapaUtils';
 import MapaArtefactos from '../components/mapa/MapaArtefactos';
+import GraficosMapa from '../components/mapa/GraficosMapa';
 import MapaTimelapseBanda, {
   type VelocidadTimelapse,
   type ComparacionVentana,
@@ -199,22 +201,51 @@ const HOTSPOT_PARAMS = { radiusMeters: 80, minPoints: 3, daysBack: 90 };
 // Alto elástico del lienzo: toma lo que queda de viewport desde donde arranca
 // el mapa, dejando aire abajo para que se asome la lista de zonas calientes.
 // El piso evita que en una laptop quede aplastado.
-/** Arranque, antes de la primera medicion. */
-const MAPA_ALTO_MIN = 420;
-/** Lo minimo que puede ceder el mapa. Bajo a proposito: en 768 el mapa tiene
- *  que achicarse para que el reproductor entre en la misma pantalla. */
-const MAPA_ALTO_PISO = 260;
-/** Lo que se le deja abajo al mapa cuando NO hay reproductor a la vista. */
-const MAPA_AIRE_INFERIOR = 96;
-/** Lo que ocupa la banda del time-lapse. Cuando esta abierta, el mapa cede
- *  esto de mas: el reproductor tiene que verse SIN scrollear, si no uno le da
- *  play y no ve pasar nada (dueno, 2026-09-05). */
-const ALTO_REPRODUCTOR = 148;
+/** Arranque, antes de la primera medicion. Bajo a proposito: si arranca en 420
+ *  y la medicion tarda un frame, el primer pintado ya empuja la grilla fuera de
+ *  una pantalla de 768 y la pagina nace con scroll. */
+/** Debajo de este zoom los donuts no se dibujan: se apilan y tapan el mapa.
+ *  13 es el zoom de arranque (un municipio entero); 11 ya es la region. */
+/** El H1, por lente. Lo que el mapa esta contestando en este momento. */
+const TITULO_LENTE: Record<string, string> = {
+  repiten: 'Dónde se concentran los reclamos del municipio',
+  atrasado: 'Qué quedó atrasado, y hace cuánto',
+  resolvimos: 'Qué resolvimos, y con qué rapidez',
+  sinllegar: 'A qué barrios no estamos llegando',
+};
+
+const ZOOM_MIN_DONUT = 11;
 
 /** Ancla de la sección del ranking (la acción del hero scrollea acá). El id
  *  del DOM se mantiene estable aunque el ranking cambie de contenido con la
  *  pregunta: es la dirección a la que apuntan deep-links y verificaciones. */
 const ID_RANKING = 'mapa-zonas-calientes';
+
+/** "8 de julio" — formato largo para la frase narrada del hero. */
+const fechaLarga = (ms: number) =>
+  new Date(ms).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
+
+const MAPA_ALTO_MIN = 300;
+/** Lo minimo que puede ceder el mapa. Bajo a proposito: en 768 el mapa tiene
+ *  que achicarse para que el reproductor entre en la misma pantalla. */
+/** Lo minimo que puede medir EL LIENZO. 460 y no 260: con el banner semantico
+ *  arriba no entra todo en 768 --- eso ya se sabe --- pero entre un mapa
+ *  apretado de 246px que hay que scrollear igual y uno de 460 que se lee, gana
+ *  el segundo. La pagina scrollea, como cualquier pagina. */
+const MAPA_ALTO_PISO = 460;
+/** Lo que se le deja abajo al mapa cuando NO hay reproductor a la vista.
+ *  Eran 96px para que se asomara la lista de zonas calientes que vivia debajo.
+ *  Ya no vive nada debajo: las lecturas estan al costado, dentro del panel,
+ *  y el mapa llega al borde de la pantalla. Sobra el aire de un respiro. */
+// 26 = el padding inferior que el shell de la pagina pone despues del bloque.
+// No es un numero magico: es lo MEDIDO. Con 14 sobraban 11px de scroll y con 2
+// sobraban 23; la diferencia es exactamente ese padding, asi que descontarlo
+// deja la pantalla en 768 clavados, sin barra (medido en 1366x768, 2026-09-06).
+const MAPA_AIRE_INFERIOR = 26;
+/** Lo que ocupa la banda del time-lapse. Cuando esta abierta, el mapa cede
+ *  esto de mas: el reproductor tiene que verse SIN scrollear, si no uno le da
+ *  play y no ve pasar nada (dueno, 2026-09-05). */
+const ALTO_REPRODUCTOR = 148;
 
 /** Opciones del filtro Período. El label es lo que se LEE dentro de la
  *  oración de la consulta guiada, así que va en minúscula y con su
@@ -568,10 +599,6 @@ function barrioDominante(lista: Reclamo[]): { nombre: string; count: number } | 
 const fechaCorta = (ms: number) =>
   new Date(ms).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 
-/** "8 de julio" — formato largo para la frase narrada del hero. */
-const fechaLarga = (ms: number) =>
-  new Date(ms).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
-
 /** Etiqueta del eje del electro: con tramos mensuales el día no significa
  *  nada ("1 ago" para todo agosto engaña), así que se rotula el mes. */
 const fechaEje = (ms: number, escala: EscalaElectro) =>
@@ -697,6 +724,23 @@ const ESTADO_COLORS_LISTA: Record<string, string> = Object.fromEntries(
  * municipio— y el usuario veia un lugar cualquiera. Que no haya reclamos que
  * dibujar no significa que no haya nada que mostrar.
  */
+/**
+ * SIGUE EL ZOOM DEL MAPA.
+ *
+ * Los donuts se dibujan con `divIcon`, o sea en PIXELES DE PANTALLA: no se
+ * achican al alejarse como sí lo hace todo lo que está en coordenadas. A zoom
+ * de provincia, veinte barrios que en el municipio estaban separados caen en el
+ * mismo puñado de pixeles y se apilan uno sobre otro — una columna de circulos
+ * gigantes tapando el mapa (dueño, 2026-09-06: *"mira como se ve cuando saco
+ * zoom"*). Con el zoom a mano el tamaño se escala, y por debajo de cierto nivel
+ * los donuts directamente no van: ahi lo que se lee es la mancha.
+ */
+function SeguirZoom({ onZoom }: { onZoom: (z: number) => void }) {
+  const map = useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
+  useEffect(() => { onZoom(map.getZoom()); }, [map, onZoom]);
+  return null;
+}
+
 function FitBoundsToMarkers({
   reclamos,
   signal,
@@ -1526,9 +1570,28 @@ export default function Mapa() {
   // del viewport, menos el aire de la lista de abajo. Leaflet se entera del
   // cambio por el ResizeObserver de <InvalidarAlRedimensionar />.
   const lienzoRef = useRef<HTMLDivElement>(null);
+  /** La GRILLA (mapa + panel). Es lo que hay que medir: `lienzoRef` apunta al
+   *  bloque entero —consulta incluida— y medir desde ahi daba un alto de mas
+   *  del tamaño de la consulta, que es justo lo que sobresalia de la pantalla
+   *  (grilla terminando en y=879 sobre un viewport de 768, medido 2026-09-06). */
+  const grillaRef = useRef<HTMLDivElement>(null);
   const [mapaAlto, setMapaAlto] = useState(MAPA_ALTO_MIN);
   /** Si hay que guardarle lugar a la banda del time-lapse. */
   const [reservarReproductor, setReservarReproductor] = useState(false);
+
+  /**
+   * EL PANEL DE LECTURA SE PLIEGA.
+   *
+   * Abierto se lleva 376px; plegado deja al mapa TODO el ancho y queda una
+   * pestaña de 30px para volver a abrirlo. Es la diferencia entre "el mapa con
+   * un panel al lado" y "un mapa", y la eleccion es del que mira, no nuestra
+   * (dueno, 2026-09-06). Se recuerda en la sesion: quien lo cierra no quiere
+   * que vuelva a aparecer en cada cambio de pregunta.
+   */
+  const [panelAbierto, setPanelAbierto] = useState(true);
+
+  /** Zoom actual del mapa. Lo usan los donuts para no apilarse al alejarse. */
+  const [zoomMapa, setZoomMapa] = useState(13);
 
   /**
    * EL ALTO DEL MAPA: lo que sobra del viewport, MEDIDO.
@@ -1550,21 +1613,49 @@ export default function Mapa() {
     const recalcular = () => {
       const el = lienzoRef.current;
       if (!el) return;
-      const arranque = el.getBoundingClientRect().top + window.scrollY;
+      // SIN `window.scrollY`. Lo tenia, y ese era el bug de la banda muerta:
+      // `rect.top` YA es relativo al viewport, asi que sumarle el scroll hacia
+      // la cuenta el doble apenas la pagina se movia un pixel y el mapa
+      // terminaba cortado con 200px vacios abajo (visto en 1366x768,
+      // 2026-09-06). Ahora la pantalla no scrollea y `rect.top` es estable.
+      const arranque = el.getBoundingClientRect().top;
       const aire = MAPA_AIRE_INFERIOR + (reservarReproductor ? ALTO_REPRODUCTOR : 0);
       const disponible = window.innerHeight - arranque - aire;
-      setMapaAlto(Math.max(MAPA_ALTO_PISO, Math.round(disponible)));
+      // EL PISO ES DEL MAPA, PERO LA VARIABLE ES DEL BLOQUE ENTERO.
+      //
+      // `--av2-pantalla-alto` se aplica al contenedor, que ademas del lienzo
+      // lleva la barra de consulta arriba. Con el piso pelado (260) y una
+      // consulta de 254px, al mapa le quedaban SEIS pixeles: colapsaba a una
+      // franja inservible. El piso tiene que incluir lo que la consulta se
+      // lleve, que ademas es variable --- crece cuando la oracion envuelve.
+      const consulta = el.querySelector('.av2-controles');
+      const altoConsulta = consulta ? Math.round(consulta.getBoundingClientRect().height) : 0;
+      setMapaAlto(Math.max(MAPA_ALTO_PISO + altoConsulta, Math.round(disponible)));
     };
     recalcular();
     window.addEventListener('resize', recalcular);
+    // La consulta guiada cambia de alto sola: la oracion envuelve en dos lineas,
+    // aparece la respuesta, se abre un combo. Cada vez que eso pasa la grilla
+    // arranca mas abajo y el alto viejo la manda fuera de la pantalla. Con el
+    // observer el alto se corrige en el mismo frame, sin esperar un resize.
+    // Observa el BODY, no un nodo puntual. El bug que arreglo: el efecto corría
+    // al montar la pagina —cuando todavia estaba en `loading` y el bloque del
+    // mapa NO EXISTIA— y su reintento a los 300ms tampoco lo encontraba. El
+    // bloque nacia despues, con los datos, y se quedaba con el alto de arranque
+    // (300px, de los que la consulta se comia 236 y a la grilla le sobraban 32;
+    // medido en 1366x768 el 2026-09-06). Observando el body, el propio montaje
+    // del bloque dispara la medicion.
+    const ro = new ResizeObserver(recalcular);
+    ro.observe(document.body);
     // Segunda pasada tras el primer pintado: la barra de filtros recien ahi
     // tiene su alto real (fuentes cargadas + wrap de los combos).
     const t = window.setTimeout(recalcular, 300);
     return () => {
       window.removeEventListener('resize', recalcular);
       window.clearTimeout(t);
+      ro.disconnect();
     };
-  }, [reservarReproductor]);
+  }, [reservarReproductor, loading, isPuntos]);
 
   /**
    * Pantalla completa del mapa.
@@ -1710,20 +1801,13 @@ export default function Mapa() {
   const [verRegiones, setVerRegiones] = useState(true);
   /** Que grupos de estado se estan mirando. Arrancan TODOS: el mapa no
    *  esconde nada hasta que alguien lo pida. */
-  const [estadosVisibles, setEstadosVisibles] = useState<Set<string>>(
+  const [estadosVisibles] = useState<Set<string>>(
     () => new Set(GRUPOS_ESTADO.map((g) => g.id)),
   );
-  const alternarGrupoEstado = useCallback((id: string) => {
-    setEstadosVisibles((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-  const verTodosLosEstados = useCallback(
-    () => setEstadosVisibles(new Set(GRUPOS_ESTADO.map((g) => g.id))),
-    [],
-  );
+  /* Los handlers que prendian y apagaban estados se fueron con la lista de
+     conteos que los llamaba. `estadosVisibles` queda —arranca con TODOS
+     encendidos y `reclamosFiltrados` lo sigue leyendo— para que el dia que el
+     filtro vuelva por otro control no haya que rehacer el recorte. */
 
   /** La mancha de calor, ENCENDIDA por default y de fondo.
    *
@@ -2073,21 +2157,6 @@ export default function Mapa() {
     [aplicarTiempo, reclamosAlcance],
   );
 
-  /** Cuantos hay en cada grupo de estado, con su color y su nombre. */
-  const gruposEstado = useMemo<GrupoEstado[]>(() => {
-    const cuenta = new Map<string, number>();
-    for (const r of reclamosDeLaConsulta) {
-      const g = GRUPO_DE_ESTADO[r.estado];
-      if (g) cuenta.set(g, (cuenta.get(g) || 0) + 1);
-    }
-    return GRUPOS_ESTADO.map((g) => ({
-      id: g.id,
-      label: g.label,
-      color: estadoColors[g.colorDe] || estadoColors.default,
-      cuantos: cuenta.get(g.id) || 0,
-    }));
-  }, [reclamosDeLaConsulta]);
-
   /** Lo que se dibuja: la consulta, recortada por los estados encendidos. */
   const reclamosFiltrados = useMemo(() => {
     if (estadosVisibles.size === GRUPOS_ESTADO.length) return reclamosDeLaConsulta;
@@ -2327,7 +2396,13 @@ export default function Mapa() {
    *  en cada render del mapa. */
   const iconosDonut = useMemo(() => {
     if (donutsZona.length === 0) return new Map<number, L.DivIcon>();
+    // A zoom de provincia no hay donut que entre: los barrios caen todos en el
+    // mismo puñado de pixeles. Ahi manda la mancha, que si escala con el mapa.
+    if (zoomMapa < ZOOM_MIN_DONUT) return new Map<number, L.DivIcon>();
     const max = donutsZona[0].total;
+    // Entre ZOOM_MIN_DONUT y el zoom de municipio el donut se achica en vez de
+    // desaparecer de golpe: el salto seco se lee como que algo se rompio.
+    const escala = Math.min(1, 0.42 + (zoomMapa - ZOOM_MIN_DONUT) * 0.14);
     const cs = getComputedStyle(document.documentElement);
     const leer = (t: string, f: string) => cs.getPropertyValue(t).trim() || f;
     const colorFondo = leer('--pl-surface', '#ffffff');
@@ -2335,8 +2410,8 @@ export default function Mapa() {
     const colorTexto = leer('--pl-text', '#111827');
     const m = new Map<number, L.DivIcon>();
     for (const d of donutsZona) {
-      const tamano = tamanoDonut(d.total, max);
-      const grosor = Math.max(9, Math.round(tamano * 0.17));
+      const tamano = Math.round(tamanoDonut(d.total, max) * escala);
+      const grosor = Math.max(5, Math.round(tamano * 0.17));
       m.set(d.id, L.divIcon({
         className: 'av2-donut-zona',
         html: svgDonut({
@@ -2349,10 +2424,8 @@ export default function Mapa() {
       }));
     }
     return m;
-  }, [donutsZona, barrioSel]);
+  }, [donutsZona, barrioSel, zoomMapa]);
 
-  /** Si la columna de la derecha tiene algo que mostrar. */
-  const hayLecturas = reclamosDeLaConsulta.length > 0;
 
   /** A donde llevar el mapa cuando se elige un barrio: su forma si la tiene,
    *  su centro si no. Memoizado por `barrioSel` para que el encuadre se dispare
@@ -2782,8 +2855,13 @@ export default function Mapa() {
           id: `resuelto-${r.id}`,
           titulo: r.titulo,
           detalle: detalle || undefined,
-          valor: dias < 1 ? '<1' : Math.round(dias),
-          valorSub: 'días en cerrar',
+          // El valor y su unidad se CONCATENAN al leerse, asi que los dos
+          // tienen que concordar. "<1" + "dias en cerrar" daba "<1 dias en
+          // cerrar", que no lo dice nadie; "El mismo" + "dias en cerrar" daba
+          // "El mismo dias en cerrar", que es peor. Un dia entero se redondea
+          // a 1 y la unidad se pone en singular.
+          valor: Math.max(1, Math.round(dias)),
+          valorSub: Math.max(1, Math.round(dias)) === 1 ? 'día en cerrar' : 'días en cerrar',
           tono: veredictoMenosEsMejor(dias, u.tiempoResolucionDias) ?? 'bueno',
           onClick: () => {
             if (r.latitud != null && r.longitud != null) {
@@ -3134,31 +3212,6 @@ export default function Mapa() {
   }, [reclamosFiltrados.length, reclamosVentanaPrevia]);
 
 
-  /**
-   * Remate del recorrido: la PRIMERA ventana contra la ÚLTIMA. Es la misma
-   * comparación por períodos del KPI "Barrio que más creció", con otros dos
-   * períodos — por eso comparte `compararBarrios` y no duplica la cuenta.
-   * No depende de `animationDay`: se calcula una vez por combinación de
-   * filtros, no en cada tick.
-   */
-  const timelapseRemate = useMemo(() => {
-    if (!rangoVisible || !timelapsePlan) return null;
-    const { ventanaDias, cursorInicial, cursorFinal } = timelapsePlan;
-    const anchoMs = ventanaDias * DIA_MS;
-    const finPrimera = rangoVisible.min + cursorInicial * DIA_MS;
-    const finUltima = rangoVisible.min + cursorFinal * DIA_MS;
-    const primera = enVentana(reclamosSinTiempo, finPrimera - anchoMs, finPrimera);
-    const ultima = enVentana(reclamosSinTiempo, finUltima - anchoMs, finUltima);
-    const { subio, bajo } = compararBarrios(primera, ultima);
-    return {
-      diasRecorridos: cursorFinal,
-      ventanaDias,
-      primera: primera.length,
-      ultima: ultima.length,
-      subio,
-      bajo,
-    };
-  }, [rangoVisible, timelapsePlan, reclamosSinTiempo]);
 
   // ---- Controles del time-lapse ----
   // Declarados ACÁ (y no con el resto de los handlers) porque el memo de las
@@ -3207,6 +3260,14 @@ export default function Mapa() {
   // Reclamos que la API devolvió SIN coordenada: el mapa no los puede dibujar.
   const sinCoordenada = Math.max(0, totalCargados - reclamos.length);
 
+
+
+  // KPIs del strip del hero (solo modo Reclamos; en Puntos el hero va sin
+  // strip). Son métricas GEOGRÁFICAS: cuántos reclamos se pueden ubicar, a
+  // cuántos barrios llegamos, dónde está creciendo y qué lleva demasiado
+  // abierto. Lo que responde "cuánto tardamos" (% resueltos, resolución
+  // media) vive en el Dashboard: acá sería ruido. Las zonas calientes NO son
+  // KPI porque la lista rankeada de abajo lo dice mejor y sin duplicar.
   // Acción del hero: contesta "dónde se repiten" y baja a la lista.
   const irAZonasCalientes = useCallback(() => {
     setPregunta('repiten');
@@ -3217,6 +3278,32 @@ export default function Mapa() {
 
   // Frases del hero semántico (reemplaza al PageHint estático). Solo datos ya
   // cargados: sin datos → [] y el hero no renderiza. Veredictos vía lib/veredictos.
+  /**
+   * Remate del recorrido: la PRIMERA ventana contra la ÚLTIMA. Es la misma
+   * comparación por períodos del KPI "Barrio que más creció", con otros dos
+   * períodos — por eso comparte `compararBarrios` y no duplica la cuenta.
+   * No depende de `animationDay`: se calcula una vez por combinación de
+   * filtros, no en cada tick.
+   */
+  const timelapseRemate = useMemo(() => {
+    if (!rangoVisible || !timelapsePlan) return null;
+    const { ventanaDias, cursorInicial, cursorFinal } = timelapsePlan;
+    const anchoMs = ventanaDias * DIA_MS;
+    const finPrimera = rangoVisible.min + cursorInicial * DIA_MS;
+    const finUltima = rangoVisible.min + cursorFinal * DIA_MS;
+    const primera = enVentana(reclamosSinTiempo, finPrimera - anchoMs, finPrimera);
+    const ultima = enVentana(reclamosSinTiempo, finUltima - anchoMs, finUltima);
+    const { subio, bajo } = compararBarrios(primera, ultima);
+    return {
+      diasRecorridos: cursorFinal,
+      ventanaDias,
+      primera: primera.length,
+      ultima: ultima.length,
+      subio,
+      bajo,
+    };
+  }, [rangoVisible, timelapsePlan, reclamosSinTiempo]);
+
   const heroFrases = useMemo<HeroFrase[]>(() => {
     const u = resolverUmbrales();
 
@@ -3458,12 +3545,6 @@ export default function Mapa() {
     timelapseReset,
   ]);
 
-  // KPIs del strip del hero (solo modo Reclamos; en Puntos el hero va sin
-  // strip). Son métricas GEOGRÁFICAS: cuántos reclamos se pueden ubicar, a
-  // cuántos barrios llegamos, dónde está creciendo y qué lleva demasiado
-  // abierto. Lo que responde "cuánto tardamos" (% resueltos, resolución
-  // media) vive en el Dashboard: acá sería ruido. Las zonas calientes NO son
-  // KPI porque la lista rankeada de abajo lo dice mejor y sin duplicar.
   const heroKpis = useMemo<HeroKpi[] | undefined>(() => {
     if (isPuntos || loading || reclamos.length === 0) return undefined;
     const u = resolverUmbrales();
@@ -4050,9 +4131,13 @@ export default function Mapa() {
       }
     : {
         eyebrow: 'Mapa',
-        title: 'Dónde se concentran los reclamos del municipio',
-        description:
-          'Elegí una pregunta y el mapa te la contesta: dónde se repite el mismo problema, qué quedó atrasado, qué se resolvió y a qué barrios no estamos llegando.',
+        // EL TITULO SIGUE A LA PREGUNTA. Era fijo —"Donde se concentran los
+        // reclamos"— y quedaba mintiendo en tres de las cuatro opciones: con
+        // "Lo atrasado" elegido, el encabezado seguia hablando de
+        // concentracion (visto 2026-09-06). El titulo de una pantalla que
+        // cambia de pregunta tiene que cambiar con ella.
+        title: TITULO_LENTE[pregunta] ?? TITULO_LENTE.repiten,
+        description: '',
       };
 
   // =================================================================
@@ -4290,22 +4375,30 @@ export default function Mapa() {
         }
       `}</style>
 
-      {/* 1. Cabecera de módulo: eyebrow + H1 + bajada. Lo PRIMERO que se lee. */}
+      {/* LA CABECERA, CON EL COMPONENTE DEL KIT.
+          Estaba escrita a mano --un <div> con su <h1> y clases propias-- para
+          ahorrar alto. Ahorrar 40px copiando a mano un componente que ya
+          existe sale mas caro de lo que ahorra: el dia que el kit cambia el
+          tratamiento del titulo, esta pantalla se queda atras sin que nadie se
+          entere (dueno, 2026-09-06: "siempre usa los componentes del kit"). */}
       <PageHeader
         eyebrow={cabecera.eyebrow}
         title={cabecera.title}
         description={cabecera.description}
       />
 
-      {/* 2. ModuleHero = SemanticHero con la stat strip adentro. */}
-      <div className="av2-hero-wrap">
-        <SemanticHero
-          etiqueta={isPuntos ? 'MAPA · PUNTOS DE INTERÉS' : 'MAPA · RECLAMOS'}
-          frases={heroFrases}
-          kpis={heroKpis}
-          className="av2-hero"
-        />
-      </div>
+      {/* EL BANNER SEMANTICO. Volvio despues de haberlo reemplazado por una
+          tira de numeros sueltos, y con razon: los KPIs sin la frase son una
+          planilla --- el "estas viendo 250 reclamos repartidos en 44 de 45
+          barrios" es lo que convierte cuatro numeros en una lectura (dueno,
+          2026-09-06). */}
+      <SemanticHero
+        etiqueta={isPuntos ? 'MAPA · PUNTOS DE INTERÉS' : 'MAPA · RECLAMOS'}
+        frases={heroFrases}
+        kpis={heroKpis}
+        className="av2-hero av2-hero--mapa"
+      />
+
 
       {/* 3. La CONSULTA GUIADA. La pantalla ya no ofrece herramientas con
           nombre técnico: ofrece PREGUNTAS, arma sola la oración con los
@@ -4322,6 +4415,7 @@ export default function Mapa() {
       <div
         className={`av2-mapa-full${expandidoCss ? ' av2-mapa-full--expandido' : ''}`}
         ref={lienzoRef}
+        style={{ '--av2-pantalla-alto': `${mapaAlto}px` } as CSSProperties}
       >
       <div className="av2-controles">
         {controlesMapa.length > 0 && (
@@ -4368,7 +4462,20 @@ export default function Mapa() {
       {/* La grilla reserva la columna SOLO si hay algo que poner en ella: con la
           consulta en cero, los 340px quedaban en blanco al lado de un mapa
           achicado sin razon. */}
-      <div className={`av2-mapa-grilla${hayLecturas ? '' : ' av2-mapa-grilla--sola'}`}>
+      {/* LA CONSULTA OCUPA SOLO EL ANCHO DEL MAPA, no el de los dos.
+          Estaba arriba de todo y sus 203px se le descontaban tambien al panel:
+          mapa y panel quedaban con 400px cada uno y el panel necesitaba 530, asi
+          que el segundo grafico caia abajo del pliegue siempre. En el diseño
+          (`mapa-una-pantalla.html`) el panel va del techo al piso. El reparto lo
+          hace el CSS —`.av2-mapa-grilla` es `display: contents`— para no mover
+          el JSX: la consulta esta fuera de este condicional y envolverla acá
+          rompia el arbol. */}
+      <div
+        className={
+          `av2-mapa-grilla` + (!panelAbierto ? ' av2-mapa-grilla--plegada' : '')
+        }
+        ref={grillaRef}
+      >
       <div className="av2-mapa">
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}
@@ -4394,6 +4501,7 @@ export default function Mapa() {
               signal={fitSignal}
               respaldo={puntosTerritorio}
             />
+            <SeguirZoom onZoom={setZoomMapa} />
             <EncuadrarBarrio encuadre={encuadreBarrio} />
             <MapController target={mapTarget} />
             <InvalidarAlRedimensionar />
@@ -4917,6 +5025,13 @@ export default function Mapa() {
           </div>
         )}
 
+        {/* La lista de estados con sus conteos ya no se dibuja.
+            Estuvo en el panel y despues flotando sobre el mapa; en los dos
+            lugares fue lo mismo: cuatro numeros crudos ocupando lugar. El
+            dueño la corto dos veces (2026-09-06) — *"el peor grafico del
+            mundo"*, *"ese grafico de jardin de infantes vuela"*. Filtrar por
+            estado sigue estando: es el combo de la oracion en "ver todo". */}
+
         {/* SIN RECLAMOS QUE DIBUJAR — un aviso al pie, no una cortina.
             Antes esto era una card tendida sobre todo el lienzo (`inset: 0` mas
             un velo) que tapaba el mapa entero para anunciar un cero. El dueno
@@ -5018,20 +5133,34 @@ export default function Mapa() {
             El scroll, si hace falta, es de esta columna --- el mapa queda
             fijo. */}
         <div className="av2-mapa-columna">
-          {/* El ESTADO no es una lectura mas: es el control que enciende y
-              apaga lo que se dibuja, y de paso la leyenda del color del mapa.
-              Por eso va arriba de las cards y no entre ellas. */}
-          {reclamosDeLaConsulta.length > 0 && (
-            <div className="av2-mapa-lateral">
-              <FiltroEstadoMapa
-                grupos={gruposEstado}
-                activos={estadosVisibles}
-                onToggle={alternarGrupoEstado}
-                onTodos={verTodosLosEstados}
-              />
-            </div>
-          )}
-          <MapaArtefactos pregunta={pregunta} ranking={ranking} reclamos={reclamosFiltrados} />
+          {/* La pestaña de plegado vive PEGADA al borde del panel y se ve en
+              los dos estados: abierta cierra, plegada abre. Un panel que se
+              cierra y no deja rastro de como volver es un panel perdido. */}
+          <button
+            type="button"
+            className="av2-mapa-plegar"
+            onClick={() => setPanelAbierto((v) => !v)}
+            aria-expanded={panelAbierto}
+            title={panelAbierto ? 'Plegar el panel' : 'Abrir el panel'}
+          >
+            {panelAbierto ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+          </button>
+
+          {/* Lo que se pliega. Scrollea ADENTRO: la pagina no scrollea nunca,
+              asi el mapa siempre llega al borde de la pantalla. */}
+          {/* TRES BLOQUES Y NADA MAS: el KPI semantico de la lente, y dos
+              graficos elegidos para ESA pregunta.
+
+              Lo que se fue de aca: la lista de estados con sus conteos
+              ("Pendientes 92 · Finalizados 129"). El dueño la señalo el
+              2026-09-06 — *"esto es un KPI semantico o es el peor grafico del
+              mundo?"* — y tenia razon: son conteos crudos ocupando el lugar
+              del primer panel. Sigue viva como leyenda-filtro FLOTANDO sobre
+              el mapa, que es donde el diseño la pone. */}
+          <div className="av2-mapa-columna-scroll">
+            <MapaArtefactos pregunta={pregunta} ranking={ranking} />
+            <GraficosMapa pregunta={pregunta} reclamos={reclamosFiltrados} />
+          </div>
         </div>
       </div>{/* /av2-mapa-grilla */}
 

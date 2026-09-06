@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de reclamos — por pregunta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+:root{
+  --primary:#00B37E; --accent:#FFB800; --danger:#E5484D;
+  --bg-0:#0B120F; --bg-1:#111A17; --bg-2:#1A2421; --bg-3:#222E2A;
+  --fg-1:#EAF0ED; --fg-2:#9BA9A4; --fg-3:#8A9994;
+  --border:rgba(234,240,237,.10); --border-2:rgba(234,240,237,.06);
+  --heat-1:#7C5CD6; --heat-4:#D62F8F;
+  --shadow-float:0 6px 20px rgba(0,0,0,.42), 0 2px 6px rgba(0,0,0,.3);
+  --ease:cubic-bezier(0.2,0.8,0.2,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg-0);color:var(--fg-1);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:var(--primary);text-decoration:none}
+a:hover{color:var(--primary);text-decoration:underline}
+button{font-family:inherit}
+.app{display:grid;grid-template-rows:54px 56px 1fr;height:100%}
+
+/* topbar */
+.top{display:flex;align-items:center;gap:18px;padding:0 16px;background:var(--bg-1);border-bottom:1px solid var(--border)}
+.crumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-3);flex:none}
+.mark{width:24px;height:24px;border-radius:7px;background:var(--primary);display:grid;place-items:center;
+  font-family:Sora,sans-serif;font-weight:700;font-size:14px;color:#04140F}
+.crumb b{color:var(--fg-1);font-weight:600}
+.kpis{display:flex;flex:1;min-width:0}
+.kpi{padding:0 15px;border-left:1px solid var(--border-2);line-height:1.1;flex:none}
+.kpi:first-child{border-left:0}
+.kpi-n{font-family:Sora,sans-serif;font-size:16px;font-weight:700;letter-spacing:-.02em}
+.kpi-l{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-3);font-weight:600;margin-top:3px}
+.seg{display:flex;gap:3px;background:var(--bg-2);padding:3px;border-radius:9px;flex:none}
+.seg button{border:0;background:transparent;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);
+  padding:7px 12px;border-radius:7px;cursor:pointer;transition:all 150ms var(--ease)}
+.seg button:hover{color:var(--fg-1)}
+.seg button[aria-pressed="true"]{background:var(--bg-3);color:var(--fg-1);font-weight:600}
+.avatar{width:29px;height:29px;border-radius:999px;background:var(--bg-3);display:grid;place-items:center;
+  font-size:11px;font-weight:600;color:var(--fg-2);flex:none}
+
+/* barra de preguntas */
+.qbar{display:flex;align-items:center;gap:8px;padding:0 16px;background:var(--bg-0);
+  border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.qbar::-webkit-scrollbar{display:none}
+.qbar .lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);font-weight:600;
+  flex:none;padding-right:6px}
+.q{display:flex;align-items:center;gap:8px;flex:none;border:1px solid var(--border);background:transparent;
+  border-radius:999px;padding:9px 16px 9px 13px;font:500 13px/1 Inter,sans-serif;color:var(--fg-2);
+  cursor:pointer;white-space:nowrap;transition:all 150ms var(--ease)}
+.q:hover{background:var(--bg-2);color:var(--fg-1)}
+.q svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.q[aria-pressed="true"]{font-weight:600}
+.q[data-q="repiten"][aria-pressed="true"]{background:rgba(214,47,143,.16);border-color:rgba(214,47,143,.45);color:#F58FCB}
+.q[data-q="atrasado"][aria-pressed="true"]{background:rgba(255,184,0,.14);border-color:rgba(255,184,0,.42);color:#FFCE4D}
+.q[data-q="resuelto"][aria-pressed="true"]{background:rgba(0,179,126,.14);border-color:rgba(0,179,126,.42);color:#43D3A6}
+.q[data-q="sinllegar"][aria-pressed="true"]{background:rgba(229,72,77,.14);border-color:rgba(229,72,77,.42);color:#FF8A8D}
+
+/* body */
+.body{display:grid;grid-template-columns:1fr 376px;min-height:0}
+.map-wrap{position:relative;min-width:0}
+#map{position:absolute;inset:0}
+.leaflet-container{background:#0E1512;font-family:Inter,sans-serif}
+.leaflet-tile-pane{filter:invert(1) grayscale(1) brightness(.82) contrast(1.05)}
+.leaflet-control-attribution{background:rgba(11,18,15,.72)!important;color:var(--fg-3)!important;font-size:10px}
+.leaflet-control-attribution a{color:var(--fg-2)!important}
+.leaflet-bar a{background:var(--bg-2)!important;color:var(--fg-1)!important;border-color:var(--border)!important}
+.heat-canvas{position:absolute;pointer-events:none;transition:opacity 150ms var(--ease)}
+
+.tools{position:absolute;top:12px;left:12px;right:12px;z-index:500;display:flex;gap:8px;align-items:center;pointer-events:none}
+.tools>*{pointer-events:auto}
+.spacer{flex:1;min-width:0;pointer-events:none}
+.float{background:rgba(17,26,23,.9);backdrop-filter:blur(16px);border:1px solid var(--border);
+  border-radius:999px;box-shadow:var(--shadow-float);display:flex;align-items:center;padding:4px}
+.sw{display:flex;align-items:center;gap:9px;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);padding:6px 14px 6px 8px;cursor:pointer}
+.sw input{appearance:none;width:32px;height:19px;border-radius:999px;background:var(--bg-3);position:relative;
+  cursor:pointer;transition:background 150ms var(--ease);margin:0;flex:none}
+.sw input::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:999px;
+  background:var(--fg-2);transition:all 150ms var(--ease)}
+.sw input:checked{background:var(--primary)}
+.sw input:checked::after{transform:translateX(13px);background:#04140F}
+.ghost{background:rgba(17,26,23,.9);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:999px;
+  box-shadow:var(--shadow-float);color:var(--fg-1);font:600 12px/1 Inter,sans-serif;padding:11px 16px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;transition:background 150ms var(--ease)}
+.ghost:hover{background:rgba(26,36,33,.96)}
+.ghost svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+.pop-panel{position:absolute;top:60px;left:12px;z-index:600;width:266px;background:var(--bg-1);
+  border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-float);padding:16px;display:none}
+.pop-panel.on{display:block}
+.pp-t{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);font-weight:600;margin:0 0 10px}
+.pp-t+.pp-t{margin-top:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--border);background:transparent;border-radius:999px;padding:6px 11px;
+  font:500 11.5px/1 Inter,sans-serif;color:var(--fg-2);cursor:pointer;transition:all 150ms var(--ease)}
+.chip:hover{background:var(--bg-2);color:var(--fg-1)}
+.chip[aria-pressed="true"]{background:var(--fg-1);border-color:var(--fg-1);color:var(--bg-0)}
+
+.legend{position:absolute;bottom:14px;left:12px;z-index:500;background:rgba(17,26,23,.9);backdrop-filter:blur(16px);
+  border:1px solid var(--border);border-radius:999px;padding:8px 15px;display:flex;align-items:center;gap:10px;
+  box-shadow:var(--shadow-float)}
+.legend .t{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);font-weight:600}
+.legend .s{font-size:11px;color:var(--fg-2)}
+.legend .r{width:74px;height:7px;border-radius:999px}
+
+/* ── panel: resumen en palabras + una sola lista ────────────────── */
+.panel{background:var(--bg-1);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.sum{padding:18px 18px 16px;border-bottom:1px solid var(--border)}
+.sum h2{font-family:Sora,sans-serif;font-size:16px;font-weight:700;letter-spacing:-.015em;margin:0 0 9px;line-height:1.2}
+.sum p{margin:0;font-size:13px;line-height:1.55;color:var(--fg-2)}
+.sum p b{color:var(--fg-1);font-weight:600}
+.sum .hi{font-weight:600}
+.sum .act{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.sum .act button{border:1px solid var(--border);background:transparent;color:var(--fg-1);border-radius:999px;
+  font:500 11.5px/1 Inter,sans-serif;padding:7px 12px;cursor:pointer;transition:background 150ms var(--ease)}
+.sum .act button:hover{background:var(--bg-2)}
+
+.lhead{padding:14px 18px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.blocks{flex:1;overflow-y:auto;padding:2px 10px 14px;min-height:0}
+.blocks::-webkit-scrollbar{width:9px}
+.blocks::-webkit-scrollbar-thumb{background:rgba(234,240,237,.14);border-radius:999px;border:3px solid var(--bg-1)}
+.blk{padding:13px 8px 8px;border-bottom:1px solid var(--border-2)}
+.blk:last-child{border-bottom:0}
+.blk h3{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);font-weight:600;
+  margin:0 0 8px;display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.blk h3 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:500;color:var(--fg-3);flex:none}
+.brow{display:grid;grid-template-columns:1fr 52px 40px;gap:9px;align-items:center;width:100%;text-align:left;
+  border:0;background:transparent;padding:5px 6px;border-radius:7px;transition:background 150ms var(--ease)}
+.brow:hover{background:var(--bg-2)}
+.brow .n{font:500 12.5px/1.3 Inter,sans-serif;color:var(--fg-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .n em{font-style:normal;color:var(--fg-3);font-weight:400}
+.brow .v{font:600 12.5px/1 Inter,sans-serif;color:var(--fg-1);text-align:right}
+.brow .bar{height:4px;border-radius:999px;display:flex;overflow:hidden;background:var(--bg-3)}
+.brow .bar i{display:block;height:100%}
+.blk .none{margin:2px 6px 4px;font-size:12px;color:var(--fg-3);line-height:1.45}
+.lhead h3{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);font-weight:600;margin:0}
+.lhead span{font-size:11px;color:var(--fg-3)}
+.list{flex:1;overflow-y:auto;padding:0 10px 12px;min-height:0}
+.list::-webkit-scrollbar{width:9px}
+.list::-webkit-scrollbar-thumb{background:rgba(234,240,237,.14);border-radius:999px;border:3px solid var(--bg-1)}
+.row{display:grid;grid-template-columns:1fr 56px 38px;gap:10px;align-items:center;width:100%;text-align:left;
+  border:0;background:transparent;padding:7px 8px;border-radius:8px;cursor:pointer;transition:background 150ms var(--ease)}
+.row:hover{background:var(--bg-2)}
+.row .n{font:500 13px/1.3 Inter,sans-serif;color:var(--fg-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .n em{font-style:normal;color:var(--fg-3);font-weight:400}
+.row .v{font:600 13px/1 Inter,sans-serif;color:var(--fg-1);text-align:right}
+.row .bar{height:4px;border-radius:999px;display:flex;overflow:hidden;background:var(--bg-3)}
+.row .bar i{display:block;height:100%}
+.rank{width:17px;height:17px;border-radius:5px;background:var(--bg-3);color:var(--fg-2);font-size:10px;
+  font-weight:600;display:inline-grid;place-items:center;margin-right:7px;vertical-align:1px}
+.foot{border-top:1px solid var(--border);padding:12px 18px 14px;flex:none}
+.foot h3{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-3);font-weight:600;margin:0 0 8px}
+.frow{display:grid;grid-template-columns:1fr 48px 30px;gap:10px;align-items:center;padding:4px 0;font-size:12.5px}
+.frow .n{color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow .v{text-align:right;font-weight:600;color:var(--fg-1)}
+.frow .bar{height:4px;border-radius:999px;background:var(--bg-3);overflow:hidden}
+.frow .bar i{display:block;height:100%;background:var(--heat-4)}
+
+/* markers */
+.pin{border-radius:999px;display:grid;place-items:center;cursor:pointer;font-family:Sora,sans-serif;font-weight:700;
+  box-shadow:0 0 0 2px var(--bg-0),0 3px 10px rgba(0,0,0,.5);transition:transform 150ms var(--ease)}
+.pin:hover{transform:scale(1.08)}
+.donut{border-radius:999px;display:grid;place-items:center;cursor:pointer;
+  box-shadow:0 0 0 2px var(--bg-0),0 3px 10px rgba(0,0,0,.5);transition:transform 150ms var(--ease)}
+.donut:hover{transform:scale(1.08)}
+.donut span{background:var(--bg-1);border-radius:999px;display:grid;place-items:center;
+  font-family:Sora,sans-serif;font-weight:700;color:var(--fg-1)}
+.leaflet-marker-icon.dwrap{background:none;border:0}
+.pop .leaflet-popup-content-wrapper{background:var(--bg-1);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow-float);padding:0;color:var(--fg-1)}
+.pop .leaflet-popup-content{margin:0;width:212px!important}
+.pop .leaflet-popup-tip{background:var(--bg-1)}
+.p-in{padding:13px 15px 11px}
+.p-t{font-family:Sora,sans-serif;font-size:14.5px;font-weight:700;margin:0 0 2px}
+.p-s{font-size:11.5px;color:var(--fg-3);margin:0 0 11px}
+.p-r{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;color:var(--fg-2)}
+.p-r b{margin-left:auto;color:var(--fg-1);font-weight:600}
+.dot{width:9px;height:9px;border-radius:999px;flex:none}
+.p-f{border-top:1px solid var(--border);padding:8px 15px;font-size:11px;color:var(--fg-3);background:var(--bg-2);border-radius:0 0 12px 12px}
+
+@media (max-width:1320px){ .kpi.opt{display:none} }
+@media (max-height:740px){ .sum{padding:14px 18px 13px} .blk{padding:10px 8px 6px} .brow{padding:4px 6px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="crumb"><div class="mark">m</div>Villa Carlos Paz&nbsp;/&nbsp;<b>Mapa</b></div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-n" id="kTot">—</div><div class="kpi-l">Reclamos</div></div>
+      <div class="kpi"><div class="kpi-n" id="kPct" style="color:var(--primary)">—</div><div class="kpi-l">Finalizados</div></div>
+      <div class="kpi"><div class="kpi-n" id="kPend" style="color:var(--accent)">—</div><div class="kpi-l">Pendientes</div></div>
+      <div class="kpi opt"><div class="kpi-n" id="kViejo" style="color:var(--danger)">—</div><div class="kpi-l">+15 días</div></div>
+      <div class="kpi opt"><div class="kpi-n" id="kDias">—</div><div class="kpi-l">Días a cerrar</div></div>
+    </div>
+    <div class="seg" id="segPeriod">
+      <button data-d="7">7 días</button>
+      <button data-d="30" aria-pressed="true">30 días</button>
+      <button data-d="90">90 días</button>
+    </div>
+    <div class="avatar">AD</div>
+  </header>
+
+  <nav class="qbar" id="qbar">
+    <span class="lbl">¿Qué querés ver en el mapa?</span>
+    <button class="q" data-q="repiten" aria-pressed="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3c2.5 3 4.5 5 4.5 8a4.5 4.5 0 11-9 0c0-3 2-5 4.5-8z"/></svg>
+      Dónde se repiten</button>
+    <button class="q" data-q="atrasado">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      Lo atrasado</button>
+    <button class="q" data-q="resuelto">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+      Qué resolvimos</button>
+    <button class="q" data-q="sinllegar">
+      <svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A9 9 0 0121 12a9 9 0 01-1.4 2.5M6.6 6.7A9 9 0 003 12a9 9 0 0013.4 5.4"/></svg>
+      Dónde no llegamos</button>
+  </nav>
+
+  <div class="body">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="tools">
+        <div class="float"><label class="sw"><input type="checkbox" id="dotsToggle">Ver reclamo por reclamo</label></div>
+        <button class="ghost" id="filtBtn">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filtros <span id="filtN" style="color:var(--fg-3);font-weight:500"></span>
+        </button>
+        <div class="spacer"></div>
+        <button class="ghost" id="pdfBtn">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+          Informe del área
+        </button>
+      </div>
+      <div class="pop-panel" id="filtPanel">
+        <p class="pp-t">Tipo de reclamo</p>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <aside class="panel">
+      <div class="sum">
+        <h2 id="sumT">—</h2>
+        <p id="sumP">—</p>
+        <div class="act" id="sumA"></div>
+      </div>
+      <div class="blocks" id="blocks"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* ── datos de muestra sobre la geografía real de Villa Carlos Paz ──
+   Reemplazar ZONES / RUBROS / FRENOS por la consulta al sistema. */
+const ZONES = [
+  {n:"Centro",                     c:[-31.4213,-64.4968], w:1.00, mix:[.52,.34,.14], dias:7},
+  {n:"Villa del Lago",             c:[-31.4046,-64.4918], w:0.66, mix:[.40,.50,.10], dias:12},
+  {n:"Costa Azul",                 c:[-31.3934,-64.4826], w:0.60, mix:[.62,.29,.09], dias:8},
+  {n:"Santa Rita del Lago",        c:[-31.3884,-64.4756], w:0.50, mix:[.60,.31,.09], dias:9},
+  {n:"Sol y Lago",                 c:[-31.4104,-64.4874], w:0.34, mix:[.58,.33,.09], dias:6},
+  {n:"Carlos Paz Sierras",         c:[-31.4332,-64.5152], w:0.46, mix:[.57,.33,.10], dias:11},
+  {n:"Miguel Muñoz B",             c:[-31.4322,-64.5044], w:0.52, mix:[.42,.45,.13], dias:14},
+  {n:"Domingo Faustino Sarmiento", c:[-31.4472,-64.4934], w:0.62, mix:[.36,.49,.15], dias:16},
+  {n:"Los Prados",                 c:[-31.4618,-64.5038], w:0.44, mix:[.39,.47,.14], dias:15},
+  {n:"Villa Suiza",                c:[-31.4392,-64.5148], w:0.30, mix:[.49,.39,.12], dias:12}
+];
+const RUBROS = ["Plagas y control","Recolección de residuos","Arbolado y espacios verdes","Ruidos y convivencia","Bacheo y calles","Alumbrado público"];
+const RW =     [1.00,0.88,0.76,0.72,0.60,0.52];
+const STATES = [
+  {k:"finalizado", n:"Finalizados", c:"#00B37E"},
+  {k:"pendiente",  n:"Pendientes",  c:"#FFB800"},
+  {k:"rechazado",  n:"Rechazados",  c:"#E5484D"}
+];
+const SC = {finalizado:"#00B37E", pendiente:"#FFB800", rechazado:"#E5484D"};
+const FRENOS = [
+  {n:"Falta de cuadrilla",    trabajos:7, dias:118},
+  {n:"Compra de materiales",  trabajos:5, dias:79},
+  {n:"Sin acceso",            trabajos:3, dias:57},
+  {n:"Otra obra en el lugar", trabajos:4, dias:19}
+];
+const CALLES = ["Florida","La Rioja","Cárcano","San Martín","Belgrano","Los Álamos","Uruguay","Sarmiento"];
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20260905);
+const pick = w=>{const s=w.reduce((a,b)=>a+b,0);let r=rnd()*s;for(let i=0;i<w.length;i++){r-=w[i];if(r<=0)return i}return 0};
+const ALL = (()=>{
+  const out=[];
+  ZONES.forEach((z,zi)=>{
+    const count=Math.round(24+z.w*52);
+    for(let i=0;i<count;i++){
+      const sp=0.0050+z.w*0.0026, r=rnd();
+      out.push({zi,
+        lat:z.c[0]+(rnd()+rnd()+rnd()-1.5)/1.5*sp,
+        lng:z.c[1]+(rnd()+rnd()+rnd()-1.5)/1.5*sp*1.15,
+        est:r<z.mix[0]?"finalizado":r<z.mix[0]+z.mix[1]?"pendiente":"rechazado",
+        rubro:RUBROS[pick(RW)],
+        calle:CALLES[Math.floor(rnd()*CALLES.length)]+" "+(Math.floor(rnd()*3)+1),
+        edad:Math.floor(rnd()*90)+1,
+        cierre:Math.max(1,Math.round(z.dias+(rnd()-.5)*z.dias*1.1)),
+        espera:0});
+    }
+  });
+  out.forEach(p=>{if(p.est!=='finalizado') p.espera=p.edad});
+  return out;
+})();
+
+const F={dias:30, rubros:new Set(RUBROS), q:"repiten", dots:false};
+const filtered = ()=> ALL.filter(p=> p.edad<=F.dias && F.rubros.has(p.rubro));
+const topOf=(l,k)=>{if(!l.length)return"—";const c={};l.forEach(p=>c[p[k]]=(c[p[k]]||0)+1);return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0]};
+const nf = n=>n.toLocaleString('es-AR');
+const nd = n=>Number(n).toFixed(1).replace('.',',');
+
+/* ── mapa ───────────────────────────────────────────────────────── */
+const map=L.map('map',{center:[-31.4245,-64.4985],zoom:13,minZoom:12,maxZoom:17,zoomControl:false,
+  maxBounds:[[-31.505,-64.585],[-31.358,-64.425]],maxBoundsViscosity:1});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+
+const LUT=(()=>{
+  const c=document.createElement('canvas');c.width=1;c.height=256;
+  const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);
+  g.addColorStop(0,'rgba(124,92,214,0)');g.addColorStop(.18,'rgba(124,92,214,.52)');
+  g.addColorStop(.42,'rgba(162,79,200,.76)');g.addColorStop(.68,'rgba(196,63,174,.90)');
+  g.addColorStop(1,'rgba(214,47,143,.98)');
+  x.fillStyle=g;x.fillRect(0,0,1,256);
+  return x.getImageData(0,0,1,256).data;
+})();
+const HeatLayer=L.Layer.extend({
+  initialize(){this._pts=[]},
+  setPoints(p){this._pts=p;if(this._canvas)this._draw()},
+  onAdd(m){this._map=m;this._canvas=L.DomUtil.create('canvas','heat-canvas');
+    m.getPanes().overlayPane.appendChild(this._canvas);
+    m.on('move resize',this._draw,this);m.on('zoomstart',this._h,this);m.on('zoomend',this._s,this);this._draw()},
+  onRemove(m){m.off('move resize',this._draw,this);m.off('zoomstart',this._h,this);m.off('zoomend',this._s,this);
+    L.DomUtil.remove(this._canvas);this._canvas=null},
+  _h(){this._canvas.style.opacity=0},
+  _s(){this._canvas.style.opacity=1;this._draw()},
+  _draw(){
+    if(!this._canvas)return;
+    const m=this._map,size=m.getSize(),cv=this._canvas;
+    if(!size.x||!size.y)return;
+    if(cv.width!==size.x||cv.height!==size.y){cv.width=size.x;cv.height=size.y}
+    L.DomUtil.setPosition(cv,m.containerPointToLayerPoint([0,0]));
+    const ctx=cv.getContext('2d');ctx.clearRect(0,0,size.x,size.y);
+    const r=24*Math.pow(2,m.getZoom()-13);
+    for(const p of this._pts){
+      const pt=m.latLngToContainerPoint([p.lat,p.lng]);
+      if(pt.x<-r||pt.y<-r||pt.x>size.x+r||pt.y>size.y+r)continue;
+      const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,r);
+      g.addColorStop(0,'rgba(0,0,0,.52)');g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(pt.x,pt.y,r,0,6.2832);ctx.fill();
+    }
+    const img=ctx.getImageData(0,0,size.x,size.y),d=img.data;
+    for(let i=3;i<d.length;i+=4){const a=d[i];if(!a)continue;const o=a*4;
+      d[i-3]=LUT[o];d[i-2]=LUT[o+1];d[i-1]=LUT[o+2];d[i]=LUT[o+3]}
+    ctx.putImageData(img,0,0);
+  }
+});
+const heat=new HeatLayer(), markers=L.layerGroup().addTo(map);
+
+/* ── bloques: 2-3 gráficos que cambian según el enfoque ─────────── */
+const blk=(title,hint,rows,none)=>({title,hint,rows,none});
+function rubroBlk(pts,color,label="Categorías del recorte"){
+  const c={}; pts.forEach(p=>c[p.rubro]=(c[p.rubro]||0)+1);
+  const r=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const m=r.length?r[0][1]:1;
+  return blk(label,"de mayor a menor",
+    r.map(([n,v])=>({label:n,value:v,bar:[[v/m*100,color]]})),"Sin datos con estos filtros.");
+}
+
+/* ── una pregunta = un mapa + un resumen + 2-3 gráficos ─────────── */
+const Q = {
+
+repiten:{
+  heat:true, marker:null,
+  lhead:["Direcciones que más repiten","radio 80 m"],
+  legend:`<span class="t">Concentración</span><span class="s">pocos</span>
+    <span class="r" style="background:linear-gradient(90deg,rgba(124,92,214,.25),var(--heat-1),#C43FAE,var(--heat-4))"></span><span class="s">muchos</span>`,
+  build(pts){
+    const g={};
+    pts.forEach(p=>{const k=p.calle+'||'+p.zi;(g[k]=g[k]||{calle:p.calle,zi:p.zi,items:[]}).items.push(p)});
+    const rows=Object.values(g).filter(x=>x.items.length>=3).sort((a,b)=>b.items.length-a.items.length);
+    const t=rows[0];
+    return {
+      title:"Hay reclamos que vuelven al mismo lugar",
+      text: t
+        ? `<b>${nf(rows.length)} direcciones</b> acumulan 3 o más reclamos en los últimos ${F.dias} días.
+           La que más repite es <b>${t.calle}</b>, en ${ZONES[t.zi].n}: ${t.items.length} reclamos,
+           sobre todo de ${topOf(t.items,'rubro').toLowerCase()}.`
+        : `Ninguna dirección acumula 3 o más reclamos en los últimos ${F.dias} días.`,
+      acts: t ? [["Ir a "+t.calle, ()=>map.flyTo(ZONES[t.zi].c,16,{duration:.6})]] : [],
+      blocks:[
+        blk("Dónde más se repite","radio 80 m",
+          rows.slice(0,6).map((r,i)=>({
+            label:`<span class="rank">${i+1}</span>${r.calle} <em>· ${ZONES[r.zi].n}</em>`,
+            title:`${r.calle} · ${ZONES[r.zi].n} · ${topOf(r.items,'rubro').toLowerCase()}`,
+            value:r.items.length, go:()=>map.flyTo(ZONES[r.zi].c,16,{duration:.6})
+          })),"Ninguna dirección repite 3 o más con estos filtros."),
+        rubroBlk(pts,"var(--heat-4)"),
+        (()=>{
+          const z=ZONES.map((zz,i)=>({zz,i,tot:pts.filter(p=>p.zi===i).length}))
+            .filter(r=>r.tot).sort((a,b)=>b.tot-a.tot).slice(0,4);
+          const m=z.length?z[0].tot:1;
+          return blk("Zonas más densas","reclamos",z.map(r=>({
+            label:r.zz.n, value:r.tot, bar:[[r.tot/m*100,"var(--heat-1)"]],
+            go:()=>map.flyTo(r.zz.c,15,{duration:.6})})),"Sin datos.");
+        })()
+      ]
+    };
+  }
+},
+
+atrasado:{
+  heat:false, marker:{key:"pendiente",color:"#FFB800",ink:"#1A1200"},
+  lhead:["Zonas por espera acumulada","días promedio"],
+  legend:`<span class="t">Pendientes</span><span class="s">por zona · el número es la cantidad sin cerrar</span>`,
+  build(pts){
+    const per=ZONES.map((z,i)=>{
+      const zp=pts.filter(p=>p.zi===i), pend=zp.filter(p=>p.est==='pendiente');
+      const esp=pend.length?pend.reduce((s,p)=>s+p.espera,0)/pend.length:0;
+      return {z,i,pend:pend.length,esp,viejos:pend.filter(p=>p.espera>15).length,top:topOf(pend,'rubro')};
+    }).filter(r=>r.pend).sort((a,b)=>b.esp-a.esp);
+    const w=per[0], tot=pts.filter(p=>p.est==='pendiente').length;
+    const viejos=pts.filter(p=>p.est==='pendiente'&&p.espera>15).length;
+    const fr=FRENOS.slice().sort((a,b)=>b.dias-a.dias)[0];
+    const max=Math.max(...per.map(r=>r.esp),1);
+    return {
+      title:"Lo que está esperando hace más tiempo",
+      text: w
+        ? `<b>${nf(tot)} reclamos sin cerrar</b>, y <b>${nf(viejos)}</b> llevan más de 15 días.
+           La zona más atrasada es <b>${w.z.n}</b>: ${w.pend} pendientes, ${w.esp.toFixed(0)} días de espera promedio.
+           Lo que más frena es la <b>${fr.n.toLowerCase()}</b>, con ${fr.dias} días acumulados en ${fr.trabajos} trabajos.`
+        : `No hay reclamos sin cerrar con estos filtros.`,
+      acts: w ? [["Ir a "+w.z.n, ()=>map.flyTo(w.z.c,15,{duration:.6})]] : [],
+      blocks:[
+        blk("Zonas por espera acumulada","días promedio",
+          per.slice(0,6).map(r=>({
+            label:`${r.z.n} <em>· ${r.pend} pend.</em>`,
+            title:`${r.z.n} · ${r.pend} pendientes · ${r.viejos} de más de 15 días · sobre todo ${r.top.toLowerCase()}`,
+            value:r.esp.toFixed(0)+"d", bar:[[r.esp/max*100,"var(--accent)"]],
+            go:()=>map.flyTo(r.z.c,15,{duration:.6})
+          })),"Nada pendiente con estos filtros."),
+        (()=>{
+          const fs=FRENOS.slice().sort((a,b)=>b.dias-a.dias), m=fs[0].dias;
+          return blk("Lo que más frena","días acumulados",fs.map(f=>({
+            label:`${f.n} <em>· ${f.trabajos} trabajos</em>`, title:`${f.trabajos} trabajos esperando`,
+            value:f.dias+"d", bar:[[f.dias/m*100,"var(--accent)"]]})));
+        })(),
+        (()=>{
+          const pend=pts.filter(p=>p.est==='pendiente');
+          const bk=[["Hasta 7 días",0,7],["8 a 15 días",8,15],["16 a 30 días",16,30],["Más de 30 días",31,999]]
+            .map(([n,a,b])=>({n,v:pend.filter(p=>p.espera>=a&&p.espera<=b).length}));
+          const m=Math.max(...bk.map(x=>x.v),1);
+          return blk("Antigüedad de lo pendiente","reclamos",bk.map(x=>({
+            label:x.n, value:x.v,
+            bar:[[x.v/m*100, x.n==="Más de 30 días"?"var(--danger)":"var(--accent)"]]})),"Nada pendiente.");
+        })()
+      ]
+    };
+  }
+},
+
+resuelto:{
+  heat:false, marker:{key:"pct",color:"#00B37E",ink:"#04140F"},
+  lhead:["Cierres por semana","ingresados vs. cerrados"],
+  legend:`<span class="t">Finalizados</span><span class="s">por zona · el número es el % ya cerrado</span>`,
+  build(pts){
+    const w=Math.max(1,Math.round(F.dias/7));
+    const b=Array.from({length:w},()=>({tot:0,res:0}));
+    pts.forEach(p=>{const i=Math.min(w-1,Math.floor((p.edad-1)/7));b[i].tot++;if(p.est==='finalizado')b[i].res++});
+    const fin=pts.filter(p=>p.est==='finalizado');
+    const pct=pts.length?Math.round(fin.length/pts.length*100):0;
+    const prom=fin.length?nd(fin.reduce((s,p)=>s+p.cierre,0)/fin.length):"—";
+    const best=ZONES.map((z,i)=>{
+      const zp=pts.filter(p=>p.zi===i);
+      return {z,tot:zp.length,pct:zp.length?zp.filter(p=>p.est==='finalizado').length/zp.length:0};
+    }).filter(r=>r.tot>=8).sort((a,b)=>b.pct-a.pct)[0];
+    const max=Math.max(...b.map(x=>x.tot),1);
+    return {
+      title:"Cómo venimos cerrando",
+      text:`Cerramos <b>${nf(fin.length)} de ${nf(pts.length)}</b> reclamos: <b>${pct}%</b>.
+        El cierre lleva <b>${prom} días</b> promedio.
+        ${b[0]?`Esta semana entraron ${b[0].tot} y ya cerraron ${b[0].res}.`:''}
+        ${best?`La zona que mejor responde es <b>${best.z.n}</b>, con ${Math.round(best.pct*100)}% cerrado.`:''}`,
+      acts: best ? [["Ir a "+best.z.n, ()=>map.flyTo(best.z.c,15,{duration:.6})]] : [],
+      blocks:[
+        blk("Cierres por semana","ingresados vs. cerrados",b.map((x,i)=>({
+          label:i===0?"Esta semana":`Hace ${i} semana${i>1?'s':''}`,
+          title:`${x.tot} ingresados · ${x.res} ya cerrados`, value:x.tot,
+          bar:[[x.res/max*100,SC.finalizado],[(x.tot-x.res)/max*100,"rgba(234,240,237,.22)"]]
+        })),"Sin datos en el período."),
+        (()=>{
+          const z=ZONES.map((zz,i)=>{
+            const zp=pts.filter(p=>p.zi===i);
+            return {zz,tot:zp.length,pct:zp.length?zp.filter(p=>p.est==='finalizado').length/zp.length:0};
+          }).filter(r=>r.tot>=6).sort((a,b)=>b.pct-a.pct).slice(0,4);
+          return blk("Zonas que mejor responden","% cerrado",z.map(r=>({
+            label:`${r.zz.n} <em>· ${r.tot} reclamos</em>`, value:Math.round(r.pct*100)+"%",
+            bar:[[r.pct*100,SC.finalizado]], go:()=>map.flyTo(r.zz.c,15,{duration:.6})
+          })),"Sin zonas comparables.");
+        })(),
+        (()=>{
+          const g={}; fin.forEach(p=>(g[p.rubro]=g[p.rubro]||[]).push(p.cierre));
+          const r=Object.entries(g).map(([n,v])=>[n,v.reduce((s,x)=>s+x,0)/v.length])
+            .sort((a,b)=>b[1]-a[1]).slice(0,4);
+          const m=r.length?r[0][1]:1;
+          return blk("Tiempo de cierre por categoría","días promedio",r.map(([n,v])=>({
+            label:n, value:nd(v), bar:[[v/m*100,"var(--fg-3)"]]})),"Sin cierres en el período.");
+        })()
+      ]
+    };
+  }
+},
+
+sinllegar:{
+  heat:false, marker:{key:"gap",color:"#E5484D",ink:"#2A0507"},
+  lhead:["Zonas por deuda de gestión","% sin cerrar"],
+  legend:`<span class="t">Sin cerrar</span><span class="s">por zona · el número es el % que no cerramos</span>`,
+  build(pts){
+    const per=ZONES.map((z,i)=>{
+      const zp=pts.filter(p=>p.zi===i);
+      const ab=zp.filter(p=>p.est!=='finalizado').length;
+      return {z,i,tot:zp.length,ab,gap:zp.length?ab/zp.length:0,
+        rech:zp.filter(p=>p.est==='rechazado').length,top:topOf(zp.filter(p=>p.est!=='finalizado'),'rubro')};
+    }).filter(r=>r.tot>=6).sort((a,b)=>b.gap-a.gap);
+    const w=per[0], malas=per.filter(r=>r.gap>=.5).length;
+    const rech=pts.filter(p=>p.est==='rechazado').length;
+    return {
+      title:"Dónde la gestión queda debiendo",
+      text: w
+        ? `En <b>${malas} ${malas===1?'zona':'zonas'}</b> cerramos menos de la mitad de lo que entró.
+           La más resentida es <b>${w.z.n}</b>: ${w.tot} reclamos, ${w.ab} sin cerrar
+           (<b>${Math.round(w.gap*100)}%</b>), sobre todo de ${w.top.toLowerCase()}.
+           Además hay <b>${nf(rech)} rechazados</b> en todo el ejido.`
+        : `No hay zonas con volumen suficiente para comparar.`,
+      acts: w ? [["Ir a "+w.z.n, ()=>map.flyTo(w.z.c,15,{duration:.6})]] : [],
+      blocks:[
+        blk("Zonas por deuda de gestión","% sin cerrar",per.slice(0,6).map(r=>({
+          label:`${r.z.n} <em>· ${r.ab} de ${r.tot}</em>`,
+          title:`${r.z.n} · ${r.ab} sin cerrar de ${r.tot} · ${r.rech} rechazados`,
+          value:Math.round(r.gap*100)+"%", bar:[[r.gap*100,"var(--danger)"]],
+          go:()=>map.flyTo(r.z.c,15,{duration:.6})
+        })),"Sin zonas comparables con estos filtros."),
+        rubroBlk(pts.filter(p=>p.est!=='finalizado'),"var(--danger)","Categorías sin cerrar"),
+        (()=>{
+          const pend=pts.filter(p=>p.est==='pendiente').length, m=Math.max(pend,rech,1);
+          return blk("Composición de lo no cerrado","reclamos",[
+            {label:"Pendientes",value:pend,bar:[[pend/m*100,"var(--accent)"]]},
+            {label:"Rechazados",value:rech,bar:[[rech/m*100,"var(--danger)"]]}
+          ]);
+        })()
+      ]
+    };
+  }
+}};
+
+/* ── render ─────────────────────────────────────────────────────── */
+let acts=[];
+function render(){
+  const pts=filtered(), q=Q[F.q];
+  const by={finalizado:0,pendiente:0,rechazado:0};
+  pts.forEach(p=>by[p.est]++);
+  const fin=pts.filter(p=>p.est==='finalizado');
+
+  document.getElementById('kTot').textContent  = nf(pts.length);
+  document.getElementById('kPct').textContent  = pts.length?Math.round(by.finalizado/pts.length*100)+'%':'—';
+  document.getElementById('kPend').textContent = nf(by.pendiente);
+  document.getElementById('kViejo').textContent= pts.filter(p=>p.est==='pendiente'&&p.espera>15).length;
+  document.getElementById('kDias').textContent = fin.length?nd(fin.reduce((s,p)=>s+p.cierre,0)/fin.length):'—';
+  const nfl=RUBROS.length-F.rubros.size;
+  document.getElementById('filtN').textContent = nfl?'· '+nfl:'';
+
+  /* mapa — aislado: un fallo de canvas no puede vaciar el panel */
+  try{
+    if(q.heat && !map.hasLayer(heat)) heat.addTo(map);
+    if(!q.heat && map.hasLayer(heat)) map.removeLayer(heat);
+    if(q.heat) heat.setPoints(pts);
+  }catch(e){ console.warn('capa de calor',e) }
+
+  markers.clearLayers();
+  if(F.dots){
+    pts.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:5,weight:1.5,color:'#0B120F',fillColor:SC[p.est],fillOpacity:.95})
+      .bindTooltip(`${p.calle} · ${p.rubro} · ${p.est}`,{direction:'top'}).addTo(markers));
+  } else if(q.marker){
+    const m=q.marker, agg=new Map();
+    pts.forEach(p=>{
+      if(!agg.has(p.zi)) agg.set(p.zi,{finalizado:0,pendiente:0,rechazado:0,tot:0,cierre:[],items:[]});
+      const a=agg.get(p.zi);a[p.est]++;a.tot++;a.items.push(p);
+      if(p.est==='finalizado')a.cierre.push(p.cierre);
+    });
+    const val=a=> m.key==='pendiente' ? a.pendiente
+              : m.key==='pct' ? Math.round(a.finalizado/a.tot*100)
+              : Math.round((a.tot-a.finalizado)/a.tot*100);
+    const size=a=> m.key==='pendiente' ? a.pendiente : a.tot;
+    const max=Math.max(...[...agg.values()].map(size),1);
+    agg.forEach((a,zi)=>{
+      const v=val(a); if(m.key==='pendiente'&&!v) return;
+      const s=Math.round(30+26*Math.sqrt(size(a)/max));
+      const label=m.key==='pendiente'?v:v+'%';
+      const html=`<div class="pin" style="width:${s}px;height:${s}px;background:${m.color};color:${m.ink};
+        font-size:${s>48?14:12}px">${label}</div>`;
+      L.marker(ZONES[zi].c,{icon:L.divIcon({html,className:'dwrap',iconSize:[s,s],iconAnchor:[s/2,s/2]})})
+        .bindPopup(popup(ZONES[zi],a),{className:'pop',offset:[0,-4],closeButton:false}).addTo(markers);
+    });
+  }
+  document.getElementById('legend').innerHTML = F.dots
+    ? STATES.map(x=>`<span class="s" style="display:flex;align-items:center;gap:6px">
+        <span class="dot" style="background:${x.c}"></span>${x.n}</span>`).join('')
+    : q.legend;
+
+  /* panel */
+  const b=q.build(pts);
+  document.getElementById('sumT').textContent=b.title;
+  document.getElementById('sumP').innerHTML=b.text;
+  const aEl=document.getElementById('sumA');
+  acts=b.acts||[];
+  aEl.innerHTML=acts.map((a,i)=>`<button data-a="${i}">${a[0]} →</button>`).join('');
+  aEl.querySelectorAll('button').forEach(btn=>btn.onclick=()=>acts[+btn.dataset.a][1]());
+
+  document.getElementById('blocks').innerHTML = b.blocks.map((bl,bi)=>`
+    <section class="blk">
+      <h3>${bl.title}${bl.hint?`<em>${bl.hint}</em>`:''}</h3>
+      ${bl.rows.length ? bl.rows.map((r,i)=>`
+        <${r.go?'button':'div'} class="brow" data-b="${bi}" data-i="${i}"
+          title="${(r.title||'').replace(/"/g,'&quot;')}"${r.go?' style="cursor:pointer"':''}>
+          <span class="n">${r.label}</span>
+          <span class="bar"${r.bar?'':' style="background:transparent"'}>
+            ${(r.bar||[]).map(([w,c])=>`<i style="width:${w}%;background:${c}"></i>`).join('')}
+          </span>
+          <span class="v">${r.value}</span>
+        </${r.go?'button':'div'}>`).join('')
+        : `<p class="none">${bl.none||'Sin datos.'}</p>`}
+    </section>`).join('');
+  document.querySelectorAll('#blocks .brow').forEach(el=>{
+    const r=b.blocks[+el.dataset.b].rows[+el.dataset.i];
+    if(r&&r.go) el.onclick=r.go;
+  });
+}
+
+function popup(z,a){
+  const prom=a.cierre.length?nd(a.cierre.reduce((s,v)=>s+v,0)/a.cierre.length)+' días':'sin datos';
+  return `<div class="p-in"><p class="p-t">${z.n}</p>
+    <p class="p-s">${a.tot} reclamos · sobre todo ${topOf(a.items,'rubro').toLowerCase()}</p>
+    ${STATES.map(x=>`<div class="p-r"><span class="dot" style="background:${x.c}"></span>${x.n}<b>${a[x.k]}</b></div>`).join('')}
+    </div><div class="p-f">Cierre promedio: ${prom}</div>`;
+}
+
+/* ── controles ──────────────────────────────────────────────────── */
+document.querySelectorAll('.q').forEach(b=>b.onclick=()=>{
+  F.q=b.dataset.q;
+  document.querySelectorAll('.q').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  render();
+});
+document.querySelectorAll('#segPeriod button').forEach(b=>b.onclick=()=>{
+  F.dias=+b.dataset.d;
+  document.querySelectorAll('#segPeriod button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  render();
+});
+document.getElementById('chips').innerHTML=RUBROS.map(r=>`<button class="chip" data-r="${r}" aria-pressed="true">${r}</button>`).join('');
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+  const r=b.dataset.r;
+  if(F.rubros.has(r)&&F.rubros.size>1){F.rubros.delete(r);b.setAttribute('aria-pressed','false')}
+  else {F.rubros.add(r);b.setAttribute('aria-pressed','true')}
+  render();
+});
+document.getElementById('dotsToggle').onchange=e=>{F.dots=e.target.checked;render()};
+document.getElementById('filtBtn').onclick=()=>document.getElementById('filtPanel').classList.toggle('on');
+document.getElementById('pdfBtn').onclick=()=>alert('Marcá un área del mapa y descargás el detalle de esos reclamos en PDF.');
+
+render();
+requestAnimationFrame(()=>{map.invalidateSize();render()});
+window.addEventListener('load',()=>{map.invalidateSize();render()});
+if(window.ResizeObserver){
+  let t;
+  new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(()=>map.invalidateSize(),120)})
+    .observe(document.querySelector('.map-wrap'));
+}
+</script>
+</body>
+</html>

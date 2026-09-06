@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gráficos para un tablero de reclamos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#00B37E; --accent:#FFB800; --danger:#E5484D;
+  --bg-0:#0B120F; --bg-1:#111A17; --bg-2:#1A2421; --bg-3:#222E2A;
+  --fg-1:#EAF0ED; --fg-2:#9BA9A4; --fg-3:#8A9994;
+  --border:rgba(234,240,237,.10); --border-2:rgba(234,240,237,.06);
+  --heat-1:#7C5CD6; --heat-4:#D62F8F;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-0);color:var(--fg-1);font-family:Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:var(--primary);text-decoration:none}
+a:hover{color:var(--primary);text-decoration:underline}
+
+.head{max-width:1420px;margin:0 auto;padding:44px 24px 8px}
+.eyebrow{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--fg-3);font-weight:600;margin-bottom:14px}
+.eyebrow .m{width:22px;height:22px;border-radius:6px;background:var(--primary);display:grid;place-items:center;
+  font-family:Sora,sans-serif;font-weight:700;font-size:13px;color:#04140F}
+h1{font-family:Sora,sans-serif;font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin:0 0 12px;max-width:22ch}
+.lede{font-size:14.5px;line-height:1.6;color:var(--fg-2);max-width:62ch;margin:0}
+.lede b{color:var(--fg-1);font-weight:600}
+
+.nav{max-width:1420px;margin:26px auto 0;padding:0 24px;display:flex;gap:7px;flex-wrap:wrap}
+.nav a{border:1px solid var(--border);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:500;
+  color:var(--fg-2);white-space:nowrap}
+.nav a:hover{background:var(--bg-2);color:var(--fg-1);text-decoration:none}
+
+.band{max-width:1420px;margin:0 auto;padding:38px 24px 0}
+.band h2{font-family:Sora,sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--fg-3);margin:0 0 4px}
+.band p{font-size:13px;color:var(--fg-2);margin:0 0 18px;max-width:70ch;line-height:1.55}
+
+.grid{max-width:1420px;margin:0 auto;padding:0 24px;display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(430px,1fr))}
+.card{background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:18px 18px 14px;
+  display:flex;flex-direction:column;min-width:0}
+.card.wide{grid-column:1/-1}
+.card h3{font-family:Sora,sans-serif;font-size:15.5px;font-weight:700;letter-spacing:-.01em;margin:0 0 5px}
+.card .q{font-size:12.5px;color:var(--fg-2);margin:0 0 16px;line-height:1.5}
+.card .q b{color:var(--fg-1);font-weight:600}
+.card svg{width:100%;height:auto;display:block;overflow:visible}
+.card .key{display:flex;gap:14px;flex-wrap:wrap;margin-top:13px;font-size:11.5px;color:var(--fg-2)}
+.card .key b{display:flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap}
+.card .key i{width:9px;height:9px;border-radius:3px;display:block;flex:none}
+.card .tip{margin:13px 0 0;padding-top:12px;border-top:1px solid var(--border-2);font-size:11.5px;
+  color:var(--fg-3);line-height:1.5}
+.card .tip b{color:var(--fg-2);font-weight:600}
+.grow{flex:1}
+
+text{font-family:Inter,sans-serif;font-variant-numeric:tabular-nums}
+.ax{font-size:10px;fill:var(--fg-3)}
+.axv{font-size:10px;fill:var(--fg-3)}
+.gl{stroke:rgba(234,240,237,.07);stroke-width:1}
+.bl{stroke:rgba(234,240,237,.18);stroke-width:1}
+
+.foot{max-width:1420px;margin:0 auto;padding:44px 24px 64px;font-size:12.5px;color:var(--fg-3);line-height:1.6;max-width:70ch}
+@media (max-width:640px){ .grid{grid-template-columns:1fr;padding:0 14px} .head,.band{padding-left:14px;padding-right:14px} h1{font-size:26px} }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="eyebrow"><span class="m">m</span>Villa Carlos Paz · Tablero de reclamos</div>
+  <h1>Treinta gráficos para leer los reclamos</h1>
+  <p class="lede">Cada uno contesta una pregunta distinta y ninguno reemplaza al mapa. Están armados con
+    <b>datos de muestra</b> con la forma que suelen tener los reclamos municipales: mucha cola larga, picos de mañana
+    y de tarde, y una minoría de casos que se eternizan. Elegí los que te sirvan y los llevo al tablero.</p>
+</header>
+
+<nav class="nav">
+  <a href="#tiempo">Tiempo</a>
+  <a href="#distribucion">Distribución</a>
+  <a href="#zonas">Comparar zonas</a>
+  <a href="#proceso">Proceso</a>
+  <a href="#tiempo2">Tiempo · avanzado</a>
+  <a href="#distribucion2">Composición</a>
+  <a href="#zonas2">Ranking y equidad</a>
+  <a href="#proceso2">Flujo y deuda</a>
+</nav>
+
+<section class="band" id="tiempo">
+  <h2>Tiempo</h2>
+  <p>Lo primero que pregunta cualquier gestión: ¿estamos mejorando o empeorando? Ojo con quedarse solo en el primero
+     de estos cuatro — se puede cerrar mucho y seguir acumulando.</p>
+</section>
+<div class="grid" id="g1"></div>
+
+<section class="band" id="distribucion">
+  <h2>Distribución</h2>
+  <p>Dónde se concentra el volumen y qué forma tiene la cola. Un promedio de diez días puede esconder mitad en dos días
+     y mitad en treinta, y eso se gestiona distinto.</p>
+</section>
+<div class="grid" id="g2"></div>
+
+<section class="band" id="zonas">
+  <h2>Comparar zonas</h2>
+  <p>Diez barrios no se comparan con diez números sueltos. Estos cuatro ordenan la comparación para que la conclusión
+     salte sin leer la tabla.</p>
+</section>
+<div class="grid" id="g3"></div>
+
+<section class="band" id="proceso">
+  <h2>Proceso</h2>
+  <p>El reclamo no se demora: se demora una etapa del reclamo. Estos gráficos separan el problema del proceso
+     del problema de la cuadrilla.</p>
+</section>
+<div class="grid" id="g4"></div>
+
+<section class="band" id="tiempo2">
+  <h2>Tiempo · avanzado</h2>
+  <p>Los cuatro anteriores dicen si mejorás. Estos dicen <b>por qué</b>: qué día de la semana carga el sistema,
+     qué categoría creció, y si lo que se acumula es nuevo o viejo.</p>
+</section>
+<div class="grid" id="g5"></div>
+
+<section class="band" id="distribucion2">
+  <h2>Composición</h2>
+  <p>Cuánto pesa cada parte sobre el total. Son los gráficos que reemplazan a la torta, cada uno por un motivo
+     distinto.</p>
+</section>
+<div class="grid" id="g6"></div>
+
+<section class="band" id="zonas2">
+  <h2>Ranking y equidad</h2>
+  <p>Los reclamos municipales casi nunca se reparten parejo. Estos cuatro muestran la desigualdad territorial
+     sin necesidad de un mapa.</p>
+</section>
+<div class="grid" id="g7"></div>
+
+<section class="band" id="proceso2">
+  <h2>Flujo y deuda</h2>
+  <p>Cómo se reparte el trabajo entre categorías y estados, y quiénes son los casos concretos que arrastrás
+     desde hace meses.</p>
+</section>
+<div class="grid" id="g8"></div>
+
+<p class="foot">Todos los números son sintéticos y se generan en el navegador con una semilla fija, así que el dibujo
+  es el mismo cada vez que abrís la página. Para llevar cualquiera de estos al tablero real hace falta: fecha de ingreso,
+  fecha de cierre, estado, categoría, zona y — para los de proceso — fecha de asignación y motivo de demora.</p>
+
+<script>
+/* ── datos de muestra ───────────────────────────────────────────── */
+const ZONES=["Centro","Villa del Lago","Costa Azul","Santa Rita del Lago","Sol y Lago",
+  "Carlos Paz Sierras","Miguel Muñoz B","Domingo F. Sarmiento","Los Prados","Villa Suiza"];
+const ZW=[1.00,.66,.60,.50,.34,.46,.52,.62,.44,.30];
+const ZMIX=[.52,.40,.62,.60,.58,.57,.42,.36,.39,.49];
+const ZDIAS=[7,12,8,9,6,11,14,16,15,12];
+const RUBROS=["Plagas y control","Recolección de residuos","Arbolado y espacios verdes",
+  "Ruidos y convivencia","Bacheo y calles","Alumbrado público"];
+const RW=[1.00,.88,.76,.72,.60,.52];
+const DOW=["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+const DAYS=182, WEEKS=26;
+const C={ok:"#00B37E",pend:"#FFB800",no:"#E5484D",heat:"#D62F8F",vio:"#7C5CD6",mute:"#3A4844"};
+
+function mul(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd=mul(20260905);
+const wp=w=>{const s=w.reduce((a,b)=>a+b,0);let r=rnd()*s;for(let i=0;i<w.length;i++){r-=w[i];if(r<=0)return i}return 0};
+const g3=()=> (rnd()+rnd()+rnd())/3;
+
+const D=(()=>{
+  const out=[];
+  for(let i=0;i<980;i++){
+    const zi=wp(ZW), ri=wp(RW);
+    const t=Math.floor(rnd()*DAYS);                    // día de ingreso, 0 = más viejo
+    const edad=DAYS-t;
+    const r=rnd();
+    const est = r<ZMIX[zi] ? "ok" : r<ZMIX[zi]+ (1-ZMIX[zi])*.78 ? "pend" : "no";
+    const base=ZDIAS[zi]*(0.7+ri*0.16);
+    const cierre=Math.max(1,Math.round(base*(0.35+g3()*1.9)));
+    const hb=rnd();
+    const hora = hb<.34 ? 8+Math.floor(rnd()*4) : hb<.62 ? 17+Math.floor(rnd()*4)
+               : hb<.86 ? 12+Math.floor(rnd()*5) : Math.floor(rnd()*24);
+    out.push({zi,ri,t,edad,est,cierre,hora,dow:(t+3)%7,
+      cerrado: est==="ok" ? t+cierre : null});
+  }
+  return out;
+})();
+
+/* ── helpers svg ────────────────────────────────────────────────── */
+const W=520,H=210, L=38,R=8,T=14,B=30;
+const px=(i,n)=>L+(W-L-R)*(n<2?.5:i/(n-1));
+const iw=W-L-R, ih=H-T-B;
+const yv=(v,max)=>T+ih-(v/max)*ih;
+const path=p=>p.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+const svg=inner=>`<svg viewBox="0 0 ${W} ${H}" role="img">${inner}</svg>`;
+const nfi=n=>Math.round(n).toLocaleString('es-AR');
+/* tinta sobre relleno de color: elige blanco o negro por contraste real,
+   compositando el hue sobre el fondo del card (nunca por suposición) */
+const BGRGB=[17,26,23];
+const _lin=c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
+function inkOn(hex,a=1){
+  const f=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
+  const c=f.map((v,i)=>v*a+BGRGB[i]*(1-a));
+  const Lm=0.2126*_lin(c[0])+0.7152*_lin(c[1])+0.0722*_lin(c[2]);
+  return (1.05/(Lm+0.05)) >= ((Lm+0.05)/0.05) ? '#FFFFFF' : '#08110E';
+}
+/* paso "lindo" entero, para que un eje de unidades enteras nunca muestre decimales */
+function niceStep(max,n=4){
+  const rough=max/n, pow=Math.pow(10,Math.floor(Math.log10(rough)));
+  const cand=[1,2,2.5,5,10].map(m=>m*pow).filter(Number.isInteger);
+  return cand.find(s=>s>=rough) || Math.max(1,Math.ceil(rough));
+}
+function yaxis(max,step,fmt){
+  if(step==null||!Number.isInteger(step)) step=niceStep(max);
+  const f=fmt||nfi;
+  let s='';
+  for(let v=0;v<=max+1e-9;v+=step){
+    const y=yv(v,max);
+    s+=`<line class="gl" x1="${L}" y1="${y.toFixed(1)}" x2="${W-R}" y2="${y.toFixed(1)}"/>
+        <text class="axv" x="${L-8}" y="${(y+3.5).toFixed(1)}" text-anchor="end">${f(v)}</text>`;
+  }
+  return s;
+}
+const xlab=(i,n,txt)=>`<text class="ax" x="${px(i,n).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${txt}</text>`;
+const card=(cls,title,q,body,key,tip)=>`<article class="card${cls?' '+cls:''}">
+  <h3>${title}</h3><p class="q">${q}</p><div class="grow">${body}</div>
+  ${key?`<div class="key">${key.map(([c,t])=>`<b><i style="background:${c}"></i>${t}</b>`).join('')}</div>`:''}
+  ${tip?`<p class="tip">${tip}</p>`:''}</article>`;
+const wk=t=>Math.min(WEEKS-1,Math.floor(t/7));
+const nd=n=>Number(n).toFixed(1).replace('.',',');
+const SHORT=["Centro","V. del Lago","Costa Azul","Santa Rita","Sol y Lago",
+  "CP Sierras","M. Muñoz B","D. F. Sarmiento","Los Prados","V. Suiza"];
+/* separa etiquetas que caerían una encima de otra */
+function declutter(items,gap,top,bot){
+  const a=items.slice().sort((p,q)=>p.y-q.y);
+  for(let i=1;i<a.length;i++) if(a[i].y-a[i-1].y<gap) a[i].y=a[i-1].y+gap;
+  if(a[a.length-1].y>bot){
+    a[a.length-1].y=bot;
+    for(let i=a.length-2;i>=0;i--) a[i].y=Math.min(a[i].y,a[i+1].y-gap);
+  }
+  if(a[0].y<top){
+    a[0].y=top;
+    for(let i=1;i<a.length;i++) a[i].y=Math.max(a[i].y,a[i-1].y+gap);
+  }
+  return items;
+}
+
+/* ═══ 1 · TIEMPO ═══════════════════════════════════════════════ */
+
+/* 1.1 ingresados vs cerrados por semana */
+function chIngresados(){
+  const a=Array.from({length:WEEKS},()=>({in:0,out:0}));
+  D.forEach(d=>{a[wk(d.t)].in++; if(d.cerrado!=null&&d.cerrado<DAYS) a[wk(d.cerrado)].out++});
+  const max=Math.ceil(Math.max(...a.map(x=>Math.max(x.in,x.out)))/10)*10;
+  const bw=iw/WEEKS-2.5;
+  let s=yaxis(max,max/4,v=>v);
+  a.forEach((x,i)=>{
+    const x0=L+iw*(i/WEEKS)+1.2;
+    s+=`<rect x="${x0.toFixed(1)}" y="${yv(x.in,max).toFixed(1)}" width="${bw.toFixed(1)}"
+         height="${(ih-(yv(x.in,max)-T)).toFixed(1)}" rx="2" fill="${C.mute}"/>`;
+    s+=`<rect x="${x0.toFixed(1)}" y="${yv(x.out,max).toFixed(1)}" width="${bw.toFixed(1)}"
+         height="${(ih-(yv(x.out,max)-T)).toFixed(1)}" rx="2" fill="${C.ok}"/>`;
+  });
+  [[0,'hace 26 sem'],[13,'hace 13'],[25,'esta sem']].forEach(([i,t])=>{
+    s+=`<text class="ax" x="${(L+iw*(i/WEEKS)+bw/2).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${t}</text>`;
+  });
+  return card('','Ingresados y cerrados por semana',
+    'El punto de partida: <b>¿entra más de lo que sale?</b> Las barras verdes por debajo de las grises son semanas en las que perdiste terreno.',
+    svg(s), [[C.mute,'Ingresados'],[C.ok,'Cerrados']],
+    'Cuidado: <b>este gráfico solo no alcanza.</b> Podés cerrar mucho y acumular igual. Miralo junto al backlog.');
+}
+
+/* 1.2 backlog acumulado */
+function chBacklog(){
+  const a=[];
+  for(let w=0;w<WEEKS;w++){
+    const d=w*7+6;
+    a.push(D.filter(x=>x.t<=d && (x.cerrado==null||x.cerrado>d)).length);
+  }
+  const max=Math.ceil(Math.max(...a)/50)*50;
+  const pts=a.map((v,i)=>[px(i,WEEKS),yv(v,max)]);
+  let s=yaxis(max,max/4);
+  s+=`<path d="${path(pts)} L ${px(WEEKS-1,WEEKS)} ${T+ih} L ${L} ${T+ih} Z" fill="${C.pend}" opacity=".14"/>`;
+  s+=`<path d="${path(pts)}" fill="none" stroke="${C.pend}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  s+=`<circle cx="${px(WEEKS-1,WEEKS).toFixed(1)}" cy="${yv(a[WEEKS-1],max).toFixed(1)}" r="4.5" fill="${C.pend}" stroke="${'var(--bg-1)'}" stroke-width="2"/>`;
+  s+=`<text x="${(px(WEEKS-1,WEEKS)-6).toFixed(1)}" y="${(yv(a[WEEKS-1],max)-12).toFixed(1)}"
+       text-anchor="end" font-size="13" font-weight="700" fill="${C.pend}" font-family="Sora,sans-serif">${a[WEEKS-1]}</text>`;
+  s+=xlab(0,WEEKS,'hace 26 sem')+xlab(WEEKS-1,WEEKS,'hoy');
+  return card('','Backlog: cuántos quedan abiertos',
+    'El gráfico más honesto del tablero. Cuenta <b>cuántos reclamos siguen sin cerrar</b> al final de cada semana. Si sube, la deuda crece aunque cierres a buen ritmo.',
+    svg(s), null,
+    'Si el backlog es plano y alto, el problema es de <b>capacidad</b>. Si sube en escalones, el problema es de <b>picos sin refuerzo</b>.');
+}
+
+/* 1.3 curva de supervivencia */
+function chSupervivencia(){
+  const K=90;
+  const open=k=>D.filter(d=> d.est==="ok" ? d.cierre>k : d.edad>k).length/D.length*100;
+  const a=Array.from({length:K+1},(_,k)=>open(k));
+  const pts=a.map((v,i)=>[L+iw*(i/K),yv(v,100)]);
+  let s=yaxis(100,25,v=>v+'%');
+  [7,15,30,60].forEach(k=>{
+    const x=L+iw*(k/K), y=yv(a[k],100);
+    s+=`<line class="bl" x1="${x.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x.toFixed(1)}" y2="${T+ih}" stroke-dasharray="2 3"/>
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${C.vio}"/>
+        <text class="ax" x="${x.toFixed(1)}" y="${(y-9).toFixed(1)}" text-anchor="middle" fill="var(--fg-2)">${Math.round(a[k])}%</text>
+        <text class="ax" x="${x.toFixed(1)}" y="${H-B+16}" text-anchor="middle">${k}d</text>`;
+  });
+  s+=`<path d="${path(pts)}" fill="none" stroke="${C.vio}" stroke-width="2.5"/>`;
+  return card('','Cuánto sobrevive sin cerrarse',
+    'Del total que entra, <b>qué porcentaje sigue abierto</b> a los 7, 15, 30 y 60 días. Contesta "¿cuánto tarda de verdad?" mucho mejor que un promedio.',
+    svg(s), null,
+    'La caída de los primeros 15 días es tu capacidad de respuesta. La <b>cola plana</b> del final son los casos que nadie va a tocar si no los forzás.');
+}
+
+/* 1.4 heatmap día × hora */
+function chHeatHora(){
+  const HH=12, cw=(W-L-R)/HH, ch=(H-T-B-4)/7;
+  const m=Array.from({length:7},()=>Array(HH).fill(0));
+  D.forEach(d=>m[d.dow][Math.floor(d.hora/2)]++);
+  const max=Math.max(...m.flat());
+  let s='';
+  m.forEach((row,r)=>row.forEach((v,c)=>{
+    const o=v/max;
+    s+=`<rect x="${(L+c*cw+1).toFixed(1)}" y="${(T+r*ch+1).toFixed(1)}"
+         width="${(cw-2).toFixed(1)}" height="${(ch-2).toFixed(1)}" rx="2"
+         fill="${C.heat}" opacity="${(0.06+o*0.94).toFixed(2)}"/>`;
+  }));
+  DOW.forEach((d,r)=>s+=`<text class="axv" x="${L-8}" y="${(T+r*ch+ch/2+3.5).toFixed(1)}" text-anchor="end">${d}</text>`);
+  [0,3,6,9,11].forEach(c=>s+=`<text class="ax" x="${(L+c*cw+cw/2).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${c*2}h</text>`);
+  return card('','Cuándo entran los reclamos',
+    'Día de la semana contra franja horaria. Sirve para una cosa muy concreta: <b>dimensionar guardias y turnos de atención</b>.',
+    svg(s), null,
+    'En municipios el patrón casi siempre es doble pico: <b>media mañana y primera hora de la tarde</b>, con el lunes cargando el fin de semana.');
+}
+
+/* ═══ 2 · DISTRIBUCIÓN ═════════════════════════════════════════ */
+
+/* 2.1 barras horizontales ordenadas */
+function chRubros(){
+  const c=RUBROS.map((n,i)=>({n,v:D.filter(d=>d.ri===i).length})).sort((a,b)=>b.v-a.v);
+  const max=c[0].v, rh=(H-T-8)/c.length, LB=150;
+  let s='';
+  c.forEach((r,i)=>{
+    const y=T+i*rh, bh=Math.min(20,rh-9);
+    s+=`<text class="axv" x="${LB-10}" y="${(y+bh/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${r.n}</text>
+        <rect x="${LB}" y="${y.toFixed(1)}" width="${(W-LB-34)}" height="${bh}" rx="3" fill="rgba(234,240,237,.05)"/>
+        <rect x="${LB}" y="${y.toFixed(1)}" width="${((W-LB-34)*r.v/max).toFixed(1)}" height="${bh}" rx="3" fill="${C.heat}"/>
+        <text x="${W-4}" y="${(y+bh/2+4).toFixed(1)}" text-anchor="end" font-size="12" font-weight="600" fill="var(--fg-1)">${r.v}</text>`;
+  });
+  return card('','Categorías, de mayor a menor',
+    'El caballo de batalla. Barras horizontales ordenadas: <b>se lee de un vistazo y los nombres largos entran completos</b>.',
+    svg(s), null,
+    'Casi siempre le gana a una torta. Con más de tres porciones, la torta obliga a comparar ángulos y nadie sabe hacerlo.');
+}
+
+/* 2.2 histograma de espera */
+function chHistograma(){
+  const bins=[[0,3],[4,7],[8,14],[15,21],[22,30],[31,45],[46,60],[61,90],[91,120],[121,999]];
+  const lab=["0-3","4-7","8-14","15-21","22-30","31-45","46-60","61-90","91-120","+120"];
+  const a=bins.map(([x,y])=>D.filter(d=>{const e=d.est==="ok"?d.cierre:d.edad;return e>=x&&e<=y}).length);
+  const max=Math.ceil(Math.max(...a)/50)*50, bw=iw/a.length-4;
+  let s=yaxis(max,max/4);
+  a.forEach((v,i)=>{
+    const x0=L+iw*(i/a.length)+2, y=yv(v,max);
+    s+=`<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${(T+ih-y).toFixed(1)}" rx="2"
+         fill="${i>=6?C.no:i>=4?C.pend:C.ok}" opacity="${i>=6?.95:i>=4?.9:.85}"/>`;
+    if(i%2===0||i>7) s+=`<text class="ax" x="${(x0+bw/2).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${lab[i]}</text>`;
+  });
+  return card('','La forma de la cola',
+    'Cuántos reclamos caen en cada rango de días. Un promedio de diez días puede ser <b>todos en diez</b> o <b>la mitad en dos y la otra en treinta</b> — y se gestionan distinto.',
+    svg(s), [[C.ok,'Hasta 14 días'],[C.pend,'15 a 30'],[C.no,'Más de 30']],
+    'La barra de <b>+120 días</b> es la que hay que mirar en la reunión. No es un promedio malo: son casos abandonados.');
+}
+
+/* 2.3 boxplot por categoría */
+function chBoxplot(){
+  const q=(a,p)=>{const s=a.slice().sort((x,y)=>x-y);const i=(s.length-1)*p;const lo=Math.floor(i),hi=Math.ceil(i);
+    return s[lo]+(s[hi]-s[lo])*(i-lo)};
+  const rows=RUBROS.map((n,i)=>{
+    const v=D.filter(d=>d.ri===i&&d.est==="ok").map(d=>d.cierre);
+    return {n,p5:q(v,.05),q1:q(v,.25),med:q(v,.5),q3:q(v,.75),p95:q(v,.95)};
+  }).sort((a,b)=>b.med-a.med);
+  const max=Math.ceil(Math.max(...rows.map(r=>r.p95))/10)*10;
+  const LB=150, rh=(ih-6)/rows.length, sx=v=>LB+(W-LB-20)*(v/max);
+  let s='';
+  for(let v=0,st=niceStep(max);v<=max;v+=st)
+    s+=`<line class="gl" x1="${sx(v).toFixed(1)}" y1="${T}" x2="${sx(v).toFixed(1)}" y2="${T+ih}"/>
+        <text class="ax" x="${sx(v).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${v}d</text>`;
+  rows.forEach((r,i)=>{
+    const y=T+i*rh+rh/2-6, h=13;
+    s+=`<text class="axv" x="${LB-10}" y="${(y+h/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${r.n}</text>
+      <line x1="${sx(r.p5).toFixed(1)}" y1="${(y+h/2).toFixed(1)}" x2="${sx(r.p95).toFixed(1)}" y2="${(y+h/2).toFixed(1)}"
+        stroke="rgba(234,240,237,.28)" stroke-width="1.5"/>
+      <rect x="${sx(r.q1).toFixed(1)}" y="${y.toFixed(1)}" width="${(sx(r.q3)-sx(r.q1)).toFixed(1)}" height="${h}" rx="2.5"
+        fill="${C.vio}" opacity=".55"/>
+      <line x1="${sx(r.med).toFixed(1)}" y1="${(y-2).toFixed(1)}" x2="${sx(r.med).toFixed(1)}" y2="${(y+h+2).toFixed(1)}"
+        stroke="var(--fg-1)" stroke-width="2"/>`;
+  });
+  return card('','Cuán impredecible es cada categoría',
+    'La línea blanca es la mediana; la caja, la mitad central de los casos; los bigotes, los extremos. Muestra <b>qué rubro es errático</b>, no solo cuál es lento.',
+    svg(s), null,
+    'Una caja angosta y corrida a la derecha es <b>lento pero previsible</b>: se puede prometer un plazo. Una caja ancha no se puede prometer.');
+}
+
+/* 2.4 pico horario polar */
+function chPolar(){
+  const a=Array(24).fill(0);
+  D.forEach(d=>a[d.hora]++);
+  const max=Math.max(...a), cx=W/2, cy=H/2+4, r0=26, r1=Math.min(H/2-14,86);
+  let s=`<circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" class="gl"/>
+         <circle cx="${cx}" cy="${cy}" r="${(r0+(r1-r0)*.5).toFixed(1)}" fill="none" class="gl"/>`;
+  a.forEach((v,i)=>{
+    const a0=(i/24)*Math.PI*2-Math.PI/2, a1=((i+.86)/24)*Math.PI*2-Math.PI/2;
+    const rr=r0+(r1-r0)*(v/max);
+    const p=(ang,rad)=>[(cx+Math.cos(ang)*rad).toFixed(1),(cy+Math.sin(ang)*rad).toFixed(1)];
+    const [x0,y0]=p(a0,r0),[x1,y1]=p(a0,rr),[x2,y2]=p(a1,rr),[x3,y3]=p(a1,r0);
+    s+=`<path d="M${x0} ${y0} L${x1} ${y1} A${rr.toFixed(1)} ${rr.toFixed(1)} 0 0 1 ${x2} ${y2} L${x3} ${y3}
+         A${r0} ${r0} 0 0 0 ${x0} ${y0} Z" fill="${C.pend}" opacity="${(0.28+0.72*v/max).toFixed(2)}"/>`;
+  });
+  [[0,'0h'],[6,'6h'],[12,'12h'],[18,'18h']].forEach(([h,t])=>{
+    const ang=(h/24)*Math.PI*2-Math.PI/2;
+    s+=`<text class="ax" x="${(cx+Math.cos(ang)*(r1+14)).toFixed(1)}" y="${(cy+Math.sin(ang)*(r1+14)+3.5).toFixed(1)}"
+         text-anchor="middle">${t}</text>`;
+  });
+  return card('','El reloj del día',
+    'Las 24 horas en círculo, cada cuña es el volumen de esa hora. Es el <b>único caso donde un gráfico radial gana</b>: el dato es cíclico, y el círculo lo dice sin explicar nada.',
+    svg(s), null,
+    'Para cualquier otra cosa, barras. Los radiales distorsionan el área y hacen que diferencias chicas parezcan enormes.');
+}
+
+/* ═══ 3 · ZONAS ════════════════════════════════════════════════ */
+
+/* 3.1 barras divergentes */
+function chDivergentes(){
+  const prom=D.filter(d=>d.est==="ok").length/D.length;
+  const rows=ZONES.map((n,i)=>{
+    const z=D.filter(d=>d.zi===i);
+    return {n,d:(z.filter(x=>x.est==="ok").length/z.length)-prom};
+  }).sort((a,b)=>b.d-a.d);
+  const max=Math.max(...rows.map(r=>Math.abs(r.d)))*1.15;
+  const cx=W/2+34, half=W-cx-30, rh=(ih-6)/rows.length;
+  let s=`<line class="bl" x1="${cx}" y1="${T-2}" x2="${cx}" y2="${T+ih+2}"/>`;
+  rows.forEach((r,i)=>{
+    const y=T+i*rh, bh=Math.min(13,rh-5), w=Math.abs(r.d)/max*half;
+    const pos=r.d>=0;
+    s+=`<rect x="${(pos?cx:cx-w).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${bh}" rx="2"
+          fill="${pos?C.ok:C.no}"/>
+        <text class="axv" x="${(pos?cx-8:cx-w-8).toFixed(1)}" y="${(y+bh/2+3.5).toFixed(1)}" text-anchor="end"
+          fill="var(--fg-2)">${r.n}</text>
+        <text x="${(pos?cx+w+6:cx+6).toFixed(1)}" y="${(y+bh/2+3.5).toFixed(1)}" font-size="10.5" font-weight="600"
+          fill="${pos?C.ok:C.no}">${(r.d>=0?'+':'−')+Math.abs(Math.round(r.d*100))}</text>`;
+  });
+  s+=`<text class="ax" x="${cx}" y="${H-B+16}" text-anchor="middle">promedio del municipio (${Math.round(prom*100)}% cerrado)</text>`;
+  return card('','Quién está por debajo del promedio',
+    'Cada barra es el desvío de la zona respecto del promedio municipal. <b>Verde a la derecha, rojo a la izquierda.</b> El de arriba de todo y el de abajo son la conversación entera.',
+    svg(s), null,
+    'Es el gráfico para llevar a una reunión: <b>no hay que leer un solo número</b> para saber quién está mal.');
+}
+
+/* 3.2 scatter volumen vs % resuelto */
+function chScatter(){
+  const rows=ZONES.map((n,i)=>{
+    const z=D.filter(d=>d.zi===i);
+    return {n,tot:z.length,pct:z.filter(x=>x.est==="ok").length/z.length*100};
+  });
+  const mx=Math.ceil(Math.max(...rows.map(r=>r.tot))/25)*25;
+  const sx=v=>L+iw*(v/mx), sy=v=>yv(v,100);
+  const cutX=sx(mx*.5), cutY=sy(50);
+  let s=`<rect x="${cutX.toFixed(1)}" y="${cutY.toFixed(1)}" width="${(W-R-cutX).toFixed(1)}"
+          height="${(T+ih-cutY).toFixed(1)}" fill="${C.no}" opacity=".07"/>
+    <text class="ax" x="${(W-R-6)}" y="${(T+ih-8).toFixed(1)}" text-anchor="end" fill="${C.no}">mucho volumen, poco resuelto</text>`;
+  s+=yaxis(100,25,v=>v+'%');
+  for(let v=0,st=niceStep(mx);v<=mx;v+=st) s+=`<text class="ax" x="${sx(v).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${nfi(v)}</text>`;
+  s+=`<line class="bl" x1="${cutX.toFixed(1)}" y1="${T}" x2="${cutX.toFixed(1)}" y2="${T+ih}" stroke-dasharray="3 3"/>
+      <line class="bl" x1="${L}" y1="${cutY.toFixed(1)}" x2="${W-R}" y2="${cutY.toFixed(1)}" stroke-dasharray="3 3"/>`;
+  rows.forEach(r=>{
+    r.bad=r.tot>mx*.5&&r.pct<50;
+    r.cx=sx(r.tot); r.cy=sy(r.pct);
+    s+=`<circle cx="${r.cx.toFixed(1)}" cy="${r.cy.toFixed(1)}" r="${r.bad?7:5.5}"
+          fill="${r.bad?C.no:C.vio}" opacity=".9" stroke="var(--bg-1)" stroke-width="1.5"/>`;
+  });
+  /* etiquetas al costado del punto, separadas para que no se pisen */
+  const lab=declutter(
+    rows.filter(r=>r.bad||r.tot>mx*.55||r.pct>62).map(r=>({r,y:r.cy})),
+    13, T+6, T+ih-4);
+  lab.forEach(({r,y})=>{
+    const off=r.bad?11:9;
+    s+=`<line x1="${(r.cx+off-3).toFixed(1)}" y1="${r.cy.toFixed(1)}" x2="${(r.cx+off).toFixed(1)}" y2="${y.toFixed(1)}"
+          stroke="rgba(234,240,237,.20)" stroke-width="1"/>
+        <text class="ax" x="${(r.cx+off+3).toFixed(1)}" y="${(y+3.5).toFixed(1)}"
+          fill="${r.bad?'#FF9EA0':'var(--fg-2)'}">${SHORT[ZONES.indexOf(r.n)]}</text>`;
+  });
+  s+=`<text class="ax" x="${W-R}" y="${H-B+28}" text-anchor="end">reclamos recibidos →</text>`;
+  return card('','Volumen contra capacidad de cierre',
+    'Cada punto es una zona. El cuadrante de arriba a la derecha se arma solo: <b>mucho volumen y poco resuelto</b>. Ésa es tu lista de prioridades, sin que nadie la escriba.',
+    svg(s), null,
+    'Cuando el tablero tiene que <b>decidir</b> y no solo informar, este gráfico rinde más que cualquier ranking.');
+}
+
+/* 3.3 slope chart */
+function chSlope(){
+  const r2=mul(777);
+  const rows=ZONES.slice(0,8).map((n,i)=>{
+    const z=D.filter(d=>d.zi===i);
+    const now=z.filter(x=>x.est==="ok").length/z.length*100;
+    return {n:SHORT[i],prev:Math.max(12,Math.min(92,now+(r2()-.5)*34)),now};
+  });
+  const x0=L+62, x1=W-116;
+  const sy=v=>T+ih-(v/100)*ih;
+  rows.forEach(r=>{r.yp=sy(r.prev);r.yn=sy(r.now)});
+  const lp=declutter(rows.map(r=>({r,y:r.yp})),12,T+4,T+ih-2);
+  const ln=declutter(rows.map(r=>({r,y:r.yn})),12,T+4,T+ih-2);
+  let s=`<line class="bl" x1="${x0}" y1="${T}" x2="${x0}" y2="${T+ih}"/>
+         <line class="bl" x1="${x1}" y1="${T}" x2="${x1}" y2="${T+ih}"/>
+         <text class="ax" x="${x0}" y="${H-B+16}" text-anchor="middle">mes anterior</text>
+         <text class="ax" x="${x1}" y="${H-B+16}" text-anchor="middle">este mes</text>`;
+  rows.forEach(r=>{
+    const up=r.now>=r.prev, c=up?C.ok:C.no;
+    s+=`<line x1="${x0}" y1="${r.yp.toFixed(1)}" x2="${x1}" y2="${r.yn.toFixed(1)}"
+          stroke="${c}" stroke-width="2" opacity=".8"/>
+        <circle cx="${x0}" cy="${r.yp.toFixed(1)}" r="3.5" fill="${c}"/>
+        <circle cx="${x1}" cy="${r.yn.toFixed(1)}" r="3.5" fill="${c}"/>`;
+  });
+  lp.forEach(({r,y})=>{
+    s+=`<line x1="${x0-6}" y1="${r.yp.toFixed(1)}" x2="${x0-12}" y2="${y.toFixed(1)}"
+          stroke="rgba(234,240,237,.18)" stroke-width="1"/>
+        <text class="axv" x="${x0-15}" y="${(y+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${Math.round(r.prev)}%</text>`;
+  });
+  ln.forEach(({r,y})=>{
+    s+=`<line x1="${x1+6}" y1="${r.yn.toFixed(1)}" x2="${x1+12}" y2="${y.toFixed(1)}"
+          stroke="rgba(234,240,237,.18)" stroke-width="1"/>
+        <text class="axv" x="${x1+15}" y="${(y+3.5).toFixed(1)}" fill="var(--fg-2)">${r.n} ${Math.round(r.now)}%</text>`;
+  });
+  return card('','Quién mejoró y quién empeoró',
+    'Dos columnas, una línea por zona. <b>La pendiente es el mensaje.</b> No hay que leer ningún número para ver quién cayó.',
+    svg(s), [[C.ok,'Mejoró'],[C.no,'Empeoró']],
+    'Funciona hasta unas diez líneas. Con más se vuelve un plato de fideos y conviene pasar a barras divergentes.');
+}
+
+/* 3.4 bump chart */
+function chBump(){
+  const r2=mul(4242), M=6, K=6;
+  const names=ZONES.slice(0,K);
+  const series=names.map((n,i)=>({n,v:Array.from({length:M},()=>ZW[i]*100*(0.7+r2()*0.7))}));
+  const ranks=Array.from({length:M},(_,m)=>
+    series.map((s,i)=>({i,v:s.v[m]})).sort((a,b)=>b.v-a.v).map(x=>x.i));
+  const sy=r=>T+8+(ih-24)*(r/(K-1));
+  const bx=m=>L+(W-L-96)*(m/(M-1));   /* escala propia: reserva canaleta para las etiquetas */
+  const cols=["#00B37E","#FFB800","#D62F8F","#7C5CD6","#E5484D","#3B82F6"];
+  const mlab=["abr","may","jun","jul","ago","sep"];
+  let s='';
+  mlab.forEach((t,m)=>s+=`<text class="ax" x="${bx(m).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${t}</text>`);
+  for(let r=0;r<K;r++) s+=`<text class="axv" x="${L-10}" y="${(sy(r)+3.5).toFixed(1)}" text-anchor="end">${r+1}º</text>`;
+  series.forEach((sr,i)=>{
+    const pts=ranks.map((rk,m)=>[bx(m),sy(rk.indexOf(i))]);
+    s+=`<path d="${path(pts)}" fill="none" stroke="${cols[i]}" stroke-width="2.5" stroke-linejoin="round" opacity=".9"/>`;
+    pts.forEach(p=>s+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="${cols[i]}" stroke="var(--bg-1)" stroke-width="1.5"/>`);
+    s+=`<text class="axv" x="${(bx(M-1)+10).toFixed(1)}" y="${(pts[M-1][1]+3.5).toFixed(1)}" fill="${cols[i]}">${SHORT[i]}</text>`;
+  });
+  return card('','Cómo se mueve el ranking',
+    'El puesto de cada zona mes a mes. Sirve para una pregunta que las barras no contestan: <b>¿el que está primero está siempre primero?</b>',
+    svg(s), null,
+    'Es más divertido que útil, pero funciona muy bien en <b>informes mensuales</b>: la gente sigue su barrio como si fuera una tabla de posiciones.');
+}
+
+/* ═══ 4 · PROCESO ══════════════════════════════════════════════ */
+
+/* 4.1 funnel */
+function chFunnel(){
+  const tot=D.length;
+  const st=[["Ingresado",tot],["Asignado",Math.round(tot*.84)],["En curso",Math.round(tot*.61)],
+            ["Cerrado",D.filter(d=>d.est==="ok").length]];
+  const rh=(H-T-14)/st.length, cx=W/2;
+  let s='';
+  st.forEach(([n,v],i)=>{
+    const w=(W-160)*(v/tot), y=T+i*rh, bh=Math.min(26,rh-10);
+    const drop=i?Math.round((st[i-1][1]-v)/st[i-1][1]*100):0;
+    s+=`<rect x="${(cx-w/2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${bh}" rx="3"
+          fill="${C.ok}" opacity="${(1-i*0.16).toFixed(2)}"/>
+        <text class="axv" x="${(cx-w/2-10).toFixed(1)}" y="${(y+bh/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${n}</text>
+        <text x="${(cx+w/2+10).toFixed(1)}" y="${(y+bh/2+4).toFixed(1)}" font-size="12" font-weight="600" fill="var(--fg-1)">${v}</text>`;
+    if(i) s+=`<text class="ax" x="${(cx+w/2+52).toFixed(1)}" y="${(y+bh/2+3.5).toFixed(1)}" fill="${C.no}">−${drop}%</text>`;
+  });
+  return card('','Dónde se cae el proceso',
+    'Los cuatro estados y la pérdida entre uno y otro. Contesta algo distinto al resto del tablero: <b>no dónde se atascan los reclamos, sino en qué paso del proceso</b>.',
+    svg(s), null,
+    'Si la caída grande está entre <b>ingresado y asignado</b>, el problema es administrativo, no de cuadrillas. Es el hallazgo más común.');
+}
+
+/* 4.2 tiempo por etapa */
+function chEtapas(){
+  const r2=mul(31337);
+  const rows=RUBROS.map((n,i)=>{
+    const v=D.filter(d=>d.ri===i&&d.est==="ok").map(d=>d.cierre);
+    const t=v.reduce((a,b)=>a+b,0)/v.length;
+    const asig=t*(0.24+r2()*0.3);
+    const ejec=(t-asig)*(0.62+r2()*0.24);
+    return {n,asig,ejec,cierre:t-asig-ejec,t};
+  }).sort((a,b)=>b.t-a.t);
+  const max=Math.max(...rows.map(r=>r.t))*1.06, LB=150, rh=(H-T-8)/rows.length;
+  const sw=v=>(W-LB-42)*(v/max);
+  let s='';
+  rows.forEach((r,i)=>{
+    const y=T+i*rh, bh=Math.min(18,rh-8);
+    let x=LB;
+    [[r.asig,C.no],[r.ejec,C.pend],[r.cierre,C.ok]].forEach(([v,c],k)=>{
+      s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(0,sw(v)).toFixed(1)}" height="${bh}"
+            rx="${k===0?'3':k===2?'3':'0'}" fill="${c}"/>`;
+      x+=sw(v);
+    });
+    s+=`<text class="axv" x="${LB-10}" y="${(y+bh/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${r.n}</text>
+        <text x="${W-4}" y="${(y+bh/2+4).toFixed(1)}" text-anchor="end" font-size="12" font-weight="600" fill="var(--fg-1)">${nd(r.t)}d</text>`;
+  });
+  return card('','En qué se van los días',
+    'El tiempo total de cada categoría partido en etapas. <b>Separa el problema del proceso del problema de la cuadrilla</b>, que es la discusión que siempre se mezcla.',
+    svg(s), [[C.no,'Asignar'],[C.pend,'Ejecutar'],[C.ok,'Cerrar y notificar']],
+    'Si la franja roja es ancha, ninguna cuadrilla extra te va a mejorar el número.');
+}
+
+/* 4.3 lollipop frenos */
+function chFrenos(){
+  const F=[["Falta de cuadrilla",7,118],["Compra de materiales",5,79],["Sin acceso al lugar",3,57],
+           ["Otra obra en el lugar",4,19],["Falta de datos del vecino",6,34],["Espera de tercero (EPEC, agua)",2,66]]
+    .sort((a,b)=>b[2]-a[2]);
+  const max=F[0][2]*1.1, LB=176, rh=(H-T-8)/F.length, sx=v=>LB+(W-LB-40)*(v/max);
+  let s='';
+  F.forEach(([n,tr,d],i)=>{
+    const y=T+i*rh+rh/2-3;
+    s+=`<line x1="${LB}" y1="${y.toFixed(1)}" x2="${sx(d).toFixed(1)}" y2="${y.toFixed(1)}"
+          stroke="rgba(234,240,237,.16)" stroke-width="2"/>
+        <circle cx="${sx(d).toFixed(1)}" cy="${y.toFixed(1)}" r="${(4+tr*0.9).toFixed(1)}" fill="${C.pend}" opacity=".9"/>
+        <text class="axv" x="${LB-10}" y="${(y+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${n}</text>
+        <text x="${W-4}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="12" font-weight="600" fill="var(--fg-1)">${d}d</text>`;
+  });
+  return card('','Lo que más frena',
+    'Días acumulados de espera por motivo. El <b>tamaño del punto</b> es cuántos trabajos están frenados por esa causa: distingue el motivo crónico del motivo puntual.',
+    svg(s), null,
+    'Un punto chico muy a la derecha es <b>un caso eterno</b>. Un punto grande al medio es un problema sistémico. Se atienden distinto.');
+}
+
+/* 4.4 small multiples */
+function chSparks(){
+  const cols=5, rows=2, cw=W/cols, chh=(H-6)/rows;
+  const series=ZONES.map((n,i)=>Array.from({length:WEEKS},(_,w)=>D.filter(d=>d.zi===i&&wk(d.t)===w).length));
+  const gmax=Math.max(...series.flat(),1);   /* una sola escala para los diez */
+  let s='';
+  ZONES.forEach((n,i)=>{
+    const cx0=(i%cols)*cw, cy0=Math.floor(i/cols)*chh;
+    const a=series[i];
+    const pw=cw-16, ph=chh-46;
+    const pts=a.map((v,w)=>[cx0+8+pw*(w/(WEEKS-1)), cy0+30+ph-(v/gmax)*ph]);
+    const last=a[WEEKS-1], prev=a[WEEKS-2]||0;
+    s+=`<text x="${cx0+8}" y="${cy0+12}" font-size="10" fill="var(--fg-2)">${SHORT[i]}</text>
+        <text x="${cx0+8}" y="${cy0+26}" font-size="14" font-weight="700" font-family="Sora,sans-serif"
+          fill="var(--fg-1)">${last}</text>
+        <text x="${cx0+8+String(last).length*9+6}" y="${cy0+26}" font-size="10" font-weight="600"
+          fill="${last>=prev?C.no:C.ok}">${last>=prev?'▲':'▼'}</text>
+        <path d="${path(pts)} L ${(cx0+8+pw).toFixed(1)} ${(cy0+30+ph).toFixed(1)} L ${cx0+8} ${(cy0+30+ph).toFixed(1)} Z"
+          fill="${C.vio}" opacity=".18"/>
+        <path d="${path(pts)}" fill="none" stroke="${C.vio}" stroke-width="1.6"/>`;
+  });
+  return card('wide','Una miniatura por zona',
+    'Diez gráficos chicos con <b>la misma escala vertical</b>, para escanear todo el municipio de un saque. Reemplaza a un selector de zona: no hace falta elegir para comparar.',
+    svg(s), null,
+    'La regla que los hace funcionar: <b>misma escala en todos</b>. Si cada uno se escala solo, la comparación es mentira.');
+}
+
+/* ═══ 5 · TIEMPO AVANZADO ══════════════════════════════════════ */
+const svgH=(h,inner)=>`<svg viewBox="0 0 ${W} ${h}" role="img">${inner}</svg>`;
+const SER=["#00B37E","#FFB800","#D62F8F","#7C5CD6","#E5484D","#3B82F6"];
+
+/* área apilada genérica sobre WEEKS semanas */
+function stackArea(series,cols,max){
+  let s=yaxis(max,max/4);
+  const base=Array(WEEKS).fill(0);
+  series.forEach((row,i)=>{
+    const up=row.map((v,w)=>[px(w,WEEKS),yv(base[w]+v,max)]);
+    const dn=base.map((v,w)=>[px(w,WEEKS),yv(v,max)]).reverse();
+    s+=`<path d="${path(up.concat(dn))} Z" fill="${cols[i]}" opacity=".82"/>`;
+    row.forEach((v,w)=>base[w]+=v);
+  });
+  return s;
+}
+
+/* 5.1 calendario semana × día */
+function chCalendario(){
+  const cw=(W-L-R)/WEEKS, chh=(H-T-B-2)/7;
+  const m=Array.from({length:7},()=>Array(WEEKS).fill(0));
+  D.forEach(d=>m[d.dow][wk(d.t)]++);
+  const max=Math.max(...m.flat());
+  let s='';
+  m.forEach((row,r)=>row.forEach((v,c)=>{
+    s+=`<rect x="${(L+c*cw+1).toFixed(1)}" y="${(T+r*chh+1).toFixed(1)}" width="${(cw-2).toFixed(1)}"
+         height="${(chh-2).toFixed(1)}" rx="2" fill="${C.vio}" opacity="${(0.05+0.95*v/max).toFixed(2)}"/>`;
+  }));
+  DOW.forEach((d,r)=>{ if(r%2===0)
+    s+=`<text class="axv" x="${L-8}" y="${(T+r*chh+chh/2+3.5).toFixed(1)}" text-anchor="end">${d}</text>`});
+  ["abr","may","jun","jul","ago","sep"].forEach((t,i)=>{
+    const c=Math.round(i*(WEEKS-1)/5);
+    s+=`<text class="ax" x="${(L+c*cw+cw/2).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${t}</text>`;
+  });
+  return card('','Calendario de seis meses',
+    'Una celda por día, seis meses de corrido. Muestra dos cosas juntas: <b>el día de la semana que carga el sistema</b> y las semanas atípicas — un temporal, un feriado largo, una campaña.',
+    svg(s), null,
+    'Es el gráfico que mejor detecta <b>lo excepcional</b>. Una columna entera oscura es un evento, no una tendencia.');
+}
+
+/* 5.2 composición por categoría en el tiempo */
+function chComposicion(){
+  const m=RUBROS.map((n,ri)=>Array.from({length:WEEKS},(_,w)=>D.filter(d=>d.ri===ri&&wk(d.t)===w).length));
+  const tot=Array.from({length:WEEKS},(_,w)=>m.reduce((a,r)=>a+r[w],0));
+  const max=Math.ceil(Math.max(...tot)/10)*10;
+  let s=stackArea(m,SER,max);
+  s+=xlab(0,WEEKS,'hace 26 sem')+xlab(WEEKS-1,WEEKS,'hoy');
+  return card('','Qué categoría creció',
+    'El mismo volumen semanal, partido por categoría. Contesta algo que el total esconde: <b>si el crecimiento viene de un rubro nuevo o de todos a la vez</b>.',
+    svg(s), RUBROS.map((n,i)=>[SER[i],n]),
+    'Con más de seis series se vuelve ilegible. Si necesitás más, agrupá en "otras" y dejá las cinco grandes.');
+}
+
+/* 5.3 flujo acumulado por antigüedad */
+function chFlujo(){
+  const bands=[[C.ok,'Hasta 7 días'],[C.pend,'8 a 30 días'],[C.no,'Más de 30 días']];
+  const series=[[],[],[]];
+  for(let w=0;w<WEEKS;w++){
+    const d=w*7+6;
+    const age=D.filter(x=>x.t<=d&&(x.cerrado==null||x.cerrado>d)).map(x=>d-x.t);
+    series[0].push(age.filter(a=>a<=7).length);
+    series[1].push(age.filter(a=>a>7&&a<=30).length);
+    series[2].push(age.filter(a=>a>30).length);
+  }
+  const tot=series[0].map((_,w)=>series.reduce((a,s)=>a+s[w],0));
+  const max=Math.ceil(Math.max(...tot)/50)*50;
+  let s=stackArea(series,bands.map(b=>b[0]),max);
+  s+=xlab(0,WEEKS,'hace 26 sem')+xlab(WEEKS-1,WEEKS,'hoy');
+  return card('','De qué está hecho el backlog',
+    'El backlog abierto en cada semana, partido por antigüedad. Un backlog que crece en verde es <b>trabajo en curso</b>; uno que crece en rojo es <b>deuda</b>.',
+    svg(s), bands.map(([c,t])=>[c,t]),
+    'Ésta es la versión que hay que llevar a una reunión: el número total de pendientes no distingue lo fresco de lo abandonado.');
+}
+
+/* 5.4 tiempo de cierre con promedio móvil */
+function chTendencia(){
+  const raw=Array.from({length:WEEKS},(_,w)=>{
+    const v=D.filter(d=>d.cerrado!=null&&d.cerrado<DAYS&&wk(d.cerrado)===w).map(d=>d.cierre);
+    return v.length>=3 ? v.reduce((a,b)=>a+b,0)/v.length : null;
+  });
+  let prev=null; const ff=raw.map(v=>{if(v!=null)prev=v;return prev});
+  const start=Math.max(0,ff.findIndex(v=>v!=null));
+  const max=Math.ceil(Math.max(...ff.filter(v=>v!=null))/5)*5;
+  const mov=ff.map((v,i)=>{
+    if(i<start) return null;
+    const w=ff.slice(Math.max(start,i-3),i+1);
+    return w.reduce((a,b)=>a+b,0)/w.length;
+  });
+  let s=yaxis(max,max/4,v=>v+'d');
+  const rp=[],mp=[];
+  for(let i=start;i<WEEKS;i++){rp.push([px(i,WEEKS),yv(ff[i],max)]);mp.push([px(i,WEEKS),yv(mov[i],max)])}
+  s+=`<path d="${path(rp)}" fill="none" stroke="rgba(234,240,237,.26)" stroke-width="1.5"/>`;
+  s+=`<path d="${path(mp)}" fill="none" stroke="${C.ok}" stroke-width="2.8" stroke-linejoin="round"/>`;
+  s+=`<circle cx="${mp[mp.length-1][0].toFixed(1)}" cy="${mp[mp.length-1][1].toFixed(1)}" r="4.5"
+        fill="${C.ok}" stroke="var(--bg-1)" stroke-width="2"/>`;
+  s+=`<text x="${(mp[mp.length-1][0]-8).toFixed(1)}" y="${(mp[mp.length-1][1]-12).toFixed(1)}" text-anchor="end"
+        font-size="13" font-weight="700" font-family="Sora,sans-serif" fill="${C.ok}">${nd(mov[WEEKS-1])}d</text>`;
+  s+=xlab(start,WEEKS,'hace 26 sem')+xlab(WEEKS-1,WEEKS,'hoy');
+  return card('','Tiempo de cierre, semana a semana',
+    'La línea fina es el promedio de cada semana; la gruesa, el promedio de las últimas cuatro. <b>El ruido semanal no es una tendencia</b>, y sin la línea gruesa se confunden.',
+    svg(s), [["rgba(234,240,237,.4)",'Semana'],[C.ok,'Promedio de 4 semanas']],
+    'Regla práctica: si la fina cruza la gruesa dos semanas seguidas en la misma dirección, ahí sí cambió algo.');
+}
+
+/* ═══ 6 · COMPOSICIÓN ══════════════════════════════════════════ */
+
+/* 6.1 pareto */
+function chPareto(){
+  const RB=38;
+  const c=RUBROS.map((n,i)=>({n,v:D.filter(d=>d.ri===i).length})).sort((a,b)=>b.v-a.v);
+  const tot=c.reduce((a,b)=>a+b.v,0);
+  const max=Math.ceil(c[0].v/50)*50, pw=W-L-RB, bw=pw/c.length-9;
+  let s='';
+  for(let v=0,st=niceStep(max);v<=max;v+=st){
+    const y=yv(v,max);
+    s+=`<line class="gl" x1="${L}" y1="${y.toFixed(1)}" x2="${(L+pw).toFixed(1)}" y2="${y.toFixed(1)}"/>
+        <text class="axv" x="${L-8}" y="${(y+3.5).toFixed(1)}" text-anchor="end">${nfi(v)}</text>`;
+  }
+  const y80=T+ih-0.8*ih;
+  s+=`<line x1="${L}" y1="${y80.toFixed(1)}" x2="${(L+pw).toFixed(1)}" y2="${y80.toFixed(1)}"
+        stroke="${C.pend}" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>
+      <text class="ax" x="${(L+pw+6).toFixed(1)}" y="${(y80+3.5).toFixed(1)}" fill="${C.pend}">80%</text>`;
+  let acc=0; const pts=[];
+  c.forEach((r,i)=>{
+    acc+=r.v;
+    const x0=L+pw*(i/c.length)+4.5, y=yv(r.v,max);
+    s+=`<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${(T+ih-y).toFixed(1)}"
+          rx="2" fill="${C.heat}" opacity=".85"/>
+        <text class="ax" x="${(x0+bw/2).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${r.n.split(' ')[0]}</text>`;
+    pts.push([x0+bw/2, T+ih-(acc/tot)*ih]);
+  });
+  s+=`<path d="${path(pts)}" fill="none" stroke="${C.pend}" stroke-width="2.2"/>`;
+  pts.forEach(p=>s+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.2" fill="${C.pend}"/>`);
+  const n80=0;
+  let cum=0,k=0; c.forEach(r=>{if(cum/tot<0.8){cum+=r.v;k++}});
+  return card('','Pareto: las pocas que explican el todo',
+    `Barras por volumen más la curva acumulada. Acá <b>${k} de ${c.length} categorías</b> explican el 80% de los reclamos: ahí está el retorno de cualquier plan.`,
+    svg(s), [[C.heat,'Reclamos'],[C.pend,'Acumulado']],
+    'Sirve para <b>defender una decisión</b>: muestra qué queda afuera y cuánto cuesta dejarlo afuera.');
+}
+
+/* 6.2 treemap */
+function chTreemap(){
+  const items=RUBROS.map((n,i)=>({n,v:D.filter(d=>d.ri===i).length})).sort((a,b)=>b.v-a.v);
+  let x=L,y=T,w=W-L-R,h=ih,rem=items.reduce((a,b)=>a+b.v,0);
+  let s='';
+  items.forEach((it,i)=>{
+    const f=it.v/rem, last=i===items.length-1;
+    const rw = (w>=h) ? (last?w:w*f) : w;
+    const rh = (w>=h) ? h : (last?h:h*f);
+    s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(rw-2).toFixed(1)}" height="${(rh-2).toFixed(1)}"
+          rx="3" fill="${SER[i]}" opacity=".85"/>`;
+    if(rw>60&&rh>34){
+      const ink=inkOn(SER[i],0.85);
+      s+=`<text x="${(x+9).toFixed(1)}" y="${(y+19).toFixed(1)}" font-size="10.5" font-weight="600"
+            fill="${ink}">${it.n.split(' ')[0]}</text>
+          <text x="${(x+9).toFixed(1)}" y="${(y+34).toFixed(1)}" font-size="13" font-weight="700"
+            font-family="Sora,sans-serif" fill="${ink}">${it.v}</text>`;
+    }
+    if(w>=h){x+=rw;w-=rw} else {y+=rh;h-=rh}
+    rem-=it.v;
+  });
+  return card('','Treemap de categorías',
+    'El área de cada bloque es su volumen. Aprovecha todo el rectángulo, así que <b>rinde cuando el espacio es poco</b> y hay muchas categorías.',
+    svg(s), items.map((it,i)=>[SER[i],it.n]),
+    'Su límite: <b>comparar áreas es difícil</b>. Para leer diferencias finas, barras. Para dar una impresión de peso, treemap.');
+}
+
+/* 6.3 waffle */
+function chWaffle(){
+  const tot=D.length;
+  const st=[["ok",C.ok,"Finalizados"],["pend",C.pend,"Pendientes"],["no",C.no,"Rechazados"]];
+  const raw=st.map(([k])=>D.filter(d=>d.est===k).length/tot*100);
+  const n=raw.map(v=>Math.floor(v));
+  let falta=100-n.reduce((a,b)=>a+b,0);
+  const orden=raw.map((v,i)=>[v-Math.floor(v),i]).sort((a,b)=>b[0]-a[0]);
+  for(let i=0;i<falta;i++) n[orden[i%3][1]]++;
+  const COLS=20, ROWS=5;
+  const cs=Math.min((W-L-R)/COLS,ih/ROWS);
+  const ox=(W-cs*COLS)/2, oy=T+(ih-cs*ROWS)/2;
+  let idx=0,s='';
+  n.forEach((cnt,si)=>{for(let k=0;k<cnt;k++){
+    const c=idx%COLS, r=Math.floor(idx/COLS);
+    s+=`<rect x="${(ox+c*cs+1.5).toFixed(1)}" y="${(oy+r*cs+1.5).toFixed(1)}"
+          width="${(cs-3).toFixed(1)}" height="${(cs-3).toFixed(1)}" rx="2.5" fill="${st[si][1]}"/>`;
+    idx++;
+  }});
+  return card('','Cien cuadraditos, cien por ciento',
+    'Cada cuadrado es un 1% del total. Es la <b>alternativa honesta a la torta</b>: el ojo cuenta cuadrados bien y compara ángulos mal.',
+    svg(s), st.map(([k,c,t],i)=>[c,`${t} · ${n[i]}%`]),
+    'Ideal para una sola cifra de composición en un informe. No sirve para series ni para más de cuatro categorías.');
+}
+
+/* 6.4 strip plot */
+function chStrip(){
+  const LB=150, maxD=120, rh=(ih-6)/RUBROS.length;
+  const sx=v=>LB+(W-LB-26)*(Math.min(v,maxD)/maxD);
+  const r2=mul(99);
+  let s='';
+  for(let v=0;v<=maxD;v+=30)
+    s+=`<line class="gl" x1="${sx(v).toFixed(1)}" y1="${T}" x2="${sx(v).toFixed(1)}" y2="${T+ih}"/>
+        <text class="ax" x="${sx(v).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${v}d</text>`;
+  RUBROS.forEach((n,i)=>{
+    const y=T+i*rh+rh/2, items=D.filter(d=>d.ri===i);
+    s+=`<text class="axv" x="${LB-10}" y="${(y+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${n}</text>`;
+    items.forEach(d=>{
+      const e=d.est==="ok"?d.cierre:d.edad;
+      s+=`<circle cx="${sx(e).toFixed(1)}" cy="${(y+(r2()-.5)*(rh-11)).toFixed(1)}" r="2.1"
+            fill="${d.est==="ok"?C.ok:C.pend}" opacity=".42"/>`;
+    });
+  });
+  return card('','Un punto por reclamo',
+    'Todos los reclamos de cada categoría, dispersados. No resume nada: <b>muestra los datos crudos</b>, y los casos extremos aparecen como puntos sueltos a la derecha en vez de desaparecer en un promedio.',
+    svg(s), [[C.ok,'Cerrado'],[C.pend,'Sigue abierto']],
+    'Los puntos amontonados contra el borde derecho son los <b>+120 días</b>. Cada uno es un vecino esperando.');
+}
+
+/* ═══ 7 · RANKING Y EQUIDAD ════════════════════════════════════ */
+
+/* 7.1 matriz zona × categoría */
+function chMatriz(){
+  const HH=250, LB=104, TT=48, RR=8;
+  const cw=(W-LB-RR)/RUBROS.length, rh=(HH-TT-10)/ZONES.length;
+  const m=ZONES.map((n,zi)=>RUBROS.map((r,ri)=>D.filter(d=>d.zi===zi&&d.ri===ri).length));
+  const max=Math.max(...m.flat());
+  const ab=["Plagas","Residuos","Arbolado","Ruidos","Bacheo","Alumbrado"];
+  let s='';
+  ab.forEach((t,c)=>s+=`<text x="${(LB+c*cw+cw/2).toFixed(1)}" y="${TT-12}" text-anchor="middle"
+    font-size="9.5" fill="var(--fg-3)">${t}</text>`);
+  m.forEach((row,r)=>{
+    s+=`<text class="axv" x="${LB-9}" y="${(TT+r*rh+rh/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${SHORT[r]}</text>`;
+    row.forEach((v,c)=>{
+      const op=0.06+(v/max)*0.80;
+      s+=`<rect x="${(LB+c*cw+1).toFixed(1)}" y="${(TT+r*rh+1).toFixed(1)}" width="${(cw-2).toFixed(1)}"
+            height="${(rh-2).toFixed(1)}" rx="2" fill="${C.heat}" opacity="${op.toFixed(2)}"/>
+          <text x="${(LB+c*cw+cw/2).toFixed(1)}" y="${(TT+r*rh+rh/2+3.5).toFixed(1)}" text-anchor="middle"
+            font-size="9.5" font-weight="600" fill="${inkOn(C.heat,op)}">${v}</text>`;
+    });
+  });
+  return card('wide','Matriz de zona por categoría',
+    'Las dos dimensiones cruzadas, con el número dentro de cada celda. Contesta la pregunta que ningún ranking puede: <b>¿el problema de esta zona es el mismo que el de la vecina?</b>',
+    svgH(HH,s), null,
+    'Reemplaza a diez gráficos de torta. Y como cada celda tiene el número, <b>sirve igual impresa en blanco y negro</b>.');
+}
+
+/* 7.2 dumbbell */
+function chDumbbell(){
+  const LB=104, RB=34, rh=(ih-6)/ZONES.length;
+  const rows=ZONES.map((n,i)=>{
+    const z=D.filter(d=>d.zi===i);
+    return {i,fin:z.filter(x=>x.est==="ok").length,pen:z.filter(x=>x.est!=="ok").length};
+  }).sort((a,b)=>b.pen-a.pen);
+  const max=Math.max(...rows.flatMap(r=>[r.fin,r.pen]))*1.08;
+  const sx=v=>LB+(W-LB-RB)*(v/max);
+  let s='';
+  for(let v=0;v<=max;v+=Math.ceil(max/4/10)*10)
+    s+=`<line class="gl" x1="${sx(v).toFixed(1)}" y1="${T}" x2="${sx(v).toFixed(1)}" y2="${T+ih}"/>
+        <text class="ax" x="${sx(v).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${v}</text>`;
+  rows.forEach((r,k)=>{
+    const y=T+k*rh+rh/2-2;
+    s+=`<line x1="${sx(Math.min(r.fin,r.pen)).toFixed(1)}" y1="${y.toFixed(1)}"
+          x2="${sx(Math.max(r.fin,r.pen)).toFixed(1)}" y2="${y.toFixed(1)}"
+          stroke="rgba(234,240,237,.20)" stroke-width="2.5"/>
+        <circle cx="${sx(r.fin).toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${C.ok}"/>
+        <circle cx="${sx(r.pen).toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${C.pend}"/>
+        <text class="axv" x="${LB-9}" y="${(y+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${SHORT[r.i]}</text>`;
+  });
+  return card('','Cerrados contra sin cerrar',
+    'Dos puntos por zona unidos por una línea. <b>El largo de la línea es la brecha</b>, y las zonas donde el punto ámbar está a la derecha del verde son las que están perdiendo.',
+    svg(s), [[C.ok,'Cerrados'],[C.pend,'Sin cerrar']],
+    'Le gana a dos barras agrupadas: la mitad de la tinta y la comparación queda en un solo trazo.');
+}
+
+/* 7.3 100% apilado */
+function chCien(){
+  const LB=104, RB=40, rh=(ih)/ZONES.length;
+  const rows=ZONES.map((n,i)=>{
+    const z=D.filter(d=>d.zi===i);
+    const o=z.filter(x=>x.est==="ok").length, p=z.filter(x=>x.est==="pend").length;
+    return {i,tot:z.length,ok:o,pend:p,no:z.length-o-p};
+  }).sort((a,b)=>b.ok/b.tot-a.ok/a.tot);
+  const bw=W-LB-RB;
+  let s='';
+  rows.forEach((r,k)=>{
+    const y=T+k*rh, bh=Math.min(14,rh-4);
+    let x=LB;
+    [[r.ok,C.ok],[r.pend,C.pend],[r.no,C.no]].forEach(([v,c])=>{
+      const w=bw*v/r.tot;
+      s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${bh}" fill="${c}"/>`;
+      x+=w;
+    });
+    s+=`<text class="axv" x="${LB-9}" y="${(y+bh/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${SHORT[r.i]}</text>
+        <text x="${W-4}" y="${(y+bh/2+4).toFixed(1)}" text-anchor="end" font-size="11" font-weight="600"
+          fill="var(--fg-1)">${Math.round(r.ok/r.tot*100)}%</text>`;
+  });
+  return card('','Composición de cada zona',
+    'Todas las barras miden lo mismo, así que se comparan <b>proporciones y no volúmenes</b>. Ordenadas por porcentaje cerrado, el ranking sale de arriba hacia abajo.',
+    svg(s), [[C.ok,'Finalizados'],[C.pend,'Pendientes'],[C.no,'Rechazados']],
+    'Ojo: esconde el volumen. Una zona con 9 reclamos y otra con 140 se ven igual de anchas — miralo junto al dumbbell.');
+}
+
+/* 7.4 curva de concentración */
+function chLorenz(){
+  const z=ZONES.map((n,i)=>D.filter(d=>d.zi===i).length).sort((a,b)=>b-a);
+  const tot=z.reduce((a,b)=>a+b,0);
+  const pts=[[L,T+ih]]; let acc=0;
+  z.forEach((v,i)=>{acc+=v;pts.push([L+iw*((i+1)/z.length), T+ih-(acc/tot)*ih])});
+  const t3=Math.round(z.slice(0,3).reduce((a,b)=>a+b,0)/tot*100);
+  let s=yaxis(100,25,v=>v+'%');
+  s+=`<line x1="${L}" y1="${T+ih}" x2="${W-R}" y2="${T}" stroke="rgba(234,240,237,.22)" stroke-dasharray="4 4"/>`;
+  s+=`<path d="${path(pts)} L ${W-R} ${T+ih} Z" fill="${C.heat}" opacity=".13"/>`;
+  s+=`<path d="${path(pts)}" fill="none" stroke="${C.heat}" stroke-width="2.5"/>`;
+  const p3=pts[3];
+  s+=`<circle cx="${p3[0].toFixed(1)}" cy="${p3[1].toFixed(1)}" r="4.5" fill="${C.heat}" stroke="var(--bg-1)" stroke-width="2"/>
+      <text x="${(p3[0]+10).toFixed(1)}" y="${(p3[1]+4).toFixed(1)}" font-size="11" font-weight="600"
+        fill="var(--fg-1)">3 zonas = ${t3}%</text>`;
+  s+=`<text class="ax" x="${L}" y="${H-B+16}" text-anchor="start">zonas ordenadas por volumen →</text>`;
+  return card('','Cuán concentrado está el problema',
+    `La diagonal sería un municipio parejo. Cuanto más se despega la curva, más desigual: acá <b>tres barrios concentran el ${t3}%</b> de los reclamos.`,
+    svg(s), null,
+    'Es el gráfico de <b>equidad territorial</b>. Útil cuando hay que justificar por qué se refuerza una zona y no otra.');
+}
+
+/* ═══ 8 · FLUJO Y DEUDA ════════════════════════════════════════ */
+
+/* 8.1 sankey categoría → estado */
+function chSankey(){
+  const LB=132, x0=LB, nw=9, x1=W-108, xm=(x0+nw+x1)/2;
+  const EST=[["ok",C.ok,"Finalizados"],["pend",C.pend,"Pendientes"],["no",C.no,"Rechazados"]];
+  const m=RUBROS.map((n,ri)=>EST.map(([k])=>D.filter(d=>d.ri===ri&&d.est===k).length));
+  const rt=m.map(r=>r.reduce((a,b)=>a+b,0));
+  const et=EST.map((_,j)=>m.reduce((a,r)=>a+r[j],0));
+  const tot=rt.reduce((a,b)=>a+b,0);
+  const gapL=5, gapR=12;
+  const hL=ih-gapL*(RUBROS.length-1), hR=ih-gapR*(EST.length-1);
+  const lY=[],rY=[];
+  let y=T; rt.forEach(v=>{lY.push(y);y+=hL*v/tot+gapL});
+  y=T; et.forEach(v=>{rY.push(y);y+=hR*v/tot+gapR});
+  const lo=lY.slice(), ro=rY.slice();
+  let s='';
+  m.forEach((row,i)=>row.forEach((v,j)=>{
+    if(!v) return;
+    const ha=hL*v/tot, hb=hR*v/tot;
+    const a0=lo[i], a1=a0+ha, b0=ro[j], b1=b0+hb;
+    s+=`<path d="M ${x0+nw} ${a0.toFixed(1)} C ${xm} ${a0.toFixed(1)}, ${xm} ${b0.toFixed(1)}, ${x1} ${b0.toFixed(1)}
+         L ${x1} ${b1.toFixed(1)} C ${xm} ${b1.toFixed(1)}, ${xm} ${a1.toFixed(1)}, ${x0+nw} ${a1.toFixed(1)} Z"
+         fill="${EST[j][1]}" opacity=".26"/>`;
+    lo[i]+=ha; ro[j]+=hb;
+  }));
+  rt.forEach((v,i)=>{
+    const h=hL*v/tot;
+    s+=`<rect x="${x0}" y="${lY[i].toFixed(1)}" width="${nw}" height="${h.toFixed(1)}" rx="2" fill="${SER[i]}"/>
+        <text class="axv" x="${x0-8}" y="${(lY[i]+h/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)">${RUBROS[i].split(' ')[0]}</text>`;
+  });
+  et.forEach((v,j)=>{
+    const h=hR*v/tot;
+    s+=`<rect x="${x1}" y="${rY[j].toFixed(1)}" width="${nw}" height="${h.toFixed(1)}" rx="2" fill="${EST[j][1]}"/>
+        <text class="axv" x="${x1+nw+8}" y="${(rY[j]+h/2+3.5).toFixed(1)}" fill="var(--fg-2)">${EST[j][2]}</text>
+        <text x="${x1+nw+8}" y="${(rY[j]+h/2+16).toFixed(1)}" font-size="10" font-weight="600" fill="var(--fg-1)">${v}</text>`;
+  });
+  return card('','De categoría a estado',
+    'El caudal completo: cada cinta es cuántos reclamos de un rubro terminaron en cada estado. <b>El ancho es el volumen</b>, y se ve de un tirón qué rubro alimenta la columna de pendientes.',
+    svg(s), null,
+    'Con seis rubros funciona. Con veinte se convierte en un plato de espaguetis — agrupá antes de dibujarlo.');
+}
+
+/* 8.2 gantt de los más viejos
+   La ventana de D es de 6 meses, así que la deuda histórica se modela aparte:
+   son casos abiertos anteriores al período, que es de donde sale la dispersión real. */
+const OLD=Array.from({length:12},()=>({
+  ri:wp(RW), zi:wp(ZW), edad:Math.round(96+Math.pow(rnd(),1.7)*330)
+})).sort((a,b)=>b.edad-a.edad);
+
+function chGantt(){
+  const LB=176, RB=34, N=OLD.length;
+  const max=Math.ceil(OLD[0].edad*1.05/60)*60, rh=(ih-4)/N, sx=v=>LB+(W-LB-RB)*(v/max);
+  let s='';
+  for(let v=0;v<=max;v+=Math.max(60,Math.round(max/5/60)*60))
+    s+=`<line class="gl" x1="${sx(v).toFixed(1)}" y1="${T}" x2="${sx(v).toFixed(1)}" y2="${T+ih}"/>
+        <text class="ax" x="${sx(v).toFixed(1)}" y="${H-B+16}" text-anchor="middle">${v}d</text>`;
+  OLD.forEach((d,i)=>{
+    const y=T+i*rh, bh=Math.min(11,rh-3);
+    s+=`<rect x="${LB}" y="${y.toFixed(1)}" width="${(sx(d.edad)-LB).toFixed(1)}" height="${bh}" rx="2"
+          fill="${d.edad>270?C.no:C.pend}" opacity=".9"/>
+        <text class="axv" x="${LB-9}" y="${(y+bh/2+3.5).toFixed(1)}" text-anchor="end" fill="var(--fg-2)"
+          font-size="9.5">${RUBROS[d.ri].split(' ')[0]} · ${SHORT[d.zi]}</text>
+        <text x="${W-4}" y="${(y+bh/2+4).toFixed(1)}" text-anchor="end" font-size="11" font-weight="600"
+          fill="var(--fg-1)">${d.edad}</text>`;
+  });
+  return card('','Los doce más viejos, con nombre',
+    'No un promedio: <b>los casos concretos</b> que llevan más tiempo esperando, con su rubro y su barrio. Es la lista que se puede repartir en una reunión y salir con responsables.',
+    svg(s), [[C.pend,'Sin cerrar'],[C.no,'Más de 270 días']],
+    'Todo tablero necesita al menos un gráfico así: <b>los agregados no se pueden accionar</b>, los doce casos sí.');
+}
+
+document.getElementById('g1').innerHTML=[chIngresados(),chBacklog(),chSupervivencia(),chHeatHora()].join('');
+document.getElementById('g2').innerHTML=[chRubros(),chHistograma(),chBoxplot(),chPolar()].join('');
+document.getElementById('g3').innerHTML=[chDivergentes(),chScatter(),chSlope(),chBump()].join('');
+document.getElementById('g4').innerHTML=[chFunnel(),chEtapas(),chFrenos(),chSparks()].join('');
+document.getElementById('g5').innerHTML=[chCalendario(),chComposicion(),chFlujo(),chTendencia()].join('');
+document.getElementById('g6').innerHTML=[chPareto(),chTreemap(),chWaffle(),chStrip()].join('');
+document.getElementById('g7').innerHTML=[chMatriz(),chDumbbell(),chCien(),chLorenz()].join('');
+document.getElementById('g8').innerHTML=[chSankey(),chGantt()].join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de reclamos — Villa Carlos Paz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+:root{
+  --primary:#00B37E; --primary-dark:#008F63; --accent:#FFB800;
+  --warning:#F59E0B; --danger:#E5484D; --info:#3B82F6;
+  --bg-1:#FAFBFA; --bg-2:#F1F4F2; --surface:#FFFFFF;
+  --fg-1:#0D1412; --fg-2:#4A5551; --fg-3:#7B8683;
+  --border-1:rgba(13,20,18,0.08);
+  --shadow-card:0 1px 2px rgba(13,20,18,0.04), 0 2px 6px rgba(13,20,18,0.04);
+  --shadow-float:0 6px 20px rgba(13,20,18,0.10), 0 2px 6px rgba(13,20,18,0.06);
+  --ease:cubic-bezier(0.2,0.8,0.2,1);
+  --heat-1:#7C5CD6; --heat-2:#A24FC8; --heat-3:#C43FAE; --heat-4:#D62F8F;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:Inter,system-ui,sans-serif; color:var(--fg-1); background:var(--bg-2);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary-dark);text-decoration:none}
+a:hover{color:var(--primary-dark);text-decoration:underline}
+.app{display:grid;grid-template-columns:352px 1fr;height:100vh;min-height:640px}
+
+/* ── Sidebar ─────────────────────────────── */
+.side{
+  background:var(--surface);border-right:1px solid var(--border-1);
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;
+}
+.side::-webkit-scrollbar{width:10px}
+.side::-webkit-scrollbar-thumb{background:rgba(13,20,18,.14);border-radius:999px;border:3px solid var(--surface)}
+.head{padding:20px 20px 16px;border-bottom:1px solid var(--border-1)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.mark{
+  width:28px;height:28px;border-radius:8px;background:var(--primary);
+  display:grid;place-items:center;color:#fff;font-family:Sora,sans-serif;font-weight:700;font-size:16px;
+}
+.brand-txt{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-3);font-weight:600}
+h1{font-family:Sora,sans-serif;font-size:21px;font-weight:700;letter-spacing:-.02em;margin:0 0 4px;line-height:1.15}
+.sub{font-size:13px;color:var(--fg-2);margin:0}
+
+.sec{padding:18px 20px;border-bottom:1px solid var(--border-1)}
+.sec:last-child{border-bottom:0}
+.sec-t{
+  font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-3);
+  font-weight:600;margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline;
+}
+.sec-t em{font-style:normal;text-transform:none;letter-spacing:0;font-size:11px;color:var(--fg-3);font-weight:500}
+
+/* metrics */
+.hero-metric{
+  border:1px solid var(--border-1);border-radius:12px;padding:14px 16px;margin-bottom:12px;
+  display:flex;align-items:center;gap:14px;
+}
+.hero-num{font-family:Sora,sans-serif;font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;color:var(--primary-dark)}
+.hero-lbl{font-size:12px;color:var(--fg-2);line-height:1.35}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.m{border:1px solid var(--border-1);border-radius:12px;padding:11px 12px}
+.m-num{font-family:Sora,sans-serif;font-size:20px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1}
+.m-lbl{font-size:11px;color:var(--fg-3);margin-top:3px;line-height:1.25}
+
+/* controls */
+.seg{display:flex;gap:4px;background:var(--bg-2);padding:4px;border-radius:10px}
+.seg button{
+  flex:1;border:0;background:transparent;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);
+  padding:8px 4px;border-radius:8px;cursor:pointer;transition:all 150ms var(--ease);
+}
+.seg button:hover{color:var(--fg-1)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg-1);font-weight:600;box-shadow:var(--shadow-card)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  border:1px solid var(--border-1);background:var(--surface);border-radius:999px;
+  padding:6px 12px;font:500 12px/1 Inter,sans-serif;color:var(--fg-2);cursor:pointer;
+  transition:all 150ms var(--ease);
+}
+.chip:hover{background:var(--bg-2)}
+.chip[aria-pressed="true"]{background:var(--fg-1);border-color:var(--fg-1);color:#fff}
+
+/* status toggles */
+.st{display:flex;flex-direction:column;gap:2px}
+.st button{
+  display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;
+  padding:8px 8px;border-radius:10px;cursor:pointer;text-align:left;
+  transition:background 150ms var(--ease);
+}
+.st button:hover{background:var(--bg-2)}
+.st button[aria-pressed="false"]{opacity:.42}
+.dot{width:11px;height:11px;border-radius:999px;flex:none}
+.st-name{font:500 13px/1 Inter,sans-serif;color:var(--fg-1);flex:1}
+.st-num{font:600 13px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;color:var(--fg-2)}
+
+/* legend */
+/* trend */
+.trend{display:flex;align-items:flex-end;gap:6px;height:78px;margin-bottom:8px}
+.tcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:default}
+.tbar{position:relative;width:100%;border-radius:5px 5px 3px 3px;background:var(--bg-2);overflow:hidden;transition:height 240ms var(--ease)}
+.tbar i{position:absolute;left:0;right:0;bottom:0;background:var(--primary);transition:height 240ms var(--ease)}
+.tlbl{display:flex;gap:6px;font-size:10.5px;color:var(--fg-3)}
+.tlbl span{flex:1;text-align:center}
+.tkey{display:flex;gap:14px;font-size:11.5px;color:var(--fg-2);margin-top:10px;align-items:center}
+.tkey b{display:flex;align-items:center;gap:6px;font-weight:500}
+.tkey i{width:9px;height:9px;border-radius:3px;display:block}
+
+.ramp{height:8px;border-radius:999px;background:linear-gradient(90deg,#EDE7F9,var(--heat-1),var(--heat-2),var(--heat-3),var(--heat-4));margin-bottom:6px}
+.ramp-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--fg-3)}
+.note{font-size:11.5px;color:var(--fg-3);line-height:1.45;margin:10px 0 0}
+
+/* top zonas */
+.zl{display:flex;flex-direction:column;gap:2px}
+.z{
+  display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;
+  border:0;background:transparent;padding:9px 8px;border-radius:10px;cursor:pointer;width:100%;text-align:left;
+  transition:background 150ms var(--ease);
+}
+.z:hover{background:var(--bg-2)}
+.z-name{font:500 13px/1.2 Inter,sans-serif;color:var(--fg-1)}
+.z-meta{grid-column:1/-1;font-size:11.5px;color:var(--fg-3);line-height:1.3}
+.z-num{font:600 13px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;color:var(--fg-2)}
+.z-bar{grid-column:1/-1;height:5px;border-radius:999px;display:flex;overflow:hidden;background:var(--bg-2)}
+.z-bar i{display:block;height:100%}
+
+/* ── Map ─────────────────────────────────── */
+.map-wrap{position:relative;background:var(--bg-2)}
+#map{position:absolute;inset:0}
+.leaflet-container{background:#EEF1EF;font-family:Inter,sans-serif}
+.leaflet-tile-pane{filter:grayscale(1) brightness(1.07) contrast(.86) opacity(.92)}
+.leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.82)}
+.leaflet-control-zoom a{color:var(--fg-1)!important;border-radius:8px!important}
+
+.heat-canvas{position:absolute;pointer-events:none;transition:opacity 150ms var(--ease)}
+
+.donut{border-radius:999px;display:grid;place-items:center;box-shadow:0 0 0 2px #fff,var(--shadow-card);cursor:pointer;transition:transform 150ms var(--ease)}
+.donut:hover{transform:scale(1.07)}
+.donut span{
+  background:#fff;border-radius:999px;display:grid;place-items:center;
+  font-family:Sora,sans-serif;font-weight:700;color:var(--fg-1);font-variant-numeric:tabular-nums;
+}
+.leaflet-marker-icon.dwrap{background:none;border:0}
+
+.pop .leaflet-popup-content-wrapper{border-radius:12px;box-shadow:var(--shadow-float);padding:0}
+.pop .leaflet-popup-content{margin:0;width:216px!important}
+.pop .leaflet-popup-tip{box-shadow:var(--shadow-float)}
+.p-in{padding:14px 16px 12px}
+.p-t{font-family:Sora,sans-serif;font-size:15px;font-weight:700;letter-spacing:-.01em;margin:0 0 2px}
+.p-s{font-size:12px;color:var(--fg-3);margin:0 0 12px}
+.p-r{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px;color:var(--fg-2)}
+.p-r b{margin-left:auto;color:var(--fg-1);font-variant-numeric:tabular-nums;font-weight:600}
+.p-f{border-top:1px solid var(--border-1);padding:9px 16px;font-size:11.5px;color:var(--fg-3);background:var(--bg-1);border-radius:0 0 12px 12px}
+
+/* floating map bar */
+.mapbar{
+  position:absolute;top:14px;left:14px;right:14px;z-index:500;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;pointer-events:none;
+}
+.mapbar>*{pointer-events:auto}
+.pill{
+  background:rgba(255,255,255,.9);backdrop-filter:blur(16px);
+  border:1px solid var(--border-1);border-radius:999px;box-shadow:var(--shadow-card);
+  padding:7px 8px;display:flex;gap:2px;align-items:center;
+}
+.pill button{
+  border:0;background:transparent;font:500 12.5px/1 Inter,sans-serif;color:var(--fg-2);
+  padding:7px 13px;border-radius:999px;cursor:pointer;transition:all 150ms var(--ease);
+}
+.pill button:hover{color:var(--fg-1)}
+.pill button[aria-pressed="true"]{background:var(--fg-1);color:#fff;font-weight:600}
+.pill .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);font-weight:600;padding:0 8px 0 6px}
+.sw{display:flex;align-items:center;gap:8px;font:500 12.5px/1 Inter,sans-serif;color:var(--fg-2);padding:7px 14px 7px 10px;cursor:pointer}
+.sw input{appearance:none;width:34px;height:20px;border-radius:999px;background:rgba(13,20,18,.16);position:relative;cursor:pointer;transition:background 150ms var(--ease);margin:0;flex:none}
+.sw input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff;transition:transform 150ms var(--ease);box-shadow:0 1px 2px rgba(13,20,18,.2)}
+.sw input:checked{background:var(--primary)}
+.sw input:checked::after{transform:translateX(14px)}
+.empty{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:400;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(16px);border:1px solid var(--border-1);
+  border-radius:12px;box-shadow:var(--shadow-float);padding:18px 22px;text-align:center;display:none;
+}
+.empty p{margin:0 0 10px;font-size:13.5px;color:var(--fg-2)}
+.empty button{border:0;background:var(--primary);color:#fff;font:600 13px/1 Inter,sans-serif;padding:11px 18px;border-radius:12px;cursor:pointer;transition:background 150ms var(--ease)}
+.empty button:hover{background:var(--primary-dark)}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:56vh auto;height:auto}
+  .side{border-right:0;border-top:1px solid var(--border-1);order:2;max-height:none}
+  .map-wrap{order:1;min-height:56vh}
+  .mapbar{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="head">
+      <div class="brand"><div class="mark">m</div><div class="brand-txt">Mandao · Gestión urbana</div></div>
+      <h1>Mapa de reclamos</h1>
+      <p class="sub">Villa Carlos Paz · <span id="periodLbl">últimos 30 días</span></p>
+    </div>
+
+    <div class="sec">
+      <div class="hero-metric">
+        <div class="hero-num" id="mPct">—</div>
+        <div class="hero-lbl">de los reclamos<br>del período están <b>resueltos</b></div>
+      </div>
+      <div class="mgrid">
+        <div class="m"><div class="m-num" id="mTot">—</div><div class="m-lbl">Reclamos en el período</div></div>
+        <div class="m"><div class="m-num" id="mDias">—</div><div class="m-lbl">Días promedio de resolución</div></div>
+        <div class="m"><div class="m-num" id="mPend" style="color:#B07800">—</div><div class="m-lbl">Pendientes sin cerrar</div></div>
+        <div class="m"><div class="m-num" id="mViejo" style="color:var(--danger)">—</div><div class="m-lbl">Pendientes hace +15 días</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-t">Período</p>
+      <div class="seg" id="segPeriod">
+        <button data-d="7">7 días</button>
+        <button data-d="30" aria-pressed="true">30 días</button>
+        <button data-d="90">90 días</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-t">Tipo de reclamo <em id="tipoCount"></em></p>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-t">Estado <em>tocá para filtrar</em></p>
+      <div class="st" id="stList"></div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-t">Ingresados vs. resueltos <em>por semana</em></p>
+      <div class="trend" id="trend"></div>
+      <div class="tlbl" id="trendLbl"></div>
+      <div class="tkey">
+        <b><i style="background:var(--primary)"></i>Resueltos</b>
+        <b><i style="background:var(--bg-2)"></i>Sin cerrar</b>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="sec-t">Concentración de reclamos</p>
+      <div class="ramp"></div>
+      <div class="ramp-lbl"><span>Baja</span><span>Alta</span></div>
+      <p class="note">La mancha mide <b>densidad</b>, no estado. Los colores de estado (verde, ámbar, rojo) nunca se usan en el mapa de calor, para que las dos capas no se confundan.</p>
+    </div>
+
+    <div class="sec">
+      <p class="sec-t">Zonas con más reclamos</p>
+      <div class="zl" id="zoneList"></div>
+    </div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="mapbar">
+      <div class="pill">
+        <span class="lbl">Capa</span>
+        <button data-layer="heat" aria-pressed="true">Concentración</button>
+        <button data-layer="status">Estado</button>
+        <button data-layer="both">Ambas</button>
+      </div>
+      <div class="pill"><label class="sw"><input type="checkbox" id="groupToggle" checked>Agrupar por zona</label></div>
+    </div>
+    <div class="empty" id="empty">
+      <p>No hay reclamos con esos filtros.</p>
+      <button id="resetBtn">Limpiar filtros</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── datos ────────────────────────────────────────────────────────────
+   Muestra sintética con la geografía real de Villa Carlos Paz.
+   Reemplazar ZONES + genPoints() por la consulta al sistema de reclamos. */
+const ZONES = [
+  {n:"Centro",              c:[-31.4213,-64.4968], w:1.00, mix:[.52,.34,.14], dias:7},
+  {n:"Villa del Lago",      c:[-31.4046,-64.4918], w:0.62, mix:[.66,.27,.07], dias:5},
+  {n:"Costa Azul Norte",    c:[-31.3934,-64.4826], w:0.55, mix:[.44,.46,.10], dias:11},
+  {n:"Playas de Oro",       c:[-31.3892,-64.4742], w:0.34, mix:[.58,.33,.09], dias:8},
+  {n:"Sol y Lago",          c:[-31.4104,-64.4874], w:0.44, mix:[.61,.30,.09], dias:6},
+  {n:"El Canal",            c:[-31.4262,-64.4902], w:0.48, mix:[.49,.38,.13], dias:9},
+  {n:"Miguel Muñoz",        c:[-31.4322,-64.5044], w:0.74, mix:[.38,.48,.14], dias:14},
+  {n:"Colinas del Lago",    c:[-31.4158,-64.5138], w:0.40, mix:[.63,.28,.09], dias:7},
+  {n:"Villa Suiza",         c:[-31.4392,-64.5148], w:0.36, mix:[.47,.41,.12], dias:12},
+  {n:"San Nicolás",         c:[-31.4478,-64.4932], w:0.58, mix:[.41,.45,.14], dias:13},
+  {n:"Los Prados",          c:[-31.4618,-64.5038], w:0.66, mix:[.35,.50,.15], dias:16},
+  {n:"Santa Rita",          c:[-31.4702,-64.5116], w:0.42, mix:[.40,.46,.14], dias:15},
+  {n:"Villa del Río",       c:[-31.3992,-64.5282], w:0.24, mix:[.55,.36,.09], dias:10}
+];
+const TIPOS = ["Alumbrado","Baches y calzada","Residuos","Agua y cloacas","Ruidos molestos","Espacios verdes"];
+const STATES = [
+  {k:"resuelto",  n:"Resueltos",  c:"#00B37E"},
+  {k:"pendiente", n:"Pendientes", c:"#FFB800"},
+  {k:"rechazado", n:"Rechazados", c:"#E5484D"}
+];
+const SC = {resuelto:"#00B37E", pendiente:"#FFB800", rechazado:"#E5484D"};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20260905);
+
+const ALL = (()=>{
+  const out=[];
+  ZONES.forEach((z,zi)=>{
+    const count = Math.round(26 + z.w*54);
+    for(let i=0;i<count;i++){
+      const spread = 0.0052 + z.w*0.0026;
+      const lat = z.c[0] + (rnd()+rnd()+rnd()-1.5)/1.5*spread;
+      const lng = z.c[1] + (rnd()+rnd()+rnd()-1.5)/1.5*spread*1.15;
+      const r=rnd();
+      const est = r < z.mix[0] ? "resuelto" : r < z.mix[0]+z.mix[1] ? "pendiente" : "rechazado";
+      out.push({
+        zi, lat, lng, est,
+        tipo: TIPOS[Math.floor(rnd()*TIPOS.length)],
+        edad: Math.floor(rnd()*90)+1,
+        cierre: Math.max(1, Math.round(z.dias + (rnd()-.5)*z.dias*1.1))
+      });
+    }
+  });
+  return out;
+})();
+
+/* ── estado de la vista ─────────────────────────────────────────────── */
+const F = {dias:30, tipos:new Set(TIPOS), estados:new Set(["resuelto","pendiente","rechazado"]), layer:"heat", group:true};
+const filtered = ()=> ALL.filter(p=> p.edad<=F.dias && F.tipos.has(p.tipo) && F.estados.has(p.est));
+
+/* ── mapa ───────────────────────────────────────────────────────────── */
+const map = L.map('map',{
+  center:[-31.4245,-64.4985], zoom:13, minZoom:12, maxZoom:17,
+  zoomControl:false, maxBounds:[[-31.505,-64.585],[-31.358,-64.425]], maxBoundsViscosity:1
+});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap contributors', maxZoom:19
+}).addTo(map);
+
+/* capa de calor: rampa violeta→magenta, deliberadamente fuera de la
+   paleta semántica de estados */
+const LUT = (()=>{
+  const c=document.createElement('canvas');c.width=1;c.height=256;
+  const g=c.getContext('2d').createLinearGradient(0,0,0,256);
+  g.addColorStop(0.00,'rgba(124,92,214,0)');
+  g.addColorStop(0.18,'rgba(124,92,214,0.50)');
+  g.addColorStop(0.42,'rgba(162,79,200,0.74)');
+  g.addColorStop(0.68,'rgba(196,63,174,0.88)');
+  g.addColorStop(1.00,'rgba(214,47,143,0.97)');
+  const x=c.getContext('2d');x.fillStyle=g;x.fillRect(0,0,1,256);
+  return x.getImageData(0,0,1,256).data;
+})();
+
+const HeatLayer = L.Layer.extend({
+  initialize(){ this._pts=[]; },
+  setPoints(p){ this._pts=p; if(this._canvas) this._draw(); },
+  setDim(d){ this._dim=d; if(this._canvas) this._canvas.style.opacity = d?0.5:1; },
+  onAdd(m){
+    this._map=m;
+    this._canvas=L.DomUtil.create('canvas','heat-canvas');
+    m.getPanes().overlayPane.appendChild(this._canvas);
+    m.on('move resize',this._draw,this);
+    m.on('zoomstart',this._hide,this);
+    m.on('zoomend',this._show,this);
+    this._draw();
+  },
+  onRemove(m){
+    m.off('move resize',this._draw,this);
+    m.off('zoomstart',this._hide,this); m.off('zoomend',this._show,this);
+    L.DomUtil.remove(this._canvas); this._canvas=null;
+  },
+  _hide(){ this._canvas.style.opacity=0; },
+  _show(){ this._canvas.style.opacity=this._dim?0.5:1; this._draw(); },
+  _draw(){
+    if(!this._canvas) return;
+    const m=this._map, size=m.getSize(), cv=this._canvas;
+    if(cv.width!==size.x||cv.height!==size.y){cv.width=size.x;cv.height=size.y;}
+    L.DomUtil.setPosition(cv, m.containerPointToLayerPoint([0,0]));
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,size.x,size.y);
+    const r = 24 * Math.pow(2, m.getZoom()-13);
+    ctx.globalCompositeOperation='source-over';
+    for(const p of this._pts){
+      const pt=m.latLngToContainerPoint([p.lat,p.lng]);
+      if(pt.x<-r||pt.y<-r||pt.x>size.x+r||pt.y>size.y+r) continue;
+      const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,r);
+      g.addColorStop(0,'rgba(0,0,0,0.52)');
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(pt.x,pt.y,r,0,6.2832);ctx.fill();
+    }
+    const img=ctx.getImageData(0,0,size.x,size.y), d=img.data;
+    for(let i=3;i<d.length;i+=4){
+      const a=d[i]; if(!a) continue;
+      const o=a*4;
+      d[i-3]=LUT[o]; d[i-2]=LUT[o+1]; d[i-1]=LUT[o+2]; d[i]=LUT[o+3];
+    }
+    ctx.putImageData(img,0,0);
+  }
+});
+const heat = new HeatLayer();
+const markerLayer = L.layerGroup().addTo(map);
+
+/* ── render ─────────────────────────────────────────────────────────── */
+function render(){
+  const pts = filtered();
+
+  /* métricas */
+  const byEst = {resuelto:0,pendiente:0,rechazado:0};
+  pts.forEach(p=>byEst[p.est]++);
+  const res = byEst.resuelto;
+  document.getElementById('mTot').textContent = pts.length.toLocaleString('es-AR');
+  document.getElementById('mPct').textContent = pts.length ? Math.round(res/pts.length*100)+'%' : '—';
+  const cierres = pts.filter(p=>p.est==='resuelto');
+  document.getElementById('mDias').textContent = cierres.length
+    ? (cierres.reduce((s,p)=>s+p.cierre,0)/cierres.length).toFixed(1) : '—';
+  document.getElementById('mPend').textContent = byEst.pendiente.toLocaleString('es-AR');
+  document.getElementById('mViejo').textContent = pts.filter(p=>p.est==='pendiente'&&p.edad>15).length;
+
+  /* conteos por estado (sin el filtro de estado, para que el número no desaparezca) */
+  const base = ALL.filter(p=>p.edad<=F.dias && F.tipos.has(p.tipo));
+  document.querySelectorAll('#stList button').forEach(b=>{
+    const k=b.dataset.k;
+    b.querySelector('.st-num').textContent = base.filter(p=>p.est===k).length.toLocaleString('es-AR');
+    b.setAttribute('aria-pressed', F.estados.has(k));
+  });
+
+  /* capa de calor */
+  const showHeat = F.layer!=='status';
+  if(showHeat && !map.hasLayer(heat)) heat.addTo(map);
+  if(!showHeat && map.hasLayer(heat)) map.removeLayer(heat);
+  heat.setDim(F.layer==='both');
+  heat.setPoints(pts);
+
+  /* capa de estado */
+  markerLayer.clearLayers();
+  if(F.layer!=='heat'){
+    if(F.group){
+      const agg=new Map();
+      pts.forEach(p=>{
+        if(!agg.has(p.zi)) agg.set(p.zi,{resuelto:0,pendiente:0,rechazado:0,tot:0,cierre:[],items:[]});
+        const a=agg.get(p.zi); a[p.est]++; a.tot++; a.items.push(p); if(p.est==='resuelto')a.cierre.push(p.cierre);
+      });
+      agg.forEach(a=>a.top=topTipo(a.items));
+      const max=Math.max(...[...agg.values()].map(a=>a.tot),1);
+      agg.forEach((a,zi)=>{
+        const z=ZONES[zi];
+        const s=Math.round(34+26*Math.sqrt(a.tot/max));
+        let acc=0; const stops=[];
+        STATES.forEach(st=>{
+          const f=a[st.k]/a.tot; if(f<=0) return;
+          stops.push(`${st.c} ${(acc*100).toFixed(2)}% ${((acc+f)*100).toFixed(2)}%`); acc+=f;
+        });
+        const html=`<div class="donut" style="width:${s}px;height:${s}px;background:conic-gradient(${stops.join(',')})">
+          <span style="width:${s-15}px;height:${s-15}px;font-size:${s>50?14:12}px">${a.tot}</span></div>`;
+        L.marker(z.c,{icon:L.divIcon({html,className:'dwrap',iconSize:[s,s],iconAnchor:[s/2,s/2]})})
+          .bindPopup(popup(z,a),{className:'pop',offset:[0,-4],closeButton:false})
+          .addTo(markerLayer);
+      });
+    } else {
+      pts.forEach(p=>{
+        L.circleMarker([p.lat,p.lng],{
+          radius:5, weight:1.5, color:'#fff', fillColor:SC[p.est], fillOpacity:.95
+        }).bindTooltip(`${p.tipo} · ${p.est} · hace ${p.edad} d`,{direction:'top'}).addTo(markerLayer);
+      });
+    }
+  }
+
+  /* tendencia semanal */
+  const weeks = Math.max(1, Math.round(F.dias/7));
+  const buckets = Array.from({length:weeks},()=>({tot:0,res:0}));
+  pts.forEach(p=>{
+    const b = Math.min(weeks-1, Math.floor((p.edad-1)/7));
+    buckets[weeks-1-b].tot++; if(p.est==='resuelto') buckets[weeks-1-b].res++;
+  });
+  const bmax = Math.max(...buckets.map(b=>b.tot),1);
+  document.getElementById('trend').innerHTML = buckets.map(b=>{
+    const h = Math.max(3, b.tot/bmax*100);
+    return `<div class="tcol" title="${b.tot} ingresados · ${b.res} resueltos">
+      <div class="tbar" style="height:${h}%"><i style="height:${b.tot?b.res/b.tot*100:0}%"></i></div></div>`;
+  }).join('');
+  document.getElementById('trendLbl').innerHTML = buckets.map((b,i)=>
+    `<span>${i===buckets.length-1 ? 'ahora' : (weeks-1-i===0?'':'-'+(weeks-1-i)+'s')}</span>`).join('');
+
+  /* zonas */
+  const zAgg = ZONES.map((z,i)=>{
+    const zp=pts.filter(p=>p.zi===i);
+    return {z,i,tot:zp.length, topTipo:topTipo(zp),
+      resuelto:zp.filter(p=>p.est==='resuelto').length,
+      pendiente:zp.filter(p=>p.est==='pendiente').length,
+      rechazado:zp.filter(p=>p.est==='rechazado').length};
+  }).filter(a=>a.tot).sort((a,b)=>b.pendiente-a.pendiente).slice(0,6);
+  document.getElementById('zoneList').innerHTML = zAgg.map(a=>`
+    <button class="z" data-zi="${a.i}">
+      <span class="z-name">${a.z.n}</span><span class="z-num">${a.tot}</span>
+      <span class="z-meta">${a.pendiente} pendientes · sobre todo ${a.topTipo.toLowerCase()}</span>
+      <span class="z-bar">
+        <i style="width:${a.resuelto/a.tot*100}%;background:${SC.resuelto}"></i>
+        <i style="width:${a.pendiente/a.tot*100}%;background:${SC.pendiente}"></i>
+        <i style="width:${a.rechazado/a.tot*100}%;background:${SC.rechazado}"></i>
+      </span>
+    </button>`).join('');
+  document.querySelectorAll('.z').forEach(b=>b.onclick=()=>{
+    map.flyTo(ZONES[+b.dataset.zi].c, 15, {duration:.6});
+  });
+
+  document.getElementById('empty').style.display = pts.length ? 'none' : 'block';
+  document.getElementById('tipoCount').textContent =
+    F.tipos.size===TIPOS.length ? 'todos' : `${F.tipos.size} de ${TIPOS.length}`;
+  document.getElementById('periodLbl').textContent = `últimos ${F.dias} días`;
+}
+
+function topTipo(list){
+  if(!list.length) return '—';
+  const c={}; list.forEach(p=>c[p.tipo]=(c[p.tipo]||0)+1);
+  return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
+}
+
+function popup(z,a){
+  const prom = a.cierre.length ? (a.cierre.reduce((s,v)=>s+v,0)/a.cierre.length).toFixed(1)+' días' : 'sin datos';
+  return `<div class="p-in">
+    <p class="p-t">${z.n}</p><p class="p-s">${a.tot} reclamos · sobre todo ${a.top.toLowerCase()}</p>
+    ${STATES.map(st=>`<div class="p-r"><span class="dot" style="background:${st.c}"></span>${st.n}<b>${a[st.k]}</b></div>`).join('')}
+  </div><div class="p-f">Resolución promedio: ${prom}</div>`;
+}
+
+/* ── controles ──────────────────────────────────────────────────────── */
+document.getElementById('chips').innerHTML =
+  TIPOS.map(t=>`<button class="chip" data-t="${t}" aria-pressed="true">${t}</button>`).join('');
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+  const t=b.dataset.t;
+  if(F.tipos.has(t)&&F.tipos.size>1){F.tipos.delete(t);b.setAttribute('aria-pressed','false');}
+  else {F.tipos.add(t);b.setAttribute('aria-pressed','true');}
+  render();
+});
+
+document.getElementById('stList').innerHTML = STATES.map(st=>`
+  <button data-k="${st.k}" aria-pressed="true">
+    <span class="dot" style="background:${st.c}"></span>
+    <span class="st-name">${st.n}</span><span class="st-num">—</span>
+  </button>`).join('');
+document.querySelectorAll('#stList button').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k;
+  if(F.estados.has(k)&&F.estados.size>1) F.estados.delete(k); else F.estados.add(k);
+  render();
+});
+
+document.querySelectorAll('#segPeriod button').forEach(b=>b.onclick=()=>{
+  F.dias=+b.dataset.d;
+  document.querySelectorAll('#segPeriod button').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  render();
+});
+
+document.querySelectorAll('[data-layer]').forEach(b=>b.onclick=()=>{
+  F.layer=b.dataset.layer;
+  document.querySelectorAll('[data-layer]').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  render();
+});
+
+document.getElementById('groupToggle').onchange=e=>{F.group=e.target.checked;render();};
+document.getElementById('resetBtn').onclick=()=>{
+  F.tipos=new Set(TIPOS); F.estados=new Set(["resuelto","pendiente","rechazado"]);
+  document.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed','true'));
+  render();
+};
+
+render();
+</script>
+</body>
+</html>

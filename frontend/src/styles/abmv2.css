@@ -2499,13 +2499,32 @@ button.av2-chip:hover { opacity: 0.85; }
 
    No lleva veredictos ni frases: es un ENCABEZADO. Lo que hay que interpretar
    se lee en la respuesta de la consulta y en las cards del costado. */
+/* Titulo + indicadores EN UNA SOLA BARRA. El titulo no necesita una franja
+   propia: el sidebar ya marca donde estas y la miga de la topbar lo repite. */
+.av2-mapa-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 8px 20px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.av2-mapa-cabecera-titulo {
+  margin: 0;
+  flex: 0 0 auto;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-h2, 20px);
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--pl-text);
+}
 .av2-mapa-tira {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px 26px;
-  margin-top: 10px;
-  padding: 10px 14px;
+  gap: 6px 22px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 14px;
   background: var(--pl-surface);
   border: 1px solid var(--pl-border);
   border-radius: var(--pl-radius-lg);
@@ -2546,16 +2565,33 @@ button.av2-chip:hover { opacity: 0.85; }
    Las franjas se caen ANTES que el mapa al angostarse la pantalla: primero la
    derecha, despues la izquierda, y en telefono queda el mapa solo con los
    paneles debajo. Nunca al reves: el mapa es lo que se vino a ver. */
-.av2-mapa-grilla {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 12px;
-  align-items: start;
-}
+/* UNA SOLA PANTALLA, Y NADA SCROLLEA.
+   La grilla toma el alto MEDIDO (`--av2-mapa-alto`, el mismo que ya calculaba
+   el lienzo) y se lo reparte entre el mapa y el panel. Antes el alto se lo
+   quedaba solo el lienzo y la columna de al lado crecia libre: la pagina
+   terminaba con 2272px de scrollHeight y el mapa arrancando en y=762, fuera de
+   una pantalla de 768 (medido con Playwright, 2026-09-06).
+
+   El que scrollea ahora es el PANEL, adentro. La pagina, nunca. */
+/* `display: contents`: la grilla no genera caja y sus dos hijos —el mapa y el
+   panel— participan de la grilla de `.av2-mapa-full`. Asi el panel puede
+   ocupar las DOS filas (queda del techo al piso, ganando los 203px de la
+   consulta) sin tener que mover el JSX, donde la consulta vive fuera del
+   condicional que envuelve a estos dos. */
+.av2-mapa-grilla { display: contents; }
+.av2-mapa-grilla > .av2-mapa { grid-column: 1; grid-row: 2; min-width: 0; min-height: 0; }
+/* El panel arranca A LA ALTURA DEL MAPA, no en la fila de la consulta: si
+   ocupa las dos filas, le come el ancho a la consulta de arriba. */
+.av2-mapa-grilla > .av2-mapa-columna { grid-column: 2; grid-row: 2; min-height: 0; }
 
 /* Sin lecturas al costado, el mapa se queda con todo el ancho. Reservar la
    columna igual dejaba 340px en blanco al lado de un mapa achicado. */
 .av2-mapa-grilla--sola { grid-template-columns: minmax(0, 1fr); }
+
+/* PLEGADA: al panel le queda el ancho de su pestaña y el mapa se lleva el
+   resto. No es `display:none` a proposito — la pestaña tiene que seguir ahi
+   para poder volver a abrirlo. */
+.av2-mapa-full:has(.av2-mapa-grilla--plegada) { --av2-panel-ancho: 30px; }
 
 /* EL MAPA NO ES STICKY, Y NO HACE FALTA QUE LO SEA.
    Lo fue un rato y rompio la pantalla: con la barra de consulta TAMBIEN sticky
@@ -2573,11 +2609,65 @@ button.av2-chip:hover { opacity: 0.85; }
    mitad (reportado el 2026-09-05). Un panel de lectura no necesita techo: crece
    lo que necesite y la pagina scrollea, que es lo que hace cualquier pagina. */
 .av2-mapa-columna {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Lo que se pliega y lo que scrollea. El scroll vive ACA, nunca en la pagina:
+   es lo que deja al mapa llegando siempre al borde inferior de la pantalla. */
+.av2-mapa-columna-scroll {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding-left: 26px; /* le deja el carril a la pestaña de plegado */
 }
+.av2-mapa-grilla--plegada .av2-mapa-columna-scroll {
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* LA PESTAÑA DE PLEGADO — chica y arriba, no un cuadrado en el medio del aire.
+   Estuvo flotando entre el mapa y las cards, sin pertenecer a ninguno de los
+   dos, y ocupando de mas (dueño, 2026-09-06). Ahora es un boton de 22px en el
+   ANGULO SUPERIOR del panel, alineado con el titulo de la primera card: se ve
+   como el tirador del panel y no le come alto a nada. */
+.av2-mapa-plegar {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-sm, 6px);
+  background: var(--pl-surface);
+  color: var(--pl-text-muted);
+  cursor: pointer;
+  transition: background 150ms var(--pl-ease, ease), color 150ms var(--pl-ease, ease);
+}
+.av2-mapa-plegar:hover {
+  background: var(--pl-surface-hover);
+  color: var(--pl-text);
+}
+.av2-mapa-plegar:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 2px;
+}
+/* Plegado queda centrado en su carril de 30px, que es todo el panel. */
+.av2-mapa-grilla--plegada .av2-mapa-plegar { left: 4px; }
 
 /* Las cards de lectura vienen en fila de tres (vivian abajo del mapa). Al
    costado se apilan: es una columna de 340px, no una banda de 1200. */
@@ -2590,7 +2680,15 @@ button.av2-chip:hover { opacity: 0.85; }
 /* Angosto: la columna baja abajo del mapa y ocupa todo el ancho. El mapa nunca
    se achica mas: es lo que se vino a ver. */
 @media (max-width: 1180px) {
+  /* Una columna: el panel baja debajo del mapa y el alto vuelve a ser libre.
+     Clavar la pantalla acá apilaría mapa y panel dentro del mismo alto y
+     ninguno de los dos entraría. */
+  .av2-mapa-full { height: auto; overflow: visible; }
   .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
+  .av2-mapa-grilla .av2-mapa,
+  .av2-mapa-grilla .av2-mapa-lienzo { height: var(--av2-pantalla-alto, 420px); }
+  .av2-mapa-columna-scroll { overflow: visible; padding-left: 0; }
+  .av2-mapa-plegar { display: none; }
   /* Debajo del mapa vuelven a entrar de a varias por fila. */
   .av2-mapa-columna .map-art {
     flex-direction: row;
@@ -2738,6 +2836,17 @@ button.av2-chip:hover { opacity: 0.85; }
   height: var(--av2-mapa-alto, 420px);
 }
 
+/* DENTRO DE LA GRILLA el alto ya lo puso la grilla: el lienzo solo tiene que
+   llenar su celda. Si conservara el alto medido, la celda y el lienzo medirian
+   lo mismo por dos caminos distintos y cualquier desfase se ve como una banda
+   muerta. Fuera de la grilla (modo puntos) sigue mandando el alto medido. */
+.av2-mapa-grilla .av2-mapa,
+.av2-mapa-grilla .av2-mapa-lienzo {
+  height: 100%;
+  min-height: 0;
+  margin-top: 0;
+}
+
 /* --- PANTALLA COMPLETA ---------------------------------------------------
    Dos caminos para el mismo resultado, porque la Fullscreen API no existe en
    Safari de iPhone sobre un div (sólo la acepta en <video>): si el navegador
@@ -2753,7 +2862,32 @@ button.av2-chip:hover { opacity: 0.85; }
    no se puede manejar. Mientras no está maximizado el envoltorio es
    `display: contents` --- no genera caja, así que la página se arma igual que
    antes de que existiera. */
-.av2-mapa-full { display: contents; }
+/* EL BLOQUE DEL MAPA ES UNA PANTALLA, NO UN TRAMO DE PAGINA.
+   Era `display: contents` (no generaba caja) y el alto se le clavaba al mapa
+   por JS. Eso no puede funcionar: la consulta cambia de alto sola —la oracion
+   envuelve, aparece la respuesta, se abre el reproductor— y cada vez el numero
+   medido quedaba viejo, con el mapa cortado o la grilla fuera de pantalla.
+
+   Ahora el alto se mide UNA vez sobre este bloque y el reparto lo hace flex:
+   la consulta ocupa lo que ocupa y la grilla se queda con TODO el resto. Es la
+   misma idea del diseño (`mapa-una-pantalla.html`): `grid-template-rows` con
+   un `1fr` que absorbe, en vez de una resta que hay que mantener. */
+.av2-mapa-full {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--av2-panel-ancho, 376px);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  height: var(--av2-pantalla-alto, 520px);
+  min-height: 0;
+  overflow: hidden;
+  transition: grid-template-columns 180ms var(--pl-ease, ease);
+}
+/* LA CONSULTA OCUPA EL ANCHO COMPLETO.
+   Estaba confinada a la columna del mapa y quedaba apretada contra el panel:
+   la oracion se partia en tres renglones para caber en 1fr menos 376px. Es la
+   barra de mando de la pantalla, no una columna mas (dueno, 2026-09-06: "eso
+   ocupa el 100"). */
+.av2-mapa-full > .av2-controles { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
 
 .av2-mapa-full:fullscreen,
 .av2-mapa-full--expandido {
@@ -6008,3 +6142,214 @@ button.av2-recorrido-miga:hover {
 .av2-tilde--activa .av2-tilde-conteo { color: inherit; }
 /* En el panel angosto se apilan como el resto de los filtros. */
 .av2-filtros-panel .av2-tildes { flex-wrap: wrap; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   [GRAFICOS DEL MAPA] — los dos graficos del panel, por lente.
+   Geometria y criterio: `docs/design-sync/Mapa de calor y reclamos/
+   galeria-graficos.html`. El color sale de los tokens, no de los hex de la
+   galeria: un municipio con acento propio no puede ver otra paleta.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Compacta a proposito: en 398px de panel entran el KPI y DOS de estas. */
+.gm-card {
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  padding: 10px 12px;
+  min-width: 0;
+}
+.gm-titulo {
+  margin: 0 0 6px;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 700;
+  color: var(--pl-text);
+}
+/* La explicacion se acota a DOS lineas. El texto completo queda en el `title`
+   del elemento: lo que hace falta a la vista es el grafico, no el parrafo. */
+.gm-pregunta {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--pl-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gm-pie {
+  margin: 7px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--pl-border);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--pl-text-muted);
+}
+.gm-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+/* Ejes y grilla: la grilla se INSINUA. Si compite con el dato, tapa el dato. */
+.gm-gl { stroke: var(--pl-border); stroke-width: 1; }
+.gm-ax,
+.gm-axv {
+  font-size: 10.5px;
+  fill: var(--pl-text-muted);
+  font-family: var(--pl-font-body, inherit);
+}
+.gm-valor {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--pl-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Marcas. EL COLOR SALE DE LA PALETA DE DATOS DEL THEME (`--pl-data-1..5`),
+   que ThemeContext deriva del acento del municipio. Primero puse `--pl-accent`
+   y `--pl-red`, que NO EXISTEN: una var indefinida en un `fill` no hereda ni
+   avisa, pinta NEGRO — y el panel salio con las barras en negro sobre negro
+   (visto 2026-09-06). Si agregas una marca nueva, verificá que el token exista
+   en `pl-tokens.css` o en ThemeContext antes de usarlo. */
+.gm-pista { fill: var(--pl-track, var(--pl-border)); }
+.gm-barra { fill: var(--pl-data-1, var(--pl-green)); }
+.gm-celda { fill: var(--pl-data-1, var(--pl-green)); }
+.gm-ok { fill: var(--pl-green); }
+.gm-mal { fill: var(--pl-amber-strong, var(--pl-data-3)); }
+.gm-tallo { stroke: var(--pl-border-strong, var(--pl-border)); stroke-width: 2; }
+.gm-punto { fill: var(--pl-data-1, var(--pl-green)); }
+.gm-punto-ok { fill: var(--pl-green); }
+.gm-punto-mal { fill: var(--pl-amber-strong, var(--pl-data-3)); }
+.gm-curva {
+  fill: none;
+  stroke: var(--pl-data-1, var(--pl-green));
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* EL FILTRO DE ESTADOS, FLOTANDO SOBRE EL MAPA (arriba a la derecha).
+   Es control + leyenda: por eso vive sobre el lienzo y no en el panel, que
+   quedo reservado para el KPI semantico y sus dos graficos. Arriba a la
+   derecha para no pelear con la leyenda de concentracion, que va abajo a la
+   izquierda, ni con los controles de capa, que van arriba al centro. */
+/* ABAJO A LA DERECHA, y no arriba: arriba estan la barra de capa (al centro)
+   y la columna de botones (expandir / capas / ubicacion), y el panel les caia
+   justo encima — se veia encimado y tapaba los dos (dueño, 2026-09-06). Abajo
+   a la derecha el lienzo esta libre: la leyenda de concentracion ocupa la
+   esquina de enfrente. */
+.av2-mapa-estados-flotante {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 500;
+  max-width: 214px;
+  padding: 8px 10px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-float, 0 6px 20px rgba(0, 0, 0, 0.35));
+}
+/* Compacto: es una leyenda con la que se puede filtrar, no una tabla. */
+.av2-mapa-estados-flotante .av2-mapa-estado { padding: 3px 6px; }
+.av2-mapa-estados-flotante .av2-mapa-estados-lista { gap: 1px; }
+
+@media (max-width: 1180px) {
+  /* En angosto se cruza con la leyenda de concentracion: sube. */
+  .av2-mapa-estados-flotante { bottom: auto; top: 60px; right: 12px; }
+}
+
+/* CONSULTA COMPACTA — SOLO EN EL MAPA.
+   `ConsultaGuiada` es un control compartido y su espaciado normal esta bien
+   donde el alto no cuesta nada. Aca cuesta: medida en 1366x768 se llevaba
+   236px de los 768, y cada pixel suyo es un pixel que le falta al mapa. Los
+   overrides viven de este lado —no en `consulta-guiada.css`— para no cambiarle
+   el aire a las otras pantallas que la usan. */
+.av2-mapa-consulta .cg {
+  margin-top: 0;
+  padding: var(--pl-space-3);
+  /* ALTO MINIMO: la oracion cambia de largo con la pregunta ("...los reclamos
+     de X, del tipo Y, en Z" contra "...los barrios que no registran ninguno"),
+     y con ella se movia el arranque del mapa — 398px en una opcion, 468 en
+     otra. El dueño lo pidio explicito: *"y los mapas siempre iguales"*. Con el
+     piso, cambiar de pregunta cambia el mapa, no el layout. */
+  /* ALTO FIJO, CON EL CONTENIDO CENTRADO.
+     La oracion cambia de largo con la pregunta y con ella se movia el arranque
+     del mapa (398px en una opcion, 468 en otra); el dueño lo pidio explicito:
+     *"y los mapas siempre iguales"*. 203px es el alto de la pregunta MAS larga,
+     medido. Y el contenido va centrado a proposito: con `min-height` a secas la
+     pregunta corta quedaba arriba y dejaba un pozo de 80px abajo, que se lee
+     como un error. Centrado, el sobrante es aire repartido. */
+  min-height: 246px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.av2-mapa-consulta .cg-respuesta {
+  margin-top: var(--pl-space-2);
+  line-height: 1.3;
+}
+.av2-mapa-consulta .cg-consulta {
+  margin-top: var(--pl-space-2);
+  padding-top: var(--pl-space-2);
+}
+
+/* EL RECUADRO BLANCO AL CLICKEAR EN EL MAPA.
+   Leaflet enfoca el path o el marker que recibe el click, y el navegador le
+   pinta su outline por defecto: un rectangulo claro alrededor del barrio o del
+   donut recien elegido, que ademas no sigue la forma y se ve como un error
+   (dueño, 2026-09-06). Se saca para el PUNTERO y se conserva para el TECLADO:
+   `:focus-visible` solo aparece cuando se navega con Tab, que es justo cuando
+   hace falta ver donde esta uno parado. */
+.av2-mapa-lienzo .leaflet-interactive:focus,
+.av2-mapa-lienzo .leaflet-marker-icon:focus,
+.av2-mapa-lienzo .leaflet-container:focus,
+.av2-mapa-lienzo path:focus {
+  outline: none;
+}
+.av2-mapa-lienzo .leaflet-interactive:focus-visible,
+.av2-mapa-lienzo .leaflet-marker-icon:focus-visible {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 2px;
+}
+
+/* Leyenda de dos marcas, debajo del dibujo. Un grafico de dos series sin
+   leyenda obliga a adivinar cual es cual. */
+.gm-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--pl-text-muted);
+}
+.gm-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.gm-leyenda i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  display: block;
+}
+.gm-sw-pista { background: var(--pl-track, var(--pl-border)); }
+.gm-sw-ok { background: var(--pl-green); }
+.gm-sw-mal { background: var(--pl-amber-strong, var(--pl-data-3)); }
+
+/* EL KPI SEMANTICO, COMPACTO — solo dentro del panel del mapa.
+   `KpiSemantico` es del kit y su tamaño normal esta bien en el tablero, donde
+   una card por fila tiene todo el ancho. Aca comparte 400px de alto con DOS
+   graficos: medido, se llevaba 235 de los 400 y el segundo grafico quedaba
+   siempre abajo del pliegue. Los overrides viven de este lado para no cambiarle
+   el tamaño a las otras pantallas que lo usan. */
+.av2-mapa-columna-scroll .map-art { gap: 12px; }
+/* El piso de 232px existe para que las CINCO tarjetas del tablero midan
+   igual entre si. Aca hay UNA sola: el piso no iguala nada y se lleva 80px de
+   los 400 del panel. */
+.av2-mapa-columna-scroll .kse {
+  min-height: 0;
+  padding: 12px 14px;
+  box-shadow: none;
+}
+/* El numerote baja de tamaño display a titulo: sigue siendo lo primero que se
+   lee, pero deja de ocupar el alto de tres renglones el solo. */
+.av2-mapa-columna-scroll .kse-valor { font-size: 30px; line-height: 1.05; }
+.av2-mapa-columna-scroll .kse-pregunta { font-size: 13.5px; }
+.av2-mapa-columna-scroll .kse-detalle { font-size: 12.5px; line-height: 1.4; }
+/* La marca de agua gigante del fondo no aporta en una columna angosta. */
+.av2-mapa-columna-scroll .kse-marca { display: none; }
