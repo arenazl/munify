@@ -941,6 +941,7 @@ export default function Territorio() {
       <div className="av2-mapa territorio-mapa">
         <div className={`av2-mapa-lienzo ${claseBasemap(isDarkTheme)}`}>
           <MapContainer
+        scrollWheelZoom={false}
             center={[-34.6, -58.4]}
             zoom={5}
             preferCanvas

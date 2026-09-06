@@ -97,6 +97,7 @@ export function PolygonDrawer({
 
       <div className="rounded-xl overflow-hidden" style={{ height, border: '1px solid currentColor' }}>
         <MapContainer
+        scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
           center={centro}

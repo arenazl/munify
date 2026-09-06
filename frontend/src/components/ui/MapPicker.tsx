@@ -194,6 +194,7 @@ export function MapPicker({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
+        scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}
@@ -282,6 +283,7 @@ export function MapView({
   return (
     <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
+        scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
         center={[mapCenter.lat, mapCenter.lng]}

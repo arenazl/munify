@@ -596,6 +596,7 @@ export default function HeatmapWidget({
       style={{ height: '100%', width: '100%' }}
     >
       <MapContainer
+        scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
         center={mapCenter}

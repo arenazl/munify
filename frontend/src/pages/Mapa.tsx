@@ -86,6 +86,9 @@ import BurbujasBarrio, { type BurbujaBarrio } from '../components/mapa/BurbujasB
 // La segunda linea: EN QUE ANDAN los reclamos. Es la que le da sentido al
 // color de las burbujas y, de paso, es su leyenda.
 import FiltroEstadoMapa, { type GrupoEstado } from '../components/mapa/FiltroEstadoMapa';
+// Las franjas de los costados: donde vive lo que el mapa no puede decir
+// dibujando (y, de paso, el margen por donde scrollear sin pisarlo).
+import PanelLateral, { type FilaPanel } from '../components/mapa/PanelesLaterales';
 import {
   Reclamo,
   type PuntoInteres,
@@ -135,6 +138,36 @@ import MapaTimelapseBanda, {
  * paleta propia: el naranja del mapa tiene que ser el mismo naranja de la
  * pantalla de Reclamos.
  */
+/**
+ * Como se dice cada motivo de pausa en pantalla.
+ *
+ * El enum viaja en codigo (`materiales`, `otra_obra`) y eso no se le muestra a
+ * nadie. La frase corta es la que entra en una fila de panel; la larga es la
+ * que arma el remate en prosa.
+ */
+const MOTIVO_PAUSA_LABEL: Record<string, string> = {
+  materiales: 'Materiales',
+  presupuesto: 'Presupuesto',
+  personal: 'Personal',
+  tercero: 'Un tercero',
+  otra_obra: 'Otra obra',
+  clima: 'Clima',
+  sin_acceso: 'Sin acceso',
+  otro: 'Otro motivo',
+};
+
+/** La misma idea, en la frase con la que se arma el remate. */
+const MOTIVO_PAUSA_FRASE: Record<string, string> = {
+  materiales: 'la compra de materiales',
+  presupuesto: 'una licitación o partida pendiente',
+  personal: 'la falta de cuadrilla',
+  tercero: 'una obra de un tercero',
+  otra_obra: 'otra obra que va primero',
+  clima: 'el clima',
+  sin_acceso: 'no poder entrar al lugar',
+  otro: 'otros motivos',
+};
+
 const GRUPOS_ESTADO: Array<{ id: string; label: string; estados: string[]; colorDe: string }> = [
   {
     id: 'pendiente',
@@ -1746,6 +1779,20 @@ export default function Mapa() {
    *  2026-09-05: "comercialmente el mapa de calor es imbatible"). El boton de
    *  la llama la apaga para mirar las burbujas solas. */
   const [verCalor, setVerCalor] = useState(true);
+  /** Cartel de "usá Ctrl para hacer zoom", que se muestra solo cuando alguien
+   *  lo intenta sin Ctrl. No va fijo: un cartel permanente sobre el mapa es
+   *  ruido para el que ya sabe. */
+  const [avisoZoom, setAvisoZoom] = useState(false);
+  const avisoZoomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mostrarAvisoZoom = useCallback(() => {
+    setAvisoZoom(true);
+    if (avisoZoomTimer.current) clearTimeout(avisoZoomTimer.current);
+    avisoZoomTimer.current = setTimeout(() => setAvisoZoom(false), 1800);
+  }, []);
+  useEffect(() => () => {
+    if (avisoZoomTimer.current) clearTimeout(avisoZoomTimer.current);
+  }, []);
+
 
   /** Momento del ultimo click que YA atendio un poligono o un pin. Lo lee el
    *  handler de click del mapa para no volver a resolver lo mismo. */
@@ -2260,8 +2307,40 @@ export default function Mapa() {
     const salida: BurbujaBarrio[] = [];
     for (const [id, lista] of porBarrio) {
       const b = barriosMunicipio.find((x) => x.id === id);
-      if (!b || b.latitud == null || b.longitud == null) continue;
+      if (!b) continue;
       const n = lista.length;
+
+      // LA BURBUJA VA ENCIMA DE SUS PROPIOS RECLAMOS, no en el centro que el
+      // catalogo le asigna al barrio.
+      //
+      // Son el MISMO dato y tienen que verse como uno solo. Con el centro del
+      // catalogo, la mancha de calor quedaba en un lado y el circulo en otro
+      // --a veces a varias cuadras-- y se leian como dos cosas distintas
+      // (dueno, 2026-09-05: "una zona que marca que hay muchos reclamos y
+      // despues al lado el circulito... y es el mismo"). El centroide de los
+      // reclamos que la burbuja RESUME cae, por definicion, donde esta la
+      // mancha que resume los mismos puntos.
+      //
+      // El centro del catalogo queda de respaldo para el barrio que no tiene
+      // ningun reclamo ubicado: ahi no hay centroide que calcular.
+      let lat = 0;
+      let lng = 0;
+      let conCoord = 0;
+      for (const r of lista) {
+        if (r.latitud == null || r.longitud == null) continue;
+        lat += r.latitud;
+        lng += r.longitud;
+        conCoord += 1;
+      }
+      if (conCoord > 0) {
+        lat /= conCoord;
+        lng /= conCoord;
+      } else if (b.latitud != null && b.longitud != null) {
+        lat = b.latitud;
+        lng = b.longitud;
+      } else {
+        continue;
+      }
 
       // EL COLOR DICE EL ESTADO QUE MANDA EN EL BARRIO, no su posicion en un
       // ranking. Antes pintaba el tercio peor del municipio: un concepto que
@@ -2295,7 +2374,7 @@ export default function Mapa() {
         : (etiquetaGrupo ? `todos ${etiquetaGrupo}` : undefined);
 
       salida.push({
-        id, nombre: b.nombre, lat: b.latitud, lng: b.longitud,
+        id, nombre: b.nombre, lat, lng,
         valor: n, color,
         etiqueta: `${n} ${n === 1 ? 'reclamo' : 'reclamos'}`,
         detalle,
@@ -2303,6 +2382,90 @@ export default function Mapa() {
     }
     return salida;
   }, [dibujoMapa, reclamosFiltrados, barriosMunicipio]);
+
+  /**
+   * POR QUE ESTAN FRENADOS: el desglose de `motivo_pausa` de lo que se esta
+   * mirando.
+   *
+   * Es la lectura que el mapa no puede dar dibujando --un pin no dice que
+   * espera una compra-- y la que el dueno pidio para el funcionario: "necesita
+   * informacion procesada, no datos" (2026-09-05). Por eso no es una tabla de
+   * codigos sino filas con su frase, ordenadas por lo que mas frena.
+   *
+   * `pausado_desde` es lo que convierte el conteo en un problema: cinco
+   * trabajos frenados no dicen nada; cinco frenados hace ochenta dias, si.
+   */
+  const razonesDelFreno = useMemo(() => {
+    const porMotivo = new Map<string, { n: number; dias: number[] }>();
+    for (const r of reclamosDeLaConsulta) {
+      if (!r.motivo_pausa) continue;
+      const acc = porMotivo.get(r.motivo_pausa) ?? { n: 0, dias: [] };
+      acc.n += 1;
+      if (r.pausado_desde) acc.dias.push(diasDesde(r.pausado_desde));
+      porMotivo.set(r.motivo_pausa, acc);
+    }
+    const filas = Array.from(porMotivo, ([motivo, acc]) => ({
+      motivo,
+      n: acc.n,
+      diasProm: acc.dias.length
+        ? Math.round(acc.dias.reduce((a, b) => a + b, 0) / acc.dias.length)
+        : null,
+    })).sort((a, b) => b.n - a.n);
+    return filas;
+  }, [reclamosDeLaConsulta]);
+
+  const filasRazones = useMemo<FilaPanel[]>(() => {
+    if (razonesDelFreno.length === 0) return [];
+    const max = razonesDelFreno[0].n;
+    return razonesDelFreno.map((f) => ({
+      id: f.motivo,
+      titulo: MOTIVO_PAUSA_LABEL[f.motivo] ?? f.motivo,
+      valor: String(f.n),
+      detalle: f.diasProm != null
+        ? `${f.diasProm} ${f.diasProm === 1 ? 'día' : 'días'} esperando`
+        : undefined,
+      color: estadoColors.pospuesto,
+      proporcion: f.n / max,
+    }));
+  }, [razonesDelFreno]);
+
+  /** El remate del panel: la conclusion, en una frase. */
+  const remateRazones = useMemo(() => {
+    if (razonesDelFreno.length === 0) return undefined;
+    const top = razonesDelFreno[0];
+    const frase = MOTIVO_PAUSA_FRASE[top.motivo] ?? 'ese motivo';
+    // El que MAS TIEMPO lleva no siempre es el que mas veces aparece, y suele
+    // ser el mas grave: se nombra aparte cuando no coinciden.
+    const masViejo = [...razonesDelFreno]
+      .filter((f) => f.diasProm != null)
+      .sort((a, b) => (b.diasProm ?? 0) - (a.diasProm ?? 0))[0];
+    let texto = `Lo que más frena es ${frase}: ${top.n} ${top.n === 1 ? 'trabajo' : 'trabajos'}`;
+    if (top.diasProm != null) texto += `, ${top.diasProm} días esperando`;
+    texto += '.';
+    if (masViejo && masViejo.motivo !== top.motivo && (masViejo.diasProm ?? 0) > 0) {
+      texto += ` Lo que más tiempo lleva es ${MOTIVO_PAUSA_FRASE[masViejo.motivo] ?? 'otro motivo'}: ${masViejo.diasProm} días.`;
+    }
+    return texto;
+  }, [razonesDelFreno]);
+
+  /** DONDE SE CONCENTRA: los barrios con más de lo que se está mirando. */
+  const filasBarrios = useMemo<FilaPanel[]>(() => {
+    const orden = [...burbujasBarrio].sort((a, b) => b.valor - a.valor).slice(0, 8);
+    if (orden.length === 0) return [];
+    const max = orden[0].valor;
+    return orden.map((b) => ({
+      id: String(b.id),
+      titulo: b.nombre,
+      valor: String(b.valor),
+      detalle: b.detalle,
+      color: b.color,
+      proporcion: b.valor / max,
+      activo: barrioSel === b.id,
+      // Clickeable: la lista y el mapa son la misma cosa vista de dos maneras,
+      // asi que tocar la fila tiene que hacer lo mismo que tocar la burbuja.
+      onClick: () => setBarrioSel((x) => (x === b.id ? null : b.id)),
+    }));
+  }, [burbujasBarrio, barrioSel]);
 
   // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
   // La ventana móvil recorta sobre esto y el remate compara la primera ventana
@@ -4223,6 +4386,21 @@ export default function Mapa() {
       {/* ============================ MODO RECLAMOS ============================ */}
       {!isPuntos && (
         <>
+      {/* TRES COLUMNAS: el mapa deja de ocupar todo el ancho y las dos franjas
+          de los costados se quedan con lo que el mapa no puede decir dibujando.
+          No es solo estetico --tambien devuelve el margen por donde bajar por
+          la pagina sin pasar el cursor por encima del mapa (dueno, 2026-09-05).
+          En pantalla completa la grilla se deshace y el mapa se queda con todo,
+          que es para lo que existe ese modo. */}
+      <div className="av2-mapa-grilla">
+        <PanelLateral
+          titulo="Por qué están frenados"
+          bajada="Los trabajos que no se pudieron resolver, y qué los traba."
+          filas={filasRazones}
+          vacio="Ningún trabajo quedó frenado con un motivo cargado."
+          remate={remateRazones}
+        />
+
       <div className="av2-mapa">
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}
@@ -4234,6 +4412,7 @@ export default function Mapa() {
           style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
         >
           <MapContainer
+        scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
             center={getMapCenter()}
@@ -4250,7 +4429,10 @@ export default function Mapa() {
             <EncuadrarBarrio encuadre={encuadreBarrio} />
             <MapController target={mapTarget} />
             <InvalidarAlRedimensionar />
-            <ZoomRuedaDeAUno />
+            <ZoomRuedaDeAUno
+              zoomLibre={pantallaCompleta}
+              onIntentoSinModificador={mostrarAvisoZoom}
+            />
 
             {/* ---- REGIONES: cada barrio pintado con el color de su distrito ----
                  Va PRIMERO para que quede debajo de los pines. Con un distrito
@@ -4749,6 +4931,13 @@ export default function Mapa() {
           </div>
         )}
 
+        {/* Aparece SOLO al intentar el zoom sin Ctrl, y se va solo. */}
+        {avisoZoom && !pantallaCompleta && (
+          <div className="av2-mapa-hint av2-mapa-hint--neutro" role="status">
+            Usá Ctrl + rueda para hacer zoom
+          </div>
+        )}
+
         {/* Hint mientras marcás el área del informe. El resumen y la descarga
             NO viven acá: viven en el panel "Informe de una zona" de abajo. */}
         {drawMode && !drawnBBox && (
@@ -4791,6 +4980,14 @@ export default function Mapa() {
             remate={remateElectro}
           />
         )}
+
+        <PanelLateral
+          titulo="Dónde se concentra"
+          bajada="Los barrios con más de lo que estás mirando. Tocá uno y el mapa va."
+          filas={filasBarrios}
+          vacio="Todavía no hay nada ubicado para esta consulta."
+        />
+      </div>{/* /av2-mapa-grilla */}
 
       {/* === Informe de una zona: no es un control del mapa, es una acción que
              PRODUCE UN DOCUMENTO. Por eso tiene panel propio, con el nombre de
@@ -4886,6 +5083,7 @@ export default function Mapa() {
               style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
             >
               <MapContainer
+        scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
         zoomSnap={1}
                 center={getPoiCenter()}

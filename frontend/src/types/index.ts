@@ -2,6 +2,19 @@ export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin' | 'opera
 export type EstadoReclamo = 'recibido' | 'en_curso' | 'finalizado' | 'pospuesto' | 'rechazado' | 'nuevo' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
+/** POR QUE un trabajo quedo diferido. Espeja el enum del backend
+ *  (`models/enums.MotivoPausa`); la lista es corta a proposito: con veinte
+ *  opciones el que carga elige "otro" siempre y el dato se muere. */
+export type MotivoPausa =
+  | 'materiales'
+  | 'clima'
+  | 'tercero'
+  | 'otra_obra'
+  | 'personal'
+  | 'sin_acceso'
+  | 'presupuesto'
+  | 'otro';
+
 // Info de dependencia para usuarios de dependencia
 export interface DependenciaInfo {
   id: number;
@@ -413,6 +426,11 @@ export interface Reclamo {
   referencia?: string;
   es_anonimo?: boolean;
   motivo_rechazo?: MotivoRechazo;
+  /** POR QUE quedo frenado, y desde cuando. Solo vienen con estado `pospuesto`:
+   *  al reanudarse el backend los limpia, porque describen el AHORA y no la
+   *  historia (la historia queda en el historial del reclamo). */
+  motivo_pausa?: MotivoPausa | null;
+  pausado_desde?: string | null;
   descripcion_rechazo?: string;
   resolucion?: string;
   fecha_resolucion?: string;

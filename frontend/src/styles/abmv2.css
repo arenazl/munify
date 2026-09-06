@@ -2459,6 +2459,155 @@ button.av2-chip:hover { opacity: 0.85; }
 }
 .av2-tl-btn--activo .av2-tl-icono { color: var(--pl-green-700); }
 
+/* --- LA GRILLA DEL MAPA: franja, mapa, franja ---------------------------
+   El mapa dejo de ocupar todo el ancho por dos razones que resultaron ser la
+   misma (dueno, 2026-09-05): las metricas necesitaban un lugar donde vivir, y
+   el mapa a ancho completo se comia el scroll de la pagina porque el cursor
+   caia encima si o si. Angostarlo dejo dos franjas justo del ancho de una
+   lista, y ahi va la lectura procesada.
+
+   `minmax(0, 1fr)` en el medio y no `1fr` a secas: sin el minimo en cero, el
+   contenido del mapa (los tiles) le impone un ancho minimo a la columna y la
+   grilla desborda hacia la derecha.
+
+   Las franjas se caen ANTES que el mapa al angostarse la pantalla: primero la
+   derecha, despues la izquierda, y en telefono queda el mapa solo con los
+   paneles debajo. Nunca al reves: el mapa es lo que se vino a ver. */
+.av2-mapa-grilla {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1400px) {
+  .av2-mapa-grilla { grid-template-columns: 240px minmax(0, 1fr); }
+  /* La franja derecha baja abajo de todo y ocupa el ancho completo. */
+  .av2-mapa-grilla > .av2-mapa-lateral:last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 1000px) {
+  .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
+  .av2-mapa-grilla > .av2-mapa-lateral:last-child { grid-column: auto; }
+  /* El mapa primero: es lo que se vino a ver. */
+  .av2-mapa-grilla > .av2-mapa { order: -1; }
+}
+
+/* A pantalla completa la grilla se deshace: el mapa se queda con todo y las
+   franjas no van --- para eso se pidio la pantalla completa. */
+.av2-mapa-full:fullscreen .av2-mapa-grilla,
+.av2-mapa-full--expandido .av2-mapa-grilla {
+  display: block;
+}
+.av2-mapa-full:fullscreen .av2-mapa-lateral,
+.av2-mapa-full--expandido .av2-mapa-lateral {
+  display: none;
+}
+
+/* --- LA FRANJA --- */
+.av2-mapa-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  min-width: 0;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+.av2-mapa-lateral-head { display: flex; flex-direction: column; gap: 3px; }
+.av2-mapa-lateral-titulo {
+  margin: 0;
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-display);
+  color: var(--pl-text);
+}
+.av2-mapa-lateral-bajada,
+.av2-mapa-lateral-vacio {
+  margin: 0;
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.4;
+  color: var(--pl-text-muted);
+  text-wrap: pretty;
+}
+.av2-mapa-lateral-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Una fila: nombre + numero arriba, la vara debajo y la barra al pie. Es una
+   grilla y no un flex para que el numero quede SIEMPRE pegado a la derecha,
+   con el nombre absorbiendo lo que sobra. */
+.av2-mapa-fila {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 8px;
+  padding: 7px 9px;
+  text-align: left;
+  background: var(--pl-surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--pl-radius-md);
+  font-family: var(--pl-font-sans);
+}
+.av2-mapa-fila--clickeable { cursor: pointer; }
+.av2-mapa-fila--clickeable:hover { background: var(--pl-surface-hover); }
+.av2-mapa-fila--activa {
+  border-color: color-mix(in srgb, var(--av2-fila-color) 55%, transparent);
+  background: color-mix(in srgb, var(--av2-fila-color) 12%, var(--pl-surface));
+}
+.av2-mapa-fila-titulo {
+  min-width: 0;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av2-mapa-fila-valor {
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--av2-fila-color);
+}
+.av2-mapa-fila-detalle {
+  grid-column: 1 / -1;
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+}
+.av2-mapa-fila-barra {
+  grid-column: 1 / -1;
+  margin-top: 5px;
+  height: 4px;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  overflow: hidden;
+}
+.av2-mapa-fila-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--av2-fila-color);
+}
+.av2-mapa-lateral-remate {
+  margin: 2px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--pl-border);
+  font-size: var(--pl-fs-body-sm);
+  line-height: 1.45;
+  color: var(--pl-text);
+  text-wrap: pretty;
+}
+
 .av2-mapa {
   position: relative;
   margin-top: 12px;
@@ -2699,6 +2848,14 @@ button.av2-chip:hover { opacity: 0.85; }
 }
 
 /* Hint mientras se marca el área del informe. */
+/* Variante neutra del hint: el verde es para "estás haciendo algo"; este
+   avisa cómo se hace algo, que no es un estado de la app. */
+.av2-mapa-hint--neutro {
+  color: var(--pl-text);
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+}
+
 .av2-mapa-hint {
   position: absolute;
   top: 12px;
