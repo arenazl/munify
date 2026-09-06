@@ -103,7 +103,10 @@ export default function MapaTimelapseBanda({
   const IconoRemate = remate?.mejora ? TrendingDown : TrendingUp;
 
   return (
-    <section className="mtl" aria-label="Recorrido temporal del mapa">
+    // `--dock`: fija al pie de la ventana mientras se reproduce. En el flujo
+    // obligaba al mapa a cederle alto justo cuando el mapa es lo unico que
+    // importa mirar.
+    <section className="mtl mtl--dock" aria-label="Recorrido temporal del mapa">
       <header className="mtl-cab">
         {/* En reposo el botón LATE y arrastra el rótulo "Ver la evolución":
             sin eso nada invitaba a tocarlo y el recorrido quedaba escondido. */}

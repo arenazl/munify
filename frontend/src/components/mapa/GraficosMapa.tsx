@@ -711,9 +711,13 @@ export default function GraficosMapa({ pregunta, reclamos }: Props) {
   const elegidos = useMemo(() => {
     const orden = POR_LENTE[pregunta] ?? POR_LENTE.repiten;
     const red = ['categorias', 'cuando', 'supervivencia', 'brecha'];
+    // TRES por enfoque, no dos. Cada lente ya declara cuatro candidatos en
+    // orden de relevancia: cortar en dos dejaba el tercero --- que suele ser el
+    // que explica el porqué --- sin dibujar, y el panel a media asta (dueño,
+    // 2026-09-06: "y 3 gráficos por enfoque").
     const salida: string[] = [];
     for (const id of [...orden, ...red]) {
-      if (salida.length === 2) break;
+      if (salida.length === 3) break;
       if (salida.includes(id)) continue;
       if (D[id]?.hay(reclamos, ahora)) salida.push(id);
     }

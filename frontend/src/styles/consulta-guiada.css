@@ -341,12 +341,14 @@
 }
 
 /* --- herramientas del costado (no filtran: hacen algo) --- */
+/* Van en la cabecera, pegadas a la derecha junto a "ver todo". */
 .cg-acciones {
   flex: 0 0 auto;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
 }
 .cg-accion {
   display: inline-flex;

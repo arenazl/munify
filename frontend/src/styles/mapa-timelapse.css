@@ -19,6 +19,30 @@
   box-shadow: var(--pl-shadow-card);
 }
 
+/* DOCKEADA AL PIE MIENTRAS SE REPRODUCE.
+   La banda vivía en el flujo, debajo del mapa, y por eso el mapa tenía que
+   cederle 148px de alto justo cuando uno le da play — o sea, justo cuando el
+   mapa es lo único que importa mirar. Fija al pie no le quita nada: flota
+   sobre la página, el mapa se queda con todo su alto, y el reproductor está
+   siempre a la vista sin importar dónde esté el scroll (dueño, 2026-09-06:
+   "el player dockeado al footer").
+
+   `left`/`right` en 0 y no un ancho fijo: la barra ocupa el ancho de la
+   ventana, que es lo que hace un reproductor. */
+.mtl--dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 700;
+  margin: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.28);
+}
+
 /* --- Cabecera: una sola línea ------------------------------ */
 .mtl-cab {
   display: flex;

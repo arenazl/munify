@@ -216,10 +216,6 @@ const TITULO_LENTE: Record<string, string> = {
 
 const ZOOM_MIN_DONUT = 11;
 
-/** Ancla de la sección del ranking (la acción del hero scrollea acá). El id
- *  del DOM se mantiene estable aunque el ranking cambie de contenido con la
- *  pregunta: es la dirección a la que apuntan deep-links y verificaciones. */
-const ID_RANKING = 'mapa-zonas-calientes';
 
 /** "8 de julio" — formato largo para la frase narrada del hero. */
 const fechaLarga = (ms: number) =>
@@ -228,11 +224,14 @@ const fechaLarga = (ms: number) =>
 const MAPA_ALTO_MIN = 300;
 /** Lo minimo que puede ceder el mapa. Bajo a proposito: en 768 el mapa tiene
  *  que achicarse para que el reproductor entre en la misma pantalla. */
-/** Lo minimo que puede medir EL LIENZO. 460 y no 260: con el banner semantico
- *  arriba no entra todo en 768 --- eso ya se sabe --- pero entre un mapa
- *  apretado de 246px que hay que scrollear igual y uno de 460 que se lee, gana
- *  el segundo. La pagina scrollea, como cualquier pagina. */
-const MAPA_ALTO_PISO = 460;
+/** Lo minimo que puede medir EL LIENZO.
+ *
+ *  580 y no 260: con el banner semantico arriba no entra todo en 768 --- eso ya
+ *  se sabe --- y si igual hay que scrollear un poco, mejor que el mapa se vea.
+ *  Con 446px de alto y 720 de ancho el dueno lo llamo "super chico" y tenia
+ *  razon: un mapa de reclamos con menos de medio viewport no deja leer una
+ *  ciudad. La pagina scrollea, como cualquier pagina. */
+const MAPA_ALTO_PISO = 580;
 /** Lo que se le deja abajo al mapa cuando NO hay reproductor a la vista.
  *  Eran 96px para que se asomara la lista de zonas calientes que vivia debajo.
  *  Ya no vive nada debajo: las lecturas estan al costado, dentro del panel,
@@ -242,10 +241,6 @@ const MAPA_ALTO_PISO = 460;
 // sobraban 23; la diferencia es exactamente ese padding, asi que descontarlo
 // deja la pantalla en 768 clavados, sin barra (medido en 1366x768, 2026-09-06).
 const MAPA_AIRE_INFERIOR = 26;
-/** Lo que ocupa la banda del time-lapse. Cuando esta abierta, el mapa cede
- *  esto de mas: el reproductor tiene que verse SIN scrollear, si no uno le da
- *  play y no ve pasar nada (dueno, 2026-09-05). */
-const ALTO_REPRODUCTOR = 148;
 
 /** Opciones del filtro Período. El label es lo que se LEE dentro de la
  *  oración de la consulta guiada, así que va en minúscula y con su
@@ -753,31 +748,73 @@ function FitBoundsToMarkers({
   const map = useMap();
   const lastSignal = useRef(-1);
 
+  /**
+   * Los datos van por REF, no por dependencia — y eso es el arreglo, no un
+   * atajo.
+   *
+   * `reclamos` y `respaldo` son arrays nuevos en cada render. Estando en las
+   * dependencias, el efecto se re-ejecutaba enseguida, su cleanup CANCELABA el
+   * `setTimeout` de 100 ms antes de que llegara a encuadrar, y al volver a
+   * entrar el `signal` ya coincidía con el guardado: salía por el `return` sin
+   * hacer nada. El encuadre no ocurría NUNCA --- ni al cambiar de pregunta, ni
+   * al plegar el panel, ni tocando "centrar el mapa". El síntoma que lo delató:
+   * "pongo todo el municipio y se ve sólo una parte" (dueño, 2026-09-06), con
+   * 13 de 44 zonas visibles y sin cambiar al ensanchar el mapa 346px.
+   *
+   * Con la ref, el efecto depende SOLO de la señal --- que es lo que de verdad
+   * pide un encuadre --- y lee los datos frescos cuando el temporizador corre.
+   */
+  const datos = useRef({ reclamos, respaldo });
+  // La ref se refresca en un efecto, no durante el render: escribirla en el
+  // cuerpo del componente es leerla/mutarla mientras React renderiza.
+  useEffect(() => {
+    datos.current = { reclamos, respaldo };
+  }, [reclamos, respaldo]);
+
   useEffect(() => {
     if (signal === lastSignal.current) return;
-    lastSignal.current = signal;
     const timer = setTimeout(() => {
-      const valid = reclamos.filter(r => r.latitud != null && r.longitud != null);
+      // La señal se marca como atendida DENTRO del temporizador, no antes.
+      //
+      // Marcarla arriba parecía lo mismo y no lo era: en desarrollo React monta,
+      // desmonta y vuelve a montar cada efecto (StrictMode). La primera pasada
+      // marcaba la señal y su cleanup cancelaba el `setTimeout`; la segunda
+      // entraba, veía la señal ya marcada y salía por el `return`. El encuadre
+      // no ocurría NUNCA — ni al entrar, ni al cambiar de pregunta, ni tocando
+      // "centrar el mapa" — y el mapa quedaba clavado en el zoom inicial con 31
+      // de las 44 zonas fuera de la vista, todas hacia el sur (dueño,
+      // 2026-09-06: "pongo todo el municipio y se ve sólo una parte").
+      lastSignal.current = signal;
+      const { reclamos: rs, respaldo: resp } = datos.current;
+      const valid = rs.filter(r => r.latitud != null && r.longitud != null);
+      map.invalidateSize();
       if (valid.length === 0) {
-        if (respaldo && respaldo.length >= 2) {
-          map.invalidateSize();
-          map.fitBounds(L.latLngBounds(respaldo.map((p) => L.latLng(p[0], p[1]))), {
+        if (resp && resp.length >= 2) {
+          map.fitBounds(L.latLngBounds(resp.map((p) => L.latLng(p[0], p[1]))), {
             padding: [40, 40],
             maxZoom: 14,
           });
         }
         return;
       }
-      map.invalidateSize();
       if (valid.length === 1) {
         map.setView([valid[0].latitud!, valid[0].longitud!], 15);
       } else {
         const latlngs = valid.map(r => L.latLng(r.latitud!, r.longitud!));
-        map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 15 });
+        // AIRE CHICO A PROPOSITO. Con los 50 px de antes el municipio entraba
+        // "comodo" y esa comodidad costaba un nivel de zoom ENTERO: a zoom 13
+        // el lienzo (720x566) deja 620x466 utiles = 10,1 x 7,6 km, y Carlos Paz
+        // mide 8,8 x 8,3 -- no entra por 700 metros, asi que Leaflet bajaba a 12
+        // y el municipio quedaba chiquito en medio del campo, con el embalse y
+        // Tanti ocupando media pantalla (dueno, 2026-09-06: "cuando pongo todo
+        // el municipio se ve solo una parte"). Con 16 px quedan 688x534 = 11,2 x
+        // 8,7 km y el municipio entra a 13, que es el zoom donde se leen los
+        // barrios. El aire visual ya lo ponen los propios donuts.
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [16, 16], maxZoom: 15 });
       }
-    }, 100);
+    }, 120);
     return () => clearTimeout(timer);
-  }, [reclamos, map, signal, respaldo]);
+  }, [map, signal]);
 
   return null;
 }
@@ -1619,7 +1656,9 @@ export default function Mapa() {
       // terminaba cortado con 200px vacios abajo (visto en 1366x768,
       // 2026-09-06). Ahora la pantalla no scrollea y `rect.top` es estable.
       const arranque = el.getBoundingClientRect().top;
-      const aire = MAPA_AIRE_INFERIOR + (reservarReproductor ? ALTO_REPRODUCTOR : 0);
+      // La banda del time-lapse ya no ocupa lugar en el flujo (va fija al pie),
+      // asi que el mapa no le cede alto: se queda con todo el disponible.
+      const aire = MAPA_AIRE_INFERIOR;
       const disponible = window.innerHeight - arranque - aire;
       // EL PISO ES DEL MAPA, PERO LA VARIABLE ES DEL BLOQUE ENTERO.
       //
@@ -1732,9 +1771,17 @@ export default function Mapa() {
    * la marca, en un municipio con acento rojo volveriamos al mismo problema.
    */
   const rampaDensidad = useMemo<RampaDensidad>(() => ({
-    baja: '#8B5CF6',    // violeta
-    media: '#C026D3',   // fucsia
-    alta: '#EC4899',    // magenta
+    // Amarillo -> naranja -> rojo profundo. Es la rampa de calor de toda la
+    // vida: se lee como temperatura sin que nadie la explique, y sigue estando
+    // fuera del vocabulario de ESTADO (cyan pendiente, naranja pospuesto, verde
+    // finalizado) porque ninguno de esos tres es amarillo ni rojo profundo.
+    //
+    // La anterior era violeta -> magenta: no competía con los estados pero
+    // tampoco se leía como densidad — el violeta no dice "acá hay muchos"
+    // (dueño, 2026-09-06: "tirando a un naranja, no a ese turquesa").
+    baja: '#FDBA2E',    // amarillo
+    media: '#F97316',   // naranja
+    alta: '#DC2626',    // rojo profundo
   }), []);
 
 
@@ -2095,6 +2142,30 @@ export default function Mapa() {
     setReservarReproductor(tlActivo && !isPuntos);
   }, [tlActivo, isPuntos]);
 
+  /**
+   * Al darle play, el panel se pliega solo.
+   *
+   * El recorrido es para MIRAR el mapa: es lo único que se mueve, y con el
+   * panel abierto el mapa se queda con 720px de ancho cuando podría tener
+   * 1100. Las cards de al lado no se actualizan con la reproducción, así que
+   * ese ancho está ocupado por algo quieto mientras uno mira algo que pasa
+   * (dueño, 2026-09-06). Al cortar el recorrido el panel vuelve solo: plegarlo
+   * es parte del modo reproducción, no una preferencia que el usuario haya
+   * expresado.
+   */
+  const panelAntesDelPlay = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (tlActivo) {
+      if (panelAntesDelPlay.current === null) {
+        panelAntesDelPlay.current = panelAbierto;
+        setPanelAbierto(false);
+      }
+    } else if (panelAntesDelPlay.current !== null) {
+      setPanelAbierto(panelAntesDelPlay.current);
+      panelAntesDelPlay.current = null;
+    }
+  }, [tlActivo, panelAbierto]);
+
   /* En el telefono el reproductor se monta ABAJO del mapa, que ya se come casi
      toda la pantalla: al apretar "Evolucion" la banda aparecia a 968px con una
      ventana de 664 y el usuario no veia nada pasar (dueño, 2026-08-31). Se lo
@@ -2399,7 +2470,15 @@ export default function Mapa() {
     // A zoom de provincia no hay donut que entre: los barrios caen todos en el
     // mismo puñado de pixeles. Ahi manda la mancha, que si escala con el mapa.
     if (zoomMapa < ZOOM_MIN_DONUT) return new Map<number, L.DivIcon>();
-    const max = donutsZona[0].total;
+    // EL MAXIMO ES EL MAYOR TOTAL, no el total del primero de la lista.
+    //
+    // La lista se ordena por `valor`, que desde que el donut contesta la
+    // pregunta activa puede ser un PORCENTAJE: el primero es el barrio con el
+    // porcentaje mas alto, que suele tener dos o tres reclamos. Tomarlo como
+    // maximo hacia que un barrio de veinte se escalara contra dos --- raiz de
+    // diez --- y saliera de 166px. Los donuts se veian "gigantes
+    // desproporcionales" (dueno, 2026-09-06) y tapaban el mapa.
+    const max = Math.max(...donutsZona.map((d) => d.total), 1);
     // Entre ZOOM_MIN_DONUT y el zoom de municipio el donut se achica en vez de
     // desaparecer de golpe: el salto seco se lee como que algo se rompio.
     const escala = Math.min(1, 0.42 + (zoomMapa - ZOOM_MIN_DONUT) * 0.14);
@@ -3267,14 +3346,6 @@ export default function Mapa() {
   // cuántos barrios llegamos, dónde está creciendo y qué lleva demasiado
   // abierto. Lo que responde "cuánto tardamos" (% resueltos, resolución
   // media) vive en el Dashboard: acá sería ruido. Las zonas calientes NO son
-  // KPI porque la lista rankeada de abajo lo dice mejor y sin duplicar.
-  // Acción del hero: contesta "dónde se repiten" y baja a la lista.
-  const irAZonasCalientes = useCallback(() => {
-    setPregunta('repiten');
-    document
-      .getElementById(ID_RANKING)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, []);
 
   // Frases del hero semántico (reemplaza al PageHint estático). Solo datos ya
   // cargados: sin datos → [] y el hero no renderiza. Veredictos vía lib/veredictos.
@@ -3477,19 +3548,11 @@ export default function Mapa() {
     }
     segmentosA.push(seg('.'));
 
-    const fraseA: HeroFrase = {
-      segmentos: segmentosA,
-      acciones:
-        hotspots.length > 0
-          ? [
-              {
-                label: `Ver las ${hotspots.length} zonas calientes`,
-                onClick: irAZonasCalientes,
-                primaria: true,
-              },
-            ]
-          : undefined,
-    };
+    // SIN BOTÓN. Llevaba a "Ver las N zonas calientes", que es exactamente lo
+    // que hace la lente "Dónde se repiten" — a dos centímetros, en la fila de
+    // preguntas. Un botón que duplica un control visible cuesta 54px de banner
+    // y no ahorra ni un clic (dueño, 2026-09-06).
+    const fraseA: HeroFrase = { segmentos: segmentosA };
 
     const frases: HeroFrase[] = [fraseA];
 
@@ -3536,7 +3599,6 @@ export default function Mapa() {
     lugaresMunicipio.length,
     barrioQueMasCrecio,
     sinCoordenada,
-    irAZonasCalientes,
     tlEstado,
     ventanaTimelapse,
     reclamosVentanaPrevia,
@@ -4102,6 +4164,23 @@ export default function Mapa() {
     if (barrioSel == null) setFitSignal(s => s + 1);
   }, [barrioSel]);
 
+  /**
+   * Al CAMBIAR DE TAMAÑO el lienzo, se vuelve a encuadrar.
+   *
+   * Leaflet se entera del resize --el ResizeObserver le avisa-- pero sólo
+   * redibuja: conserva el centro y el zoom que tenía. Con un lienzo más alto
+   * eso deja el mismo recorte con bandas nuevas, y con uno más ancho recorta:
+   * el dueño lo vio como "pongo todo el municipio y se ve sólo una parte"
+   * (2026-09-06), justo después de que el mapa pasara de 446 a 566px de alto.
+   *
+   * Se dispara también cuando el panel se pliega --el ancho cambia-- que es
+   * cuando más se nota.
+   */
+  useEffect(() => {
+    const t = setTimeout(() => setFitSignal(s => s + 1), 120);
+    return () => clearTimeout(t);
+  }, [mapaAlto, panelAbierto]);
+
   // En modo Puntos no bloqueamos por la carga de reclamos (el panel de POIs
   // tiene su propio loading). El spinner global es solo para el modo Reclamos.
   if (loading && !isPuntos) {
@@ -4381,10 +4460,14 @@ export default function Mapa() {
           existe sale mas caro de lo que ahorra: el dia que el kit cambia el
           tratamiento del titulo, esta pantalla se queda atras sin que nadie se
           entere (dueno, 2026-09-06: "siempre usa los componentes del kit"). */}
+      {/* SIN `description`: decia "Elegi una pregunta y el mapa te la contesta,
+          donde se repite el mismo problema, que quedo atrasado..." --- que es
+          exactamente lo que la consulta de abajo HACE, con las cuatro lentes a
+          la vista. Explicar arriba lo que se ve abajo costaba 40px de la unica
+          pantalla que hay. */}
       <PageHeader
         eyebrow={cabecera.eyebrow}
         title={cabecera.title}
-        description={cabecera.description}
       />
 
       {/* EL BANNER SEMANTICO. Volvio despues de haberlo reemplazado por una

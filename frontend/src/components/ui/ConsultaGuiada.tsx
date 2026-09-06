@@ -242,6 +242,34 @@ export function ConsultaGuiada({
             {verTodo.label}
           </button>
         )}
+
+        {/* LAS ACCIONES, ARRIBA A LA DERECHA.
+            Estaban abajo de la oración y cada una se comía un renglón entero:
+            "Marcar un área" ocupaba una línea completa para decir dos palabras.
+            Acá comparten la línea del encabezado, que tenía lugar de sobra a la
+            derecha (dueño, 2026-09-06: "ponelo al lado de ver todo"). */}
+        {acciones && acciones.length > 0 && (
+          <div className="cg-acciones">
+            {acciones.map((a) => {
+              const Icono = a.icono;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`cg-accion${a.activo ? ' cg-accion--activa' : ''}`}
+                  onClick={a.onClick}
+                  disabled={a.disabled}
+                  aria-pressed={a.activo}
+                  title={a.titulo || a.label}
+                  aria-label={a.titulo || a.label}
+                >
+                  {Icono && <Icono className="cg-accion-icono" aria-hidden />}
+                  <span className="cg-accion-label">{a.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 2 · La RESPUESTA: lo que más pesa del bloque. Va antes de la oración
@@ -352,28 +380,6 @@ export function ConsultaGuiada({
             )}
           </div>
 
-          {acciones && acciones.length > 0 && (
-            <div className="cg-acciones">
-              {acciones.map((a) => {
-                const Icono = a.icono;
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    className={`cg-accion${a.activo ? ' cg-accion--activa' : ''}`}
-                    onClick={a.onClick}
-                    disabled={a.disabled}
-                    aria-pressed={a.activo}
-                    title={a.titulo || a.label}
-                    aria-label={a.titulo || a.label}
-                  >
-                    {Icono && <Icono className="cg-accion-icono" aria-hidden />}
-                    <span className="cg-accion-label">{a.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
     </section>

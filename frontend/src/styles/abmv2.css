@@ -2492,6 +2492,89 @@ button.av2-chip:hover { opacity: 0.85; }
   .av2-mapa-consulta--sticky { position: static; }
 }
 
+/* EL TÍTULO DEL MAPA, EN UNA SOLA LÍNEA.
+   El título cambia con la lente ("Dónde se concentran los reclamos del
+   municipio", "Lo que está esperando hace más tiempo"…). A 34px unos entran en
+   una línea y otros en dos, y al cambiar de pregunta la página entera pega un
+   salto de 38px — el mapa se corre debajo del cursor (dueño, 2026-09-06).
+
+   Se resuelve con alto fijo de una línea: el título es una etiqueta, no un
+   párrafo. Si un título no entra, se corta con puntos suspensivos, que es
+   preferible a que se mueva la pantalla. */
+.av2-page[data-module="mapa"] .av2-pagehead-titulo {
+  font-size: 26px;
+  line-height: 1.2;
+  height: calc(26px * 1.2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* EL BANNER, OCULTO EN EL MAPA (dueño, 2026-09-06).
+   Se apaga por CSS y no se borra del árbol: el componente y sus datos quedan
+   armados, así que volver a mostrarlo es sacar estas tres líneas. Son 200px
+   que pasan directo al mapa. */
+.av2-hero--mapa { display: none; }
+
+/* --- EL BANNER, FINO, EN LA PANTALLA DEL MAPA --------------------------
+   Medido en 1366x768: 286px. Es el bloque más grande de todo lo que va arriba
+   del mapa y lo que hace que el lienzo arranque en y=717 — o sea, que uno
+   entre al mapa y no vea el mapa.
+
+   No se saca: ya se probó reemplazarlo por una tira de números y fue peor —
+   los KPIs sin la frase son una planilla. Se le quita el AIRE: menos padding,
+   la frase más cerca de los números, y los números en cuerpo de dato y no de
+   titular. La lectura queda igual; lo que se va es el margen.
+
+   La especificidad va con las tres clases juntas: `.sh-card` sola pierde
+   contra las reglas del hero que ya existen.
+
+   Acotado a `--mapa`: en el tablero, donde el hero ES lo que se viene a leer,
+   el aire original está bien. */
+.av2-hero.av2-hero--mapa.sh-card { padding: 12px 16px; }
+/* La frase y el pie: el texto entero, en cuerpo de lectura y no de titular.
+   Son los dos bloques mas altos del banner (80 y 54 px) y bajan a la mitad sin
+   perder una palabra. */
+.av2-hero--mapa .sh-stack {
+  gap: 4px;
+  font-size: var(--pl-fs-body);
+  line-height: 1.35;
+}
+.av2-hero--mapa .sh-stack > * { font-size: inherit; line-height: inherit; }
+.av2-hero--mapa .sh-kpis {
+  padding-top: 8px;
+  margin-top: 8px;
+  gap: 8px 20px;
+}
+.av2-hero--mapa .sh-kpi-valor { font-size: var(--pl-fs-card-title); line-height: 1.1; }
+.av2-hero--mapa .sh-kpi-sub { font-size: var(--pl-fs-micro); }
+
+/* --- LA CONSULTA, FINA, EN LA PANTALLA DEL MAPA ------------------------
+   Medida en 1366x768: el bloque ocupaba 254px para un contenido de 102 --- el
+   resto eran paddings y aire pensados para una pantalla donde la consulta ES
+   el contenido. Acá el contenido es el mapa, y cada píxel de arriba es un
+   píxel que le falta abajo (dueño, 2026-09-06: "bien finito").
+
+   Va acotado a `.av2-mapa-consulta` y no al componente: en las pantallas donde
+   la consulta manda, el aire original está bien. */
+.av2-mapa-consulta .cg {
+  margin-top: var(--pl-space-3);
+  padding: var(--pl-space-3);
+}
+/* Los tres bloques, pegados. Entre la pregunta, la respuesta y la oración
+   había 12px de margen y otros 12 de padding en cada junta: 40px de aire para
+   tres líneas que se leen seguidas. Acá el aire es lo que le falta al mapa
+   (dueño, 2026-09-06: "mucho más chica"). */
+.av2-mapa-consulta .cg-respuesta {
+  margin-top: 6px;
+  font-size: var(--pl-fs-body);
+}
+.av2-mapa-consulta .cg-consulta {
+  margin-top: 6px;
+  padding-top: 8px;
+}
+.av2-mapa-consulta .cg-cabecera { gap: 6px 10px; }
+
 /* --- LA TIRA DE INDICADORES DEL MAPA -----------------------------------
    Los mismos numeros que traia el hero, en una linea. El hero medía 290px de
    alto y empujaba el mapa fuera de la primera pantalla en 1366x768; la tira
@@ -2887,7 +2970,16 @@ button.av2-chip:hover { opacity: 0.85; }
    la oracion se partia en tres renglones para caber en 1fr menos 376px. Es la
    barra de mando de la pantalla, no una columna mas (dueno, 2026-09-06: "eso
    ocupa el 100"). */
-.av2-mapa-full > .av2-controles { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
+/* `align-self: start` — sin esto el grid ESTIRA el bloque al alto de su fila y
+   la consulta queda con la mitad de abajo vacía: 246px de caja para 163px de
+   contenido (dueño, 2026-09-06: "tiene la mitad del espacio al pedo"). El
+   estirado es el default de grid, no algo que se haya pedido. */
+.av2-mapa-full > .av2-controles {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+  align-self: start;
+}
 
 .av2-mapa-full:fullscreen,
 .av2-mapa-full--expandido {
@@ -2999,7 +3091,7 @@ button.av2-chip:hover { opacity: 0.85; }
   width: 96px;
   height: 8px;
   border-radius: var(--pl-radius-pill);
-  background: linear-gradient(90deg, #8B5CF6 0%, #C026D3 52%, #EC4899 100%);
+  background: linear-gradient(90deg, #FDBA2E 0%, #F97316 52%, #DC2626 100%);
 }
 .av2-mapa-leyenda-extremo {
   font-size: var(--pl-fs-micro);
@@ -6188,10 +6280,23 @@ button.av2-recorrido-miga:hover {
 
 /* Ejes y grilla: la grilla se INSINUA. Si compite con el dato, tapa el dato. */
 .gm-gl { stroke: var(--pl-border); stroke-width: 1; }
+/* LAS ETIQUETAS SE TIENEN QUE LEER.
+   Estaban en `--pl-text-muted` a 10.5px: sobre el fondo oscuro del panel el
+   nombre de la categoría desaparecía y quedaban barras sin decir de qué eran
+   (dueño, 2026-09-06: "no se ve el texto"). El eje NO es decoración: sin él
+   una barra es un rectángulo de colores.
+
+   `--pl-text-2` es el gris de lectura, no el de apoyo; y 11.5px es el mínimo
+   al que un nombre largo como "Arbolado y espacios verdes" sigue siendo
+   legible en un panel de 340px. */
+/* Las etiquetas van en unidades del viewBox del SVG, que se escala al ancho
+   del panel: a 11.5 se renderizaban a unos 9px reales y quedaban en miniatura
+   (dueño, 2026-09-06). 14 en viewBox da ~11px en pantalla, que es el mínimo
+   legible para un nombre de categoría. */
 .gm-ax,
 .gm-axv {
-  font-size: 10.5px;
-  fill: var(--pl-text-muted);
+  font-size: 14px;
+  fill: var(--pl-text-2, var(--pl-text));
   font-family: var(--pl-font-body, inherit);
 }
 .gm-valor {
@@ -6264,19 +6369,23 @@ button.av2-recorrido-miga:hover {
 .av2-mapa-consulta .cg {
   margin-top: 0;
   padding: var(--pl-space-3);
-  /* ALTO MINIMO: la oracion cambia de largo con la pregunta ("...los reclamos
-     de X, del tipo Y, en Z" contra "...los barrios que no registran ninguno"),
-     y con ella se movia el arranque del mapa — 398px en una opcion, 468 en
-     otra. El dueño lo pidio explicito: *"y los mapas siempre iguales"*. Con el
-     piso, cambiar de pregunta cambia el mapa, no el layout. */
   /* ALTO FIJO, CON EL CONTENIDO CENTRADO.
-     La oracion cambia de largo con la pregunta y con ella se movia el arranque
-     del mapa (398px en una opcion, 468 en otra); el dueño lo pidio explicito:
-     *"y los mapas siempre iguales"*. 203px es el alto de la pregunta MAS larga,
-     medido. Y el contenido va centrado a proposito: con `min-height` a secas la
-     pregunta corta quedaba arriba y dejaba un pozo de 80px abajo, que se lee
-     como un error. Centrado, el sobrante es aire repartido. */
-  min-height: 246px;
+     La oración cambia de largo con la pregunta ("…los reclamos de X, del tipo
+     Y, en Z" contra "…los barrios que no registran ninguno") y con ella se
+     movía el arranque del mapa: 398px en una opción, 468 en otra. El dueño lo
+     pidió explícito — *"y los mapas siempre iguales"* — así que el bloque tiene
+     un alto estable y el contenido va centrado, para que el sobrante sea aire
+     repartido y no un pozo abajo.
+
+     El valor es el de la pregunta MÁS LARGA, medido con las cuatro lentes en
+     1366x768: 152px de contenido más el padding. Estuvo en 246 mientras el
+     comentario decía 203, y esos 63px de más eran caja vacía en TODAS las
+     preguntas — la mitad de abajo se veía hueca (dueño, 2026-09-06). Desde que
+     las acciones subieron a la cabecera, la oración ocupa una línea menos.
+
+     Si se toca la oración o las acciones, hay que volver a medir las cuatro:
+     un valor de menos parte el layout, uno de más deja el pozo de vuelta. */
+  min-height: 165px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
