@@ -135,6 +135,38 @@ function Tarjeta({ datos }: { datos: TarjetaDatos }) {
   );
 }
 
+/** Como se dice cada motivo de pausa. El enum viaja en codigo y eso no se le
+ *  muestra a nadie: la frase corta encabeza la fila, la larga arma la prosa. */
+const MOTIVO_LABEL: Record<string, string> = {
+  materiales: 'Materiales',
+  presupuesto: 'Presupuesto',
+  personal: 'Personal',
+  tercero: 'Un tercero',
+  otra_obra: 'Otra obra',
+  clima: 'Clima',
+  sin_acceso: 'Sin acceso',
+  otro: 'Otro motivo',
+};
+const MOTIVO_FRASE: Record<string, string> = {
+  materiales: 'falta de materiales',
+  presupuesto: 'una licitación o partida pendiente',
+  personal: 'falta de cuadrilla',
+  tercero: 'una obra de un tercero',
+  otra_obra: 'otra obra que va primero',
+  clima: 'el clima',
+  sin_acceso: 'no poder entrar al lugar',
+  otro: 'otros motivos',
+};
+
+/** Estados que siguen abiertos. Lo mismo que considera el resto de la app. */
+const ABIERTOS = new Set([
+  'nuevo', 'recibido', 'asignado', 'en_proceso', 'en_curso',
+  'pendiente_confirmacion', 'pospuesto',
+]);
+
+const diasDesde = (iso?: string | null): number =>
+  iso ? Math.floor((Date.now() - new Date(iso).getTime()) / DIA_MS) : 0;
+
 const DIA_MS = 24 * 60 * 60 * 1000;
 const SEMANAS = 12;
 
@@ -294,11 +326,142 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
     };
   }, [tendencia]);
 
+  // ---------- 4. POR QUE NO AVANZA ----------
+  // La unica lectura ACCIONABLE de la pantalla: si lo que frena son materiales
+  // la accion es compras, si es personal es dotacion. Ninguna otra card dice
+  // que hacer manana. Sale de `motivo_pausa`, que se tipifico justamente para
+  // poder contestar esto sin leer el comentario de cada reclamo.
+  const cardFrenados = useMemo<TarjetaDatos>(() => {
+    const porMotivo = new Map<string, { n: number; dias: number[] }>();
+    for (const r of reclamos) {
+      if (!r.motivo_pausa) continue;
+      const acc = porMotivo.get(r.motivo_pausa) ?? { n: 0, dias: [] };
+      acc.n += 1;
+      if (r.pausado_desde) acc.dias.push(diasDesde(r.pausado_desde));
+      porMotivo.set(r.motivo_pausa, acc);
+    }
+    const filas = Array.from(porMotivo, ([motivo, a]) => ({
+      motivo,
+      n: a.n,
+      dias: a.dias.length ? Math.round(a.dias.reduce((x, y) => x + y, 0) / a.dias.length) : null,
+    })).sort((a, b) => b.n - a.n);
+
+    const total = filas.reduce((a, f) => a + f.n, 0);
+    const [top, segundo] = filas;
+    const pct = total > 0 && top ? Math.round((top.n / total) * 100) : 0;
+
+    return {
+      preg: '¿Por qué no avanza?',
+      cara: top
+        ? {
+            num: <>{pct}<small>% es {MOTIVO_FRASE[top.motivo] ?? 'ese motivo'}</small></>,
+            det: (
+              <>
+                <strong>{top.n} de {total}</strong> {total === 1 ? 'trabajo frenado espera' : 'trabajos frenados esperan'}{' '}
+                <strong>{(MOTIVO_LABEL[top.motivo] ?? top.motivo).toLowerCase()}</strong>
+                {top.dias != null && <>, hace <strong>{top.dias} días</strong> en promedio</>}.
+                {segundo && (
+                  <> Le sigue <strong>{MOTIVO_LABEL[segundo.motivo] ?? segundo.motivo}</strong> con {segundo.n}.</>
+                )}
+              </>
+            ),
+            // Un trabajo frenado hace mas de dos meses ya no es "a mirar".
+            chip: (top.dias ?? 0) > 60 ? CHIP_POR_TONO.malo : CHIP_POR_TONO.advertencia,
+          }
+        : null,
+      // Que no haya nada frenado ES una buena noticia.
+      vacio: { texto: 'Ningún trabajo quedó frenado esperando algo.', buena: true },
+      listaTitulo: 'Qué los traba · de mayor a menor',
+      casos: filas.slice(0, 5).map((f, i) => ({
+        pos: i + 1,
+        titulo: MOTIVO_LABEL[f.motivo] ?? f.motivo,
+        sub: f.dias != null ? `${f.dias} días esperando` : undefined,
+        valor: f.n,
+        unidad: f.n === 1 ? 'trabajo' : 'trabajos',
+      })),
+    };
+  }, [reclamos]);
+
+  // ---------- 5. QUIEN NO ESTA RESPONDIENDO ----------
+  // La cola vieja de cada area, medida contra SU PROPIO promedio de cierre.
+  // Es la lectura que faltaba y la que mas sorprende en los datos: ninguna area
+  // es lenta --- todas cierran en 10 a 15 dias --- pero cada una arrastra casos
+  // de 70 a 130 dias que nadie volvio a mirar. Compararlas contra un umbral
+  // fijo lo esconderia; contra su propia vara, salta.
+  const cardAreas = useMemo<TarjetaDatos>(() => {
+    const porArea = new Map<string, { cierra: number[]; cola: number[] }>();
+    for (const r of reclamos) {
+      const nombre = r.dependencia_asignada?.nombre;
+      if (!nombre) continue;
+      const acc = porArea.get(nombre) ?? { cierra: [], cola: [] };
+      if (r.fecha_resolucion) {
+        acc.cierra.push(Math.max(
+          0,
+          Math.floor((new Date(r.fecha_resolucion).getTime() - new Date(r.created_at).getTime()) / DIA_MS),
+        ));
+      } else if (ABIERTOS.has(r.estado)) {
+        acc.cola.push(diasDesde(r.created_at));
+      }
+      porArea.set(nombre, acc);
+    }
+    const prom = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+    const filas = Array.from(porArea, ([area, a]) => ({
+      area,
+      cierraEn: prom(a.cierra),
+      colaN: a.cola.length,
+      colaDias: prom(a.cola),
+      peor: a.cola.length ? Math.max(...a.cola) : 0,
+    }))
+      // Solo tiene sentido hablar de un area que TIENE cola vieja: la que esta
+      // al dia no es noticia.
+      .filter((f) => f.colaN > 0 && (f.colaDias ?? 0) > 0)
+      .sort((a, b) => (b.colaDias ?? 0) - (a.colaDias ?? 0));
+
+    const top = filas[0];
+    return {
+      preg: '¿Quién no está respondiendo?',
+      cara: top
+        ? {
+            num: <><NumAnimado v={top.colaDias ?? 0} /><small> días lleva la cola de {top.area}</small></>,
+            det: (
+              <>
+                {top.cierraEn != null ? (
+                  <>
+                    <strong>{top.area}</strong> cierra en <strong>{top.cierraEn} días</strong> promedio,
+                    pero tiene <strong>{top.colaN}</strong> esperando hace {top.colaDias}.
+                    {' '}No es lenta: es una cola que nadie volvió a mirar.
+                  </>
+                ) : (
+                  <>
+                    <strong>{top.area}</strong> tiene <strong>{top.colaN}</strong>{' '}
+                    {top.colaN === 1 ? 'reclamo' : 'reclamos'} esperando hace {top.colaDias} días
+                    y todavía no cerró ninguno en el período.
+                  </>
+                )}
+              </>
+            ),
+            chip: (top.colaDias ?? 0) > 60 ? CHIP_POR_TONO.malo : CHIP_POR_TONO.advertencia,
+          }
+        : null,
+      vacio: { texto: 'Ningún área arrastra reclamos viejos sin resolver.', buena: true },
+      listaTitulo: 'Cuánto lleva esperando cada área',
+      casos: filas.slice(0, 5).map((f, i) => ({
+        pos: i + 1,
+        titulo: f.area,
+        sub: f.cierraEn != null ? `cierra en ${f.cierraEn} días · el peor lleva ${f.peor}` : `el peor lleva ${f.peor} días`,
+        valor: f.colaDias ?? 0,
+        unidad: 'días',
+      })),
+    };
+  }, [reclamos]);
+
   return (
     /* key por lente: al cambiar el chip las cards REMONTAN — la entrada
        escalonada y los counters vuelven a correr, como en el modo TV. */
     <div className="map-art" key={pregunta}>
       <Tarjeta datos={cardLente} />
+      <Tarjeta datos={cardFrenados} />
+      <Tarjeta datos={cardAreas} />
       <Tarjeta datos={cardCategorias} />
       <Tarjeta datos={cardTendencia} />
     </div>

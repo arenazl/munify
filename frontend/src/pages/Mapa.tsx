@@ -82,13 +82,11 @@ import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
 // cuantos reclamos tiene y del color de como esta. Reemplaza a la mancha de
 // calor como respuesta a "donde": la mancha dice que hay muchos, la burbuja
 // dice QUE barrio, CUANTOS y si esta bien o mal.
-import type { BurbujaBarrio } from '../components/mapa/BurbujasBarrio';
 // La segunda linea: EN QUE ANDAN los reclamos. Es la que le da sentido al
 // color de las burbujas y, de paso, es su leyenda.
 import FiltroEstadoMapa, { type GrupoEstado } from '../components/mapa/FiltroEstadoMapa';
 // Las franjas de los costados: donde vive lo que el mapa no puede decir
 // dibujando (y, de paso, el margen por donde scrollear sin pisarlo).
-import PanelLateral, { type FilaPanel } from '../components/mapa/PanelesLaterales';
 // La zona como ANILLO: cuantos hay y como se reparten por estado, sin tener
 // que elegir un solo color para todo el barrio.
 import { svgDonut, tamanoDonut, type TramoDonut } from '../components/mapa/DonutZona';
@@ -124,52 +122,7 @@ import MapaTimelapseBanda, {
   type ComparacionVentana,
 } from '../components/mapa/MapaTimelapseBanda';
 
-/**
- * EN QUE ANDA un reclamo, en los cuatro grupos que le importan a un municipio.
- *
- * Los diez estados de la base son el detalle de la gestion; para mirar un mapa
- * alcanza con saber si el trabajo esta esperando, trabado, hecho o descartado.
- * "Con inconveniente" es el que el dueno pidio por su nombre (2026-09-05) y es
- * exactamente `pospuesto`: el que no se pudo resolver y tiene un `motivo_pausa`
- * que lo explica.
- *
- * `rechazado` entra como cuarto grupo aunque solo se pidieron tres: dejarlo
- * afuera haria desaparecer reclamos del mapa sin que nadie pueda explicarse
- * por que, que es peor que un boton de mas.
- *
- * El COLOR sale de `estadoColors` --el SSoT visual de la app-- y no de una
- * paleta propia: el naranja del mapa tiene que ser el mismo naranja de la
- * pantalla de Reclamos.
- */
-/**
- * Como se dice cada motivo de pausa en pantalla.
- *
- * El enum viaja en codigo (`materiales`, `otra_obra`) y eso no se le muestra a
- * nadie. La frase corta es la que entra en una fila de panel; la larga es la
- * que arma el remate en prosa.
- */
-const MOTIVO_PAUSA_LABEL: Record<string, string> = {
-  materiales: 'Materiales',
-  presupuesto: 'Presupuesto',
-  personal: 'Personal',
-  tercero: 'Un tercero',
-  otra_obra: 'Otra obra',
-  clima: 'Clima',
-  sin_acceso: 'Sin acceso',
-  otro: 'Otro motivo',
-};
 
-/** La misma idea, en la frase con la que se arma el remate. */
-const MOTIVO_PAUSA_FRASE: Record<string, string> = {
-  materiales: 'la compra de materiales',
-  presupuesto: 'una licitación o partida pendiente',
-  personal: 'la falta de cuadrilla',
-  tercero: 'una obra de un tercero',
-  otra_obra: 'otra obra que va primero',
-  clima: 'el clima',
-  sin_acceso: 'no poder entrar al lugar',
-  otro: 'otros motivos',
-};
 
 const GRUPOS_ESTADO: Array<{ id: string; label: string; estados: string[]; colorDe: string }> = [
   {
@@ -645,31 +598,6 @@ const colorDeArea = (color: string | undefined | null, idx: number) =>
 const iconoDeArea = (icono: string | undefined | null, idx: number) =>
   icono || ICONOS_AREA[idx % ICONOS_AREA.length];
 
-// =====================================================================
-// Pin: gota del color del área, con el glifo del área adentro
-// =====================================================================
-// `glifo` es el SVG del icono lucide ya renderizado a markup (lo precarga la
-// página: los imports de lucide son asíncronos y Leaflet necesita HTML
-// sincrónico). Sin glifo se dibuja el punto blanco de siempre, así que el pin
-// nunca queda a medio dibujar mientras el icono viaja.
-const createPinIcon = (color: string, glifo?: string) =>
-  L.divIcon({
-    className: 'custom-pin-marker',
-    html: `
-      <div style="position: relative; width: 30px; height: 42px;">
-        <svg width="30" height="42" viewBox="0 0 30 42" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M15 0C6.716 0 0 6.716 0 15c0 10.5 15 27 15 27s15-16.5 15-27C30 6.716 23.284 0 15 0z" fill="${color}"/>
-          <circle cx="15" cy="15" r="9" fill="white"/>
-        </svg>
-        ${glifo
-          ? `<div style="position:absolute;top:6px;left:9px;width:12px;height:12px;color:${color};">${glifo}</div>`
-          : ''}
-      </div>
-    `,
-    iconSize: [30, 42],
-    iconAnchor: [15, 42],
-    popupAnchor: [0, -42],
-  });
 
 // =====================================================================
 // DIAGNÓSTICO DEL MAPA
@@ -2392,197 +2320,8 @@ export default function Mapa() {
     return m;
   }, [universoSin]);
 
-  /**
-   * LA LECTURA POR BARRIO: cada barrio como una burbuja parada en su punto.
-   *
-   * Se arma sobre `barriosMunicipio` --el catalogo, que tiene coordenada en
-   * 2.026 de 2.028 barrios-- y no sobre los contornos, que son 349. El contorno
-   * es un lujo (dueno, 2026-09-05); el punto es lo que siempre hay, y con el
-   * punto alcanza para contestar "en estos barrios tenes problemas, en estos
-   * no", que es lo que se mira desde la altura del municipio.
-   *
-   * El COLOR sale de comparar los barrios ENTRE SI, no contra un numero
-   * absoluto inventado: el peor tercio va en rojo, el del medio en ambar y el
-   * resto en verde. Un umbral fijo ("mas de 10 es malo") no significa lo mismo
-   * en un barrio de 300 casas que en uno de 5.000; el orden relativo, si.
-   *
-   * Y el sentido se DA VUELTA segun la pregunta: en "que resolvimos" tener
-   * muchos es lo bueno. Sin esa vuelta, el barrio que mas cerro se pintaria de
-   * rojo, que es exactamente al reves de lo que paso.
-   */
-  const burbujasBarrio = useMemo<BurbujaBarrio[]>(() => {
-    if (dibujoMapa !== 'barrios') return [];
-    const porBarrio = new Map<number, Reclamo[]>();
-    for (const r of reclamosFiltrados) {
-      const id = r.barrio?.id;
-      if (id == null) continue;
-      const lista = porBarrio.get(id);
-      if (lista) lista.push(r); else porBarrio.set(id, [r]);
-    }
-    if (porBarrio.size === 0) return [];
 
-    const salida: BurbujaBarrio[] = [];
-    for (const [id, lista] of porBarrio) {
-      const b = barriosMunicipio.find((x) => x.id === id);
-      if (!b) continue;
-      const n = lista.length;
 
-      // LA BURBUJA VA ENCIMA DE SUS PROPIOS RECLAMOS, no en el centro que el
-      // catalogo le asigna al barrio.
-      //
-      // Son el MISMO dato y tienen que verse como uno solo. Con el centro del
-      // catalogo, la mancha de calor quedaba en un lado y el circulo en otro
-      // --a veces a varias cuadras-- y se leian como dos cosas distintas
-      // (dueno, 2026-09-05: "una zona que marca que hay muchos reclamos y
-      // despues al lado el circulito... y es el mismo"). El centroide de los
-      // reclamos que la burbuja RESUME cae, por definicion, donde esta la
-      // mancha que resume los mismos puntos.
-      //
-      // El centro del catalogo queda de respaldo para el barrio que no tiene
-      // ningun reclamo ubicado: ahi no hay centroide que calcular.
-      let lat = 0;
-      let lng = 0;
-      let conCoord = 0;
-      for (const r of lista) {
-        if (r.latitud == null || r.longitud == null) continue;
-        lat += r.latitud;
-        lng += r.longitud;
-        conCoord += 1;
-      }
-      if (conCoord > 0) {
-        lat /= conCoord;
-        lng /= conCoord;
-      } else if (b.latitud != null && b.longitud != null) {
-        lat = b.latitud;
-        lng = b.longitud;
-      } else {
-        continue;
-      }
-
-      // EL COLOR DICE EL ESTADO QUE MANDA EN EL BARRIO, no su posicion en un
-      // ranking. Antes pintaba el tercio peor del municipio: un concepto que
-      // nadie puede adivinar mirando un circulo, y que ademas exageraba
-      // diferencias irrelevantes --un barrio con 4 reclamos nuevos salia rojo
-      // por tener uno mas que el de al lado--. Ahora contesta la pregunta que
-      // la gente le hace al color: "¿estos estan resueltos o no?".
-      //
-      // La CANTIDAD ya la contesta el tamano de la burbuja y, sobre todo, el
-      // mapa de calor debajo: son dos preguntas y cada capa se ocupa de una.
-      const porGrupo = new Map<string, number>();
-      for (const r of lista) {
-        const g = GRUPO_DE_ESTADO[r.estado];
-        if (g) porGrupo.set(g, (porGrupo.get(g) || 0) + 1);
-      }
-      let grupoTop = 'pendiente';
-      let topN = -1;
-      for (const [g, c] of porGrupo) {
-        if (c > topN) { topN = c; grupoTop = g; }
-      }
-      const defTop = GRUPOS_ESTADO.find((g) => g.id === grupoTop);
-      const color = estadoColors[defTop?.colorDe ?? 'recibido'] || estadoColors.default;
-
-      // El detalle nombra el color: cuantos son del estado que manda. Sin esto
-      // el circulo tiene un color y el rotulo un numero que no se hablan entre
-      // si. Se escribe solo si ese estado no es TODO el barrio --"5 reclamos,
-      // 5 pendientes" es decir dos veces lo mismo--.
-      const etiquetaGrupo = defTop?.label.toLowerCase() ?? '';
-      const detalle = topN > 0 && topN < n
-        ? `${topN} ${etiquetaGrupo}`
-        : (etiquetaGrupo ? `todos ${etiquetaGrupo}` : undefined);
-
-      salida.push({
-        id, nombre: b.nombre, lat, lng,
-        valor: n, color,
-        etiqueta: `${n} ${n === 1 ? 'reclamo' : 'reclamos'}`,
-        detalle,
-      });
-    }
-    return salida;
-  }, [dibujoMapa, reclamosFiltrados, barriosMunicipio]);
-
-  /**
-   * POR QUE ESTAN FRENADOS: el desglose de `motivo_pausa` de lo que se esta
-   * mirando.
-   *
-   * Es la lectura que el mapa no puede dar dibujando --un pin no dice que
-   * espera una compra-- y la que el dueno pidio para el funcionario: "necesita
-   * informacion procesada, no datos" (2026-09-05). Por eso no es una tabla de
-   * codigos sino filas con su frase, ordenadas por lo que mas frena.
-   *
-   * `pausado_desde` es lo que convierte el conteo en un problema: cinco
-   * trabajos frenados no dicen nada; cinco frenados hace ochenta dias, si.
-   */
-  const razonesDelFreno = useMemo(() => {
-    const porMotivo = new Map<string, { n: number; dias: number[] }>();
-    for (const r of reclamosDeLaConsulta) {
-      if (!r.motivo_pausa) continue;
-      const acc = porMotivo.get(r.motivo_pausa) ?? { n: 0, dias: [] };
-      acc.n += 1;
-      if (r.pausado_desde) acc.dias.push(diasDesde(r.pausado_desde));
-      porMotivo.set(r.motivo_pausa, acc);
-    }
-    const filas = Array.from(porMotivo, ([motivo, acc]) => ({
-      motivo,
-      n: acc.n,
-      diasProm: acc.dias.length
-        ? Math.round(acc.dias.reduce((a, b) => a + b, 0) / acc.dias.length)
-        : null,
-    })).sort((a, b) => b.n - a.n);
-    return filas;
-  }, [reclamosDeLaConsulta]);
-
-  const filasRazones = useMemo<FilaPanel[]>(() => {
-    if (razonesDelFreno.length === 0) return [];
-    const max = razonesDelFreno[0].n;
-    return razonesDelFreno.map((f) => ({
-      id: f.motivo,
-      titulo: MOTIVO_PAUSA_LABEL[f.motivo] ?? f.motivo,
-      valor: String(f.n),
-      detalle: f.diasProm != null
-        ? `${f.diasProm} ${f.diasProm === 1 ? 'día' : 'días'} esperando`
-        : undefined,
-      color: estadoColors.pospuesto,
-      proporcion: f.n / max,
-    }));
-  }, [razonesDelFreno]);
-
-  /** El remate del panel: la conclusion, en una frase. */
-  const remateRazones = useMemo(() => {
-    if (razonesDelFreno.length === 0) return undefined;
-    const top = razonesDelFreno[0];
-    const frase = MOTIVO_PAUSA_FRASE[top.motivo] ?? 'ese motivo';
-    // El que MAS TIEMPO lleva no siempre es el que mas veces aparece, y suele
-    // ser el mas grave: se nombra aparte cuando no coinciden.
-    const masViejo = [...razonesDelFreno]
-      .filter((f) => f.diasProm != null)
-      .sort((a, b) => (b.diasProm ?? 0) - (a.diasProm ?? 0))[0];
-    let texto = `Lo que más frena es ${frase}: ${top.n} ${top.n === 1 ? 'trabajo' : 'trabajos'}`;
-    if (top.diasProm != null) texto += `, ${top.diasProm} días esperando`;
-    texto += '.';
-    if (masViejo && masViejo.motivo !== top.motivo && (masViejo.diasProm ?? 0) > 0) {
-      texto += ` Lo que más tiempo lleva es ${MOTIVO_PAUSA_FRASE[masViejo.motivo] ?? 'otro motivo'}: ${masViejo.diasProm} días.`;
-    }
-    return texto;
-  }, [razonesDelFreno]);
-
-  /** DONDE SE CONCENTRA: los barrios con más de lo que se está mirando. */
-  const filasBarrios = useMemo<FilaPanel[]>(() => {
-    const orden = [...burbujasBarrio].sort((a, b) => b.valor - a.valor).slice(0, 8);
-    if (orden.length === 0) return [];
-    const max = orden[0].valor;
-    return orden.map((b) => ({
-      id: String(b.id),
-      titulo: b.nombre,
-      valor: String(b.valor),
-      detalle: b.detalle,
-      color: b.color,
-      proporcion: b.valor / max,
-      activo: barrioSel === b.id,
-      // Clickeable: la lista y el mapa son la misma cosa vista de dos maneras,
-      // asi que tocar la fila tiene que hacer lo mismo que tocar la burbuja.
-      onClick: () => setBarrioSel((x) => (x === b.id ? null : b.id)),
-    }));
-  }, [burbujasBarrio, barrioSel]);
 
   // Universo del time-lapse: el alcance de la pregunta SIN el corte temporal.
   // La ventana móvil recorta sobre esto y el remate compara la primera ventana
@@ -4846,24 +4585,48 @@ export default function Mapa() {
               );
             })}
 
-            {/* SIN AGRUPAR: un pin por reclamo, del color de en que anda. */}
+            {/* SIN AGRUPAR: UN PUNTO por reclamo, del color de en que anda.
+                No un pin.
+
+                El pin con glifo mide 42px de alto y se ancla por la punta, asi
+                que dos reclamos de la misma cuadra se tapan enteros. Con
+                doscientos en pantalla el mapa dejaba de ser un mapa: el dueno
+                lo describio como "el tren de Japon a la rush hour"
+                (2026-09-05). Un punto de 6px de radio ocupa la centesima parte
+                y se solapa muchisimo menos; donde igual se amontonan, para eso
+                esta el toggle de agrupar por zona.
+
+                Ademas es mas liviano: un CircleMarker es un path vectorial,
+                mientras que cada pin era un divIcon con su SVG y su nodo en el
+                DOM --doscientos de esos se pagan en cada zoom--.
+
+                El glifo del area se pierde y esta bien: el area ya se elige con
+                un filtro y su nombre sigue estando en el tooltip. */}
             {verEstado && !agruparPorZona &&
               reclamosFiltrados.map(r => (
-                <Marker
+                <CircleMarker
                   key={r.id}
-                  position={[r.latitud!, r.longitud!]}
-                  icon={createPinIcon(colorDelPin(r), glifoDelPin(r))}
+                  center={[r.latitud!, r.longitud!]}
+                  radius={6}
+                  pathOptions={{
+                    color: '#ffffff',      // el aro claro los separa entre si
+                    weight: 1.5,
+                    opacity: 0.9,
+                    fillColor: colorDelPin(r),
+                    fillOpacity: 1,
+                  }}
                   eventHandlers={{ click: () => handleMarkerClick(r) }}
                 >
-                  <Tooltip direction="top" offset={[0, -42]} permanent={false}>
+                  <Tooltip direction="top" offset={[0, -8]} permanent={false}>
                     <div className="font-medium text-sm">{r.titulo}</div>
                     <div className="text-xs text-gray-500">{r.direccion}</div>
-                    {/* El nombre del área: es lo que decodifica el glifo del pin. */}
+                    {/* El area ya no viaja en el color ni en el glifo: se dice
+                        con todas las letras, que es mas claro que un icono. */}
                     {r.dependencia_asignada?.nombre && (
                       <div className="text-xs font-medium">{r.dependencia_asignada.nombre}</div>
                     )}
                   </Tooltip>
-                </Marker>
+                </CircleMarker>
               ))}
 
             {/* Círculos sobre las esquinas que repiten (sólo esa pregunta). */}
@@ -5121,20 +4884,17 @@ export default function Mapa() {
           />
         )}
 
-        {/* UNA SOLA COLUMNA, A LA DERECHA. Se probo con una franja de cada
-            lado y se volvio: es la convencion del resto de la app (dueno,
-            2026-09-05, "normalmente ponemos todo a la derecha"), evita barrer
-            la pantalla de punta a punta para leer dos mitades de lo mismo, y le
-            devuelve al mapa 260px de ancho. El margen para scrollear sin pisar
-            el mapa sigue estando: es el lado izquierdo, ahora libre.
-
-            El orden es por lo accionable: primero POR QUE esta trabado --que es
-            sobre lo que se puede hacer algo-- y despues DONDE se concentra. */}
+        {/* LAS LECTURAS, AL COSTADO DEL MAPA.
+            Estaban ABAJO y ahi no las veia nadie: el propio dueno no sabia que
+            existian (2026-09-05). Un panel que hay que descubrir bajando no
+            existe, por bueno que sea. Al costado se ven junto con el mapa, que
+            es como se leen: la card dice el que y el mapa el donde.
+            El scroll, si hace falta, es de esta columna --- el mapa queda
+            fijo. */}
         <div className="av2-mapa-columna">
-          {/* EL ESTADO, ARRIBA DE TODO. Reporta, hace de leyenda del color del
-              mapa y filtra, con un solo componente. Va primero porque es la
-              lectura mas rapida de la pantalla: tres numeros y ya sabes como
-              viene el municipio. */}
+          {/* El ESTADO no es una lectura mas: es el control que enciende y
+              apaga lo que se dibuja, y de paso la leyenda del color del mapa.
+              Por eso va arriba de las cards y no entre ellas. */}
           {reclamosDeLaConsulta.length > 0 && (
             <div className="av2-mapa-lateral">
               <FiltroEstadoMapa
@@ -5145,19 +4905,7 @@ export default function Mapa() {
               />
             </div>
           )}
-          <PanelLateral
-            titulo="Por qué están frenados"
-            bajada="Los trabajos que no se pudieron resolver, y qué los traba."
-            filas={filasRazones}
-            vacio="Ningún trabajo quedó frenado con un motivo cargado."
-            remate={remateRazones}
-          />
-          <PanelLateral
-            titulo="Dónde se concentra"
-            bajada="Las zonas con más de lo que estás mirando. Tocá una y el mapa va."
-            filas={filasBarrios}
-            vacio="Todavía no hay nada ubicado para esta consulta."
-          />
+          <MapaArtefactos pregunta={pregunta} ranking={ranking} reclamos={reclamosFiltrados} />
         </div>
       </div>{/* /av2-mapa-grilla */}
 
@@ -5234,14 +4982,6 @@ export default function Mapa() {
           )}
         </div>
       </section>
-
-      {/* === Los artefactos de la lente (reemplazan al ranking + donut +
-             sparkline viejos, decisión del dueño 2026-08-27): tres cards
-             semánticas de dos caras — pregunta ↔ listado — que siguen a la
-             pregunta activa y al recorte de filtros. === */}
-      <div id={ID_RANKING}>
-        <MapaArtefactos pregunta={pregunta} ranking={ranking} reclamos={reclamosFiltrados} />
-      </div>
         </>
       )}
       </div>{/* /av2-mapa-full */}

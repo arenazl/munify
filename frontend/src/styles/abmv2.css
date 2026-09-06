@@ -2508,24 +2508,58 @@ button.av2-chip:hover { opacity: 0.85; }
    paneles debajo. Nunca al reves: el mapa es lo que se vino a ver. */
 .av2-mapa-grilla {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 12px;
   align-items: start;
 }
-/* La columna de la derecha apila sus paneles. */
+
+/* EL MAPA QUEDA FIJO. Es la mitad del sentido de la pantalla: si al bajar
+   para leer las cards se pierde de vista, la card dice "Los Prados" y uno ya
+   no sabe donde queda. Se pega debajo de la barra de consulta, que tambien es
+   sticky, por eso el `top` las suma. */
+.av2-mapa-grilla > .av2-mapa {
+  position: sticky;
+  top: calc(var(--pl-topbar-h, 46px) + 78px);
+}
+
+/* El que scrollea es el costado, y solo si hace falta: con pocas cards no se
+   nota, y cuando son muchas el mapa igual no se mueve. El alto se ata al del
+   mapa para que las dos columnas terminen juntas en vez de dejar un colgajo. */
 .av2-mapa-columna {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  max-height: calc(var(--av2-mapa-alto, 520px) + 2px);
+  overflow-y: auto;
+  overscroll-behavior: contain;   /* al llegar al fondo no arrastra la pagina */
+}
+
+/* Las cards de lectura vienen en fila de tres (vivian abajo del mapa). Al
+   costado se apilan: es una columna de 340px, no una banda de 1200. */
+.av2-mapa-columna .map-art {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* Angosto: la columna baja abajo del mapa y ocupa todo el ancho. El mapa nunca
    se achica mas: es lo que se vino a ver. */
 @media (max-width: 1180px) {
   .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
-  .av2-mapa-columna { flex-direction: row; flex-wrap: wrap; }
-  .av2-mapa-columna > .av2-mapa-lateral { flex: 1 1 320px; }
+  /* Sin columna al costado no hay nada que fijar, y un mapa pegajoso sobre una
+     pagina angosta se come la pantalla entera. */
+  .av2-mapa-grilla > .av2-mapa { position: static; }
+  .av2-mapa-columna {
+    max-height: none;
+    overflow: visible;
+  }
+  /* Debajo del mapa vuelven a entrar de a varias por fila. */
+  .av2-mapa-columna .map-art {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .av2-mapa-columna .map-art > * { flex: 1 1 320px; }
 }
 
 /* A pantalla completa la grilla se deshace: el mapa se queda con todo y las
