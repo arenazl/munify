@@ -199,8 +199,17 @@ const HOTSPOT_PARAMS = { radiusMeters: 80, minPoints: 3, daysBack: 90 };
 // Alto elástico del lienzo: toma lo que queda de viewport desde donde arranca
 // el mapa, dejando aire abajo para que se asome la lista de zonas calientes.
 // El piso evita que en una laptop quede aplastado.
+/** Arranque, antes de la primera medicion. */
 const MAPA_ALTO_MIN = 420;
+/** Lo minimo que puede ceder el mapa. Bajo a proposito: en 768 el mapa tiene
+ *  que achicarse para que el reproductor entre en la misma pantalla. */
+const MAPA_ALTO_PISO = 260;
+/** Lo que se le deja abajo al mapa cuando NO hay reproductor a la vista. */
 const MAPA_AIRE_INFERIOR = 96;
+/** Lo que ocupa la banda del time-lapse. Cuando esta abierta, el mapa cede
+ *  esto de mas: el reproductor tiene que verse SIN scrollear, si no uno le da
+ *  play y no ve pasar nada (dueno, 2026-09-05). */
+const ALTO_REPRODUCTOR = 148;
 
 /** Ancla de la sección del ranking (la acción del hero scrollea acá). El id
  *  del DOM se mantiene estable aunque el ranking cambie de contenido con la
@@ -1518,6 +1527,44 @@ export default function Mapa() {
   // cambio por el ResizeObserver de <InvalidarAlRedimensionar />.
   const lienzoRef = useRef<HTMLDivElement>(null);
   const [mapaAlto, setMapaAlto] = useState(MAPA_ALTO_MIN);
+  /** Si hay que guardarle lugar a la banda del time-lapse. */
+  const [reservarReproductor, setReservarReproductor] = useState(false);
+
+  /**
+   * EL ALTO DEL MAPA: lo que sobra del viewport, MEDIDO.
+   *
+   * Se mide donde arranca el lienzo dentro del documento y se le da todo lo que
+   * queda hasta el borde de la pantalla, menos el aire de abajo. Medir y no
+   * calcular con `vh` es a proposito: una resta fija ("100vh menos 330") supone
+   * cuanto miden la topbar y la barra de filtros, y esa suposicion se rompe
+   * apenas los filtros envuelven en dos lineas o cambia el tamano de fuente.
+   *
+   * EL PISO ES BAJO A PROPOSITO. Antes era 420px y ese era el bug: en una
+   * pantalla de 768 --la que tiene la gente, no monitores de 34 pulgadas
+   * (dueno, 2026-09-05)-- la cuenta daba menos de 420, se forzaba a 420 igual,
+   * y el reproductor del time-lapse terminaba abajo del pliegue. Con 260 el
+   * mapa cede lo que haga falta para que en UNA pantalla entren los filtros, el
+   * mapa y el reproductor.
+   */
+  useEffect(() => {
+    const recalcular = () => {
+      const el = lienzoRef.current;
+      if (!el) return;
+      const arranque = el.getBoundingClientRect().top + window.scrollY;
+      const aire = MAPA_AIRE_INFERIOR + (reservarReproductor ? ALTO_REPRODUCTOR : 0);
+      const disponible = window.innerHeight - arranque - aire;
+      setMapaAlto(Math.max(MAPA_ALTO_PISO, Math.round(disponible)));
+    };
+    recalcular();
+    window.addEventListener('resize', recalcular);
+    // Segunda pasada tras el primer pintado: la barra de filtros recien ahi
+    // tiene su alto real (fuentes cargadas + wrap de los combos).
+    const t = window.setTimeout(recalcular, 300);
+    return () => {
+      window.removeEventListener('resize', recalcular);
+      window.clearTimeout(t);
+    };
+  }, [reservarReproductor]);
 
   /**
    * Pantalla completa del mapa.
@@ -1571,25 +1618,6 @@ export default function Mapa() {
     return () => document.removeEventListener('keydown', alaTecla);
   }, [expandidoCss]);
 
-  useEffect(() => {
-    const recalcular = () => {
-      const el = lienzoRef.current;
-      if (!el) return;
-      // Offset dentro del DOCUMENTO (independiente del scroll actual).
-      const arranque = el.getBoundingClientRect().top + window.scrollY;
-      const disponible = window.innerHeight - arranque - MAPA_AIRE_INFERIOR;
-      setMapaAlto(Math.max(MAPA_ALTO_MIN, Math.round(disponible)));
-    };
-    recalcular();
-    window.addEventListener('resize', recalcular);
-    // Segunda pasada tras el primer pintado: el hero y la barra de controles
-    // recién ahí tienen su alto real (fuentes + KPIs + wrap de los combos).
-    const t = window.setTimeout(recalcular, 300);
-    return () => {
-      window.removeEventListener('resize', recalcular);
-      window.clearTimeout(t);
-    };
-  }, [isPuntos, loading]);
 
   // Rampa de densidad: los 3 matices de veredicto del theme activo. Leaflet y
   // la leyenda necesitan colores concretos, así que salen de los MISMOS
@@ -1975,6 +2003,13 @@ export default function Mapa() {
 
   /** El time-lapse manda sobre el filtro de período (corriendo o congelado). */
   const tlActivo = tlEstado !== 'inactivo';
+
+  // El mapa cede su alto en cuanto aparece el reproductor, y lo recupera al
+  // cerrarlo. Sin esto la banda quedaba abajo del pliegue justo cuando hay algo
+  // que mirar pasar.
+  useEffect(() => {
+    setReservarReproductor(tlActivo && !isPuntos);
+  }, [tlActivo, isPuntos]);
 
   /* En el telefono el reproductor se monta ABAJO del mapa, que ya se come casi
      toda la pantalla: al apretar "Evolucion" la banda aparecia a 968px con una
@@ -4008,6 +4043,51 @@ export default function Mapa() {
   // El label de cada opción es lo que se LEE en la frase, así que va en
   // minúscula y con su preposición ("cualquier categoría", "todas las áreas").
   // Los conteos entre paréntesis son datos reales del universo filtrado.
+  /**
+   * LAS ACCIONES DE LA CONSULTA: marcar un area y bajar su informe.
+   *
+   * Vivian en un panel propio abajo del mapa, con titulo, bajada y su propia
+   * caja --- y el dueno lo corto (2026-09-05): *"eso tiene que ir como un boton
+   * dentro de los filtros"*. Tenia razon: producir un PDF no es una LECTURA de
+   * la pantalla, es algo que uno HACE con lo que esta mirando. Las cosas que se
+   * hacen van con los controles, no ocupando el lugar de las que se leen.
+   *
+   * El boton cambia con el estado en vez de multiplicarse: marca, cancela o
+   * descarga, segun donde este el usuario en el recorrido.
+   */
+  const accionesConsulta: ConsultaAccion[] = (() => {
+    const hayQueBajar = ambitoInforme != null && ambitoInforme.reclamos.length > 0;
+    const acciones: ConsultaAccion[] = [
+      {
+        id: 'marcar',
+        label: drawMode ? 'Cancelar' : 'Marcar un área',
+        icono: drawMode ? X : Square,
+        activo: drawMode,
+        onClick: handleToggleDraw,
+      },
+    ];
+    if (hayQueBajar) {
+      acciones.push({
+        id: 'informe',
+        // El label DICE de que es el informe: bajar "el informe" a secas
+        // obliga a acordarse de que estaba marcado.
+        label: `Informe de ${ambitoInforme.nombre}`,
+        icono: FileDown,
+        onClick: exportZonaPdf,
+      });
+    }
+    if (drawnBBox) {
+      acciones.push({
+        id: 'borrar-area',
+        label: '',
+        titulo: 'Borrar el área marcada',
+        icono: Eraser,
+        onClick: clearDrawnBBox,
+      });
+    }
+    return acciones;
+  })();
+
   const filtrosConsulta: ConsultaFiltro[] = [
     // ORDEN: primero la DEPENDENCIA y después el TIPO. La dependencia contiene
     // a las categorías, así que al revés se podían armar combinaciones que no
@@ -4222,6 +4302,7 @@ export default function Mapa() {
             valor={pregunta}
             onChange={handlePreguntaChange}
             filtros={filtrosConsulta}
+            acciones={accionesConsulta}
             respuesta={respuestaConsulta.length > 0 ? respuestaConsulta : undefined}
             continuacion={continuacionConsulta}
             verTodo={VER_TODO}
@@ -4909,79 +4990,6 @@ export default function Mapa() {
         </div>
       </div>{/* /av2-mapa-grilla */}
 
-      {/* === Informe de una zona: no es un control del mapa, es una acción que
-             PRODUCE UN DOCUMENTO. Por eso tiene panel propio, con el nombre de
-             lo que genera y el resumen de lo que va a entrar adentro. === */}
-      <section className="av2-panel av2-informe">
-        <div className="av2-panel-head">
-          <FileDown size={16} strokeWidth={2} aria-hidden />
-          <h2 className="av2-panel-titulo">Informe de una zona</h2>
-          <span className="av2-panel-caption">PDF con el detalle de los reclamos del área</span>
-        </div>
-        <div className="av2-informe-fila">
-          {!ambitoInforme ? (
-            <>
-              <p className="av2-informe-texto">
-                {regiones.distritos.length > 1
-                  ? 'Elegí un distrito arriba y el informe sale solo, o marcá un área a mano para un recorte cualquiera: los indicadores, las cinco zonas que más repiten y el listado reclamo por reclamo.'
-                  : 'Marcá un área del mapa y descargás el detalle de esos reclamos en PDF: los indicadores del área, las cinco zonas que más repiten y el listado reclamo por reclamo.'}
-              </p>
-              <div className="av2-informe-acciones">
-                <button
-                  type="button"
-                  className={`av2-btn-secundario${drawMode ? ' av2-btn-secundario--activo' : ''}`}
-                  onClick={handleToggleDraw}
-                >
-                  <Square size={14} strokeWidth={2} aria-hidden />
-                  {drawMode ? 'Cancelar el marcado' : 'Marcar el área en el mapa'}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="av2-informe-texto">
-                <span className="av2-informe-resumen">
-                  {ambitoInforme.reclamos.length}{' '}
-                  {ambitoInforme.reclamos.length === 1 ? 'reclamo' : 'reclamos'}
-                </span>{' '}
-                en {ambitoInforme.nombre}.{' '}
-                {ambitoInforme.reclamos.length === 0
-                  ? 'Así el informe saldría vacío.'
-                  : 'Eso es lo que va a salir en el informe.'}
-              </p>
-              <div className="av2-informe-snapshot">
-                <ZonaSnapshot reclamos={ambitoInforme.reclamos} theme={theme} />
-              </div>
-              <div className="av2-informe-acciones">
-                <button
-                  type="button"
-                  className="av2-btn-primario"
-                  onClick={exportZonaPdf}
-                  disabled={ambitoInforme.reclamos.length === 0}
-                >
-                  <FileDown size={14} strokeWidth={2} aria-hidden />
-                  Descargar el informe
-                </button>
-                {ambitoInforme.tipo === 'area' ? (
-                  <button type="button" className="av2-btn-secundario" onClick={clearDrawnBBox}>
-                    <X size={14} strokeWidth={2} aria-hidden />
-                    Borrar el área
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className={`av2-btn-secundario${drawMode ? ' av2-btn-secundario--activo' : ''}`}
-                    onClick={handleToggleDraw}
-                  >
-                    <Square size={14} strokeWidth={2} aria-hidden />
-                    {drawMode ? 'Cancelar el marcado' : 'Marcar un área más chica'}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </section>
         </>
       )}
       </div>{/* /av2-mapa-full */}
@@ -4992,8 +5000,7 @@ export default function Mapa() {
           <div className="av2-mapa av2-mapa--pegado flex-1 min-w-0" ref={lienzoRef}>
             <div
               className={`av2-mapa-lienzo ${claseBasemap(isDarkTheme)}`}
-              style={{ '--av2-mapa-alto': `${mapaAlto}px` } as CSSProperties}
-            >
+                >
               <MapContainer
         scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
@@ -5474,52 +5481,3 @@ export default function Mapa() {
 // =====================================================================
 // Mini-snapshot para popup de zona dibujada
 // =====================================================================
-function ZonaSnapshot({
-  reclamos,
-  theme,
-}: {
-  reclamos: Reclamo[];
-  theme: ReturnType<typeof useTheme>['theme'];
-}) {
-  if (reclamos.length === 0) {
-    return (
-      <p className="text-sm text-center py-4" style={{ color: theme.textSecondary }}>
-        No hay reclamos en el área seleccionada.
-      </p>
-    );
-  }
-  const resueltos = reclamos.filter(r => isResuelto(r.estado)).length;
-  const abiertos = reclamos.length - resueltos;
-  // Top categoría
-  const catCounts: Record<string, number> = {};
-  for (const r of reclamos) {
-    const k = r.categoria?.nombre || 'Sin categoría';
-    catCounts[k] = (catCounts[k] || 0) + 1;
-  }
-  const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
-
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
-          <p className="text-xl font-bold" style={{ color: theme.text }}>{reclamos.length}</p>
-          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Total</p>
-        </div>
-        <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
-          <p className="text-xl font-bold" style={{ color: estadoColor('finalizado') }}>{resueltos}</p>
-          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Resueltos</p>
-        </div>
-        <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
-          <p className="text-xl font-bold" style={{ color: estadoColor('recibido') }}>{abiertos}</p>
-          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Abiertos</p>
-        </div>
-      </div>
-      {topCat && (
-        <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: theme.background, color: theme.text }}>
-          <span style={{ color: theme.textSecondary }}>Top categoría: </span>
-          <span className="font-bold">{topCat[0]}</span> ({topCat[1]})
-        </div>
-      )}
-    </div>
-  );
-}

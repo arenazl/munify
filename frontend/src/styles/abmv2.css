@@ -2513,14 +2513,15 @@ button.av2-chip:hover { opacity: 0.85; }
   align-items: start;
 }
 
-/* EL MAPA QUEDA FIJO. Es la mitad del sentido de la pantalla: si al bajar
-   para leer las cards se pierde de vista, la card dice "Los Prados" y uno ya
-   no sabe donde queda. Se pega debajo de la barra de consulta, que tambien es
-   sticky, por eso el `top` las suma. */
-.av2-mapa-grilla > .av2-mapa {
-  position: sticky;
-  top: calc(var(--pl-topbar-h, 46px) + 78px);
-}
+/* EL MAPA NO ES STICKY, Y NO HACE FALTA QUE LO SEA.
+   Lo fue un rato y rompio la pantalla: con la barra de consulta TAMBIEN sticky
+   quedaban dos contextos de apilamiento compitiendo, el mapa se quedaba quieto
+   mientras la columna de al lado scrolleaba, y las cards terminaban pintandose
+   encima del mapa (reportado el 2026-09-05).
+
+   Con el alto atado al viewport el problema desaparece solo: si todo entra en
+   una pantalla, no hay scroll del que salvar al mapa. Fijarlo era tapar el
+   sintoma de un mapa demasiado alto. */
 
 /* El que scrollea es el costado, y solo si hace falta: con pocas cards no se
    nota, y cuando son muchas el mapa igual no se mueve. El alto se ata al del
@@ -2530,7 +2531,7 @@ button.av2-chip:hover { opacity: 0.85; }
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  max-height: calc(var(--av2-mapa-alto, 520px) + 2px);
+  max-height: calc(var(--av2-mapa-alto, 420px) + 2px);
   overflow-y: auto;
   overscroll-behavior: contain;   /* al llegar al fondo no arrastra la pagina */
 }
@@ -2547,9 +2548,6 @@ button.av2-chip:hover { opacity: 0.85; }
    se achica mas: es lo que se vino a ver. */
 @media (max-width: 1180px) {
   .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
-  /* Sin columna al costado no hay nada que fijar, y un mapa pegajoso sobre una
-     pagina angosta se come la pantalla entera. */
-  .av2-mapa-grilla > .av2-mapa { position: static; }
   .av2-mapa-columna {
     max-height: none;
     overflow: visible;
@@ -2689,10 +2687,16 @@ button.av2-chip:hover { opacity: 0.85; }
 /* El contenedor de arriba ya puso su separación (modo Puntos). */
 .av2-mapa--pegado { margin-top: 0; }
 
+/* EL ALTO LO MIDE JS, y esta bien que asi sea.
+   `--av2-mapa-alto` lo escribe la pantalla midiendo DONDE ARRANCA el lienzo y
+   cuanto queda de viewport hasta abajo. Es exacto: una regla en `vh` tendria
+   que RESTAR a ojo la topbar y la barra de filtros, y esa resta miente apenas
+   los filtros envuelven en dos lineas.
+
+   El fallback de 420px es solo para el primer pintado, antes de la medicion. */
 .av2-mapa-lienzo {
   width: 100%;
-  height: var(--av2-mapa-alto, 520px);
-  min-height: 420px;
+  height: var(--av2-mapa-alto, 420px);
 }
 
 /* --- PANTALLA COMPLETA ---------------------------------------------------

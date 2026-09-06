@@ -1,31 +1,39 @@
 /**
- * MapaArtefactos — los TRES artefactos de la lente, abajo del mapa.
+ * MapaArtefactos — las lecturas del mapa, en el MISMO componente que el resto
+ * de la app.
  *
- * Reemplazan a la fila vieja (ranking + donut + sparkline sin eje) por
- * decisión del dueño (2026-08-27): cards SEMÁNTICAS de dos caras —
- * pregunta con veredicto ↔ listado rankeado — que auto-rotan cada 10 s
- * ("Ver más" pasa a manual y frena esa card).
+ * Antes esto tenía su propia `Tarjeta`: una card de dos caras hecha a mano, con
+ * su CSS propio, su chip y su "Ver más". Una copia peor de algo que ya existía.
+ * El dueño lo cortó (2026-09-05): *"todo debería ser componentizable, debería
+ * usar ese componente y no crear uno parecido y mal copiado"*. Tenía razón:
+ * `KpiSemantico` es LA card de pregunta en prosa del kit — la que usan el
+ * tablero de trámites, el de finanzas y el de reclamos. Mismo ícono en su
+ * cuadrito, mismas fuentes, mismos tamaños, misma distribución.
  *
- *   1. La pregunta de la LENTE: se alimenta del mismo `ranking` por pregunta
- *      que armaba la fila vieja (dinámico: cambia con el chip de arriba).
- *   2. Qué categoría pesa en el RECORTE (sigue a los filtros del mapa).
- *   3. La tendencia del recorte: semanas agregadas CON eje y fechas — nada
- *      de serrucho diario ni "+50%" sin base.
+ * Este archivo queda como lo que debió ser siempre: un ARMADOR. Calcula las
+ * preguntas del mapa y su gramática; el dibujo lo pone el kit. Es el mismo
+ * reparto que ya usa el tablero (`armadoresTramites.ts` + `KpiSemantico`).
  *
- * Sin material no hay gráfico vacío: la card se da vuelta y da la BUENA
- * NOTICIA ("nada vencido con este filtro"), o el aviso neutro si el vacío
- * no es una buena noticia (todavía no se cerró ninguno).
+ * Las cinco preguntas, en orden de lo que primero hay que saber:
+ *
+ *   1. La de la LENTE — cambia con el chip de arriba. Es el RESUMEN, y por eso
+ *      va primera.
+ *   2. POR QUÉ NO AVANZA — el motivo que traba, con sus días. La única
+ *      accionable: si son materiales la acción es compras, si es personal es
+ *      dotación.
+ *   3. QUIÉN NO ESTÁ RESPONDIENDO — la cola vieja de cada área contra SU PROPIO
+ *      promedio de cierre.
+ *   4. Qué es lo que más preocupa (la categoría que pesa).
+ *   5. Cómo viene la entrada, por semana.
+ *
+ * Sin material, la pregunta NO se dibuja. Una card que dice "no hay datos"
+ * ocupa el lugar de una que sí tiene algo para decir.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
+import { Flame, PauseCircle, Clock, Tags, TrendingUp, type LucideIcon } from 'lucide-react';
+import { KpiSemantico, type TonoKpi } from '../ui/KpiSemantico';
 import type { Reclamo } from '../../types';
 import type { RankedListItem } from '../ui/RankedList';
-import { useCountUp } from '../../hooks/useCountUp';
-import '../../styles/mapa-artefactos.css';
-
-/** Número que cuenta desde 0 (pieza del kit). Sólo para valores numéricos. */
-function NumAnimado({ v }: { v: number }) {
-  return <>{useCountUp(v)}</>;
-}
 
 interface RankingLente {
   titulo: string;
@@ -38,10 +46,22 @@ interface RankingLente {
 interface Props {
   /** La lente activa ('repiten' | 'atrasado' | 'resolvimos' | 'sinllegar'). */
   pregunta: string;
-  /** El paquete por lente que ya arma la página (mismo de la fila vieja). */
+  /** El paquete por lente que ya arma la página. */
   ranking: RankingLente;
   /** El recorte actual del mapa (ya filtrado). */
   reclamos: Reclamo[];
+}
+
+/** Lo que necesita `KpiSemantico`. Su API tal cual: acá no se agrega un campo. */
+interface Pregunta {
+  id: string;
+  pregunta: string;
+  icono: LucideIcon;
+  tono: TonoKpi;
+  valor: string;
+  unidad?: string;
+  detalle: ReactNode;
+  pie?: string;
 }
 
 const PREGUNTA_LENTE: Record<string, string> = {
@@ -51,92 +71,15 @@ const PREGUNTA_LENTE: Record<string, string> = {
   sinllegar: '¿Dónde no llegamos?',
 };
 
-const CHIP_POR_TONO = {
-  malo: { tono: 'grave', label: 'atención acá' },
-  advertencia: { tono: 'warn', label: 'mirar' },
-  bueno: { tono: 'ok', label: 'buena señal' },
-} as const;
+const ICONO_LENTE: Record<string, LucideIcon> = {
+  repiten: Flame,
+  atrasado: Clock,
+  resolvimos: Clock,
+  sinllegar: Tags,
+};
 
-interface CasoLista { pos: number; titulo: string; sub?: string; valor: string | number; unidad?: string }
-
-interface CaraPregunta { num: ReactNode; det: ReactNode; chip: { tono: string; label: string } }
-
-interface TarjetaDatos {
-  preg: string;
-  /** null => sin material: se muestra `vacio`. */
-  cara: CaraPregunta | null;
-  vacio: { texto: string; buena: boolean };
-  listaTitulo: string;
-  casos: CasoLista[];
-  /** Contenido extra de la cara A (la tendencia mete sus barras acá). */
-  extraA?: ReactNode;
-}
-
-/** Card de dos caras. Auto-rota cada 10 s si hay listado; "Ver más" frena. */
-function Tarjeta({ datos }: { datos: TarjetaDatos }) {
-  const [abierta, setAbierta] = useState(false);
-  const [manual, setManual] = useState(false);
-  const rota = datos.cara !== null && datos.casos.length > 0 && !manual;
-
-  useEffect(() => {
-    if (!rota) return;
-    const t = setInterval(() => setAbierta((a) => !a), 10_000);
-    return () => clearInterval(t);
-  }, [rota]);
-
-  const voltear = (cara: boolean) => { setAbierta(cara); setManual(true); };
-
-  if (datos.cara === null) {
-    return (
-      <div className={`tj tj-vacia${datos.vacio.buena ? ' buena' : ''}`}>
-        {datos.vacio.buena && <div className="tj-tilde" aria-hidden="true">&check;</div>}
-        <span className="tj-preg">{datos.preg}</span>
-        <p>{datos.vacio.texto}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="tj">
-      {!abierta ? (
-        <>
-          <span className="tj-preg">{datos.preg}</span>
-          <p className="tj-num">{datos.cara.num}</p>
-          <p className="tj-det">{datos.cara.det}</p>
-          {datos.extraA}
-          <div className="chips tj-pie">
-            <span className={`chip ${datos.cara.chip.tono}`}>{datos.cara.chip.label}</span>
-            {datos.casos.length > 0 && (
-              <button className="tj-vermas" onClick={() => voltear(true)}>Ver más</button>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          <span className="tj-preg">{datos.listaTitulo}</span>
-          <ol className="tj-lista">
-            {datos.casos.map((c) => (
-              <li key={c.pos}>
-                <span className="pos">{c.pos}</span>
-                <span className="cuerpo">
-                  <strong>{c.titulo}</strong>
-                  {c.sub && <small>{c.sub}</small>}
-                </span>
-                <span className="cant">{c.valor}{c.unidad && <small>{c.unidad}</small>}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="chips tj-pie">
-            <button className="tj-vermas" onClick={() => voltear(false)}>Volver a la pregunta</button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/** Como se dice cada motivo de pausa. El enum viaja en codigo y eso no se le
- *  muestra a nadie: la frase corta encabeza la fila, la larga arma la prosa. */
+/** Cómo se dice cada motivo de pausa. El enum viaja en código y eso no se le
+ *  muestra a nadie: la frase corta encabeza, la larga arma la prosa. */
 const MOTIVO_LABEL: Record<string, string> = {
   materiales: 'Materiales',
   presupuesto: 'Presupuesto',
@@ -148,14 +91,14 @@ const MOTIVO_LABEL: Record<string, string> = {
   otro: 'Otro motivo',
 };
 const MOTIVO_FRASE: Record<string, string> = {
-  materiales: 'falta de materiales',
-  presupuesto: 'una licitación o partida pendiente',
-  personal: 'falta de cuadrilla',
-  tercero: 'una obra de un tercero',
-  otra_obra: 'otra obra que va primero',
-  clima: 'el clima',
-  sin_acceso: 'no poder entrar al lugar',
-  otro: 'otros motivos',
+  materiales: 'es falta de materiales',
+  presupuesto: 'espera una licitación',
+  personal: 'es falta de cuadrilla',
+  tercero: 'depende de un tercero',
+  otra_obra: 'espera otra obra',
+  clima: 'es el clima',
+  sin_acceso: 'es no poder entrar',
+  otro: 'son otros motivos',
 };
 
 /** Estados que siguen abiertos. Lo mismo que considera el resto de la app. */
@@ -164,174 +107,45 @@ const ABIERTOS = new Set([
   'pendiente_confirmacion', 'pospuesto',
 ]);
 
-const diasDesde = (iso?: string | null): number =>
-  iso ? Math.floor((Date.now() - new Date(iso).getTime()) / DIA_MS) : 0;
-
 const DIA_MS = 24 * 60 * 60 * 1000;
 const SEMANAS = 12;
 
-const fmtCorta = (d: Date) =>
-  d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }).replace('.', '');
+const diasDesde = (iso?: string | null): number =>
+  iso ? Math.floor((Date.now() - new Date(iso).getTime()) / DIA_MS) : 0;
+
+const plural = (n: number, uno: string, muchos: string) => (n === 1 ? uno : muchos);
 
 export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
-  // ---------- 1. La pregunta de la lente (del ranking por pregunta) ----------
-  const cardLente = useMemo<TarjetaDatos>(() => {
-    const preg = PREGUNTA_LENTE[pregunta] ?? ranking.titulo;
+  // ---------- 1. LA LENTE: el resumen de lo que se está mirando ----------
+  const qLente = useMemo<Pregunta | null>(() => {
     const [top, segundo] = ranking.items;
+    if (!top) return null;
     return {
-      preg,
-      cara: top
-        ? {
-            num: top.titulo,
-            det: (
-              <>
-                {top.detalle ? <>{top.detalle} — </> : null}
-                <strong>
-                  {typeof top.valor === 'number' ? <NumAnimado v={top.valor} /> : top.valor}
-                  {top.valorSub ? ` ${top.valorSub}` : ''}
-                </strong>
-                {segundo && (
-                  <>. Le sigue <strong>{segundo.titulo}</strong> con {segundo.valor}
-                  {segundo.valorSub ? ` ${segundo.valorSub}` : ''}.</>
-                )}
-              </>
-            ),
-            chip: CHIP_POR_TONO[ranking.tono],
-          }
-        : null,
-      // Que no haya atrasados/focos/barrios sin atención ES una buena
-      // noticia; que no haya resueltos todavía, no.
-      vacio: { texto: ranking.vacio, buena: ranking.tono !== 'bueno' },
-      listaTitulo: `${ranking.titulo} · ${ranking.caption}`,
-      casos: ranking.items.slice(0, 5).map((it, i) => ({
-        pos: i + 1,
-        titulo: it.titulo,
-        sub: it.detalle,
-        valor: it.valor,
-        unidad: it.valorSub,
-      })),
+      id: 'lente',
+      pregunta: PREGUNTA_LENTE[pregunta] ?? ranking.titulo,
+      icono: ICONO_LENTE[pregunta] ?? Flame,
+      tono: ranking.tono,
+      valor: String(top.valor),
+      unidad: top.valorSub,
+      detalle: (
+        <>
+          <strong>{top.titulo}</strong>
+          {top.detalle ? <> · {top.detalle}</> : null}
+          {segundo && (
+            <>. Le sigue <strong>{segundo.titulo}</strong> con {segundo.valor}
+              {segundo.valorSub ? ` ${segundo.valorSub}` : ''}</>
+          )}.
+        </>
+      ),
+      pie: ranking.caption,
     };
   }, [pregunta, ranking]);
 
-  // ---------- 2. Qué categoría pesa en el recorte ----------
-  const cardCategorias = useMemo<TarjetaDatos>(() => {
-    const cuentas = new Map<string, number>();
-    reclamos.forEach((r) => {
-      const nombre = r.categoria?.nombre || 'Sin categoría';
-      cuentas.set(nombre, (cuentas.get(nombre) ?? 0) + 1);
-    });
-    const orden = [...cuentas.entries()].sort((a, b) => b[1] - a[1]);
-    const total = reclamos.length;
-    const [top, segundo] = orden;
-    const parte = top ? Math.round((top[1] / total) * 100) : 0;
-    return {
-      preg: '¿Qué categoría pesa más?',
-      cara: top
-        ? {
-            num: top[0],
-            det: (
-              <>
-                <strong><NumAnimado v={top[1]} /> de {total}</strong> reclamos del recorte ({parte}%)
-                {segundo && <>. Le sigue <strong>{segundo[0]}</strong> con {segundo[1]}.</>}
-              </>
-            ),
-            chip: parte >= 40
-              ? { tono: 'warn', label: 'concentrado' }
-              : { tono: 'ok', label: 'repartido' },
-          }
-        : null,
-      vacio: { texto: 'Sin reclamos en este recorte: nada que clasificar.', buena: true },
-      listaTitulo: 'Categorías del recorte · de mayor a menor',
-      casos: orden.slice(0, 5).map(([nombre, n], i) => ({
-        pos: i + 1,
-        titulo: nombre,
-        valor: n,
-        unidad: n === 1 ? 'reclamo' : 'reclamos',
-      })),
-    };
-  }, [reclamos]);
-
-  // ---------- 3. La tendencia del recorte, en semanas y con eje ----------
-  const tendencia = useMemo(() => {
-    const hoy = new Date();
-    hoy.setHours(23, 59, 59, 999);
-    const cuentas = new Array<number>(SEMANAS).fill(0);
-    reclamos.forEach((r) => {
-      const dias = Math.floor((hoy.getTime() - new Date(r.created_at).getTime()) / DIA_MS);
-      const semana = SEMANAS - 1 - Math.floor(dias / 7);
-      if (semana >= 0 && semana < SEMANAS) cuentas[semana] += 1;
-    });
-    const inicioDe = (i: number) => new Date(hoy.getTime() - (SEMANAS - i) * 7 * DIA_MS + DIA_MS);
-    return { cuentas, inicioDe, max: Math.max(...cuentas, 1) };
-  }, [reclamos]);
-
-  const cardTendencia = useMemo<TarjetaDatos>(() => {
-    const { cuentas, inicioDe, max } = tendencia;
-    const actual = cuentas[SEMANAS - 1];
-    const previa = cuentas[SEMANAS - 2];
-    const totalVentana = cuentas.reduce((s, n) => s + n, 0);
-    const chip = actual > previa
-      ? { tono: 'warn', label: 'subiendo' }
-      : actual < previa
-        ? { tono: 'ok', label: 'bajando' }
-        : { tono: 'info', label: 'estable' };
-    return {
-      preg: '¿Cómo viene la entrada?',
-      cara: totalVentana > 0
-        ? {
-            num: <><NumAnimado v={actual} /> <small>esta semana</small></>,
-            det: (
-              <>Venía de <strong>{previa}</strong> la semana anterior;{' '}
-              <strong>{totalVentana}</strong> en las últimas {SEMANAS} semanas.</>
-            ),
-            chip,
-          }
-        : null,
-      vacio: { texto: `Sin entradas en las últimas ${SEMANAS} semanas para este recorte.`, buena: true },
-      listaTitulo: `Entradas por semana · últimas ${SEMANAS}`,
-      casos: cuentas
-        .map((n, i) => ({ n, i }))
-        .slice(-5)
-        .reverse()
-        .map(({ n, i }, pos) => ({
-          pos: pos + 1,
-          titulo: i === SEMANAS - 1 ? 'Esta semana' : `Semana del ${fmtCorta(inicioDe(i))}`,
-          valor: n,
-          unidad: n === 1 ? 'reclamo' : 'reclamos',
-        })),
-      extraA: (
-        <div aria-hidden="true">
-          <div className="barras">
-            {cuentas.map((n, i) => (
-              <div
-                key={i}
-                className={`b${i === SEMANAS - 1 ? ' hoy' : ''}`}
-                data-v={n}
-                style={{
-                  height: `${Math.max((n / max) * 100, 4)}%`,
-                  animationDelay: `${i * 35}ms`,
-                }}
-              />
-            ))}
-          </div>
-          <div className="ejex">
-            {cuentas.map((_, i) => (
-              <span key={i}>
-                {i === SEMANAS - 1 ? 'hoy' : i % 4 === 0 ? fmtCorta(inicioDe(i)) : ''}
-              </span>
-            ))}
-          </div>
-        </div>
-      ),
-    };
-  }, [tendencia]);
-
-  // ---------- 4. POR QUE NO AVANZA ----------
-  // La unica lectura ACCIONABLE de la pantalla: si lo que frena son materiales
-  // la accion es compras, si es personal es dotacion. Ninguna otra card dice
-  // que hacer manana. Sale de `motivo_pausa`, que se tipifico justamente para
-  // poder contestar esto sin leer el comentario de cada reclamo.
-  const cardFrenados = useMemo<TarjetaDatos>(() => {
+  // ---------- 2. POR QUÉ NO AVANZA ----------
+  // La única lectura ACCIONABLE de la pantalla. Sale de `motivo_pausa`, que se
+  // tipificó justamente para poder contestar esto sin leer el comentario de
+  // cada reclamo uno por uno.
+  const qFrenados = useMemo<Pregunta | null>(() => {
     const porMotivo = new Map<string, { n: number; dias: number[] }>();
     for (const r of reclamos) {
       if (!r.motivo_pausa) continue;
@@ -346,124 +160,182 @@ export default function MapaArtefactos({ pregunta, ranking, reclamos }: Props) {
       dias: a.dias.length ? Math.round(a.dias.reduce((x, y) => x + y, 0) / a.dias.length) : null,
     })).sort((a, b) => b.n - a.n);
 
-    const total = filas.reduce((a, f) => a + f.n, 0);
     const [top, segundo] = filas;
-    const pct = total > 0 && top ? Math.round((top.n / total) * 100) : 0;
+    if (!top) return null;
+    const total = filas.reduce((a, f) => a + f.n, 0);
+    const pct = Math.round((top.n / total) * 100);
 
     return {
-      preg: '¿Por qué no avanza?',
-      cara: top
-        ? {
-            num: <>{pct}<small>% es {MOTIVO_FRASE[top.motivo] ?? 'ese motivo'}</small></>,
-            det: (
-              <>
-                <strong>{top.n} de {total}</strong> {total === 1 ? 'trabajo frenado espera' : 'trabajos frenados esperan'}{' '}
-                <strong>{(MOTIVO_LABEL[top.motivo] ?? top.motivo).toLowerCase()}</strong>
-                {top.dias != null && <>, hace <strong>{top.dias} días</strong> en promedio</>}.
-                {segundo && (
-                  <> Le sigue <strong>{MOTIVO_LABEL[segundo.motivo] ?? segundo.motivo}</strong> con {segundo.n}.</>
-                )}
-              </>
-            ),
-            // Un trabajo frenado hace mas de dos meses ya no es "a mirar".
-            chip: (top.dias ?? 0) > 60 ? CHIP_POR_TONO.malo : CHIP_POR_TONO.advertencia,
-          }
-        : null,
-      // Que no haya nada frenado ES una buena noticia.
-      vacio: { texto: 'Ningún trabajo quedó frenado esperando algo.', buena: true },
-      listaTitulo: 'Qué los traba · de mayor a menor',
-      casos: filas.slice(0, 5).map((f, i) => ({
-        pos: i + 1,
-        titulo: MOTIVO_LABEL[f.motivo] ?? f.motivo,
-        sub: f.dias != null ? `${f.dias} días esperando` : undefined,
-        valor: f.n,
-        unidad: f.n === 1 ? 'trabajo' : 'trabajos',
-      })),
+      id: 'frenados',
+      pregunta: '¿Por qué no avanza?',
+      icono: PauseCircle,
+      // Frenado hace más de dos meses ya no es "a mirar".
+      tono: (top.dias ?? 0) > 60 ? 'malo' : 'advertencia',
+      valor: `${pct}%`,
+      unidad: MOTIVO_FRASE[top.motivo] ?? 'es ese motivo',
+      detalle: (
+        <>
+          <strong>{top.n} de {total}</strong>{' '}
+          {plural(total, 'trabajo frenado espera', 'trabajos frenados esperan')}{' '}
+          <strong>{(MOTIVO_LABEL[top.motivo] ?? top.motivo).toLowerCase()}</strong>
+          {top.dias != null && <>, hace <strong>{top.dias} días</strong> en promedio</>}
+          {segundo && (
+            <>. Le sigue <strong>{MOTIVO_LABEL[segundo.motivo] ?? segundo.motivo}</strong> con {segundo.n}</>
+          )}.
+        </>
+      ),
+      pie: `${total} ${plural(total, 'frenado', 'frenados')} de ${reclamos.length} reclamos`,
     };
   }, [reclamos]);
 
-  // ---------- 5. QUIEN NO ESTA RESPONDIENDO ----------
-  // La cola vieja de cada area, medida contra SU PROPIO promedio de cierre.
-  // Es la lectura que faltaba y la que mas sorprende en los datos: ninguna area
-  // es lenta --- todas cierran en 10 a 15 dias --- pero cada una arrastra casos
-  // de 70 a 130 dias que nadie volvio a mirar. Compararlas contra un umbral
-  // fijo lo esconderia; contra su propia vara, salta.
-  const cardAreas = useMemo<TarjetaDatos>(() => {
+  // ---------- 3. QUIÉN NO ESTÁ RESPONDIENDO ----------
+  // La cola vieja de cada área contra SU PROPIO promedio de cierre. Es el
+  // hallazgo más fuerte de los datos: ninguna área es lenta —todas cierran en
+  // 10 a 15 días— pero cada una arrastra casos de 70 a 130 que nadie volvió a
+  // mirar. Contra un umbral fijo eso se esconde; contra su propia vara, salta.
+  const qAreas = useMemo<Pregunta | null>(() => {
     const porArea = new Map<string, { cierra: number[]; cola: number[] }>();
     for (const r of reclamos) {
       const nombre = r.dependencia_asignada?.nombre;
       if (!nombre) continue;
       const acc = porArea.get(nombre) ?? { cierra: [], cola: [] };
       if (r.fecha_resolucion) {
-        acc.cierra.push(Math.max(
-          0,
-          Math.floor((new Date(r.fecha_resolucion).getTime() - new Date(r.created_at).getTime()) / DIA_MS),
-        ));
+        acc.cierra.push(Math.max(0, Math.floor(
+          (new Date(r.fecha_resolucion).getTime() - new Date(r.created_at).getTime()) / DIA_MS,
+        )));
       } else if (ABIERTOS.has(r.estado)) {
         acc.cola.push(diasDesde(r.created_at));
       }
       porArea.set(nombre, acc);
     }
-    const prom = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+    const prom = (xs: number[]) =>
+      (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+
     const filas = Array.from(porArea, ([area, a]) => ({
       area,
       cierraEn: prom(a.cierra),
       colaN: a.cola.length,
-      colaDias: prom(a.cola),
-      peor: a.cola.length ? Math.max(...a.cola) : 0,
+      colaDias: prom(a.cola) ?? 0,
     }))
-      // Solo tiene sentido hablar de un area que TIENE cola vieja: la que esta
-      // al dia no es noticia.
-      .filter((f) => f.colaN > 0 && (f.colaDias ?? 0) > 0)
-      .sort((a, b) => (b.colaDias ?? 0) - (a.colaDias ?? 0));
+      // Hablar de un área al día no es noticia: sólo entran las que arrastran.
+      .filter((f) => f.colaN > 0 && f.colaDias > 0)
+      .sort((a, b) => b.colaDias - a.colaDias);
 
     const top = filas[0];
+    if (!top) return null;
+
     return {
-      preg: '¿Quién no está respondiendo?',
-      cara: top
-        ? {
-            num: <><NumAnimado v={top.colaDias ?? 0} /><small> días lleva la cola de {top.area}</small></>,
-            det: (
-              <>
-                {top.cierraEn != null ? (
-                  <>
-                    <strong>{top.area}</strong> cierra en <strong>{top.cierraEn} días</strong> promedio,
-                    pero tiene <strong>{top.colaN}</strong> esperando hace {top.colaDias}.
-                    {' '}No es lenta: es una cola que nadie volvió a mirar.
-                  </>
-                ) : (
-                  <>
-                    <strong>{top.area}</strong> tiene <strong>{top.colaN}</strong>{' '}
-                    {top.colaN === 1 ? 'reclamo' : 'reclamos'} esperando hace {top.colaDias} días
-                    y todavía no cerró ninguno en el período.
-                  </>
-                )}
-              </>
-            ),
-            chip: (top.colaDias ?? 0) > 60 ? CHIP_POR_TONO.malo : CHIP_POR_TONO.advertencia,
-          }
-        : null,
-      vacio: { texto: 'Ningún área arrastra reclamos viejos sin resolver.', buena: true },
-      listaTitulo: 'Cuánto lleva esperando cada área',
-      casos: filas.slice(0, 5).map((f, i) => ({
-        pos: i + 1,
-        titulo: f.area,
-        sub: f.cierraEn != null ? `cierra en ${f.cierraEn} días · el peor lleva ${f.peor}` : `el peor lleva ${f.peor} días`,
-        valor: f.colaDias ?? 0,
-        unidad: 'días',
-      })),
+      id: 'areas',
+      pregunta: '¿Quién no está respondiendo?',
+      icono: Clock,
+      tono: top.colaDias > 60 ? 'malo' : 'advertencia',
+      valor: String(top.colaDias),
+      unidad: `días lleva la cola de ${top.area}`,
+      detalle: top.cierraEn != null ? (
+        <>
+          <strong>{top.area}</strong> cierra en <strong>{top.cierraEn} días</strong> promedio,
+          pero tiene <strong>{top.colaN}</strong> esperando hace {top.colaDias}.
+          {' '}No es lenta: es una cola que nadie volvió a mirar.
+        </>
+      ) : (
+        <>
+          <strong>{top.area}</strong> tiene <strong>{top.colaN}</strong>{' '}
+          {plural(top.colaN, 'reclamo', 'reclamos')} esperando hace {top.colaDias} días
+          y todavía no cerró ninguno.
+        </>
+      ),
+      pie: `${filas.length} ${plural(filas.length, 'área arrastra cola', 'áreas arrastran cola')}`,
     };
   }, [reclamos]);
 
+  // ---------- 4. QUÉ ES LO QUE MÁS PREOCUPA ----------
+  const qCategorias = useMemo<Pregunta | null>(() => {
+    const cuentas = new Map<string, number>();
+    for (const r of reclamos) {
+      const nombre = r.categoria?.nombre || 'Sin categoría';
+      cuentas.set(nombre, (cuentas.get(nombre) ?? 0) + 1);
+    }
+    const orden = [...cuentas.entries()].sort((a, b) => b[1] - a[1]);
+    const [top, segundo] = orden;
+    if (!top) return null;
+    const total = reclamos.length;
+    const pct = Math.round((top[1] / total) * 100);
+
+    return {
+      id: 'categorias',
+      pregunta: '¿Qué es lo que más preocupa?',
+      icono: Tags,
+      tono: pct >= 40 ? 'advertencia' : 'neutro',
+      valor: `${pct}%`,
+      unidad: `es ${top[0].toLowerCase()}`,
+      detalle: (
+        <>
+          <strong>{top[1]} de {total}</strong> reclamos son de <strong>{top[0]}</strong>
+          {segundo && <>. <strong>{segundo[0]}</strong> suma otros {segundo[1]}</>}.
+        </>
+      ),
+      pie: `${orden.length} ${plural(orden.length, 'categoría', 'categorías')} en el recorte`,
+    };
+  }, [reclamos]);
+
+  // ---------- 5. CÓMO VIENE LA ENTRADA ----------
+  const qTendencia = useMemo<Pregunta | null>(() => {
+    const hoy = new Date();
+    hoy.setHours(23, 59, 59, 999);
+    const cuentas = new Array<number>(SEMANAS).fill(0);
+    for (const r of reclamos) {
+      const dias = Math.floor((hoy.getTime() - new Date(r.created_at).getTime()) / DIA_MS);
+      const semana = SEMANAS - 1 - Math.floor(dias / 7);
+      if (semana >= 0 && semana < SEMANAS) cuentas[semana] += 1;
+    }
+    const total = cuentas.reduce((s, n) => s + n, 0);
+    if (total === 0) return null;
+    const actual = cuentas[SEMANAS - 1];
+    const previa = cuentas[SEMANAS - 2];
+
+    return {
+      id: 'tendencia',
+      pregunta: '¿Cómo viene la entrada?',
+      icono: TrendingUp,
+      // Que entren MÁS reclamos no es malo en sí: puede ser que la gente
+      // empezó a usar el canal. Por eso es aviso, no alarma.
+      tono: actual > previa ? 'advertencia' : actual < previa ? 'bueno' : 'neutro',
+      valor: String(actual),
+      unidad: 'esta semana',
+      detalle: (
+        <>
+          Venía de <strong>{previa}</strong> la semana anterior;{' '}
+          <strong>{total}</strong> en las últimas {SEMANAS} semanas.
+        </>
+      ),
+      pie: `últimas ${SEMANAS} semanas`,
+    };
+  }, [reclamos]);
+
+  // El orden importa: primero el RESUMEN de la lente, después lo accionable.
+  const preguntas = useMemo(
+    () => [qLente, qFrenados, qAreas, qCategorias, qTendencia].filter(Boolean) as Pregunta[],
+    [qLente, qFrenados, qAreas, qCategorias, qTendencia],
+  );
+
+  if (preguntas.length === 0) return null;
+
   return (
-    /* key por lente: al cambiar el chip las cards REMONTAN — la entrada
-       escalonada y los counters vuelven a correr, como en el modo TV. */
+    /* key por lente: al cambiar el chip las cards REMONTAN, así los contadores
+       vuelven a correr y se nota que la respuesta cambió. */
     <div className="map-art" key={pregunta}>
-      <Tarjeta datos={cardLente} />
-      <Tarjeta datos={cardFrenados} />
-      <Tarjeta datos={cardAreas} />
-      <Tarjeta datos={cardCategorias} />
-      <Tarjeta datos={cardTendencia} />
+      {preguntas.map((p) => (
+        <KpiSemantico
+          key={p.id}
+          pregunta={p.pregunta}
+          icono={p.icono}
+          tono={p.tono}
+          valor={p.valor}
+          unidad={p.unidad}
+          detalle={<Fragment>{p.detalle}</Fragment>}
+          pie={p.pie}
+        />
+      ))}
     </div>
   );
 }
