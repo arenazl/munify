@@ -2459,6 +2459,39 @@ button.av2-chip:hover { opacity: 0.85; }
 }
 .av2-tl-btn--activo .av2-tl-icono { color: var(--pl-green-700); }
 
+/* --- LA CONSULTA, PEGADA ARRIBA ----------------------------------------
+   La pregunta y los chips de estado son la barra de mando de la pantalla: se
+   usan MIENTRAS se mira el mapa y se leen los paneles de abajo, no una sola vez
+   al entrar. Sin sticky habia que volver al tope cada vez que uno queria
+   cambiar de pregunta o apagar un estado (dueno, 2026-09-05).
+
+   `top` sale de la altura del topbar del shell, asi que la barra se apoya
+   justo debajo y no queda tapada ni flotando en el aire.
+
+   OJO al tocar los ancestros: `position: sticky` deja de funcionar en silencio
+   si CUALQUIER padre tiene `overflow` distinto de visible. */
+.av2-mapa-consulta--sticky {
+  position: sticky;
+  top: calc(var(--pl-topbar-h, 46px) + 8px);
+  z-index: 620;   /* sobre los controles del lienzo (600), bajo los modales */
+  padding-bottom: 8px;
+  /* Fondo propio: sin el, el mapa se ve POR DEBAJO de la barra al scrollear. */
+  background: var(--pl-bg);
+}
+
+/* A pantalla completa no hay topbar contra la que apoyarse ni pagina que
+   scrollear: el `top` calculado dejaria la barra flotando en el aire. */
+.av2-mapa-full:fullscreen .av2-mapa-consulta--sticky,
+.av2-mapa-full--expandido .av2-mapa-consulta--sticky {
+  position: static;
+}
+
+/* En pantallas bajas la barra se comeria el mapa: ahi vuelve a scrollear con
+   la pagina. Un mapa de 300px con una barra fija arriba no sirve para nada. */
+@media (max-height: 700px) {
+  .av2-mapa-consulta--sticky { position: static; }
+}
+
 /* --- LA GRILLA DEL MAPA: franja, mapa, franja ---------------------------
    El mapa dejo de ocupar todo el ancho por dos razones que resultaron ser la
    misma (dueno, 2026-09-05): las metricas necesitaban un lugar donde vivir, y
@@ -2808,26 +2841,38 @@ button.av2-chip:hover { opacity: 0.85; }
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  /* Leaflet los pega al borde; con botones grandes conviene el mismo margen
+     que usan los controles de la derecha, asi los dos lados se ven parejos. */
+  margin: 12px 0 0 12px;
 }
+/* GRANDES Y FACILES DE TOCAR: 44px es el minimo tactil real, y estos botones
+   son, ademas, la alternativa a la rueda desde que el zoom pide Ctrl --- el
+   camino principal para mucha gente, no un accesorio. A 34px con la tipografia
+   chica de Leaflet quedaban "re ocultos" (dueno, 2026-09-05). El signo va en
+   grande y con peso: es lo unico que tiene que leerse de estos botones. */
 .av2-mapa-lienzo .leaflet-control-zoom a {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   font-family: var(--pl-font-sans);
-  font-size: 17px;
-  font-weight: 500;
+  font-size: 24px;
+  font-weight: 600;
   line-height: 1;
-  color: var(--pl-text-3);
+  color: var(--pl-text);
   background: var(--pl-surface);
   border: 1px solid var(--pl-border);
   border-radius: var(--pl-radius-md);
   box-shadow: var(--pl-shadow-float);
   transition:
     background var(--pl-dur-ui) var(--pl-ease),
-    color var(--pl-dur-ui) var(--pl-ease);
+    color var(--pl-dur-ui) var(--pl-ease),
+    transform var(--pl-dur-ui) var(--pl-ease);
 }
+/* Se hunde al apretar: con el zoom por rueda restringido, este boton se toca
+   muchas veces seguidas y sin respuesta tactil uno no sabe si registro. */
+.av2-mapa-lienzo .leaflet-control-zoom a:active { transform: scale(0.94); }
 .av2-mapa-lienzo .leaflet-control-zoom a:hover {
   background: var(--pl-surface-hover);
   color: var(--pl-text);

@@ -4354,6 +4354,11 @@ export default function Mapa() {
           />
         )}
 
+        {/* LA CONSULTA QUEDA A LA VISTA MIENTRAS SE BAJA.
+            El mapa es alto y los paneles de abajo son largos: sin esto, para
+            cambiar de pregunta o apagar un estado habia que volver arriba cada
+            vez. Es la barra de mando de la pantalla, no un encabezado. */}
+        <div className={`av2-mapa-consulta${isPuntos ? '' : ' av2-mapa-consulta--sticky'}`}>
         {!isPuntos && (
           <ConsultaGuiada
             titulo="¿Qué querés ver en el mapa?"
@@ -4379,6 +4384,7 @@ export default function Mapa() {
             onTodos={verTodosLosEstados}
           />
         )}
+        </div>{/* /av2-mapa-consulta */}
 
 
       </div>
