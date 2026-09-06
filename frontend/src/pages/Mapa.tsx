@@ -82,13 +82,16 @@ import MapaPuntosPanel from '../components/mapa/MapaPuntosPanel';
 // cuantos reclamos tiene y del color de como esta. Reemplaza a la mancha de
 // calor como respuesta a "donde": la mancha dice que hay muchos, la burbuja
 // dice QUE barrio, CUANTOS y si esta bien o mal.
-import BurbujasBarrio, { type BurbujaBarrio } from '../components/mapa/BurbujasBarrio';
+import type { BurbujaBarrio } from '../components/mapa/BurbujasBarrio';
 // La segunda linea: EN QUE ANDAN los reclamos. Es la que le da sentido al
 // color de las burbujas y, de paso, es su leyenda.
 import FiltroEstadoMapa, { type GrupoEstado } from '../components/mapa/FiltroEstadoMapa';
 // Las franjas de los costados: donde vive lo que el mapa no puede decir
 // dibujando (y, de paso, el margen por donde scrollear sin pisarlo).
 import PanelLateral, { type FilaPanel } from '../components/mapa/PanelesLaterales';
+// La zona como ANILLO: cuantos hay y como se reparten por estado, sin tener
+// que elegir un solo color para todo el barrio.
+import { svgDonut, tamanoDonut, type TramoDonut } from '../components/mapa/DonutZona';
 import {
   Reclamo,
   type PuntoInteres,
@@ -1663,30 +1666,30 @@ export default function Mapa() {
   // Rampa de densidad: los 3 matices de veredicto del theme activo. Leaflet y
   // la leyenda necesitan colores concretos, así que salen de los MISMOS
   // tokens que usa el CSS (patrón polimórfico, cero hex fijos).
-  const rampaDensidad = useMemo<RampaDensidad>(() => {
-    const cs = getComputedStyle(document.documentElement);
-    const leer = (token: string, fallback: string) =>
-      cs.getPropertyValue(token).trim() || fallback;
-    return {
-      baja: leer('--pl-green', theme.primary),
-      media: leer('--pl-amber-strong', theme.primary),
-      alta: leer('--pl-red', theme.primary),
-    };
-  }, [theme.primary]);
+  /**
+   * LA MANCHA MIDE DENSIDAD, NO ESTADO — y por eso tiene su propia paleta.
+   *
+   * Venia pintada con los tres matices de veredicto (verde -> ambar -> rojo),
+   * los MISMOS que usan los pines y las burbujas para decir en que anda un
+   * reclamo. Dos capas hablando el mismo idioma de color sobre el mismo mapa:
+   * un manchon rojo parecia "hay problemas aca" cuando solo decia "hay muchos
+   * aca", y ningun cartel de leyenda alcanzaba para deshacer esa lectura.
+   *
+   * La regla sale del diseno (Claude Design, 2026-09-05) y es explicita: los
+   * colores de estado NUNCA se usan en el mapa de calor, para que las dos capas
+   * no se confundan. La rampa violeta -> magenta no significa nada en el
+   * vocabulario de estados de la app, que es justamente lo que se necesita: se
+   * lee como intensidad y no como veredicto.
+   *
+   * Son constantes y no tokens del theme a proposito: si salieran del acento de
+   * la marca, en un municipio con acento rojo volveriamos al mismo problema.
+   */
+  const rampaDensidad = useMemo<RampaDensidad>(() => ({
+    baja: '#8B5CF6',    // violeta
+    media: '#C026D3',   // fucsia
+    alta: '#EC4899',    // magenta
+  }), []);
 
-  /** Los matices de veredicto en color CONCRETO: Leaflet dibuja con valores,
-   *  no con custom properties. Salen de los MISMOS tokens que el CSS, así el
-   *  mapa sigue al theme y a la marca en vez de quedar clavado en un hex. */
-  const tintesMapa = useMemo(() => {
-    const cs = getComputedStyle(document.documentElement);
-    const leer = (token: string, fallback: string) =>
-      cs.getPropertyValue(token).trim() || fallback;
-    return {
-      malo: leer('--pl-red', theme.primary),
-      bueno: leer('--pl-green', theme.primary),
-      tenue: leer('--pl-text-muted', theme.textSecondary),
-    };
-  }, [theme.primary, theme.textSecondary]);
 
   // =================================================================
   // Universos derivados
@@ -1778,7 +1781,27 @@ export default function Mapa() {
    *  lo explique cuando se muestra la pantalla por primera vez (dueno,
    *  2026-09-05: "comercialmente el mapa de calor es imbatible"). El boton de
    *  la llama la apaga para mirar las burbujas solas. */
-  const [verCalor, setVerCalor] = useState(true);
+  /**
+   * QUE CAPAS SE VEN. Reemplaza al botoncito de la llama por lo que el diseno
+   * resolvio mejor (Claude Design, 2026-09-05): un control de tres posiciones,
+   * porque son tres lecturas distintas y no un interruptor.
+   *
+   *   concentracion — solo la mancha: donde se amontonan, sin importar el estado
+   *   estado        — solo los reclamos, cada uno del color de en que anda
+   *   ambas         — las dos, que es como se entiende el mapa completo
+   *
+   * Arranca en "ambas" porque es la lectura que contesta las dos preguntas de
+   * una; el que quiere una sola la aisla con un toque.
+   */
+  const [capaMapa, setCapaMapa] = useState<'concentracion' | 'estado' | 'ambas'>('ambas');
+  const verCalor = capaMapa !== 'estado';
+  const verEstado = capaMapa !== 'concentracion';
+
+  /** Agrupar por zona: un donut por barrio en vez de un punto por reclamo.
+   *  Encendido por default porque con cientos de reclamos los puntos sueltos
+   *  son la masa que el dueno llamo "un caos de pines que no sirven para nada". */
+  const [agruparPorZona, setAgruparPorZona] = useState(true);
+
   /** Cartel de "usá Ctrl para hacer zoom", que se muestra solo cuando alguien
    *  lo intenta sin Ctrl. No va fijo: un cartel permanente sobre el mapa es
    *  ruido para el que ya sabe. */
@@ -1939,11 +1962,23 @@ export default function Mapa() {
    */
   const colorDelPin = useCallback(
     (r: Reclamo) => {
-      const area = r.dependencia_asignada ? areaPorId.get(r.dependencia_asignada.id) : undefined;
-      if (area) return area.color;
-      return preguntaConfig?.tinte ? tintesMapa[preguntaConfig.tinte] : estadoColor(r.estado);
+      // EL COLOR DEL PIN ES EN QUE ANDA, no de quien es.
+      //
+      // Venia siendo el area que lo atiende, y el dueno lo corto (2026-09-05):
+      // "nos olvidamos de los colores a nivel de direccion de transito, para eso
+      // estan los filtros". Tenia razon por dos motivos. El area ya se elige con
+      // un filtro, asi que el color se gastaba en algo que uno mismo acababa de
+      // decidir; y el mismo verde que en el resto de la app significa "esto esta
+      // bien" significaba "Ambiente" en el mapa, con lo cual una pantalla
+      // llamada "lo atrasado" se veia llena de pines verdes.
+      //
+      // El glifo del pin sigue siendo el del area: la informacion no se pierde,
+      // cambia de canal.
+      const grupo = GRUPO_DE_ESTADO[r.estado];
+      const def = GRUPOS_ESTADO.find((g) => g.id === grupo);
+      return estadoColors[def?.colorDe ?? r.estado] || estadoColor(r.estado);
     },
-    [areaPorId, preguntaConfig, tintesMapa],
+    [],
   );
 
   /** Glifo del pin: el del área. `undefined` hasta que el icono termina de cargar. */
@@ -2235,6 +2270,88 @@ export default function Mapa() {
     }
     return m;
   }, [universoSin]);
+
+  /**
+   * LOS DONUTS: una zona, cuantos reclamos tiene y como se reparten por estado.
+   *
+   * Se paran en el CENTROIDE de sus propios reclamos --no en el centro que el
+   * catalogo le da al barrio-- para que caigan encima de la mancha que resume
+   * los mismos puntos. Cuando el barrio no tiene ninguno ubicado se cae al
+   * centro del catalogo, que es lo unico que queda.
+   */
+  const donutsZona = useMemo(() => {
+    if (!verEstado || !agruparPorZona) return [];
+    const porBarrio = new Map<number, Reclamo[]>();
+    for (const r of reclamosFiltrados) {
+      const id = r.barrio?.id;
+      if (id == null) continue;
+      const l = porBarrio.get(id);
+      if (l) l.push(r); else porBarrio.set(id, [r]);
+    }
+    const salida: Array<{
+      id: number; nombre: string; lat: number; lng: number;
+      total: number; tramos: TramoDonut[];
+    }> = [];
+    for (const [id, lista] of porBarrio) {
+      const b = barriosMunicipio.find((x) => x.id === id);
+      if (!b) continue;
+      let lat = 0, lng = 0, conCoord = 0;
+      for (const r of lista) {
+        if (r.latitud == null || r.longitud == null) continue;
+        lat += r.latitud; lng += r.longitud; conCoord += 1;
+      }
+      if (conCoord > 0) { lat /= conCoord; lng /= conCoord; }
+      else if (b.latitud != null && b.longitud != null) { lat = b.latitud; lng = b.longitud; }
+      else continue;
+
+      // Los tramos van SIEMPRE en el mismo orden --el de GRUPOS_ESTADO-- para
+      // que el anillo se lea igual en todas las zonas: si cada donut ordenara
+      // por cantidad, el mismo color caeria en un lugar distinto en cada uno y
+      // compararlos de un vistazo seria imposible.
+      const cuenta = new Map<string, number>();
+      for (const r of lista) {
+        const g = GRUPO_DE_ESTADO[r.estado];
+        if (g) cuenta.set(g, (cuenta.get(g) || 0) + 1);
+      }
+      const tramos: TramoDonut[] = GRUPOS_ESTADO
+        .filter((g) => (cuenta.get(g.id) || 0) > 0)
+        .map((g) => ({
+          id: g.id,
+          valor: cuenta.get(g.id) || 0,
+          color: estadoColors[g.colorDe] || estadoColors.default,
+        }));
+      salida.push({ id, nombre: b.nombre, lat, lng, total: lista.length, tramos });
+    }
+    return salida.sort((a, b) => b.total - a.total);
+  }, [verEstado, agruparPorZona, reclamosFiltrados, barriosMunicipio]);
+
+  /** Los iconos, resueltos aparte: `divIcon` crea DOM y no conviene rehacerlo
+   *  en cada render del mapa. */
+  const iconosDonut = useMemo(() => {
+    if (donutsZona.length === 0) return new Map<number, L.DivIcon>();
+    const max = donutsZona[0].total;
+    const cs = getComputedStyle(document.documentElement);
+    const leer = (t: string, f: string) => cs.getPropertyValue(t).trim() || f;
+    const colorFondo = leer('--pl-surface', '#ffffff');
+    const colorTrack = leer('--pl-track', '#e5e7eb');
+    const colorTexto = leer('--pl-text', '#111827');
+    const m = new Map<number, L.DivIcon>();
+    for (const d of donutsZona) {
+      const tamano = tamanoDonut(d.total, max);
+      const grosor = Math.max(9, Math.round(tamano * 0.17));
+      m.set(d.id, L.divIcon({
+        className: 'av2-donut-zona',
+        html: svgDonut({
+          tramos: d.tramos, total: d.total, tamano, grosor,
+          colorTexto, colorFondo, colorTrack,
+          resaltado: barrioSel === d.id,
+        }),
+        iconSize: [tamano, tamano],
+        iconAnchor: [tamano / 2, tamano / 2],
+      }));
+    }
+    return m;
+  }, [donutsZona, barrioSel]);
 
   /** A donde llevar el mapa cuando se elige un barrio: su forma si la tiene,
    *  su centro si no. Memoizado por `barrioSel` para que el encuadre se dispare
@@ -4372,18 +4489,6 @@ export default function Mapa() {
           />
         )}
 
-        {/* LA SEGUNDA LINEA: en que andan. Va pegada abajo de la consulta
-            porque es otra pregunta sobre lo mismo --la primera elige QUE mirar,
-            esta EN QUE ANDA-- y porque es, ademas, la leyenda del color de las
-            burbujas: el punto de cada boton es el color que se ve en el mapa. */}
-        {reclamosDeLaConsulta.length > 0 && (
-          <FiltroEstadoMapa
-            grupos={gruposEstado}
-            activos={estadosVisibles}
-            onToggle={alternarGrupoEstado}
-            onTodos={verTodosLosEstados}
-          />
-        )}
         </div>{/* /av2-mapa-consulta */}
 
 
@@ -4399,14 +4504,6 @@ export default function Mapa() {
           En pantalla completa la grilla se deshace y el mapa se queda con todo,
           que es para lo que existe ese modo. */}
       <div className="av2-mapa-grilla">
-        <PanelLateral
-          titulo="Por qué están frenados"
-          bajada="Los trabajos que no se pudieron resolver, y qué los traba."
-          filas={filasRazones}
-          vacio="Ningún trabajo quedó frenado con un motivo cargado."
-          remate={remateRazones}
-        />
-
       <div className="av2-mapa">
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}
@@ -4721,23 +4818,36 @@ export default function Mapa() {
               <HeatLayer reclamos={reclamosFiltrados} rampa={rampaDensidad} />
             )}
 
-            {dibujoMapa === 'barrios' && (
-              <BurbujasBarrio
-                burbujas={burbujasBarrio}
-                elegidoId={barrioSel}
-                /* NINGUN rotulo fijo: molestaban y tapaban el mapa (dueno,
-                   2026-09-05, "esos cartelitos son molestos"). El nombre
-                   aparece al pasar el mouse, y queda escrito solo en el barrio
-                   que se elige --que es el unico que uno esta mirando--. */
-                rotulosFijos={0}
-                onElegir={(id) => {
-                  clickAtendidoRef.current = Date.now();
-                  setBarrioSel(id);
-                }}
-              />
-            )}
+            {/* AGRUPADO POR ZONA: un donut por barrio, con el reparto por
+                estado en el anillo y el total en el centro. Reemplaza al circulo
+                relleno, que tenia que elegir UN color y escondia la mezcla. */}
+            {verEstado && agruparPorZona && donutsZona.map((d) => {
+              const icono = iconosDonut.get(d.id);
+              if (!icono) return null;
+              return (
+                <Marker
+                  key={`donut-${d.id}`}
+                  position={[d.lat, d.lng]}
+                  icon={icono}
+                  eventHandlers={{
+                    click: () => {
+                      clickAtendidoRef.current = Date.now();
+                      setBarrioSel(d.id);
+                    },
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -6]}>
+                    <div className="font-medium text-sm">{d.nombre}</div>
+                    <div className="text-xs text-gray-500">
+                      {d.total} {d.total === 1 ? 'reclamo' : 'reclamos'}
+                    </div>
+                  </Tooltip>
+                </Marker>
+              );
+            })}
 
-            {dibujoMapa === 'puntos' &&
+            {/* SIN AGRUPAR: un pin por reclamo, del color de en que anda. */}
+            {verEstado && !agruparPorZona &&
               reclamosFiltrados.map(r => (
                 <Marker
                   key={r.id}
@@ -4806,6 +4916,40 @@ export default function Mapa() {
             cualquier mapa que la gente haya usado en su vida están ahí, no en
             una barra arriba. Mismo tratamiento visual que la leyenda de
             densidad (superficie, borde y sombra flotante de los tokens). */}
+        {/* CAPA: las tres lecturas del mapa, en un control de tres posiciones.
+            Viene del diseno (Claude Design, 2026-09-05) y reemplaza al boton de
+            la llama: son tres estados y no un interruptor, y ademas se declaran
+            con su nombre en vez de esconderse detras de un icono. */}
+        <div className="av2-mapa-capas">
+          <span className="av2-mapa-capas-titulo">Capa</span>
+          {([
+            ['concentracion', 'Concentración'],
+            ['estado', 'Estado'],
+            ['ambas', 'Ambas'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={`av2-mapa-capa${capaMapa === id ? ' av2-mapa-capa--on' : ''}`}
+              onClick={() => setCapaMapa(id)}
+              aria-pressed={capaMapa === id}
+            >
+              {label}
+            </button>
+          ))}
+          {verEstado && (
+            <label className="av2-mapa-agrupar">
+              <input
+                type="checkbox"
+                checked={agruparPorZona}
+                onChange={(e) => setAgruparPorZona(e.target.checked)}
+              />
+              <span className="av2-mapa-agrupar-pista" aria-hidden />
+              Agrupar por zona
+            </label>
+          )}
+        </div>
+
         <div className="av2-mapa-controles">
           <button
             type="button"
@@ -4831,16 +4975,6 @@ export default function Mapa() {
               <Layers size={16} strokeWidth={2} aria-hidden />
             </button>
           )}
-          <button
-            type="button"
-            className={`av2-mapa-ctrl${verCalor ? ' av2-mapa-ctrl--activo' : ''}`}
-            onClick={() => setVerCalor((v) => !v)}
-            aria-pressed={verCalor}
-            title={verCalor ? 'Ocultar el mapa de calor' : 'Ver la concentración como mapa de calor'}
-            aria-label={verCalor ? 'Ocultar el mapa de calor' : 'Ver la concentración como mapa de calor'}
-          >
-            <Flame size={16} strokeWidth={2} aria-hidden />
-          </button>
           <button
             type="button"
             className="av2-mapa-ctrl"
@@ -4987,12 +5121,44 @@ export default function Mapa() {
           />
         )}
 
-        <PanelLateral
-          titulo="Dónde se concentra"
-          bajada="Los barrios con más de lo que estás mirando. Tocá uno y el mapa va."
-          filas={filasBarrios}
-          vacio="Todavía no hay nada ubicado para esta consulta."
-        />
+        {/* UNA SOLA COLUMNA, A LA DERECHA. Se probo con una franja de cada
+            lado y se volvio: es la convencion del resto de la app (dueno,
+            2026-09-05, "normalmente ponemos todo a la derecha"), evita barrer
+            la pantalla de punta a punta para leer dos mitades de lo mismo, y le
+            devuelve al mapa 260px de ancho. El margen para scrollear sin pisar
+            el mapa sigue estando: es el lado izquierdo, ahora libre.
+
+            El orden es por lo accionable: primero POR QUE esta trabado --que es
+            sobre lo que se puede hacer algo-- y despues DONDE se concentra. */}
+        <div className="av2-mapa-columna">
+          {/* EL ESTADO, ARRIBA DE TODO. Reporta, hace de leyenda del color del
+              mapa y filtra, con un solo componente. Va primero porque es la
+              lectura mas rapida de la pantalla: tres numeros y ya sabes como
+              viene el municipio. */}
+          {reclamosDeLaConsulta.length > 0 && (
+            <div className="av2-mapa-lateral">
+              <FiltroEstadoMapa
+                grupos={gruposEstado}
+                activos={estadosVisibles}
+                onToggle={alternarGrupoEstado}
+                onTodos={verTodosLosEstados}
+              />
+            </div>
+          )}
+          <PanelLateral
+            titulo="Por qué están frenados"
+            bajada="Los trabajos que no se pudieron resolver, y qué los traba."
+            filas={filasRazones}
+            vacio="Ningún trabajo quedó frenado con un motivo cargado."
+            remate={remateRazones}
+          />
+          <PanelLateral
+            titulo="Dónde se concentra"
+            bajada="Las zonas con más de lo que estás mirando. Tocá una y el mapa va."
+            filas={filasBarrios}
+            vacio="Todavía no hay nada ubicado para esta consulta."
+          />
+        </div>
       </div>{/* /av2-mapa-grilla */}
 
       {/* === Informe de una zona: no es un control del mapa, es una acción que

@@ -19,6 +19,13 @@ import type { CSSProperties } from 'react';
  * `lib/enums/reclamo`, el SSoT visual de estados de toda la app. Asi el naranja
  * del mapa es el mismo naranja de la pantalla de Reclamos, y nadie tiene que
  * aprender dos idiomas.
+ *
+ * Va en LISTA vertical dentro del panel, y no en chips sobre el mapa, porque
+ * asi hace tres trabajos con un solo componente (diseno de Claude Design,
+ * 2026-09-05, y el dueno lo marco: "esto soluciona el reporte y la leyenda en
+ * un mismo componente"): REPORTA cuantos hay de cada estado, es la LEYENDA del
+ * color que se ve en el mapa, y FILTRA. Tres cosas que antes pedian tres
+ * lugares distintos en pantalla.
  */
 
 export interface GrupoEstado {
@@ -43,35 +50,45 @@ export function FiltroEstadoMapa({ grupos, activos, onToggle, onTodos }: Props) 
   const todos = grupos.every((g) => activos.has(g.id));
   return (
     <div className="av2-mapa-estados" role="group" aria-label="En qué anda cada reclamo">
-      <span className="av2-mapa-estados-titulo">¿En qué andan?</span>
-      {grupos.map((g) => {
-        const on = activos.has(g.id);
-        return (
-          <button
-            key={g.id}
-            type="button"
-            className={`av2-mapa-estado${on ? ' av2-mapa-estado--on' : ''}`}
-            style={{ '--av2-estado-color': g.color } as CSSProperties}
-            onClick={() => onToggle(g.id)}
-            aria-pressed={on}
-            /* El titulo dice lo que el boton HACE, que no siempre es obvio con
-               un toggle: apagado, lo que ofrece es volver a mostrarlos. */
-            title={on ? `Ocultar los ${g.label.toLowerCase()}` : `Mostrar los ${g.label.toLowerCase()}`}
-          >
-            {/* El punto de color ES la leyenda: dice que significa ese color en
-                el mapa, en el mismo lugar donde se prende y se apaga. Una
-                leyenda aparte obliga a mirar dos sitios para entender uno. */}
-            <span className="av2-mapa-estado-punto" aria-hidden />
-            {g.label}
-            <span className="av2-mapa-estado-n">{g.cuantos.toLocaleString('es-AR')}</span>
-          </button>
-        );
-      })}
-      {!todos && (
-        <button type="button" className="av2-mapa-estados-todos" onClick={onTodos}>
-          ver todos
+      <div className="av2-mapa-estados-head">
+        <span className="av2-mapa-estados-titulo">Estado</span>
+        {/* La instruccion va en el encabezado y no en cada fila: una lista de
+            numeros no se ve clickeable, y sin esta linea nadie descubre que
+            ademas filtra. */}
+        <button
+          type="button"
+          className="av2-mapa-estados-todos"
+          onClick={onTodos}
+          disabled={todos}
+        >
+          {todos ? 'tocá para filtrar' : 'ver todos'}
         </button>
-      )}
+      </div>
+
+      <ul className="av2-mapa-estados-lista">
+        {grupos.map((g) => {
+          const on = activos.has(g.id);
+          return (
+            <li key={g.id}>
+              <button
+                type="button"
+                className={`av2-mapa-estado${on ? ' av2-mapa-estado--on' : ''}`}
+                style={{ '--av2-estado-color': g.color } as CSSProperties}
+                onClick={() => onToggle(g.id)}
+                aria-pressed={on}
+                title={on ? `Ocultar los ${g.label.toLowerCase()}` : `Mostrar los ${g.label.toLowerCase()}`}
+              >
+                {/* El punto de color ES la leyenda: dice que significa ese color
+                    en el mapa, en la misma fila donde se prende y se apaga. Una
+                    leyenda aparte obliga a mirar dos sitios para entender uno. */}
+                <span className="av2-mapa-estado-punto" aria-hidden />
+                <span className="av2-mapa-estado-label">{g.label}</span>
+                <span className="av2-mapa-estado-n">{g.cuantos.toLocaleString('es-AR')}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

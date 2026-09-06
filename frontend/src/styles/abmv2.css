@@ -2508,23 +2508,24 @@ button.av2-chip:hover { opacity: 0.85; }
    paneles debajo. Nunca al reves: el mapa es lo que se vino a ver. */
 .av2-mapa-grilla {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 12px;
   align-items: start;
 }
-
-@media (max-width: 1400px) {
-  .av2-mapa-grilla { grid-template-columns: 240px minmax(0, 1fr); }
-  /* La franja derecha baja abajo de todo y ocupa el ancho completo. */
-  .av2-mapa-grilla > .av2-mapa-lateral:last-child {
-    grid-column: 1 / -1;
-  }
+/* La columna de la derecha apila sus paneles. */
+.av2-mapa-columna {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
-@media (max-width: 1000px) {
+
+/* Angosto: la columna baja abajo del mapa y ocupa todo el ancho. El mapa nunca
+   se achica mas: es lo que se vino a ver. */
+@media (max-width: 1180px) {
   .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
-  .av2-mapa-grilla > .av2-mapa-lateral:last-child { grid-column: auto; }
-  /* El mapa primero: es lo que se vino a ver. */
-  .av2-mapa-grilla > .av2-mapa { order: -1; }
+  .av2-mapa-columna { flex-direction: row; flex-wrap: wrap; }
+  .av2-mapa-columna > .av2-mapa-lateral { flex: 1 1 320px; }
 }
 
 /* A pantalla completa la grilla se deshace: el mapa se queda con todo y las
@@ -2779,17 +2780,15 @@ button.av2-chip:hover { opacity: 0.85; }
   text-transform: uppercase;
   color: var(--pl-text-muted);
 }
+/* La rampa de la leyenda tiene que ser LA MISMA que pinta el heatmap, si no la
+   leyenda miente. Violeta -> magenta, deliberadamente fuera del vocabulario de
+   estados: la mancha mide densidad, no veredicto. */
 .av2-mapa-leyenda-rampa {
   display: inline-flex;
   width: 96px;
   height: 8px;
   border-radius: var(--pl-radius-pill);
-  background: linear-gradient(
-    90deg,
-    var(--pl-green) 0%,
-    var(--pl-amber) 52%,
-    var(--pl-red) 100%
-  );
+  background: linear-gradient(90deg, #8B5CF6 0%, #C026D3 52%, #EC4899 100%);
 }
 .av2-mapa-leyenda-extremo {
   font-size: var(--pl-fs-micro);
@@ -2959,20 +2958,18 @@ button.av2-chip:hover { opacity: 0.85; }
 /* --- Vacío: si el filtro no deja nada, el mapa mudo parece roto. Se
    explica qué pasó y cómo salir, sin bloquear el paneo (el scrim no
    recibe punteros; sólo la tarjeta). --- */
-/* --- SEGUNDA LINEA DEL MAPA: en que andan los reclamos ---
-   Chips de estado que hacen dos trabajos a la vez: prenden y apagan lo que se
-   dibuja, y SON la leyenda del color de las burbujas. El punto de cada chip es
-   exactamente el color que se ve en el mapa, asi que no hace falta mirar a otro
-   lado para entenderlo.
-
-   El color entra por `--av2-estado-color`, que lo pone el padre desde
-   `estadoColors` (el SSoT visual de la app): aca no se decide ningun color. */
-.av2-mapa-estados {
+/* --- ESTADO: reporte + leyenda + filtro, en un solo bloque -------------
+   Tres cosas que antes pedian tres lugares distintos en pantalla: cuantos hay
+   de cada estado (reporte), que significa cada color del mapa (leyenda) y
+   prender o apagar (filtro). En lista vertical dentro del panel, como lo
+   resolvio el diseno --- en chips sobre el mapa el numero no entraba y la
+   leyenda quedaba lejos de lo que explica. */
+.av2-mapa-estados { display: flex; flex-direction: column; gap: 8px; }
+.av2-mapa-estados-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
-  margin: 10px 0 0;
 }
 .av2-mapa-estados-titulo {
   font-size: var(--pl-fs-eyebrow);
@@ -2981,60 +2978,184 @@ button.av2-chip:hover { opacity: 0.85; }
   text-transform: uppercase;
   color: var(--pl-text-muted);
 }
+.av2-mapa-estados-todos {
+  padding: 0;
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-micro);
+  color: var(--pl-text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+/* Deshabilitado = ya estan todos prendidos. Ahi el texto pasa a ser la
+   instruccion de que la lista se puede tocar, que es lo que hace falta
+   justamente cuando no hay nada filtrado. */
+.av2-mapa-estados-todos:disabled { cursor: default; }
+.av2-mapa-estados-todos:not(:disabled):hover {
+  color: var(--pl-text);
+  text-decoration: underline;
+}
+
+.av2-mapa-estados-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .av2-mapa-estado {
-  display: inline-flex;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
+  padding: 7px 8px;
+  font-family: var(--pl-font-sans);
+  background: none;
+  border: 0;
+  border-radius: var(--pl-radius-md);
+  cursor: pointer;
+  transition:
+    background var(--pl-dur-ui) var(--pl-ease),
+    opacity var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-mapa-estado:hover { background: var(--pl-surface-hover); }
+/* Apagado se ATENUA, no desaparece: una fila que se va deja al usuario sin
+   saber que ese estado existe ni como volver a verlo. */
+.av2-mapa-estado:not(.av2-mapa-estado--on) { opacity: 0.4; }
+.av2-mapa-estado-punto {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--av2-estado-color);
+}
+.av2-mapa-estado-label {
+  min-width: 0;
+  text-align: left;
+  font-size: var(--pl-fs-body-sm);
+  font-weight: 600;
+  color: var(--pl-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av2-mapa-estado-n {
+  font-size: var(--pl-fs-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-text);
+}
+
+/* --- CAPA: las tres lecturas del mapa ----------------------------------
+   Flota sobre el lienzo, arriba al centro. Son tres estados excluyentes y no
+   un interruptor, y se declaran con su nombre en vez de esconderse detras de
+   un icono que hay que adivinar. */
+.av2-mapa-capas {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 610;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px 5px 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-pill);
+  box-shadow: var(--pl-shadow-float);
+}
+.av2-mapa-capas-titulo {
+  margin-right: 4px;
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+}
+.av2-mapa-capa {
   padding: 5px 12px;
   font-family: var(--pl-font-sans);
   font-size: var(--pl-fs-body-sm);
   font-weight: 600;
   color: var(--pl-text-muted);
-  background: var(--pl-surface);
-  border: 1px solid var(--pl-border);
+  background: none;
+  border: 0;
   border-radius: var(--pl-radius-pill);
   cursor: pointer;
   transition:
     background var(--pl-dur-ui) var(--pl-ease),
-    border-color var(--pl-dur-ui) var(--pl-ease),
-    color var(--pl-dur-ui) var(--pl-ease),
-    opacity var(--pl-dur-ui) var(--pl-ease);
+    color var(--pl-dur-ui) var(--pl-ease);
 }
-/* Apagado NO se esconde: se atenua. Un chip que desaparece deja al usuario sin
-   saber que existe ese estado ni como volver a verlo. */
-.av2-mapa-estado:not(.av2-mapa-estado--on) {
-  opacity: 0.45;
+.av2-mapa-capa:hover { color: var(--pl-text); }
+.av2-mapa-capa--on {
+  color: var(--pl-on-accent);
+  background: var(--pl-green);
 }
-.av2-mapa-estado:hover { background: var(--pl-surface-hover); }
-.av2-mapa-estado--on {
-  color: var(--pl-text);
-  border-color: color-mix(in srgb, var(--av2-estado-color) 55%, transparent);
-  background: color-mix(in srgb, var(--av2-estado-color) 10%, var(--pl-surface));
-}
-.av2-mapa-estado-punto {
-  width: 10px;
-  height: 10px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--av2-estado-color);
-}
-.av2-mapa-estado-n {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--pl-text-3);
-}
-.av2-mapa-estados-todos {
-  padding: 4px 8px;
-  font-size: var(--pl-fs-micro);
+
+/* El interruptor de agrupar, pegado al control de capa: solo tiene sentido
+   cuando la capa de estado esta a la vista, asi que vive con ella. */
+.av2-mapa-agrupar {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--pl-border);
+  font-family: var(--pl-font-sans);
+  font-size: var(--pl-fs-body-sm);
   font-weight: 600;
   color: var(--pl-text-muted);
-  background: none;
-  border: 0;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  white-space: nowrap;
 }
-.av2-mapa-estados-todos:hover { color: var(--pl-text); }
+.av2-mapa-agrupar input { position: absolute; opacity: 0; pointer-events: none; }
+.av2-mapa-agrupar-pista {
+  width: 32px;
+  height: 18px;
+  flex: none;
+  position: relative;
+  border-radius: var(--pl-radius-pill);
+  background: var(--pl-track);
+  transition: background var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-mapa-agrupar-pista::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--pl-surface);
+  box-shadow: var(--pl-shadow-float);
+  transition: transform var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-mapa-agrupar input:checked + .av2-mapa-agrupar-pista { background: var(--pl-green); }
+.av2-mapa-agrupar input:checked + .av2-mapa-agrupar-pista::after { transform: translateX(14px); }
+.av2-mapa-agrupar input:focus-visible + .av2-mapa-agrupar-pista {
+  outline: 2px solid var(--pl-green);
+  outline-offset: 2px;
+}
+
+/* El donut vive en un divIcon, que Leaflet dibuja con fondo y borde propios. */
+.av2-donut-zona { background: none; border: 0; }
+.av2-donut-zona svg { display: block; }
+
+@media (max-width: 720px) {
+  /* En pantalla angosta el control se apila: en una linea no entra y el
+     ultimo boton quedaba cortado contra el borde. */
+  .av2-mapa-capas {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    border-radius: var(--pl-radius-lg);
+  }
+  .av2-mapa-agrupar { margin-left: 0; padding-left: 0; border-left: 0; }
+}
 
 /* --- AVISO al pie del mapa ---
    Reemplaza a la card `.av2-mapa-vacio`, que se tendia sobre TODO el lienzo
