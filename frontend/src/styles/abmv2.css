@@ -2492,6 +2492,46 @@ button.av2-chip:hover { opacity: 0.85; }
   .av2-mapa-consulta--sticky { position: static; }
 }
 
+/* --- LA TIRA DE INDICADORES DEL MAPA -----------------------------------
+   Los mismos numeros que traia el hero, en una linea. El hero medía 290px de
+   alto y empujaba el mapa fuera de la primera pantalla en 1366x768; la tira
+   ocupa ~56px y dice lo mismo.
+
+   No lleva veredictos ni frases: es un ENCABEZADO. Lo que hay que interpretar
+   se lee en la respuesta de la consulta y en las cards del costado. */
+.av2-mapa-tira {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 26px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-lg);
+}
+.av2-mapa-tira-kpi {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+.av2-mapa-tira-valor {
+  font-family: var(--pl-font-display);
+  font-size: var(--pl-fs-card-title);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--pl-text);
+}
+.av2-mapa-tira-label {
+  font-size: var(--pl-fs-eyebrow);
+  font-weight: 700;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
 /* --- LA GRILLA DEL MAPA: franja, mapa, franja ---------------------------
    El mapa dejo de ocupar todo el ancho por dos razones que resultaron ser la
    misma (dueno, 2026-09-05): las metricas necesitaban un lugar donde vivir, y
@@ -2513,6 +2553,10 @@ button.av2-chip:hover { opacity: 0.85; }
   align-items: start;
 }
 
+/* Sin lecturas al costado, el mapa se queda con todo el ancho. Reservar la
+   columna igual dejaba 340px en blanco al lado de un mapa achicado. */
+.av2-mapa-grilla--sola { grid-template-columns: minmax(0, 1fr); }
+
 /* EL MAPA NO ES STICKY, Y NO HACE FALTA QUE LO SEA.
    Lo fue un rato y rompio la pantalla: con la barra de consulta TAMBIEN sticky
    quedaban dos contextos de apilamiento compitiendo, el mapa se quedaba quieto
@@ -2523,17 +2567,16 @@ button.av2-chip:hover { opacity: 0.85; }
    una pantalla, no hay scroll del que salvar al mapa. Fijarlo era tapar el
    sintoma de un mapa demasiado alto. */
 
-/* El que scrollea es el costado, y solo si hace falta: con pocas cards no se
-   nota, y cuando son muchas el mapa igual no se mueve. El alto se ata al del
-   mapa para que las dos columnas terminen juntas en vez de dejar un colgajo. */
+/* SIN ALTURA MAXIMA. La tuvo un rato --atada al alto del mapa, con scroll
+   propio-- y eso invento un bug: ese alto lo mide JS, asi que al redimensionar
+   la ventana queda desfasado un instante y la columna CORTA la card por la
+   mitad (reportado el 2026-09-05). Un panel de lectura no necesita techo: crece
+   lo que necesite y la pagina scrollea, que es lo que hace cualquier pagina. */
 .av2-mapa-columna {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  max-height: calc(var(--av2-mapa-alto, 420px) + 2px);
-  overflow-y: auto;
-  overscroll-behavior: contain;   /* al llegar al fondo no arrastra la pagina */
 }
 
 /* Las cards de lectura vienen en fila de tres (vivian abajo del mapa). Al
@@ -2548,10 +2591,6 @@ button.av2-chip:hover { opacity: 0.85; }
    se achica mas: es lo que se vino a ver. */
 @media (max-width: 1180px) {
   .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
-  .av2-mapa-columna {
-    max-height: none;
-    overflow: visible;
-  }
   /* Debajo del mapa vuelven a entrar de a varias por fila. */
   .av2-mapa-columna .map-art {
     flex-direction: row;
@@ -3214,7 +3253,10 @@ button.av2-chip:hover { opacity: 0.85; }
   bottom: 12px;
   transform: translateX(-50%);
   z-index: 650;
-  max-width: min(560px, calc(100% - 24px));
+  /* `width` y no solo `max-width`: con max-width la pildora se encoge al ancho
+     del texto mas largo que entre, y el mensaje termina partido en seis lineas
+     dentro de una capsula angosta. */
+  width: min(560px, calc(100% - 24px));
   display: flex;
   align-items: center;
   gap: 10px;

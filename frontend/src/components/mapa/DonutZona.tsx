@@ -50,7 +50,7 @@ const CIRCUNFERENCIA = 2 * Math.PI * RADIO;
  */
 export function svgDonut({
   tramos,
-  total,
+  texto,
   tamano,
   grosor,
   colorTexto,
@@ -59,7 +59,10 @@ export function svgDonut({
   resaltado,
 }: {
   tramos: TramoDonut[];
-  total: number;
+  /** Lo que va en el centro, YA redactado por quien llama: un numero, un
+   *  porcentaje. La pregunta activa decide que significa; el kit solo lo
+   *  dibuja. */
+  texto: string;
   tamano: number;
   grosor: number;
   colorTexto: string;
@@ -88,7 +91,9 @@ export function svgDonut({
 
   // El numero se lee sobre el centro, asi que el centro lleva su propio disco
   // opaco: sobre el mapa a secas, el texto compite con calles y etiquetas.
-  const fuente = total >= 100 ? 26 : 30;
+  // Cuatro caracteres o mas (un "100%") no entran a 30px sin desbordar el
+  // anillo.
+  const fuente = texto.length >= 4 ? 24 : texto.length === 3 ? 27 : 30;
   return (
     `<svg viewBox="0 0 100 100" width="${tamano}" height="${tamano}" ` +
     `style="overflow:visible;transform:rotate(-90deg)">` +
@@ -101,7 +106,7 @@ export function svgDonut({
       : '') +
     `<text x="50" y="50" text-anchor="middle" dominant-baseline="central" ` +
     `transform="rotate(90 50 50)" font-family="inherit" font-size="${fuente}" ` +
-    `font-weight="700" fill="${colorTexto}">${total}</text>` +
+    `font-weight="700" fill="${colorTexto}">${texto}</text>` +
     `</svg>`
   );
 }

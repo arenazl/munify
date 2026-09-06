@@ -24,7 +24,7 @@ import {
   Tag,
   Clock,
   Navigation,
-  Square,
+  SquareDashed,
   FileDown,
   Flame,
   Pencil,
@@ -2253,7 +2253,15 @@ export default function Mapa() {
     }
     const salida: Array<{
       id: number; nombre: string; lat: number; lng: number;
-      total: number; tramos: TramoDonut[];
+      /** Cuantos resume, para el TAMANO. Siempre la cantidad: si el tamano
+       *  siguiera al porcentaje, una zona con 2 de 2 cerrados se veria mas
+       *  grande que una con 40 de 100. */
+      total: number;
+      /** Lo que decide el orden. */
+      valor: number;
+      /** Lo que se lee en el centro, ya redactado. */
+      texto: string;
+      tramos: TramoDonut[];
     }> = [];
     for (const [id, lista] of porBarrio) {
       const b = barriosMunicipio.find((x) => x.id === id);
@@ -2283,10 +2291,37 @@ export default function Mapa() {
           valor: cuenta.get(g.id) || 0,
           color: estadoColors[g.colorDe] || estadoColors.default,
         }));
-      salida.push({ id, nombre: b.nombre, lat, lng, total: lista.length, tramos });
+      // EL NUMERO DEL CENTRO CONTESTA LA PREGUNTA ACTIVA.
+      //
+      // Un mapa que muestra siempre "cuantos hay" contesta una sola pregunta,
+      // sea cual sea la que uno hizo. Con la lente en "que resolvimos", el dato
+      // que importa no es cuantos entraron sino que porcentaje se cerro; en
+      // "donde no llegamos", cuanto quedo sin cerrar.
+      const cerrados = lista.filter((r) => isResuelto(r.estado)).length;
+      const sinCerrar = lista.length - cerrados;
+      let texto: string;
+      let valor: number;
+      switch (pregunta) {
+        case 'resolvimos':
+          valor = Math.round((cerrados / lista.length) * 100);
+          texto = `${valor}%`;
+          break;
+        case 'sinllegar':
+          valor = Math.round((sinCerrar / lista.length) * 100);
+          texto = `${valor}%`;
+          break;
+        case 'atrasado':
+          valor = sinCerrar;
+          texto = String(sinCerrar);
+          break;
+        default:
+          valor = lista.length;
+          texto = String(lista.length);
+      }
+      salida.push({ id, nombre: b.nombre, lat, lng, total: lista.length, valor, texto, tramos });
     }
-    return salida.sort((a, b) => b.total - a.total);
-  }, [verEstado, agruparPorZona, reclamosFiltrados, barriosMunicipio]);
+    return salida.sort((a, b) => b.valor - a.valor);
+  }, [verEstado, agruparPorZona, reclamosFiltrados, barriosMunicipio, pregunta]);
 
   /** Los iconos, resueltos aparte: `divIcon` crea DOM y no conviene rehacerlo
    *  en cada render del mapa. */
@@ -2305,7 +2340,7 @@ export default function Mapa() {
       m.set(d.id, L.divIcon({
         className: 'av2-donut-zona',
         html: svgDonut({
-          tramos: d.tramos, total: d.total, tamano, grosor,
+          tramos: d.tramos, texto: d.texto, tamano, grosor,
           colorTexto, colorFondo, colorTrack,
           resaltado: barrioSel === d.id,
         }),
@@ -2315,6 +2350,9 @@ export default function Mapa() {
     }
     return m;
   }, [donutsZona, barrioSel]);
+
+  /** Si la columna de la derecha tiene algo que mostrar. */
+  const hayLecturas = reclamosDeLaConsulta.length > 0;
 
   /** A donde llevar el mapa cuando se elige un barrio: su forma si la tiene,
    *  su centro si no. Memoizado por `barrioSel` para que el encuadre se dispare
@@ -4060,8 +4098,12 @@ export default function Mapa() {
     const acciones: ConsultaAccion[] = [
       {
         id: 'marcar',
-        label: drawMode ? 'Cancelar' : 'Marcar un área',
-        icono: drawMode ? X : Square,
+        // Label CORTO: sin texto quedaba el icono `Square` solo --un cuadrado
+        // hueco que se lee como un checkbox roto-- y con "Marcar un área"
+        // entero empujaba la oracion a otro renglon.
+        label: drawMode ? 'Cancelar' : 'Área',
+        titulo: drawMode ? 'Cancelar el marcado' : 'Marcar un área para el informe',
+        icono: drawMode ? X : SquareDashed,
         activo: drawMode,
         onClick: handleToggleDraw,
       },
@@ -4323,7 +4365,10 @@ export default function Mapa() {
           la pagina sin pasar el cursor por encima del mapa (dueno, 2026-09-05).
           En pantalla completa la grilla se deshace y el mapa se queda con todo,
           que es para lo que existe ese modo. */}
-      <div className="av2-mapa-grilla">
+      {/* La grilla reserva la columna SOLO si hay algo que poner en ella: con la
+          consulta en cero, los 340px quedaban en blanco al lado de un mapa
+          achicado sin razon. */}
+      <div className={`av2-mapa-grilla${hayLecturas ? '' : ' av2-mapa-grilla--sola'}`}>
       <div className="av2-mapa">
         {/* Alto ELÁSTICO: --av2-mapa-alto es el único valor runtime (el resto
             del estilo vive en abmv2.css [MAPA]). */}

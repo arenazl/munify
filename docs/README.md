@@ -111,3 +111,4 @@ componentes del kit y los tokens, nunca copiando el markup (regla global 22).
 - **CLAUDE.md (root)** define las reglas duras de desarrollo. Lectura obligatoria antes de codear.
 - **BUILD_GUIDE.md (root)** es el manual de componentes y patrones de UI — fuente de verdad de cómo se construye.
 - Las decisiones del día a día viven en commits + PRs, no en MDs.
+- [Mapa — handoff del rediseño (2026-09-06)](mapa/2026-09-06-handoff-rediseno-mapa.md) — estado a mitad de camino, qué falta y los errores a no repetir.

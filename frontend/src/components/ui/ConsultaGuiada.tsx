@@ -280,7 +280,14 @@ export function ConsultaGuiada({
                 const pegaConControl =
                   siguiente?.tipo === 'marca' &&
                   (siguiente.id === 'pregunta' || porId.has(siguiente.id));
-                return pegaConControl ? parte.texto.replace(/ $/, ' ') : parte.texto;
+                // En un SPAN y no suelto: es lo que se retira cuando la
+                // oracion no entra (ver `.cg-texto` en el CSS). Un nodo de
+                // texto pelado no se puede esconder por CSS.
+                return (
+                  <span key={`t-${i}`} className="cg-texto">
+                    {pegaConControl ? parte.texto.replace(/ $/, ' ') : parte.texto}
+                  </span>
+                );
               }
               if (parte.id === 'pregunta') {
                 return (
@@ -303,6 +310,11 @@ export function ConsultaGuiada({
                       : undefined
                   }
                 >
+                  {/* La etiqueta del filtro: en modo oracion sobra --la frase
+                      ya dice que es-- y en modo compacto es lo unico que lo
+                      identifica. Se dibuja siempre y la esconde el CSS, asi el
+                      cambio es una regla de estilo y no un salto de componente. */}
+                  <span className="cg-combo-label">{filtro.etiqueta}</span>
                   <ModernSelect
                     variant="v2"
                     className="cg-combo"
@@ -352,7 +364,8 @@ export function ConsultaGuiada({
                     onClick={a.onClick}
                     disabled={a.disabled}
                     aria-pressed={a.activo}
-                    title={a.label}
+                    title={a.titulo || a.label}
+                    aria-label={a.titulo || a.label}
                   >
                     {Icono && <Icono className="cg-accion-icono" aria-hidden />}
                     <span className="cg-accion-label">{a.label}</span>

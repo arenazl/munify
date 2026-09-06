@@ -146,13 +146,65 @@
    La oración ocupa el ANCHO COMPLETO y las herramientas (si las hay) van en su
    propia línea debajo: al costado le comían el ancho y la partían en dos
    renglones, con la preposición colgada arriba y su combo abajo. */
+/* LA ORACION Y SUS ACCIONES, EN LA MISMA LINEA.
+   Estaban una debajo de la otra y cada accion se comia un renglon entero: la
+   oracion, "Evolucion" y "Marcar un area" sumaban tres lineas de alto para
+   decir una sola cosa. En una pantalla de 768 eso es alto que le falta al mapa
+   (dueno, 2026-09-05: "si no ocupa catorce millones de altura").
+
+   `wrap` para que en pantalla angosta las acciones bajen solas en vez de
+   apretar la frase hasta romperla. */
+/* --- DEGRADACION: de ORACION a COMBOS -----------------------------------
+   La frase con los combos adentro es lo mejor que tiene esta pantalla... hasta
+   que no entra. En una laptop de 1366 --y peor con el panel al costado-- la
+   oracion se parte en tres renglones y el filtro se come el alto que necesita
+   el mapa (dueno, 2026-09-06).
+
+   Asi que el control se ADAPTA en vez de romperse: por debajo del ancho donde
+   la frase deja de entrar, las palabras se retiran y cada combo pasa a
+   mostrarse con su etiqueta chiquita arriba. Sigue siendo el mismo componente
+   con los mismos combos --sin remonte ni salto--, cambia como se presenta.
+
+   Es la degradacion progresiva del kit: el control decide su forma segun el
+   espacio y quien lo usa no se entera. */
+.cg-combo-label {
+  display: none;
+  font-size: var(--pl-fs-micro);
+  font-weight: 600;
+  letter-spacing: var(--pl-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--pl-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  /* Fuera las palabras: quedan los datos, que es lo que se opera. */
+  .cg-texto,
+  .cg-enfasis { display: none; }
+
+  .cg-oracion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px 10px;
+  }
+  /* Cada combo pasa a ser una columnita: etiqueta arriba, control abajo. */
+  .cg-combo-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cg-combo-label { display: block; }
+}
+
 .cg-consulta {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--pl-space-3);
-  margin-top: var(--pl-space-4);
-  padding-top: var(--pl-space-4);
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pl-space-2) var(--pl-space-3);
+  margin-top: var(--pl-space-3);
+  padding-top: var(--pl-space-3);
   border-top: 1px solid var(--pl-border);
   min-width: 0;
 }
@@ -292,8 +344,8 @@
 .cg-acciones {
   flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 6px;
 }
 .cg-accion {
@@ -315,6 +367,17 @@
     background var(--pl-dur-ui) var(--pl-ease),
     color var(--pl-dur-ui) var(--pl-ease);
 }
+/* Sin label la accion queda REDONDA, sólo con su ícono: es como se ven las
+   acciones en el resto de la app y no le roba ancho a la oración. El nombre
+   vive en el `title` y en el `aria-label`, así que no se pierde. */
+.cg-accion:has(.cg-accion-label:empty) {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--pl-radius-pill);
+}
+.cg-accion-label:empty { display: none; }
+
 .cg-accion:hover { background: var(--pl-surface-hover); }
 .cg-accion:disabled { opacity: 0.45; cursor: not-allowed; }
 .cg-accion--activa,
