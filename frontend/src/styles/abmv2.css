@@ -2668,8 +2668,11 @@ button.av2-chip:hover { opacity: 0.85; }
 .av2-mapa-grilla > .av2-mapa-columna { grid-column: 2; grid-row: 2; min-height: 0; }
 
 /* Sin lecturas al costado, el mapa se queda con todo el ancho. Reservar la
-   columna igual dejaba 340px en blanco al lado de un mapa achicado. */
-.av2-mapa-grilla--sola { grid-template-columns: minmax(0, 1fr); }
+   columna igual dejaba 340px en blanco al lado de un mapa achicado.
+   Va por `--av2-panel-ancho` sobre el CONTENEDOR, como `--plegada` de abajo:
+   escrita sobre `.av2-mapa-grilla` no hacia nada, porque esa es
+   `display: contents` y no tiene caja a la que ponerle columnas. */
+.av2-mapa-full:has(.av2-mapa-grilla--sola) { --av2-panel-ancho: 0px; }
 
 /* PLEGADA: el panel se va ENTERO y el mapa se lleva todo el ancho. Antes le
    quedaban 30px para sostener su pestaña; ahora el boton vive en la botonera
@@ -2749,8 +2752,23 @@ button.av2-chip:hover { opacity: 0.85; }
   /* Una columna: el panel baja debajo del mapa y el alto vuelve a ser libre.
      Clavar la pantalla acá apilaría mapa y panel dentro del mismo alto y
      ninguno de los dos entraría. */
-  .av2-mapa-full { height: auto; overflow: visible; }
-  .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
+  /* LAS COLUMNAS SE LE PIDEN AL CONTENEDOR, NO A LA GRILLA (dueno,
+     2026-09-07: "por que no hay mapa"). `.av2-mapa-grilla` es
+     `display: contents`: no genera caja, asi que `grid-template-columns` sobre
+     ella NO HACE NADA --- el grid de verdad es `.av2-mapa-full`. La regla
+     estaba escrita sobre la grilla, el contenedor seguia con `1fr 376px`, y en
+     un telefono de 390 el panel se llevaba sus 376 fijos y AL MAPA LE QUEDABAN
+     CERO PIXELES de ancho. Medido: anchoMapa 0, anchoPanel 376. El mapa estaba
+     ahi, aplastado contra el borde izquierdo. */
+  .av2-mapa-full {
+    height: auto;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+  /* y cada uno a su fila: el mapa primero, las lecturas debajo */
+  .av2-mapa-grilla > .av2-mapa { grid-column: 1; grid-row: 2; }
+  .av2-mapa-grilla > .av2-mapa-columna { grid-column: 1; grid-row: 3; }
   .av2-mapa-grilla .av2-mapa,
   .av2-mapa-grilla .av2-mapa-lienzo { height: var(--av2-pantalla-alto, 420px); }
   .av2-mapa-columna { height: auto; }
@@ -2768,7 +2786,13 @@ button.av2-chip:hover { opacity: 0.85; }
 }
 
 /* A pantalla completa la grilla se deshace: el mapa se queda con todo y las
-   franjas no van --- para eso se pidio la pantalla completa. */
+   franjas no van --- para eso se pidio la pantalla completa.
+   Y el contenedor tiene que SOLTAR la columna del panel: deshacer la grilla no
+   alcanzaba, porque `.av2-mapa-full` seguia reservando sus 376px y quedaban
+   muertos a la derecha justo cuando se pidio ver el mapa lo mas grande
+   posible. Mismo descuido que el de la vista angosta (2026-09-07). */
+.av2-mapa-full:fullscreen,
+.av2-mapa-full--expandido { --av2-panel-ancho: 0px; }
 .av2-mapa-full:fullscreen .av2-mapa-grilla,
 .av2-mapa-full--expandido .av2-mapa-grilla {
   display: block;
