@@ -11,6 +11,7 @@ import { getNavigation, isMobileDevice } from '../config/navigation';
 import { BrandMark } from '../brands/BrandMark';
 import { BRAND, logoDelMunicipio } from '../brands';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
+import { useMunicipioEnUrl } from '../hooks/useMunicipioEnUrl';
 import { useNavBadges } from './shell/useNavBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
@@ -75,6 +76,10 @@ const getMobileTabs = (userRole: string, modulosActivos: string[] = []) => {
 };
 
 export default function Layout() {
+  // El municipio, a la vista en la barra de direcciones (?municipio=la-falda).
+  // Espejo de la sesión, no un comando: ver el docstring del hook.
+  useMunicipioEnUrl();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
