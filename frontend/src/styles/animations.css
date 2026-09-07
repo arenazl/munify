@@ -562,9 +562,29 @@
    ANIMACIONES GLOBALES PARA ELEMENTOS INTERACTIVOS
    ============================================ */
 
-/* Botones - Animación base para todos los botones */
+/* Botones - Animación base para todos los botones.
+ *
+ * OJO CON `[role="button"]`: NO TOCA LOS MARCADORES DEL MAPA.
+ *
+ * Leaflet le pone `role="button"` a todo marcador que tenga un click, asi que
+ * los donuts del mapa entraban por este selector y se llevaban las tres cosas
+ * que un marcador no puede tener:
+ *
+ *   - `position: relative` los sacaba de absoluto y los metia EN EL FLUJO: cada
+ *     marcador arrancaba donde terminaba el anterior y el desplazamiento se
+ *     acumulaba. El primero caia perfecto y los demas degradaban en orden de
+ *     dibujado, sin patron geografico --- con un solo marcador no se notaba,
+ *     porque no habia nada antes que lo corriera.
+ *   - los `transform` de hover y active PISABAN el transform con el que Leaflet
+ *     posiciona el marcador, mandandolo al origen del pane al pasar el mouse.
+ *   - `transition: all` animaba ese mismo transform, asi que cada
+ *     reposicionamiento se veia deslizarse.
+ *
+ * Costo: una tarde entera persiguiendo "los circulos se van a otra provincia"
+ * (dueno, 2026-09-06 y 07). Los datos y la agrupacion nunca estuvieron mal.
+ */
 button,
-[role="button"],
+[role="button"]:not(.leaflet-marker-icon):not(.leaflet-interactive),
 .btn {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -572,15 +592,26 @@ button,
 }
 
 button:not(:disabled):hover,
-[role="button"]:not(:disabled):hover,
+[role="button"]:not(.leaflet-marker-icon):not(.leaflet-interactive):not(:disabled):hover,
 .btn:not(:disabled):hover {
   transform: translateY(-2px);
 }
 
 button:not(:disabled):active,
-[role="button"]:not(:disabled):active,
+[role="button"]:not(.leaflet-marker-icon):not(.leaflet-interactive):not(:disabled):active,
 .btn:not(:disabled):active {
   transform: translateY(0) scale(0.98);
+}
+
+/* CINTURON: aunque alguien vuelva a escribir una regla global de botones, los
+   marcadores del mapa conservan lo suyo. Leaflet los posiciona con `transform`
+   sobre `position: absolute`; cualquier cosa que pise esas dos propiedades
+   rompe el mapa entero. */
+.leaflet-marker-icon,
+.leaflet-marker-icon:hover,
+.leaflet-marker-icon:active {
+  position: absolute;
+  overflow: visible;
 }
 
 /* Efecto ripple para botones */

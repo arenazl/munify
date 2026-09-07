@@ -57,11 +57,42 @@ HASTA = datetime(2026, 9, 5, 20, 0)
 # Los barrios que concentran. Salen de como funciona una ciudad turistica
 # serrana: el centro y la costanera reciben mucho mas que un barrio residencial
 # de las afueras.
+# TRES SECTORES SE LLEVAN EL GRUESO, el resto queda casi vacio.
+#
+# Los pesos anteriores estaban repartidos entre diez barrios y el efecto era el
+# mismo que no tener pesos: mirabas el mapa y leias "tengo reclamos parejos en
+# todo el municipio" (dueno, 2026-09-07). Un municipio real no reparte parejo:
+# tiene dos o tres zonas que generan la mayoria --- el centro comercial, la
+# costanera turistica, el barrio grande --- y decenas de barrios con uno o dos
+# reclamos al mes. Esa desigualdad ES el dato: es lo que el mapa viene a
+# mostrar y lo que le dice al intendente donde mandar la cuadrilla.
+# Y van SEPARADOS EN EL MAPA --- uno al norte, uno al medio, uno al sur ---
+# porque si los tres caen juntos el contraste no se ve: quedan como una sola
+# mancha grande y el resto del municipio vacio, que es otra vez un mapa que
+# contesta lo mismo en todas partes (dueno, 2026-09-07: "en el centro y 2 en
+# los laterales, asi se ve un contraste").
 PESOS_ALTOS = {
-    "Centro": 26, "Costa Azul": 20, "Santa Rita del Lago": 16, "Villa del Lago": 14,
-    "Playas de Oro": 12, "Sol y Lago": 11, "Colinas": 10, "Miguel Muñoz B": 9,
-    "Carlos Paz Sierras": 8, "La Quinta": 8,
+    "Costa Azul": 30,        # NORTE  --- la costanera, que se llena en verano
+    "Centro": 40,            # MEDIO  --- el casco comercial
+    "Playas de Oro": 25,     # SUR    --- el barrio grande del sur
 }
+
+# LOS FOCOS: esquinas que se denuncian UNA Y OTRA VEZ.
+#
+# Sin esto la siembra repartia los 250 reclamos casi uno por cuadra --- 194 de
+# 218 celdas de 150 m tenian exactamente uno --- y con esa uniformidad el mapa
+# de calor no tenia nada que mostrar: cualquier escala daba una plancha lisa,
+# porque los datos no tenian relieve (medido el 2026-09-07). Un municipio de
+# verdad no es asi: hay una esquina que se inunda cada tormenta, el bache de la
+# entrada que reaparece, el basural de siempre. Esos puntos concentran, y son
+# justamente los que la pantalla tiene que saber encontrar.
+#
+# Cada foco es (barrio, cuantos, radio en metros, de que se queja la gente ahi).
+FOCOS = [
+    ("Costa Azul", 13, 90, "Recolección de residuos"),
+    ("Centro", 16, 80, "Bacheo y calles"),
+    ("Playas de Oro", 11, 80, "Alumbrado público"),
+]
 
 # titulo, descripcion, prioridad. El texto tiene que sonar a vecino, no a
 # formulario: es lo que se lee en el tooltip del pin y en el detalle.
@@ -150,22 +181,44 @@ def punto_en_poligono(lat, lng, anillo):
 
 
 def punto_en_barrio(rnd, anillo, centro):
-    """Un punto que cae DE VERDAD en el barrio.
+    """Un punto que cae DE VERDAD en el barrio, y APINADO como en una ciudad.
 
-    Con contorno: se sortea dentro de su caja y se descarta lo que cae afuera
-    (30 intentos; un barrio con forma de L necesita varios). Sin contorno: se
-    dispersa alrededor del centro con desvio de ~200 m, que es el tamano tipico
-    de un par de manzanas --no se finge una precision que no se tiene.
+    El sorteo era UNIFORME sobre el poligono, y eso se veia: los reclamos
+    quedaban repartidos parejo por toda la superficie del barrio, incluidos el
+    cerro, los baldios y el fondo de los lotes. El mapa entero contestaba lo
+    mismo en todas partes --- "tengo reclamos parejos en todo el municipio"
+    (dueno, 2026-09-07), que es una lectura correcta de un dato falso.
+
+    Una ciudad no funciona asi: la gente vive y circula cerca del centro de su
+    barrio y sobre las calles principales, y de ahi salen los reclamos. El borde
+    tiene mucho menos, y el cerro no tiene ninguno.
+
+    Por eso el punto se sortea con una CAMPANA centrada en el barrio --- la
+    mayoria cae cerca del centro, unos pocos llegan al borde --- y se sigue
+    verificando contra el contorno, asi que ningun punto se escapa del barrio.
     """
     if anillo:
         lats = [p[0] for p in anillo]
         lngs = [p[1] for p in anillo]
+        clat = sum(lats) / len(lats)
+        clng = sum(lngs) / len(lngs)
+        # Sigma = un cuarto del semiancho del barrio: el 95% de los puntos cae
+        # dentro de la mitad central, que es donde esta la trama urbana.
+        sig_lat = max((max(lats) - min(lats)) / 4, 0.0004)
+        sig_lng = max((max(lngs) - min(lngs)) / 4, 0.0004)
+        for _ in range(40):
+            lat = rnd.gauss(clat, sig_lat)
+            lng = rnd.gauss(clng, sig_lng)
+            if punto_en_poligono(lat, lng, anillo):
+                return round(lat, 6), round(lng, 6)
+        # Si la campana no acerto --- un barrio con forma de C, con el centro
+        # geometrico afuera --- se cae al sorteo uniforme de siempre.
         for _ in range(30):
             lat = rnd.uniform(min(lats), max(lats))
             lng = rnd.uniform(min(lngs), max(lngs))
             if punto_en_poligono(lat, lng, anillo):
                 return round(lat, 6), round(lng, 6)
-        return round(sum(lats) / len(lats), 6), round(sum(lngs) / len(lngs), 6)
+        return round(clat, 6), round(clng, 6)
     clat, clng = centro
     d = 0.0018  # ~200 m
     return (round(clat + rnd.gauss(0, d), 6),
@@ -275,17 +328,20 @@ async def main():
                     "DELETE FROM reclamos WHERE municipio_id=:m AND referencia='seed-demo-cbapaz'"), {"m": MUNI})
                 print("  borrados (con su historial).")
 
-        # ---- reparto de los 200 entre los barrios ----
-        pool = []
-        for b in barrios:
-            peso = PESOS_ALTOS.get(b["nombre"], 3)
-            pool += [b] * peso
-        elegidos = [pool[rnd.randrange(len(pool))] for _ in range(TOTAL)]
-
-        # ---- armado ----
-        filas = []
-        span = (HASTA - DESDE).total_seconds()
-        for i, b in enumerate(elegidos):
+        # ---- los FOCOS se llevan su cuota, el resto se dispersa ----
+        #
+        # No suman reclamos: se los restan al reparto disperso. El total sigue
+        # siendo TOTAL --- lo que cambia es que dejan de estar repartidos uno
+        # por cuadra y aparecen las esquinas que se denuncian de nuevo y de
+        # nuevo, que es lo que el mapa de calor y "donde se repiten" vienen a
+        # encontrar (dueno, 2026-09-07: "hay que cambiar la semilla para que
+        # genere zonas y se vean claras... repartilos").
+        por_nombre = {b["nombre"]: b for b in barrios}
+        anclas = []            # (barrio, lat, lng, cuantos, radio_m, categoria)
+        for nombre, cuantos, radio_m, categoria in FOCOS:
+            b = por_nombre.get(nombre)
+            if not b:
+                continue
             anillo = None
             if b["poligono"]:
                 try:
@@ -293,10 +349,56 @@ async def main():
                     anillo = [[p[1], p[0]] for p in pts]
                 except (TypeError, ValueError):
                     anillo = None
-            centro = (b["latitud"], b["longitud"])
-            if anillo is None and (centro[0] is None or centro[1] is None):
+            if anillo is None and (b["latitud"] is None or b["longitud"] is None):
                 continue
-            lat, lng = punto_en_barrio(rnd, anillo, centro)
+            # El ancla es UNA esquina concreta del barrio, no su centro: los
+            # reclamos de un foco pasan todos en el mismo lugar.
+            alat, alng = punto_en_barrio(rnd, anillo, (b["latitud"], b["longitud"]))
+            anclas.append((b, alat, alng, cuantos, radio_m, categoria))
+
+        en_focos = sum(a[3] for a in anclas)
+        sueltos = max(0, TOTAL - en_focos)
+
+        pool = []
+        for b in barrios:
+            peso = PESOS_ALTOS.get(b["nombre"], 1)
+            pool += [b] * peso
+        elegidos = [pool[rnd.randrange(len(pool))] for _ in range(sueltos)]
+
+        # Cada reclamo de foco viaja con su ancla, para caer AHI y no en
+        # cualquier parte del barrio.
+        focales = []
+        for b, alat, alng, cuantos, radio_m, categoria in anclas:
+            for _ in range(cuantos):
+                focales.append((b, alat, alng, radio_m, categoria))
+        rnd.shuffle(focales)
+        print("  focos: %d reclamos en %d esquinas; %d repartidos"
+              % (en_focos, len(anclas), sueltos))
+
+        # ---- armado ----
+        filas = []
+        span = (HASTA - DESDE).total_seconds()
+        todos = [(b, None, None, 0, None) for b in elegidos] + focales
+        rnd.shuffle(todos)
+        for i, (b, alat, alng, radio_m, cat_foco) in enumerate(todos):
+            if alat is not None:
+                # DEL FOCO: alrededor de su esquina, con la dispersion de una
+                # cuadra. En grados: 1 grado de latitud son ~111 km.
+                d = radio_m / 111_000.0
+                lat = round(alat + rnd.gauss(0, d / 2), 6)
+                lng = round(alng + rnd.gauss(0, d / 2 / max(math.cos(math.radians(alat)), 0.1)), 6)
+            else:
+                anillo = None
+                if b["poligono"]:
+                    try:
+                        pts = json.loads(b["poligono"])
+                        anillo = [[p[1], p[0]] for p in pts]
+                    except (TypeError, ValueError):
+                        anillo = None
+                centro = (b["latitud"], b["longitud"])
+                if anillo is None and (centro[0] is None or centro[1] is None):
+                    continue
+                lat, lng = punto_en_barrio(rnd, anillo, centro)
 
             # la fecha se sesga hacia el presente: el municipio recibe cada vez
             # mas reclamos a medida que la app se usa mas.
@@ -305,7 +407,14 @@ async def main():
             dias = (HASTA - creado).days
             estado = estado_para(dias, rnd)
 
-            cat = cats[rnd.randrange(len(cats))]
+            # En un foco la gente se queja SIEMPRE DE LO MISMO --- es el mismo
+            # bache, el mismo basural --- y eso es lo que lo hace un foco y no
+            # una casualidad estadistica.
+            cat = None
+            if cat_foco:
+                cat = next((c for c in cats if c["nombre"] == cat_foco), None)
+            if cat is None:
+                cat = cats[rnd.randrange(len(cats))]
             guion = GUION.get(cat["nombre"])
             if not guion:
                 guion = GUION[list(GUION)[rnd.randrange(len(GUION))]]

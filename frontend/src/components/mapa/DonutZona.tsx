@@ -116,6 +116,25 @@ export function svgDonut({
  * AREA y no el radio: lineal, una zona con el doble de reclamos se ve cuatro
  * veces mas grande y el mapa exagera.
  */
-export function tamanoDonut(valor: number, max: number, min = 46, maxPx = 84): number {
-  return Math.round(min + (maxPx - min) * Math.sqrt(valor / Math.max(max, 1)));
+export function tamanoDonut(valor: number, max: number, min = 30, maxPx = 84): number {
+  // EL AREA SIGUE A LA CANTIDAD, DE VERDAD.
+  //
+  // El piso era 46 px y aplastaba toda la escala: con un maximo de 19 reclamos,
+  // el circulo de UNO median 55 px y el de DIECINUEVE 84 --- la cantidad
+  // cambiaba 19 veces y el tamano apenas un 50%, asi que en el mapa todos se
+  // veian iguales y el conjunto era una nube pareja donde no se distinguia lo
+  // importante de lo anecdotico (dueno, 2026-09-07: "hay que ponderar el tamano
+  // de los circulos en base a su cantidad, de forma relativa").
+  //
+  // Ahora el diametro es `maxPx * raiz(valor/max)`, que es la unica forma de que
+  // el AREA --- lo que el ojo compara --- sea proporcional a la cantidad: el de
+  // 19 ocupa diecinueve veces la superficie del de 1.
+  //
+  // El piso son 30 px y no menos: la fuente del numero es el 30% del diametro,
+  // asi que por debajo de eso el numero queda en 8 px y no se lee. Y el numero
+  // tiene que estar SIEMPRE --- el tamano dice "es grande", el numero dice
+  // cuanto (dueno, 2026-09-07). Entre 30 y 84 px la escala sigue siendo
+  // elocuente: el mayor ocupa ocho veces la superficie del menor.
+  const proporcional = maxPx * Math.sqrt(valor / Math.max(max, 1));
+  return Math.round(Math.max(min, proporcional));
 }

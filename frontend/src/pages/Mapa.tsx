@@ -46,6 +46,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   type LucideIcon,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -730,9 +731,23 @@ const ESTADO_COLORS_LISTA: Record<string, string> = Object.fromEntries(
  * zoom"*). Con el zoom a mano el tamaño se escala, y por debajo de cierto nivel
  * los donuts directamente no van: ahi lo que se lee es la mancha.
  */
+/**
+ * El zoom que sigue la pantalla, REDONDEADO al nivel entero.
+ *
+ * Desde que el encuadre usa `zoomSnap` de 0,25 el mapa se para en 13,25 o
+ * 13,75, y cada cuarto de nivel disparaba un `zoomend`. Todo lo que depende del
+ * zoom --- y de eso cuelga la creacion de los 44 iconos de donut, que son 44
+ * nodos nuevos en el DOM --- se rehacia cuatro veces mas seguido: de ahi el
+ * parpadeo, que empeoro justo al ganar el zoom fraccionado (dueno, 2026-09-07:
+ * "el flickering esta cada vez peor").
+ *
+ * El encuadre sigue usando el zoom fraccionado --- el municipio entra igual de
+ * ajustado ---; lo que se redondea es lo que la pantalla OBSERVA, que solo
+ * necesita saber en que nivel esta parada para elegir el tamano de los iconos.
+ */
 function SeguirZoom({ onZoom }: { onZoom: (z: number) => void }) {
-  const map = useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
-  useEffect(() => { onZoom(map.getZoom()); }, [map, onZoom]);
+  const map = useMapEvents({ zoomend: () => onZoom(Math.round(map.getZoom())) });
+  useEffect(() => { onZoom(Math.round(map.getZoom())); }, [map, onZoom]);
   return null;
 }
 
@@ -829,6 +844,43 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
   const map = useMap();
   const layerRef = useRef<L.HeatLayerInstance | null>(null);
 
+  /**
+   * CUANTOS RECLAMOS TIENE LA ESQUINA MAS CARGADA.
+   *
+   * Es el techo de la escala de color: la mancha llega al rojo recien ahi. Sale
+   * de los datos y no de una constante, porque la densidad de un municipio no
+   * se parece a la de otro --- un pueblo con 40 reclamos y una ciudad con 4.000
+   * necesitan escalas distintas para que el rojo siga queriendo decir "acá
+   * pasa algo raro" y no simplemente "acá hay gente".
+   *
+   * Se cuenta sobre una grilla de ~150 m, que es la escala a la que un vecino
+   * diria "en esta cuadra". Y se toma el percentil 90 en vez del maximo: un
+   * unico punto con quince reclamos encima --- una esquina denunciada mil veces
+   * --- no puede achatar todo el resto del mapa a naranja palido.
+   */
+  const maxDensidad = useMemo(() => {
+    const CELDA = 0.00135;                       // ~150 m de latitud
+    const celdas = new Map<string, number>();
+    for (const r of reclamos) {
+      const la = Number(r.latitud);
+      const lo = Number(r.longitud);
+      if (!Number.isFinite(la) || !Number.isFinite(lo)) continue;
+      const k = `${Math.round(la / CELDA)}:${Math.round(lo / CELDA)}`;
+      celdas.set(k, (celdas.get(k) || 0) + 1);
+    }
+    if (celdas.size === 0) return 3;
+    const cuentas = [...celdas.values()].sort((a, b) => a - b);
+    // Percentil 75 y no 90: el `blur` reparte cada punto sobre su vecindario,
+    // asi que el valor que la mancha alcanza de verdad es bastante menor que la
+    // cuenta cruda de la celda. Con el techo en el 90 el rojo no llegaba a
+    // aparecer NUNCA y la escala se quedaba sin su extremo --- que es
+    // justamente el que contesta "acá pasa algo".
+    const p75 = cuentas[Math.floor(cuentas.length * 0.75)] ?? cuentas[cuentas.length - 1];
+    // Nunca menos de 3: con dos reclamos en todo el municipio la mancha no
+    // deberia gritar. Nunca mas de 40: pasado eso el gradiente se aplana.
+    return Math.min(40, Math.max(3, p75));
+  }, [reclamos]);
+
   const puntos = useMemo(
     () =>
       reclamos
@@ -868,26 +920,131 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
       //
       // Radio mas grande y menos desenfoque = manchas mas solidas y menos
       // corridas del punto real, que era la otra queja.
-      radius: 34,
-      blur: 18,
+      // EL ROJO TIENE QUE SER EXCEPCIONAL, si no no dice nada.
+      //
+      // `max` era 3: con tres reclamos cerca la mancha ya llegaba al tope de la
+      // escala, y en un municipio con 250 repartidos en 8 km casi cualquier
+      // esquina junta tres. Resultado: el municipio entero pintado de rojo
+      // liso, sin un solo matiz, respondiendo "acá hay muchos" en todas partes
+      // (dueno, 2026-09-07: "se ve todo rojo, no tiene matices, esta muy
+      // intenso"). El valor correcto no es una constante: depende de cuantos
+      // reclamos tenga el municipio y de que tan apretados esten, asi que se
+      // calcula de los datos --- `maxDensidad` mira la celda mas cargada.
+      //
+      // `minOpacity` era 0,62: un reclamo solo ya se pintaba al 62%, asi que
+      // tampoco existia la zona tenue. Con 0,22 lo poco se insinua y deja ver
+      // la calle debajo, que es lo que permite comparar.
+      // RADIO CHICO PARA QUE LO INTENSO SEA INTENSO.
+      //
+      // Con radio 26 cada reclamo suelto pintaba unos 50 px y en la trama
+      // Lo que hace que un foco se DESTAQUE no es apagar el resto --- se probo
+      // bajando el radio a 16 y la opacidad a 0,12, y el mapa quedaba casi en
+      // blanco, peor que antes (dueno, 2026-09-07) --- sino que el pico llegue
+      // de verdad al extremo de la escala. De eso se ocupan el `max` y las
+      // paradas del gradiente, aca abajo. El radio y la opacidad vuelven a la
+      // presencia que la mancha necesita para leerse.
+      radius: 26,
+      blur: 20,
       maxZoom: 17,
-      max: 3,
-      minOpacity: 0.62,
+      // LA MITAD, NO LA CUENTA ENTERA.
+      //
+      // `leaflet.heat` normaliza cada punto contra este numero, pero el alpha
+      // que el canvas alcanza de verdad es bastante menor que la cuenta cruda
+      // de la celda: el radio y el blur reparten cada punto sobre sus vecinos.
+      // Medido sobre el mapa real, con `max` igual a la densidad el pico del
+      // canvas se quedaba en 128 de 255 --- la mitad superior del gradiente, la
+      // que tiene el naranja y el rojo, NO SE USABA NUNCA (2026-09-07). Con la
+      // mitad, el pico llega arriba y la escala se usa entera.
+      max: Math.max(1, maxDensidad * 0.5),
+      // El piso era 0,62 --- un reclamo solo ya se pintaba al 62% y no existia
+      // la zona tenue. 0,34 deja ver la calle debajo y conserva la presencia.
+      minOpacity: 0.34,
+      // Cinco paradas en vez de tres: la escala tiene que tener recorrido para
+      // que el ojo distinga "algo", "bastante" y "mucho".
+      // La escala se estira abajo y se aprieta arriba: el amarillo cubre casi
+      // toda la parte baja --- donde vive la mayoria de los puntos --- y el
+      // naranja y el rojo se reservan para el ultimo tramo. Asi el salto de
+      // color coincide con el salto de sentido.
+      // LAS PARADAS SIGUEN AL RANGO QUE EL CANVAS ALCANZA DE VERDAD, no al
+      // 0-100 teorico. Medido: la masa de pixeles vive entre 0 y 40 --- son los
+      // reclamos sueltos --- y el pico de los focos llega a 74. Por eso el
+      // amarillo cubre hasta 0,35, el naranja entra en 0,5 y el rojo en 0,68:
+      // asi el salto de color cae justo donde esta el salto de sentido, y no en
+      // un tramo de la escala al que ningun dato llega.
       gradient: {
         0.0: rampa.baja,
-        0.55: rampa.media,
+        0.35: rampa.baja,
+        0.5: rampa.media,
+        0.68: rampa.alta,
         1.0: rampa.alta,
       },
     });
     heat.addTo(map);
+
+    // NO DIBUJAR SOBRE UN CANVAS DE ANCHO CERO.
+    //
+    // `leaflet.heat` redibuja escuchando los eventos del mapa, y si el canvas
+    // todavia no tiene tamano su `draw` llama a `getImageData` con width 0 y
+    // tira `IndexSizeError`. Lo grave no es que falte el calor un instante: esa
+    // excepcion viaja SIN ATRAPAR por adentro del `_resetView` de Leaflet, que
+    // es el que reposiciona todas las capas, y al abortar a la mitad el fondo
+    // queda reencuadrado y los marcadores con la posicion anterior.
+    // `_redraw` es interno de la libreria y no esta en sus tipos: el cast esta
+    // acotado a estas lineas.
+    const interno = heat as unknown as { _redraw?: () => void };
+    const redibujar = interno._redraw?.bind(heat);
+    if (redibujar) {
+      interno._redraw = () => {
+        const tam = map.getSize();
+        if (!tam || tam.x <= 0 || tam.y <= 0) return;
+        redibujar();
+      };
+    }
+
     // El canvas se muda al pane de atrás. Se busca por su clase porque el
     // handle del canvas es privado de leaflet.heat; si algún día cambia, la
     // capa sigue funcionando, sólo vuelve a quedar arriba.
     const canvas = map.getContainer().querySelector('canvas.leaflet-heatmap-layer');
     if (canvas && pane) pane.appendChild(canvas);
 
+    // EL RADIO SIGUE AL ZOOM, porque tiene que valer METROS y no pixeles.
+    //
+    // `leaflet.heat` toma el radio en pixeles de pantalla y no lo toca nunca.
+    // Al alejarse, la misma cuadra pasa a medir cuatro pixeles pero cada
+    // reclamo sigue pintando un circulo de 26: los puntos se montan unos sobre
+    // otros, la suma satura y el municipio entero termina rojo --- inventando
+    // una concentracion que solo existe porque se alejo la camara (dueno,
+    // 2026-09-07: "cuando te alejas con el zoom se pinta todo de rojo").
+    //
+    // Fijando la distancia REAL --- 420 m, que es el radio que 26 px
+    // representaban al zoom de municipio --- la mancha significa lo mismo en
+    // todos los niveles. El piso de 8 px evita que a zoom de provincia el calor
+    // desaparezca; el techo de 34 evita manchones al acercarse mucho.
+    const METROS = 420;
+    const radioParaElZoom = () => {
+      const z = map.getZoom();
+      const lat = map.getCenter().lat;
+      const mxpx = (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, z);
+      return Math.round(Math.min(34, Math.max(8, METROS / mxpx)));
+    };
+    // `setOptions` es de leaflet.heat y no esta en sus tipos: el cast queda
+    // acotado a esta funcion.
+    const capa = heat as unknown as {
+      options: { radius?: number };
+      setOptions: (o: { radius: number; blur: number }) => void;
+    };
+    const ajustarRadio = () => {
+      const r = radioParaElZoom();
+      if (capa.options.radius !== r) {
+        capa.setOptions({ radius: r, blur: Math.round(r * 0.78) });
+      }
+    };
+    ajustarRadio();
+    map.on('zoomend', ajustarRadio);
+
     layerRef.current = heat;
     return () => {
+      map.off('zoomend', ajustarRadio);
       // DEVOLVER EL CANVAS A SU PANE ANTES DE SACAR LA CAPA.
       //
       // leaflet.heat hace `overlayPane.removeChild(canvas)` en su onRemove, sin
@@ -903,7 +1060,7 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
       map.removeLayer(heat);
       layerRef.current = null;
     };
-  }, [map, rampa]);
+  }, [map, rampa, maxDensidad]);
 
   // Los PUNTOS se actualizan in situ. Es el camino caliente: durante el
   // time-lapse esto corre ~30 veces por reproducción, y recrear la capa (lo que
@@ -966,12 +1123,25 @@ interface RotuloMapa {
  * sale de `.av2-rotulo` (abmv2.css [MAPA]) sobre tokens --pl-*.
  */
 function RotulosLayer({ rotulos }: { rotulos: RotuloMapa[] }) {
+  // EL LADO LO DECIDE EL MAPA, no el orden (dueño, 2026-09-07: "se perdió
+  // uno"). Alternar a ciegas mandaba hacia afuera al rótulo de un foco pegado
+  // al borde y quedaba recortado. Cada uno sale hacia adentro: si el punto está
+  // en la mitad derecha, el rótulo va a la izquierda, y al revés.
+  const map = useMap();
+  const [centroLng, setCentroLng] = useState(() => map.getCenter().lng);
+  useMapEvents({
+    moveend: () => setCentroLng(map.getCenter().lng),
+    zoomend: () => setCentroLng(map.getCenter().lng),
+  });
   return (
     <>
       {rotulos.map((r, i) => {
-        // Se alternan arriba/abajo: dos zonas calientes vecinas ponían sus dos
-        // etiquetas en el mismo renglón y una tapaba a la otra.
-        const arriba = i % 2 === 0;
+        // AL COSTADO, no arriba ni abajo (dueño, 2026-09-07): puestas sobre el
+        // punto se apilaban encima de los donuts y se pisaban entre ellas.
+        const derecha = r.lng <= centroLng;
+        // y un escaloncito alternado, para que dos focos a la misma altura y del
+        // mismo lado no terminen uno encima del otro.
+        const escalon = i % 2 === 0 ? -9 : 9;
         return (
           <CircleMarker
             key={r.id}
@@ -982,8 +1152,8 @@ function RotulosLayer({ rotulos }: { rotulos: RotuloMapa[] }) {
           >
             <Tooltip
               permanent
-              direction={arriba ? 'top' : 'bottom'}
-              offset={[0, arriba ? -8 : 8]}
+              direction={derecha ? 'right' : 'left'}
+              offset={[derecha ? 14 : -14, escalon]}
               className={`av2-rotulo${r.tono ? ` av2-rotulo--${r.tono}` : ''}`}
             >
               {r.texto}
@@ -1627,6 +1797,10 @@ export default function Mapa() {
    */
   const [panelAbierto, setPanelAbierto] = useState(true);
 
+  /** La consulta arranca abierta --- hay que elegir algo --- y se pliega sola en
+   *  cuanto elegis: a partir de ahi lo que queres es el mapa. */
+  const [consultaAbierta, setConsultaAbierta] = useState(true);
+
   /** Zoom actual del mapa. Lo usan los donuts para no apilarse al alejarse. */
   const [zoomMapa, setZoomMapa] = useState(13);
 
@@ -1888,20 +2062,6 @@ export default function Mapa() {
    *  Encendido por default porque con cientos de reclamos los puntos sueltos
    *  son la masa que el dueno llamo "un caos de pines que no sirven para nada". */
   const [agruparPorZona, setAgruparPorZona] = useState(true);
-
-  /** Cartel de "usá Ctrl para hacer zoom", que se muestra solo cuando alguien
-   *  lo intenta sin Ctrl. No va fijo: un cartel permanente sobre el mapa es
-   *  ruido para el que ya sabe. */
-  const [avisoZoom, setAvisoZoom] = useState(false);
-  const avisoZoomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mostrarAvisoZoom = useCallback(() => {
-    setAvisoZoom(true);
-    if (avisoZoomTimer.current) clearTimeout(avisoZoomTimer.current);
-    avisoZoomTimer.current = setTimeout(() => setAvisoZoom(false), 1800);
-  }, []);
-  useEffect(() => () => {
-    if (avisoZoomTimer.current) clearTimeout(avisoZoomTimer.current);
-  }, []);
 
 
   /** Momento del ultimo click que YA atendio un poligono o un pin. Lo lee el
@@ -2406,12 +2566,26 @@ export default function Mapa() {
     for (const [id, lista] of porBarrio) {
       const b = barriosMunicipio.find((x) => x.id === id);
       if (!b) continue;
-      let lat = 0, lng = 0, conCoord = 0;
+      // MEDIANA, NO PROMEDIO. El promedio lo arrastra un solo dato malo: un
+      // barrio con cinco reclamos, cuatro en su cuadra y uno geocodificado
+      // lejos, corre el circulo fuera de sus propios puntos. La mediana ignora
+      // los extremos.
+      const lats: number[] = [];
+      const lngs: number[] = [];
       for (const r of lista) {
-        if (r.latitud == null || r.longitud == null) continue;
-        lat += r.latitud; lng += r.longitud; conCoord += 1;
+        const la = Number(r.latitud);
+        const lo = Number(r.longitud);
+        // `Number(null)` es 0, y 0,0 es el Golfo de Guinea: fuera.
+        if (!Number.isFinite(la) || !Number.isFinite(lo) || (la === 0 && lo === 0)) continue;
+        lats.push(la); lngs.push(lo);
       }
-      if (conCoord > 0) { lat /= conCoord; lng /= conCoord; }
+      const mediana = (v: number[]) => {
+        const o = [...v].sort((x, y) => x - y);
+        const m = o.length >> 1;
+        return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
+      };
+      let lat: number, lng: number;
+      if (lats.length > 0) { lat = mediana(lats); lng = mediana(lngs); }
       else if (b.latitud != null && b.longitud != null) { lat = b.latitud; lng = b.longitud; }
       else continue;
 
@@ -3065,13 +3239,22 @@ export default function Mapa() {
             tono: 'malo' as const,
           }));
       case 'resolvimos':
-        return topZonas(reclamosFiltrados, 3, 150).map((z, i) => ({
-          id: `rot-resuelto-${i}-${z.centerLat.toFixed(4)}`,
-          lat: z.centerLat,
-          lng: z.centerLng,
-          texto: `${z.reclamos.length} ${z.reclamos.length === 1 ? 'resuelto' : 'resueltos'}`,
-          tono: 'bueno' as const,
-        }));
+        // EL ROTULO SIGUE A LOS DONUTS, no a otra agrupacion (dueño, 2026-09-07:
+        // "si es por cantidad hay uno que es mas grande que los demas y no tiene
+        // label"). Antes rotulaba clusters de 150 m sobre los reclamos mientras
+        // los donuts agrupan por BARRIO: dos mapas distintos dibujados encima, y
+        // por eso el circulo mas grande se quedaba sin etiqueta. Ahora se rotulan
+        // las tres zonas de mayor tamaño, que son las que el ojo va a buscar.
+        return [...donutsZona]
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 3)
+          .map((z) => ({
+            id: `rot-resuelto-${z.id}`,
+            lat: z.lat,
+            lng: z.lng,
+            texto: `${z.nombre} · ${z.total} ${z.total === 1 ? 'reclamo' : 'reclamos'}`,
+            tono: 'bueno' as const,
+          }));
       case 'sinllegar':
         return barriosSinCobertura
           .filter((b) => b.centro)
@@ -3100,7 +3283,7 @@ export default function Mapa() {
       default:
         return [];
     }
-  }, [pregunta, reclamosFiltrados, hotspots, barriosSinCobertura]);
+  }, [pregunta, reclamosFiltrados, hotspots, barriosSinCobertura, donutsZona]);
 
   // =================================================================
   // La RESPUESTA: una línea corta, en el mismo idioma de la pregunta
@@ -3802,6 +3985,9 @@ export default function Mapa() {
   const handlePreguntaChange = (id: string) => {
     const siguiente = (PREGUNTAS.some((p) => p.id === id) ? id : '') as ConsultaId;
     setPregunta(siguiente);
+    // Elegida la pregunta, el control se pliega: ya hizo su trabajo y lo que
+    // sigue es mirar el mapa.
+    if (siguiente !== '') setConsultaAbierta(false);
     if (siguiente !== '') setFiltroEstado(null);
     // "Cómo fue apareciendo" ES el recorrido: elegirla lo arranca, y salir de
     // ella lo apaga. Sin esto habría que elegir la pregunta Y ADEMÁS buscar un
@@ -4514,7 +4700,16 @@ export default function Mapa() {
             cambiar de pregunta o apagar un estado habia que volver arriba cada
             vez. Es la barra de mando de la pantalla, no un encabezado. */}
         <div className={`av2-mapa-consulta${isPuntos ? '' : ' av2-mapa-consulta--sticky'}`}>
-        {!isPuntos && (
+        {/* ABIERTA: elegis la pregunta y armas la consulta.
+            PLEGADA: una banda fina que dice que estas mirando y como volver.
+
+            El control ocupaba 230 px fijos arriba del mapa para algo que se usa
+            una vez y despues estorba: elegis la lente y a partir de ahi lo unico
+            que queres es el mapa mas grande. Se pliega solo al elegir, porque
+            ese es el momento en que dejaste de necesitarlo (dueno, 2026-09-07).
+            Sigue sticky en los dos estados: la banda queda a mano para volver a
+            abrirlo sin subir la pagina. */}
+        {!isPuntos && consultaAbierta && (
           <ConsultaGuiada
             titulo="¿Qué querés ver en el mapa?"
             preguntas={preguntasConLugar}
@@ -4526,6 +4721,24 @@ export default function Mapa() {
             continuacion={continuacionConsulta}
             verTodo={VER_TODO}
           />
+        )}
+
+        {!isPuntos && !consultaAbierta && (
+          <button
+            type="button"
+            className="av2-mapa-consulta-banda"
+            onClick={() => setConsultaAbierta(true)}
+            aria-expanded={false}
+            title="Cambiar la consulta"
+          >
+            <span className="av2-mapa-consulta-banda-lente">
+              {TITULO_LENTE[pregunta] ?? TITULO_LENTE.repiten}
+            </span>
+            <span className="av2-mapa-consulta-banda-dato">
+              {reclamosFiltrados.length} {reclamosFiltrados.length === 1 ? 'reclamo' : 'reclamos'}
+            </span>
+            <ChevronDown size={15} strokeWidth={2.2} aria-hidden />
+          </button>
         )}
 
         </div>{/* /av2-mapa-consulta */}
@@ -4572,7 +4785,15 @@ export default function Mapa() {
           <MapContainer
         scrollWheelZoom={false}
         maxZoom={BASEMAP_MAX_ZOOM}
-        zoomSnap={1}
+            /* Los niveles de Leaflet van de a potencias de 2: entre uno y el
+               siguiente el territorio visible se DUPLICA. Carlos Paz (8,8 x 8,3
+               km) no entra en 14 y en 13 sobra media pantalla, asi que el
+               municipio quedaba chiquito rodeado de campo. Con `zoomSnap` de
+               0,25 el encuadre elige 13,25 o 13,75 y el municipio LLENA el mapa
+               en cualquier pantalla; `zoomDelta` queda en 1 para que los
+               botones y la rueda sigan moviendo de a un nivel entero. */
+        zoomSnap={0.25}
+        zoomDelta={1}
             center={getMapCenter()}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
@@ -4587,11 +4808,19 @@ export default function Mapa() {
             <SeguirZoom onZoom={setZoomMapa} />
             <EncuadrarBarrio encuadre={encuadreBarrio} />
             <MapController target={mapTarget} />
-            <InvalidarAlRedimensionar />
-            <ZoomRuedaDeAUno
-              zoomLibre={pantallaCompleta}
-              onIntentoSinModificador={mostrarAvisoZoom}
+            {/* `invalidateSize` sola deja el mismo zoom: un mapa que crece
+                muestra mas territorio alrededor de lo mismo, asi que al
+                agrandar la ventana o colapsar el panel el municipio quedaba
+                chiquito con campo ajeno alrededor. */}
+            <InvalidarAlRedimensionar
+              onRedimensionar={() => setFitSignal((n) => n + 1)}
             />
+            {/* La rueda hace zoom SIEMPRE, sin pedir Ctrl. Exigir el
+                modificador cuidaba el scroll de la pagina, pero el precio lo
+                pagaba el uso normal: girabas sobre el mapa y no pasaba nada. El
+                mapa esta clavado en su alto y lo que scrollea es el panel del
+                costado. Sigue siendo un nivel por gesto. */}
+            <ZoomRuedaDeAUno zoomLibre />
 
             {/* ---- REGIONES: cada barrio pintado con el color de su distrito ----
                  Va PRIMERO para que quede debajo de los pines. Con un distrito
@@ -5064,6 +5293,22 @@ export default function Mapa() {
           >
             <LocateFixed size={16} strokeWidth={2} aria-hidden />
           </button>
+          {/* PLEGAR EL PANEL, con sus pares. Estaba colgado del borde del
+              panel, flotando en la banda entre el mapa y las lecturas: rompia
+              la simetria y se comia un pedazo de ancho para un boton. Aca no
+              ocupa nada --- la botonera ya existe. */}
+          <button
+            type="button"
+            className={`av2-mapa-ctrl${!panelAbierto ? ' av2-mapa-ctrl--activo' : ''}`}
+            onClick={() => setPanelAbierto((v) => !v)}
+            aria-pressed={!panelAbierto}
+            title={panelAbierto ? 'Plegar las lecturas' : 'Mostrar las lecturas'}
+            aria-label={panelAbierto ? 'Plegar las lecturas' : 'Mostrar las lecturas'}
+          >
+            {panelAbierto
+              ? <PanelRightClose size={16} strokeWidth={2} aria-hidden />
+              : <PanelRightOpen size={16} strokeWidth={2} aria-hidden />}
+          </button>
           {canUsePoi && (
             <button
               type="button"
@@ -5158,13 +5403,6 @@ export default function Mapa() {
           </div>
         )}
 
-        {/* Aparece SOLO al intentar el zoom sin Ctrl, y se va solo. */}
-        {avisoZoom && !pantallaCompleta && (
-          <div className="av2-mapa-hint av2-mapa-hint--neutro" role="status">
-            Usá Ctrl + rueda para hacer zoom
-          </div>
-        )}
-
         {/* Hint mientras marcás el área del informe. El resumen y la descarga
             NO viven acá: viven en el panel "Informe de una zona" de abajo. */}
         {drawMode && !drawnBBox && (
@@ -5216,19 +5454,6 @@ export default function Mapa() {
             El scroll, si hace falta, es de esta columna --- el mapa queda
             fijo. */}
         <div className="av2-mapa-columna">
-          {/* La pestaña de plegado vive PEGADA al borde del panel y se ve en
-              los dos estados: abierta cierra, plegada abre. Un panel que se
-              cierra y no deja rastro de como volver es un panel perdido. */}
-          <button
-            type="button"
-            className="av2-mapa-plegar"
-            onClick={() => setPanelAbierto((v) => !v)}
-            aria-expanded={panelAbierto}
-            title={panelAbierto ? 'Plegar el panel' : 'Abrir el panel'}
-          >
-            {panelAbierto ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-          </button>
-
           {/* Lo que se pliega. Scrollea ADENTRO: la pagina no scrollea nunca,
               asi el mapa siempre llega al borde de la pantalla. */}
           {/* TRES BLOQUES Y NADA MAS: el KPI semantico de la lente, y dos

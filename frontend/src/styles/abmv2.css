@@ -2671,10 +2671,12 @@ button.av2-chip:hover { opacity: 0.85; }
    columna igual dejaba 340px en blanco al lado de un mapa achicado. */
 .av2-mapa-grilla--sola { grid-template-columns: minmax(0, 1fr); }
 
-/* PLEGADA: al panel le queda el ancho de su pestaña y el mapa se lleva el
-   resto. No es `display:none` a proposito — la pestaña tiene que seguir ahi
-   para poder volver a abrirlo. */
-.av2-mapa-full:has(.av2-mapa-grilla--plegada) { --av2-panel-ancho: 30px; }
+/* PLEGADA: el panel se va ENTERO y el mapa se lleva todo el ancho. Antes le
+   quedaban 30px para sostener su pestaña; ahora el boton vive en la botonera
+   del mapa, asi que no hay nada que reservar y no queda una franja muerta al
+   costado (dueno, 2026-09-06). */
+.av2-mapa-full:has(.av2-mapa-grilla--plegada) { --av2-panel-ancho: 0px; }
+.av2-mapa-grilla--plegada > .av2-mapa-columna { display: none; }
 
 /* EL MAPA NO ES STICKY, Y NO HACE FALTA QUE LO SEA.
    Lo fue un rato y rompio la pantalla: con la barra de consulta TAMBIEN sticky
@@ -2696,11 +2698,26 @@ button.av2-chip:hover { opacity: 0.85; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* EL PANEL MIDE EXACTAMENTE LO QUE EL MAPA.
+     `--av2-mapa-alto` es el alto que la pantalla le calculo al mapa; atando la
+     columna al mismo numero, las lecturas empiezan y terminan donde empieza y
+     termina el mapa. Antes la columna crecia con su contenido y las dos mitades
+     terminaban en alturas distintas --- la asimetria que el dueno marco el
+     2026-09-06. */
+  height: var(--av2-mapa-alto, 100%);
   min-height: 0;
 }
 
 /* Lo que se pliega y lo que scrollea. El scroll vive ACA, nunca en la pagina:
    es lo que deja al mapa llegando siempre al borde inferior de la pantalla. */
+/* Cada lectura mide LO QUE SU CONTENIDO PIDE.
+   Se probo repartir el alto en partes iguales para que las cuatro quedaran
+   parejas, y el precio fue que la primera --- la que lleva la frase larga ---
+   cortaba el texto a la mitad. El panel entero ya termina donde termina el
+   mapa (ver `.av2-mapa-columna`); adentro scrollea, que es lo acordado: el
+   mapa queda fijo y lo que se mueve es la columna de al lado. */
+.av2-mapa-columna-scroll > * { flex: 0 0 auto; }
+
 .av2-mapa-columna-scroll {
   display: flex;
   flex-direction: column;
@@ -2711,46 +2728,12 @@ button.av2-chip:hover { opacity: 0.85; }
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding-left: 26px; /* le deja el carril a la pestaña de plegado */
 }
 .av2-mapa-grilla--plegada .av2-mapa-columna-scroll {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
 }
-
-/* LA PESTAÑA DE PLEGADO — chica y arriba, no un cuadrado en el medio del aire.
-   Estuvo flotando entre el mapa y las cards, sin pertenecer a ninguno de los
-   dos, y ocupando de mas (dueño, 2026-09-06). Ahora es un boton de 22px en el
-   ANGULO SUPERIOR del panel, alineado con el titulo de la primera card: se ve
-   como el tirador del panel y no le come alto a nada. */
-.av2-mapa-plegar {
-  position: absolute;
-  top: 6px;
-  left: 0;
-  z-index: 2;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--pl-border);
-  border-radius: var(--pl-radius-sm, 6px);
-  background: var(--pl-surface);
-  color: var(--pl-text-muted);
-  cursor: pointer;
-  transition: background 150ms var(--pl-ease, ease), color 150ms var(--pl-ease, ease);
-}
-.av2-mapa-plegar:hover {
-  background: var(--pl-surface-hover);
-  color: var(--pl-text);
-}
-.av2-mapa-plegar:focus-visible {
-  outline: 2px solid var(--pl-green);
-  outline-offset: 2px;
-}
-/* Plegado queda centrado en su carril de 30px, que es todo el panel. */
-.av2-mapa-grilla--plegada .av2-mapa-plegar { left: 4px; }
 
 /* Las cards de lectura vienen en fila de tres (vivian abajo del mapa). Al
    costado se apilan: es una columna de 340px, no una banda de 1200. */
@@ -2770,8 +2753,12 @@ button.av2-chip:hover { opacity: 0.85; }
   .av2-mapa-grilla { grid-template-columns: minmax(0, 1fr); }
   .av2-mapa-grilla .av2-mapa,
   .av2-mapa-grilla .av2-mapa-lienzo { height: var(--av2-pantalla-alto, 420px); }
-  .av2-mapa-columna-scroll { overflow: visible; padding-left: 0; }
-  .av2-mapa-plegar { display: none; }
+  .av2-mapa-columna { height: auto; }
+  .av2-mapa-columna-scroll { overflow: visible; }
+  /* Apiladas abajo, cada una vuelve a medir lo suyo. */
+  .av2-mapa-columna-scroll > * { flex: 0 0 auto; }
+  /* Y plegado no oculta nada: en una sola columna no hay que plegar. */
+  .av2-mapa-grilla--plegada > .av2-mapa-columna { display: flex; }
   /* Debajo del mapa vuelven a entrar de a varias por fila. */
   .av2-mapa-columna .map-art {
     flex-direction: row;
@@ -6462,3 +6449,52 @@ button.av2-recorrido-miga:hover {
 .av2-mapa-columna-scroll .kse-detalle { font-size: 12.5px; line-height: 1.4; }
 /* La marca de agua gigante del fondo no aporta en una columna angosta. */
 .av2-mapa-columna-scroll .kse-marca { display: none; }
+
+/* ROTULO DE DIAGNOSTICO (?debug=1). Feo a proposito: se lee sobre cualquier
+   fondo del mapa y no se confunde con la interfaz de verdad. */
+.av2-debug-rotulo {
+  background: #111827 !important;
+  color: #fde047 !important;
+  border: 1px solid #fde047 !important;
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+  padding: 3px 5px !important;
+  opacity: 1 !important;
+  white-space: nowrap;
+}
+.av2-debug-rotulo::before { display: none !important; }
+
+/* LA BANDA DE LA CONSULTA PLEGADA.
+   Es el segundo estado del mismo control: una linea que dice que estas mirando
+   y como volver a abrirlo. Comparte el sticky con la version abierta, asi que
+   queda a mano sin subir la pagina. */
+.av2-mapa-consulta-banda {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius, 10px);
+  background: var(--pl-surface);
+  color: var(--pl-text);
+  cursor: pointer;
+  text-align: left;
+}
+.av2-mapa-consulta-banda:hover { background: var(--pl-surface-hover); }
+.av2-mapa-consulta-banda-lente {
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* El dato empuja la flecha al borde: la banda llega siempre al 100%. */
+.av2-mapa-consulta-banda-dato {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--pl-text-2, var(--pl-text));
+}
+/* Plegada no necesita los 165px que pide la version abierta. */
+.av2-mapa-consulta:has(.av2-mapa-consulta-banda) { min-height: 0; }

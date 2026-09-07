@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
@@ -170,7 +170,11 @@ export default function Login() {
     try {
       await login(userEmail, passReal);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRouteForUser(user));
+      // Destino del atajo de desarrollo (`?ir=/gestion/mapa`). Se consume una
+      // sola vez: un login normal despues no tiene por que ir a parar ahi.
+      const atajo = import.meta.env.PROD ? null : sessionStorage.getItem('atajo_destino');
+      if (atajo) sessionStorage.removeItem('atajo_destino');
+      navigate(atajo || getDefaultRouteForUser(user));
     } catch (err: unknown) {
       if (demoProtegido) {
         // PIN vencido o mal tipeado: se descarta y se vuelve a preguntar.
@@ -228,6 +232,7 @@ export default function Login() {
     dependencia_nombre?: string | null;
   }>>([]);
 
+
   // Estado para usuarios de dependencia
   const [dependenciaUsers, setDependenciaUsers] = useState<Array<{
     email: string;
@@ -241,6 +246,54 @@ export default function Login() {
   }>>([]);
   // true cuando las dos listas de perfiles ya respondieron (con datos o vacías).
   const [perfilesResueltos, setPerfilesResueltos] = useState(false);
+
+  /**
+   * ATAJO DE DESARROLLO: entrar derecho a una pantalla, sin login ni eleccion
+   * de perfil.
+   *
+   *     /<municipio>?perfil=admin&ir=/gestion/mapa
+   *
+   * Probar un arreglo de una pantalla interna costaba tres pasos a mano cada
+   * vez --abrir el municipio, elegir el perfil, navegar-- y eso multiplicado
+   * por cada iteracion es la mitad del tiempo de una sesion (dueno,
+   * 2026-09-06: "tenes que poder acceder directo a la pantalla, para no hacer
+   * el login, elegir el perfil y todo eso").
+   *
+   * NO ES UN BYPASS DE AUTENTICACION: usa el mismo `quickLogin` que los
+   * botones de perfil que ya estan en pantalla, con las mismas credenciales
+   * demo y respetando el PIN de las demos protegidas --- si el municipio pide
+   * PIN, se abre el modal igual que siempre. Lo unico que ahorra son los
+   * clicks.
+   *
+   * Y NO EXISTE EN PRODUCCION: `import.meta.env.PROD` lo apaga en el build de
+   * app.munify.com.ar. Vive en desarrollo y en QA, que son los ambientes donde
+   * uno itera.
+   */
+  const atajoUsado = useRef(false);
+  // `quickLogin` se redefine en cada render; guardarla en una ref evita que el
+  // efecto se re-dispare por eso solo, sin tener que tocar la funcion.
+  const quickLoginRef = useRef(quickLogin);
+  quickLoginRef.current = quickLogin;
+  useEffect(() => {
+    if (import.meta.env.PROD) return;
+    if (atajoUsado.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const rol = params.get('perfil');
+    if (!rol) return;
+    if (!perfilesResueltos) return;          // todavia no llegaron los perfiles
+    const elegido = demoUsers.find((u) => u.rol === rol)
+      || dependenciaUsers.find(() => rol === 'dependencia');
+    if (!elegido) return;
+    atajoUsado.current = true;
+    let destino = params.get('ir');
+    // `debug` viaja con el destino: si se queda en la URL del login, la
+    // pantalla a la que vamos nunca lo ve.
+    if (destino && params.has('debug') && !destino.includes('debug=')) {
+      destino += (destino.includes('?') ? '&' : '?') + 'debug=' + (params.get('debug') || '1');
+    }
+    if (destino) sessionStorage.setItem('atajo_destino', destino);
+    quickLoginRef.current(elegido.email, 'demo123');
+  }, [perfilesResueltos, demoUsers, dependenciaUsers]);
 
   // API_URL importado desde lib/api.ts
 

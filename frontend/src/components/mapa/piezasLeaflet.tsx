@@ -12,7 +12,7 @@
  *     ...
  *   </MapContainer>
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 
 /**
@@ -162,15 +162,52 @@ function contarCapas(map: ReturnType<typeof useMap>): number {
  * tiles a medio dibujar y el fitBounds queda descentrado. Un ResizeObserver
  * sobre el contenedor cubre TODOS los casos, no sólo el `window.resize`.
  */
-export function InvalidarAlRedimensionar() {
+export function InvalidarAlRedimensionar({
+  onRedimensionar,
+}: {
+  /**
+   * Se avisa cuando el mapa cambio de tamano DE VERDAD, para que la pantalla
+   * pueda volver a encuadrar.
+   *
+   * `invalidateSize` sola no alcanza: le dice a Leaflet cuanto mide ahora, pero
+   * le deja el mismo zoom. Un mapa que crece muestra mas territorio alrededor
+   * de lo mismo, asi que al agrandar la ventana --o al colapsar el panel de al
+   * lado-- el municipio se quedaba chiquito con campo ajeno alrededor, y en un
+   * monitor grande el sobrante daba para meter pueblos vecinos enteros (dueno,
+   * 2026-09-06). Redimensionar es justo cuando uno quiere ver todo, no cuando
+   * esta mirando una esquina, asi que re-encuadrar ahi no le pisa la vista a
+   * nadie.
+   */
+  onRedimensionar?: () => void;
+} = {}) {
   const map = useMap();
+  const avisar = useRef(onRedimensionar);
+  useEffect(() => { avisar.current = onRedimensionar; }, [onRedimensionar]);
+
   useEffect(() => {
     const contenedor = map.getContainer();
+    let ancho = contenedor.clientWidth;
+    let alto = contenedor.clientHeight;
+    let pendiente: ReturnType<typeof setTimeout> | null = null;
+
     const ro = new ResizeObserver(() => {
       map.invalidateSize({ animate: false });
+      const w = contenedor.clientWidth;
+      const h = contenedor.clientHeight;
+      if (!w || !h) return;
+      // Solo los cambios que descuadran. Un par de pixeles --una barra de
+      // scroll que aparece, el redondeo de un flex-- no justifican mover la
+      // vista de alguien.
+      const cambio = Math.max(Math.abs(w - ancho) / ancho, Math.abs(h - alto) / alto);
+      ancho = w; alto = h;
+      if (cambio < 0.08) return;
+      // Al final del arrastre, no en cada cuadro: redimensionar una ventana
+      // dispara decenas de eventos y no hace falta encuadrar en todos.
+      if (pendiente) clearTimeout(pendiente);
+      pendiente = setTimeout(() => avisar.current?.(), 220);
     });
     ro.observe(contenedor);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); if (pendiente) clearTimeout(pendiente); };
   }, [map]);
   return null;
 }
