@@ -20,8 +20,10 @@ from models.user import User
 from models.enums import RolUsuario
 from services.categorias_default import crear_categorias_default
 from services.email_service import email_service, EmailTemplates
+import logging
 import secrets
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Configurar Cloudinary
@@ -585,6 +587,44 @@ async def provincias_catalogo(
         ORDER BY total DESC, provincia
     """), {"pais": pais})).fetchall()
     return [{"provincia": r[0], "total": int(r[1])} for r in rows]
+
+
+@router.get("/catalogo/{catalogo_id}/barrios")
+async def barrios_catalogo_publico(
+    catalogo_id: str,
+    limite: int = 5,
+    db: AsyncSession = Depends(get_db),
+):
+    """Nombres de los barrios de un municipio del catálogo. PÚBLICO y liviano.
+
+    Lo usa la pantalla de demos del sitio comercial mientras arma la demo. Antes
+    ese paso mostraba municipios VECINOS de la misma provincia, que el visitante
+    leía como si fueran barrios suyos: se veía "Villa Gesell" mientras se creaba
+    la demo de Morón. Los barrios reales ya están en el catálogo ANTES de crear
+    la demo, así que se piden con el `id` que el combo ya tiene en la mano.
+
+    Sólo `nombre`, sólo las filas que el mapa considera (`hoja = 1`), ordenado
+    por `vertices` para que salgan primero los que están dibujados. No se toca
+    `poligono` (MEDIUMTEXT) a propósito: así la consulta entra por el índice de
+    `municipio_catalogo_id` y no arrastra el blob.
+
+    Si la tabla o la columna no existen todavía (un ambiente entre migraciones),
+    devuelve lista vacía: es una pantalla pública y no puede responder 500 — el
+    wizard ya sabe seguir sin nombres, y nunca inventa ninguno.
+    """
+    limite = max(1, min(int(limite), 20))
+    try:
+        rows = (await db.execute(text(f"""
+            SELECT nombre
+            FROM catalogo_barrios
+            WHERE municipio_catalogo_id = :id AND hoja = 1
+            ORDER BY vertices DESC, nombre
+            LIMIT {limite}
+        """), {"id": str(catalogo_id)})).fetchall()
+    except Exception as e:
+        logger.warning("catalogo/%s/barrios no disponible: %s", catalogo_id, e)
+        return []
+    return [r[0] for r in rows]
 
 
 @router.get("/argentina")
