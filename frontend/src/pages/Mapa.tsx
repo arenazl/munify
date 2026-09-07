@@ -979,8 +979,6 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
         1.0: rampa.alta,
       },
     });
-    heat.addTo(map);
-
     // NO DIBUJAR SOBRE UN CANVAS DE ANCHO CERO.
     //
     // `leaflet.heat` redibuja escuchando los eventos del mapa, y si el canvas
@@ -991,6 +989,16 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
     // queda reencuadrado y los marcadores con la posicion anterior.
     // `_redraw` es interno de la libreria y no esta en sus tipos: el cast esta
     // acotado a estas lineas.
+    // EL PARCHE VA ANTES DEL `addTo`, no después.
+    //
+    // `addTo` no espera: dispara en el acto `onAdd -> _reset -> _redraw ->
+    // draw`. Con el parche puesto después, ESE primer dibujo —el único que
+    // ocurre con el contenedor recién montado, que es justo cuando todavía no
+    // tiene alto— corría sin guarda y tiraba `IndexSizeError: The source height
+    // is 0` (dueño, 2026-09-07, en el mapa de La Falda). El error salía desde
+    // `_resetView`, se lo comía React y la pantalla entera se caía al
+    // ErrorBoundary. La guarda existía y era correcta; estaba nueve líneas
+    // tarde.
     const interno = heat as unknown as { _redraw?: () => void };
     const redibujar = interno._redraw?.bind(heat);
     if (redibujar) {
@@ -1000,6 +1008,8 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
         redibujar();
       };
     }
+
+    heat.addTo(map);
 
     // El canvas se muda al pane de atrás. Se busca por su clase porque el
     // handle del canvas es privado de leaflet.heat; si algún día cambia, la
@@ -1053,11 +1063,26 @@ function HeatLayer({ reclamos, rampa }: { reclamos: Reclamo[]; rampa: RampaDensi
       // not a child of this node") y el error subia hasta React, que volteaba
       // la pantalla entera con su pantalla de error. Se lo devuelve a su lugar
       // y recien ahi se remueve la capa.
-      const canvasVivo = pane?.querySelector('canvas.leaflet-heatmap-layer');
-      if (canvasVivo) {
-        map.getPanes().overlayPane.appendChild(canvasVivo);
+      // Se lo busca en TODO el contenedor y no sólo en `pane`: si el efecto se
+      // rehizo (cambia la rampa o la densidad), el `pane` de esta clausura
+      // puede no ser el que tiene el canvas vivo, y entonces no se devolvía
+      // nada y el `removeChild` de leaflet.heat fallaba igual.
+      const canvasVivo = map.getContainer().querySelector('canvas.leaflet-heatmap-layer');
+      const overlay = map.getPanes().overlayPane;
+      if (canvasVivo && canvasVivo.parentNode !== overlay) {
+        overlay.appendChild(canvasVivo);
       }
-      map.removeLayer(heat);
+      // Y AUNQUE ASÍ Y TODO FALLE, QUE NO SE LLEVE LA PANTALLA.
+      //
+      // Esto es limpieza: si Leaflet no encuentra un nodo que ya no está, el
+      // resultado deseado —que la capa desaparezca— igual se cumple. Lo que no
+      // puede pasar es que esa excepción suba a React y voltee el mapa entero
+      // con el ErrorBoundary, que es lo que se veía.
+      try {
+        map.removeLayer(heat);
+      } catch (e) {
+        console.warn('[mapa] la capa de calor ya no estaba montada', e);
+      }
       layerRef.current = null;
     };
   }, [map, rampa, maxDensidad]);
