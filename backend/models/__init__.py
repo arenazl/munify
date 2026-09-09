@@ -49,6 +49,9 @@ from .salesbot_config import SalesbotConfig
 from .municipio_ia_config import MunicipioIaConfig
 from .ia_uso import IaUso, IaUsoDiario
 from .calls import CallsUsuario, CallsRegistro, CallsEvento, CallsMunicipio
+from .calls_curacion import (CallsFuente, CallsRelato, CallsPagina, CallsHecho,
+                             CallsPonderacion, CallsAporte, CallsCapacidad,
+                             CallsTelefono, CallsTagPropuesto)
 from .noticia import Noticia
 from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from .turno import Turno

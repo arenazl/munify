@@ -90,12 +90,20 @@ class CallsMunicipio(Base):
     eso no alcanza — el que corrige un telefono en su celular es el unico que lo
     ve, y no hay forma de mostrar un ranking entre vendedores.
 
-    OJO CON EL SENTIDO DE LA FLECHA: la fuente de verdad de la FICHA sigue
-    siendo la curaduria (`scripts/entregas/2-curados-fable/todos.json`), y esta
-    tabla es su ESPEJO. Se llena con `backend/scripts/importar_calls_fichas.py`
-    cada vez que se cura un lote. Nadie edita una ficha por la API: lo que el
-    vendedor corrige (un telefono que no atiende) vive en `calls_registro`, que
-    es SU trabajo, y se aplica ENCIMA de la ficha al servirla.
+    LA FLECHA SE DIO VUELTA (2026-09-08). Hasta ahora la fuente de verdad era
+    el JSON de la curaduria (`scripts/entregas/2-curados-fable/todos.json`) y
+    esta tabla su espejo. Desde hoy manda la TABLA y el JSON es un archivo DE
+    PASO: el padron lo siembra, el build lo lee. El motivo es que la pantalla
+    empezo a ESCRIBIR --el vendedor toca un boton, el sistema le busca el
+    telefono-- y un archivo no aguanta dos que escriben a la vez: el ultimo
+    gana y el otro pierde sin enterarse.
+
+    Lo que el vendedor corrige sobre la marcha (un telefono que no atiende)
+    sigue viviendo en `calls_registro`, que es SU trabajo de campo, y se aplica
+    ENCIMA de la ficha al servirla.
+
+    El detalle de la curacion --los hechos, los tags, el crudo del que salieron
+    y la foto de cada ponderacion-- vive en `models/calls_curacion.py`.
 
     `muni_key` es el `id` del directorio (`argentina-ucacha`), el mismo que usan
     `calls_registro` y `calls_evento`. No es un FK a `municipios`: estos son
@@ -106,6 +114,13 @@ class CallsMunicipio(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     muni_key = Column(String(80), unique=True, nullable=False, index=True)
+    # EL ENGANCHE con el catalogo de la app: el `id` de `municipios_catalogo` ES
+    # el codigo INDEC del padron del Estado, y es lo que permite saber que este
+    # prospecto y aquel tenant son el mismo lugar. Enganche BLANDO, sin
+    # constraint: el 87,6% matchea y el resto son municipios que nosotros
+    # tenemos y la app todavia no -- que son, justamente, los prospectos.
+    # El nombre NUNCA es la llave: `avellaneda` son tres municipios distintos.
+    codigo_indec = Column(String(20), nullable=True, index=True)
     municipio = Column(String(160), nullable=False)
     provincia = Column(String(80), nullable=False, index=True)
     pais = Column(String(40), default="Argentina", nullable=False, index=True)
@@ -143,5 +158,18 @@ class CallsMunicipio(Base):
     # Cuando lo escribio el importador: sirve para saber si la base quedo atras
     # de la curaduria.
     importado_en = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # False = esto NO es un municipio (una comuna, un paraje, una entrada
+    # duplicada). Se descubrio llamando: hay fichas que ni siquiera son un
+    # gobierno local, y abrir con "hola, con la Municipalidad de..." arranca
+    # mal. NULL = todavia no se miro.
+    es_municipio = Column(Boolean, nullable=True)
+    # Sacada de la rueda de llamados, con el motivo. NO se borra: la ficha pasa
+    # a la cola de trabajo del que cura. Un prospecto que no se puede llamar hoy
+    # es un pendiente, no un descarte.
+    oculto = Column(Boolean, default=False, nullable=False)
+    motivo_oculto = Column(String(200), nullable=True)
+    curado_en = Column(DateTime, nullable=True)
+    curado_por = Column(String(60), nullable=True)
 
     __table_args__ = (Index("ix_calls_municipio_pais_prov", "pais", "provincia"),)
