@@ -76,7 +76,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import select                                                # noqa: E402
+from sqlalchemy import func, insert, select                                  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine   # noqa: E402
 
 from core.config import settings                                            # noqa: E402
@@ -368,21 +368,52 @@ def telefonos_de(f: dict) -> list:
     return out
 
 
-LOTE = 200  # municipios por transaccion
+LOTE = 300  # municipios por transaccion
 
 
-async def volcar(s, pendientes: list, ahora) -> None:
-    """Cierra el lote: un solo flush para todos los ids, y despues los aportes."""
-    if not pendientes:
-        return
-    await s.flush()
-    for fila_p, key, aps in pendientes:
-        for ap in aps:
-            s.add(CallsAporte(ponderacion_id=fila_p.id, muni_key=key, creado=ahora,
-                              universo=ap["universo"], concepto=ap["concepto"],
-                              puntos=ap["puntos"]))
+async def volcar(s, buf: dict, ahora) -> None:
+    """Cierra el lote: cada tabla en UN viaje, no una fila por viaje.
+
+    Escribir con el ORM fila por fila son unas 20 idas y vueltas por municipio
+    contra una base que esta en la nube: 50.000 viajes de 100 ms son casi dos
+    horas, y se midio --la primera version se colgo ocho minutos sin escribir
+    una fila--. Con `insert()` y una lista de diccionarios va todo junto.
+
+    El precio es que hay que armar los dicts a mano en vez de usar objetos, y
+    que MySQL no devuelve los ids de un insert masivo: por eso los aportes se
+    cuelgan releyendo las ponderaciones de ESTA corrida.
+    """
+    if buf["pond"]:
+        await s.execute(insert(CallsPonderacion), [p for p, _ in buf["pond"]])
+        claves = [p["muni_key"] for p, _ in buf["pond"]]
+        # Se releen por MAX(id) y NO por `creado == ahora`. La primera version
+        # filtraba por la marca de tiempo y perdio 9.363 de 11.517 aportes en
+        # silencio: la columna es DATETIME, que no guarda microsegundos, asi
+        # que la comparacion no encuentra la fila que se acaba de escribir. El
+        # id mas alto de cada municipio es, por definicion, la foto recien
+        # insertada.
+        ids = dict((await s.execute(
+            select(CallsPonderacion.muni_key, func.max(CallsPonderacion.id))
+            .where(CallsPonderacion.muni_key.in_(claves))
+            .group_by(CallsPonderacion.muni_key))).all())
+        faltan = [k for k in claves if k not in ids]
+        if faltan:
+            # Sin esto el problema anterior habria vuelto a pasar sin ruido.
+            raise RuntimeError(
+                "no se pudo colgar los aportes de %d municipios (%s...)"
+                % (len(faltan), ", ".join(faltan[:3])))
+        aportes = [dict(a, ponderacion_id=ids[p["muni_key"]])
+                   for p, aps in buf["pond"] for a in aps]
+        if aportes:
+            await s.execute(insert(CallsAporte), aportes)
+    for modelo, k in ((CallsMunicipio, "muni"), (CallsHecho, "hechos"),
+                      (CallsFuente, "fuentes"), (CallsCapacidad, "caps"),
+                      (CallsTelefono, "tels")):
+        if buf[k]:
+            await s.execute(insert(modelo), buf[k])
     await s.commit()
-    pendientes.clear()
+    for k in buf:
+        buf[k].clear()
 
 
 # --------------------------------------------------------------------------- #
@@ -422,7 +453,8 @@ async def main(ruta: str, seco: bool) -> int:
                 ult_pond[p.muni_key] = p
 
             ahora = datetime.utcnow()
-            pendientes = []
+            buf = {"muni": [], "hechos": [], "fuentes": [], "caps": [], "tels": [],
+                   "pond": []}
             hechas = 0
             for f in fichas:
                 key = (f.get("id") or "").strip().lower()[:80]
@@ -431,18 +463,20 @@ async def main(ruta: str, seco: bool) -> int:
                 cod = ix.get((pelado(f.get("provincia")), pelado(f.get("municipio"))))
                 n["con_indec" if cod else "sin_indec"] += 1
 
-                # --- la ficha
+                # --- la ficha. Las nuevas van en bloque; las que ya estaban se
+                # editan con el ORM, que son pocas y hay que comparar campo a
+                # campo para no marcar como cambiado lo que no cambio.
                 d = campos_ficha(f, cod)
                 fila = previas.get(key)
                 if fila is None:
-                    if not seco:
-                        s.add(CallsMunicipio(muni_key=key, **d))
                     n["fichas_nuevas"] += 1
+                    if not seco:
+                        buf["muni"].append(dict(d, muni_key=key, importado_en=ahora))
                 elif any(getattr(fila, k) != v for k, v in d.items()):
+                    n["fichas_actualizadas"] += 1
                     if not seco:
                         for k, v in d.items():
                             setattr(fila, k, v)
-                    n["fichas_actualizadas"] += 1
 
                 # --- los hechos (nada se pisa: lo distinto entra como fila nueva)
                 for h in hechos_de(f):
@@ -452,11 +486,12 @@ async def main(ruta: str, seco: bool) -> int:
                     hechos_ya.add(clave)
                     n["hechos"] += 1
                     if not seco:
-                        s.add(CallsHecho(codigo_indec=cod, muni_key=key, creado=ahora,
-                                         tag=h["tag"][:80], texto=h["texto"],
-                                         fuente_url=h["fuente_url"],
-                                         de_donde=h["de_donde"], universo=h["universo"],
-                                         peso=h["peso"], curado=h["curado"]))
+                        buf["hechos"].append(
+                            {"codigo_indec": cod, "muni_key": key, "creado": ahora,
+                             "tag": h["tag"][:80], "texto": h["texto"],
+                             "fuente_url": h["fuente_url"], "de_donde": h["de_donde"],
+                             "universo": h["universo"], "peso": h["peso"],
+                             "curado": h["curado"]})
 
                 # --- las fuentes
                 for x in fuentes_de(f):
@@ -466,15 +501,17 @@ async def main(ruta: str, seco: bool) -> int:
                     fuentes_ya.add(clave)
                     n["fuentes"] += 1
                     if not seco:
-                        s.add(CallsFuente(codigo_indec=cod, muni_key=key, creado=ahora,
-                                          provincia=(f.get("provincia") or "")[:80],
-                                          dominio=x["dominio"], url=x["url"],
-                                          de_donde=x["de_donde"], buscando=x["buscando"]))
+                        buf["fuentes"].append(
+                            {"codigo_indec": cod, "muni_key": key, "creado": ahora,
+                             "provincia": (f.get("provincia") or "")[:80],
+                             "dominio": x["dominio"], "url": x["url"],
+                             "de_donde": x["de_donde"], "buscando": x["buscando"],
+                             "responde": None})
 
                 # --- que sabe hacer su web. Si una capacidad cambio de valor
                 # entra como fila nueva: que un municipio HAYA PUESTO reclamos
                 # online este mes es la mejor noticia comercial que hay, y
-                # pisando el False anterior no se entera nadie.
+                # pisando el valor anterior no se entera nadie.
                 for c in capacidades_de(f):
                     clave = (key, c["capacidad"], c["tiene"], c["de_donde"])
                     if clave in caps_ya:
@@ -482,9 +519,10 @@ async def main(ruta: str, seco: bool) -> int:
                     caps_ya.add(clave)
                     n["capacidades"] += 1
                     if not seco:
-                        s.add(CallsCapacidad(codigo_indec=cod, muni_key=key, creado=ahora,
-                                             capacidad=c["capacidad"], tiene=c["tiene"],
-                                             de_donde=c["de_donde"]))
+                        buf["caps"].append(
+                            {"codigo_indec": cod, "muni_key": key, "creado": ahora,
+                             "capacidad": c["capacidad"], "tiene": c["tiene"],
+                             "de_donde": c["de_donde"]})
 
                 # --- los telefonos, uno por fila
                 for t in telefonos_de(f):
@@ -494,9 +532,10 @@ async def main(ruta: str, seco: bool) -> int:
                     tel_ya.add(clave)
                     n["telefonos"] += 1
                     if not seco:
-                        s.add(CallsTelefono(codigo_indec=cod, muni_key=key, creado=ahora,
-                                            numero=t["numero"], orden=t["orden"],
-                                            de_donde=t["de_donde"]))
+                        buf["tels"].append(
+                            {"codigo_indec": cod, "muni_key": key, "creado": ahora,
+                             "numero": t["numero"], "orden": t["orden"],
+                             "de_donde": t["de_donde"], "atiende": None})
 
                 # --- la foto de la ponderacion, solo si cambio
                 foto = foto_ponderacion(f)
@@ -509,32 +548,25 @@ async def main(ruta: str, seco: bool) -> int:
                         aps = aportes_de(f)
                         n["aportes"] += len(aps)
                         if not seco:
-                            fila_p = CallsPonderacion(
-                                codigo_indec=cod, muni_key=key, creado=ahora,
-                                version_reglas=ahora.strftime("%Y%m%d"), **foto)
-                            s.add(fila_p)
-                            # los aportes cuelgan de ESTA foto y necesitan su
-                            # id, pero pedirlo de a uno son 2.244 viajes a la
-                            # base: se juntan y se resuelven de a lote.
-                            pendientes.append((fila_p, key, aps))
+                            buf["pond"].append((
+                                dict(foto, codigo_indec=cod, muni_key=key, creado=ahora,
+                                     version_reglas=ahora.strftime("%Y%m%d")),
+                                [dict(a, muni_key=key, creado=ahora) for a in aps]))
 
                 # --- se escribe de a lotes, no todo en una transaccion. Una
                 # sola transaccion de 50.000 filas contra una base remota tarda
-                # y, si se corta en el medio, no queda NADA: media hora de
-                # trabajo perdida por un timeout. De a 200 municipios, lo que
-                # entro queda, y volver a correrlo sigue sin duplicar.
+                # y, si se corta en el medio, no queda NADA: media hora perdida
+                # por un timeout. De a 300 municipios lo que entro queda, y
+                # volver a correrlo sigue sin duplicar una sola fila.
                 hechas += 1
-                if not seco and len(pendientes) >= LOTE:
-                    await volcar(s, pendientes, ahora)
+                if not seco and hechas % LOTE == 0:
+                    await volcar(s, buf, ahora)
                     print("  %4d/%d municipios" % (hechas, len(fichas)), flush=True)
-
-                if n["fichas_nuevas"] + n["fichas_actualizadas"] and not seco \
-                        and (n["hechos"] + n["fuentes"]) % 4000 < 40:
-                    await s.flush()
 
             if seco:
                 print("\nSECO: no se escribio nada.")
             else:
+                await volcar(s, buf, ahora)
                 await s.commit()
 
         print()
