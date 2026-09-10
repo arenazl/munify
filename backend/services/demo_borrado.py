@@ -40,6 +40,29 @@ PROFUNDIDAD_MAX = 3
 # 80 = San Pedro Norte, el único cliente productivo.
 MUNICIPIOS_INTOCABLES = {80}
 
+# Demos BLINDADAS por código (dueño, 2026-09-03): no las borra ningún
+# proceso, en QA ni en prod — ni la pantalla de demos, ni el DELETE público
+# con llave, ni el script de purga de Infra. Por código y no por id porque
+# el id cambia entre bases (QA las tiene desplazadas). El trigger
+# `municipios_blindaje` de la base repite esta lista como última barrera.
+#   asuncion = Paraguay Limpio, la demo de venta white-label.
+#   merlo    = la demo de muestra y el banco de pruebas de la suite E2E.
+CODIGOS_INTOCABLES = {"asuncion", "merlo"}
+
+
+def es_intocable(municipio_id: int, codigo: str | None) -> bool:
+    return municipio_id in MUNICIPIOS_INTOCABLES or (codigo or "").strip().lower() in CODIGOS_INTOCABLES
+
+# Tablas con `municipio_id` que SOBREVIVEN al borrado de la demo, a propósito.
+# `demo_seed_logs` es la bitácora de lo que hizo la semilla: existe para
+# comparar demos viejas con nuevas, y perdía justo las que se borran (lo
+# detectó Infra en el smoke del 2026-09-03: 10 demos creadas y borradas en
+# prod, 0 bitácoras). El modelo ya lo decía ("sin FK: el log tiene que
+# sobrevivir al borrado"), pero el plan se deriva de information_schema por
+# COLUMNA, no por FK, y la tabla entraba igual. El `municipio_id` queda como
+# referencia histórica de un municipio que ya no existe.
+TABLAS_QUE_SOBREVIVEN = {"demo_seed_logs"}
+
 # Un usuario es "de demo" por el dominio de su email. Antes el patrón exigía
 # `@<codigo>.demo.com`, y una demo cuyo código cambió después de sembrarla
 # (prod: `moreno`, usuarios @moreno-2.demo.com) quedaba clasificada como
@@ -106,6 +129,7 @@ async def plan_borrado(db: AsyncSession) -> list[Sentencia]:
             "WHERE TABLE_SCHEMA = :s AND COLUMN_NAME = 'municipio_id'"), {"s": esquema})).fetchall()
     }
     con_muni.discard("municipios")
+    con_muni -= TABLAS_QUE_SOBREVIVEN
     fks = (await db.execute(text(
         "SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME "
         "FROM information_schema.KEY_COLUMN_USAGE "
@@ -162,8 +186,10 @@ async def borrar_municipio(db: AsyncSession, municipio_id: int) -> dict[str, int
     hacer rollback si algo falla). FOREIGN_KEY_CHECKS se restaura siempre,
     porque la conexión vuelve al pool.
     """
-    if municipio_id in MUNICIPIOS_INTOCABLES:
-        raise ValueError(f"El municipio {municipio_id} es intocable")
+    codigo = (await db.execute(text("SELECT codigo FROM municipios WHERE id = :mid"),
+                               {"mid": municipio_id})).scalar()
+    if es_intocable(municipio_id, codigo):
+        raise ValueError(f"El municipio {municipio_id} ({codigo}) está blindado: no se borra")
     borrado: dict[str, int] = {}
     await db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
     try:
@@ -213,5 +239,5 @@ async def describir_municipio(db: AsyncSession, municipio_id: int, codigo: str) 
         "usuarios_demo": int(usuarios["demo"] or 0),
         "usuarios_reales": int(usuarios["reales"] or 0),
         "dominios_reales": dominios_reales,
-        "intocable": fila["id"] in MUNICIPIOS_INTOCABLES,
+        "intocable": es_intocable(fila["id"], fila["codigo"]),
     }

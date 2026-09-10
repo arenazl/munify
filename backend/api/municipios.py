@@ -1200,6 +1200,15 @@ async def eliminar_municipio(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
+    # Blindadas (ver services/demo_borrado.CODIGOS_INTOCABLES): tampoco se
+    # desactivan — apagar la demo de venta es sacarla de circulacion.
+    from services.demo_borrado import es_intocable
+    if es_intocable(municipio.id, municipio.codigo):
+        raise HTTPException(
+            status_code=403,
+            detail="Este municipio esta blindado: no se desactiva ni se elimina",
+        )
+
     municipio.activo = False
     await db.commit()
 
@@ -1234,7 +1243,16 @@ async def eliminar_municipio_demo(
     # (cualquiera que NO matchee los patrones de demo). Un muni sin usuarios o
     # con solo users demo se considera borrable. El patrón vive con el cascade.
     from sqlalchemy import or_, not_
-    from services.demo_borrado import MUNICIPIOS_INTOCABLES, PATRONES_EMAIL_DEMO
+    from services.demo_borrado import MUNICIPIOS_INTOCABLES, PATRONES_EMAIL_DEMO, es_intocable
+    # Blindadas por el dueno (asuncion, merlo) y SPN: 403 antes de cualquier
+    # otra regla, con la llave o sin ella. El id 80 ya lo cubria la linea de
+    # abajo; lo que faltaba era el blindaje POR CODIGO, porque el id de una
+    # demo cambia entre bases y el nombre no es clave (hay cuatro "merlo").
+    if es_intocable(municipio.id, municipio.codigo):
+        raise HTTPException(
+            status_code=403,
+            detail="Esta demo esta blindada: no se elimina desde ningun proceso",
+        )
     non_demo_check = await db.execute(
         select(User).where(
             User.municipio_id == municipio.id,
