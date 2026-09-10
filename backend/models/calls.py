@@ -17,8 +17,13 @@ relevamiento comercial y NO son los tenants de la app.
 from datetime import datetime
 
 from sqlalchemy import Boolean, Column, Date, DateTime, Integer, String, Text, Index
+from sqlalchemy.dialects import mysql
 
 from core.database import Base
+
+# El render de una ficha pasa comodo los 64 KB que aguanta un TEXT de MySQL, y el
+# truncado no avisa: guarda lo que entra y descarta el resto en silencio.
+LARGO = Text().with_variant(mysql.LONGTEXT(), "mysql")
 
 
 class CallsUsuario(Base):
@@ -129,6 +134,16 @@ class CallsMunicipio(Base):
     # Se guarda el array entero y no una columna por numero porque la cantidad
     # varia y la pagina los muestra todos como links `tel:`.
     telefonos = Column(Text, nullable=True)
+    # DE DONDE SALIO CADA NUMERO Y SI YA SE PROBO. `telefonos` es un array plano de
+    # strings --lo que la pantalla dibuja-- y ahi no hay donde anotar lo que importa:
+    # que un numero lo acaba de traer un modelo y NADIE lo llamo todavia.
+    #
+    # Es un dict numero -> {de, url, fuente, estado, cuando}, con estado en
+    # `por_validar` (lo trajo la IA, sin probar), `no_anda` (se llamo y no sirve) u `ok`.
+    # Va aca y no en `calls_telefonos` --que es la tabla normalizada y tiene lo mismo--
+    # porque la ficha se sirve de una sola fila: cruzarla contra la tabla por cada una de
+    # las 2.244 seria un N+1 para dibujar una pastilla.
+    telefonos_meta = Column(Text, nullable=True)
     direccion = Column(String(300), nullable=True)
     direccion_fuente = Column(String(40), nullable=True)
     web = Column(String(400), nullable=True)
@@ -153,6 +168,15 @@ class CallsMunicipio(Base):
     ranking = Column(Text, nullable=True)
     ranking_score = Column(Integer, default=0, nullable=False, index=True)
     calidad = Column(Text, nullable=True)
+    # EL RENDER DE LA FICHA: la botonera de cuatro, el angulo con el que se abre la
+    # llamada, el libreto, lo que quedo afuera. Lo calcula `clasificar.py` a partir de
+    # los hechos y sus pesos --que son la fuente y viven normalizados en
+    # `calls_hechos` y `calls_aportes`-- y aca se guarda ya dibujado.
+    #
+    # Va como JSON y no en tablas porque se lee ENTERO al abrir una ficha y nadie
+    # pregunta por adentro. Y pesa: es el 89% de los 23,6 MB de las 2.244 fichas, asi
+    # que el listado se sirve SIN esta columna y la ficha abierta la pide sola.
+    decision = Column(LARGO, nullable=True)
     origen = Column(Text, nullable=True)
     verificado_el = Column(String(20), nullable=True)
     # Cuando lo escribio el importador: sirve para saber si la base quedo atras

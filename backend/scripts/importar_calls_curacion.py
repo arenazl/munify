@@ -180,8 +180,11 @@ def campos_ficha(f: dict, codigo: str | None) -> dict:
         # que sabe hacer su web hoy: es lo que decide si se compara o se explica
         "estructura": jtxt(f.get("capacidades_web")),
         "senal": (uni.get("fuerza") or ""),
-        # los 4 botones que muestra la ficha, ya elegidos y ordenados
-        "etiquetas": jtxt(dec.get("botonera")),
+        # LOS CHIPS chicos del encabezado --"Interino", "Web sin app"--, que son
+        # {texto, tono} y los tienen 205 fichas. NO la botonera: eso son los cuatro
+        # botones grandes, pesan 368 caracteres cada uno y viven en `decision`, que se
+        # sirve solo al abrir una ficha. Meterlos aca ponia 10 MB en el listado.
+        "etiquetas": jtxt(f.get("etiquetas")),
         "ranking": jtxt({"score": dec.get("score"), "motivos": dec.get("motivos")}
                         if dec else None),
         "calidad": jtxt({"web_estado": f.get("web_estado"),
@@ -189,6 +192,9 @@ def campos_ficha(f: dict, codigo: str | None) -> dict:
                          "intendente_dudoso": f.get("intendente_dudoso")}),
         "origen": jtxt(f.get("origen")),
         "ranking_score": int(dec.get("score") or 0),
+        # el render completo, para que la pagina lo pida al abrir una ficha en vez de
+        # traerse los 23 MB de todas
+        "decision": jtxt(dec),
     }
 
 

@@ -20,8 +20,22 @@ class Settings(BaseSettings):
     # URL del frontend (para links en notificaciones)
     FRONTEND_URL: str = "http://localhost:5173"
 
-    # IA Provider - Orden de prioridad ("gemini,groq" o "groq,gemini")
-    AI_PROVIDER_ORDER: str = "gemini,groq"
+    # MUERTA: NO LA LEE NADIE, y no hay que hacer que la lean (dueno, 2026-09-09).
+    #
+    # Sigue declarada SOLO porque esta en los `.env` y esta configuracion rechaza toda
+    # variable que no conoce: sacarla del modelo hace que el backend no arranque. Se probo.
+    #
+    # NO HAY ORDEN DE PROVEEDORES NI FALLBACK, a proposito. La regla es: Gemini se usa
+    # SOLO cuando hace falta buscar en internet --y se nombra explicito en el codigo que
+    # lo necesita--; Groq para todo lo demas, que es gratis. Un fallback silencioso es
+    # peor que un error: el 2026-09-01 la pagina venia contestando con Gemini en
+    # produccion sin que nadie se enterara, porque prod no montaba la key de Groq. Y
+    # ahora que Gemini factura, caer solo ahi significa gastar sin aviso. Si falta una
+    # key, el endpoint tiene que fallar FUERTE.
+    #
+    # Si algun dia alguien "arregla" el codigo para respetar esta variable, esta rompiendo
+    # esa regla. Borrala del `.env` de todos los ambientes y despues sacala de aca.
+    AI_PROVIDER_ORDER: str = "groq"
 
     # Gemini (Google - gratis con límites)
     GEMINI_API_KEY: str = ""

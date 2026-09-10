@@ -274,6 +274,10 @@ def _ficha(m: CallsMunicipio, reg: Optional[dict]) -> dict:
     tel = _json(m.telefonos, []) or []
     fix = (reg or {}).get("telFix") or {}
     tel_final = [fix.get(t, t) for t in tel]
+    # La marca (de quien es la linea, de donde salio, si ya se probo) viaja con el numero
+    # YA CORREGIDO: la pantalla dibuja `telefonos` y busca la marca con ese mismo string.
+    meta = _json(m.telefonos_meta, {}) or {}
+    meta_final = {fix.get(k, k): v for k, v in meta.items()}
     return {
         "id": m.muni_key,
         "municipio": m.municipio,
@@ -282,6 +286,7 @@ def _ficha(m: CallsMunicipio, reg: Optional[dict]) -> dict:
         "tipo_gobierno": m.tipo_gobierno or "",
         "telefonos": tel_final,
         "telefonos_curados": tel,
+        "telefonos_meta": meta_final,
         "direccion": m.direccion or "",
         "direccion_fuente": m.direccion_fuente or "",
         "web": m.web or "",
@@ -304,16 +309,43 @@ def _ficha(m: CallsMunicipio, reg: Optional[dict]) -> dict:
         "calidad": _json(m.calidad, {}) or {},
         "origen": _json(m.origen, []) or [],
         "verificado_el": m.verificado_el or "",
+        # el enganche con el catalogo de la app; el nombre nunca es la llave
+        "codigo_indec": m.codigo_indec or "",
+        # False = no es un municipio (comuna, paraje, entrada duplicada)
+        "es_municipio": m.es_municipio,
+        "oculto": bool(m.oculto),
+        "motivo_oculto": m.motivo_oculto or "",
+        "curado_en": m.curado_en.isoformat() if m.curado_en else "",
+        "curado_por": m.curado_por or "",
     }
+
+
+def _ficha_completa(m: CallsMunicipio, reg: Optional[dict]) -> dict:
+    """La ficha CON su render. Solo para la que se esta mirando.
+
+    `decision` --la botonera, el angulo, el libreto, lo que quedo afuera-- pesa el 89% de
+    todo: 20,9 MB de los 23,6 que ocupan las 2.244. Mandarlo en el listado es lo que hacia
+    que la pagina se bajara 23 MB para dibujar una grilla.
+    """
+    d = _ficha(m, reg)
+    d["decision"] = _json(m.decision, {}) or {}
+    return d
 
 
 @router.get("/fichas")
 async def fichas(db: AsyncSession = Depends(get_db), _: CallsUsuario = Depends(usuario_calls)):
-    """Las fichas curadas + el pipeline del equipo, en una sola llamada.
+    """Todas las fichas SIN el render, mas el pipeline del equipo.
 
-    La pagina arranca con esto y ya sabe todo: a quien llamar, en que orden, que
-    paso con cada uno y quien lo atendio. Son ~180 fichas: entra comodo en una
-    respuesta y evita que la pagina tenga que cruzar dos listas."""
+    LA FLECHA SE DIO VUELTA (2026-09-09). Hasta hoy la pagina se bajaba un `datos.json`
+    de 23 MB horneado en el build: cada uno veia SU copia, y lo que curaba se lo llevaba
+    su archivo. Con dos personas trabajando eso no es un directorio compartido, son dos
+    directorios.
+
+    Ahora la lista sale de la base. Y sale sin `decision`, que es el render de cada ficha
+    --la botonera, el angulo, el libreto-- y pesa el 89% del total: 20,9 MB de 23,6.
+    Sin eso, las 2.244 entran en unos 2,7 MB. El render lo pide `/ficha/{muni_key}`
+    cuando se abre una, que son ~9 KB.
+    """
     munis = (await db.execute(
         select(CallsMunicipio).order_by(CallsMunicipio.ranking_score.desc(),
                                         CallsMunicipio.municipio.asc())
@@ -337,6 +369,37 @@ async def fichas(db: AsyncSession = Depends(get_db), _: CallsUsuario = Depends(u
         "importado_en": max([m.importado_en for m in munis if m.importado_en],
                             default=datetime.utcnow()).isoformat(),
     }
+
+
+@router.get("/ficha/{muni_key}")
+async def ficha_una(
+    muni_key: str,
+    db: AsyncSession = Depends(get_db),
+    _: CallsUsuario = Depends(usuario_calls),
+):
+    """UNA ficha con todo, incluido el render. Es lo que se pide al abrirla.
+
+    Se separo del listado porque el render pesa: mandarlo para las 2.244 son 20,9 MB que
+    la pagina usa para dibujar cuatro botones de la que esta mirando.
+    """
+    m = (await db.execute(
+        select(CallsMunicipio).where(CallsMunicipio.muni_key == muni_key)
+    )).scalar_one_or_none()
+    if m is None:
+        raise HTTPException(status_code=404, detail="No conozco esa ficha")
+    reg = (await db.execute(
+        select(CallsRegistro).where(CallsRegistro.muni_key == muni_key)
+    )).scalar_one_or_none()
+    eventos = (await db.execute(
+        select(CallsEvento).where(CallsEvento.muni_key == muni_key)
+        .order_by(CallsEvento.creado.asc())
+    )).scalars().all()
+    d = _a_dict(reg) if reg else None
+    if eventos:
+        d = d or {"estado": "", "notas": "", "quien": "", "proximo": "", "telFix": {}}
+        d["hist"] = [{"t": e.creado.isoformat(), "tipo": e.tipo, "txt": e.texto,
+                      "autor": e.autor} for e in eventos]
+    return {"ficha": _ficha_completa(m, d), "db": d or {}}
 
 
 @router.get("/ranking")
