@@ -2508,7 +2508,11 @@ export const cajasApi = {
   pagarTarjeta: (data: {
     tarjeta_caja_id: number;
     caja_origen_id: number;
-    monto: string | number;
+    /** SIN monto = se paga TODO y la tarjeta queda en cero. El total lo calcula
+     *  el backend leyendo la deuda en ese instante, no el navegador: si entró un
+     *  gasto mientras el modal estaba abierto, igual queda en cero exacto.
+     *  Con monto = pago parcial. */
+    monto?: string | number;
     fecha: string;
     concepto?: string;
     descripcion?: string;

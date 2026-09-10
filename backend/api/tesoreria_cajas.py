@@ -298,10 +298,44 @@ async def delete_movimiento(
 class PagoTarjetaRequest(BaseModel):
     tarjeta_caja_id: int                      # caja tipo TARJETA que se paga
     caja_origen_id: int                       # caja real de donde sale la plata
-    monto: Decimal = Field(..., gt=0)
+    # SIN MONTO = PAGUE TODO (dueno, 2026-09-10). El caso normal del cliente es
+    # pagar el resumen entero: "pone pagar tarjeta, graba, y ya le aparece la
+    # tarjeta con el saldo en cero". Si el monto viaja, es un pago PARCIAL.
+    #
+    # Por que lo calcula el backend y no la pantalla: el navegador manda el
+    # numero que tenia cargado cuando abrio el modal. Si entro un gasto en el
+    # medio, ese pago deja la tarjeta cerca de cero, no en cero — y el cliente
+    # ve un resto de $230.000 que no entiende. La deuda se lee de la base en el
+    # mismo instante en que se registra el pago.
+    monto: Optional[Decimal] = Field(None, gt=0)
     fecha: date
     concepto: Optional[str] = None
     descripcion: Optional[str] = None
+
+
+async def _deuda_de_tarjeta(db: AsyncSession, caja_id: int) -> Decimal:
+    """Lo que se debe HOY en esa tarjeta: egresos (compras) menos ingresos (pagos).
+
+    OJO: la deuda NO depende del limite. `saldo_actual` es `limite + ingresos -
+    egresos` y la deuda es `limite - saldo_actual`, asi que el limite se cancela
+    solo. Por eso una tarjeta con limite 0 —el caso de San Pedro Norte, que no
+    quiere administrar cupos— arroja la deuda correcta igual. Calcularla asi,
+    directo, evita depender de un campo que al cliente no le importa cargar.
+    """
+    rows = (await db.execute(
+        select(TesoreriaMovimientoCaja.tipo,
+               func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0))
+        .where(TesoreriaMovimientoCaja.caja_id == caja_id)
+        .group_by(TesoreriaMovimientoCaja.tipo)
+    )).all()
+    ingresos = egresos = Decimal(0)
+    for tipo, total in rows:
+        tipo_val = tipo.value if hasattr(tipo, "value") else tipo
+        if tipo_val == "ingreso":
+            ingresos = Decimal(total)
+        else:
+            egresos = Decimal(total)
+    return egresos - ingresos
 
 
 @router.post("/pagar-tarjeta", status_code=201)
@@ -320,6 +354,10 @@ async def pagar_tarjeta(
 
     NO crea un Gasto: el gasto ya se registro al comprar con la tarjeta. Esto
     solo cancela (total o parcialmente) la deuda acumulada, sin duplicar el gasto.
+
+    **Sin `monto` = se paga TODO** y la tarjeta queda en cero. Con `monto`, es un
+    pago parcial. La pantalla lo dice con todas las letras (un selector Total /
+    Parcial); aca no se deduce nada: o viene el numero, o se paga el resumen.
     """
     _require_admin(current_user)
     muni_id = get_effective_municipio_id(request, current_user)
@@ -345,6 +383,18 @@ async def pagar_tarjeta(
     if es_caja_tarjeta(origen):
         raise HTTPException(422, "No se puede pagar una tarjeta con otra tarjeta")
 
+    # SIN MONTO = PAGUE TODO. La deuda se lee ACA, no en la pantalla, para que
+    # el saldo quede en cero exacto aunque haya entrado un gasto mientras el
+    # modal estaba abierto.
+    deuda = await _deuda_de_tarjeta(db, tarjeta.id)
+    total = payload.monto is None
+    monto = payload.monto if payload.monto is not None else deuda
+
+    if total and deuda <= 0:
+        raise HTTPException(422, f"'{tarjeta.nombre}' no tiene deuda para pagar")
+    if monto <= 0:
+        raise HTTPException(422, "El monto a pagar tiene que ser mayor a cero")
+
     concepto = (payload.concepto or f"Pago de tarjeta {tarjeta.nombre}").strip()[:150]
 
     # INGRESO en la tarjeta: cancela deuda -> sube el credito disponible.
@@ -352,7 +402,7 @@ async def pagar_tarjeta(
         municipio_id=muni_id,
         caja_id=tarjeta.id,
         tipo=TipoMovimientoCaja.INGRESO,
-        monto=payload.monto,
+        monto=monto,
         fecha=payload.fecha,
         concepto=concepto,
         descripcion=payload.descripcion or f"Pago desde {origen.nombre}",
@@ -362,16 +412,20 @@ async def pagar_tarjeta(
         municipio_id=muni_id,
         caja_id=origen.id,
         tipo=TipoMovimientoCaja.EGRESO,
-        monto=payload.monto,
+        monto=monto,
         fecha=payload.fecha,
         concepto=concepto,
         descripcion=payload.descripcion or f"Pago de {tarjeta.nombre}",
     ))
     await db.commit()
 
+    # La pantalla necesita poder decir "quedo en cero" sin volver a preguntar.
     return {
         "ok": True,
-        "monto": str(payload.monto),
+        "monto": str(monto),
+        "total": total,
+        "deuda_previa": str(deuda),
+        "deuda_restante": str(deuda - monto),
         "tarjeta": await _enrich_caja_response(db, tarjeta),
         "caja_origen": await _enrich_caja_response(db, origen),
     }
