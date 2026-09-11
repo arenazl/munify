@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, CheckCircle2, Edit2, Loader2, SkipForward, Trash2, Wallet, X } from 'lucide-react';
+import { Check, CheckCircle2, CreditCard, Edit2, Loader2, SkipForward, Trash2, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,6 +43,16 @@ import {
   contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS_SINGULAR,
 } from '../lib/contactoIcons';
 import { agendaPagosApi, contactosApi, cajasApi, conceptosLiquidacionApi } from '../lib/api';
+import { esCajaTarjeta, montoPrevisto, nombreDestino } from '../lib/pagoProgramado';
+
+/* Un programado paga a un CONTACTO (nace un gasto) o paga una TARJETA (sin
+   gasto, todo lo que deba ese día). La pantalla no calcula: muestra lo que
+   manda el backend. La lectura común vive en lib/pagoProgramado. */
+type Destino = 'contacto' | 'tarjeta';
+const DESTINO_OPTIONS = [
+  { value: 'contacto', label: 'Un contacto (sueldo, proveedor)' },
+  { value: 'tarjeta', label: 'Una tarjeta de crédito' },
+];
 import { clasificarPagos, diasDesdeHoy } from '../lib/tesoreria-helpers';
 import type {
   Caja, Contacto, ConceptoLiquidacion, FrecuenciaPago, PagoEjecutadoHistorial, PagoProgramado,
@@ -248,7 +258,7 @@ export default function PagosProgramados() {
   const [borrando, setBorrando] = useState(false);
 
   const [form, setForm] = useState({
-    contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
+    destino: 'contacto' as Destino, contacto_id: 0, tarjeta_caja_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
     monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual' as FrecuenciaPago,
     dia_del_mes: 5, dia_semana: null as number | null,
     fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
@@ -324,7 +334,8 @@ export default function PagosProgramados() {
       if (conceptoFiltro && p.concepto !== conceptoFiltro) return false;
       if (s) {
         const hay = (p.concepto || '').toLowerCase().includes(s)
-          || (p.contacto_nombre || '').toLowerCase().includes(s);
+          || (p.contacto_nombre || '').toLowerCase().includes(s)
+          || (p.tarjeta_nombre || '').toLowerCase().includes(s);
         if (!hay) return false;
       }
       const dias = diasDesdeHoy(p.proximo_pago);
@@ -373,7 +384,7 @@ export default function PagosProgramados() {
   const seleccionados = useMemo(
     () => filtered.filter(p => seleccion.has(p.id)), [filtered, seleccion]);
   const totalSeleccionado = useMemo(
-    () => seleccionados.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0), [seleccionados]);
+    () => seleccionados.reduce((s, p) => s + montoPrevisto(p), 0), [seleccionados]);
 
   const toggleSeleccion = (id: number) => setSeleccion(prev => {
     const n = new Set(prev);
@@ -410,15 +421,16 @@ export default function PagosProgramados() {
     setEditing(p);
     setForm(p
       ? {
-          contacto_id: p.contacto_id, caja_id: p.caja_id || 0,
+          destino: (p.es_pago_tarjeta ? 'tarjeta' : 'contacto') as Destino,
+          contacto_id: p.contacto_id || 0, tarjeta_caja_id: p.tarjeta_caja_id || 0, caja_id: p.caja_id || 0,
           concepto: p.concepto, descripcion: p.descripcion || '',
-          monto_pesos: String(p.monto_pesos), forma_pago: p.forma_pago,
+          monto_pesos: p.monto_pesos == null ? '' : String(p.monto_pesos), forma_pago: p.forma_pago,
           frecuencia: p.frecuencia, dia_del_mes: p.dia_del_mes, dia_semana: p.dia_semana ?? null,
           fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin || '',
           premios_default: (p.premios_default as number[] | null) || [],
         }
       : {
-          contacto_id: 0, caja_id: 0, concepto: '', descripcion: '',
+          destino: 'contacto' as Destino, contacto_id: 0, tarjeta_caja_id: 0, caja_id: 0, concepto: '', descripcion: '',
           monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual',
           dia_del_mes: 1, dia_semana: null,
           fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
@@ -428,16 +440,22 @@ export default function PagosProgramados() {
   };
 
   const save = async () => {
-    if (!form.contacto_id) return toast.error('Elegí un contacto');
+    const esTarjeta = form.destino === 'tarjeta';
+    if (esTarjeta && !form.tarjeta_caja_id) return toast.error('Elegí la tarjeta');
+    if (esTarjeta && !form.caja_id) return toast.error('Elegí la caja de donde sale la plata');
+    if (esTarjeta && form.caja_id === form.tarjeta_caja_id) return toast.error('La tarjeta y la caja de origen no pueden ser la misma');
+    if (!esTarjeta && !form.contacto_id) return toast.error('Elegí un contacto');
     if (!form.concepto.trim()) return toast.error('Falta concepto');
-    if (!form.monto_pesos || parseFloat(form.monto_pesos) <= 0) return toast.error('Monto inválido');
+    if (!esTarjeta && (!form.monto_pesos || parseFloat(form.monto_pesos) <= 0)) return toast.error('Monto inválido');
     setSaving(true);
     try {
       const payload = {
-        contacto_id: form.contacto_id,
+        contacto_id: esTarjeta ? null : form.contacto_id,
+        tarjeta_caja_id: esTarjeta ? form.tarjeta_caja_id : null,
         caja_id: form.caja_id || null,
         concepto: form.concepto.trim(), descripcion: form.descripcion.trim() || null,
-        monto_pesos: parseFloat(form.monto_pesos), forma_pago: form.forma_pago,
+        // Tarjeta: sin monto, paga todo lo que deba el día del vencimiento.
+        monto_pesos: esTarjeta ? null : parseFloat(form.monto_pesos), forma_pago: form.forma_pago,
         frecuencia: form.frecuencia, dia_del_mes: form.dia_del_mes,
         dia_semana: form.frecuencia === 'semanal' ? (form.dia_semana ?? 4) : null,
         fecha_inicio: form.fecha_inicio, fecha_fin: form.fecha_fin || null,
@@ -479,7 +497,7 @@ export default function PagosProgramados() {
 
   const handleEjecutar = (p: PagoProgramado) => {
     setEjecutarPago(p);
-    setEjecutarMonto(p.monto_pesos);
+    setEjecutarMonto(p.es_pago_tarjeta ? '' : (p.monto_pesos ?? ''));
     // Fecha de impacto = la programada (proximo_pago), no la del clic: un pago
     // del día 4 confirmado el 1 figura en historial como del día 4.
     setEjecutarFecha((p.proximo_pago || '').slice(0, 10) || new Date().toISOString().slice(0, 10));
@@ -491,22 +509,27 @@ export default function PagosProgramados() {
   };
 
   const ejecutarTotal = parseFloat(ejecutarMonto || '0') || 0;
+  const ejecutarEsTarjeta = !!ejecutarPago?.es_pago_tarjeta;
+  const ejecutarDeuda = ejecutarPago ? montoPrevisto(ejecutarPago) : 0;
+  const ejecutarMontoFinal = ejecutarEsTarjeta ? ejecutarDeuda : ejecutarTotal;
 
   const confirmarEjecutar = async () => {
     if (!ejecutarPago) return;
-    if (!ejecutarTotal || ejecutarTotal <= 0) { toast.error('Monto inválido'); return; }
     const pagado = ejecutarPago;
+    if (!pagado.es_pago_tarjeta && (!ejecutarTotal || ejecutarTotal <= 0)) { toast.error('Monto inválido'); return; }
     setExecutingId(pagado.id);
     try {
       const res = await agendaPagosApi.ejecutar(pagado.id, {
         fecha_pago: ejecutarFecha,
-        monto_base: ejecutarMonto,
+        // Tarjeta: sin monto, el backend paga todo lo que deba en ese instante.
+        monto_base: pagado.es_pago_tarjeta ? undefined : ejecutarMonto,
         // Los premios se cargan como liquidaciones independientes (presentismo
         // semanal, incentivo de mitad de mes), no como extras del sueldo.
         premios_aplicados: [],
         notas: ejecutarNotas.trim() || undefined,
       });
-      toast.success(`Pago de ${fmtMoney(res.data.monto_total)} ejecutado`);
+      if (res.data.tipo === 'pago_tarjeta') toast.success(res.data.mensaje || `Tarjeta pagada: ${fmtMoney(res.data.monto_total)}`);
+      else toast.success(`Pago de ${fmtMoney(res.data.monto_total)} ejecutado`);
       setCierre({
         cantidad: 1,
         monto: parseFloat(res.data.monto_total) || 0,
@@ -555,6 +578,19 @@ export default function PagosProgramados() {
 
   const frecuenciaOptions = useMemo(
     () => FRECUENCIAS_SELECCIONABLES.map(f => ({ value: f, label: FRECUENCIA_LABELS[f] })), []);
+
+  // Las tarjetas son cajas con código TARJETA: destino posible de un programado.
+  const tarjetaOptions = useMemo(
+    () => cajas.filter(esCajaTarjeta).map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
+    [cajas]);
+  // De dónde sale la plata para pagar una tarjeta: cualquier caja que no sea otra tarjeta.
+  const cajaOrigenOptions = useMemo(
+    () => cajas.filter(c => !esCajaTarjeta(c)).map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
+    [cajas]);
+  const conceptoTarjeta = (id: number) => {
+    const t = cajas.find(c => c.id === id);
+    return t ? `Pago de tarjeta ${t.nombre}` : 'Pago de tarjeta';
+  };
 
   // Conceptos derivados de los pagos cargados (matchea siempre lo filtrable).
   const conceptoOptions = useMemo(
@@ -667,6 +703,23 @@ export default function PagosProgramados() {
 
   const celdaMonto = (v: string) => <span className="av2-money av2-tabla-monto">{fmtMoney(v)}</span>;
 
+  /** Destino tarjeta: la fila muestra la tarjeta y, en vez de un monto fijo,
+   *  lo que debe hoy (eso es lo que va a salir de la caja al pagar). */
+  const celdaTarjeta = (p: PagoProgramado) => (
+    <EntityCell icon={CreditCard} tileColor={theme.primary} title={nombreDestino(p)}
+      subtitle="Tarjeta de crédito" dotColor={theme.primary} />
+  );
+  const celdaMontoProgramado = (p: PagoProgramado) => {
+    if (!p.es_pago_tarjeta) return celdaMonto(p.monto_pesos || '0');
+    const deuda = parseFloat(p.deuda_actual || '0') || 0;
+    return (
+      <span className="flex flex-col items-end">
+        <span className="av2-money av2-tabla-monto">{fmtMoney(Math.abs(deuda))}</span>
+        <span className="av2-tabla-texto">{deuda > 0 ? 'hoy debe' : deuda < 0 ? 'a favor' : 'sin deuda'}</span>
+      </span>
+    );
+  };
+
   const COL_CONTACTO = { header: 'CONTACTO', width: 'minmax(180px, 1.7fr)', kind: 'entity' } as const;
   const COL_CONCEPTO = { header: 'CONCEPTO', width: 'minmax(160px, 1.4fr)', kind: 'entity' } as const;
   const COL_MONTO = { header: 'MONTO', width: 'minmax(100px, 126px)', kind: 'money', align: 'right' } as const;
@@ -678,7 +731,7 @@ export default function PagosProgramados() {
     return (
       <button
         type="button" role="checkbox" aria-checked={on}
-        aria-label={`Marcar el pago de ${p.contacto_nombre || 'contacto'} para pagar en grupo`}
+        aria-label={`Marcar el pago de ${nombreDestino(p) || 'contacto'} para pagar en grupo`}
         className={on ? 'liq-check liq-check--on' : 'liq-check'}
         onClick={(e) => { e.stopPropagation(); toggleSeleccion(p.id); }}
       >
@@ -728,7 +781,7 @@ export default function PagosProgramados() {
         ));
       },
     },
-    { ...COL_CONTACTO, id: 'contacto_nombre', cell: (p) => celdaContacto(p.contacto_nombre, p.contacto_id) },
+    { ...COL_CONTACTO, id: 'contacto_nombre', cell: (p) => (p.es_pago_tarjeta ? celdaTarjeta(p) : celdaContacto(p.contacto_nombre, p.contacto_id)) },
     {
       ...COL_CONCEPTO, id: 'concepto',
       cell: (p) => (
@@ -741,7 +794,7 @@ export default function PagosProgramados() {
         />
       ),
     },
-    { ...COL_MONTO, id: 'monto_pesos', cell: (p) => celdaMonto(p.monto_pesos) },
+    { ...COL_MONTO, id: 'monto_pesos', cell: (p) => celdaMontoProgramado(p) },
     {
       id: 'acciones', header: 'ACCIONES', width: 'minmax(150px, 162px)',
       kind: 'text', align: 'right', cell: celdaAcciones,
@@ -750,7 +803,7 @@ export default function PagosProgramados() {
 
   const grupos = useMemo(
     () => agruparPorDia<PagoProgramado>(
-      filtered, (p) => p.proximo_pago, (p) => parseFloat(p.monto_pesos || '0'),
+      filtered, (p) => p.proximo_pago, (p) => montoPrevisto(p),
       // "1 de agosto" arriba y "5 pagos · venció hace 1 día" abajo — un día =
       // una transferencia. El día que ya venció va en rojo (insignia incluida);
       // el que vence hoy, en ámbar. Los de más adelante quedan neutros: no hay
@@ -836,13 +889,13 @@ export default function PagosProgramados() {
         </button>
       )}
       <button type="button" className={completo ? 'av2-tabla-accion ml-auto' : 'av2-tabla-accion'}
-        title="Editar" aria-label={`Editar el pago de ${p.contacto_nombre || 'contacto'}`}
+        title="Editar" aria-label={`Editar el pago de ${nombreDestino(p) || 'contacto'}`}
         onClick={() => openSheet(p)}>
         <Edit2 size={16} strokeWidth={1.8} />
       </button>
       {completo && (
         <button type="button" className="av2-tabla-accion av2-tabla-accion--peligro"
-          title="Eliminar" aria-label={`Eliminar el pago de ${p.contacto_nombre || 'contacto'}`}
+          title="Eliminar" aria-label={`Eliminar el pago de ${nombreDestino(p) || 'contacto'}`}
           onClick={() => setBorrarPago(p)}>
           <Trash2 size={16} strokeWidth={1.8} />
         </button>
@@ -862,14 +915,17 @@ export default function PagosProgramados() {
               <EntityCell
                 icon={conceptoIcon(p.concepto)}
                 tileColor={colorFrecuencia[p.frecuencia]}
-                title={p.contacto_nombre || 'Contacto'}
+                title={nombreDestino(p) || 'Contacto'}
                 subtitle={p.concepto}
               />
               <span className="ml-auto">
                 <ChipEstado label={FRECUENCIA_LABELS[p.frecuencia]} tone={FRECUENCIA_TONO[p.frecuencia]} />
               </span>
             </div>
-            <span className="av2-money av2-tabla-monto">{fmtMoney(p.monto_pesos)}</span>
+            <span className="av2-money av2-tabla-monto">
+              {p.es_pago_tarjeta ? <span className="av2-tabla-texto">hoy debe </span> : null}
+              {fmtMoney(montoPrevisto(p))}
+            </span>
             <span className="av2-panel-caption">
               {fmtFecha(p.proximo_pago)} ·{' '}
               <span className={dias < 0 ? 'av2-money--bad' : dias <= 7 ? 'liq-warn' : undefined}>
@@ -890,10 +946,10 @@ export default function PagosProgramados() {
       items={filtered}
       getId={(p) => p.id}
       getDate={(p) => p.proximo_pago}
-      getLabel={(p) => (p.contacto_nombre || '').split(' ')[0]}
-      getAmount={(p) => parseFloat(p.monto_pesos)}
+      getLabel={(p) => (nombreDestino(p) || '').split(' ')[0]}
+      getAmount={(p) => montoPrevisto(p)}
       getColor={(p) => colorFrecuencia[p.frecuencia]}
-      getTooltip={(p) => `${p.contacto_nombre} · ${p.concepto} · ${fmtMoney(p.monto_pesos)}`}
+      getTooltip={(p) => `${nombreDestino(p)} · ${p.concepto} · ${fmtMoney(montoPrevisto(p))}`}
       onItemClick={(p) => openSheet(p)}
       onItemDrop={(p, newIso) => handleMoverPago(p, newIso)}
       mesesStorageKey="agenda_meses_visibles"
@@ -904,10 +960,10 @@ export default function PagosProgramados() {
           <EntityCell
             icon={conceptoIcon(p.concepto)}
             tileColor={colorFrecuencia[p.frecuencia]}
-            title={p.contacto_nombre || 'Contacto'}
+            title={nombreDestino(p) || 'Contacto'}
             subtitle={`${p.concepto} · ${fmtFecha(p.proximo_pago)}`}
           />
-          <span className="av2-money av2-tabla-monto ml-auto">{fmtMoney(p.monto_pesos)}</span>
+          <span className="av2-money av2-tabla-monto ml-auto">{fmtMoney(montoPrevisto(p))}</span>
           {botonesFila(p, false)}
         </div>
       )}
@@ -1040,11 +1096,11 @@ export default function PagosProgramados() {
       <Sheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        title={editing ? `Editar pago · ${editing.contacto_nombre}` : 'Nuevo pago'}
+        title={editing ? `Editar pago · ${nombreDestino(editing)}` : 'Nuevo pago'}
         description="Pago recurrente"
         customHeader={headSheet(
           `Pagos programados · ${editing ? 'Edición' : 'Alta'}`,
-          editing ? editing.contacto_nombre || 'Editar pago' : 'Nuevo pago',
+          editing ? nombreDestino(editing) || 'Editar pago' : 'Nuevo pago',
           'Un pago programado se repite solo. Definís a quién, cuánto y cada cuánto; el sistema calcula el próximo vencimiento y te avisa cuándo toca.',
           () => setSheetOpen(false),
         )}
@@ -1054,16 +1110,43 @@ export default function PagosProgramados() {
         )}
       >
         <div className="av2-form-grid">
-          <div className="av2-field av2-field--full">
-            <span className="av2-field-label">Contacto<span className="av2-field-req" aria-hidden>*</span></span>
-            <ModernSelect variant="v2" value={form.contacto_id ? String(form.contacto_id) : ''}
-              onChange={(v) => setForm(f => ({ ...f, contacto_id: parseInt(v, 10) }))}
-              options={contactoOptions} placeholder="Elegir contacto…" searchable />
-          </div>
+          {/* Destino: sólo se ofrece elegir si el municipio tiene alguna tarjeta. */}
+          {tarjetaOptions.length > 0 && (
+            <div className="av2-field av2-field--full">
+              <span className="av2-field-label">A quién se paga</span>
+              <ModernSelect variant="v2" value={form.destino}
+                onChange={(v) => setForm(f => ({
+                  ...f,
+                  destino: v as Destino,
+                  concepto: v === 'tarjeta' ? conceptoTarjeta(f.tarjeta_caja_id) : (f.concepto.startsWith('Pago de tarjeta') ? '' : f.concepto),
+                }))}
+                options={DESTINO_OPTIONS} />
+            </div>
+          )}
+
+          {form.destino === 'tarjeta' ? (
+            <div className="av2-field av2-field--full">
+              <span className="av2-field-label">Tarjeta<span className="av2-field-req" aria-hidden>*</span></span>
+              <ModernSelect variant="v2" value={form.tarjeta_caja_id ? String(form.tarjeta_caja_id) : ''}
+                onChange={(v) => { const id = parseInt(v, 10); setForm(f => ({ ...f, tarjeta_caja_id: id, concepto: conceptoTarjeta(id) })); }}
+                options={tarjetaOptions} placeholder="Elegir tarjeta…" />
+              <p className="av2-field-ayuda">
+                Cada vencimiento paga todo lo que la tarjeta deba ese día y la deja en cero. No nace un
+                gasto: las compras ya se registraron como gasto al pagarlas con la tarjeta.
+              </p>
+            </div>
+          ) : (
+            <div className="av2-field av2-field--full">
+              <span className="av2-field-label">Contacto<span className="av2-field-req" aria-hidden>*</span></span>
+              <ModernSelect variant="v2" value={form.contacto_id ? String(form.contacto_id) : ''}
+                onChange={(v) => setForm(f => ({ ...f, contacto_id: parseInt(v, 10) }))}
+                options={contactoOptions} placeholder="Elegir contacto…" searchable />
+            </div>
+          )}
 
           <div className="av2-field av2-field--full">
             <span className="av2-field-label">Concepto<span className="av2-field-req" aria-hidden>*</span></span>
-            {conceptosLiq.length > 0 ? (
+            {conceptosLiq.length > 0 && form.destino !== 'tarjeta' ? (
               <ModernSelect
                 variant="v2"
                 value={form.concepto}
@@ -1092,25 +1175,41 @@ export default function PagosProgramados() {
               <>
                 <input value={form.concepto} aria-label="Concepto del pago" style={ESTILO_INPUT}
                   onChange={(e) => setForm(f => ({ ...f, concepto: e.target.value }))} />
-                <p className="av2-field-ayuda">
-                  Cargá conceptos en Configuración → Tesorería → Conceptos de liquidación.
-                </p>
+                {form.destino !== 'tarjeta' && (
+                  <p className="av2-field-ayuda">
+                    Cargá conceptos en Configuración → Tesorería → Conceptos de liquidación.
+                  </p>
+                )}
               </>
             )}
           </div>
 
-          <div className="av2-field">
-            <span className="av2-field-label">Monto<span className="av2-field-req" aria-hidden>*</span></span>
-            <MoneyInput value={form.monto_pesos} onChange={(v) => setForm(f => ({ ...f, monto_pesos: v }))}
-              style={{ ...ESTILO_INPUT, fontVariantNumeric: 'tabular-nums' }} />
-          </div>
+          {form.destino === 'tarjeta' ? (
+            <div className="av2-field">
+              <span className="av2-field-label">Monto</span>
+              <p className="av2-field-ayuda">
+                Todo lo que deba ese día. Un resumen cambia todos los meses, por eso no se fija un
+                número; si un mes no hubo compras, el vencimiento se saltea solo.
+              </p>
+            </div>
+          ) : (
+            <div className="av2-field">
+              <span className="av2-field-label">Monto<span className="av2-field-req" aria-hidden>*</span></span>
+              <MoneyInput value={form.monto_pesos} onChange={(v) => setForm(f => ({ ...f, monto_pesos: v }))}
+                style={{ ...ESTILO_INPUT, fontVariantNumeric: 'tabular-nums' }} />
+            </div>
+          )}
 
           <div className="av2-field">
-            <span className="av2-field-label">Caja</span>
+            <span className="av2-field-label">
+              {form.destino === 'tarjeta'
+                ? <>Sale de la caja<span className="av2-field-req" aria-hidden>*</span></>
+                : 'Caja'}
+            </span>
             <ModernSelect variant="v2" value={String(form.caja_id)}
               onChange={(v) => setForm(f => ({ ...f, caja_id: parseInt(v, 10) }))}
-              options={[{ value: '0', label: 'Sin caja específica' }, ...cajaOptions]}
-              placeholder="Sin caja" searchable />
+              options={form.destino === 'tarjeta' ? cajaOrigenOptions : [{ value: '0', label: 'Sin caja específica' }, ...cajaOptions]}
+              placeholder={form.destino === 'tarjeta' ? 'Elegir caja…' : 'Sin caja'} searchable />
           </div>
 
           <div className="av2-field">
@@ -1169,12 +1268,12 @@ export default function PagosProgramados() {
         open={!!ejecutarPago}
         onClose={cerrarEjecutar}
         title="Ejecutar pago programado"
-        description={ejecutarPago?.contacto_nombre || ''}
+        description={ejecutarPago ? nombreDestino(ejecutarPago) : ''}
         customHeader={ejecutarPago
           ? headSheet(
               `Pago programado · ${FRECUENCIA_LABELS[ejecutarPago.frecuencia]}`,
-              ejecutarPago.contacto_nombre || 'Ejecutar pago',
-              `${ejecutarPago.concepto} · vence el ${fmtFecha(ejecutarPago.proximo_pago)} · caja ${ejecutarPago.caja_nombre || 'sin asignar'} · base ${fmtMoney(ejecutarPago.monto_pesos)}`,
+              nombreDestino(ejecutarPago) || 'Ejecutar pago',
+              `${ejecutarPago.concepto} · vence el ${fmtFecha(ejecutarPago.proximo_pago)} · caja ${ejecutarPago.caja_nombre || 'sin asignar'} · ${ejecutarEsTarjeta ? `hoy debe ${fmtMoney(ejecutarDeuda)}` : `base ${fmtMoney(ejecutarPago.monto_pesos || '0')}`}`,
               cerrarEjecutar,
             )
           : undefined}
@@ -1184,18 +1283,29 @@ export default function PagosProgramados() {
             {executingId === ejecutarPago?.id
               ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               : <CheckCircle2 className="h-4 w-4" aria-hidden />}
-            Confirmar pago · {fmtMoney(ejecutarTotal)}
+            {ejecutarEsTarjeta ? (ejecutarDeuda > 0 ? 'Pagar todo' : 'Sin deuda · saltear') : 'Confirmar pago'} · {fmtMoney(ejecutarMontoFinal)}
           </>,
         )}
       >
         {ejecutarPago && (
           <div className="av2-form-grid">
-            <div className="av2-field av2-field--full">
-              <span className="av2-field-label">Monto base del mes</span>
-              <MoneyInput value={ejecutarMonto} onChange={setEjecutarMonto}
-                style={{ ...ESTILO_INPUT, height: 40, fontSize: 'var(--pl-fs-hero-line)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }} />
-              <p className="av2-field-ayuda">Si el monto de este mes es distinto al programado, ajustalo acá.</p>
-            </div>
+            {ejecutarEsTarjeta ? (
+              <div className="av2-field av2-field--full">
+                <span className="av2-field-label">Se paga todo lo que deba hoy</span>
+                <p className="av2-field-ayuda">
+                  {ejecutarDeuda > 0
+                    ? `${fmtMoney(ejecutarDeuda)} salen de ${ejecutarPago.caja_nombre || 'la caja asignada'} y la tarjeta queda en cero. El monto exacto lo lee el sistema al grabar, por si entró una compra mientras tanto.`
+                    : 'La tarjeta no debe nada: se saltea este período sin mover plata.'}
+                </p>
+              </div>
+            ) : (
+              <div className="av2-field av2-field--full">
+                <span className="av2-field-label">Monto base del mes</span>
+                <MoneyInput value={ejecutarMonto} onChange={setEjecutarMonto}
+                  style={{ ...ESTILO_INPUT, height: 40, fontSize: 'var(--pl-fs-hero-line)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }} />
+                <p className="av2-field-ayuda">Si el monto de este mes es distinto al programado, ajustalo acá.</p>
+              </div>
+            )}
 
             <div className="av2-field av2-field--full">
               <span className="av2-field-label">Fecha del pago</span>
@@ -1214,7 +1324,7 @@ export default function PagosProgramados() {
               <div className="av2-panel-head">
                 <Wallet size={18} aria-hidden />
                 <span className="av2-panel-titulo">Total a pagar</span>
-                <span className="av2-money av2-tabla-monto ml-auto">{fmtMoney(ejecutarTotal)}</span>
+                <span className="av2-money av2-tabla-monto ml-auto">{fmtMoney(ejecutarMontoFinal)}</span>
               </div>
             </div>
           </div>
@@ -1228,7 +1338,7 @@ export default function PagosProgramados() {
         variant="warning"
         title="Omitir este período"
         message={omitirPago
-          ? `¿Omitir el pago de "${omitirPago.contacto_nombre}" del ${fmtFecha(omitirPago.proximo_pago)}? Se avanza al siguiente período sin generar gasto ni descontar la caja.`
+          ? `¿Omitir el pago de "${nombreDestino(omitirPago)}" del ${fmtFecha(omitirPago.proximo_pago)}? Se avanza al siguiente período sin generar gasto ni descontar la caja.`
           : ''}
         confirmText="Omitir período"
         cancelText="Cancelar"
@@ -1244,7 +1354,7 @@ export default function PagosProgramados() {
         variant="danger"
         title="Eliminar el pago programado"
         message={borrarPago
-          ? `Se elimina el pago programado de "${borrarPago.contacto_nombre}" (${borrarPago.concepto} · ${fmtMoney(borrarPago.monto_pesos)}). Los pagos ya ejecutados quedan como están.`
+          ? `Se elimina el pago programado de "${nombreDestino(borrarPago)}" (${borrarPago.concepto} · ${fmtMoney(montoPrevisto(borrarPago))}). Los pagos ya ejecutados quedan como están.`
           : ''}
         confirmText="Eliminar"
         cancelText="Cancelar"

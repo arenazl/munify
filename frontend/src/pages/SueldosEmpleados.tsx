@@ -60,7 +60,8 @@ export default function SueldosEmpleados() {
   // Mapa contacto_id -> pago_programado (si tiene)
   const pagoPorContacto = useMemo(() => {
     const m = new Map<number, PagoProgramado>();
-    pagosProg.forEach(p => m.set(p.contacto_id, p));
+    // Un programado de TARJETA no tiene contacto: no es el sueldo de nadie.
+    pagosProg.forEach(p => { if (p.contacto_id) m.set(p.contacto_id, p); });
     return m;
   }, [pagosProg]);
 
@@ -210,7 +211,7 @@ export default function SueldosEmpleados() {
                 <div className="text-right flex-shrink-0 hidden sm:block">
                   <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Sueldo base</p>
                   <p className="text-base font-bold tabular-nums" style={{ color: theme.text }}>
-                    {fmtMoney(pago.monto_pesos)}
+                    {fmtMoney(pago.monto_pesos || '0')}
                   </p>
                   <p className="text-[10px]" style={{ color: theme.textSecondary }}>
                     {pago.frecuencia} · próx {pago.proximo_pago}

@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy import select, func, update, or_
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -16,6 +15,9 @@ from models import (
     Contacto, Gasto, GastoCuota, TesoreriaPremio, User, RolUsuario,
 )
 from models.gasto import EstadoGastoCuota
+from services.tesoreria_tarjeta import (
+    PagoTarjetaError, cargar_tarjeta_y_origen, deudas_de_tarjetas, registrar_pago_tarjeta,
+)
 from schemas.tesoreria_extra import (
     PagoProgramadoCreate, PagoProgramadoUpdate, PagoProgramadoResponse,
     EjecutarPagoRequest, EjecutarPagoResponse, PremioAplicado,
@@ -96,13 +98,21 @@ def _calcular_fecha_inicio_premio(hoy: date, frecuencia: FrecuenciaPago, dia_sem
 async def _enrich(db: AsyncSession, pp: TesoreriaPagoProgramado) -> PagoProgramadoResponse:
     """Enrich de UN solo PagoProgramado. Para listas usar _enrich_bulk (evita N+1)."""
     resp = PagoProgramadoResponse.model_validate(pp)
-    c = (await db.execute(select(Contacto).where(Contacto.id == pp.contacto_id))).scalar_one_or_none()
-    if c:
-        resp.contacto_nombre = f"{c.nombre} {c.apellido or ''}".strip()
+    if pp.contacto_id:
+        c = (await db.execute(select(Contacto).where(Contacto.id == pp.contacto_id))).scalar_one_or_none()
+        if c:
+            resp.contacto_nombre = f"{c.nombre} {c.apellido or ''}".strip()
     if pp.caja_id:
         caja = (await db.execute(select(TesoreriaCaja).where(TesoreriaCaja.id == pp.caja_id))).scalar_one_or_none()
         if caja:
             resp.caja_nombre = caja.nombre
+    if pp.tarjeta_caja_id:
+        tarjeta = (await db.execute(
+            select(TesoreriaCaja).where(TesoreriaCaja.id == pp.tarjeta_caja_id)
+        )).scalar_one_or_none()
+        resp.es_pago_tarjeta = True
+        resp.tarjeta_nombre = tarjeta.nombre if tarjeta else None
+        resp.deuda_actual = (await deudas_de_tarjetas(db, {pp.tarjeta_caja_id})).get(pp.tarjeta_caja_id)
     return resp
 
 
@@ -113,7 +123,8 @@ async def _enrich_bulk(
     if not pagos:
         return []
     contacto_ids = {p.contacto_id for p in pagos if p.contacto_id}
-    caja_ids = {p.caja_id for p in pagos if p.caja_id}
+    tarjeta_ids = {p.tarjeta_caja_id for p in pagos if p.tarjeta_caja_id}
+    caja_ids = {p.caja_id for p in pagos if p.caja_id} | tarjeta_ids
 
     contactos_map: dict[int, str] = {}
     if contacto_ids:
@@ -129,14 +140,50 @@ async def _enrich_bulk(
         )).all()
         cajas_map = {cid: nom for cid, nom in rows}
 
+    # Una sola query agrupada para todas las tarjetas: lo que debe cada una HOY.
+    deudas = await deudas_de_tarjetas(db, tarjeta_ids)
+
     out: list[PagoProgramadoResponse] = []
     for p in pagos:
         resp = PagoProgramadoResponse.model_validate(p)
-        resp.contacto_nombre = contactos_map.get(p.contacto_id)
+        resp.contacto_nombre = contactos_map.get(p.contacto_id) if p.contacto_id else None
         if p.caja_id:
             resp.caja_nombre = cajas_map.get(p.caja_id)
+        if p.tarjeta_caja_id:
+            resp.es_pago_tarjeta = True
+            resp.tarjeta_nombre = cajas_map.get(p.tarjeta_caja_id)
+            resp.deuda_actual = deudas.get(p.tarjeta_caja_id)
         out.append(resp)
     return out
+
+
+async def _validar_destino(
+    db: AsyncSession, muni_id: int,
+    contacto_id: Optional[int], tarjeta_caja_id: Optional[int], caja_id: Optional[int],
+    monto_pesos,
+) -> None:
+    """Exactamente UN destino, y que exista en este municipio.
+
+    Contacto: nace un gasto al ejecutar, y necesita monto. Tarjeta: se paga la
+    tarjeta desde `caja_id` (obligatoria, no puede ser otra tarjeta); sin monto
+    significa "todo lo que deba ese dia". Las validaciones de cajas son las
+    mismas del modal "Pagar tarjeta", una sola implementacion.
+    """
+    if (contacto_id is None) == (tarjeta_caja_id is None):
+        raise HTTPException(422, "Elegi un destino: un contacto o una tarjeta, no ambos ni ninguno")
+    if contacto_id is not None:
+        c = (await db.execute(
+            select(Contacto).where(Contacto.id == contacto_id, Contacto.municipio_id == muni_id)
+        )).scalar_one_or_none()
+        if not c:
+            raise HTTPException(422, "Contacto invalido para este municipio")
+        if monto_pesos is None:
+            raise HTTPException(422, "Falta el monto del pago")
+        return
+    try:
+        await cargar_tarjeta_y_origen(db, muni_id, tarjeta_caja_id, caja_id)
+    except PagoTarjetaError as e:
+        raise HTTPException(e.status, e.detail)
 
 
 @router.get("", response_model=List[PagoProgramadoResponse])
@@ -172,12 +219,9 @@ async def create_pago(
 ):
     _require_admin(current_user)
     muni_id = get_effective_municipio_id(request, current_user)
-    # Validar contacto
-    c = (await db.execute(
-        select(Contacto).where(Contacto.id == payload.contacto_id, Contacto.municipio_id == muni_id)
-    )).scalar_one_or_none()
-    if not c:
-        raise HTTPException(422, "Contacto invalido para este municipio")
+    await _validar_destino(
+        db, muni_id, payload.contacto_id, payload.tarjeta_caja_id, payload.caja_id, payload.monto_pesos,
+    )
 
     # Calcular proximo_pago inicial = primer vencimiento >= fecha_inicio.
     # While y no if: con fecha_inicio a fin de mes, UN solo avance podia
@@ -351,6 +395,24 @@ async def update_pago(
         raise HTTPException(404, "No encontrado")
 
     data = payload.model_dump(exclude_unset=True)
+
+    # Si cambia el destino, el origen o el monto, se valida el CONJUNTO final
+    # (lo que viene pisado sobre lo que ya tenia): un solo destino, cajas
+    # reales, monto presente si es contacto. Cambiar de contacto a tarjeta
+    # limpia el otro lado solo, para que nunca queden los dos cargados.
+    if {"contacto_id", "tarjeta_caja_id", "caja_id", "monto_pesos"} & data.keys():
+        if data.get("tarjeta_caja_id"):
+            data["contacto_id"] = None
+        elif data.get("contacto_id"):
+            data["tarjeta_caja_id"] = None
+        await _validar_destino(
+            db, muni_id,
+            data.get("contacto_id", pp.contacto_id),
+            data.get("tarjeta_caja_id", pp.tarjeta_caja_id),
+            data.get("caja_id", pp.caja_id),
+            data.get("monto_pesos", pp.monto_pesos),
+        )
+
     # Detectar si cambian campos que afectan al proximo_pago. Solo recalculamos
     # cuando la liquidacion todavia NO se ejecuto (ultimo_pago IS NULL). Si ya
     # hubo pagos previos respetamos la secuencia que el sistema vino llevando
@@ -396,6 +458,68 @@ async def delete_pago(
     pp.activo = False
     await db.commit()
     return {"ok": True, "id": pp_id}
+
+
+def _avanzar_periodo(pp: TesoreriaPagoProgramado) -> None:
+    """Corre `proximo_pago` un periodo y apaga el programado si paso su fin."""
+    pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
+    if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
+        pp.activo = False
+
+
+def _monto_tarjeta(pp: TesoreriaPagoProgramado, override) -> Optional[Decimal]:
+    """None = pagar todo lo que deba ese dia. Un numero = pago parcial fijo."""
+    if override is not None:
+        return Decimal(str(override))
+    if pp.monto_pesos is not None:
+        return Decimal(str(pp.monto_pesos))
+    return None
+
+
+def _mensaje_tarjeta(nombre: str, res) -> str:
+    if res.omitido:
+        return f"'{nombre}' no tenia deuda: se salteo el periodo sin mover plata"
+    if res.deuda_restante <= 0:
+        return f"'{nombre}' queda en cero"
+    return f"'{nombre}' sigue debiendo ${res.deuda_restante:,.2f}"
+
+
+async def _ejecutar_pago_tarjeta(
+    db: AsyncSession, muni_id: int, pp: TesoreriaPagoProgramado, fecha: date, monto_override,
+) -> EjecutarPagoResponse:
+    """Rama TARJETA de /ejecutar. Llega con el claim de `ultimo_pago` ya hecho.
+
+    No nace ningun gasto: las compras ya son gastos. Se registran los dos
+    movimientos (ingreso en la tarjeta, egreso en la caja de origen) por lo
+    que se deba en este instante, y el periodo avanza. Si la tarjeta no debe
+    nada, el periodo avanza igual sin mover plata: un mes sin compras no es
+    un error, es un mes sin compras.
+    """
+    try:
+        tarjeta, origen = await cargar_tarjeta_y_origen(db, muni_id, pp.tarjeta_caja_id, pp.caja_id)
+        res = await registrar_pago_tarjeta(
+            db, muni_id, tarjeta, origen, _monto_tarjeta(pp, monto_override), fecha,
+            concepto=pp.concepto, descripcion=pp.descripcion or None,
+            pago_programado_id=pp.id, sin_deuda="omitir",
+        )
+    except PagoTarjetaError as e:
+        # Sin commit, el claim de ultimo_pago se descarta con la sesion.
+        raise HTTPException(e.status, e.detail)
+
+    _avanzar_periodo(pp)
+    await db.commit()
+    return EjecutarPagoResponse(
+        ok=True,
+        tipo="pago_tarjeta",
+        gasto_id=None,
+        monto_total=res.monto,
+        monto_base=res.monto,
+        proximo_pago=pp.proximo_pago.isoformat() if pp.activo else None,
+        deuda_previa=res.deuda_previa,
+        deuda_restante=res.deuda_restante,
+        omitido=res.omitido,
+        mensaje=_mensaje_tarjeta(tarjeta.nombre, res),
+    )
 
 
 @router.post("/{pp_id}/ejecutar", response_model=EjecutarPagoResponse)
@@ -456,6 +580,9 @@ async def ejecutar_pago(
             f"Este período ya fue pagado (último pago: {pp.ultimo_pago}). "
             "Si es un pago extra del mismo día, usá una fecha de pago posterior.",
         )
+
+    if pp.tarjeta_caja_id:
+        return await _ejecutar_pago_tarjeta(db, muni_id, pp, fecha, payload.monto_base)
 
     monto_base = Decimal(str(payload.monto_base)) if payload.monto_base is not None else Decimal(str(pp.monto_pesos))
 
@@ -607,6 +734,17 @@ async def ejecutar_pagos_masivo(
             continue
         fecha = pp.proximo_pago or date.today()
 
+        # Tarjeta: las cajas se validan ANTES del claim. Si algo esta mal, el
+        # item falla sin haber tocado `ultimo_pago` (el commit final es de
+        # todos juntos, y un claim sin pago seria un periodo "pagado" en falso).
+        cajas_tarjeta = None
+        if pp.tarjeta_caja_id:
+            try:
+                cajas_tarjeta = await cargar_tarjeta_y_origen(db, muni_id, pp.tarjeta_caja_id, pp.caja_id)
+            except PagoTarjetaError as e:
+                items.append(EjecutarMasivoItem(pago_id=pid, ok=False, tipo="pago_tarjeta", error=e.detail))
+                continue
+
         # Mismo claim atómico anti doble-ejecución que en /ejecutar
         claim = await db.execute(
             update(TesoreriaPagoProgramado)
@@ -624,6 +762,22 @@ async def ejecutar_pagos_masivo(
                 pago_id=pid, ok=False,
                 error=f"Período ya pagado (último pago: {pp.ultimo_pago})",
             ))
+            continue
+
+        if cajas_tarjeta is not None:
+            tarjeta, origen = cajas_tarjeta
+            # Con sin_deuda="omitir" y monto validado > 0 esto no puede fallar.
+            res = await registrar_pago_tarjeta(
+                db, muni_id, tarjeta, origen, _monto_tarjeta(pp, None), fecha,
+                concepto=pp.concepto, descripcion=pp.descripcion or None,
+                pago_programado_id=pp.id, sin_deuda="omitir",
+            )
+            _avanzar_periodo(pp)
+            items.append(EjecutarMasivoItem(
+                pago_id=pid, ok=True, tipo="pago_tarjeta", monto=res.monto, omitido=res.omitido,
+            ))
+            monto_total_acum += res.monto
+            exitosos += 1
             continue
 
         monto = Decimal(str(pp.monto_pesos))
@@ -659,7 +813,7 @@ async def ejecutar_pagos_masivo(
         pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
         if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
             pp.activo = False
-        items.append(EjecutarMasivoItem(pago_id=pid, ok=True, gasto_id=gasto.id))
+        items.append(EjecutarMasivoItem(pago_id=pid, ok=True, gasto_id=gasto.id, monto=monto))
         monto_total_acum += monto
         exitosos += 1
 
@@ -756,10 +910,27 @@ async def historial_pagos(
 
     gastos = list((await db.execute(q)).scalars().all())
 
+    # Pagos de TARJETA hechos desde la agenda: no tienen gasto, son el INGRESO
+    # en la caja-tarjeta con `pago_programado_id`. Entran al mismo historial.
+    qm = select(TesoreriaMovimientoCaja).where(
+        TesoreriaMovimientoCaja.municipio_id == muni_id,
+        TesoreriaMovimientoCaja.pago_programado_id.is_not(None),
+        TesoreriaMovimientoCaja.tipo == TipoMovimientoCaja.INGRESO,
+        TesoreriaMovimientoCaja.fecha >= desde,
+    )
+    if hasta:
+        qm = qm.where(TesoreriaMovimientoCaja.fecha <= hasta)
+    if caja_id:
+        qm = qm.where(TesoreriaMovimientoCaja.caja_id == caja_id)
+    if pago_programado_id:
+        qm = qm.where(TesoreriaMovimientoCaja.pago_programado_id == pago_programado_id)
+    qm = qm.order_by(TesoreriaMovimientoCaja.fecha.desc(), TesoreriaMovimientoCaja.id.desc()).limit(limit)
+    pagos_tarjeta = [] if contacto_id else list((await db.execute(qm)).scalars().all())
+
     # Enriquecer con nombres
     contacto_ids = {g.destino_contacto_id for g in gastos if g.destino_contacto_id}
-    caja_ids = {g.caja_id for g in gastos if g.caja_id}
-    pp_ids = {g.pago_programado_id for g in gastos if g.pago_programado_id}
+    caja_ids = {g.caja_id for g in gastos if g.caja_id} | {m.caja_id for m in pagos_tarjeta}
+    pp_ids = {g.pago_programado_id for g in gastos if g.pago_programado_id} | {m.pago_programado_id for m in pagos_tarjeta}
     contactos_map = {}
     cajas_map = {}
     pp_map = {}
@@ -771,11 +942,43 @@ async def historial_pagos(
         cajas_map = {c.id: {"nombre": c.nombre, "color": c.color} for c in rows}
     if pp_ids:
         rows = (await db.execute(select(TesoreriaPagoProgramado).where(TesoreriaPagoProgramado.id.in_(pp_ids)))).scalars().all()
-        pp_map = {p.id: {"concepto": p.concepto, "frecuencia": p.frecuencia.value if hasattr(p.frecuencia, "value") else str(p.frecuencia)} for p in rows}
+        pp_map = {p.id: {"concepto": p.concepto, "frecuencia": p.frecuencia.value if hasattr(p.frecuencia, "value") else str(p.frecuencia), "caja_id": p.caja_id} for p in rows}
+        origen_ids = {v["caja_id"] for v in pp_map.values() if v.get("caja_id")} - set(cajas_map)
+        if origen_ids:
+            rows = (await db.execute(select(TesoreriaCaja).where(TesoreriaCaja.id.in_(origen_ids)))).scalars().all()
+            cajas_map.update({c.id: {"nombre": c.nombre, "color": c.color} for c in rows})
 
-    return [
+    def _origen(m):
+        return pp_map.get(m.pago_programado_id, {}).get("caja_id")
+
+    # El id negativo distingue un pago de tarjeta (movimiento) de un gasto sin
+    # chocar claves en la pantalla, que los mezcla en una sola lista.
+    filas_tarjeta = [
+        {
+            "id": -m.id,
+            "tipo": "pago_tarjeta",
+            "fecha": m.fecha.isoformat(),
+            "monto_pesos": str(m.monto),
+            "concepto": m.concepto,
+            "descripcion": m.descripcion,
+            "forma_pago": "transferencia",
+            "contacto_id": None,
+            "contacto_nombre": f"Tarjeta {cajas_map.get(m.caja_id, {}).get('nombre') or ''}".strip(),
+            "tarjeta_id": m.caja_id,
+            "tarjeta_nombre": cajas_map.get(m.caja_id, {}).get("nombre"),
+            "caja_id": _origen(m),
+            "caja_nombre": cajas_map.get(_origen(m), {}).get("nombre"),
+            "caja_color": cajas_map.get(_origen(m), {}).get("color"),
+            "pago_programado_id": m.pago_programado_id,
+            "pp_frecuencia": pp_map.get(m.pago_programado_id, {}).get("frecuencia"),
+        }
+        for m in pagos_tarjeta
+    ]
+
+    filas_gasto = [
         {
             "id": g.id,
+            "tipo": "gasto",
             "fecha": g.fecha.isoformat(),
             "monto_pesos": str(g.monto_pesos),
             "concepto": g.concepto,
@@ -791,6 +994,9 @@ async def historial_pagos(
         }
         for g in gastos
     ]
+    filas = filas_gasto + filas_tarjeta
+    filas.sort(key=lambda f: (f["fecha"], abs(f["id"])), reverse=True)
+    return filas[:limit]
 
 
 @router.get("/reportes")

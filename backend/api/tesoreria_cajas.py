@@ -16,9 +16,12 @@ from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import (
-    TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja, User, RolUsuario,
+    TesoreriaCaja, TesoreriaMovimientoCaja, User, RolUsuario,
 )
 from models.tesoreria_extra import es_caja_tarjeta
+from services.tesoreria_tarjeta import (
+    PagoTarjetaError, cargar_tarjeta_y_origen, registrar_pago_tarjeta,
+)
 from schemas.tesoreria_extra import (
     CajaCreate, CajaUpdate, CajaResponse,
     MovimientoCajaCreate, MovimientoCajaResponse,
@@ -313,31 +316,6 @@ class PagoTarjetaRequest(BaseModel):
     descripcion: Optional[str] = None
 
 
-async def _deuda_de_tarjeta(db: AsyncSession, caja_id: int) -> Decimal:
-    """Lo que se debe HOY en esa tarjeta: egresos (compras) menos ingresos (pagos).
-
-    OJO: la deuda NO depende del limite. `saldo_actual` es `limite + ingresos -
-    egresos` y la deuda es `limite - saldo_actual`, asi que el limite se cancela
-    solo. Por eso una tarjeta con limite 0 —el caso de San Pedro Norte, que no
-    quiere administrar cupos— arroja la deuda correcta igual. Calcularla asi,
-    directo, evita depender de un campo que al cliente no le importa cargar.
-    """
-    rows = (await db.execute(
-        select(TesoreriaMovimientoCaja.tipo,
-               func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0))
-        .where(TesoreriaMovimientoCaja.caja_id == caja_id)
-        .group_by(TesoreriaMovimientoCaja.tipo)
-    )).all()
-    ingresos = egresos = Decimal(0)
-    for tipo, total in rows:
-        tipo_val = tipo.value if hasattr(tipo, "value") else tipo
-        if tipo_val == "ingreso":
-            ingresos = Decimal(total)
-        else:
-            egresos = Decimal(total)
-    return egresos - ingresos
-
-
 @router.post("/pagar-tarjeta", status_code=201)
 async def pagar_tarjeta(
     payload: PagoTarjetaRequest,
@@ -362,70 +340,28 @@ async def pagar_tarjeta(
     _require_admin(current_user)
     muni_id = get_effective_municipio_id(request, current_user)
 
-    if payload.tarjeta_caja_id == payload.caja_origen_id:
-        raise HTTPException(422, "La tarjeta y la caja de origen no pueden ser la misma")
-
-    cajas = {c.id: c for c in (await db.execute(
-        select(TesoreriaCaja).where(
-            TesoreriaCaja.id.in_([payload.tarjeta_caja_id, payload.caja_origen_id]),
-            TesoreriaCaja.municipio_id == muni_id,
+    # Validaciones y los dos movimientos viven en services/tesoreria_tarjeta:
+    # es exactamente lo mismo que hace la agenda cuando un programado tiene
+    # destino tarjeta. Una sola implementacion, dos puertas.
+    try:
+        tarjeta, origen = await cargar_tarjeta_y_origen(
+            db, muni_id, payload.tarjeta_caja_id, payload.caja_origen_id,
         )
-    )).scalars().all()}
-
-    tarjeta = cajas.get(payload.tarjeta_caja_id)
-    origen = cajas.get(payload.caja_origen_id)
-    if not tarjeta:
-        raise HTTPException(404, "Tarjeta no encontrada")
-    if not origen:
-        raise HTTPException(404, "Caja de origen no encontrada")
-    if not es_caja_tarjeta(tarjeta):
-        raise HTTPException(422, f"'{tarjeta.nombre}' no es una tarjeta de credito")
-    if es_caja_tarjeta(origen):
-        raise HTTPException(422, "No se puede pagar una tarjeta con otra tarjeta")
-
-    # SIN MONTO = PAGUE TODO. La deuda se lee ACA, no en la pantalla, para que
-    # el saldo quede en cero exacto aunque haya entrado un gasto mientras el
-    # modal estaba abierto.
-    deuda = await _deuda_de_tarjeta(db, tarjeta.id)
-    total = payload.monto is None
-    monto = payload.monto if payload.monto is not None else deuda
-
-    if total and deuda <= 0:
-        raise HTTPException(422, f"'{tarjeta.nombre}' no tiene deuda para pagar")
-    if monto <= 0:
-        raise HTTPException(422, "El monto a pagar tiene que ser mayor a cero")
-
-    concepto = (payload.concepto or f"Pago de tarjeta {tarjeta.nombre}").strip()[:150]
-
-    # INGRESO en la tarjeta: cancela deuda -> sube el credito disponible.
-    db.add(TesoreriaMovimientoCaja(
-        municipio_id=muni_id,
-        caja_id=tarjeta.id,
-        tipo=TipoMovimientoCaja.INGRESO,
-        monto=monto,
-        fecha=payload.fecha,
-        concepto=concepto,
-        descripcion=payload.descripcion or f"Pago desde {origen.nombre}",
-    ))
-    # EGRESO en la caja real: de ahi sale efectivamente la plata.
-    db.add(TesoreriaMovimientoCaja(
-        municipio_id=muni_id,
-        caja_id=origen.id,
-        tipo=TipoMovimientoCaja.EGRESO,
-        monto=monto,
-        fecha=payload.fecha,
-        concepto=concepto,
-        descripcion=payload.descripcion or f"Pago de {tarjeta.nombre}",
-    ))
+        res = await registrar_pago_tarjeta(
+            db, muni_id, tarjeta, origen, payload.monto, payload.fecha,
+            concepto=payload.concepto, descripcion=payload.descripcion,
+        )
+    except PagoTarjetaError as e:
+        raise HTTPException(e.status, e.detail)
     await db.commit()
 
     # La pantalla necesita poder decir "quedo en cero" sin volver a preguntar.
     return {
         "ok": True,
-        "monto": str(monto),
-        "total": total,
-        "deuda_previa": str(deuda),
-        "deuda_restante": str(deuda - monto),
+        "monto": str(res.monto),
+        "total": res.total,
+        "deuda_previa": str(res.deuda_previa),
+        "deuda_restante": str(res.deuda_restante),
         "tarjeta": await _enrich_caja_response(db, tarjeta),
         "caja_origen": await _enrich_caja_response(db, origen),
     }

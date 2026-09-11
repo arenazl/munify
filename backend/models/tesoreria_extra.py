@@ -201,6 +201,13 @@ class TesoreriaMovimientoCaja(Base):
     municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="CASCADE"), nullable=False, index=True)
     gasto_id = Column(Integer, ForeignKey("gastos.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Un pago de TARJETA hecho desde la agenda no tiene gasto (el gasto ya se
+    # registro al comprar). Este puntero es lo que deja que el historial de la
+    # agenda lo encuentre y que "quien lo genero" no se pierda.
+    pago_programado_id = Column(
+        Integer, ForeignKey("tesoreria_pagos_programados.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
 
     tipo = Column(
         Enum(TipoMovimientoCaja, values_callable=lambda x: [e.value for e in x]),
@@ -239,12 +246,24 @@ class TesoreriaPagoProgramado(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
-    contacto_id = Column(Integer, ForeignKey("contactos.id"), nullable=False, index=True)
+    # DESTINO: exactamente uno de los dos.
+    #   contacto_id     -> al ejecutar nace un GASTO a ese contacto (sueldo, proveedor).
+    #   tarjeta_caja_id -> al ejecutar se PAGA esa tarjeta: ingreso en la caja-tarjeta
+    #                      + egreso en `caja_id`, SIN gasto (el gasto ya se registro al
+    #                      comprar con la tarjeta). Dueno, 2026-09-11: "el programado,
+    #                      asi como descuenta de caja, descuenta de la caja tarjeta".
+    contacto_id = Column(Integer, ForeignKey("contactos.id"), nullable=True, index=True)
+    tarjeta_caja_id = Column(
+        Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
+    # ORIGEN: de que caja sale la plata. Opcional para gastos; obligatoria para tarjeta.
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True)
 
     concepto = Column(String(150), nullable=False)
     descripcion = Column(Text, nullable=True)
-    monto_pesos = Column(Numeric(15, 2), nullable=False)
+    # NULL solo en pagos de tarjeta = "paga TODO lo que deba ese dia". Un resumen
+    # de tarjeta no es un monto fijo; agendarlo con un numero era la trampa.
+    monto_pesos = Column(Numeric(15, 2), nullable=True)
     forma_pago = Column(String(30), default="transferencia", nullable=False)
 
     frecuencia = Column(
@@ -273,5 +292,12 @@ class TesoreriaPagoProgramado(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    @property
+    def es_pago_tarjeta(self) -> bool:
+        return self.tarjeta_caja_id is not None
+
     def __repr__(self):
-        return f"<PagoProgramado {self.id} contacto={self.contacto_id} ${self.monto_pesos} {self.frecuencia.value}>"
+        destino = f"tarjeta={self.tarjeta_caja_id}" if self.es_pago_tarjeta else f"contacto={self.contacto_id}"
+        monto = "todo" if self.monto_pesos is None else f"${self.monto_pesos}"
+        frec = self.frecuencia.value if hasattr(self.frecuencia, "value") else self.frecuencia
+        return f"<PagoProgramado {self.id} {destino} {monto} {frec}>"

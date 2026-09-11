@@ -5,6 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { WizardModal, WizardStep } from '../ui/WizardModal';
 import { Sheet } from '../ui/Sheet';
 import { agendaPagosApi } from '../../lib/api';
+import { montoPrevisto, nombreDestino } from '../../lib/pagoProgramado';
 import type { PagoProgramado } from '../../types';
 import '../../styles/liquidaciones.css';
 
@@ -24,7 +25,8 @@ function fmtMoney(v: string | number): string {
   return `$${(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
 }
 function totalDe(ps: PagoProgramado[]): number {
-  return ps.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0);
+  // Una tarjeta no tiene monto fijo: lo que va a salir es lo que deba hoy.
+  return ps.reduce((s, p) => s + montoPrevisto(p), 0);
 }
 /** Días hasta la fecha (negativo = vencido). */
 function diasHasta(f: string): number {
@@ -143,7 +145,9 @@ export function PagoMasivoModal({ open, onClose, pagos, preseleccion, onDone }: 
     setSaving(true);
     try {
       const { data } = await agendaPagosApi.ejecutarMasivo(ids);
+      const salteados = (data.items || []).filter(i => i.omitido).length;
       if (data.fallidos > 0) toast.warning(`${data.exitosos} pagados, ${data.fallidos} fallaron`);
+      else if (salteados) toast.success(`${data.exitosos - salteados} pagados · ${fmtMoney(data.monto_total)} · ${salteados} sin deuda, salteados`);
       else toast.success(`${data.exitosos} ${data.exitosos === 1 ? 'pago realizado' : 'pagos realizados'} · ${fmtMoney(data.monto_total)}`);
       cerrar();
       onDone({ cantidad: data.exitosos, monto: parseFloat(data.monto_total) || 0 });
@@ -260,7 +264,8 @@ export function PagoMasivoModal({ open, onClose, pagos, preseleccion, onDone }: 
       content: (
         <div className="space-y-2">
           <p className="text-xs" style={{ color: theme.textSecondary }}>
-            Destildá los que no querés pagar. Se pagan con su monto y caja predefinidos.
+            Destildá los que no querés pagar. Se pagan con su monto y caja predefinidos; una
+            tarjeta paga todo lo que deba ese día.
           </p>
           {ps.map(p => {
             const on = checked.has(p.id);
@@ -270,12 +275,12 @@ export function PagoMasivoModal({ open, onClose, pagos, preseleccion, onDone }: 
                 style={{ backgroundColor: on ? `${theme.primary}12` : theme.background, border: `1px solid ${on ? theme.primary : theme.border}` }}>
                 {checkBox(on)}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{p.contacto_nombre}</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{nombreDestino(p)}</p>
                   <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                    {p.concepto}{p.caja_nombre ? ` · ${p.caja_nombre}` : ''}
+                    {p.es_pago_tarjeta ? 'paga todo lo que deba' : p.concepto}{p.caja_nombre ? ` · ${p.caja_nombre}` : ''}
                   </p>
                 </div>
-                <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</span>
+                <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>{fmtMoney(montoPrevisto(p))}</span>
               </button>
             );
           })}
@@ -313,9 +318,9 @@ export function PagoMasivoModal({ open, onClose, pagos, preseleccion, onDone }: 
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
                     style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>{fmtFecha(p.proximo_pago)}</span>
                   <span className="flex-1 min-w-0 text-sm truncate" style={{ color: theme.text }}>
-                    {p.contacto_nombre} <span style={{ color: theme.textSecondary }}>· {p.concepto}</span>
+                    {nombreDestino(p)} <span style={{ color: theme.textSecondary }}>· {p.concepto}</span>
                   </span>
-                  <span className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</span>
+                  <span className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color: theme.text }}>{fmtMoney(montoPrevisto(p))}</span>
                 </div>
               ))}
             </div>
