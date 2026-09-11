@@ -1078,13 +1078,21 @@ export interface Paraje {
 export interface PagoProgramado {
   id: number;
   municipio_id: number;
-  contacto_id: number;
+  // DESTINO: exactamente uno. Contacto = al ejecutar nace un gasto. Tarjeta =
+  // al ejecutar se paga la tarjeta (ingreso en la caja-tarjeta + egreso en
+  // `caja_id`), sin gasto. `monto_pesos` null = "paga todo lo que deba ese dia".
+  contacto_id: number | null;
   contacto_nombre?: string | null;
+  tarjeta_caja_id?: number | null;
+  tarjeta_nombre?: string | null;
+  es_pago_tarjeta?: boolean;
+  // Solo tarjeta: lo que debe HOY (negativo = saldo a favor).
+  deuda_actual?: string | null;
   caja_id?: number | null;
   caja_nombre?: string | null;
   concepto: string;
   descripcion?: string | null;
-  monto_pesos: string;
+  monto_pesos: string | null;
   forma_pago: string;
   frecuencia: FrecuenciaPago;
   dia_del_mes: number;
@@ -1101,7 +1109,10 @@ export interface PagoProgramado {
 }
 
 export interface PagoEjecutadoHistorial {
+  // Negativo = pago de tarjeta (movimiento de caja), positivo = gasto.
   id: number;
+  tipo?: 'gasto' | 'pago_tarjeta';
+  tarjeta_nombre?: string | null;
   fecha: string;
   monto_pesos: string;
   concepto: string;

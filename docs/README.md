@@ -12,7 +12,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Carpeta | Qué tiene |
 |---|---|
 | [`plataforma/`](plataforma/) | Arquitectura, deploy, testing, refactors de referencia, schema/OpenAPI |
-| [`produccion/`](produccion/) | **Incidentes de producción y requerimientos operativos**: qué falló, la causa verificada, cómo se resolvió y qué mirar si vuelve a pasar |
+| [`produccion/`](produccion/) | **Incidentes de producción y requerimientos operativos**: qué falló, la causa verificada, cómo se resolvió y qué mirar si vuelve a pasar. Lo último: `02` la tarjeta Visa de San Pedro Norte, con los pagos del resumen cargados como gastos (leído en prod el 2026-09-11), y `03` la solución: el pago programado con destino tarjeta más el script de curación, ya probados en QA y pendientes de que Infra los aplique |
 | [`salesbot/`](salesbot/) | Specs de la integración SalesBot ↔ Munify (API, turnos, verificación) |
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
@@ -20,10 +20,12 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`financiero/`](financiero/) | **Qué hace hoy el módulo financiero** (Contaduría + Tesorería + Sueldos + dashboard): descripción funcional fiel, base para buscar mejoras |
 | [`comunicacion/`](comunicacion/) | **Módulo NUEVO** (a construir): avisos al vecino, obras a la vista, cronogramas. Tres etapas, spec de la primera |
 | [`recursos/`](recursos/) | **Módulo NUEVO** (a construir): flota y combustible, presentismo de cuadrillas, reservas. Tres etapas, consolidado con OT+Inventario |
-| [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
+| [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad **Persona**). **`02-plan-consolidacion.md` (2026-09-06) es el vigente y autosuficiente**: modelo destino aprobado (la libreta es `contactos`→`personas`, empleado y proveedor son dos tipos que cuelgan de ella, tipos como catálogo editable por muni, la agenda de pagos NO se toca), números medidos de SPN, los 6 pasos y el gate de paridad. `01` es el análisis previo, con el modelo destino ya corregido |
+| [`obras/`](obras/) | **Gestión de obras — ANÁLISIS, sin implementar** (2026-09-10): qué existe hoy (`proyectos` + imputación de gastos + "Obras a la vista"), la decisión de módulo propio con Obra como tipo de Proyecto, dónde se carga la plata (desde la obra, cae en gastos: sin libro paralelo) y el mapa de cruces con cada módulo. Punto de partida cuando se retome |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
 | [`calls/`](calls/) | **Directorio de llamados** (`/calls`): `01` cómo regenerar la app y repasar los intendentes · `02` qué le falta y por dónde seguir |
 | [`geo/`](geo/) | Cartografía del alta de demos. **`03-forense-cartografia-demos.md`** (2026-09-02): qué está precargado y su calidad medida, los 4 bugs del día, lo que FALTA (capa de barrios/calles precargada, 53% de contornos groseros) y la hoja de ruta del batch offline — **regla de Lucas: NADA de cartografía online durante el alta** |
+- [Irregularidades del catálogo de municipios (2026-09-07)](cartografia/irregularidades-catalogo-2026-09-07.md) — para el equipo de demos: 176 nombres repetidos en el catálogo (algunos cruzan país), 836 municipios con la web oficial caída y las capacidades digitales medidas. Informe, no cambio
 | [`dashboard/`](dashboard/) | **Dashboard modular por módulos**: diseño cerrado (registry + hooks por dominio, cinta, regla del cero, orden por actividad) + WOs F1-F4 |
 | [`e2e/`](e2e/) | **Suite Playwright de circuito completo** (agnóstica de tenant): qué cubre, cómo correrla y cómo llevarla a otro municipio |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |

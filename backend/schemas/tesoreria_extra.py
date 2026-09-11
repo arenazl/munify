@@ -3,9 +3,9 @@ TipoEmpleado, Caja, MovimientoCaja, PagoProgramado, Premio.
 """
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Literal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 from models.tesoreria_extra import TipoMovimientoCaja, FrecuenciaPago
 
@@ -101,11 +101,20 @@ class EjecutarPagoRequest(BaseModel):
 
 class EjecutarPagoResponse(BaseModel):
     ok: bool
-    gasto_id: int
+    # 'gasto': nacio un Gasto (gasto_id). 'pago_tarjeta': dos movimientos de
+    # caja y ningun gasto (gasto_id None).
+    tipo: Literal["gasto", "pago_tarjeta"] = "gasto"
+    gasto_id: Optional[int] = None
     monto_total: Decimal
     monto_base: Decimal
     premios_aplicados: List[PremioAplicado] = []
     proximo_pago: Optional[str] = None
+    # Solo tarjeta.
+    deuda_previa: Optional[Decimal] = None
+    deuda_restante: Optional[Decimal] = None
+    # True = la tarjeta no debia nada: no se movio plata, el periodo avanzo.
+    omitido: bool = False
+    mensaje: Optional[str] = None
 
 
 class EjecutarMasivoRequest(BaseModel):
@@ -118,7 +127,10 @@ class EjecutarMasivoRequest(BaseModel):
 class EjecutarMasivoItem(BaseModel):
     pago_id: int
     ok: bool
+    tipo: Literal["gasto", "pago_tarjeta"] = "gasto"
     gasto_id: Optional[int] = None
+    monto: Optional[Decimal] = None
+    omitido: bool = False
     error: Optional[str] = None
 
 
@@ -247,11 +259,16 @@ class MovimientoCajaResponse(MovimientoCajaBase):
 # ============================================================
 
 class PagoProgramadoBase(BaseModel):
-    contacto_id: int
+    # DESTINO: exactamente uno. Contacto = nace un gasto; tarjeta = se paga la
+    # tarjeta (ingreso en la caja-tarjeta + egreso en `caja_id`), sin gasto.
+    contacto_id: Optional[int] = None
+    tarjeta_caja_id: Optional[int] = None
+    # ORIGEN de la plata. Opcional para gastos, obligatoria para tarjeta.
     caja_id: Optional[int] = None
     concepto: str = Field(..., min_length=1, max_length=150)
     descripcion: Optional[str] = None
-    monto_pesos: Decimal = Field(..., gt=0)
+    # None SOLO en pagos de tarjeta: "paga todo lo que deba ese dia".
+    monto_pesos: Optional[Decimal] = Field(None, gt=0)
     forma_pago: str = "transferencia"
     frecuencia: FrecuenciaPago = FrecuenciaPago.MENSUAL
     dia_del_mes: int = Field(1, ge=1, le=28)
@@ -266,11 +283,24 @@ class PagoProgramadoBase(BaseModel):
 
 
 class PagoProgramadoCreate(PagoProgramadoBase):
-    pass
+    @model_validator(mode="after")
+    def _destino_coherente(self):
+        tiene_contacto = self.contacto_id is not None
+        tiene_tarjeta = self.tarjeta_caja_id is not None
+        if tiene_contacto == tiene_tarjeta:
+            raise ValueError("Elegi un destino: un contacto o una tarjeta, no ambos ni ninguno")
+        if tiene_tarjeta and not self.caja_id:
+            raise ValueError("Un pago de tarjeta necesita la caja de donde sale la plata")
+        if tiene_tarjeta and self.caja_id == self.tarjeta_caja_id:
+            raise ValueError("La tarjeta y la caja de origen no pueden ser la misma")
+        if tiene_contacto and self.monto_pesos is None:
+            raise ValueError("Falta el monto del pago")
+        return self
 
 
 class PagoProgramadoUpdate(BaseModel):
     contacto_id: Optional[int] = None
+    tarjeta_caja_id: Optional[int] = None
     caja_id: Optional[int] = None
     concepto: Optional[str] = None
     descripcion: Optional[str] = None
@@ -296,5 +326,10 @@ class PagoProgramadoResponse(PagoProgramadoBase):
     activo: bool
     contacto_nombre: Optional[str] = None
     caja_nombre: Optional[str] = None
+    # Pago de tarjeta: que tarjeta y cuanto debe HOY (lo que pagaria si se
+    # ejecutara ahora). Negativo = saldo a favor.
+    es_pago_tarjeta: bool = False
+    tarjeta_nombre: Optional[str] = None
+    deuda_actual: Optional[Decimal] = None
     created_at: datetime
     updated_at: datetime

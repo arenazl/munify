@@ -2635,7 +2635,19 @@ export const agendaPagosApi = {
     premio_ids?: number[];
     premios_aplicados?: { premio_id: number; monto?: string }[];
     notas?: string;
-  }) => api.post(`/tesoreria/agenda/${id}/ejecutar`, data),
+  }) => api.post<{
+    ok: boolean;
+    // 'gasto' nace un Gasto; 'pago_tarjeta' son dos movimientos de caja sin gasto.
+    tipo: 'gasto' | 'pago_tarjeta';
+    gasto_id: number | null;
+    monto_total: string;
+    monto_base: string;
+    proximo_pago: string | null;
+    deuda_previa?: string | null;
+    deuda_restante?: string | null;
+    omitido: boolean;
+    mensaje?: string | null;
+  }>(`/tesoreria/agenda/${id}/ejecutar`, data),
   reportes: () => api.get('/tesoreria/agenda/reportes'),
   historial: (params?: {
     desde?: string;
@@ -2662,7 +2674,10 @@ export const agendaPagosApi = {
   ejecutarMasivo: (pago_ids: number[]) =>
     api.post<{
       total: number; exitosos: number; fallidos: number; monto_total: string;
-      items: { pago_id: number; ok: boolean; gasto_id?: number; error?: string }[];
+      items: {
+        pago_id: number; ok: boolean; tipo?: 'gasto' | 'pago_tarjeta';
+        gasto_id?: number | null; monto?: string | null; omitido?: boolean; error?: string;
+      }[];
     }>('/tesoreria/agenda/ejecutar-masivo', { pago_ids }),
 };
 
