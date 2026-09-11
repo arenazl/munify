@@ -48,12 +48,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api import calls_serper
 from api.calls import CallsUsuario, usuario_calls
 from core.config import settings
 from core.database import get_db
 from core.rate_limit import limiter
 from models.calls import CallsMunicipio
-from models.calls_curacion import CallsFuente, CallsRelato, CallsTelefono
+from models.calls_curacion import CallsConfig, CallsFuente, CallsRelato, CallsTelefono
 
 router = APIRouter()
 
@@ -65,6 +66,21 @@ URL_GEMINI = ("https://generativelanguage.googleapis.com/v1beta/models/"
               "%s:generateContent?key=%s")
 COSTO_POR_BUSQUEDA = 0.035
 
+# Donde vive el prompt C. Una sola fila para toda la aplicacion.
+CLAVE_PROMPT = "prompt_comercial_c"
+
+
+async def prompt_activo(db: AsyncSession) -> str:
+    """EL prompt comercial. Uno solo para toda la aplicacion.
+
+    Vacio significa que todavia no se escribio ninguno: ahi se usa la plantilla B, que es
+    la de fabrica. Nunca se queda sin poder traer nada.
+    """
+    fila = (await db.execute(
+        select(CallsConfig).where(CallsConfig.clave == CLAVE_PROMPT)
+    )).scalar_one_or_none()
+    return (fila.valor or "").strip() if fila else ""
+
 
 class Pedido(BaseModel):
     muni_key: str = Field(min_length=2, max_length=80)
@@ -72,6 +88,15 @@ class Pedido(BaseModel):
     # le dijeron que no existe, y necesita otro. Mandarlo sirve para dos cosas --pedirle
     # al modelo uno DISTINTO y dejar anotado que ese esta muerto-- y hasta hoy se perdia.
     malo: Optional[str] = Field(default=None, max_length=40)
+    # QUE VERSION DEL PROMPT COMERCIAL usar. Sirve para correr las dos sobre el MISMO
+    # municipio virgen y decidir con las dos salidas al lado, en vez de por corazonada
+    # (dueno, 2026-09-10). Los datos de contacto van en las dos: eso no esta a prueba.
+    #   v1 = el original, sin instrucciones de fecha
+    #   v2 = el de 2026-09-10, que pide priorizar lo nuevo y datar cada hecho
+    # NO HAY VARIANTES (dueno, 2026-09-10: "el circuito va a ser uno solo"). El pedido
+    # comercial usa EL prompt: uno, editable desde la cocina y guardado en `calls_config`.
+    # Elegir version en cada llamada era andamiaje: lo que hace falta para comparar no es
+    # un selector, es que cada corrida recuerde con que prompt se hizo -- y eso se guarda.
 
 
 # --------------------------------------------------------------------------- #
@@ -172,6 +197,80 @@ def _como_se_llama(f: CallsMunicipio) -> str:
 
 
 # --------------------------------------------------------------------------- #
+def _con_tokens(texto: str, f: CallsMunicipio) -> str:
+    """Mete el municipio adentro del prompt escrito a mano.
+
+    Se aceptan las dos formas a proposito: la larga --{{MUNICIPIO}}, {{PROVINCIA}},
+    {{PAIS}}-- porque es la que sale sola al escribir un prompt y se lee sin explicacion,
+    y la corta --{M}, {P}-- porque ya estaba documentada. Obligar a una sola forma para
+    que el codigo quede prolijo hace que un prompt escrito de la manera obvia se mande
+    con los tokens SIN reemplazar, y eso no falla: busca cualquier cosa y devuelve un
+    texto que parece bien (dueno, 2026-09-10).
+
+    {{MUNICIPIO}} es SOLO EL NOMBRE. Devolver "Municipalidad de Santo Tomas" ahi hacia
+    que un prompt que empieza "en la Municipalidad/Comuna de {{MUNICIPIO}}" terminara
+    diciendo "la Municipalidad/Comuna de Municipalidad de Santo Tomas". Para el nombre
+    completo del ente --que no siempre es una municipalidad-- esta {{ENTIDAD}}.
+    """
+    pais = (f.pais or "Argentina").capitalize()
+    for k, v in (("{{ENTIDAD}}", _como_se_llama(f)),
+                 ("{{MUNICIPIO}}", f.municipio or ""),
+                 ("{{PROVINCIA}}", f.provincia or ""),
+                 ("{{PAIS}}", pais),
+                 ("{M}", f.municipio or ""),
+                 ("{P}", f.provincia or ""),
+                 ("{PAIS}", pais)):
+        texto = texto.replace(k, v)
+    return texto
+
+
+def _prompt_comercial(nombre: str, provincia: str, version: str,
+                      texto: Optional[str] = None) -> str:
+    """El pedido comercial, ya armado con el municipio adentro.
+
+    `version` es de donde sale el texto:
+      propio = el que esta guardado y se edita desde la cocina. Es el que se usa.
+      v1, v2 = las dos PLANTILLAS de fabrica. No se usan para traer: estan para partir de
+               ellas al escribir el propio, y para no perder de donde venimos (dueno,
+               2026-09-10: "no quiero perder ni el original ni el que editaste vos").
+               v1 es el original; v2 agrega priorizar lo nuevo y datar cada hecho.
+    """
+    if version == "propio":
+        return texto or ""
+
+    recencia = (
+        "Lo que mas me importa es lo NUEVO: el ultimo ano, y sobre todo los ultimos "
+        "meses. Lo viejo traelo igual si es importante, pero DECIME CUANDO FUE cada "
+        "cosa --mes y ano--. Si no sabes la fecha, decilo en vez de omitirla.\n\n"
+    ) if version == "v2" else ""
+
+    return (
+        "Contame que esta pasando en la %s, %s, Argentina%s.\n\n"
+        "%s"
+        "Me interesa lo que le sirve a alguien que le va a vender un sistema de gestion "
+        "municipal:\n"
+        "- que obras o servicios esta encarando, con cifras y fechas si las hay\n"
+        "- que problemas tiene: reclamos, conflictos, cosas que no funcionan\n"
+        "- si compro o contrato algun sistema, plataforma o software, y a quien\n"
+        "- que publica sobre su dinero: presupuesto, licitaciones, compras, boletin\n"
+        "- quien conduce y de que viene: profesion, trayectoria, de que habla\n"
+        "- de que vive el municipio: produccion, industria, turismo\n\n"
+        "Escribi en prosa, en parrafos, citando la fuente de cada cosa. Contame lo que "
+        "ENCONTRASTE, no lo que suponés. Si de algo no hay informacion, decilo.\n\n"
+        # Los datos de contacto NO estan a prueba: van en las dos versiones. Se cobra por
+        # REQUEST, asi que pedirlos aca no cuesta un centavo mas y ahorra otra busqueda.
+        "Y AL FINAL DE TODO, los datos de contacto del MUNICIPIO --no de otra entidad--, "
+        "cada uno en su renglon y con este formato exacto:\n\n"
+        "TELEFONO: el numero institucional como se marca, con codigo de area\n"
+        "MAIL: el correo oficial\n"
+        "WEB: la direccion del sitio oficial, entera\n\n"
+        "Si alguno no lo encontraste, escribi 'no encontre' en ese renglon. No pongas "
+        "el de otro municipio, ni el de la provincia, ni uno inventado."
+        % (nombre, provincia, "" if version == "v2" else ", en los ultimos meses",
+           recencia))
+
+
+# --------------------------------------------------------------------------- #
 @router.post("/curar/telefono")
 @limiter.limit("40/hour")
 async def curar_telefono(
@@ -198,6 +297,7 @@ async def curar_telefono(
         if n not in ya:
             ya.append(n)
     otros = [n for n in ya if n != malo]
+    vistos_ya = set(ya)
     meta = _meta_de(f)
 
     # EL QUE NO ANDA SE ANOTA ANTES DE BUSCAR: si la busqueda falla o el modelo se cae, el
@@ -238,15 +338,51 @@ async def curar_telefono(
            if malo else "",
            ("Estos ya los tenemos, no los repitas: %s\n\n" % ", ".join(otros)) if otros else ""))
 
-    texto, crudo = _gemini(prompt)
-    encontrados = (_json_de(texto).get("telefonos") or [])[:6]
+    # SERPER PRIMERO, GEMINI DESPUES. Los dos buscan en Google, pero uno sale 1 credito
+    # de 2.500 gratis y el otro 3,5 centavos encuentre o no. Y no es solo el precio:
+    # serper devuelve los resultados CRUDOS de Google, que es donde esta el telefono de
+    # un municipio chico -- Gemini busca con su propio indice y muchas veces no lo ve.
+    # El hallazgo es del dueno (2026-09-09): municipios que el modelo no encontraba, el
+    # los veia en Google en la primera devolucion.
+    texto, crudo = "", {}
+    encontrados = []
+    por_donde = ""
+    if calls_serper.hay_key():
+        tels, web_serper, crudo_serper = calls_serper.buscar_contacto(
+            f.municipio or "", f.provincia or "")
+        # el crudo se guarda ENCUENTRE O NO: es lo que permite volver a leerlo gratis
+        # cuando se mejora un filtro, y lo que evita dar por inexistente algo que estaba
+        if crudo_serper:
+            db.add(CallsRelato(
+                muni_key=data.muni_key, codigo_indec=f.codigo_indec,
+                motor="serper", modelo="search", variante="telefono:serper",
+                prompt=crudo_serper.get("consulta"),
+                texto=json.dumps(crudo_serper.get("respuesta"), ensure_ascii=False)[:60000],
+                costo_usd=0, busquedas=1, creado=ahora))
+        if web_serper and not (f.web or "").strip():
+            f.web = web_serper[:300]
+        for x in tels:
+            if x["numero"] in vistos_ya:
+                continue
+            encontrados.append({"numero": x["numero"], "de_quien": x["de_quien"],
+                                "url": x["url"], "forma": x["forma"],
+                                "fuente": x["fuente"]})
+        if encontrados:
+            por_donde = "serper"
+
+    # Gemini solo si serper no resolvio: la bala cara para lo dificil
+    if not encontrados:
+        texto, crudo = _gemini(prompt)
+        encontrados = (_json_de(texto).get("telefonos") or [])[:6]
+        por_donde = "gemini"
 
     # El crudo se guarda SIEMPRE, encuentre o no. Cuando algo sale mal, comparar el crudo
     # contra lo que la pantalla mostro es lo unico que permite ver donde se rompio.
-    db.add(CallsRelato(muni_key=data.muni_key, codigo_indec=f.codigo_indec,
-                       motor="gemini", modelo=MODELO, variante="telefono",
-                       texto=texto, costo_usd=COSTO_POR_BUSQUEDA, busquedas=1,
-                       creado=ahora))
+    if por_donde == "gemini":
+        db.add(CallsRelato(muni_key=data.muni_key, codigo_indec=f.codigo_indec,
+                           motor="gemini", modelo=MODELO, variante="telefono",
+                           texto=texto, costo_usd=COSTO_POR_BUSQUEDA, busquedas=1,
+                           creado=ahora))
 
     nuevos = []
     vistos = set(ya)
@@ -290,10 +426,10 @@ async def curar_telefono(
     await db.commit()
 
     return {"ok": True, "muni_key": data.muni_key, "encontrados": nuevos,
-            "ya_tenia": ya, "malo": malo,
+            "por_donde": por_donde, "ya_tenia": ya, "malo": malo,
             # la ficha YA ORDENADA, para que la pantalla se redibuje sin recargar
             "telefonos": _lista(f.telefonos), "telefonos_meta": meta,
-            "costo_usd": COSTO_POR_BUSQUEDA,
+            "costo_usd": COSTO_POR_BUSQUEDA if por_donde == "gemini" else 0,
             "busco": ((crudo.get("candidates") or [{}])[0]
                       .get("groundingMetadata", {}).get("webSearchQueries") or [])[:4],
             "nota": "" if nuevos else texto[:400]}
@@ -315,29 +451,25 @@ async def curar_comercial(
     despues, que ademas permite reprocesarla gratis cuando cambie el criterio.
     """
     f = await _ficha(db, data.muni_key)
-    prompt = (
-        "Contame que esta pasando en la %s, %s, Argentina, en los ultimos meses.\n\n"
-        "Me interesa lo que le sirve a alguien que le va a vender un sistema de gestion "
-        "municipal:\n"
-        "- que obras o servicios esta encarando, con cifras y fechas si las hay\n"
-        "- que problemas tiene: reclamos, conflictos, cosas que no funcionan\n"
-        "- si compro o contrato algun sistema, plataforma o software, y a quien\n"
-        "- que publica sobre su dinero: presupuesto, licitaciones, compras, boletin\n"
-        "- quien conduce y de que viene: profesion, trayectoria, de que habla\n"
-        "- de que vive el municipio: produccion, industria, turismo\n\n"
-        "Escribi en prosa, en parrafos, citando la fuente de cada cosa. Contame lo que "
-        "ENCONTRASTE, no lo que suponés. Si de algo no hay informacion, decilo."
-        % (_como_se_llama(f), f.provincia))
+    # EL prompt. Si todavia no se escribio ninguno se usa la plantilla B, para que la
+    # pantalla nunca quede sin poder traer nada.
+    propio = await prompt_activo(db)
+    prompt = (_con_tokens(propio, f) if propio
+              else _prompt_comercial(_como_se_llama(f), f.provincia, "v2"))
 
     texto, _crudo = _gemini(prompt, timeout=120)
     ahora = datetime.utcnow()
     db.add(CallsRelato(muni_key=data.muni_key, codigo_indec=f.codigo_indec,
-                       motor="gemini", modelo=MODELO, variante="comercial",
+                       motor="gemini", modelo=MODELO,
+                       variante="comercial",
+                       # EL PROMPT QUE LA TRAJO, entero. Una corrida sin su prompt no se
+                       # puede reproducir ni comparar: es la mitad del experimento.
+                       prompt=prompt,
                        texto=texto, costo_usd=COSTO_POR_BUSQUEDA, busquedas=1,
                        creado=ahora))
     f.curado_en, f.curado_por = ahora, quien.usuario
     await db.commit()
     return {"ok": True, "muni_key": data.muni_key, "texto": texto,
-            "costo_usd": COSTO_POR_BUSQUEDA,
+            "de_fabrica": not propio, "costo_usd": COSTO_POR_BUSQUEDA,
             "nota": "guardado como relato crudo; la segmentacion en hechos y tags corre "
                     "aparte"}

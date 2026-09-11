@@ -29,6 +29,8 @@ from .portal_publico import router as portal_publico_router
 from .calls import router as calls_router
 from .calls_ia import router as calls_ia_router
 from .calls_curar import router as calls_curar_router
+from .calls_procesar import router as calls_procesar_router
+from .calls_aplicar import router as calls_aplicar_router
 from .ia_uso import router as ia_uso_router
 from .calls_push import router as calls_push_router
 from .municipios import router as municipios_router
@@ -122,6 +124,8 @@ api_router.include_router(portal_publico_router, prefix="/publico", tags=["Porta
 api_router.include_router(calls_router, prefix="/public/calls", tags=["Calls"])
 api_router.include_router(calls_ia_router, prefix="/public/calls", tags=["Calls IA"])
 api_router.include_router(calls_curar_router, prefix="/public/calls", tags=["Calls Curar"])
+api_router.include_router(calls_procesar_router, prefix="/public/calls", tags=["Calls Procesar"])
+api_router.include_router(calls_aplicar_router, prefix="/public/calls", tags=["Calls Aplicar"])
 api_router.include_router(ia_uso_router, tags=["IA Uso"])
 api_router.include_router(calls_push_router, prefix="/public/calls", tags=["Calls Push"])
 api_router.include_router(imagenes_router, tags=["Imágenes"])

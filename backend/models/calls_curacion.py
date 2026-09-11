@@ -118,6 +118,10 @@ class CallsRelato(Base):
     texto = Column(LARGO, nullable=False)
     costo_usd = Column(Float, default=0.0, nullable=False)
     busquedas = Column(Integer, default=0, nullable=False)
+    # CON QUE SE PIDIO. Una corrida sin su prompt no se puede reproducir ni
+    # comparar contra otra: es la mitad del experimento. Se guarda entero,
+    # tambien el que alguien escribio a mano desde la pantalla.
+    prompt = Column(Text, nullable=True)
     creado = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
@@ -349,3 +353,24 @@ class CallsTagPropuesto(Base):
     aprobado_por = Column(String(60), nullable=True)
     aprobado_en = Column(DateTime, nullable=True)
     creado = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+class CallsConfig(Base):
+    """LA CONFIGURACION DE /calls, en clave y valor.
+
+    Nace para el PROMPT C: el que escribe el dueno desde la pantalla para probar ideas
+    sin tocar el codigo ni esperar un deploy. Es UNO SOLO PARA TODA LA APLICACION --no
+    uno por municipio-- porque lo que se esta afinando es como se le pregunta al modelo,
+    y eso no cambia segun a quien se le pregunte (dueno, 2026-09-10).
+
+    Clave/valor y no una columna por cosa: lo que se guarda aca son ajustes que cambian
+    a mano y de a uno, y una tabla nueva por cada uno seria una migracion por capricho.
+    """
+
+    __tablename__ = "calls_config"
+
+    clave = Column(String(60), primary_key=True)
+    valor = Column(Text, nullable=True)
+    quien = Column(String(60), nullable=True)
+    creado = Column(DateTime, default=datetime.utcnow, nullable=False)
+    actualizado = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow,
+                         nullable=False)

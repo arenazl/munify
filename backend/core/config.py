@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # esa regla. Borrala del `.env` de todos los ambientes y despues sacala de aca.
     AI_PROVIDER_ORDER: str = "groq"
 
+    # SERPER.DEV: la googleada de verdad. Es lo que Gemini NO hace -- Gemini busca con
+    # su propio indice y serper devuelve los resultados de Google crudos, que es donde
+    # aparece el telefono de un municipio chico. Y cuesta 1 credito de 2.500 gratis
+    # contra 3,5 centavos por busqueda de Gemini: por eso va primero, y lo pago queda
+    # para lo que no resuelve.
+    SERPER_API_KEY: str = ""
+
     # Gemini (Google - gratis con límites)
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-flash"

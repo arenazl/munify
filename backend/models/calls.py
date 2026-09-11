@@ -144,6 +144,10 @@ class CallsMunicipio(Base):
     # porque la ficha se sirve de una sola fila: cruzarla contra la tabla por cada una de
     # las 2.244 seria un N+1 para dibujar una pastilla.
     telefonos_meta = Column(Text, nullable=True)
+    # EL CORREO OFICIAL. Sale del mismo pedido que el telefono y la web --se cobra por
+    # request, no por dato-- y para un municipio chico suele ser el canal que de verdad
+    # contestan: el telefono lo atiende quien pasa, el mail lo lee el secretario.
+    mail = Column(String(120), nullable=True)
     direccion = Column(String(300), nullable=True)
     direccion_fuente = Column(String(40), nullable=True)
     web = Column(String(400), nullable=True)
