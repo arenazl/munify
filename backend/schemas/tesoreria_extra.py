@@ -7,7 +7,7 @@ from typing import Optional, List, Literal
 
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
-from models.tesoreria_extra import TipoMovimientoCaja, FrecuenciaPago
+from models.tesoreria_extra import TipoMovimientoCaja, FrecuenciaPago, ModoEjecucionPago
 
 
 # ============================================================
@@ -271,6 +271,8 @@ class PagoProgramadoBase(BaseModel):
     monto_pesos: Optional[Decimal] = Field(None, gt=0)
     forma_pago: str = "transferencia"
     frecuencia: FrecuenciaPago = FrecuenciaPago.MENSUAL
+    # Recordatorio que alguien confirma (default) o pago que se ejecuta solo.
+    modo_ejecucion: ModoEjecucionPago = ModoEjecucionPago.APROBACION
     dia_del_mes: int = Field(1, ge=1, le=28)
     # Solo cuando frecuencia=semanal. 0=lunes..6=domingo.
     dia_semana: Optional[int] = Field(None, ge=0, le=6)
@@ -307,6 +309,7 @@ class PagoProgramadoUpdate(BaseModel):
     monto_pesos: Optional[Decimal] = None
     forma_pago: Optional[str] = None
     frecuencia: Optional[FrecuenciaPago] = None
+    modo_ejecucion: Optional[ModoEjecucionPago] = None
     dia_del_mes: Optional[int] = Field(None, ge=1, le=28)
     dia_semana: Optional[int] = Field(None, ge=0, le=6)
     fecha_inicio: Optional[date] = None
@@ -331,5 +334,8 @@ class PagoProgramadoResponse(PagoProgramadoBase):
     es_pago_tarjeta: bool = False
     tarjeta_nombre: Optional[str] = None
     deuda_actual: Optional[Decimal] = None
+    # Ultima vez que lo ejecuto el sistema (no una persona). None = siempre lo
+    # confirmo alguien.
+    ejecutado_auto_en: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
