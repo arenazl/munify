@@ -7,6 +7,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ThemedToaster } from './components/ThemedToaster'
+import { MantenimientoCartel } from './components/MantenimientoCartel'
 import DynamicManifest from './components/DynamicManifest'
 import ServiceWorkerUpdater from './components/ServiceWorkerUpdater'
 import { router } from './routes'
@@ -68,6 +69,7 @@ createRoot(document.getElementById('root')!).render(
           <ServiceWorkerUpdater />
           <RouterProvider router={router} />
           <ThemedToaster />
+          <MantenimientoCartel />
         </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>

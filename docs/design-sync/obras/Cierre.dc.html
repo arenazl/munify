@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,800&family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #103070; color: #fff; font-family: Inter, system-ui, sans-serif; }
+    a { color: #9ec5f5; } a:hover { color: #fff; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    .card { border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); }
+    .rise { animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+  </style>
+</helmet>
+<!-- Cuadro de cierre de la película: el veredicto de la obra hasta hoy. -->
+<div style="width: 1440px; height: 900px; background: radial-gradient(circle at 0% 100%, rgba(47,163,107,.2), transparent 55%), #103070; display: flex; flex-direction: column; padding: 40px 56px 32px; box-sizing: border-box; gap: 28px;">
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.7); font-weight: 600;">Predio municipal · mayo a diciembre 2026</div>
+    <div class="rise" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 64px; line-height: 1; letter-spacing: -0.01em;">Hasta hoy</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+    <div class="card rise" style="animation-delay: 150ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 600;">Presupuesto vigente</div>
+      <div class="tnum" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 56px; line-height: 1;">$118,0 M</div>
+      <div style="font-size: 12.5px; color: rgba(255,255,255,.7);">contrato + 1 adicional</div>
+    </div>
+    <div class="card rise" style="animation-delay: 300ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 600;">Ejecutado</div>
+      <div class="tnum" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 56px; line-height: 1;">$71,0 M</div>
+      <div style="font-size: 12.5px; color: rgba(255,255,255,.7);">21 gastos · 8 proveedores</div>
+    </div>
+    <div class="card rise" style="animation-delay: 450ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px;">
+      <div style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 600;">Comprometido</div>
+      <div class="tnum" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 56px; line-height: 1;">$9,6 M</div>
+      <div style="font-size: 12.5px; color: rgba(255,255,255,.7);">2 certificados sin pagar</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; flex: 1; min-height: 0;">
+    <div class="card rise" style="animation-delay: 600ms; padding: 24px 28px; display: flex; flex-direction: column; justify-content: center; gap: 18px;">
+      <div style="display: inline-flex; align-items: center; gap: 12px;">
+        <span style="width: 44px; height: 44px; border-radius: 12px; background: rgba(47,163,107,.25); color: #7fdba6; display: inline-flex; align-items: center; justify-content: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </span>
+        <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 34px; line-height: 1.05;">En plazo y en plata</span>
+      </div>
+      <div style="font-size: 17px; line-height: 1.5; color: rgba(255,255,255,.85); max-width: 56ch;">Con el 62% de avance se gastó el 60% del presupuesto. La etapa 1 se pasó $3,9 M, y las dos siguientes lo compensaron. Quedan $37,4 M para las terminaciones, con dos certificados por pagar.</div>
+      <div style="display: flex; gap: 22px; font-size: 13px; color: rgba(255,255,255,.7);">
+        <span><strong style="color: #fff;">4</strong> etapas · 3 terminadas</span>
+        <span><strong style="color: #fff;">14</strong> órdenes de trabajo · 212 h</span>
+        <span><strong style="color: #fff;">8</strong> novedades publicadas</span>
+      </div>
+    </div>
+    <div class="card rise" style="animation-delay: 750ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; justify-content: center;">
+      <div style="font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.65); font-weight: 600;">Dónde se fue</div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; flex-direction: column; gap: 5px;"><div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Platea y suelos</span><span class="tnum" style="font-weight: 700;">$43,9 M</span></div><div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,.1);"><div style="width: 62%; height: 100%; background: #fff; border-radius: 999px;"></div></div></div>
+        <div style="display: flex; flex-direction: column; gap: 5px;"><div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Techado y cerramientos</span><span class="tnum" style="font-weight: 700;">$19,8 M</span></div><div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,.1);"><div style="width: 28%; height: 100%; background: rgba(255,255,255,.8); border-radius: 999px;"></div></div></div>
+        <div style="display: flex; flex-direction: column; gap: 5px;"><div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Estructura</span><span class="tnum" style="font-weight: 700;">$7,3 M</span></div><div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,.1);"><div style="width: 10%; height: 100%; background: rgba(255,255,255,.6); border-radius: 999px;"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div style="font-size: 12.5px; color: rgba(255,255,255,.55);">Los mismos números, filtrados, van a "Obras en tu ciudad" si la obra está publicada.</div>
+    <div style="display: flex; gap: 10px;">
+      <span style="height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+        Volver a ver
+      </span>
+      <span style="height: 44px; padding: 0 18px; border-radius: 999px; background: #fff; color: #103070; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+        Compartir el informe
+      </span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

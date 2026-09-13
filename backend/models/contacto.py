@@ -34,6 +34,13 @@ class Contacto(Base):
       - Excel formato matriz del intendente (sheets Concejales / Empleados / ...)
       - KMZ con placemarks geolocalizados (matching por nombre)
     """
+    # PERSONA. Esta tabla es la libreta unica del sistema (plan
+    # docs/tesoreria/04-plan-integral-persona-y-obras.md): de ella cuelgan la
+    # ficha laboral (`Empleado.persona_id`), el login (`User.persona_id`) y
+    # los tipos (`persona_roles`). El nombre fisico sigue siendo `contactos`
+    # A PROPOSITO: el backend publicado lee esta misma base y el renombre a
+    # `personas` es la fase 2 de la noche de migracion (03-...md, 6.3), con su
+    # deploy. Hasta entonces, el codigo habla de Persona y la tabla no cambia.
     __tablename__ = "contactos"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -92,6 +99,10 @@ class Contacto(Base):
 
     # Relacion inversa
     gastos = relationship("Gasto", back_populates="contacto", foreign_keys="Gasto.destino_contacto_id")
+
+    # Que es esta persona (varios a la vez). El enum `tipo` de arriba queda como
+    # espejo del rol principal mientras conviva el codigo viejo.
+    roles = relationship("PersonaRol", back_populates="persona", cascade="all, delete-orphan")
 
     @property
     def nombre_completo(self) -> str:

@@ -299,6 +299,9 @@ class InventarioOrdenCompra(Base):
 
     numero = Column(String(30), nullable=False, index=True)   # OC-YYYY-NNNN
     proveedor = Column(String(200), nullable=True)
+    # La Persona proveedora (plan Persona, F0). Cierra comprar -> recibir -> pagar.
+    # El varchar de arriba queda como snapshot del nombre.
+    proveedor_persona_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"), nullable=True, index=True)
     estado = Column(
         Enum(EstadoOrdenCompra, values_callable=lambda x: [e.value for e in x]),
         nullable=False, default=EstadoOrdenCompra.BORRADOR, index=True,

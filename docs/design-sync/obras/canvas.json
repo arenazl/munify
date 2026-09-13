@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Obras · lista (kit v3)", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Ficha.dc.html", "title": "Ficha de la obra · SideModal", "x": 1560, "y": 0, "w": 640, "h": 1000 },
+    { "file": "Pelicula.dc.html", "title": "La película · Mayo 2026", "x": 0, "y": 1140, "w": 1440, "h": 900 },
+    { "file": "Cierre.dc.html", "title": "La película · cierre", "x": 1560, "y": 1140, "w": 1440, "h": 900 }
+  ],
+  "annotations": [
+    { "id": "nota-datos", "x": 0, "y": -150, "w": 520, "text": "Datos reales de San Pedro Norte en QA: Predio municipal $71,0 M en 21 gastos (Hidronorte $41,7 M, Rubbertone, Chochi Paredes, Carlos Kako Martinez...), meses may-dic 2026.\nLo que SPN todavia no cargo y aca es EJEMPLO: presupuesto ($118 M), etapas y sus nombres, avance, certificados, ordenes de trabajo y horas." },
+    { "id": "nota-pelicula", "x": 0, "y": 1000, "w": 520, "text": "La pelicula: un cuadro por mes, pantalla completa sobre PresentacionLive. El acumulado cuenta hacia arriba (useCountUp), las barras se llenan, la banda de meses avanza sola y se puede arrastrar. Sin etapas cargadas, la pelicula igual existe: es la pelicula de la plata." }
+  ],
+  "launch": { "view": "canvas" }
+}

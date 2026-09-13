@@ -19,6 +19,7 @@ from models.municipio import Municipio
 from models.user import User
 from models.enums import RolUsuario
 from services.categorias_default import crear_categorias_default
+from services.persona_tipos import sembrar_persona_tipos
 from services.email_service import email_service, EmailTemplates
 import logging
 import secrets
@@ -1012,6 +1013,7 @@ async def crear_municipio_demo(
 
         # 2. Sembrar categorías default (10 reclamo + 10 trámite)
         await crear_categorias_default(db, municipio.id)
+        await sembrar_persona_tipos(db, municipio.id)
         await db.flush()
 
         # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud.
@@ -1175,6 +1177,7 @@ async def crear_municipio(
     # 1. Sembrar categorías default (10 reclamo + 10 trámite per-municipio)
     #    El admin del municipio puede luego renombrar/agregar/eliminar libremente.
     await crear_categorias_default(db, municipio.id)
+    await sembrar_persona_tipos(db, municipio.id)
     await db.flush()
 
     # 2. Cargar barrios automáticamente con IA + Nominatim (best-effort)

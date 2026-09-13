@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; background: #1a1a1d; color: #ececef; font-family: Inter, system-ui, sans-serif; font-size: 13.5px; }
+    a { color: #2f8fdc; } a:hover { color: #5aa9e6; }
+    .eyebrow { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #9b9ba4; font-weight: 600; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(128,128,128,.2); font-size: 12.5px; font-weight: 500; color: #c9c9d1; }
+    .pill.on { background: #2f8fdc; border-color: #2f8fdc; color: #fff; }
+    .kpi-v { font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1; }
+    .bar { height: 6px; border-radius: 999px; background: rgba(128,128,128,.18); overflow: hidden; }
+    .bar > div { height: 100%; border-radius: 999px; }
+    .tnum { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #1a1a1d;">
+  <!-- Sidebar del shell (208px), sólo referencia de contexto -->
+  <div style="width: 208px; flex: 0 0 208px; background: #16161a; border-right: 1px solid rgba(128,128,128,.14); padding: 20px 14px; display: flex; flex-direction: column; gap: 6px;">
+    <div class="eyebrow" style="padding: 6px 10px;">Gestión interna</div>
+    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Tesorería</div>
+    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Contaduría</div>
+    <div style="padding: 9px 10px; border-radius: 8px; background: rgba(47,143,220,.14); color: #fff; font-weight: 600;">Obras</div>
+    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Patrimonio</div>
+    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Recursos</div>
+    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Personas</div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; padding: 28px 36px; display: flex; flex-direction: column; gap: 20px; overflow: hidden;">
+    <!-- Pagehead (av2-pagehead) -->
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+      <div style="max-width: 760px; display: flex; flex-direction: column; gap: 6px;">
+        <div class="eyebrow">San Pedro Norte · Gestión interna</div>
+        <h1 style="margin: 0; font-family: Sora, system-ui, sans-serif; font-size: 34px; font-weight: 700; line-height: 1.12; letter-spacing: -0.03em;">Obras</h1>
+        <div style="color: #9b9ba4; font-size: 13.5px;">Cada obra con sus etapas, su plata y su gente. Lo que se publica al vecino se decide en Comunicación.</div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button style="height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid rgba(128,128,128,.2); background: transparent; color: #ececef; font-size: 13.5px; font-weight: 500;">Nueva obra</button>
+      </div>
+    </div>
+
+    <!-- Hero semántico (av2-hero): frase + 5 KPIs con veredicto -->
+    <div style="border-radius: 16px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="eyebrow">Obras en marcha</div>
+      <div style="font-family: Sora, system-ui, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; max-width: 900px;">Cuatro obras en ejecución por <span class="tnum">$128,0 M</span>. El Predio municipal se lleva el 55% de la plata y va en plazo; el Salón de actos gastó el 70% con el 40% de avance.</div>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;">
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-right: 18px;">
+          <div class="kpi-v tnum">4</div>
+          <div style="font-size: 12.5px; font-weight: 600;">en ejecución</div>
+          <div style="font-size: 11.5px; color: #9b9ba4;">de 6 cargadas</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
+          <div class="kpi-v tnum" style="color: #d99a2b;">1</div>
+          <div style="font-size: 12.5px; font-weight: 600;">atrasada</div>
+          <div style="font-size: 11.5px; color: #9b9ba4;">Balneario, 34 días</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
+          <div class="kpi-v tnum" style="color: #d65454;">1</div>
+          <div style="font-size: 12.5px; font-weight: 600;">con desvío de plata</div>
+          <div style="font-size: 11.5px; color: #9b9ba4;">gastó más que lo que avanzó</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
+          <div class="kpi-v tnum">2</div>
+          <div style="font-size: 12.5px; font-weight: 600;">sin novedades hace 30 días</div>
+          <div style="font-size: 11.5px; color: #9b9ba4;">nadie cargó avance</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
+          <div class="kpi-v tnum" style="color: #2fa36b;">1</div>
+          <div style="font-size: 12.5px; font-weight: 600;">publicada al vecino</div>
+          <div style="font-size: 11.5px; color: #9b9ba4;">Predio municipal</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros: píldoras (pasan a combo cuando no entran) + vistas -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <span class="pill on">Obras</span>
+        <span class="pill">Programas</span>
+        <span style="width: 1px; height: 20px; background: rgba(128,128,128,.2);"></span>
+        <span class="pill">En ejecución</span>
+        <span class="pill">Por empezar</span>
+        <span class="pill">Terminadas</span>
+        <span style="width: 1px; height: 20px; background: rgba(128,128,128,.2);"></span>
+        <span class="pill">Contratista: todos</span>
+      </div>
+      <div style="display: flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid rgba(128,128,128,.2);">
+        <span style="padding: 6px 12px; border-radius: 8px; background: rgba(128,128,128,.16); font-size: 12.5px; font-weight: 600;">Tarjetas</span>
+        <span style="padding: 6px 12px; border-radius: 8px; font-size: 12.5px; color: #9b9ba4;">Tabla</span>
+        <span style="padding: 6px 12px; border-radius: 8px; font-size: 12.5px; color: #9b9ba4;">Mapa</span>
+      </div>
+    </div>
+
+    <!-- Tarjetas (av2-tarj): una por obra -->
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+
+      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Predio municipal</div>
+            <div style="font-size: 12.5px; color: #9b9ba4;">Espacio deportivo · por contrato · Hidronorte</div>
+          </div>
+          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #2fa36b; border-color: rgba(47,163,107,.4);">en plazo</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 3 de 4 · Techado y cerramientos</span><span class="tnum" style="color: #9b9ba4;">62% avance</span></div>
+          <div class="bar"><div style="width: 62%; background: #2f8fdc;"></div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
+          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$71,0 M</span> <span style="color: #9b9ba4;">ejecutados de $118 M · 21 gastos</span></div>
+          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+            Reproducir
+          </div>
+        </div>
+      </div>
+
+      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Vivienda Semilla</div>
+            <div style="font-size: 12.5px; color: #9b9ba4;">Viviendas · por administración · cuadrilla propia</div>
+          </div>
+          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #2fa36b; border-color: rgba(47,163,107,.4);">en plazo</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 2 de 3 · Mampostería</span><span class="tnum" style="color: #9b9ba4;">45% avance</span></div>
+          <div class="bar"><div style="width: 45%; background: #2f8fdc;"></div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
+          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$30,7 M</span> <span style="color: #9b9ba4;">ejecutados de $64 M · 36 gastos</span></div>
+          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+            Reproducir
+          </div>
+        </div>
+      </div>
+
+      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(214,84,84,.45); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Salón de actos</div>
+            <div style="font-size: 12.5px; color: #9b9ba4;">Edificio público · por contrato · Chochi Paredes</div>
+          </div>
+          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #d65454; border-color: rgba(214,84,84,.5);">desvío de plata</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 2 de 4 · Estructura</span><span class="tnum" style="color: #9b9ba4;">40% avance · 70% gastado</span></div>
+          <div class="bar"><div style="width: 40%; background: #d65454;"></div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
+          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$21,1 M</span> <span style="color: #9b9ba4;">ejecutados de $30 M · 32 gastos</span></div>
+          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+            Reproducir
+          </div>
+        </div>
+      </div>
+
+      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Balneario</div>
+            <div style="font-size: 12.5px; color: #9b9ba4;">Espacio público · por administración</div>
+          </div>
+          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #d99a2b; border-color: rgba(217,154,43,.5);">atrasada 34 días</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 1 de 2 · Vestuarios</span><span class="tnum" style="color: #9b9ba4;">20% avance</span></div>
+          <div class="bar"><div style="width: 20%; background: #d99a2b;"></div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
+          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$5,1 M</span> <span style="color: #9b9ba4;">ejecutados · sin presupuesto cargado</span></div>
+          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+            Reproducir
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

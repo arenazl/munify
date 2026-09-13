@@ -107,6 +107,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Cartel de mantenimiento (MAINTENANCE_MODE=true): 503 a todo salvo /health,
+# que es lo que Cloud Run y el protocolo de la ventana consultan. Va ANTES del
+# audit para no llenar audit_logs con las requests rechazadas.
+@app.middleware("http")
+async def cartel_de_mantenimiento(request, call_next):
+    if settings.MAINTENANCE_MODE and request.url.path != "/health":
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "mantenimiento",
+                     "mensaje": "Munify esta en mantenimiento programado. Volvemos en minutos."},
+            headers={"Retry-After": "300"},
+        )
+    return await call_next(request)
+
+
 # Audit middleware: loggea cada request /api/* a la tabla audit_logs
 # (en sesión separada y fire-and-forget — no bloquea el response).
 # También sigue imprimiendo la línea a stdout para los logs de Cloud Run.

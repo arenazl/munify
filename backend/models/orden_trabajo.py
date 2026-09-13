@@ -82,6 +82,12 @@ class OrdenTrabajo(Base):
     empleado_id = Column(Integer, ForeignKey("empleados.id", ondelete="SET NULL"), nullable=True, index=True)
     empleado = relationship("Empleado")
 
+    # De que obra (y etapa) es este trabajo. Una obra por administracion son N
+    # ordenes de trabajo; sus horas reales son el costo de mano de obra (plan
+    # Obras, F0 esquema / F4 uso).
+    proyecto_id = Column(Integer, ForeignKey("proyectos.id", ondelete="SET NULL"), nullable=True, index=True)
+    etapa_id = Column(Integer, ForeignKey("obra_etapas.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Programación
     fecha_programada = Column(Date, nullable=True)
     hora_inicio = Column(Time, nullable=True)

@@ -147,7 +147,14 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const detail = error.response?.data?.detail;
 
-    if (status === 401) {
+    if (status === 503 && detail === 'mantenimiento') {
+      // Cartel de mantenimiento: el backend rechaza todo durante una ventana
+      // (MAINTENANCE_MODE). El cartel lo muestra MantenimientoCartel, que
+      // escucha este evento; aca solo se avisa.
+      window.dispatchEvent(new CustomEvent('munify:mantenimiento', {
+        detail: error.response?.data?.mensaje,
+      }));
+    } else if (status === 401) {
       // Páginas PÚBLICAS: un 401 de fondo jamás debe expulsar al login.
       // Bug real: /demo echaba al usuario a /bienvenido por un 401 transitorio
       // del autocomplete mientras el backend deployaba (2026-07-03).

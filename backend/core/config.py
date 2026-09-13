@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     # Validación de email (desactivar para demos/desarrollo)
     SKIP_EMAIL_VALIDATION: bool = True
 
+    # Cartel de mantenimiento: con true, TODO responde 503 salvo GET /health.
+    # Lo prende Infra en Cloud Run SOLO durante la noche de producción
+    # (docs/tesoreria/03-revision-fable-y-plan-contingencia.md, seccion 6).
+    # En QA no se enciende: el ensayo del protocolo corre en local.
+    MAINTENANCE_MODE: bool = False
+
     # Web Push (VAPID keys)
     VAPID_PUBLIC_KEY: str = ""
     VAPID_PRIVATE_KEY: str = ""

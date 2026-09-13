@@ -40,6 +40,11 @@ class Empleado(Base):
     capacidad_maxima = Column(Integer, default=10)
     activo = Column(Boolean, default=True)
 
+    # La persona de la que esta ficha laboral es parte (plan Persona, F0).
+    # Nullable hasta el backfill (Parte B2); despues pasa a NOT NULL.
+    persona_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"), nullable=True, index=True)
+    persona = relationship("Contacto", foreign_keys=[persona_id])
+
     # Horario default (legacy, usar empleado_horarios para horarios por dia)
     hora_entrada = Column(Time, nullable=True)
     hora_salida = Column(Time, nullable=True)

@@ -239,6 +239,7 @@ from .municipio_modulo import MunicipioModulo
 
 # Tesoreria (control de gastos del intendente)
 from .contacto import Contacto, TipoContacto
+from .persona import PersonaTipo, PersonaRol
 from .gasto import (
     Gasto,
     GastoCuota,
@@ -248,7 +249,7 @@ from .gasto import (
     FormaPago,
     EstadoGastoCuota,
 )
-from .proyecto import Proyecto, GastoProyecto, EstadoProyecto
+from .proyecto import Proyecto, GastoProyecto, EstadoProyecto, ObraEtapa, TipoProyecto, OrigenImputacion
 from .tesoreria_concepto import TesoreriaTipoConcepto, TesoreriaConcepto
 from .tesoreria_extra import (
     TesoreriaTipoEmpleado, TesoreriaCaja, TesoreriaMovimientoCaja,
@@ -264,6 +265,8 @@ __all__ += [
     "MunicipioModulo",
     "Contacto",
     "TipoContacto",
+    "PersonaTipo",
+    "PersonaRol",
     "Gasto",
     "GastoCuota",
     "DestinoGasto",
@@ -274,6 +277,9 @@ __all__ += [
     "Proyecto",
     "GastoProyecto",
     "EstadoProyecto",
+    "ObraEtapa",
+    "TipoProyecto",
+    "OrigenImputacion",
     "TesoreriaTipoConcepto",
     "TesoreriaConcepto",
     "TesoreriaTipoEmpleado",

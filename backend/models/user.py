@@ -111,6 +111,11 @@ class User(Base):
 
     # Relacion con empleado (si es usuario empleado) - DEPRECATED
     empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)
+
+    # El login como perfil de una Persona (plan Persona, F0). Se backfillea
+    # SOLO para roles de planta, nunca vecinos: crearia una persona por
+    # ciudadano y contaminaria el padron.
+    persona_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"), nullable=True, index=True)
     empleado = relationship("Empleado", back_populates="miembros")
 
     # Relación con dependencia (para usuarios de tipo dependencia/área)
