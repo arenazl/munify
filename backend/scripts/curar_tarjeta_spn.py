@@ -21,12 +21,26 @@ tarjeta nunca bajo. Encima el programado seguia agendando un gasto fijo cada 10.
 
 QUE HACE, en UNA transaccion:
   1. Da de baja los gastos que eran pagos del resumen (baja logica + borra su
-     egreso, igual que hace la app al eliminar un gasto) y los reemplaza por
-     PAGOS DE TARJETA con la misma fecha y monto: ingreso en la caja-tarjeta +
-     egreso en la caja del banco. El banco queda igual al centavo; la tarjeta
-     baja; el gasto deja de estar duplicado.
+     egreso, igual que hace la app al eliminar un gasto) y registra en su lugar
+     PAGOS DE TARJETA de verdad: ingreso en la caja-tarjeta + egreso en la caja
+     del banco. El gasto deja de estar duplicado.
   2. Convierte el programado en un pago de tarjeta: sin contacto, sin monto
      (paga todo lo que deba el dia que vence).
+
+DOS MODOS, porque los numeros del municipio no cierran entre si (ver doc 02: los
+tres pagos suman 6.636.341,50 y las compras cargadas 6.247.510,07):
+
+  --modo cero    (default) UN solo pago por la deuda exacta del dia, fechado en
+                 el ultimo pago que registro el municipio. La tarjeta queda en
+                 CERO, que es de donde tiene que arrancar el circuito nuevo. La
+                 caja del banco recupera la diferencia que se habia pagado de
+                 mas. Es lo que pidio el dueño el 2026-09-12: *"le sacamos esos
+                 registros que hizo el equivocadamente, le dejamos el saldo en
+                 cero, y que a partir del mes que viene funcione bien"*.
+  --modo espejo  un pago por cada gasto, con su misma fecha y monto. La caja del
+                 banco queda igual al centavo y la tarjeta refleja la diferencia
+                 como saldo a favor. Sirve cuando los numeros del municipio SI
+                 cierran y no se le quiere tocar el banco.
 
 Los gastos se buscan por fecha + monto + descripcion, no por id: en cada base
 los ids son distintos. Cada uno tiene que matchear EXACTAMENTE uno, activo, en
@@ -57,6 +71,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from _entorno import parser_base, resolver_db, aplicar_o_seco
 from casos_tarjeta import caso as buscar_caso
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from services.tesoreria_tarjeta import plata  # noqa: E402
 
 BACKEND = Path(__file__).resolve().parent.parent
 # El .env local (si existe) aporta DATABASE_URL para trabajar en QA sin exportar
@@ -99,7 +116,7 @@ async def curar(args, ent, eng) -> int:
     aplicar = aplicar_o_seco(args)
     MUNI, ORIGEN, TARJETA = caso.municipio_id, caso.caja_origen_id, caso.tarjeta_caja_id
     print(f"base: {ent.base} · caso {caso.clave} (muni {MUNI}) "
-          f"({'APLICA' if aplicar else 'EN SECO'}) | agosto-doble={args.agosto_doble}")
+          f"({'APLICA' if aplicar else 'EN SECO'}) | modo={args.modo}")
 
     async with eng.connect() as c:
         tr = await c.begin()
@@ -168,29 +185,44 @@ async def curar(args, ent, eng) -> int:
 
         # ---------- acciones ----------
         concepto = f"Pago de tarjeta {nombre_tarjeta}"[:150]
+
+        async def registrar_pago(monto, fecha, detalle, pp_del_pago, restante=Decimal(0)):
+            """Los dos movimientos de un pago de tarjeta: entra en la tarjeta, sale
+            del banco. La constancia lleva el MONTO escrito, igual que la que deja
+            la app: es el comprobante que le queda al municipio."""
+            cierre = "la tarjeta queda en cero" if restante <= 0 else f"sigue debiendo {plata(restante)}"
+            constancia = (f"Pago de {nombre_tarjeta} por {plata(monto)} desde {nombre_origen}: "
+                          f"{cierre} {MARCA}, {detalle}]")
+            for caja, tipo in ((TARJETA, "ingreso"), (ORIGEN, "egreso")):
+                await c.execute(text(
+                    "INSERT INTO tesoreria_movimientos_caja (municipio_id, caja_id, tipo, monto, fecha, concepto, descripcion, pago_programado_id, conciliado, created_at) "
+                    f"VALUES (:m, :caja, '{tipo}', :mo, :f, :co, :d, :pp, 0, NOW())"),
+                    {"m": MUNI, "caja": caja, "mo": monto, "f": fecha, "co": concepto,
+                     "d": constancia, "pp": pp_del_pago})
+
+        # Los gastos mal cargados se van SIEMPRE: no eran gastos.
         for gid, pago in gastos:
-            borrar_sin_convertir = args.agosto_doble == "borrar" and (pago.fecha, pago.monto) == AGOSTO_10
             await c.execute(text("DELETE FROM tesoreria_movimientos_caja WHERE gasto_id=:g"), {"g": gid})
-            nota = ("pago duplicado de agosto, dado de baja sin convertir" if borrar_sin_convertir
-                    else "era un pago de tarjeta, reemplazado por pago de tarjeta")
             await c.execute(text(
                 "UPDATE gastos SET activo=0, observaciones=CONCAT(COALESCE(observaciones,''), :nota) WHERE id=:g"),
-                {"g": gid, "nota": f" {MARCA}] {nota}"})
-            if borrar_sin_convertir:
-                print(f"  gasto {gid} ({pago.descripcion} {pago.fecha} {pago.monto:,.2f}): baja sin convertir")
-                continue
-            pp_del_pago = pp_id if pago.del_programado else None
-            await c.execute(text(
-                "INSERT INTO tesoreria_movimientos_caja (municipio_id, caja_id, tipo, monto, fecha, concepto, descripcion, pago_programado_id, conciliado, created_at) "
-                "VALUES (:m, :t, 'ingreso', :mo, :f, :co, :d, :pp, 0, NOW())"),
-                {"m": MUNI, "t": TARJETA, "mo": pago.monto, "f": pago.fecha, "co": concepto,
-                 "d": f"Pago desde {nombre_origen} {MARCA}, ex gasto #{gid}]", "pp": pp_del_pago})
-            await c.execute(text(
-                "INSERT INTO tesoreria_movimientos_caja (municipio_id, caja_id, tipo, monto, fecha, concepto, descripcion, pago_programado_id, conciliado, created_at) "
-                "VALUES (:m, :cj, 'egreso', :mo, :f, :co, :d, :pp, 0, NOW())"),
-                {"m": MUNI, "cj": ORIGEN, "mo": pago.monto, "f": pago.fecha, "co": concepto,
-                 "d": f"Pago de {nombre_tarjeta} {MARCA}, ex gasto #{gid}]", "pp": pp_del_pago})
-            print(f"  gasto {gid} ({pago.descripcion} {pago.fecha} {pago.monto:,.2f}): convertido en pago de tarjeta")
+                {"g": gid, "nota": f" {MARCA}] no era un gasto: era un pago de la tarjeta"})
+            print(f"  gasto {gid} ({pago.descripcion} {pago.fecha} {pago.monto:,.2f}): dado de baja")
+
+        if args.modo == "cero":
+            # UN pago por lo que la tarjeta debe hoy. Queda en cero, que es de
+            # donde tiene que arrancar el circuito nuevo. Se fecha en el ultimo
+            # pago que registro el municipio, para no inventar una fecha futura.
+            fecha_pago = max(p.fecha for p in caso.pagos)
+            await registrar_pago(deuda_antes, fecha_pago, f"resumen pagado al {fecha_pago}", pp_id)
+            print(f"  pago de tarjeta {plata(deuda_antes)} al {fecha_pago}: la tarjeta queda en CERO")
+        else:
+            for gid, pago in gastos:
+                if args.agosto_doble == "borrar" and (pago.fecha, pago.monto) == AGOSTO_10:
+                    print(f"  gasto {gid} ({pago.fecha}): no se registra como pago (duplicado de agosto)")
+                    continue
+                await registrar_pago(pago.monto, pago.fecha, f"ex gasto #{gid}",
+                                     pp_id if pago.del_programado else None)
+                print(f"  pago de tarjeta {plata(pago.monto)} al {pago.fecha} (ex gasto #{gid})")
 
         await c.execute(text(
             "UPDATE tesoreria_pagos_programados SET tarjeta_caja_id=:t, contacto_id=NULL, monto_pesos=NULL, concepto=:co, "
@@ -206,15 +238,28 @@ async def curar(args, ent, eng) -> int:
         activos = (await uno(c, "SELECT COUNT(*) FROM gastos WHERE municipio_id=:m AND activo=1 AND caja_id=:cj "
                                 "AND descripcion IN :ds", m=MUNI, cj=ORIGEN,
                              ds=tuple({p.descripcion for p in caso.pagos})))[0]
-        print(f"\ndespues: caja {nombre_origen} {saldo_despues:,.2f} (antes {saldo_antes:,.2f}, diferencia {saldo_despues - saldo_antes:,.2f})")
-        print(f"         deuda {nombre_tarjeta} {deuda_despues:,.2f} (antes {deuda_antes:,.2f})"
-              + ("  -> saldo A FAVOR: compras del resumen real que nunca se cargaron" if deuda_despues < 0 else ""))
+        diferencia = saldo_despues - saldo_antes
+        print(f"\ndespues: caja {nombre_origen} {saldo_despues:,.2f} (antes {saldo_antes:,.2f}, diferencia {diferencia:,.2f})")
+        print(f"         deuda {nombre_tarjeta} {deuda_despues:,.2f} (antes {deuda_antes:,.2f})")
         print(f"         gastos 'pago de tarjeta' activos: {activos}")
-        esperado = Decimal(0) if args.agosto_doble == "convertir" else AGOSTO_10[1]
-        if saldo_despues - saldo_antes != esperado or activos != 0:
-            print("\nABORTA: los chequeos posteriores no cierran, se deshace todo")
-            await tr.rollback()
-            return 1
+
+        if args.modo == "cero":
+            # La tarjeta TIENE que quedar en cero; el banco se mueve por lo que
+            # el municipio habia pagado de mas, y ese numero se informa.
+            pagado_antes = sum(p.monto for p in caso.pagos)
+            if deuda_despues != 0 or activos != 0:
+                print("\nABORTA: la tarjeta no quedo en cero, se deshace todo")
+                await tr.rollback()
+                return 1
+            if diferencia:
+                print(f"\n   el municipio habia registrado {pagado_antes:,.2f} de pagos y la tarjeta debia "
+                      f"{deuda_antes:,.2f}: {diferencia:,.2f} vuelven a la caja {nombre_origen}.")
+        else:
+            esperado = Decimal(0) if args.agosto_doble == "convertir" else AGOSTO_10[1]
+            if diferencia != esperado or activos != 0:
+                print("\nABORTA: los chequeos posteriores no cierran, se deshace todo")
+                await tr.rollback()
+                return 1
 
         if aplicar:
             await tr.commit()
@@ -229,8 +274,11 @@ async def correr() -> int:
     ap = parser_base("Curacion de la tarjeta de credito")
     ap.add_argument("--caso", default="spn", choices=["spn", "merlo"],
                     help="spn = San Pedro Norte, el caso real (default); merlo = el ensayo en el sandbox")
+    ap.add_argument("--modo", choices=["cero", "espejo"], default="cero",
+                    help="cero = un pago por la deuda exacta y la tarjeta queda en 0 (default); "
+                         "espejo = un pago por cada gasto, el banco no cambia")
     ap.add_argument("--agosto-doble", choices=["convertir", "borrar"], default="convertir",
-                    help="que hacer con el pago del 10 de agosto (default: convertir)")
+                    help="solo en modo espejo: que hacer con el pago del 10 de agosto")
     args = ap.parse_args()
     ent = resolver_db(args)
     eng = create_async_engine(ent.url)

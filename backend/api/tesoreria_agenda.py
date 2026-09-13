@@ -16,7 +16,7 @@ from models import (
 )
 from models.gasto import EstadoGastoCuota
 from services.tesoreria_tarjeta import (
-    PagoTarjetaError, cargar_tarjeta_y_origen, deudas_de_tarjetas, registrar_pago_tarjeta,
+    PagoTarjetaError, cargar_tarjeta_y_origen, deudas_de_tarjetas, plata, registrar_pago_tarjeta,
 )
 from schemas.tesoreria_extra import (
     PagoProgramadoCreate, PagoProgramadoUpdate, PagoProgramadoResponse,
@@ -477,11 +477,13 @@ def _monto_tarjeta(pp: TesoreriaPagoProgramado, override) -> Optional[Decimal]:
 
 
 def _mensaje_tarjeta(nombre: str, res) -> str:
+    """Lo que se le dice al operador. Siempre con el monto: es lo que va a
+    buscar para controlar contra el resumen del banco."""
     if res.omitido:
-        return f"'{nombre}' no tenia deuda: se salteo el periodo sin mover plata"
+        return f"{nombre} no tenia deuda: se salteo el periodo sin mover plata"
     if res.deuda_restante <= 0:
-        return f"'{nombre}' queda en cero"
-    return f"'{nombre}' sigue debiendo ${res.deuda_restante:,.2f}"
+        return f"Se pago {nombre} por {plata(res.monto)}: la tarjeta queda en cero"
+    return f"Se pago {nombre} por {plata(res.monto)}: sigue debiendo {plata(res.deuda_restante)}"
 
 
 async def _ejecutar_pago_tarjeta(
@@ -499,8 +501,8 @@ async def _ejecutar_pago_tarjeta(
         tarjeta, origen = await cargar_tarjeta_y_origen(db, muni_id, pp.tarjeta_caja_id, pp.caja_id)
         res = await registrar_pago_tarjeta(
             db, muni_id, tarjeta, origen, _monto_tarjeta(pp, monto_override), fecha,
-            concepto=pp.concepto, descripcion=pp.descripcion or None,
-            pago_programado_id=pp.id, sin_deuda="omitir",
+            concepto=pp.concepto, descripcion=None,
+            pago_programado_id=pp.id, sin_deuda="omitir", desde_programado=True,
         )
     except PagoTarjetaError as e:
         # Sin commit, el claim de ultimo_pago se descarta con la sesion.
@@ -769,8 +771,8 @@ async def ejecutar_pagos_masivo(
             # Con sin_deuda="omitir" y monto validado > 0 esto no puede fallar.
             res = await registrar_pago_tarjeta(
                 db, muni_id, tarjeta, origen, _monto_tarjeta(pp, None), fecha,
-                concepto=pp.concepto, descripcion=pp.descripcion or None,
-                pago_programado_id=pp.id, sin_deuda="omitir",
+                concepto=pp.concepto, descripcion=None,
+                pago_programado_id=pp.id, sin_deuda="omitir", desde_programado=True,
             )
             _avanzar_periodo(pp)
             items.append(EjecutarMasivoItem(
