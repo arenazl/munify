@@ -30,6 +30,31 @@ from models import TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja
 from models.tesoreria_extra import es_caja_tarjeta
 
 
+def plata(monto: Decimal) -> str:
+    """$1.234.567,89 — el formato en el que el municipio lee un numero."""
+    entero, _, dec = f"{monto:.2f}".partition(".")
+    negativo = entero.startswith("-")
+    entero = entero.lstrip("-")
+    miles = ""
+    while len(entero) > 3:
+        miles = "." + entero[-3:] + miles
+        entero = entero[:-3]
+    return f"{'-' if negativo else ''}${entero}{miles},{dec}"
+
+
+def narrar_pago(tarjeta_nombre: str, origen_nombre: str, monto: Decimal, deuda_restante: Decimal,
+                programado: bool = False) -> str:
+    """La CONSTANCIA del pago, con el monto escrito. Es lo que el municipio ve
+    en el movimiento de caja y lo que le queda como comprobante: tiene que
+    poder leerse solo, sin abrir la ficha ni mirar otra columna (dueño,
+    2026-09-12: "el pago programado tiene que decir, se hizo un pago programado
+    de la tarjeta tal por tantos pesos")."""
+    quien = "Pago programado" if programado else "Pago"
+    cierre = ("la tarjeta queda en cero" if deuda_restante <= 0
+              else f"sigue debiendo {plata(deuda_restante)}")
+    return f"{quien} de {tarjeta_nombre} por {plata(monto)} desde {origen_nombre}: {cierre}"
+
+
 class PagoTarjetaError(Exception):
     """Validacion de negocio. `status` es el HTTP que corresponde devolver."""
 
@@ -131,6 +156,7 @@ async def registrar_pago_tarjeta(
     descripcion: Optional[str] = None,
     pago_programado_id: Optional[int] = None,
     sin_deuda: str = "error",
+    desde_programado: bool = False,
 ) -> ResultadoPagoTarjeta:
     """Agrega los dos movimientos a la sesion. NO hace commit: el que llama
     decide la transaccion (la agenda mete esto junto con el avance del
@@ -155,6 +181,12 @@ async def registrar_pago_tarjeta(
         raise PagoTarjetaError(422, "El monto a pagar tiene que ser mayor a cero")
 
     concepto_final = (concepto or f"Pago de tarjeta {tarjeta.nombre}").strip()[:150]
+    # La constancia lleva el MONTO escrito: es el comprobante que le queda al
+    # municipio y tiene que leerse solo. Si el que llama trae su propio texto
+    # (la curacion, por ejemplo), se respeta.
+    constancia = descripcion or narrar_pago(
+        tarjeta.nombre, origen.nombre, monto_final, deuda - monto_final, desde_programado,
+    )
 
     # INGRESO en la tarjeta: cancela deuda -> sube el credito disponible.
     db.add(TesoreriaMovimientoCaja(
@@ -164,7 +196,7 @@ async def registrar_pago_tarjeta(
         monto=monto_final,
         fecha=fecha,
         concepto=concepto_final,
-        descripcion=descripcion or f"Pago desde {origen.nombre}",
+        descripcion=constancia,
         pago_programado_id=pago_programado_id,
     ))
     # EGRESO en la caja real: de ahi sale efectivamente la plata.
@@ -175,7 +207,7 @@ async def registrar_pago_tarjeta(
         monto=monto_final,
         fecha=fecha,
         concepto=concepto_final,
-        descripcion=descripcion or f"Pago de {tarjeta.nombre}",
+        descripcion=constancia,
         pago_programado_id=pago_programado_id,
     ))
     return ResultadoPagoTarjeta(monto_final, total, deuda, deuda - monto_final)
