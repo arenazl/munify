@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { saveMunicipio } from '../utils/municipioStorage';
 import {
   Building2, Plus, Search, MapPin, Loader2, X,
   ChevronDown, ChevronUp, Map, Briefcase, Mail
 } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -33,6 +36,7 @@ interface Barrio {
 
 export default function Municipios() {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
@@ -330,6 +334,20 @@ export default function Municipios() {
                   </div>
 
                   <div className="flex items-center gap-3">
+                    {/* Entrar como admin desde acá, sin pasar por el login del municipio (dueño, 2026-09-13) */}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await saveMunicipio({ id: String(municipio.id), codigo: municipio.codigo, nombre: municipio.nombre, color: municipio.color_primario || theme.primary });
+                        navigate('/gestion/dashboard');
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
+                      style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
+                      title="Entrar al municipio como admin con tu sesión de super"
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      Entrar
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setToSendBienvenida(municipio); }}
                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"

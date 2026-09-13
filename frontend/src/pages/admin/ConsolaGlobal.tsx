@@ -4,7 +4,8 @@ import {
   Building2, Users, ClipboardList, FileText, Activity, AlertCircle,
   TrendingUp, Clock, ArrowRight, Zap,
 } from 'lucide-react';
-import { auditApi } from '../../lib/api';
+import { auditApi, municipiosApi } from '../../lib/api';
+import { saveMunicipio } from '../../utils/municipioStorage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ConsolaResumen } from '../../types/audit';
@@ -19,6 +20,22 @@ export default function ConsolaGlobal() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  // Entrar como admin a un municipio DESDE la consola, sin pasar por el login
+  // del municipio (dueño, 2026-09-13): fija el contexto igual que el selector
+  // del sidebar y va al tablero con la sesión de super.
+  const [catalogo, setCatalogo] = useState<Record<number, { id: number; codigo: string; nombre: string; color_primario?: string | null }>>({});
+  useEffect(() => {
+    municipiosApi.getAll().then((r) => {
+      const lista = (Array.isArray(r.data) ? r.data : r.data?.items ?? []) as { id: number; codigo: string; nombre: string; color_primario?: string | null }[];
+      setCatalogo(Object.fromEntries(lista.map((m) => [m.id, m])));
+    }).catch(() => undefined);
+  }, []);
+  const entrarComoAdmin = async (municipioId: number) => {
+    const m = catalogo[municipioId];
+    if (!m) return;
+    await saveMunicipio({ id: String(m.id), codigo: m.codigo, nombre: m.nombre, color: m.color_primario || theme.primary });
+    navigate('/gestion/dashboard');
+  };
   const [data, setData] = useState<ConsolaResumen | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -124,7 +141,12 @@ export default function ConsolaGlobal() {
               ) : (
                 <ul className="space-y-2">
                   {data.top_municipios.map((m, i) => (
-                    <li key={m.municipio_id} className="flex items-center justify-between text-sm">
+                    <li
+                      key={m.municipio_id}
+                      className="flex items-center justify-between text-sm cursor-pointer rounded-lg px-1 -mx-1 hover:bg-white/5"
+                      title="Entrar como admin"
+                      onClick={() => { void entrarComoAdmin(m.municipio_id); }}
+                    >
                       <span className="flex items-center gap-2" style={{ color: theme.text }}>
                         <span
                           className="text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold"
