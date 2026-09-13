@@ -396,7 +396,8 @@ pines" cuando no le llegan poligonos):
 `cartografiado: true` y 88 poligonos; `.../700070` (Pocito) devuelve
 `cartografiado: false`, **0 poligonos** y los 47 nombres con su punto; el
 listado `?pais=AR` trae 147 cartografiados sobre 2.082. En la pantalla
-(Playwright sobre `app-qa.munify.com.ar`, solapa Mapa a pantalla completa):
+(Playwright sobre el front de QA — entonces `app-qa.munify.com.ar`, hoy
+`qa.munify.com.ar` —, solapa Mapa a pantalla completa):
 Funes dibuja sus barrios adentro del contorno; **Pocito dibuja el contorno del
 municipio con los barrios como pines**. 0 errores de consola, 0 requests 4xx.
 Capturas en el scratchpad de la sesion (`_cart_funes.png`, `_cart_pocito.png`).

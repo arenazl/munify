@@ -49,10 +49,11 @@ export function getSubdomainMunicipio(): string | null {
     const subdomain = parts[0].toLowerCase();
 
     // Ignorar subdominios comunes que no son municipios. Los de la plataforma
-    // ('app-qa', 'qa', 'calls') son la razon por la que esto fallaba SOLO en QA:
-    // 'app' estaba y 'app-qa' no, asi que app-qa.munify.com.ar devolvia "app-qa"
-    // como codigo de municipio y le ganaba al ?municipio= de la URL.
-    const ignoredSubdomains = ['www', 'api', 'admin', 'app', 'app-qa', 'qa', 'calls', 'demo', 'staging', 'test'];
+    // ('qa', 'lqa', 'calls') son la razon por la que esto fallaba SOLO en QA: el
+    // host de QA se leia como codigo de municipio y le ganaba al ?municipio= de la
+    // URL. Se dejan tambien los alias viejos ya dados de baja ('app-qa', 'qa-app'):
+    // no molestan y cubren un bookmark que sobreviva.
+    const ignoredSubdomains = ['www', 'api', 'admin', 'app', 'qa', 'lqa', 'app-qa', 'qa-app', 'calls', 'demo', 'staging', 'test'];
     if (ignoredSubdomains.includes(subdomain)) {
       return null;
     }

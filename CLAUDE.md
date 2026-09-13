@@ -1,4 +1,9 @@
-# Instrucciones para Claude — reglas duras
+# Instrucciones para Claude — convenciones del proyecto
+
+> Los principios de trabajo (7, lineamientos y no reglas duras) viven en el CLAUDE.md global y en
+> `base-compartida/00-LINEAMIENTOS.md`. Lo de abajo son convenciones de ESTE repo: dónde vive cada
+> cosa y cómo se construye. Si el dueño dice "local" en la sesión, se trabaja local y no se pushea
+> hasta que lo pida; el default sigue siendo push a `qa` al cerrar un bloque.
 
 > ### OJO: hay un SUBPROYECTO hermano — `munify-calls`
 >
@@ -79,10 +84,10 @@ async def migrate():
 
 ---
 
-## REGLAS DURAS DE DESARROLLO (NO NEGOCIABLES)
+## CONVENCIONES DE DESARROLLO
 
 ### 1. DRY — componentes compartidos
-- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo al kit `components/abmv2/` (regla 6.bis — la carpeta vieja no recibe piezas nuevas).
+- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo al **kit v3** (carpeta `components/abmv2/`, nombre viejo — ver 6.bis).
 - Variaciones se manejan con **props**, no duplicando componentes (ej. `<ReclamoCard showCreador />`, NO `<ReclamoCardVecino>` + `<ReclamoCardSupervisor>`).
 - **Antes de crear** un componente nuevo, buscar en `components/ui/` (correr `python scripts/generate_ui_inventory.py` si dudás del inventario actual).
 
@@ -123,8 +128,14 @@ Inventario completo y demás reemplazos: **BUILD_GUIDE.md §5 y §6**.
 - Lista + Sheet en la misma ruta. Click en card abre Sheet en modo edición.
 - **NUNCA** rutas `/<entidad>/nuevo`, `/<entidad>/:id`, `/<entidad>/:id/edit`.
 
-### 6.bis. Pantallas NUEVAS = kit abmv2. `ABMPage` es LEGACY.
-Toda pantalla nueva se arma con el kit `components/abmv2/` — `SemanticAbmPage`
+### 6.bis. Pantallas NUEVAS = kit v3. `ABMPage` es LEGACY.
+
+> **Nomenclatura (dueño, 2026-09-06): el kit se llama v3, y así se lo nombra siempre.**
+> La guía es `base-compartida/framework/GUIA-SEMANTIC-ABM-V3.md`. Lo que todavía
+> dice v2 son RUTAS con el nombre viejo — la carpeta `components/abmv2/` de este
+> repo y el catálogo `APP_GUIDE/components/v2` — pendientes de renombre. Son el
+> mismo kit, no versiones distintas. Al escribir doc o hablar: **kit v3**.
+Toda pantalla nueva se arma con el **kit v3** (carpeta `components/abmv2/`) — `SemanticAbmPage`
 como composición mayor, o sus PIEZAS sueltas (hero semántico y sus variantes,
 strip de 5 KPIs con veredictos, acciones por frase, filtros, las tres vistas,
 `DataTable` con sus kinds, `SideModal`, píldoras adaptativas↔combo,
@@ -133,14 +144,14 @@ usar una pieza o todo. **Prohibido implementar pantallas nuevas sobre
 `components/ui/ABMPage`** (queda sólo para las viejas aún no migradas).
 **La carpeta de controles vieja (`components/ui/`) está DEPRECADA como
 canon**: no se agrega nada ahí; los controles que el kit aún consume desde
-ahí (combo moderno, píldoras adaptativas, date pickers…) se MIGRAN a la
-suite v2 con el concepto nuevo — tontos (el padre declara contenido y
+ahí (combo moderno, píldoras adaptativas, date pickers…) se MIGRAN al
+kit v3 con el concepto nuevo — tontos (el padre declara contenido y
 colores) y POLIMÓRFICOS/adaptables al contenedor (píldoras cuando entran,
 combo cuando no; la forma la decide el espacio).
 *Why:* el dueño detectó implementaciones nuevas cayendo al ABM y controles
 viejos (2026-08-14). El estándar estético vive en el kit, no en cada pantalla.
 
-**6.ter. Si TOCÁS una pantalla que usa `ABMPage`, la MIGRÁS a `abmv2`.**
+**6.ter. Si TOCÁS una pantalla que usa `ABMPage`, la MIGRÁS al kit v3.**
 No alcanza con que lo nuevo use el kit: `ABMPage` **no debería existir más**
 (dueño, 2026-08-31). No es una migración masiva de golpe — es la regla del
 campamento: la pantalla que se toca, se deja migrada. Quedan **28** usando
@@ -192,14 +203,14 @@ Los `name` de items del sidebar (`frontend/src/config/navigation.ts`) **siempre 
 
 ---
 
-## REGLAS DE TRABAJO CON EL USER
+## CÓMO TRABAJAMOS CON EL DUEÑO
 
-### 11. Jamás modificar módulos centrales sin consentimiento explícito
+### 11. Módulos centrales: proponer, esperar "dale", editar
 Proponer en texto primero (qué archivo, qué cambio, por qué). Esperar "dale" /
 "hacelo" / "aplicalo". "Aplicá los cambios que consideres" NO es carta blanca.
 
-### 12. Respuestas en UNA línea por defecto
-Excepción: cuando el user pide explícitamente listas, detalle, o roadmap.
+### 12. Respuestas cortas, un tema por vez
+Excepción: análisis y diagnósticos van completos; listas o roadmap cuando los pide.
 
 ### 13. No adivinar — verificar con datos reales
 Si el user duda de un resultado o pregunta "¿esto es real?", ejecutar query/script
@@ -229,11 +240,11 @@ Todo el CD son triggers de **Cloud Build** (proyecto GCP `munify-api`, región
 | Trigger | Repo | Branch | Sólo si cambia | Publica en |
 |---|---|---|---|---|
 | `deploy-munify-front` | `munify` | `master` | `frontend/**` | Pages `munify` → **app.munify.com.ar** |
-| `deploy-munify-front-qa` | `munify` | `qa` | `frontend/**` | Pages `munify-qa` → **app-qa.munify.com.ar** |
+| `deploy-munify-front-qa` | `munify` | `qa` | `frontend/**` | Pages `munify-qa` → **qa.munify.com.ar** |
 | `deploy-munify-api-us` | `munify` | `master` | `backend/**` | Cloud Run `munify-api` |
 | `deploy-munify-api-qa` | `munify` | `qa` | `backend/**` | Cloud Run `munify-api-qa` |
 | `deploy-munify-landing` | `landing` | `master` | — | Pages `munify-landing` → munify.com.ar |
-| `deploy-munify-landing-qa` | `landing` | `qa` | — | Pages `munify-landing-qa` |
+| `deploy-munify-landing-qa` | `landing` | `qa` | — | Pages `munify-landing-qa` → **lqa.munify.com.ar** |
 | `deploy-munify-calls` | **`munify-calls`** | `main` | — | Pages `munify-calls` → **calls.munify.com.ar** |
 
 - **DB:** MySQL en Aiven — `munify_prod` (prod) y `sugerenciasmun-qa` (QA).
@@ -256,7 +267,7 @@ Todo el CD son triggers de **Cloud Build** (proyecto GCP `munify-api`, región
    `.github/workflows/cd.yml` está roto/legacy — ignorarlo, el CD no pasa por GitHub Actions.)
 3. Verificar qué build corrió:
    `gcloud builds list --project=munify-api --region=us-east4 --filter="substitutions.TRIGGER_NAME=deploy-munify-front-qa" --limit=3 --format="table(status,createTime,substitutions.SHORT_SHA)"`
-   y el bundle vivo: `curl -s https://app-qa.munify.com.ar/ | grep -oE 'index-\w+\.js'`.
+   y el bundle vivo: `curl -s https://qa.munify.com.ar/ | grep -oE 'index-\w+\.js'`.
 4. NUNCA un deploy manual (`wrangler pages deploy`, `netlify deploy`): rompe la
    trazabilidad commit → deploy. Sólo `git push`.
 
@@ -264,9 +275,9 @@ Todo el CD son triggers de **Cloud Build** (proyecto GCP `munify-api`, región
 `gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update` manualmente para
 Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 
-> ### SE PUSHEA SIEMPRE a `qa` (desde 2026-08-30)
+> ### Ambiente por sesión: default push a `qa`; "local" = cero push hasta que lo pida (2026-09-05)
 >
-> **El ciclo termina en el PUSH, no en el commit.** Desarrollar → gates (build /
+> **Por default el ciclo termina en el PUSH, no en el commit.** Desarrollar → gates (build /
 > `tsc` / eslint / pyflakes) → commit → **`git push origin qa`** → informar. Sin
 > preguntar, después de cada bloque terminado.
 >
@@ -284,8 +295,8 @@ Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 > reporte vino de `qa`, verificar contra `qa` en vivo, no contra el archivo local.
 >
 > Sigue vedado SIEMPRE: `master`, promover qa→prod y escribir en la base de
-> producción. Esto **reemplaza** la regla anterior de "commit local, push sólo a
-> pedido" (2026-08-06).
+> producción. Y si el dueño dijo "local" o "no quiero más push" en la sesión, se trabaja
+> local (build/serve) y no se pushea hasta que lo pida: no es una contradicción, es su interruptor.
 
 > ### REGLA DE ORO de secretos y variables (norma del ecosistema)
 >
@@ -306,7 +317,7 @@ Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura.
 > promover qa→prod. Y ninguna sesión autoriza por otra (regla 4 del doc).
 >
 > Nota de plataforma: **los fronts viven en Cloudflare Pages** — QA en
-> `app-qa.munify.com.ar` y prod en `app.munify.com.ar`, ambos con CD por push
+> `qa.munify.com.ar` y prod en `app.munify.com.ar`, ambos con CD por push
 > vía Cloud Build de Infra. **Netlify NO SE USA MÁS en este proyecto**
 > (dueño, 2026-09-03): cualquier mención a `munify-qa.netlify.app`, a
 > `netlify deploy` o a site IDs de Netlify en docs o scripts es legacy.
@@ -323,11 +334,12 @@ significa que ya esté deployado en Cloud Run.
 - **El user trabaja local** (desde 2026-08-06). Levantar la app localmente para ver un cambio
   funcionando es la vía normal, no una excepción.
 - **`qa` NO es un preview: es un ambiente COMPLETO** (backend `munify-api-qa` +
-  DB `sugerenciasmun-qa` + front `app-qa.munify.com.ar` en Cloudflare Pages).
+  DB `sugerenciasmun-qa` + front `qa.munify.com.ar` en Cloudflare Pages).
   Flujo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. El camino
   `qa`→`master` (a producción) es exclusivo de Infra.
 - Proyectos de Cloudflare Pages: `munify` (prod, `app.munify.com.ar`), `munify-qa`
-  (QA, `app-qa.munify.com.ar`) y `munify-calls` (`calls.munify.com.ar`, repo aparte).
+  (QA, `qa.munify.com.ar`), `munify-landing-qa` (landing QA, `lqa.munify.com.ar`) y
+  `munify-calls` (`calls.munify.com.ar`, repo aparte).
 
 **Carpeta compartida:** tu carpeta propia es `base-compartida/munify/` (= tu `id`). Ahí viven tus
 docs de coordinación con Infra (ej. `AMBIENTES.md`). La raíz de `base-compartida/` es solo
@@ -345,3 +357,26 @@ NO contestar todo de una. Responder de a una y esperar antes de seguir.
 - **Este archivo (`CLAUDE.md`)** se actualiza cuando aparece una regla dura nueva o el user da feedback que se vuelve regla.
 - **NO** ensuciar `CLAUDE.md` ni `BUILD_GUIDE.md` con "estado actual del desarrollo", "fixes recientes" o decisiones de producto. Eso vive en commits, PRs e issues.
 - Docs viejos (planes terminados, specs ya implementadas) → `docs/legacy/`.
+
+---
+
+## FUENTE OFICIAL DE MUNICIPIOS (para demos y cartografía)
+
+El padrón del Estado está **en este repo**, no hay que salir a buscarlo:
+
+    docs/cartografia/fuentes-oficiales/padron_municipios.csv
+
+2.304 municipios argentinos con `codigo` INDEC, provincia, departamento, categoría,
+población 2022, **los nombres de sus localidades**, coordenadas, autoridad y contacto.
+Es el ReFeGLo del Ministerio del Interior cruzado con el INDEC (`datos.gob.ar`).
+
+**Antes de tocar el catálogo de municipios o la generación de demos, leer
+[`docs/cartografia/irregularidades-catalogo-2026-09-07.md`](docs/cartografia/irregularidades-catalogo-2026-09-07.md)**:
+el cruce del catálogo contra ese padrón, hecho desde `munify-calls` el 2026-09-07. Marca
+seis nombres repetidos dentro de la misma zona, 836 municipios con la web oficial caída y
+las capacidades digitales medidas por municipio.
+
+**Regla que salió de ahí: la clave de un municipio nunca es el nombre.** `avellaneda` son
+tres municipios distintos y `general alvear` cuatro. Se usa el `codigo` INDEC, o el nombre
+con su provincia. En `munify-calls` el `id` se armó sólo con el nombre y produjo datos
+cruzados que tardaron semanas en verse.

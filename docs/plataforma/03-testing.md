@@ -87,7 +87,7 @@ Después de pushear:
 gcloud builds list --project=munify-api --region=us-east4 --limit=5   --format="table(status,createTime,substitutions.TRIGGER_NAME,substitutions.SHORT_SHA)"
 
 # 2. Hash del bundle vivo en QA vs el local
-curl -s https://app-qa.munify.com.ar/ | grep -oE "index-[A-Za-z0-9_-]+\.js"
+curl -s https://qa.munify.com.ar/ | grep -oE "index-[A-Za-z0-9_-]+\.js"
 # Comparar contra frontend/dist/index.html local.
 
 # 3. Backend de QA vivo

@@ -30,11 +30,11 @@ es la versión expandida. Todo lo de acá está **verificado contra los triggers
 | Trigger | Repo | Branch | Sólo si cambia | Publica en |
 |---|---|---|---|---|
 | `deploy-munify-front` | `munify` | `master` | `frontend/**` | Pages `munify` → **app.munify.com.ar** |
-| `deploy-munify-front-qa` | `munify` | `qa` | `frontend/**` | Pages `munify-qa` → **app-qa.munify.com.ar** |
+| `deploy-munify-front-qa` | `munify` | `qa` | `frontend/**` | Pages `munify-qa` → **qa.munify.com.ar** |
 | `deploy-munify-api-us` | `munify` | `master` | `backend/**` | Cloud Run `munify-api` |
 | `deploy-munify-api-qa` | `munify` | `qa` | `backend/**` | Cloud Run `munify-api-qa` |
 | `deploy-munify-landing` | `landing` | `master` | — | Pages `munify-landing` → munify.com.ar |
-| `deploy-munify-landing-qa` | `landing` | `qa` | — | Pages `munify-landing-qa` |
+| `deploy-munify-landing-qa` | `landing` | `qa` | — | Pages `munify-landing-qa` → **lqa.munify.com.ar** |
 | `deploy-munify-calls` | **`munify-calls`** | `main` | — | Pages `munify-calls` → **calls.munify.com.ar** |
 
 Base de datos: **Aiven MySQL** — `munify_prod` (prod) y `sugerenciasmun-qa` (QA).
@@ -89,7 +89,7 @@ gcloud builds list --project=munify-api --region=us-east4 \
   --format="table(status,createTime,substitutions.SHORT_SHA)"
 
 # que bundle esta vivo
-curl -s https://app-qa.munify.com.ar/ | grep -oE "index-[A-Za-z0-9_-]+\.js"
+curl -s https://qa.munify.com.ar/ | grep -oE "index-[A-Za-z0-9_-]+\.js"
 ```
 
 ## Backend

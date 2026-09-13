@@ -76,7 +76,8 @@
 | Base de producción | **`munify_prod`** |
 | Bases que YA NO existen | `sugerenciasmun`, `sugerenciasmun-ensayo` (si un doc las nombra, es viejo) |
 | Backend QA | `https://munify-api-qa-vmpxsxe7ra-uk.a.run.app` |
-| Front QA | `qa-app.munify.com.ar` y `app-qa.munify.com.ar` (Cloudflare Pages) |
+| Front QA | **`qa.munify.com.ar`** (Cloudflare Pages). Cuando se escribió esto los
+  alias eran `qa-app.` y `app-qa.`; los dos fueron dados de baja |
 | Front QA VIEJO, no usar | `munify-qa.netlify.app` — quedó congelado |
 | Sesión de Infra | `structure-6f` (proyecto `d:\Code\structure`) |
 | Otra sesión de Munify | `sugerenciasmun-72` — tiene el tema **demos** (ver §6) |
