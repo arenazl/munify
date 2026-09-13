@@ -58,8 +58,12 @@ en seco), todos idempotentes.
 | Script | Qué hace |
 |---|---|
 | `migrate_programado_tarjeta.py` | la migración, chequeando qué falta antes de cada paso. Equivale a `alembic/versions/20260911_programado_tarjeta.py`, que es el registro formal |
-| `semilla_caso_tarjeta_spn.py` | **sólo QA.** Deja el municipio 80 igual que producción: 26 compras por 6.247.510,07, cero pagos, los 3 pagos del resumen cargados como gasto y el programado 650 como lo dejó Bartolo. Re-ejecutable: deshace una curación previa y borra compras de ensayo |
-| `curar_tarjeta_spn.py` | la curación. **Es el mismo que corre en producción** |
+| `semilla_caso_tarjeta_spn.py` | arma el caso: 26 compras por 6.247.510,07, cero pagos, los 3 pagos del resumen cargados como gasto y el programado como lo dejó el municipio. Re-ejecutable: deshace una curación previa y borra compras de ensayo. Sembrar el caso real (`--caso spn`) en producción está **prohibido**: son datos del cliente |
+| `curar_tarjeta_spn.py` | la curación. **El mismo código para el ensayo y para el cliente** |
+
+Los dos toman `--caso`: `merlo` es el sandbox de producción (municipio 1000149) y `spn` el
+cliente real. Los ids de cada uno viven en `scripts/casos_tarjeta.py`, así que el ensayo no
+es un script parecido, es el mismo.
 
 La curación aborta sin tocar nada si algo no cuadra: que la caja 373 sea la tarjeta, que los
 tres gastos existan una sola vez y activos, que cada uno tenga un solo egreso en la caja 107,
@@ -67,8 +71,10 @@ que ninguno tenga orden de pago vinculada, que la tarjeta no tenga pagos ya regi
 el programado 650 siga como estaba. Al terminar verifica que el saldo del banco no se haya
 movido y que no queden gastos de "pago de tarjeta" activos; si no cierra, deshace todo.
 
-`--agosto-doble borrar` es para cuando Bartolo confirme si el 10 de agosto hubo o no un
-segundo pago real. Por defecto convierte los tres.
+`--agosto-doble borrar` existe por si alguna vez hay que dar de baja un pago sin convertirlo.
+**No se usa en este caso**: el cruce con los resúmenes (2026-09-12, ver doc `02`) mostró que
+ningún pago coincide con ningún cierre y que faltan compras por cargar, así que los tres se
+convierten y la caja del banco queda intacta.
 
 ## 5. Probado en QA (2026-09-11)
 
@@ -91,10 +97,13 @@ municipio, todas en verde. Lo que se comprobó:
 
 1. Correr `migrate_programado_tarjeta.py --env prod --aplicar` en producción.
 2. Promover `qa` a `master` para que el código quede vivo.
-3. Correr `curar_tarjeta_spn.py --env prod --aplicar`, después de que el dueño decida el
-   `--agosto-doble` hablando con Bartolo.
-4. Recién entonces, probar el circuito en el sandbox de producción (Merlo, municipio
-   1000149) con una tarjeta de prueba.
+3. Sembrar el caso en el sandbox de producción y ensayar ahí la curación completa:
+   `semilla_caso_tarjeta_spn.py --caso merlo --env prod --aplicar` y
+   `curar_tarjeta_spn.py --caso merlo --env prod --aplicar`. Los ids de cada caso viven en
+   `scripts/casos_tarjeta.py`, así que lo que se prueba en Merlo es el mismo código que
+   después corre sobre el cliente.
+4. Con los números del ensayo a la vista, `curar_tarjeta_spn.py --caso spn --env prod
+   --aplicar`.
 
 Hasta que eso pase, **Bartolo no tiene que apretar "Pagar todo"**: la tarjeta en producción
 sigue con los 6.247.510,07 que ya pagó, y el banco se descontaría por segunda vez.

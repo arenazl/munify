@@ -27,11 +27,37 @@ sin pasar por "Pagar tarjeta". Ninguno tocó la caja de la tarjeta:
 | 1022252 | 2026-09-10 | 2.180.305,30 | "Tarjeta de crédito" | ídem, pago programado 650 |
 
 Total registrado como pago: 6.636.341,50. Deuda de la tarjeta en el sistema: 6.247.510,07.
-La diferencia (388.831,43) son compras del resumen real que nunca se cargaron como gasto con
-tarjeta. Aparte, el gasto 20508 "Tarjeta (débito)" de 1.212.265,67 es débito, no esta Visa.
+La diferencia son 388.831,43 pagados de más, y el cruce con los resúmenes (abajo) explica por
+qué. Aparte, el gasto 20508 "Tarjeta (débito)" de 1.212.265,67 es débito, no esta Visa.
 
-Sospecha a confirmar con él: agosto tiene dos pagos (el manual del 08-08 y el programado del
-08-10). Uno de los dos puede estar de más.
+### Lo que dicen los resúmenes (2026-09-12): faltan compras por cargar
+
+La tarjeta cierra el día 8. Reconstruidos los resúmenes reales desde las compras cargadas:
+
+| Cierre | Compras | Del resumen | Acumulado |
+|---|---|---|---|
+| 2026-05-08 | 3 | 479.999,00 | 479.999,00 |
+| 2026-06-08 | 2 | 55.168,97 | 535.167,97 |
+| 2026-07-08 | 7 | 563.877,68 | 1.099.045,65 |
+| 2026-08-08 | 7 | 921.956,74 | 2.021.002,39 |
+| 2026-09-08 | 6 | 3.996.507,68 | 6.017.510,07 |
+| 2026-10-08 | 1 | 230.000,00 | 6.247.510,07 |
+
+**Ninguno de los tres pagos coincide con ningún resumen**, ni con ninguna suma de resúmenes.
+Y el del 8 de agosto (2.275.730,90) ya era mayor que todo lo acumulado hasta esa fecha
+(2.021.002,39). La conclusión es que **en Munify faltan compras con tarjeta por cargar**: los
+pagos salieron de resúmenes reales del banco que incluyen consumos que nunca se registraron.
+
+Los dos pagos de 2.180.305,30 son idénticos al centavo y los generó el programado 650, que
+tenía ese monto **fijo**, ejecutado dos veces el 9 de septiembre con dos minutos de diferencia
+para ponerse al día con agosto y septiembre. Ese número es el que el municipio puso en la
+agenda, no el resumen real de cada mes.
+
+**Decisión (2026-09-12): los tres pagos se convierten, no se borra ninguno.** El criterio que
+manda es que la caja del banco no cambie: si el municipio registró esas tres salidas de plata,
+es porque salieron. Borrar una cambiaría el saldo del banco por una hipótesis nuestra. El
+saldo a favor de 388.831,43 que queda en la tarjeta es la señal visible de que faltan compras
+por cargar, y es un dato para que el municipio revise su resumen, no un error a tapar.
 
 ## El pago programado 650 (leído en prod el 2026-09-11)
 
@@ -63,17 +89,23 @@ cuando Bartolo ejecute el masivo de sueldos, se lo lleva puesto.
 - **Si Bartolo aprieta "Pagar todo" hoy desde Cooparticipación, el banco se descuenta por
   segunda vez** (6.247.510,07). No está "listo para que pague de vuelta".
 
-## Qué corresponde hacer (decisión del dueño; la escritura en prod es de Infra)
+## Qué se hace
 
-1. Dar de baja los tres gastos de arriba (21071, 1022248, 1022252): no son gastos, son pagos
-   de la tarjeta.
-2. Registrar esos mismos pagos por "Pagar tarjeta" desde la caja 107, como **parciales** con
-   las fechas y montos reales. La tarjeta queda con 388.831,43 a favor, que es la señal de que
-   faltan compras por cargar (o Bartolo las carga y queda en cero).
-3. **Pausar o borrar el pago programado 650** ("Tarjeta de crédito", 2.180.305,30 mensual):
-   un resumen de tarjeta no es un monto fijo, y cada mes va a volver a generar el gasto.
-4. De acá en más, el circuito es: compras con tarjeta como gasto con `forma_pago = tarjeta`,
-   y el resumen por "Pagar tarjeta" → "Pagar todo".
+Todo esto lo ejecuta el script `backend/scripts/curar_tarjeta_spn.py` en una transacción, y
+está detallado en `03-plan-programado-tarjeta-y-curacion.md`:
 
-Lectura hecha con `scratchpad/leer_tarjeta_spn*.py` (SELECT solamente, URL por `gcloud
-secrets`, guarda anti-QA).
+1. Dar de baja los tres gastos (21071, 1022248, 1022252): no son gastos, son pagos de la
+   tarjeta.
+2. Registrar esos mismos pagos por el circuito de "Pagar tarjeta" desde la caja 107, con sus
+   fechas y montos. El banco no cambia; la tarjeta baja.
+3. El pago programado 650 **no se pausa: se arregla.** Pasa a pagar la tarjeta (todo lo que
+   deba el día 10), que es lo que el municipio quiso hacer desde el principio. Un resumen no
+   es un monto fijo, y ese era el error de origen.
+4. De acá en más el circuito es: las compras con tarjeta como gasto con
+   `forma_pago = tarjeta`, y el resumen por "Pagar tarjeta" o por el programado.
+
+**Lo que hay que decirle al municipio:** que faltan compras por cargar. El saldo a favor que
+queda en la tarjeta es exactamente esa señal.
+
+Lecturas hechas con scripts de SELECT solamente, con la URL resuelta por `gcloud secrets` y
+guarda anti-QA.
