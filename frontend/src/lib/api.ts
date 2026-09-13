@@ -2470,6 +2470,17 @@ export const modulosApi = {
     api.put(`/modulos/${nombre}`, { modulo: nombre, activo }),
 };
 
+// Obras: Obra = Proyecto de tipo obra, con etapas (F2).
+export const obrasApi = {
+  list: (tipo: 'obra' | 'programa' | 'todos' = 'obra') => api.get('/obras', { params: { tipo } }),
+  get: (id: number) => api.get(`/obras/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/obras', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/obras/${id}`, data),
+  etapas: (id: number, etapas: Record<string, unknown>[]) => api.put(`/obras/${id}/etapas`, etapas),
+  confirmar: (id: number, imputacion_ids: number[], etapa_id?: number) =>
+    api.post(`/obras/${id}/imputaciones/confirmar`, { imputacion_ids, etapa_id }),
+};
+
 // Personas: la libreta única (F1). Sirve a Configuración › Personas y a Obras.
 export const personasApi = {
   list: (params?: { q?: string; tipo?: string; activo?: boolean; page?: number; page_size?: number }) =>

@@ -97,6 +97,8 @@ import MiArea from './pages/MiArea';
 import Tesoreria from './pages/Tesoreria';
 import TesoreriaContactos from './pages/TesoreriaContactos';
 import Personas from './pages/Personas';
+import Obras from './pages/Obras';
+import ObraDetalle from './pages/ObraDetalle';
 import TesoreriaMapa from './pages/TesoreriaMapa';
 import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
 import TesoreriaProyectos from './pages/TesoreriaProyectos';
@@ -289,6 +291,8 @@ export const router = createBrowserRouter([
       { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
       { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
       { path: 'personas', element: <ProtectedRoute roles={['admin', 'supervisor']}><Personas /></ProtectedRoute> },
+      { path: 'obras', element: <ProtectedRoute roles={['admin', 'supervisor']}><Obras /></ProtectedRoute> },
+      { path: 'obras/:id', element: <ProtectedRoute roles={['admin', 'supervisor']}><ObraDetalle /></ProtectedRoute> },
       { path: 'tesoreria/proyectos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyectos /></ProtectedRoute> },
       { path: 'tesoreria/pagos-programados', element: <ProtectedRoute roles={['admin', 'supervisor']}><PagosProgramados /></ProtectedRoute> },
       // La ruta vieja ('agenda') queda redirigiendo: hay deep-links guardados y

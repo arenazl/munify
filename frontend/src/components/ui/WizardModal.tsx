@@ -38,6 +38,8 @@ interface WizardModalProps {
   embedded?: boolean;
   /** Color personalizado para el botón primario (ej: color de categoría) */
   primaryButtonColor?: string;
+  /** Variante ANCHA (1240px): asistentes de dos columnas, como Nueva obra (dueño, 2026-09-13). */
+  ancho?: boolean;
 }
 
 export function WizardModal({
@@ -56,6 +58,7 @@ export function WizardModal({
   headerBadge,
   embedded = false,
   primaryButtonColor,
+  ancho = false,
 }: WizardModalProps) {
   const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
@@ -161,7 +164,7 @@ export function WizardModal({
       width: 100%;
       /* Un poco más angosto y con el acento verde ARRIBA (pedido del dueño,
          2026-08-07): el modal se lee como pieza del kit, no como página. */
-      max-width: ${aiPanel ? '1040px' : '760px'};
+      max-width: ${ancho ? '1240px' : aiPanel ? '1040px' : '760px'};
       max-height: calc(100vh - 48px);
       margin: 0 !important;
       display: flex;

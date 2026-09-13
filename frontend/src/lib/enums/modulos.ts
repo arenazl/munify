@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, FileCheck, Map, ScanLine, Receipt, Wallet,
   LayoutDashboard, CalendarClock, Activity, Sparkles, PiggyBank, Hammer,
-  FileSignature, Users, MapPin, Megaphone, UserCheck, CalendarCheck, Boxes,
+  FileSignature, Users, MapPin, Megaphone, UserCheck, CalendarCheck, Boxes, Construction,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -37,6 +37,7 @@ export const MODULOS: ModuloDef[] = [
   { key: 'panel-bi', label: 'Análisis', descripcion: 'Panel BI con consultas en lenguaje natural (requiere IA)', icon: Sparkles, optIn: false },
   { key: 'tesoreria', label: 'Tesorería', descripcion: 'Gastos, cajas, contactos, conciliación y reportes financieros', icon: PiggyBank, optIn: true },
   { key: 'sueldos', label: 'Sueldos', descripcion: 'Liquidaciones, empleados con sueldo y pagos recurrentes', icon: Users, optIn: true },
+  { key: 'obras', label: 'Obras', descripcion: 'Obras públicas con etapas, plata imputada por etapa y quién trabajó', icon: Construction, optIn: true },
   { key: 'contaduria', label: 'Contaduría', descripcion: 'Órdenes de pago con autorización formal y sus reportes', icon: FileSignature, optIn: true },
   { key: 'ordenes_trabajo', label: 'Órdenes de trabajo', descripcion: 'OTs de campo con cuadrillas y materiales', icon: Hammer, optIn: true },
   { key: 'poi', label: 'Puntos de interés', descripcion: 'POIs en el mapa (hospital, escuela, bomberos...) con radio de zona y prioridad', icon: MapPin, optIn: true },

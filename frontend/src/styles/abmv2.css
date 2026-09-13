@@ -6522,3 +6522,70 @@ button.av2-recorrido-miga:hover {
 }
 /* Plegada no necesita los 165px que pide la version abierta. */
 .av2-mapa-consulta:has(.av2-mapa-consulta-banda) { min-height: 0; }
+
+/* ============================================================
+   LÍNEA DE TIEMPO DE OBRA (components/abmv2/LineaDeTiempoObra.tsx)
+   Dos niveles: la obra entera arriba (siempre entra), la etapa
+   tocada explotada abajo. Dueño, 2026-09-13.
+   ============================================================ */
+.lt { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lt-macro { position: relative; height: 150px; }
+.lt-hitos { position: absolute; left: 0; right: 0; top: 0; height: 40px; }
+.lt-hito { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.lt-hito-l { font-size: 10.5px; color: var(--pl-text-2); white-space: nowrap; font-weight: 500; }
+.lt-hito-d { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 2px; background: var(--pl-text); }
+.lt-hito--primario .lt-hito-d { background: var(--pl-green); }
+.lt-hito--bueno .lt-hito-d { background: var(--pl-green-700, var(--pl-green)); }
+.lt-hito--previsto .lt-hito-d { background: transparent; border: 1.5px dashed var(--pl-text-muted); }
+.lt-carril { position: absolute; left: 0; right: 0; top: 52px; height: 56px; }
+.lt-seg {
+  position: absolute; top: 0; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  padding: 0 12px; box-sizing: border-box; border-radius: 10px; text-align: left; min-width: 0; overflow: hidden;
+  font-family: inherit; cursor: pointer; border: 1px solid var(--pl-border-strong); background: var(--pl-surface-2); color: var(--pl-text);
+  transition: box-shadow var(--pl-dur-ui) var(--pl-ease);
+}
+.lt-seg-n { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt-seg-m { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--pl-text-2); }
+.lt-seg--ok { background: color-mix(in srgb, var(--pl-green) 18%, var(--pl-surface)); border-color: color-mix(in srgb, var(--pl-green) 50%, transparent); }
+.lt-seg--curso { background: color-mix(in srgb, var(--pl-green) 26%, var(--pl-surface)); border-color: var(--pl-green); }
+.lt-seg--mal { background: color-mix(in srgb, var(--pl-red) 16%, var(--pl-surface)); border-color: color-mix(in srgb, var(--pl-red) 50%, transparent); }
+.lt-seg--pend { border-style: dashed; color: var(--pl-text-muted); }
+.lt-seg--activa { box-shadow: 0 0 0 2px var(--pl-text), 0 0 0 6px color-mix(in srgb, var(--pl-text) 12%, transparent); }
+.lt-hoy { position: absolute; top: 44px; height: 72px; width: 2px; background: var(--pl-amber-strong); box-shadow: 0 0 8px color-mix(in srgb, var(--pl-amber-strong) 60%, transparent); }
+.lt-hoy span { position: absolute; top: -16px; left: 5px; font-size: 10px; font-weight: 700; color: var(--pl-amber-strong); white-space: nowrap; }
+.lt-hoy--zoom { top: 0; height: 100%; }
+.lt-eje { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; border-top: 1px solid var(--pl-border); }
+.lt-eje span { position: absolute; top: 6px; font-size: 11px; color: var(--pl-text-muted); font-weight: 600; white-space: nowrap; }
+.lt-zoom { border-radius: 12px; border: 1px solid var(--pl-border-strong); background: var(--pl-bg); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.lt-zoom-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: var(--pl-fs-card-title); }
+.lt-zoom-sub { color: var(--pl-text-muted); font-weight: 500; font-size: var(--pl-fs-body-sm); }
+.lt-zoom-lab { position: absolute; left: 0; top: 0; font-size: 11px; color: var(--pl-text-muted); }
+.lt-zoom-plazo { position: relative; height: 44px; margin-left: 0; padding-left: 48px; }
+.lt-zoom-prev { position: absolute; top: 12px; height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--pl-green) 16%, transparent); border: 1px dashed color-mix(in srgb, var(--pl-green) 60%, transparent); margin-left: 48px; }
+.lt-zoom-real { position: absolute; top: 26px; height: 10px; border-radius: 999px; background: var(--pl-green); margin-left: 48px; }
+.lt-zoom-plata { position: relative; height: 96px; padding-left: 48px; border-bottom: 1px solid var(--pl-border); }
+.lt-tick { position: absolute; bottom: 0; width: 8px; border-radius: 3px 3px 0 0; margin-left: 48px; transform: translateX(-50%); }
+.lt-tick--prog { opacity: .45; outline: 1px dashed var(--pl-text-muted); }
+.lt-zoom-vacio { position: absolute; left: 48px; bottom: 8px; font-size: var(--pl-fs-body-sm); color: var(--pl-text-muted); }
+.lt-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--pl-text-muted); }
+.lt-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.lt-leyenda i { width: 9px; height: 9px; border-radius: 3px; display: block; }
+.lt-leyenda-prog { border: 1px dashed var(--pl-text-muted); }
+.lt-pista { margin: 0; font-size: var(--pl-fs-body-sm); color: var(--pl-text-muted); }
+
+/* Gráficos de obra (components/abmv2/GraficosObra.tsx): la gramática de la
+   galería (docs/design-sync/Mapa de calor y reclamos/galeria-graficos.html) */
+.gr-card { background: var(--pl-surface); border: 1px solid var(--pl-border); border-radius: 12px; padding: 18px 18px 14px; display: flex; flex-direction: column; min-width: 0; }
+.gr-card h3 { font-family: var(--pl-font-display); font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 5px; }
+.gr-card .gr-q { font-size: 12.5px; color: var(--pl-text-muted); margin: 0 0 14px; line-height: 1.5; }
+.gr-card .gr-q b { color: var(--pl-text); font-weight: 600; }
+.gr-card svg { width: 100%; height: auto; display: block; overflow: visible; }
+.gr-card .gr-key { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11.5px; color: var(--pl-text-muted); }
+.gr-card .gr-key b { display: flex; align-items: center; gap: 6px; font-weight: 500; white-space: nowrap; }
+.gr-card .gr-key i { width: 9px; height: 9px; border-radius: 3px; display: block; flex: none; }
+.gr-card .gr-tip { margin: 12px 0 0; padding-top: 11px; border-top: 1px solid var(--pl-border); font-size: 11.5px; color: var(--pl-text-muted); line-height: 1.5; }
+.gr-gl { stroke: var(--pl-border); stroke-width: 1; }
+.gr-ax { font-size: 10.5px; fill: var(--pl-text-muted); }
+.gr-axv { font-size: 11px; fill: var(--pl-text-muted); }
+.gr-val { font-size: 11px; font-weight: 600; fill: var(--pl-text); }
+.gr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }

@@ -6,6 +6,7 @@ import {
   History, Sprout, Megaphone, Truck, UserCheck, CalendarCheck, PackageOpen, Gauge, Globe,
   FlaskConical,
   type LucideIcon,
+  Construction
 } from 'lucide-react';
 
 /**
@@ -25,6 +26,7 @@ export const ICONO_CATEGORIA: Record<string, LucideIcon> = {
   'Tesorería': Wallet,
   'Sueldos': Banknote,
   'Contaduría': Receipt,
+  'Obras': Construction,
   'Campo': Hammer,
   'Comunicación': Megaphone,
   'Recursos': Truck,
@@ -509,7 +511,10 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Contactos',
       href: '/gestion/tesoreria/contactos',
       icon: Users,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      // VUELA del menú (dueño, 2026-09-13): la libreta única es Configuración › Personas.
+      // La ruta sigue viva para no romper links viejos. Gate original:
+      //   show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      show: false,
       categoria: 'Tesorería',
       description: 'Padrón de personas y proveedores'
     },
@@ -558,6 +563,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: false,
       categoria: 'Tesorería',
       description: 'Masa salarial, top sueldos, próximos pagos'
+    },
+    // === OBRAS (módulo propio, opt-in; plan docs/tesoreria/04 F2) ===
+    {
+      name: 'Obras',
+      href: '/gestion/obras',
+      icon: Construction,
+      show: isAdminOrSupervisor && moduloOn('obras'),
+      categoria: 'Obras',
+      description: 'Obras con sus etapas, su plata y su gente'
     },
     // === CONTADURÍA (flag propio desde la reorg 2026-07; apagado por default) ===
     {
