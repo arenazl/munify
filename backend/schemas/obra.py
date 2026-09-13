@@ -26,16 +26,39 @@ class EtapaIn(BaseModel):
     monto_previsto: Optional[Decimal] = None
 
 
+class GenteEtapa(BaseModel):
+    ordenes_trabajo: int = 0
+    horas: float = 0
+    cuadrillas: List[str] = []
+
+
 class EtapaOut(EtapaIn):
     model_config = ConfigDict(from_attributes=True)
     id: int
     ejecutado: Decimal = Decimal("0")
+    programado: Decimal = Decimal("0")     # con fecha futura, todavía sin pagar
     n_gastos: int = 0
     # cuánto de lo ejecutado fue cada cosa (heurística por tipo de la persona destino)
     contratista: Decimal = Decimal("0")
     materiales: Decimal = Decimal("0")
     mano_de_obra: Decimal = Decimal("0")
     otros: Decimal = Decimal("0")
+    # --- los tres relojes de la etapa (la etapa es una obra en chico)
+    monto_previsto_efectivo: Optional[Decimal] = None   # el cargado, o incidencia × presupuesto
+    pct_plata: Optional[int] = None                     # gastado / previsto
+    plazo_dias: Optional[int] = None                    # fin previsto − inicio previsto
+    dias_llevados: Optional[int] = None                 # hasta hoy o hasta el fin real
+    pct_tiempo: Optional[int] = None                    # puede pasar de 100
+    desvio_inicio_dias: Optional[int] = None            # real − previsto (positivo = arrancó tarde)
+    desvio_fin_dias: Optional[int] = None               # real (o hoy si sigue abierta) − previsto
+    dias_sin_gastos: Optional[int] = None               # desde el último gasto pagado
+    ultimo_gasto: Optional[date] = None
+    # --- el diagnóstico, en una palabra y en una frase
+    situacion: str = "por_empezar"   # por_empezar | por_empezar_atrasada | en_ritmo | lenta | cara | parada | terminada
+    veredicto: Veredicto = "bueno"
+    frase: str = ""
+    arrastre: Optional[str] = None   # qué le deja a las etapas siguientes
+    gente: GenteEtapa = GenteEtapa()
 
 
 class PersonaRef(BaseModel):
@@ -191,6 +214,54 @@ class GenteDeObra(BaseModel):
     sueldos_total: Decimal = Decimal("0")
 
 
+class Reloj(BaseModel):
+    pct: Optional[int] = None          # puede pasar de 100 (tiempo consumido de más, plata de más)
+    valor: str                         # "70 de 100 días" · "46%" · "$71 M de $100 M"
+    sub: Optional[str] = None
+    veredicto: Veredicto = "bueno"
+
+
+class TresRelojes(BaseModel):
+    """La ley del control de obra: tiempo, hecho y plata tienen que caminar juntos."""
+    tiempo: Reloj
+    hecho: Reloj
+    plata: Reloj
+    lectura: str                       # la comparación, en prosa
+
+
+class Proyeccion(BaseModel):
+    """Lo que el intendente quiere saber: cuándo termina de verdad y cuánto va a costar de verdad."""
+    fin_previsto: Optional[date] = None
+    fin_proyectado: Optional[date] = None
+    desvio_dias: Optional[int] = None          # proyectado − previsto
+    costo_proyectado: Optional[Decimal] = None
+    desvio_plata: Optional[Decimal] = None     # proyectado − presupuesto
+    base: str = ""                             # de dónde sale la cuenta
+
+
+class Pendiente(BaseModel):
+    tipo: str          # sin_etapa | vencidos_sin_pagar | etapa_vencida | etapa_parada | sin_etapas | sin_presupuesto | sin_avance
+    titulo: str
+    detalle: str
+    n: int = 0
+    monto: Decimal = Decimal("0")
+    etapa_id: Optional[int] = None
+    veredicto: Veredicto = "advertencia"
+
+
+class PuntoCurva(BaseModel):
+    fecha: date
+    real: Decimal                      # acumulado pagado hasta esa semana
+    prevista: Optional[Decimal] = None # la curva lineal entre inicio y fin previsto
+    programado: bool = False           # la semana es futura: lo real ahí es lo programado
+
+
+class PuntoFisico(BaseModel):
+    fecha: date
+    pct: int
+    etiqueta: str
+
+
 class ObraKpis(BaseModel):
     presupuesto_vigente: Optional[Decimal] = None
     ejecutado: Decimal = Decimal("0")
@@ -211,6 +282,11 @@ class ObraDetalle(BaseModel):
     barrio: Optional[str] = None
     kpis: ObraKpis
     frase: str
+    relojes: Optional[TresRelojes] = None
+    proyeccion: Proyeccion = Proyeccion()
+    pendientes: List[Pendiente] = []
+    curva: List[PuntoCurva] = []
+    fisico: List[PuntoFisico] = []
     etapas: List[EtapaOut]
     gastos: List[GastoDeObra]
     proveedores: List[ProveedorDeObra]

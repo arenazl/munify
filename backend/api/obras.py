@@ -27,10 +27,11 @@ from models import (
 )
 from models.barrio import Barrio
 from schemas.obra import (
-    ConfirmarImputaciones, EtapaActual, EtapaIn, EtapaOut, GastoDeObra, GenteDeObra, MesDeObra,
+    ConfirmarImputaciones, EtapaActual, EtapaIn, EtapaOut, GastoDeObra, GenteDeObra, GenteEtapa, MesDeObra,
     ObraBase, ObraCreate, ObraDetalle, ObraKpis, ObraResumen, ObraUpdate, ObrasKpis, ObrasListado,
-    PersonaRef, ProveedorDeObra,
+    Pendiente, PersonaRef, ProveedorDeObra, Proyeccion, PuntoCurva, PuntoFisico, Reloj, TresRelojes,
 )
+from services import obra_diagnostico as diag
 
 router = APIRouter()
 
@@ -304,16 +305,49 @@ async def detalle_obra(
                 sueldos_total += monto
         por_mes[g.fecha.strftime("%Y-%m")] += monto
 
-    etapas_out = [EtapaOut(
-        id=e.id, orden=e.orden, nombre=e.nombre, descripcion=e.descripcion, incidencia_pct=_money(e.incidencia_pct),
-        avance_pct=e.avance_pct or 0, estado=e.estado or "pendiente",
-        fecha_inicio_prevista=e.fecha_inicio_prevista, fecha_fin_prevista=e.fecha_fin_prevista,
-        fecha_inicio_real=e.fecha_inicio_real, fecha_fin_real=e.fecha_fin_real,
-        monto_previsto=_money(e.monto_previsto) if e.monto_previsto is not None else None,
-        ejecutado=por_etapa[e.id]["total"], n_gastos=n_por_etapa[e.id],
-        contratista=por_etapa[e.id]["contratista"], materiales=por_etapa[e.id]["materiales"],
-        mano_de_obra=por_etapa[e.id]["mano_de_obra"], otros=por_etapa[e.id]["otros"],
-    ) for e in etapas]
+    # --- gente: órdenes de trabajo de la obra (y de cada etapa) + sueldos imputados
+    ots = (await db.execute(select(OrdenTrabajo).where(OrdenTrabajo.proyecto_id == p.id))).scalars().all()
+    horas = float(sum((ot.horas_reales or 0) for ot in ots))
+    cuad_ids = {ot.cuadrilla_id for ot in ots if ot.cuadrilla_id}
+    emp_ids = {ot.empleado_id for ot in ots if ot.empleado_id}
+    cuadrillas_por_id = {c.id: c.nombre for c in (await db.execute(select(Cuadrilla).where(Cuadrilla.id.in_(cuad_ids)))).scalars()} if cuad_ids else {}
+    personas_ot = [f"{e.nombre} {e.apellido or ''}".strip() for e in (await db.execute(select(Empleado).where(Empleado.id.in_(emp_ids)))).scalars()] if emp_ids else []
+    gente = GenteDeObra(ordenes_trabajo=len(ots), horas=horas, cuadrillas=sorted(cuadrillas_por_id.values()), personas_ot=personas_ot,
+                        sueldos_personas=len(sueldos_personas), sueldos_total=sueldos_total)
+
+    presupuesto = _money(p.monto_contrato) if p.monto_contrato else (_money(p.presupuesto) if p.presupuesto else None)
+    etapas_out: List[EtapaOut] = []
+    diags: Dict[int, diag.DiagEtapa] = {}
+    for e in etapas:
+        pagados = [g.fecha for g in gastos if g.etapa_id == e.id and g.fecha <= hoy]
+        programado_e = sum((g.monto for g in gastos if g.etapa_id == e.id and g.fecha > hoy), Decimal(0))
+        ejecutado_e = por_etapa[e.id]["total"] - programado_e
+        crudo = diag.EtapaCrudo(
+            id=e.id, orden=e.orden, nombre=e.nombre, estado=e.estado or "pendiente",
+            incidencia_pct=Decimal(str(e.incidencia_pct or 0)), avance_pct=e.avance_pct or 0,
+            fecha_inicio_prevista=e.fecha_inicio_prevista, fecha_fin_prevista=e.fecha_fin_prevista,
+            fecha_inicio_real=e.fecha_inicio_real, fecha_fin_real=e.fecha_fin_real,
+            monto_previsto=_money(e.monto_previsto) if e.monto_previsto is not None else None,
+            ejecutado=ejecutado_e, programado=programado_e, n_gastos=n_por_etapa[e.id], ultimo_gasto=max(pagados) if pagados else None,
+        )
+        dg = diags[e.id] = diag.diagnostico_etapa(crudo, hoy, presupuesto)
+        ots_e = [ot for ot in ots if ot.etapa_id == e.id]
+        etapas_out.append(EtapaOut(
+            id=e.id, orden=e.orden, nombre=e.nombre, descripcion=e.descripcion, incidencia_pct=_money(e.incidencia_pct),
+            avance_pct=e.avance_pct or 0, estado=e.estado or "pendiente",
+            fecha_inicio_prevista=e.fecha_inicio_prevista, fecha_fin_prevista=e.fecha_fin_prevista,
+            fecha_inicio_real=e.fecha_inicio_real, fecha_fin_real=e.fecha_fin_real,
+            monto_previsto=crudo.monto_previsto,
+            ejecutado=ejecutado_e, programado=programado_e, n_gastos=n_por_etapa[e.id],
+            contratista=por_etapa[e.id]["contratista"], materiales=por_etapa[e.id]["materiales"],
+            mano_de_obra=por_etapa[e.id]["mano_de_obra"], otros=por_etapa[e.id]["otros"],
+            monto_previsto_efectivo=dg.monto_previsto_efectivo, pct_plata=dg.pct_plata, plazo_dias=dg.plazo_dias,
+            dias_llevados=dg.dias_llevados, pct_tiempo=dg.pct_tiempo, desvio_inicio_dias=dg.desvio_inicio_dias,
+            desvio_fin_dias=dg.desvio_fin_dias, dias_sin_gastos=dg.dias_sin_gastos, ultimo_gasto=crudo.ultimo_gasto,
+            situacion=dg.situacion, veredicto=dg.veredicto, frase=dg.frase, arrastre=dg.arrastre,
+            gente=GenteEtapa(ordenes_trabajo=len(ots_e), horas=float(sum((ot.horas_reales or 0) for ot in ots_e)),
+                             cuadrillas=sorted({cuadrillas_por_id[ot.cuadrilla_id] for ot in ots_e if ot.cuadrilla_id in cuadrillas_por_id})),
+        ))
 
     acumulado = Decimal(0)
     meses: List[MesDeObra] = []
@@ -321,19 +355,8 @@ async def detalle_obra(
         acumulado += por_mes[mes]
         meses.append(MesDeObra(mes=mes, monto=por_mes[mes], acumulado=acumulado, programado=mes > hoy.strftime("%Y-%m")))
 
-    # --- gente: órdenes de trabajo de la obra + sueldos imputados
-    ots = (await db.execute(select(OrdenTrabajo).where(OrdenTrabajo.proyecto_id == p.id))).scalars().all()
-    horas = float(sum((ot.horas_reales or 0) for ot in ots))
-    cuad_ids = {ot.cuadrilla_id for ot in ots if ot.cuadrilla_id}
-    emp_ids = {ot.empleado_id for ot in ots if ot.empleado_id}
-    cuadrillas = [c.nombre for c in (await db.execute(select(Cuadrilla).where(Cuadrilla.id.in_(cuad_ids)))).scalars()] if cuad_ids else []
-    personas_ot = [f"{e.nombre} {e.apellido or ''}".strip() for e in (await db.execute(select(Empleado).where(Empleado.id.in_(emp_ids)))).scalars()] if emp_ids else []
-    gente = GenteDeObra(ordenes_trabajo=len(ots), horas=horas, cuadrillas=cuadrillas, personas_ot=personas_ot,
-                        sueldos_personas=len(sueldos_personas), sueldos_total=sueldos_total)
-
-    # --- kpis y frase
+    # --- kpis, relojes, proyección, pendientes y frase
     avance = _avance_derivado(p, etapas)
-    presupuesto = _money(p.monto_contrato) if p.monto_contrato else (_money(p.presupuesto) if p.presupuesto else None)
     atraso = _atraso(p, etapas, hoy, avance)
     veredicto, motivo = _veredicto(avance, ejecutado, presupuesto, atraso)
     sin_etapa = sum(1 for g in gastos if g.etapa_id is None) if etapas else 0
@@ -341,25 +364,59 @@ async def detalle_obra(
     kpis = ObraKpis(presupuesto_vigente=presupuesto, ejecutado=ejecutado, comprometido=Decimal(0), programado=programado,
                     avance=avance, pct_plata=pct_plata, atraso_dias=atraso, sin_etapa=sin_etapa, veredicto=veredicto)
 
-    partes = []
-    if avance is not None and pct_plata is not None:
-        partes.append(f"Estamos al {avance}% de la obra con el {pct_plata}% de la plata: {'en plata' if veredicto != 'malo' else 'gastó más de lo que avanzó'}.")
-    elif pct_plata is not None:
-        partes.append(f"Se gastó el {pct_plata}% del presupuesto ({_fmt_m(ejecutado)} de {_fmt_m(presupuesto)}); sin avance cargado no se puede decir si va bien.")
-    else:
-        partes.append(f"Lleva {_fmt_m(ejecutado)} en {len(gastos)} gastos; sin presupuesto ni etapas cargadas es la película de la plata, nada más.")
-    en_curso = _etapa_en_curso(etapas, hoy)
-    if en_curso:
-        if atraso > 0:
-            partes.append(f"La etapa {en_curso.orden}, {en_curso.nombre}, va {atraso} días atrasada.")
-        else:
-            partes.append(f"Etapa {en_curso.orden} de {len(etapas)}, {en_curso.nombre}, en curso.")
-    elif atraso > 0:
-        partes.append(f"La obra va {atraso} días pasada de su fin previsto.")
+    # El plan de la obra es la suma de sus etapas: si la obra no tiene fechas, las toma de ellas.
+    inicio_obra = p.fecha_inicio_real or p.fecha_inicio or min((e.fecha_inicio_real or e.fecha_inicio_prevista for e in etapas if e.fecha_inicio_real or e.fecha_inicio_prevista), default=None)
+    fin_previsto_obra = p.fecha_fin or max((e.fecha_fin_prevista for e in etapas if e.fecha_fin_prevista), default=None)
+    terminada = bool(p.fecha_fin_real) or p.estado_obra == "terminada" or (avance or 0) >= 100
+    fin_real_obra = p.fecha_fin_real if p.fecha_fin_real else (max((e.fecha_fin_real for e in etapas if e.fecha_fin_real), default=hoy) if terminada else None)
+    rel = diag.relojes_obra(hoy, inicio_obra, fin_previsto_obra, fin_real_obra, avance, ejecutado, presupuesto,
+                            etapas_terminadas=sum(1 for e in etapas if e.estado == "terminada"), etapas_total=len(etapas))
+    proy = diag.proyeccion_obra(hoy, fin_previsto_obra, fin_real_obra, avance, rel.dias_llevados, ejecutado, presupuesto)
+
+    pendientes: List[diag.Pendiente] = []
+    vencidos = [g for g in gastos if g.fecha <= hoy and g.estado_pago == "pendiente"]
+    if vencidos:
+        total_v = sum((g.monto for g in vencidos), Decimal(0))
+        pendientes.append(diag.Pendiente("vencidos_sin_pagar", f"Hay {_fmt_m(total_v)} con fecha vencida sin pagar",
+                                         f"{len(vencidos)} gasto{'s' if len(vencidos) != 1 else ''} con fecha pasada siguen pendientes: alguien está esperando cobrar.",
+                                         n=len(vencidos), monto=total_v, veredicto="malo"))
     if sin_etapa:
-        partes.append(f"Hay {sin_etapa} gasto{'s' if sin_etapa != 1 else ''} sin etapa esperando confirmación.")
-    if programado > 0:
-        partes.append(f"Quedan {_fmt_m(programado)} programados, todavía sin pagar.")
+        pendientes.append(diag.Pendiente("sin_etapa", f"{sin_etapa} gasto{'s' if sin_etapa != 1 else ''} sin etapa",
+                                         "El sistema propone la etapa en curso a la fecha de cada uno; vos confirmás.", n=sin_etapa))
+    for e in etapas:
+        dg = diags[e.id]
+        if dg.situacion == "parada" and e.estado != "parada":
+            pendientes.append(diag.Pendiente("etapa_parada", f"La etapa {e.orden}, {e.nombre}, parece parada",
+                                             dg.frase, etapa_id=e.id, veredicto="malo"))
+        elif e.estado == "en_curso" and e.fecha_fin_prevista and e.fecha_fin_prevista < hoy:
+            pendientes.append(diag.Pendiente("etapa_vencida", f"La etapa {e.orden}, {e.nombre}, tenía que terminar el {diag.fmt_fecha(e.fecha_fin_prevista)}",
+                                             "Cerrala si terminó, o corré su fin previsto para que la proyección sea honesta.", etapa_id=e.id))
+        elif dg.situacion == "por_empezar_atrasada":
+            pendientes.append(diag.Pendiente("etapa_vencida", f"La etapa {e.orden}, {e.nombre}, tenía que empezar el {diag.fmt_fecha(e.fecha_inicio_prevista)}",
+                                             "Marcala en curso si arrancó, o corré su inicio.", etapa_id=e.id))
+    if not etapas:
+        pendientes.append(diag.Pendiente("sin_etapas", "Sin etapas cargadas", "Con etapas la obra tiene avance, desvío y proyección. Cargalas con el botón Etapas."))
+    if not presupuesto:
+        pendientes.append(diag.Pendiente("sin_presupuesto", "Sin presupuesto cargado", "Sin presupuesto no hay reloj de plata ni costo proyectado."))
+    if avance is None:
+        pendientes.append(diag.Pendiente("sin_avance", "Sin avance cargado", "Sin avance físico no se puede decir si la plata va adelante o atrás."))
+
+    en_curso = _etapa_en_curso(etapas, hoy)
+    etapa_ctx = (en_curso.orden, len(etapas), en_curso.nombre, diags[en_curso.id]) if en_curso else None
+    frase = diag.frase_obra(rel, proy, etapa_ctx, pendientes, len(gastos), ejecutado)
+
+    curva = [PuntoCurva(fecha=c.fecha, real=c.real, prevista=c.prevista, programado=c.programado) for c in diag.curva_inversion(
+        hoy, [(g.fecha, g.monto) for g in gastos], inicio_obra, fin_previsto_obra, presupuesto,
+        hasta=proy.fin_proyectado or fin_previsto_obra)]
+    fisico: List[PuntoFisico] = []
+    if inicio_obra:
+        fisico.append(PuntoFisico(fecha=inicio_obra, pct=0, etiqueta="inicio"))
+    acum_inc = Decimal(0)
+    for e in sorted((e for e in etapas if e.estado == "terminada" and e.fecha_fin_real), key=lambda e: e.fecha_fin_real):
+        acum_inc += Decimal(str(e.incidencia_pct or 0))
+        fisico.append(PuntoFisico(fecha=e.fecha_fin_real, pct=int(round(acum_inc)), etiqueta=f"{e.orden} · {e.nombre}"))
+    if avance is not None and not fin_real_obra:
+        fisico.append(PuntoFisico(fecha=hoy, pct=avance, etiqueta="hoy"))
 
     contratista = None
     if p.contratista_persona_id:
@@ -394,7 +451,11 @@ async def detalle_obra(
             estado=p.estado.value if hasattr(p.estado, "value") else str(p.estado), estado_obra=p.estado_obra,
             avance=p.avance, publico=bool(p.publico), mostrar_monto=bool(p.mostrar_monto),
         ),
-        contratista=contratista, inspector=inspector, barrio=barrio, kpis=kpis, frase=" ".join(partes),
+        contratista=contratista, inspector=inspector, barrio=barrio, kpis=kpis, frase=frase,
+        relojes=TresRelojes(tiempo=Reloj(**rel.tiempo.__dict__), hecho=Reloj(**rel.hecho.__dict__), plata=Reloj(**rel.plata.__dict__), lectura=rel.lectura),
+        proyeccion=Proyeccion(**proy.__dict__),
+        pendientes=[Pendiente(**pd.__dict__) for pd in pendientes],
+        curva=curva, fisico=fisico,
         etapas=etapas_out, gastos=gastos,
         proveedores=sorted(por_proveedor.values(), key=lambda x: x.total, reverse=True),
         mes_a_mes=meses, gente=gente,

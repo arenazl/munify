@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, Sparkles, Trash2, TrendingUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useIaTesoreria } from '../hooks/useIaHabilitada';
@@ -128,6 +128,7 @@ export default function Tesoreria() {
 
   // Side modal de detalle
   const [gastoSeleccionado, setGastoSeleccionado] = useState<Gasto | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Paginación client-side (50 items por página). El estándar todavia no trae
@@ -235,6 +236,17 @@ export default function Tesoreria() {
     fetchCatalogoConceptos();
     fetchTiposEmpleado();
     fetchProyectos();
+  }, [esGestor]);
+
+  // Llegar con ?gasto=ID (desde una obra, por ejemplo) abre ese gasto directo.
+  useEffect(() => {
+    const gid = searchParams.get('gasto');
+    if (!gid || !esGestor) return;
+    gastosApi.get(Number(gid))
+      .then((r) => { setGastoSeleccionado(r.data); setSheetOpen(true); })
+      .catch(() => toast.error('No se encontró el gasto'))
+      .finally(() => { searchParams.delete('gasto'); setSearchParams(searchParams, { replace: true }); });
+    /* eslint-disable-next-line */
   }, [esGestor]);
 
   // Re-fetch gastos cada vez que cambia un filtro server-side o la paginacion.
