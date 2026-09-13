@@ -93,7 +93,20 @@ municipio, todas en verde. Lo que se comprobó:
   municipio quedaron intactos.
 - El modal "Pagar tarjeta" sigue funcionando igual: parcial, total y 422 sin deuda.
 
-## 6. Lo que falta, y es de Infra
+## 6. El reparto, acordado con Infra el 2026-09-12
+
+| Quién | Qué |
+|---|---|
+| **Infra** (`structure-8d`) | la migración en producción y la promoción `qa` → `master` hasta `d7c9b4a2`. Van sin cartel de mantenimiento |
+| **Munify** (`sugerenciasmun-b2`) | el ensayo en Merlo, y después la curación de San Pedro Norte. Los números del ensayo se le pasan a Infra antes de tocar al cliente |
+
+El cartel de mantenimiento, si hace falta, se coordina recién para la curación.
+
+**Nota sobre el canal entre agentes:** costó medio día acordar esto porque los mensajes por
+nombre se pierden (confirman entrega y no llegan). Se habla por dirección de pipe, que está en
+`.claude/sessions/*.json`. Detalle en la memoria del proyecto.
+
+## 7. Lo que falta
 
 1. Correr `migrate_programado_tarjeta.py --env prod --aplicar` en producción.
 2. Promover `qa` a `master` para que el código quede vivo.
