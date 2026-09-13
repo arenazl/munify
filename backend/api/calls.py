@@ -28,7 +28,7 @@ from core.rate_limit import limiter
 from core.security import create_access_token, verify_password
 from models.calls import (CallsEvento, CallsLlamada, CallsMunicipio, CallsRegistro,
                           CallsUsuario)
-from models.calls_curacion import CallsTelefono
+from models.calls_curacion import CallsCanal, CallsMail, CallsTelefono
 
 router = APIRouter()
 
@@ -461,7 +461,39 @@ async def ficha_una(
         d = d or {"estado": "", "notas": "", "quien": "", "proximo": "", "telFix": {}}
         d["hist"] = [{"t": e.creado.isoformat(), "tipo": e.tipo, "txt": e.texto,
                       "autor": e.autor} for e in eventos]
-    return {"ficha": _ficha_completa(m, d), "db": d or {}}
+
+    # LOS CANALES Y LOS MAILS, que son N por municipio y viven en tabla propia.
+    #
+    # Van aca y NO en `/fichas`: en el listado serian N filas por cada una de las 2.244 y
+    # se repetiria el error que ya se pago una vez --mandar el render de todas para
+    # dibujar la que se esta mirando, 20,9 MB de 23,6--. Abrir una ficha es el momento en
+    # que estos datos se usan.
+    #
+    # Se ordenan por dueno y no por fecha: primero los del municipio, que son por donde se
+    # entra, y al final los de terceros, que sirven para entender como se comunica hoy el
+    # vecino. `desconocido` queda en el medio: es un dato que hay que mirar, no uno que
+    # haya que esconder.
+    orden = {"municipio": 0, "area": 1, "funcionario": 2, "desconocido": 3, "tercero": 4}
+    canales = (await db.execute(
+        select(CallsCanal).where(CallsCanal.muni_key == muni_key)
+    )).scalars().all()
+    mails = (await db.execute(
+        select(CallsMail).where(CallsMail.muni_key == muni_key)
+    )).scalars().all()
+    ficha = _ficha_completa(m, d)
+    ficha["canales"] = sorted([{
+        "tipo": c.tipo or "otro", "dato": c.dato or "", "de": c.de or "",
+        "de_quien": c.de_quien or "desconocido", "area": c.area or "",
+        "gestion": c.gestion or "", "vigencia": c.vigencia or "",
+        "que_se_sabe": c.que_se_sabe or "", "duda": c.duda or "",
+    } for c in canales], key=lambda x: (orden.get(x["de_quien"], 3), x["tipo"]))
+    ficha["mails"] = sorted([{
+        "direccion": x.direccion or "", "de": x.de or "",
+        "de_quien": x.de_quien or "desconocido", "area": x.area or "",
+        "vigencia": x.vigencia or "", "que_se_sabe": x.que_se_sabe or "",
+        "duda": x.duda or "",
+    } for x in mails], key=lambda x: orden.get(x["de_quien"], 3))
+    return {"ficha": ficha, "db": d or {}}
 
 
 @router.get("/ranking")

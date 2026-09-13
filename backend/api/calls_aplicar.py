@@ -318,7 +318,42 @@ async def aplicar(
         m.curado_en, m.curado_por = ahora, quien.usuario
     await db.commit()
 
+    # LA FICHA ACTUALIZADA VUELVE EN LA RESPUESTA.
+    #
+    # Sin esto, guardar no se veia. La pantalla no lee la base: arranca de un
+    # `datos.json` de 22 MB horneado en el build, y el objeto que tiene en memoria es esa
+    # foto. Se guardaban los telefonos, se guardaban los canales, y el vendedor seguia
+    # mirando la ficha de antes hasta que alguien volviera a compilar.
+    #
+    # Devolviendola aca, el front pisa lo que tiene con lo que quedo en la base y repinta
+    # en el acto. Es el mismo criterio que ya usaba `curar/telefono`, que si lo hacia.
+    canales = (await db.execute(
+        select(CallsCanal).where(CallsCanal.muni_key == data.muni_key)
+    )).scalars().all()
+    mails = (await db.execute(
+        select(CallsMail).where(CallsMail.muni_key == data.muni_key)
+    )).scalars().all()
+    orden = {"municipio": 0, "area": 1, "funcionario": 2, "desconocido": 3, "tercero": 4}
+
     return {"ok": True, "muni_key": data.muni_key, "guardado": hecho,
+            "ficha": {
+                "telefonos": _lista(m.telefonos),
+                "telefonos_meta": _dict(m.telefonos_meta),
+                "web": m.web or "",
+                "mail": getattr(m, "mail", "") or "",
+                "canales": sorted([{
+                    "tipo": c.tipo or "otro", "dato": c.dato or "", "de": c.de or "",
+                    "de_quien": c.de_quien or "desconocido", "area": c.area or "",
+                    "gestion": c.gestion or "", "vigencia": c.vigencia or "",
+                    "que_se_sabe": c.que_se_sabe or "", "duda": c.duda or "",
+                } for c in canales], key=lambda x: (orden.get(x["de_quien"], 3), x["tipo"])),
+                "mails": sorted([{
+                    "direccion": x.direccion or "", "de": x.de or "",
+                    "de_quien": x.de_quien or "desconocido", "area": x.area or "",
+                    "vigencia": x.vigencia or "", "que_se_sabe": x.que_se_sabe or "",
+                    "duda": x.duda or "",
+                } for x in mails], key=lambda x: orden.get(x["de_quien"], 3)),
+            },
             "nota": "se sumo a la ficha; no se piso ni se borro nada, y el angulo de "
                     "entrada quedo como estaba"}
 
