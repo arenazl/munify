@@ -84,15 +84,18 @@ export default function Obras() {
     taxonomy: (o) => ({ label: o.modalidad ? MODALIDAD[o.modalidad] ?? o.modalidad : (o.tipo === 'obra' ? 'obra' : 'programa') }),
     headline: (o) => o.nombre,
     actor: (o) => o.contratista?.nombre ?? null,
-    context: (o) => o.etapa_actual ? `Etapa ${o.etapa_actual.orden} de ${o.etapa_actual.total} · ${o.etapa_actual.nombre}` : (o.n_etapas ? `${o.n_etapas} etapas` : 'sin etapas cargadas'),
-    amount: (o) => `${fmtMoney(o.ejecutado)}${o.presupuesto_vigente ? ` de ${fmtMoney(o.presupuesto_vigente)}` : ''} · ${o.n_gastos} gastos`,
+    // La tarjeta del kit dibuja: cabecera (headline + pills), descripción, meta (due) y pie (context + state).
+    // La plata va en la descripción, la etapa en el vencimiento y el avance como prioridad.
+    context: (o) => `${o.n_gastos} gastos${o.n_etapas ? ` · ${o.n_etapas} etapas` : ' · sin etapas cargadas'}`,
+    description: (o) => `${fmtMoney(o.ejecutado)} ejecutados${o.presupuesto_vigente ? ` de ${fmtMoney(o.presupuesto_vigente)}` : ' · sin presupuesto cargado'}`,
+    due: (o) => o.etapa_actual ? { label: `Etapa ${o.etapa_actual.orden} de ${o.etapa_actual.total} · ${o.etapa_actual.nombre}`, veredicto: o.atraso_dias > 0 ? 'advertencia' : undefined } : null,
+    priority: (o) => o.avance != null ? { label: `${o.avance}% de avance`, veredicto: o.veredicto === 'malo' ? 'malo' : undefined } : null,
     state: (o) => ({ label: o.motivo, tono: o.veredicto }),
     verdict: (o) => o.veredicto,
     badges: (o) => [
       ...(o.publico ? [{ label: 'publicada' }] : []),
       ...(o.sin_etapa ? [{ label: `${o.sin_etapa} sin etapa` }] : []),
     ],
-    description: (o) => o.avance != null ? `Avance real ${o.avance}%` : null,
   }), []);
 
   const columns: ColumnSpec<ObraResumen>[] = useMemo(() => [
