@@ -114,6 +114,9 @@ async function clearIndexedDB(): Promise<void> {
 export async function saveMunicipio(data: MunicipioData): Promise<void> {
   // Guardar en localStorage (sincrónico, backup)
   localStorage.setItem('municipio_id', data.id);
+  // La clave que leen el interceptor (X-Municipio-ID) y el selector del super admin.
+  // Sin esto el super elegia un municipio y las requests salian sin contexto (2026-09-13).
+  localStorage.setItem('municipio_actual_id', data.id);
   localStorage.setItem('municipio_codigo', data.codigo);
   localStorage.setItem('municipio_nombre', data.nombre);
   localStorage.setItem('municipio_color', data.color);
