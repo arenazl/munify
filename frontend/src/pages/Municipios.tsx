@@ -339,7 +339,7 @@ export default function Municipios() {
                       onClick={async (e) => {
                         e.stopPropagation();
                         await saveMunicipio({ id: String(municipio.id), codigo: municipio.codigo, nombre: municipio.nombre, color: municipio.color_primario || theme.primary });
-                        navigate('/gestion/dashboard');
+                        navigate('/gestion')  /* el tablero es el índice de /gestion; /gestion/dashboard no existe y caía en la ruta comodín */;
                       }}
                       className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
                       style={{ backgroundColor: theme.primary, color: 'var(--pl-on-accent)' }}
