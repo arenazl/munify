@@ -901,33 +901,24 @@ async def ejecutar_pagos_masivo(
     )
 
 
-@router.post("/ejecutar-automaticos")
-async def ejecutar_automaticos(
-    request: Request,
-    hasta: Optional[date] = Query(None, description="Vencidos hasta esta fecha (default: hoy)"),
-    municipio_id: Optional[int] = Query(None, description="Limitar a un municipio"),
-    seco: bool = Query(False, description="No escribe: informa que haria"),
-    db: AsyncSession = Depends(get_db),
-    x_cron_key: Optional[str] = Header(default=None, alias="X-Cron-Key"),
-):
-    """Ejecuta los pagos programados marcados como AUTOMATICOS que ya vencieron.
+async def ejecutar_programados_automaticos(
+    db: AsyncSession, hasta: Optional[date] = None,
+    municipio_id: Optional[int] = None, seco: bool = False,
+) -> dict:
+    """Ejecuta los pagos programados en modo AUTOMATICO que ya vencieron.
 
-    Lo llama un cron externo (Cloud Scheduler), no una persona: por eso la auth
-    es el mismo `X-Cron-Key` que ya usan los recordatorios de turnos y calls, y
-    no un usuario logueado. Sin `CRON_SECRET` configurado el endpoint esta
-    apagado (503), que es el default seguro: nadie ejecuta pagos por accidente.
+    La usan dos caminos y pueden convivir sin pisarse: las tareas del dia (que
+    se cuelgan del trafico normal, ver services/tareas_del_dia.py) y el endpoint
+    de abajo, por si alguna vez lo golpea un scheduler externo. Que corra dos
+    veces es inofensivo: cada pago se toma con el claim atomico de su periodo,
+    asi que el segundo intento no encuentra nada.
 
-    Un programado en modo `aprobacion` NO se toca nunca aca: ese sigue siendo un
+    Un programado en modo `aprobacion` NO se toca nunca: ese sigue siendo un
     recordatorio que confirma una persona.
 
-    Cada municipio se procesa en su propia transaccion: si uno falla, los demas
-    se pagan igual y el que fallo queda intacto con su motivo en la respuesta.
+    Cada pago va en su propia transaccion: si uno falla, los demas se pagan
+    igual y el que fallo queda intacto con su motivo en la respuesta.
     """
-    if not settings.CRON_SECRET:
-        raise HTTPException(503, "CRON_SECRET no configurado: el ejecutor automatico esta apagado")
-    if x_cron_key != settings.CRON_SECRET:
-        raise HTTPException(401, "Clave de cron invalida")
-
     tope = hasta or hoy_ar()
     q = select(TesoreriaPagoProgramado).where(
         TesoreriaPagoProgramado.activo.is_(True),
@@ -1033,6 +1024,32 @@ async def ejecutar_automaticos(
         "monto_total": str(pagados),
         "items": items,
     }
+
+
+
+
+@router.post("/ejecutar-automaticos")
+async def endpoint_ejecutar_automaticos(
+    hasta: Optional[date] = Query(None, description="Vencidos hasta esta fecha (default: hoy)"),
+    municipio_id: Optional[int] = Query(None, description="Limitar a un municipio"),
+    seco: bool = Query(False, description="No escribe: informa que haria"),
+    db: AsyncSession = Depends(get_db),
+    x_cron_key: Optional[str] = Header(default=None, alias="X-Cron-Key"),
+):
+    """Puerta externa a los pagos automaticos, para un scheduler.
+
+    NO hace falta para que funcionen: la app los ejecuta sola con el trafico
+    normal (services/tareas_del_dia.py). Esto existe como red de seguridad y
+    para poder forzar una corrida sin esperar a que alguien entre.
+
+    Auth: el mismo `X-Cron-Key` que ya usan los recordatorios de turnos y calls.
+    Sin `CRON_SECRET` configurado esta apagado (503), que es el default seguro.
+    """
+    if not settings.CRON_SECRET:
+        raise HTTPException(503, "CRON_SECRET no configurado: la puerta externa esta apagada")
+    if x_cron_key != settings.CRON_SECRET:
+        raise HTTPException(401, "Clave de cron invalida")
+    return await ejecutar_programados_automaticos(db, hasta=hasta, municipio_id=municipio_id, seco=seco)
 
 
 @router.post("/{pp_id}/omitir")

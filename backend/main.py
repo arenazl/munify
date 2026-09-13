@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from contextlib import asynccontextmanager
 import time
 import os
+import asyncio
 from pathlib import Path
 import sentry_sdk
 from slowapi.errors import RateLimitExceeded
@@ -110,6 +111,18 @@ app.add_middleware(
 # (en sesión separada y fire-and-forget — no bloquea el response).
 # También sigue imprimiendo la línea a stdout para los logs de Cloud Run.
 app.middleware("http")(audit_middleware)
+
+
+# Las tareas del dia se cuelgan del trafico: la primera request de cada dia las
+# dispara en segundo plano y sigue de largo. Cloud Run escala a CERO, asi que un
+# timer interno no existiria de madrugada; y al escalar a varias instancias cada
+# una tendria el suyo. Detalle y candado: services/tareas_del_dia.py
+@app.middleware("http")
+async def disparar_tareas_del_dia(request, call_next):
+    from services.tareas_del_dia import hay_algo_pendiente, correr_tareas_del_dia
+    if hay_algo_pendiente():
+        asyncio.create_task(correr_tareas_del_dia())
+    return await call_next(request)
 
 # Archivos estáticos del backend (imágenes subidas)
 static_path = Path(__file__).parent / "static"
