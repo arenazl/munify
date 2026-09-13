@@ -10,7 +10,8 @@
  *   2. Lo que hay que resolver, con su botón: gastos sin etapa, vencidos sin pagar, etapas vencidas o paradas.
  *   3. La línea de tiempo: el mapa del calendario, un solo nivel, tocar una etapa abre su ficha.
  *   4. Los tres relojes de la obra y la curva S (previsto, pagado, hecho, y a dónde va si sigue así).
- *   5. Etapa por etapa: la ficha (diagnóstico, relojes, rubros, gente, libro de gastos con enlace).
+ *   5. Etapa por etapa: un renglón por etapa; se toca (acá o en la línea de tiempo) y el detalle
+ *      abre en un MODAL GRANDE, para que la página no cambie de largo ni salte el scroll.
  *   6. A quién se le pagó y quién estuvo.
  * Los gráficos son sólo dos, y los dos tienen sentido de obra: barras contra su vara y la curva S.
  */
@@ -25,7 +26,7 @@ import { SelectorAdaptativo } from '../components/abmv2/SelectorAdaptativo';
 import LineaDeTiempoObra, { type LtEtapa, type LtHito } from '../components/abmv2/LineaDeTiempoObra';
 import { TresRelojes } from '../components/abmv2/TresRelojes';
 import { CurvaInversion } from '../components/abmv2/CurvaInversion';
-import { FichaEtapa, TablaGastosObra } from '../components/abmv2/FichaEtapa';
+import { ModalEtapa, RenglonEtapa, TablaGastosObra } from '../components/abmv2/FichaEtapa';
 import { seg, type HeroKpi } from '../lib/semanticHero';
 import { obrasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -45,7 +46,8 @@ export default function ObraDetalle() {
   const { theme } = useTheme();
   const [d, setD] = useState<DetalleObra | null>(null);
   const [loading, setLoading] = useState(true);
-  const [etapaActiva, setEtapaActiva] = useState<number | null>(null);
+  const [etapaActiva, setEtapaActiva] = useState<number | null>(null);   // la destacada en la línea de tiempo
+  const [etapaModal, setEtapaModal] = useState<number | null>(null);     // la abierta en el modal grande
   const [editEtapas, setEditEtapas] = useState<EtapaObra[] | null>(null);
   const [editObra, setEditObra] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
@@ -66,7 +68,8 @@ export default function ObraDetalle() {
   }, [id]);
   useEffect(() => { void cargar(); }, [cargar]);
 
-  // Al abrir, la etapa en curso queda abierta: es la que importa hoy.
+  // Al abrir, la etapa en curso queda DESTACADA en la línea de tiempo (no se abre el
+  // modal solo: la pantalla tiene que poder leerse entera sin nada encima).
   useEffect(() => {
     if (d && etapaActiva === null) {
       const enCurso = d.etapas.find((e) => e.estado === 'en_curso' || e.estado === 'parada') ?? d.etapas.find((e) => e.estado !== 'terminada');
@@ -114,10 +117,9 @@ export default function ObraDetalle() {
     }
   };
   const abrirGasto = (gastoId: number) => navigate(`/gestion/tesoreria?gasto=${gastoId}`);
-  const irAEtapa = (etapaId: number) => {
-    setEtapaActiva(etapaId);
-    setTimeout(() => document.getElementById(`etapa-${etapaId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  };
+  // El detalle de una etapa SIEMPRE abre en el modal grande: la página no cambia de
+  // largo, así que el scroll se queda donde estaba (dueño, 2026-09-13).
+  const irAEtapa = (etapaId: number) => { setEtapaActiva(etapaId); setEtapaModal(etapaId); };
 
   const guardarEtapas = async () => {
     if (!d || !editEtapas) return;
@@ -273,7 +275,7 @@ export default function ObraDetalle() {
           hitos={hitos}
           hoy={hoy}
           etapaActivaId={etapaActiva}
-          onEtapa={(eid) => { if (eid == null) setEtapaActiva(null); else irAEtapa(eid); }}
+          onEtapa={irAEtapa}
           fmtMoney={(n) => fmtMoney(n)}
         />
       </section>
@@ -293,21 +295,11 @@ export default function ObraDetalle() {
         <section style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
             <h3 className="fe-seccion">Etapa por etapa</h3>
-            <span style={{ fontSize: 'var(--pl-fs-caption)', color: 'var(--pl-text-muted)' }}>Cada etapa es una obra en chico: sus tres relojes, en qué se fue la plata y su libro de gastos.</span>
+            <span style={{ fontSize: 'var(--pl-fs-caption)', color: 'var(--pl-text-muted)' }}>Cada etapa es una obra en chico. Tocá una y se abre su detalle: qué pasó, sus relojes y sus gastos.</span>
           </div>
           <div className="fe-lista">
             {d.etapas.map((e) => (
-              <FichaEtapa
-                key={e.id}
-                etapa={e}
-                gastos={gastosDe(e)}
-                abierta={etapaActiva === e.id}
-                hoy={hoy}
-                onToggle={() => setEtapaActiva(etapaActiva === e.id ? null : e.id)}
-                onConfirmar={(ids, etapaId) => { void confirmar(ids, etapaId); }}
-                onAbrirGasto={abrirGasto}
-                fmtMoney={fmtMoney}
-              />
+              <RenglonEtapa key={e.id} etapa={e} activa={etapaActiva === e.id} onAbrir={() => irAEtapa(e.id)} fmtMoney={fmtMoney} />
             ))}
           </div>
         </section>
@@ -315,7 +307,7 @@ export default function ObraDetalle() {
         <article className="gr-card" style={{ marginTop: 16 }}>
           <h3>Los gastos de la obra</h3>
           <p className="gr-q">{d.gastos.length} gasto{d.gastos.length === 1 ? '' : 's'}. Sin etapas es la película de la plata, nada más. <b>Cada renglón abre en Tesorería.</b></p>
-          <TablaGastosObra gastos={d.gastos} hoy={hoy} conEtapas={false} onAbrirGasto={abrirGasto} fmtMoney={fmtMoney} />
+          <TablaGastosObra gastos={d.gastos} hoy={hoy} obraNombre={d.obra.nombre} conEtapas={false} onAbrirGasto={abrirGasto} fmtMoney={fmtMoney} />
         </article>
       )}
 
@@ -335,6 +327,25 @@ export default function ObraDetalle() {
           {fila('Sueldos imputados', d.gente.sueldos_personas ? `${d.gente.sueldos_personas} personas · ${fmtMoney(d.gente.sueldos_total)}` : 'ninguno')}
         </article>
       </div>
+
+      {etapaModal != null && (() => {
+        const e = d.etapas.find((x) => x.id === etapaModal);
+        if (!e) return null;
+        return (
+          <ModalEtapa
+            etapa={e}
+            gastos={gastosDe(e)}
+            hoy={hoy}
+            obraNombre={d.obra.nombre}
+            total={d.etapas.length}
+            onCerrar={() => setEtapaModal(null)}
+            onIr={(orden) => { const o = d.etapas.find((x) => x.orden === orden); if (o) { setEtapaModal(o.id); setEtapaActiva(o.id); } }}
+            onConfirmar={(ids, etapaId) => { void confirmar(ids, etapaId); }}
+            onAbrirGasto={abrirGasto}
+            fmtMoney={fmtMoney}
+          />
+        );
+      })()}
 
       {editEtapas && (
         <SideModal

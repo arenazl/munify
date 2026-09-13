@@ -9,7 +9,7 @@ interface ModalProps {
   children: ReactNode;
   title?: string;
   description?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full' | 'panel';
   showCloseButton?: boolean;
   closeOnBackdrop?: boolean;
   footer?: ReactNode;
@@ -24,6 +24,10 @@ const sizeClasses = {
   '3xl': '56rem', // max-w-3xl
   '4xl': '64rem', // max-w-4xl
   full: '80rem',  // max-w-6xl
+  // `panel` es para contenido que se LEE, no para confirmar algo: el detalle de una
+  // etapa de obra, con sus tres bloques en fila y su tabla. Ocupa casi todo el ancho
+  // disponible sin pegarse a los bordes (dueño, 2026-09-13: "bien cómodo, nada apretado").
+  panel: 'min(96rem, calc(100vw - 4rem))',
 };
 
 /**
@@ -110,7 +114,7 @@ export function Modal({
           style={{
             width: '100%',
             maxWidth: sizeClasses[size],
-            maxHeight: 'calc(100vh - 2rem)',
+            maxHeight: size === 'panel' ? 'calc(100vh - 3rem)' : 'calc(100vh - 2rem)',
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: theme.card,

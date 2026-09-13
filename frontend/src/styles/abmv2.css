@@ -6615,12 +6615,12 @@ button.av2-recorrido-miga:hover {
 .gr-grid--2 { grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
 .fe-seccion { font-family: var(--pl-font-display); font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
 .fe-lista { display: flex; flex-direction: column; gap: 8px; }
-.fe { border: 1px solid var(--pl-border); border-radius: 12px; background: var(--pl-surface); overflow: hidden; }
-.fe--abierta { border-color: var(--pl-border-strong); box-shadow: 0 6px 24px color-mix(in srgb, var(--pl-text) 8%, transparent); }
-.fe--malo.fe--abierta { border-color: color-mix(in srgb, var(--pl-red) 45%, transparent); }
-.fe--advertencia.fe--abierta { border-color: color-mix(in srgb, var(--pl-amber-strong) 55%, transparent); }
-.fe-cab { display: grid; grid-template-columns: 30px minmax(180px, 1.3fr) 150px minmax(240px, 1fr) 150px 20px; gap: 14px; align-items: center; width: 100%; padding: 12px 14px; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
-.fe-cab:hover { background: color-mix(in srgb, var(--pl-text) 3%, transparent); }
+.fe { border: 1px solid var(--pl-border); border-radius: 12px; background: var(--pl-surface); overflow: hidden; scroll-margin-top: 72px; }
+.fe--activa { border-color: var(--pl-border-strong); }
+.fe-cab { display: grid; grid-template-columns: 30px minmax(180px, 1.3fr) 150px minmax(240px, 1fr) 150px 62px; gap: 14px; align-items: center; width: 100%; padding: 12px 14px; text-align: left; cursor: pointer; font: inherit; transition: background .15s ease, border-color .15s ease; }
+.fe-cab:hover { background: color-mix(in srgb, var(--pl-text) 4%, transparent); border-color: var(--pl-border-strong); }
+.fe-ver { display: inline-flex; align-items: center; gap: 3px; justify-content: flex-end; font-size: 12px; font-weight: 600; color: var(--pl-text-muted); white-space: nowrap; }
+.fe-cab:hover .fe-ver { color: var(--pl-text); }
 .fe-num { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: color-mix(in srgb, var(--pl-text) 8%, transparent); }
 .fe--malo .fe-num { background: color-mix(in srgb, var(--pl-red) 18%, transparent); color: var(--pl-red-700); }
 .fe--advertencia .fe-num { background: color-mix(in srgb, var(--pl-amber-strong) 22%, transparent); color: var(--pl-amber-700); }
@@ -6634,11 +6634,20 @@ button.av2-recorrido-miga:hover {
 .fe-plata small { font-weight: 500; color: var(--pl-text-muted); font-size: 11.5px; }
 .fe-chev { color: var(--pl-text-muted); transition: transform .2s ease; }
 .fe--abierta .fe-chev { transform: rotate(180deg); }
-.fe-cuerpo { padding: 4px 18px 18px; border-top: 1px solid var(--pl-border); display: flex; flex-direction: column; gap: 14px; }
-.fe-frase { margin: 14px 0 0; font-size: 15px; font-weight: 600; line-height: 1.45; }
+.fe-cuerpo { display: flex; flex-direction: column; gap: 20px; }
+.fe-frase { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.45; }
+.fe-modal-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fe-modal-pos { font-size: 12px; color: var(--pl-text-muted); font-weight: 600; }
+.fe-modal-pie button[disabled] { opacity: .4; cursor: default; }
 .fe-arrastre { margin: -6px 0 0; font-size: 13px; color: var(--pl-text-muted); }
-.fe-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
-.fe-bloque h4 { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--pl-text-2); }
+/* Tres bloques en fila cuando hay lugar (relojes / plata / gente); el de los relojes
+   se lleva más ancho porque es el que se lee. Nunca se aprietan: bajan a dos y a una. */
+.fe-grid { display: grid; grid-template-columns: minmax(340px, 1.25fr) minmax(300px, 1fr) minmax(260px, .9fr); gap: 26px; align-items: start; }
+@media (max-width: 1180px) { .fe-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; } }
+.fe-bloque { min-width: 0; }
+.fe-bloque + .fe-bloque { position: relative; }
+@media (min-width: 1181px) { .fe-grid > .fe-bloque + .fe-bloque { padding-left: 26px; border-left: 1px solid var(--pl-border); } }
+.fe-bloque h4 { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--pl-text-2); }
 .fe-bloque h4 span { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--pl-text-muted); margin-left: 6px; }
 .fe-rubros { display: flex; height: 14px; border-radius: 999px; overflow: hidden; gap: 2px; background: color-mix(in srgb, var(--pl-text) 6%, transparent); }
 .fe-rubros i { display: block; height: 100%; }
@@ -6646,16 +6655,19 @@ button.av2-recorrido-miga:hover {
 .fe-rubros-key b { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .fe-rubros-key b span { color: var(--pl-text-muted); font-weight: 500; }
 .fe-rubros-key i { width: 9px; height: 9px; border-radius: 3px; display: block; }
-.fe-gente { margin: 0; font-size: 12.5px; color: var(--pl-text); line-height: 1.5; }
+.fe-gente { margin: 0; font-size: 13px; color: var(--pl-text); line-height: 1.65; }
 .fe-vacio { margin: 0; font-size: 12.5px; color: var(--pl-text-muted); }
 .fe-libro-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .fe-libro-cab h4 { margin: 0; }
-.fe-gastos { display: flex; flex-direction: column; margin-top: 6px; }
-.fe-gasto { display: grid; grid-template-columns: 52px minmax(120px, 1.1fr) minmax(140px, 1.4fr) 110px 110px 100px 28px; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--pl-border); font-size: 12.5px; }
+.fe-gastos { display: flex; flex-direction: column; margin-top: 8px; }
+.fe-libro-cab { margin-bottom: 2px; }
+.fe-gasto { display: grid; grid-template-columns: 62px minmax(150px, 1.1fr) minmax(200px, 2fr) 130px 130px 120px 30px; gap: 14px; align-items: center; padding: 9px 0; border-top: 1px solid var(--pl-border); font-size: 13px; }
 .fe-gasto--prog { opacity: .6; }
 .fe-gasto--prop { background: color-mix(in srgb, var(--pl-amber-strong) 8%, transparent); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 6px; }
 .fe-g-fecha { color: var(--pl-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fe-g-quien, .fe-g-que { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fe-g-quien { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* El concepto es lo que explica el gasto: si no entra en una línea, usa dos. Nunca se corta. */
+.fe-g-que { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
 .fe-g-quien em { color: var(--pl-text-muted); }
 .fe-g-que { color: var(--pl-text-2); }
 .fe-g-rubro { display: inline-flex; align-items: center; gap: 6px; color: var(--pl-text-muted); white-space: nowrap; }
@@ -6667,7 +6679,7 @@ button.av2-recorrido-miga:hover {
 .fe-g-btn:hover { border-color: var(--pl-border-strong); color: var(--pl-text); }
 .fe-g-btn--ok { border-color: color-mix(in srgb, var(--pl-green) 50%, transparent); color: var(--pl-green-700); }
 @media (max-width: 900px) {
-  .fe-cab { grid-template-columns: 30px minmax(0, 1fr) 20px; grid-template-rows: auto auto; }
+  .fe-cab { grid-template-columns: 30px minmax(0, 1fr) 62px; grid-template-rows: auto auto; }
   .fe-sit, .fe-mini, .fe-plata { grid-column: 2; }
   .fe-gasto { grid-template-columns: 52px minmax(0, 1fr) 90px 28px; }
   .fe-g-que, .fe-g-rubro, .fe-g-estado { display: none; }

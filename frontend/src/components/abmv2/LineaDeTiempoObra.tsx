@@ -37,7 +37,7 @@ export interface LineaDeTiempoObraProps {
   hitos?: LtHito[];
   hoy?: string;
   etapaActivaId: number | null;
-  onEtapa: (id: number | null) => void;
+  onEtapa: (id: number) => void;   // tocar siempre abre (y lleva a) la ficha; cerrar se hace desde la ficha
   fmtMoney: (n: number) => string;
 }
 
@@ -95,7 +95,7 @@ export function LineaDeTiempoObra({ desde, hasta, etapas, hitos = [], hoy, etapa
                 type="button"
                 className={`lt-seg ${clase(e)} ${e.id === etapaActivaId ? 'lt-seg--activa' : ''}`}
                 style={{ left: `${left}%`, width: `${width}%` }}
-                onClick={() => onEtapa(e.id === etapaActivaId ? null : e.id)}
+                onClick={() => onEtapa(e.id)}
                 title={`${e.orden} · ${e.nombre}`}
               >
                 <span className="lt-seg-n">{e.orden} · {e.nombre}</span>
