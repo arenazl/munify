@@ -34,10 +34,14 @@ export class MockDataService {
         { id: 'parajes', label: 'Parajes', tipo: 'catalogo', n: '12' },
         { id: 'vecinos', label: 'Vecinos', tipo: 'abm', n: '3.412' },
       ] },
-      { id: 'personal', label: 'Personal', hijos: [
-        { id: 'empleados', label: 'Empleados', tipo: 'abm', n: '86' },
+      // Personas (2026-09-13): UNA jerarquía para toda la app. La libreta
+      // única reemplaza a Empleados + Contactos de Tesorería + lista de
+      // Sueldos; los "tipos de empleado" son subtipos de `empleado` en el
+      // árbol de tipos. Vecinos NO va acá: Persona no es el padrón.
+      { id: 'personas', label: 'Personas', hijos: [
+        { id: 'personas', label: 'Personas', tipo: 'abm', n: '' },
+        { id: 'tipos-persona', label: 'Tipos y subtipos', tipo: 'catalogo', n: '' },
         { id: 'cuadrillas', label: 'Cuadrillas', tipo: 'abm', n: '7' },
-        { id: 'tipos-empleado', label: 'Tipos de empleado', tipo: 'catalogo', n: '5' },
       ] },
       { id: 'reclamos', label: 'Reclamos', hijos: [
         { id: 'cat-reclamo', label: 'Categorías de reclamo', tipo: 'catalogo', n: '9' },
@@ -65,7 +69,6 @@ export class MockDataService {
         { id: 'parajes', label: 'Parajes', tipo: 'abm' },
         { id: 'proyectos', label: 'Proyectos', tipo: 'abm', n: '8' },
         { id: 'tarjetas', label: 'Tarjetas', tipo: 'abm', n: '3' },
-        { id: 'contactos', label: 'Contactos', tipo: 'abm', n: '148' },
         // 'tasas' NO va acá (dueño, 2026-09-02): no hay tasas en el producto
         // hoy, y el día que las haya son su propio módulo, no un catálogo de
         // Tesorería. La pantalla GestionTasas sigue existiendo en su ruta.

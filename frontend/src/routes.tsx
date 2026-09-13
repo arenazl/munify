@@ -96,6 +96,7 @@ import MiArea from './pages/MiArea';
 // Tesoreria
 import Tesoreria from './pages/Tesoreria';
 import TesoreriaContactos from './pages/TesoreriaContactos';
+import Personas from './pages/Personas';
 import TesoreriaMapa from './pages/TesoreriaMapa';
 import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
 import TesoreriaProyectos from './pages/TesoreriaProyectos';
@@ -287,6 +288,7 @@ export const router = createBrowserRouter([
       // Tesorería (solo admin del municipio)
       { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
       { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
+      { path: 'personas', element: <ProtectedRoute roles={['admin', 'supervisor']}><Personas /></ProtectedRoute> },
       { path: 'tesoreria/proyectos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyectos /></ProtectedRoute> },
       { path: 'tesoreria/pagos-programados', element: <ProtectedRoute roles={['admin', 'supervisor']}><PagosProgramados /></ProtectedRoute> },
       // La ruta vieja ('agenda') queda redirigiendo: hay deep-links guardados y

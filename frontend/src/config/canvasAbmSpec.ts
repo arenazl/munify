@@ -544,6 +544,8 @@ export const DESCRIPCION_AJUSTE: Record<string, string> = {
   'cat-tramite': 'Las carpetas generales de trámites: Obras, Comercio, Catastro.',
   'tipos-tramite': 'Cada trámite concreto con sus prerrequisitos.',
   'tipos-poi': 'Plazas, escuelas y paradas: dónde se ponen los carteles con QR.',
+  personas: 'Todos los que cobran, trabajan o tienen acceso, en una sola libreta.',
+  'tipos-persona': 'Persona → tipo → subtipo: qué puede ser una persona en este municipio.',
   'tipos-empleado': 'Planta, contratado o jornalero: define cómo se liquida.',
   parajes: 'Los parajes con los que se imputa cada gasto.',
   'cat-inv': 'Las familias en las que se agrupa el depósito.',

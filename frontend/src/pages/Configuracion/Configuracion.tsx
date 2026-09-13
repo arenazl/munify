@@ -22,9 +22,9 @@ import { EmbedProvider } from '../../components/abmv2/EmbedContext';
 import InventarioDepositosConfig from '../InventarioDepositosConfig';
 import Inventario from '../Inventario';
 import ConfiguracionTesoreria from '../ConfiguracionTesoreria';
-import TesoreriaContactos from '../TesoreriaContactos';
 import TarjetasCredito from '../TarjetasCredito';
-import Empleados from '../Empleados';
+import Personas from '../Personas';
+import TiposPersonaConfig from '../TiposPersonaConfig';
 import Zonas from '../Zonas';
 import Barrios from '../Barrios';
 import { ALTA_DE_AJUSTE } from '../../components/config/altasDeAjuste';
@@ -120,7 +120,7 @@ export default function Configuracion() {
   const [hijosActivos, setHijosActivos] = useState<Record<string, string>>({
     general: 'muni',
     municipio: 'dependencias',
-    personal: 'empleados',
+    personas: 'personas',
     reclamos: 'cat-reclamo',
     tramites: 'arbol-tramite',
     inventario: 'inv',
@@ -367,10 +367,10 @@ export default function Configuracion() {
     retenciones: <ConfiguracionTesoreria tabInicial="retenciones" />,
     parajes: <ConfiguracionTesoreria tabInicial="parajes" />,
     proyectos: <ConfiguracionTesoreria tabInicial="proyectos" />,
-    'tipos-empleado': <ConfiguracionTesoreria tabInicial="tipos-empleado" />,
-    contactos: <TesoreriaContactos />,
     tarjetas: <TarjetasCredito />,
-    empleados: <Empleados />,
+    // Personas (2026-09-13): la libreta única y su árbol de tipos con subtipos.
+    personas: <Personas />,
+    'tipos-persona': <TiposPersonaConfig />,
     // Territorio (2026-09-02): la pantalla real de Zonas, porque es la que
     // explica «Zona única»; y Barrios, que hasta hoy no tenía pantalla — con
     // el modelo municipio -> zona -> barrio quedaban invisibles en toda la app.

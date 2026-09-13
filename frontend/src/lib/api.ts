@@ -2470,6 +2470,18 @@ export const modulosApi = {
     api.put(`/modulos/${nombre}`, { modulo: nombre, activo }),
 };
 
+// Personas: la libreta única (F1). Sirve a Configuración › Personas y a Obras.
+export const personasApi = {
+  list: (params?: { q?: string; tipo?: string; activo?: boolean; page?: number; page_size?: number }) =>
+    api.get('/personas', { params }),
+  get: (id: number) => api.get(`/personas/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/personas', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/personas/${id}`, data),
+  tipos: (activos = true) => api.get('/personas/tipos', { params: { activos } }),
+  crearTipo: (data: Record<string, unknown>) => api.post('/personas/tipos', data),
+  editarTipo: (id: number, data: Record<string, unknown>) => api.put(`/personas/tipos/${id}`, data),
+};
+
 export const contactosApi = {
   list: (params?: { tipo?: string; search?: string; activo?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/contactos', { params }),
