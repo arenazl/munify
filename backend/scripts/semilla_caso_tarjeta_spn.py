@@ -157,7 +157,8 @@ async def sembrar(args, ent, eng) -> int:
             await c.execute(text(
                 "UPDATE tesoreria_pagos_programados SET contacto_id=:ct, tarjeta_caja_id=NULL, caja_id=:cj, concepto=:co, "
                 "descripcion=:de, monto_pesos=:monto, forma_pago='transferencia', frecuencia='mensual', dia_del_mes=:dia, "
-                "fecha_fin=NULL, proximo_pago=:prox, ultimo_pago=:ult, activo=1 WHERE id=:id"), {**valores, "id": pp_id})
+                "fecha_fin=NULL, proximo_pago=:prox, ultimo_pago=:ult, activo=1, modo_ejecucion='aprobacion', "
+                "ejecutado_auto_en=NULL WHERE id=:id"), {**valores, "id": pp_id})
             hechos.append(f"programado {pp_id} vuelto a como lo dejo el municipio")
         else:
             campos = ("(municipio_id, contacto_id, tarjeta_caja_id, caja_id, concepto, descripcion, monto_pesos, forma_pago, "

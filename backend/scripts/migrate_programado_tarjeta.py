@@ -11,6 +11,8 @@ sin pasar por alembic porque QA no lleva la tabla de versiones).
   * tesoreria_pagos_programados.modo_ejecucion (aprobacion | automatico, default aprobacion)
   * tesoreria_pagos_programados.ejecutado_auto_en (cuando lo ejecuto el sistema)
   * tesoreria_movimientos_caja.pago_programado_id (FK pagos_programados, SET NULL, indice)
+  * tesoreria_movimientos_caja.fecha_programada y gastos.fecha_programada
+    (cuando estaba PREVISTO el pago, al lado de la fecha con la que se imputa)
 
 Uso:
     python scripts/migrate_programado_tarjeta.py --env qa --aplicar
@@ -96,6 +98,11 @@ async def main():
         if "fk_mov_caja_pago_programado" not in await fks(c, MOV, db_name):
             pasos.append(f"ALTER TABLE {MOV} ADD CONSTRAINT fk_mov_caja_pago_programado FOREIGN KEY (pago_programado_id) "
                          f"REFERENCES {PP}(id) ON DELETE SET NULL")
+
+        if "fecha_programada" not in cols_mov:
+            pasos.append(f"ALTER TABLE {MOV} ADD COLUMN fecha_programada DATE NULL")
+        if "fecha_programada" not in await columnas(c, "gastos"):
+            pasos.append("ALTER TABLE gastos ADD COLUMN fecha_programada DATE NULL")
 
         if not pasos:
             print("nada que hacer: ya esta aplicada")

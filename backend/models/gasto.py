@@ -131,6 +131,9 @@ class Gasto(Base):
 
     # ============ FECHA ============
     fecha = Column(Date, nullable=False, index=True)
+    # Cuando estaba PREVISTO, si nacio de un pago programado. `fecha` es la de
+    # imputacion y `created_at` el momento real de carga: tres cosas distintas.
+    fecha_programada = Column(Date, nullable=True)
 
     # ============ FINANCIACION ============
     tipo_financiacion = Column(

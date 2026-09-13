@@ -64,8 +64,14 @@ class PagoTarjetaError(Exception):
         self.detail = detail
 
 
-async def deuda_de_tarjeta(db: AsyncSession, caja_id: int) -> Decimal:
-    """Lo que se debe HOY en esa tarjeta: egresos (compras) menos ingresos (pagos).
+async def deuda_de_tarjeta(db: AsyncSession, caja_id: int, hasta: Optional[date] = None) -> Decimal:
+    """Lo que se debe en esa tarjeta: egresos (compras) menos ingresos (pagos).
+
+    `hasta` acota a lo que se debia A ESA FECHA. Un pago con fecha 10 salda lo
+    gastado hasta el 10; lo que se compro del 11 en adelante es del periodo
+    siguiente, aunque el pago se confirme el 16 (dueño, 2026-09-12: *"si el pago
+    programado fue el dia diez, deberiamos imputarle todo lo que sucedio hasta el
+    dia diez"*). Sin `hasta`, es la deuda de hoy: lo que la pantalla muestra.
 
     OJO: la deuda NO depende del limite. `saldo_actual` es `limite + ingresos -
     egresos` y la deuda es `limite - saldo_actual`, asi que el limite se cancela
@@ -73,12 +79,12 @@ async def deuda_de_tarjeta(db: AsyncSession, caja_id: int) -> Decimal:
     quiere administrar cupos) arroja la deuda correcta igual.
     Negativa = la tarjeta tiene saldo a favor (se pago mas de lo cargado).
     """
-    rows = (await db.execute(
-        select(TesoreriaMovimientoCaja.tipo,
-               func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0))
-        .where(TesoreriaMovimientoCaja.caja_id == caja_id)
-        .group_by(TesoreriaMovimientoCaja.tipo)
-    )).all()
+    q = (select(TesoreriaMovimientoCaja.tipo,
+                func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0))
+         .where(TesoreriaMovimientoCaja.caja_id == caja_id))
+    if hasta:
+        q = q.where(TesoreriaMovimientoCaja.fecha <= hasta)
+    rows = (await db.execute(q.group_by(TesoreriaMovimientoCaja.tipo))).all()
     ingresos = egresos = Decimal(0)
     for tipo, total in rows:
         tipo_val = tipo.value if hasattr(tipo, "value") else tipo
@@ -157,19 +163,23 @@ async def registrar_pago_tarjeta(
     pago_programado_id: Optional[int] = None,
     sin_deuda: str = "error",
     desde_programado: bool = False,
+    fecha_programada: Optional[date] = None,
 ) -> ResultadoPagoTarjeta:
     """Agrega los dos movimientos a la sesion. NO hace commit: el que llama
     decide la transaccion (la agenda mete esto junto con el avance del
     programado; el modal commitea solo).
 
     `monto` None = pagar todo lo que se deba ahora. Con monto = pago parcial.
+    Con "todo", lo que se paga es lo que se debia A LA FECHA del pago, no lo de
+    hoy: un resumen que vencio el 10 no incluye lo que se compro el 12.
+
     `sin_deuda`: que hacer si se pidio "todo" y la tarjeta no debe nada.
       - "error"  -> PagoTarjetaError 422 (el modal: el usuario tiene que verlo).
       - "omitir" -> devuelve `omitido=True` sin tocar nada (la agenda: el
         periodo se saltea y el programado sigue; no es un error que un mes no
         haya habido compras).
     """
-    deuda = await deuda_de_tarjeta(db, tarjeta.id)
+    deuda = await deuda_de_tarjeta(db, tarjeta.id, hasta=fecha)
     total = monto is None
     monto_final = monto if monto is not None else deuda
 
@@ -198,6 +208,7 @@ async def registrar_pago_tarjeta(
         concepto=concepto_final,
         descripcion=constancia,
         pago_programado_id=pago_programado_id,
+        fecha_programada=fecha_programada,
     ))
     # EGRESO en la caja real: de ahi sale efectivamente la plata.
     db.add(TesoreriaMovimientoCaja(
@@ -209,5 +220,6 @@ async def registrar_pago_tarjeta(
         concepto=concepto_final,
         descripcion=constancia,
         pago_programado_id=pago_programado_id,
+        fecha_programada=fecha_programada,
     ))
     return ResultadoPagoTarjeta(monto_final, total, deuda, deuda - monto_final)
