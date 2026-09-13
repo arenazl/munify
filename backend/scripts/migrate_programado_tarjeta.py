@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-El pago programado puede tener destino TARJETA (registro formal en
-alembic/versions/20260911_programado_tarjeta.py; este script aplica lo mismo,
-idempotente, sin pasar por alembic porque QA no lleva la tabla de versiones).
+El pago programado puede tener destino TARJETA y puede ser AUTOMATICO (registro
+formal en alembic/versions/20260911_programado_tarjeta.py y
+20260912_modo_ejecucion_programado.py; este script aplica lo mismo, idempotente,
+sin pasar por alembic porque QA no lleva la tabla de versiones).
 
   * tesoreria_pagos_programados.contacto_id  -> NULL permitido
   * tesoreria_pagos_programados.monto_pesos  -> NULL permitido (NULL = paga todo)
   * tesoreria_pagos_programados.tarjeta_caja_id (FK tesoreria_cajas, SET NULL, indice)
+  * tesoreria_pagos_programados.modo_ejecucion (aprobacion | automatico, default aprobacion)
+  * tesoreria_pagos_programados.ejecutado_auto_en (cuando lo ejecuto el sistema)
   * tesoreria_movimientos_caja.pago_programado_id (FK pagos_programados, SET NULL, indice)
 
 Uso:
@@ -78,6 +81,12 @@ async def main():
         if "fk_pp_tarjeta_caja" not in await fks(c, PP, db_name):
             pasos.append(f"ALTER TABLE {PP} ADD CONSTRAINT fk_pp_tarjeta_caja FOREIGN KEY (tarjeta_caja_id) "
                          f"REFERENCES tesoreria_cajas(id) ON DELETE SET NULL")
+
+        if "modo_ejecucion" not in cols_pp:
+            pasos.append(f"ALTER TABLE {PP} ADD COLUMN modo_ejecucion "
+                         "ENUM('aprobacion','automatico') NOT NULL DEFAULT 'aprobacion'")
+        if "ejecutado_auto_en" not in cols_pp:
+            pasos.append(f"ALTER TABLE {PP} ADD COLUMN ejecutado_auto_en DATETIME NULL")
 
         cols_mov = await columnas(c, MOV)
         if "pago_programado_id" not in cols_mov:

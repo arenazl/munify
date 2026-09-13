@@ -53,6 +53,14 @@ const DESTINO_OPTIONS = [
   { value: 'contacto', label: 'Un contacto (sueldo, proveedor)' },
   { value: 'tarjeta', label: 'Una tarjeta de crédito' },
 ];
+/* Un pago programado es, por default, un RECORDATORIO: vence, aparece en la
+   lista y alguien lo confirma. El modo automático lo ejecuta el sistema solo:
+   sirve cuando el monto no lo decide nadie, como el resumen de una tarjeta. */
+type ModoEjecucion = 'aprobacion' | 'automatico';
+const MODO_OPTIONS = [
+  { value: 'aprobacion', label: 'Avisame y lo confirmo yo' },
+  { value: 'automatico', label: 'Que se pague solo al vencer' },
+];
 import { clasificarPagos, diasDesdeHoy } from '../lib/tesoreria-helpers';
 import type {
   Caja, Contacto, ConceptoLiquidacion, FrecuenciaPago, PagoEjecutadoHistorial, PagoProgramado,
@@ -258,7 +266,8 @@ export default function PagosProgramados() {
   const [borrando, setBorrando] = useState(false);
 
   const [form, setForm] = useState({
-    destino: 'contacto' as Destino, contacto_id: 0, tarjeta_caja_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
+    destino: 'contacto' as Destino, modo_ejecucion: 'aprobacion' as ModoEjecucion,
+    contacto_id: 0, tarjeta_caja_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
     monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual' as FrecuenciaPago,
     dia_del_mes: 5, dia_semana: null as number | null,
     fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
@@ -422,6 +431,7 @@ export default function PagosProgramados() {
     setForm(p
       ? {
           destino: (p.es_pago_tarjeta ? 'tarjeta' : 'contacto') as Destino,
+          modo_ejecucion: (p.modo_ejecucion || 'aprobacion') as ModoEjecucion,
           contacto_id: p.contacto_id || 0, tarjeta_caja_id: p.tarjeta_caja_id || 0, caja_id: p.caja_id || 0,
           concepto: p.concepto, descripcion: p.descripcion || '',
           monto_pesos: p.monto_pesos == null ? '' : String(p.monto_pesos), forma_pago: p.forma_pago,
@@ -430,7 +440,8 @@ export default function PagosProgramados() {
           premios_default: (p.premios_default as number[] | null) || [],
         }
       : {
-          destino: 'contacto' as Destino, contacto_id: 0, tarjeta_caja_id: 0, caja_id: 0, concepto: '', descripcion: '',
+          destino: 'contacto' as Destino, modo_ejecucion: 'aprobacion' as ModoEjecucion,
+          contacto_id: 0, tarjeta_caja_id: 0, caja_id: 0, concepto: '', descripcion: '',
           monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual',
           dia_del_mes: 1, dia_semana: null,
           fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
@@ -450,6 +461,7 @@ export default function PagosProgramados() {
     setSaving(true);
     try {
       const payload = {
+        modo_ejecucion: form.modo_ejecucion,
         contacto_id: esTarjeta ? null : form.contacto_id,
         tarjeta_caja_id: esTarjeta ? form.tarjeta_caja_id : null,
         caja_id: form.caja_id || null,
@@ -709,6 +721,13 @@ export default function PagosProgramados() {
     <EntityCell icon={CreditCard} tileColor={theme.primary} title={nombreDestino(p)}
       subtitle="Tarjeta de crédito" dotColor={theme.primary} />
   );
+  /** Los automáticos se marcan: nadie los va a confirmar, se pagan solos. */
+  const chipModo = (p: PagoProgramado) => (
+    p.modo_ejecucion === 'automatico'
+      ? <ChipEstado label="Automático" tone="blue" />
+      : null
+  );
+
   const celdaMontoProgramado = (p: PagoProgramado) => {
     if (!p.es_pago_tarjeta) return celdaMonto(p.monto_pesos || '0');
     const deuda = parseFloat(p.deuda_actual || '0') || 0;
@@ -918,7 +937,8 @@ export default function PagosProgramados() {
                 title={nombreDestino(p) || 'Contacto'}
                 subtitle={p.concepto}
               />
-              <span className="ml-auto">
+              <span className="ml-auto flex items-center gap-1">
+                {chipModo(p)}
                 <ChipEstado label={FRECUENCIA_LABELS[p.frecuencia]} tone={FRECUENCIA_TONO[p.frecuencia]} />
               </span>
             </div>
@@ -1248,6 +1268,18 @@ export default function PagosProgramados() {
                   onChange={(e) => setForm(f => ({ ...f, dia_del_mes: parseInt(e.target.value, 10) || 1 }))} />
               </>
             )}
+          </div>
+
+          <div className="av2-field av2-field--full">
+            <span className="av2-field-label">Cuando vence</span>
+            <ModernSelect variant="v2" value={form.modo_ejecucion}
+              onChange={(v) => setForm(f => ({ ...f, modo_ejecucion: v as ModoEjecucion }))}
+              options={MODO_OPTIONS} />
+            <p className="av2-field-ayuda">
+              {form.modo_ejecucion === 'automatico'
+                ? 'El sistema lo paga solo el día que vence, sin que nadie confirme. Conviene cuando el monto no lo decide nadie, como el resumen de una tarjeta.'
+                : 'Aparece en la lista el día que vence y la plata sale recién cuando lo confirmás.'}
+            </p>
           </div>
 
           {/* Fecha inicio / fin ocultas a propósito: la programación arranca en

@@ -1095,6 +1095,10 @@ export interface PagoProgramado {
   monto_pesos: string | null;
   forma_pago: string;
   frecuencia: FrecuenciaPago;
+  // 'aprobacion' = recordatorio: vence y alguien lo confirma (default).
+  // 'automatico' = lo ejecuta el sistema al vencer, sin intervención.
+  modo_ejecucion?: 'aprobacion' | 'automatico';
+  ejecutado_auto_en?: string | null;
   dia_del_mes: number;
   dia_semana?: number | null;
   fecha_inicio: string;

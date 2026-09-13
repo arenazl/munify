@@ -235,6 +235,20 @@ class TesoreriaMovimientoCaja(Base):
         return f"<MovimientoCaja {self.id} caja={self.caja_id} {self.tipo.value} ${self.monto}>"
 
 
+class ModoEjecucionPago(str, enum.Enum):
+    """Como se ejecuta un pago programado cuando vence.
+
+    APROBACION: es un RECORDATORIO. Aparece vencido en la agenda y una persona
+      lo confirma. Es el default y el comportamiento historico: la plata no sale
+      sin que alguien mire.
+    AUTOMATICO: lo ejecuta el sistema al vencer, sin intervencion. Tiene sentido
+      cuando el monto no lo decide nadie —el resumen de una tarjeta, por
+      ejemplo—, no cuando hay algo que revisar.
+    """
+    APROBACION = "aprobacion"
+    AUTOMATICO = "automatico"
+
+
 class TesoreriaPagoProgramado(Base):
     """Agenda de pago recurrente a un contacto.
 
@@ -279,6 +293,18 @@ class TesoreriaPagoProgramado(Base):
     fecha_fin = Column(Date, nullable=True)
     proximo_pago = Column(Date, nullable=False, index=True)
     ultimo_pago = Column(Date, nullable=True)
+
+    # Recordatorio (default) o pago que se ejecuta solo. Ver ModoEjecucionPago.
+    modo_ejecucion = Column(
+        Enum(ModoEjecucionPago, values_callable=lambda x: [e.value for e in x]),
+        default=ModoEjecucionPago.APROBACION,
+        server_default="aprobacion",
+        nullable=False,
+    )
+    # Cuando lo ejecuto el sistema (no una persona). Queda como marca de
+    # auditoria: en la pantalla se distingue, y si algo sale mal se sabe que
+    # nadie lo confirmo.
+    ejecutado_auto_en = Column(DateTime(timezone=True), nullable=True)
 
     notas = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)

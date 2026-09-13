@@ -1,20 +1,23 @@
 """Agenda de pagos programados + ejecucion (crea Gasto real)."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from calendar import monthrange
 from decimal import Decimal
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Query
 from sqlalchemy import select, func, update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
+from core.config import settings
 from models import (
     TesoreriaPagoProgramado, FrecuenciaPago, TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja,
     Contacto, Gasto, GastoCuota, TesoreriaPremio, User, RolUsuario,
 )
 from models.gasto import EstadoGastoCuota
+from models.tesoreria_extra import ModoEjecucionPago
 from services.tesoreria_tarjeta import (
     PagoTarjetaError, cargar_tarjeta_y_origen, deudas_de_tarjetas, plata, registrar_pago_tarjeta,
 )
@@ -25,6 +28,16 @@ from schemas.tesoreria_extra import (
 )
 
 router = APIRouter()
+
+# El backend corre en UTC (Cloud Run). "Hoy" para un municipio es hoy en
+# Argentina: entre las 21 y las 24 hora local, UTC ya esta en el dia siguiente y
+# un pago confirmado a la noche quedaria fechado manana. Mismo criterio que
+# `noticias.py` y `calls_push.py`.
+ART = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def hoy_ar() -> date:
+    return datetime.now(ART).date()
 
 
 def _require_admin(user: User):
@@ -460,11 +473,80 @@ async def delete_pago(
     return {"ok": True, "id": pp_id}
 
 
+def _todavia_no_vence(pp: TesoreriaPagoProgramado, fecha_pedida: Optional[date]) -> Optional[str]:
+    """Un pago de TARJETA no se ejecuta antes de su vencimiento.
+
+    No es un capricho: como el monto es "todo lo que deba" y el boton no pide
+    confirmar un numero, dos clics seguidos pagaban el periodo vencido y acto
+    seguido el SIGUIENTE —que al no tener deuda se salteaba sin mover plata pero
+    corriendo la agenda un mes. El municipio perdia octubre sin enterarse.
+
+    Con una `fecha_pago` explicita si se deja: ahi alguien esta diciendo a
+    proposito con que fecha quiere que entre.
+    """
+    if not pp.tarjeta_caja_id or fecha_pedida:
+        return None
+    if pp.proximo_pago and pp.proximo_pago > hoy_ar():
+        return (f"Este pago todavia no vence: vence el {pp.proximo_pago.strftime('%d/%m/%Y')}. "
+                "Si lo querés adelantar, indicá con qué fecha tiene que entrar.")
+    return None
+
+
+def _claim_del_periodo(pp: TesoreriaPagoProgramado, fecha: date):
+    """Claim atomico anti doble-ejecucion: el UPDATE solo pasa si nadie pago ya
+    este periodo. La request concurrente espera el row-lock de InnoDB y al ver
+    rowcount=0 recibe 409 en vez de duplicar el pago.
+
+    El candado es el VENCIMIENTO, no la fecha del movimiento. Importa desde que
+    un pago de tarjeta se fecha el dia en que se confirma: si mirara la fecha,
+    confirmarlo el 15 y de nuevo el 16 pasaria dos veces, porque 15 < 16. El
+    periodo, en cambio, es uno solo.
+    """
+    tope = pp.proximo_pago or fecha
+    # Dos candados en uno. `tope` cubre el periodo: no se paga dos veces el mes.
+    # `fecha` cubre la repeticion literal: confirmar dos veces con la misma
+    # fecha de impacto tampoco pasa, aunque el periodo ya haya avanzado.
+    limite = min(tope, fecha)
+    return (
+        update(TesoreriaPagoProgramado)
+        .where(
+            TesoreriaPagoProgramado.id == pp.id,
+            or_(
+                TesoreriaPagoProgramado.ultimo_pago.is_(None),
+                TesoreriaPagoProgramado.ultimo_pago < limite,
+            ),
+        )
+        # Queda marcado el punto mas avanzado de los dos, para que el periodo
+        # cuente como pagado aunque el movimiento se haya fechado antes.
+        .values(ultimo_pago=max(tope, fecha))
+    )
+
+
 def _avanzar_periodo(pp: TesoreriaPagoProgramado) -> None:
     """Corre `proximo_pago` un periodo y apaga el programado si paso su fin."""
     pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
     if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
         pp.activo = False
+
+
+def _fecha_de_impacto(pp: TesoreriaPagoProgramado, pedida: Optional[date]) -> date:
+    """Con que fecha entra el movimiento.
+
+    GASTO: la fecha PLANIFICADA (`proximo_pago`). Un sueldo del dia 4 confirmado
+      el 1 figura como del dia 4: es el mes que se esta pagando, no el dia del
+      clic.
+    TARJETA: el dia en que se CONFIRMA. Es al reves a proposito (dueño,
+      2026-09-12): *"por mas que vos se lo recomiendes el dia diez y el lo
+      confirme el dia quince, tienen que entrar todos los pagos de tarjeta hasta
+      el dia quince"*. El pago cancela lo que la tarjeta debe EN ESE MOMENTO,
+      compras del 11 al 15 incluidas, asi que fecharlo el 10 seria decir que el
+      dia 10 se pagaron consumos que todavia no existian.
+    """
+    if pedida:
+        return pedida
+    if pp.tarjeta_caja_id:
+        return hoy_ar()
+    return pp.proximo_pago or hoy_ar()
 
 
 def _monto_tarjeta(pp: TesoreriaPagoProgramado, override) -> Optional[Decimal]:
@@ -559,23 +641,17 @@ async def ejecutar_pago(
     # NO el dia en que el operador apreta "Pagar". Asi en historial figura
     # con la fecha planificada (ej. el dia 4 aunque se haya pagado el 1).
     # El frontend puede pasar override si justificadamente quiere otra.
-    fecha = payload.fecha_pago or pp.proximo_pago or date.today()
+    aun_no = _todavia_no_vence(pp, payload.fecha_pago)
+    if aun_no:
+        raise HTTPException(409, aun_no)
+
+    fecha = _fecha_de_impacto(pp, payload.fecha_pago)
 
     # Anti doble-ejecución (retry de red / doble click / dos tabs): claim
     # atómico del período. El UPDATE condicional solo pasa si nadie pagó ya
     # esta fecha; la request concurrente espera el row-lock de InnoDB y al
     # ver rowcount=0 recibe 409 en lugar de duplicar gasto + egreso de caja.
-    claim = await db.execute(
-        update(TesoreriaPagoProgramado)
-        .where(
-            TesoreriaPagoProgramado.id == pp.id,
-            or_(
-                TesoreriaPagoProgramado.ultimo_pago.is_(None),
-                TesoreriaPagoProgramado.ultimo_pago < fecha,
-            ),
-        )
-        .values(ultimo_pago=fecha)
-    )
+    claim = await db.execute(_claim_del_periodo(pp, fecha))
     if claim.rowcount == 0:
         raise HTTPException(
             409,
@@ -734,7 +810,12 @@ async def ejecutar_pagos_masivo(
         if not pp:
             items.append(EjecutarMasivoItem(pago_id=pid, ok=False, error="No encontrado o inactivo"))
             continue
-        fecha = pp.proximo_pago or date.today()
+        aun_no = _todavia_no_vence(pp, None)
+        if aun_no:
+            items.append(EjecutarMasivoItem(pago_id=pid, ok=False, tipo="pago_tarjeta", error=aun_no))
+            continue
+
+        fecha = _fecha_de_impacto(pp, None)
 
         # Tarjeta: las cajas se validan ANTES del claim. Si algo esta mal, el
         # item falla sin haber tocado `ultimo_pago` (el commit final es de
@@ -748,20 +829,11 @@ async def ejecutar_pagos_masivo(
                 continue
 
         # Mismo claim atómico anti doble-ejecución que en /ejecutar
-        claim = await db.execute(
-            update(TesoreriaPagoProgramado)
-            .where(
-                TesoreriaPagoProgramado.id == pp.id,
-                or_(
-                    TesoreriaPagoProgramado.ultimo_pago.is_(None),
-                    TesoreriaPagoProgramado.ultimo_pago < fecha,
-                ),
-            )
-            .values(ultimo_pago=fecha)
-        )
+        claim = await db.execute(_claim_del_periodo(pp, fecha))
         if claim.rowcount == 0:
             items.append(EjecutarMasivoItem(
                 pago_id=pid, ok=False,
+                tipo="pago_tarjeta" if pp.tarjeta_caja_id else "gasto",
                 error=f"Período ya pagado (último pago: {pp.ultimo_pago})",
             ))
             continue
@@ -827,6 +899,140 @@ async def ejecutar_pagos_masivo(
         monto_total=monto_total_acum,
         items=items,
     )
+
+
+@router.post("/ejecutar-automaticos")
+async def ejecutar_automaticos(
+    request: Request,
+    hasta: Optional[date] = Query(None, description="Vencidos hasta esta fecha (default: hoy)"),
+    municipio_id: Optional[int] = Query(None, description="Limitar a un municipio"),
+    seco: bool = Query(False, description="No escribe: informa que haria"),
+    db: AsyncSession = Depends(get_db),
+    x_cron_key: Optional[str] = Header(default=None, alias="X-Cron-Key"),
+):
+    """Ejecuta los pagos programados marcados como AUTOMATICOS que ya vencieron.
+
+    Lo llama un cron externo (Cloud Scheduler), no una persona: por eso la auth
+    es el mismo `X-Cron-Key` que ya usan los recordatorios de turnos y calls, y
+    no un usuario logueado. Sin `CRON_SECRET` configurado el endpoint esta
+    apagado (503), que es el default seguro: nadie ejecuta pagos por accidente.
+
+    Un programado en modo `aprobacion` NO se toca nunca aca: ese sigue siendo un
+    recordatorio que confirma una persona.
+
+    Cada municipio se procesa en su propia transaccion: si uno falla, los demas
+    se pagan igual y el que fallo queda intacto con su motivo en la respuesta.
+    """
+    if not settings.CRON_SECRET:
+        raise HTTPException(503, "CRON_SECRET no configurado: el ejecutor automatico esta apagado")
+    if x_cron_key != settings.CRON_SECRET:
+        raise HTTPException(401, "Clave de cron invalida")
+
+    tope = hasta or hoy_ar()
+    q = select(TesoreriaPagoProgramado).where(
+        TesoreriaPagoProgramado.activo.is_(True),
+        TesoreriaPagoProgramado.modo_ejecucion == ModoEjecucionPago.AUTOMATICO,
+        TesoreriaPagoProgramado.proximo_pago <= tope,
+    )
+    if municipio_id:
+        q = q.where(TesoreriaPagoProgramado.municipio_id == municipio_id)
+    pendientes = list((await db.execute(q.order_by(TesoreriaPagoProgramado.municipio_id,
+                                                  TesoreriaPagoProgramado.proximo_pago))).scalars().all())
+
+    # Quien figura como creador del gasto: el primer admin activo de cada muni.
+    # Un pago automatico no tiene operador, pero el gasto necesita un autor.
+    munis = {p.municipio_id for p in pendientes}
+    admins: dict[int, int] = {}
+    if munis:
+        for mid, uid in (await db.execute(
+            select(User.municipio_id, func.min(User.id))
+            .where(User.municipio_id.in_(munis), User.rol == RolUsuario.ADMIN, User.activo.is_(True))
+            .group_by(User.municipio_id)
+        )).all():
+            admins[mid] = uid
+
+    items: list[dict] = []
+    pagados = Decimal(0)
+    for pp in pendientes:
+        detalle = {
+            "pago_id": pp.id, "municipio_id": pp.municipio_id, "concepto": pp.concepto,
+            "vencia": pp.proximo_pago.isoformat(),
+            "tipo": "pago_tarjeta" if pp.tarjeta_caja_id else "gasto",
+        }
+        if seco:
+            items.append({**detalle, "ok": True, "seco": True})
+            continue
+        fecha = _fecha_de_impacto(pp, None)
+        try:
+            if pp.tarjeta_caja_id:
+                tarjeta, origen = await cargar_tarjeta_y_origen(db, pp.municipio_id, pp.tarjeta_caja_id, pp.caja_id)
+                if (await db.execute(_claim_del_periodo(pp, fecha))).rowcount == 0:
+                    items.append({**detalle, "ok": False, "error": "periodo ya pagado"})
+                    continue
+                res = await registrar_pago_tarjeta(
+                    db, pp.municipio_id, tarjeta, origen, _monto_tarjeta(pp, None), fecha,
+                    concepto=pp.concepto, pago_programado_id=pp.id,
+                    sin_deuda="omitir", desde_programado=True,
+                )
+                monto = res.monto
+                detalle["omitido"] = res.omitido
+                detalle["mensaje"] = _mensaje_tarjeta(tarjeta.nombre, res)
+            else:
+                creador = admins.get(pp.municipio_id)
+                if not creador:
+                    items.append({**detalle, "ok": False,
+                                  "error": "el municipio no tiene un admin activo que figure como autor"})
+                    continue
+                if pp.monto_pesos is None:
+                    items.append({**detalle, "ok": False, "error": "el programado no tiene monto"})
+                    continue
+                if (await db.execute(_claim_del_periodo(pp, fecha))).rowcount == 0:
+                    items.append({**detalle, "ok": False, "error": "periodo ya pagado"})
+                    continue
+                monto = Decimal(str(pp.monto_pesos))
+                gasto = Gasto(
+                    municipio_id=pp.municipio_id, creador_id=creador, destino_tipo='contacto',
+                    destino_contacto_id=pp.contacto_id, concepto=pp.concepto,
+                    descripcion=pp.descripcion or None, monto_pesos=monto, fecha=fecha,
+                    tipo_financiacion='contado', forma_pago=pp.forma_pago, caja_id=pp.caja_id,
+                    pago_programado_id=pp.id,
+                )
+                db.add(gasto)
+                await db.flush()
+                db.add(GastoCuota(
+                    gasto_id=gasto.id, numero=1, monto=monto, fecha_vencimiento=fecha,
+                    fecha_pago=fecha, estado=EstadoGastoCuota.PAGADA, forma_pago=pp.forma_pago,
+                ))
+                if pp.caja_id:
+                    db.add(TesoreriaMovimientoCaja(
+                        municipio_id=pp.municipio_id, caja_id=pp.caja_id, gasto_id=gasto.id,
+                        tipo=TipoMovimientoCaja.EGRESO, monto=monto, fecha=fecha, concepto=pp.concepto,
+                        pago_programado_id=pp.id,
+                    ))
+                detalle["gasto_id"] = gasto.id
+            pp.ejecutado_auto_en = datetime.utcnow()
+            _avanzar_periodo(pp)
+            await db.commit()
+            pagados += monto
+            items.append({**detalle, "ok": True, "monto": str(monto),
+                          "proximo_pago": pp.proximo_pago.isoformat() if pp.activo else None})
+        except PagoTarjetaError as e:
+            await db.rollback()
+            items.append({**detalle, "ok": False, "error": e.detail})
+        except Exception as e:  # noqa: BLE001 — un pago roto no frena a los demas
+            await db.rollback()
+            items.append({**detalle, "ok": False, "error": f"{type(e).__name__}: {e}"})
+
+    exitosos = sum(1 for i in items if i.get("ok"))
+    return {
+        "fecha": tope.isoformat(),
+        "seco": seco,
+        "encontrados": len(pendientes),
+        "ejecutados": exitosos,
+        "fallidos": len(items) - exitosos,
+        "monto_total": str(pagados),
+        "items": items,
+    }
 
 
 @router.post("/{pp_id}/omitir")

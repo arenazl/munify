@@ -252,7 +252,7 @@ from .proyecto import Proyecto, GastoProyecto, EstadoProyecto
 from .tesoreria_concepto import TesoreriaTipoConcepto, TesoreriaConcepto
 from .tesoreria_extra import (
     TesoreriaTipoEmpleado, TesoreriaCaja, TesoreriaMovimientoCaja,
-    TesoreriaPagoProgramado, TipoMovimientoCaja, FrecuenciaPago,
+    TesoreriaPagoProgramado, TipoMovimientoCaja, FrecuenciaPago, ModoEjecucionPago,
     TesoreriaPremio, TesoreriaConceptoLiquidacion,
 )
 from .paraje import TesoreriaParaje
@@ -280,6 +280,7 @@ __all__ += [
     "TesoreriaCaja",
     "TesoreriaMovimientoCaja",
     "TesoreriaPagoProgramado",
+    "ModoEjecucionPago",
     "TipoMovimientoCaja",
     "FrecuenciaPago",
     "TesoreriaPremio",
