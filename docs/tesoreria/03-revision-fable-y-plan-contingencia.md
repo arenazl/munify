@@ -237,3 +237,4 @@ después se prepara para el otro día en prod** (textual).
 | Fecha | Ensayo | Duración | Resultado del gate | Qué se corrigió del procedimiento |
 |---|---|---|---|---|
 | — | — | — | — | — |
+| 2026-09-13 03:50 | F1+F3 datos en QA: B2 con SPN, `migrar_spn_f3.py` (9 subtipos, 124 contactos en su subtipo, 114 fichas laborales con modalidad, 4 obras) | ~6 min | Sólo diferencias buscadas: `/api/empleados` 7 semilla → 114 fichas; cuadrillas 6 → 0 (semilla); contactos +1 (la Persona de Bartolo); proyectos: `updated_at` de las 4 obras | (1) las fichas nacían sin `capacidad_maxima` y `/api/empleados` daba 500: la F3 la fija en 10; (2) la B2 creaba Personas para usuarios INACTIVOS (6 supervisores de baja en SPN): ahora sólo personal con login activo |

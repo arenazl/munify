@@ -10,7 +10,7 @@ Qué hace, por municipio:
    trabajo o trámites, y RESPALDA a JSON las filas y sus dependientes.
 2. Crea la Persona de cada empleado (ficha laboral) y lo engancha. Si el nombre coincide
    con MÁS de una persona del municipio, ese empleado se reporta y no se enlaza solo.
-3. Crea la Persona del personal con login (roles de planta) como `empleado`, con su vínculo
+3. Crea la Persona del personal con login ACTIVO (roles de planta) como `empleado`, con su vínculo
    en `persona_roles`. Los VECINOS nunca entran: crearía una persona por ciudadano.
 4. Normaliza `''` -> NULL en dni/cuit (MySQL trata el string vacío como colisión).
 
@@ -171,7 +171,7 @@ async def correr(dry_run: bool, sin_spn: bool):
         # ── 3. El personal con login, su Persona (los vecinos NO) ─────────────
         n = (await conn.execute(text(f"""
             SELECT COUNT(*) FROM usuarios
-             WHERE persona_id IS NULL AND municipio_id IS NOT NULL AND rol IN :roles {excl()}"""),
+             WHERE persona_id IS NULL AND municipio_id IS NOT NULL AND activo = 1 AND rol IN :roles {excl()}"""),
             {**p, "roles": ROLES_DE_PLANTA})).scalar()
         print(f"\n3. Personal con login sin Persona: {n} (los vecinos quedan afuera a propósito)")
         if not dry_run and n:
@@ -179,7 +179,7 @@ async def correr(dry_run: bool, sin_spn: bool):
                 INSERT INTO {TABLA} (municipio_id, nombre, apellido, email, telefono, dni, tipo, activo, created_at)
                 SELECT u.municipio_id, u.nombre, u.apellido, u.email, u.telefono, NULLIF(u.dni,''), 'empleado', 1, NOW()
                   FROM usuarios u
-                 WHERE u.persona_id IS NULL AND u.municipio_id IS NOT NULL AND u.rol IN :roles {excl('u')}
+                 WHERE u.persona_id IS NULL AND u.municipio_id IS NOT NULL AND u.activo = 1 AND u.rol IN :roles {excl('u')}
                    AND NOT EXISTS (
                        SELECT 1 FROM {TABLA} p
                         WHERE p.municipio_id = u.municipio_id
@@ -193,7 +193,7 @@ async def correr(dry_run: bool, sin_spn: bool):
                    AND p.nombre = u.nombre
                    AND COALESCE(p.apellido,'') = COALESCE(u.apellido,'')
                    SET u.persona_id = p.id
-                 WHERE u.persona_id IS NULL AND u.rol IN :roles {excl('u')}
+                 WHERE u.persona_id IS NULL AND u.activo = 1 AND u.rol IN :roles {excl('u')}
             """), {**p, "roles": ROLES_DE_PLANTA})
             hechos.append(f"{r.rowcount} usuarios de planta enlazados a su Persona")
             r = await conn.execute(text(f"""
