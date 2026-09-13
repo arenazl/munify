@@ -523,30 +523,34 @@ def _claim_del_periodo(pp: TesoreriaPagoProgramado, fecha: date):
 
 
 def _avanzar_periodo(pp: TesoreriaPagoProgramado) -> None:
-    """Corre `proximo_pago` un periodo y apaga el programado si paso su fin."""
+    """Corre `proximo_pago` al siguiente vencimiento y apaga el programado si
+    paso su fecha de fin.
+
+    Siempre UN periodo, tarjeta incluida: como cada pago salda lo que se debia a
+    SU fecha de vencimiento, saltear periodos dejaria sin cubrir el tramo del
+    medio. Si el municipio estuvo tres meses sin entrar, se pagan los tres, cada
+    uno con su fecha; el ejecutor automatico los encadena en una sola corrida.
+    """
     pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
     if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
         pp.activo = False
 
 
 def _fecha_de_impacto(pp: TesoreriaPagoProgramado, pedida: Optional[date]) -> date:
-    """Con que fecha entra el movimiento.
+    """Con que fecha entra el movimiento: SIEMPRE la del vencimiento planificado.
 
-    GASTO: la fecha PLANIFICADA (`proximo_pago`). Un sueldo del dia 4 confirmado
-      el 1 figura como del dia 4: es el mes que se esta pagando, no el dia del
-      clic.
-    TARJETA: el dia en que se CONFIRMA. Es al reves a proposito (dueño,
-      2026-09-12): *"por mas que vos se lo recomiendes el dia diez y el lo
-      confirme el dia quince, tienen que entrar todos los pagos de tarjeta hasta
-      el dia quince"*. El pago cancela lo que la tarjeta debe EN ESE MOMENTO,
-      compras del 11 al 15 incluidas, asi que fecharlo el 10 seria decir que el
-      dia 10 se pagaron consumos que todavia no existian.
+    Un sueldo del dia 4 confirmado el 1 figura como del dia 4, y el resumen que
+    vencia el 10 confirmado el 15 figura como del 10. Es el dia que el municipio
+    tiene en su calendario de pagos, y es lo que pidio el dueño (2026-09-12):
+    *"si el intendente entra el dia quince y tenia pago programado el diez, los
+    pagos se van a imputar con la fecha del diez"*.
+
+    OJO, no confundir con el ALCANCE, que es otra cosa y va por separado (ver
+    `_monto_tarjeta`): entra todo lo que la tarjeta deba al momento de ejecutar,
+    compras del 11 al 15 incluidas. Se paga TODO lo gastado hasta hoy, pero el
+    movimiento lleva la fecha del vencimiento.
     """
-    if pedida:
-        return pedida
-    if pp.tarjeta_caja_id:
-        return hoy_ar()
-    return pp.proximo_pago or hoy_ar()
+    return pedida or pp.proximo_pago or hoy_ar()
 
 
 def _monto_tarjeta(pp: TesoreriaPagoProgramado, override) -> Optional[Decimal]:
@@ -585,6 +589,7 @@ async def _ejecutar_pago_tarjeta(
             db, muni_id, tarjeta, origen, _monto_tarjeta(pp, monto_override), fecha,
             concepto=pp.concepto, descripcion=None,
             pago_programado_id=pp.id, sin_deuda="omitir", desde_programado=True,
+            fecha_programada=pp.proximo_pago,
         )
     except PagoTarjetaError as e:
         # Sin commit, el claim de ultimo_pago se descarta con la sesion.
@@ -739,6 +744,7 @@ async def ejecutar_pago(
         forma_pago=pp.forma_pago,
         caja_id=pp.caja_id,
         pago_programado_id=pp.id,
+        fecha_programada=pp.proximo_pago,
     )
     db.add(gasto)
     await db.flush()
@@ -754,7 +760,7 @@ async def ejecutar_pago(
         db.add(TesoreriaMovimientoCaja(
             municipio_id=muni_id, caja_id=pp.caja_id, gasto_id=gasto.id,
             tipo=TipoMovimientoCaja.EGRESO, monto=monto_total, fecha=fecha,
-            concepto=pp.concepto,
+            concepto=pp.concepto, fecha_programada=pp.proximo_pago,
         ))
 
     # Avanzar proximo_pago (ultimo_pago ya quedó claimeado arriba)
@@ -845,6 +851,7 @@ async def ejecutar_pagos_masivo(
                 db, muni_id, tarjeta, origen, _monto_tarjeta(pp, None), fecha,
                 concepto=pp.concepto, descripcion=None,
                 pago_programado_id=pp.id, sin_deuda="omitir", desde_programado=True,
+                fecha_programada=pp.proximo_pago,
             )
             _avanzar_periodo(pp)
             items.append(EjecutarMasivoItem(
@@ -869,6 +876,7 @@ async def ejecutar_pagos_masivo(
             forma_pago=pp.forma_pago,
             caja_id=pp.caja_id,
             pago_programado_id=pp.id,
+            fecha_programada=pp.proximo_pago,
         )
         db.add(gasto)
         await db.flush()
@@ -881,7 +889,7 @@ async def ejecutar_pagos_masivo(
             db.add(TesoreriaMovimientoCaja(
                 municipio_id=muni_id, caja_id=pp.caja_id, gasto_id=gasto.id,
                 tipo=TipoMovimientoCaja.EGRESO, monto=monto, fecha=fecha,
-                concepto=pp.concepto,
+                concepto=pp.concepto, fecha_programada=pp.proximo_pago,
             ))
         # ultimo_pago ya quedó claimeado arriba
         pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
@@ -944,7 +952,13 @@ async def ejecutar_programados_automaticos(
 
     items: list[dict] = []
     pagados = Decimal(0)
-    for pp in pendientes:
+    # Un programado atrasado puede tener varios vencimientos sin pagar. Se
+    # encadenan en esta misma corrida —uno por periodo, cada uno con su fecha—
+    # en vez de hacerle esperar un dia por cada mes de atraso. El tope corta
+    # cualquier bucle raro: con frecuencia semanal, 60 vueltas es mas de un año.
+    cola = [(pp, 0) for pp in pendientes]
+    while cola:
+        pp, vuelta = cola.pop(0)
         detalle = {
             "pago_id": pp.id, "municipio_id": pp.municipio_id, "concepto": pp.concepto,
             "vencia": pp.proximo_pago.isoformat(),
@@ -964,6 +978,7 @@ async def ejecutar_programados_automaticos(
                     db, pp.municipio_id, tarjeta, origen, _monto_tarjeta(pp, None), fecha,
                     concepto=pp.concepto, pago_programado_id=pp.id,
                     sin_deuda="omitir", desde_programado=True,
+                    fecha_programada=pp.proximo_pago,
                 )
                 monto = res.monto
                 detalle["omitido"] = res.omitido
@@ -986,7 +1001,7 @@ async def ejecutar_programados_automaticos(
                     destino_contacto_id=pp.contacto_id, concepto=pp.concepto,
                     descripcion=pp.descripcion or None, monto_pesos=monto, fecha=fecha,
                     tipo_financiacion='contado', forma_pago=pp.forma_pago, caja_id=pp.caja_id,
-                    pago_programado_id=pp.id,
+                    pago_programado_id=pp.id, fecha_programada=pp.proximo_pago,
                 )
                 db.add(gasto)
                 await db.flush()
@@ -998,7 +1013,7 @@ async def ejecutar_programados_automaticos(
                     db.add(TesoreriaMovimientoCaja(
                         municipio_id=pp.municipio_id, caja_id=pp.caja_id, gasto_id=gasto.id,
                         tipo=TipoMovimientoCaja.EGRESO, monto=monto, fecha=fecha, concepto=pp.concepto,
-                        pago_programado_id=pp.id,
+                        pago_programado_id=pp.id, fecha_programada=pp.proximo_pago,
                     ))
                 detalle["gasto_id"] = gasto.id
             pp.ejecutado_auto_en = datetime.utcnow()
@@ -1007,6 +1022,9 @@ async def ejecutar_programados_automaticos(
             pagados += monto
             items.append({**detalle, "ok": True, "monto": str(monto),
                           "proximo_pago": pp.proximo_pago.isoformat() if pp.activo else None})
+            # Si quedo otro vencimiento sin pagar, sigue en esta misma corrida.
+            if pp.activo and pp.proximo_pago <= tope and vuelta < 60:
+                cola.append((pp, vuelta + 1))
         except PagoTarjetaError as e:
             await db.rollback()
             items.append({**detalle, "ok": False, "error": e.detail})

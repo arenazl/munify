@@ -215,7 +215,13 @@ class TesoreriaMovimientoCaja(Base):
         index=True,
     )
     monto = Column(Numeric(15, 2), nullable=False)
+    # La fecha con la que IMPUTA: la que cuenta para la caja y los reportes.
     fecha = Column(Date, nullable=False, index=True)
+    # Cuando estaba PREVISTO que se pagara, si vino de un pago programado. Hoy
+    # coincide con `fecha` —se imputa con la del vencimiento— pero son dos
+    # conceptos distintos y el dia que se separen hay que poder distinguirlos.
+    # El momento real en que alguien lo cargo es `created_at`.
+    fecha_programada = Column(Date, nullable=True)
     concepto = Column(String(150), nullable=False)
     descripcion = Column(Text, nullable=True)
 
