@@ -44,6 +44,10 @@ class Empleado(Base):
     # Nullable hasta el backfill (Parte B2); despues pasa a NOT NULL.
     persona_id = Column(Integer, ForeignKey("contactos.id", ondelete="SET NULL"), nullable=True, index=True)
     persona = relationship("Contacto", foreign_keys=[persona_id])
+    # Modalidad de contratación (models/persona.py::MODALIDADES): planta, a prueba,
+    # contratado, jornalizado, jubilado. Aditiva: el código viejo no la lee. El "tipo de
+    # empleado" NO va acá: es un SUBTIPO de `empleado` en el catálogo de tipos de persona.
+    modalidad = Column(String(20), nullable=True, index=True)
 
     # Horario default (legacy, usar empleado_horarios para horarios por dia)
     hora_entrada = Column(Time, nullable=True)

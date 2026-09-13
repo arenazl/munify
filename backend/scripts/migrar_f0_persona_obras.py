@@ -116,6 +116,13 @@ COLUMNAS = [
      "ALTER TABLE inventario_ordenes_compra ADD COLUMN proveedor_persona_id INT NULL, "
      "ADD KEY ix_oc_proveedor_persona (proveedor_persona_id), "
      "ADD CONSTRAINT fk_oc_proveedor_persona FOREIGN KEY (proveedor_persona_id) REFERENCES contactos(id) ON DELETE SET NULL"),
+    # --- Persona: modalidad de la ficha laboral y SUBTIPOS del catálogo (docs/tesoreria/05) ---
+    ("empleados", "modalidad",
+     "ALTER TABLE empleados ADD COLUMN modalidad VARCHAR(20) NULL, ADD KEY ix_empleados_modalidad (modalidad)"),
+    ("persona_tipos", "padre_id",
+     "ALTER TABLE persona_tipos ADD COLUMN padre_id INT NULL, "
+     "ADD KEY ix_persona_tipos_padre (padre_id), "
+     "ADD CONSTRAINT fk_persona_tipos_padre FOREIGN KEY (padre_id) REFERENCES persona_tipos(id) ON DELETE CASCADE"),
     # --- Obras: proyectos ---
     ("proyectos", "tipo",
      "ALTER TABLE proyectos ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'programa', ADD KEY ix_proyectos_tipo (tipo)"),
@@ -203,11 +210,13 @@ async def migrar(dry_run: bool, permitir_prod: bool):
             munis = (await conn.execute(text(
                 "SELECT DISTINCT municipio_id FROM contactos WHERE municipio_id IS NOT NULL"))).scalars().all()
             for muni in munis:
-                for codigo, nombre, orden, cobra in TIPOS_SEMILLA:
+                for codigo, nombre, orden, cobra, activo in TIPOS_SEMILLA:
+                    # Los municipios que ya existen conservan "otro" activo (SPN lo usa):
+                    # INSERT IGNORE no toca filas existentes; la semilla nueva lo apaga.
                     await conn.execute(text(
                         "INSERT IGNORE INTO persona_tipos (municipio_id, codigo, nombre, orden, cobra, activo) "
-                        "VALUES (:m, :c, :n, :o, :cb, 1)"),
-                        {"m": muni, "c": codigo, "n": nombre, "o": orden, "cb": 1 if cobra else 0})
+                        "VALUES (:m, :c, :n, :o, :cb, :a)"),
+                        {"m": muni, "c": codigo, "n": nombre, "o": orden, "cb": 1 if cobra else 0, "a": 1 if activo else 0})
             r = await conn.execute(text("""
                 INSERT IGNORE INTO persona_roles (municipio_id, persona_id, tipo_id, principal)
                 SELECT c.municipio_id, c.id, t.id, 1

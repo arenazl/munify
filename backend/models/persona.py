@@ -39,6 +39,11 @@ class PersonaTipo(Base):
 
     # Clave estable para el código (`empleado`, `proveedor`...). El nombre lo edita el muni.
     codigo = Column(String(40), nullable=False)
+    # SUBTIPOS (dueño, 2026-09-13): "Persona -> tipo -> subtipo, un nivel más". El "tipo
+    # de empleado" de San Pedro Norte (Pasantes, Prensa, Auxiliares...) es un subtipo de
+    # `empleado`; un municipio puede abrir "corralón" y "ferretería" bajo `proveedor`.
+    # Un vínculo en `persona_roles` puede apuntar al subtipo: el padre queda implícito.
+    padre_id = Column(Integer, ForeignKey("persona_tipos.id", ondelete="CASCADE"), nullable=True, index=True)
     nombre = Column(String(100), nullable=False)
     descripcion = Column(Text, nullable=True)
     color = Column(String(20), nullable=True)
@@ -54,9 +59,17 @@ class PersonaTipo(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     roles = relationship("PersonaRol", back_populates="tipo", cascade="all, delete-orphan")
+    padre = relationship("PersonaTipo", remote_side="PersonaTipo.id", foreign_keys=[padre_id])
 
     def __repr__(self):
         return f"<PersonaTipo {self.municipio_id}:{self.codigo}>"
+
+
+# Modalidad de contratación de la ficha laboral. Las cinco salen de SPN (05-...md §2):
+# planta = relación de dependencia · a_prueba = "Pasantes" de Bartolo (se pueden quedar
+# o ir) · contratado = monotributo · jornalizado · jubilado. String, no ENUM de MySQL:
+# un municipio puede necesitar otra sin tocar el esquema.
+MODALIDADES = ("planta", "a_prueba", "contratado", "jornalizado", "jubilado")
 
 
 class PersonaRol(Base):

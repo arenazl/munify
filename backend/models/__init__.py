@@ -239,7 +239,7 @@ from .municipio_modulo import MunicipioModulo
 
 # Tesoreria (control de gastos del intendente)
 from .contacto import Contacto, TipoContacto
-from .persona import PersonaTipo, PersonaRol
+from .persona import PersonaTipo, PersonaRol, MODALIDADES
 from .gasto import (
     Gasto,
     GastoCuota,
@@ -267,6 +267,7 @@ __all__ += [
     "TipoContacto",
     "PersonaTipo",
     "PersonaRol",
+    "MODALIDADES",
     "Gasto",
     "GastoCuota",
     "DestinoGasto",

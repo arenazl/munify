@@ -1,13 +1,17 @@
 {
   "artboards": [
-    { "file": "Main.dc.html", "title": "Obras · lista (kit v3)", "x": 0, "y": 0, "w": 1440, "h": 900 },
-    { "file": "Ficha.dc.html", "title": "Ficha de la obra · SideModal", "x": 1560, "y": 0, "w": 640, "h": 1000 },
-    { "file": "Pelicula.dc.html", "title": "La película · Mayo 2026", "x": 0, "y": 1140, "w": 1440, "h": 900 },
-    { "file": "Cierre.dc.html", "title": "La película · cierre", "x": 1560, "y": 1140, "w": 1440, "h": 900 }
+    { "file": "Main.dc.html", "title": "Obras · lista, calcada del kit v3 (PageHeader → hero → toolbar+filtros → tarjetas)", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "NuevaObra.dc.html", "title": "Nueva obra · WizardModal, paso 3 Quiénes (baterías = actores configurados)", "x": 0, "y": 1020, "w": 1440, "h": 900 },
+    { "file": "Detalle.dc.html", "title": "Detalle de la obra · pantalla completa: hero semántico, línea de tiempo en dos niveles, gráficos de la galería", "x": 1560, "y": 0, "w": 1440, "h": 1700 },
+    { "file": "Pelicula.dc.html", "title": "La película · Mayo 2026", "x": 0, "y": 2040, "w": 1440, "h": 900 },
+    { "file": "Cierre.dc.html", "title": "La película · cierre", "x": 1560, "y": 2040, "w": 1440, "h": 900 }
   ],
   "annotations": [
-    { "id": "nota-datos", "x": 0, "y": -150, "w": 520, "text": "Datos reales de San Pedro Norte en QA: Predio municipal $71,0 M en 21 gastos (Hidronorte $41,7 M, Rubbertone, Chochi Paredes, Carlos Kako Martinez...), meses may-dic 2026.\nLo que SPN todavia no cargo y aca es EJEMPLO: presupuesto ($118 M), etapas y sus nombres, avance, certificados, ordenes de trabajo y horas." },
-    { "id": "nota-pelicula", "x": 0, "y": 1000, "w": 520, "text": "La pelicula: un cuadro por mes, pantalla completa sobre PresentacionLive. El acumulado cuenta hacia arriba (useCountUp), las barras se llenan, la banda de meses avanza sola y se puede arrastrar. Sin etapas cargadas, la pelicula igual existe: es la pelicula de la plata." }
+    { "id": "nota-datos", "x": 0, "y": -150, "w": 520, "text": "Datos reales de San Pedro Norte en QA: Predio municipal $71,0 M en 21 gastos (Hidronorte $41,7 M, Rubbertone, Chochi Paredes, Carlos Kako Martinez...), meses may-dic 2026.\nLo que SPN todavia no cargo y aca es EJEMPLO: presupuesto ($118 M), etapas y sus nombres, avance, certificados, ordenes de trabajo, horas, rubros (Corralon Norte es inventado para mostrar 'materiales')." },
+    { "id": "nota-lista", "x": 560, "y": -150, "w": 520, "text": "LISTA = SemanticAbmPage del kit v3, sin controles a mano: PageHeader (eyebrow, titulo 34px Sora, bajada) -> hero (frase generada + 5 KPIs con veredicto, borde izquierdo del tono) -> toolbar (buscador que crece, vistas, orden, NUEVA OBRA dockeado a la derecha) + filtros como una sola tarjeta -> tarjetas .av2-tarj (borde izquierdo = veredicto, tile, pills, meta, pie). Los valores son los del CSS real." },
+    { "id": "nota-wizard", "x": 0, "y": 880, "w": 560, "text": "NUEVA OBRA = WizardModal del kit (760px, acento arriba, stepper de circulos, pie Atras/Continuar), 4 pasos: 1 La obra (nombre, tipo, modalidad, expediente, financiamiento, presupuesto, plazo, ubicacion) · 2 Las etapas (plantilla por tipo de obra, incidencia, fechas) · 3 QUIENES: baterias guiadas, una pregunta por actor; los ACTORES los define cada municipio en Configuracion > Obras > Actores (contratista, proveedores, cuadrillas y gente contratada, inspector, secretarias, patrimonio: equipos y vehiculos); sin configurar se muestran todos · 4 El vecino (publicar, foto, monto). La edicion posterior de actores vive en la pantalla del detalle, no en un modal." },
+    { "id": "nota-detalle", "x": 1560, "y": -150, "w": 560, "text": "DETALLE = segunda pantalla completa, no un modal (dueno, 2026-09-13). Orden: hero SEMANTICO (la frase la genera un algoritmo: avance, plata, plazo, bandeja) + 5 KPIs; la LINEA DE TIEMPO macro que siempre entra entera; se toca una etapa y se EXPLOTA abajo (dos niveles, tres si los datos vienen segmentados; boton para volver a la macro): plazo previsto vs real, cada gasto como tick, hitos y novedades; despues los graficos de la GALERIA (docs/design-sync/Mapa de calor y reclamos/galeria-graficos.html): barra apilada por etapa, dumbbell previsto vs real, area de acumulado; los gastos con enlace a Tesoreria, quien estuvo, bitacora." },
+    { "id": "nota-pelicula", "x": 0, "y": 1900, "w": 520, "text": "La pelicula: la misma linea de tiempo con el cursor avanzando, un cuadro por mes, pantalla completa con el ESTILO DEL MODO EN VIVO del tablero (tarjetas con brillo, colores del tema elegido, sin italicas). El acumulado cuenta hacia arriba, las barras se llenan, la banda de meses se arrastra." }
   ],
   "launch": { "view": "canvas" }
 }

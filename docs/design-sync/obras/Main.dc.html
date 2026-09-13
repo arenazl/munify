@@ -7,183 +7,165 @@
 <body>
 <x-dc>
 <helmet>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap">
   <style>
+    /* Calcado de components/abmv2 + styles/abmv2.css (kit v3): PageHeader → hero → toolbar+filtros → tarjetas.
+       Valores tomados del CSS real; los colores son los tokens --pl-* del tema oscuro. */
     body { margin: 0; background: #1a1a1d; color: #ececef; font-family: Inter, system-ui, sans-serif; font-size: 13.5px; }
     a { color: #2f8fdc; } a:hover { color: #5aa9e6; }
-    .eyebrow { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #9b9ba4; font-weight: 600; }
-    .pill { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(128,128,128,.2); font-size: 12.5px; font-weight: 500; color: #c9c9d1; }
-    .pill.on { background: #2f8fdc; border-color: #2f8fdc; color: #fff; }
-    .kpi-v { font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    /* PageHeader (.av2-pagehead) */
+    .pagehead { padding: 4px 2px 20px; max-width: 760px; }
+    .eyebrow { display: block; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #9b9ba4; }
+    .titulo { margin: 6px 0 0; font-family: Sora, system-ui, sans-serif; font-size: 34px; font-weight: 700; line-height: 1.12; letter-spacing: -0.03em; }
+    .bajada { margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: #a8a8b1; }
+    /* Hero (.av2-hero.sh-card) */
+    .hero { padding: 20px 22px; background: #222226; border: 1px solid rgba(128,128,128,.2); border-left: 4px solid #2f8fdc; border-radius: 12px; }
+    .sh-etiqueta { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #9b9ba4; font-weight: 600; }
+    .sh-frase { margin: 8px 0 16px; font-family: Sora, system-ui, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; max-width: 1000px; }
+    .sh-kpis { display: grid; grid-template-columns: repeat(5, minmax(148px, 1fr)); gap: 0; padding-top: 16px; border-top: 1px solid rgba(128,128,128,.2); }
+    .sh-kpi { display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2); }
+    .sh-kpi:first-child { padding-left: 0; padding-right: 18px; border-left: 0; }
+    .sh-kpi-etiqueta { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #9b9ba4; font-weight: 600; }
+    .sh-kpi-valor { font-family: Sora, system-ui, sans-serif; font-size: 22px; line-height: 1; font-weight: 700; }
+    .sh-kpi-sub { font-size: 11px; color: #9b9ba4; }
+    /* Toolbar (.av2-toolbar) + filtros (.av2-filterbar), una sola tarjeta */
+    .toolbar { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); border-radius: 12px 12px 0 0; }
+    .buscador { display: flex; align-items: center; gap: 9px; flex: 1 1 260px; min-width: 0; height: 36px; padding: 0 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); border-radius: 10px; color: #8a8a93; font-size: 13px; }
+    .divisor { width: 1px; height: 24px; background: rgba(128,128,128,.2); }
+    .seg { display: flex; gap: 2px; padding: 3px; background: rgba(128,128,128,.14); border-radius: 10px; }
+    .seg span { width: 30px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: #9b9ba4; }
+    .seg span.on { background: #222226; color: #ececef; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+    .btn-sec { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border: 1px solid rgba(128,128,128,.2); border-radius: 10px; font-size: 12.5px; font-weight: 600; color: #c9c9d1; white-space: nowrap; }
+    .btn-pri { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 15px; background: #2f8fdc; border-radius: 10px; font-size: 12.5px; font-weight: 700; color: #fff; white-space: nowrap; }
+    .filterbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); border-top: 0; border-radius: 0 0 12px 12px; flex-wrap: wrap; }
+    .estados { display: flex; gap: 4px; }
+    .estado { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #a8a8b1; }
+    .estado.on { background: rgba(128,128,128,.14); color: #ececef; }
+    .estado-conteo { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: rgba(128,128,128,.16); color: #c9c9d1; }
+    .select { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px 0 12px; border: 1px solid rgba(128,128,128,.2); border-radius: 9px; font-size: 12.5px; color: #c9c9d1; }
+    .select b { color: #9b9ba4; font-weight: 500; }
+    /* Tarjetas ricas (.av2-cards-ricas > .av2-tarj) */
+    .cards { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+    .tarj { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: #222226; border: 1px solid rgba(128,128,128,.2); border-left: 3px solid rgba(128,128,128,.35); border-radius: 12px; }
+    .tarj--bueno { border-left-color: #2fa36b; } .tarj--advertencia { border-left-color: #d99a2b; } .tarj--malo { border-left-color: #d65454; }
+    .tarj-cab { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+    .tarj-tile { flex: 0 0 34px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; }
+    .tarj-titulo { margin: 0; font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+    .tarj-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+    .tarj-pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+    .tarj-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 12.5px; color: #c9c9d1; }
+    .tarj-desc { margin: 0; font-size: 12.5px; line-height: 1.5; color: #c9c9d1; }
     .bar { height: 6px; border-radius: 999px; background: rgba(128,128,128,.18); overflow: hidden; }
     .bar > div { height: 100%; border-radius: 999px; }
-    .tnum { font-variant-numeric: tabular-nums; }
+    .tarj-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.2); font-size: 12.5px; color: #9b9ba4; }
+    .tarj-id { font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: #2a2a2f; color: #c9c9d1; }
   </style>
 </helmet>
 <div style="width: 1440px; height: 900px; display: flex; background: #1a1a1d;">
-  <!-- Sidebar del shell (208px), sólo referencia de contexto -->
-  <div style="width: 208px; flex: 0 0 208px; background: #16161a; border-right: 1px solid rgba(128,128,128,.14); padding: 20px 14px; display: flex; flex-direction: column; gap: 6px;">
-    <div class="eyebrow" style="padding: 6px 10px;">Gestión interna</div>
-    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Tesorería</div>
-    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Contaduría</div>
-    <div style="padding: 9px 10px; border-radius: 8px; background: rgba(47,143,220,.14); color: #fff; font-weight: 600;">Obras</div>
-    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Patrimonio</div>
-    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Recursos</div>
-    <div style="padding: 9px 10px; border-radius: 8px; color: #9b9ba4;">Personas</div>
+  <div style="width: 208px; flex: 0 0 208px; background: #16161a; border-right: 1px solid rgba(128,128,128,.14); padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+    <div class="eyebrow" style="padding: 6px 10px 10px;">Gestión interna</div>
+    <div style="padding: 8px 10px; border-radius: 8px; color: #9b9ba4;">Tesorería</div>
+    <div style="padding: 8px 10px; border-radius: 8px; color: #9b9ba4;">Contaduría</div>
+    <div style="padding: 8px 10px; border-radius: 8px; background: rgba(47,143,220,.14); color: #fff; font-weight: 600;">Obras</div>
+    <div style="padding: 8px 10px; border-radius: 8px; color: #9b9ba4;">Patrimonio</div>
+    <div style="padding: 8px 10px; border-radius: 8px; color: #9b9ba4;">Recursos</div>
+    <div style="padding: 8px 10px; border-radius: 8px; color: #9b9ba4;">Personas</div>
   </div>
 
-  <div style="flex: 1; min-width: 0; padding: 28px 36px; display: flex; flex-direction: column; gap: 20px; overflow: hidden;">
-    <!-- Pagehead (av2-pagehead) -->
-    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
-      <div style="max-width: 760px; display: flex; flex-direction: column; gap: 6px;">
-        <div class="eyebrow">San Pedro Norte · Gestión interna</div>
-        <h1 style="margin: 0; font-family: Sora, system-ui, sans-serif; font-size: 34px; font-weight: 700; line-height: 1.12; letter-spacing: -0.03em;">Obras</h1>
-        <div style="color: #9b9ba4; font-size: 13.5px;">Cada obra con sus etapas, su plata y su gente. Lo que se publica al vecino se decide en Comunicación.</div>
-      </div>
-      <div style="display: flex; gap: 10px; align-items: center;">
-        <button style="height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid rgba(128,128,128,.2); background: transparent; color: #ececef; font-size: 13.5px; font-weight: 500;">Nueva obra</button>
+  <div style="flex: 1; min-width: 0; padding: 24px 32px; display: flex; flex-direction: column; overflow: hidden;">
+
+    <!-- 1. PageHeader -->
+    <div class="pagehead">
+      <span class="eyebrow">Obras · gestión interna</span>
+      <h1 class="titulo">Obras</h1>
+      <p class="bajada">Cada obra con sus etapas, su plata y su gente. Lo que se publica al vecino se decide en Comunicación.</p>
+    </div>
+
+    <!-- 2. Hero semántico: la frase la genera el algoritmo; el borde toma el veredicto -->
+    <div class="hero">
+      <div class="sh-etiqueta">Obras en marcha</div>
+      <div class="sh-frase">Cuatro obras en ejecución por <span class="tnum">$128,0 M</span>. El Predio municipal se lleva el 55% de la plata y va en plazo; el Salón de actos gastó el 70% con el 40% de avance.</div>
+      <div class="sh-kpis">
+        <div class="sh-kpi"><div class="sh-kpi-etiqueta">En ejecución</div><div class="sh-kpi-valor tnum">4</div><div class="sh-kpi-sub">de 6 cargadas</div></div>
+        <div class="sh-kpi"><div class="sh-kpi-etiqueta">Atrasadas</div><div class="sh-kpi-valor tnum" style="color: #d99a2b;">1</div><div class="sh-kpi-sub">Balneario, 34 días</div></div>
+        <div class="sh-kpi"><div class="sh-kpi-etiqueta">Con desvío de plata</div><div class="sh-kpi-valor tnum" style="color: #d65454;">1</div><div class="sh-kpi-sub">gastó más de lo que avanzó</div></div>
+        <div class="sh-kpi"><div class="sh-kpi-etiqueta">Sin novedades 30 días</div><div class="sh-kpi-valor tnum">2</div><div class="sh-kpi-sub">nadie cargó avance</div></div>
+        <div class="sh-kpi"><div class="sh-kpi-etiqueta">Publicadas al vecino</div><div class="sh-kpi-valor tnum" style="color: #2fa36b;">1</div><div class="sh-kpi-sub">Predio municipal</div></div>
       </div>
     </div>
 
-    <!-- Hero semántico (av2-hero): frase + 5 KPIs con veredicto -->
-    <div style="border-radius: 16px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
-      <div class="eyebrow">Obras en marcha</div>
-      <div style="font-family: Sora, system-ui, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; max-width: 900px;">Cuatro obras en ejecución por <span class="tnum">$128,0 M</span>. El Predio municipal se lleva el 55% de la plata y va en plazo; el Salón de actos gastó el 70% con el 40% de avance.</div>
-      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;">
-        <div style="display: flex; flex-direction: column; gap: 3px; padding-right: 18px;">
-          <div class="kpi-v tnum">4</div>
-          <div style="font-size: 12.5px; font-weight: 600;">en ejecución</div>
-          <div style="font-size: 11.5px; color: #9b9ba4;">de 6 cargadas</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
-          <div class="kpi-v tnum" style="color: #d99a2b;">1</div>
-          <div style="font-size: 12.5px; font-weight: 600;">atrasada</div>
-          <div style="font-size: 11.5px; color: #9b9ba4;">Balneario, 34 días</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
-          <div class="kpi-v tnum" style="color: #d65454;">1</div>
-          <div style="font-size: 12.5px; font-weight: 600;">con desvío de plata</div>
-          <div style="font-size: 11.5px; color: #9b9ba4;">gastó más que lo que avanzó</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
-          <div class="kpi-v tnum">2</div>
-          <div style="font-size: 12.5px; font-weight: 600;">sin novedades hace 30 días</div>
-          <div style="font-size: 11.5px; color: #9b9ba4;">nadie cargó avance</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);">
-          <div class="kpi-v tnum" style="color: #2fa36b;">1</div>
-          <div style="font-size: 12.5px; font-weight: 600;">publicada al vecino</div>
-          <div style="font-size: 11.5px; color: #9b9ba4;">Predio municipal</div>
-        </div>
+    <!-- 3. Toolbar: buscador que crece · vistas · orden · Nueva obra dockeado a la derecha -->
+    <div class="toolbar">
+      <div class="buscador"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>Buscar por nombre, contratista o expediente…</div>
+      <div class="divisor"></div>
+      <div class="seg">
+        <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></span>
+        <span class="on"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg></span>
+        <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg></span>
       </div>
+      <span class="btn-sec"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>Más plata primero</span>
+      <span class="btn-pri"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>Nueva obra</span>
+    </div>
+    <!-- 4. Filtros: estados como solapas + selects del kit -->
+    <div class="filterbar">
+      <div class="estados">
+        <span class="estado on">Obras <span class="estado-conteo">6</span></span>
+        <span class="estado">Programas <span class="estado-conteo">33</span></span>
+      </div>
+      <div class="divisor"></div>
+      <div class="estados">
+        <span class="estado on">En ejecución <span class="estado-conteo">4</span></span>
+        <span class="estado">Por empezar <span class="estado-conteo">1</span></span>
+        <span class="estado">Terminadas <span class="estado-conteo">1</span></span>
+      </div>
+      <div class="divisor"></div>
+      <span class="select"><b>Tipo</b> Todas <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+      <span class="select"><b>Contratista</b> Todos <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
+      <span class="select"><b>Modalidad</b> Todas <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>
     </div>
 
-    <!-- Filtros: píldoras (pasan a combo cuando no entran) + vistas -->
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-        <span class="pill on">Obras</span>
-        <span class="pill">Programas</span>
-        <span style="width: 1px; height: 20px; background: rgba(128,128,128,.2);"></span>
-        <span class="pill">En ejecución</span>
-        <span class="pill">Por empezar</span>
-        <span class="pill">Terminadas</span>
-        <span style="width: 1px; height: 20px; background: rgba(128,128,128,.2);"></span>
-        <span class="pill">Contratista: todos</span>
-      </div>
-      <div style="display: flex; gap: 2px; padding: 3px; border-radius: 10px; border: 1px solid rgba(128,128,128,.2);">
-        <span style="padding: 6px 12px; border-radius: 8px; background: rgba(128,128,128,.16); font-size: 12.5px; font-weight: 600;">Tarjetas</span>
-        <span style="padding: 6px 12px; border-radius: 8px; font-size: 12.5px; color: #9b9ba4;">Tabla</span>
-        <span style="padding: 6px 12px; border-radius: 8px; font-size: 12.5px; color: #9b9ba4;">Mapa</span>
-      </div>
-    </div>
-
-    <!-- Tarjetas (av2-tarj): una por obra -->
-    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-
-      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-          <div style="display: flex; flex-direction: column; gap: 3px;">
-            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Predio municipal</div>
-            <div style="font-size: 12.5px; color: #9b9ba4;">Espacio deportivo · por contrato · Hidronorte</div>
-          </div>
-          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #2fa36b; border-color: rgba(47,163,107,.4);">en plazo</span>
+    <!-- 5. Cuerpo: tarjetas del kit, borde izquierdo = veredicto -->
+    <div class="cards">
+      <div class="tarj tarj--bueno">
+        <div class="tarj-cab">
+          <span class="tarj-tile" style="color: #2f8fdc; background: rgba(47,143,220,.14);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"></path></svg></span>
+          <div style="min-width: 0; flex: 1;"><h3 class="tarj-titulo">Predio municipal</h3><div class="tarj-pills"><span class="tarj-pill" style="color: #86efac; background: rgba(47,163,107,.12); border: 1px solid rgba(47,163,107,.28);">en plazo</span><span class="tarj-pill" style="color: #c9c9d1; background: rgba(128,128,128,.12);">por contrato</span></div></div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 3 de 4 · Techado y cerramientos</span><span class="tnum" style="color: #9b9ba4;">62% avance</span></div>
-          <div class="bar"><div style="width: 62%; background: #2f8fdc;"></div></div>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
-          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$71,0 M</span> <span style="color: #9b9ba4;">ejecutados de $118 M · 21 gastos</span></div>
-          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
-            Reproducir
-          </div>
-        </div>
+        <div class="tarj-meta"><span>Espacio deportivo</span><span>Hidronorte</span><span>Etapa 3 de 4 · Techado</span></div>
+        <div><div style="display: flex; justify-content: space-between; font-size: 12px; color: #9b9ba4; margin-bottom: 4px;"><span>Avance real</span><span class="tnum">62%</span></div><div class="bar"><div style="width: 62%; background: #2f8fdc;"></div></div></div>
+        <div class="tarj-pie"><span class="tnum"><b style="color: #ececef;">$71,0 M</b> de $118 M · 21 gastos</span><span class="tarj-id">EXP 0412/26</span></div>
       </div>
 
-      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-          <div style="display: flex; flex-direction: column; gap: 3px;">
-            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Vivienda Semilla</div>
-            <div style="font-size: 12.5px; color: #9b9ba4;">Viviendas · por administración · cuadrilla propia</div>
-          </div>
-          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #2fa36b; border-color: rgba(47,163,107,.4);">en plazo</span>
+      <div class="tarj tarj--bueno">
+        <div class="tarj-cab">
+          <span class="tarj-tile" style="color: #2f8fdc; background: rgba(47,143,220,.14);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+          <div style="min-width: 0; flex: 1;"><h3 class="tarj-titulo">Vivienda Semilla</h3><div class="tarj-pills"><span class="tarj-pill" style="color: #86efac; background: rgba(47,163,107,.12); border: 1px solid rgba(47,163,107,.28);">en plazo</span><span class="tarj-pill" style="color: #c9c9d1; background: rgba(128,128,128,.12);">por administración</span></div></div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 2 de 3 · Mampostería</span><span class="tnum" style="color: #9b9ba4;">45% avance</span></div>
-          <div class="bar"><div style="width: 45%; background: #2f8fdc;"></div></div>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
-          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$30,7 M</span> <span style="color: #9b9ba4;">ejecutados de $64 M · 36 gastos</span></div>
-          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
-            Reproducir
-          </div>
-        </div>
+        <div class="tarj-meta"><span>Viviendas</span><span>Cuadrilla Obras</span><span>Etapa 2 de 3 · Mampostería</span></div>
+        <div><div style="display: flex; justify-content: space-between; font-size: 12px; color: #9b9ba4; margin-bottom: 4px;"><span>Avance real</span><span class="tnum">45%</span></div><div class="bar"><div style="width: 45%; background: #2f8fdc;"></div></div></div>
+        <div class="tarj-pie"><span class="tnum"><b style="color: #ececef;">$30,7 M</b> de $64 M · 36 gastos</span><span class="tarj-id">EXP 0388/26</span></div>
       </div>
 
-      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(214,84,84,.45); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-          <div style="display: flex; flex-direction: column; gap: 3px;">
-            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Salón de actos</div>
-            <div style="font-size: 12.5px; color: #9b9ba4;">Edificio público · por contrato · Chochi Paredes</div>
-          </div>
-          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #d65454; border-color: rgba(214,84,84,.5);">desvío de plata</span>
+      <div class="tarj tarj--malo">
+        <div class="tarj-cab">
+          <span class="tarj-tile" style="color: #d65454; background: rgba(214,84,84,.14);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l8-4v18"></path><path d="M19 21V11l-6-4"></path></svg></span>
+          <div style="min-width: 0; flex: 1;"><h3 class="tarj-titulo">Salón de actos</h3><div class="tarj-pills"><span class="tarj-pill" style="color: #f0a0a0; background: rgba(214,84,84,.12); border: 1px solid rgba(214,84,84,.3);">desvío de plata</span><span class="tarj-pill" style="color: #c9c9d1; background: rgba(128,128,128,.12);">por contrato</span></div></div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 2 de 4 · Estructura</span><span class="tnum" style="color: #9b9ba4;">40% avance · 70% gastado</span></div>
-          <div class="bar"><div style="width: 40%; background: #d65454;"></div></div>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
-          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$21,1 M</span> <span style="color: #9b9ba4;">ejecutados de $30 M · 32 gastos</span></div>
-          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
-            Reproducir
-          </div>
-        </div>
+        <div class="tarj-meta"><span>Edificio público</span><span>Chochi Paredes</span><span>Etapa 2 de 4 · Estructura</span></div>
+        <div><div style="display: flex; justify-content: space-between; font-size: 12px; color: #9b9ba4; margin-bottom: 4px;"><span>Avance real</span><span class="tnum">40% · gastado 70%</span></div><div class="bar"><div style="width: 40%; background: #d65454;"></div></div></div>
+        <div class="tarj-pie"><span class="tnum"><b style="color: #ececef;">$21,1 M</b> de $30 M · 32 gastos</span><span class="tarj-id">EXP 0401/26</span></div>
       </div>
 
-      <div style="border-radius: 12px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-          <div style="display: flex; flex-direction: column; gap: 3px;">
-            <div style="font-family: Sora, system-ui, sans-serif; font-size: 15px; font-weight: 600;">Balneario</div>
-            <div style="font-size: 12.5px; color: #9b9ba4;">Espacio público · por administración</div>
-          </div>
-          <span class="pill" style="height: 24px; padding: 0 10px; font-size: 11.5px; color: #d99a2b; border-color: rgba(217,154,43,.5);">atrasada 34 días</span>
+      <div class="tarj tarj--advertencia">
+        <div class="tarj-cab">
+          <span class="tarj-tile" style="color: #d99a2b; background: rgba(217,154,43,.14);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"></path><path d="M2 17c2 0 3-1 5-1s3 1 5 1 3-1 5-1 3 1 5 1"></path><path d="M12 12V4"></path></svg></span>
+          <div style="min-width: 0; flex: 1;"><h3 class="tarj-titulo">Balneario</h3><div class="tarj-pills"><span class="tarj-pill" style="color: #f3c774; background: rgba(217,154,43,.12); border: 1px solid rgba(217,154,43,.3);">atrasada 34 días</span><span class="tarj-pill" style="color: #c9c9d1; background: rgba(128,128,128,.12);">por administración</span></div></div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <div style="display: flex; justify-content: space-between; font-size: 12.5px;"><span>Etapa 1 de 2 · Vestuarios</span><span class="tnum" style="color: #9b9ba4;">20% avance</span></div>
-          <div class="bar"><div style="width: 20%; background: #d99a2b;"></div></div>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid rgba(128,128,128,.14);">
-          <div style="font-size: 12.5px;"><span class="tnum" style="font-weight: 600;">$5,1 M</span> <span style="color: #9b9ba4;">ejecutados · sin presupuesto cargado</span></div>
-          <div style="display: flex; align-items: center; gap: 6px; color: #2f8fdc; font-size: 12.5px; font-weight: 600;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
-            Reproducir
-          </div>
-        </div>
+        <div class="tarj-meta"><span>Espacio público</span><span>Cuadrilla Parques</span><span>Etapa 1 de 2 · Vestuarios</span></div>
+        <div><div style="display: flex; justify-content: space-between; font-size: 12px; color: #9b9ba4; margin-bottom: 4px;"><span>Avance real</span><span class="tnum">20%</span></div><div class="bar"><div style="width: 20%; background: #d99a2b;"></div></div></div>
+        <div class="tarj-pie"><span class="tnum"><b style="color: #ececef;">$5,1 M</b> · sin presupuesto cargado</span><span class="tarj-id">sin expediente</span></div>
       </div>
-
     </div>
   </div>
 </div>

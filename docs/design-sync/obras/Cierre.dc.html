@@ -7,79 +7,93 @@
 <body>
 <x-dc>
 <helmet>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,800&family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
   <style>
-    body { margin: 0; background: #103070; color: #fff; font-family: Inter, system-ui, sans-serif; }
-    a { color: #9ec5f5; } a:hover { color: #fff; }
+    body { margin: 0; background: #131826; color: #fff; font-family: Inter, system-ui, sans-serif; }
+    a { color: #3b82f6; } a:hover { color: #60a5fa; }
     .tnum { font-variant-numeric: tabular-nums; }
-    .card { border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); }
+    .eyebrow { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #8b93a7; font-weight: 700; }
+    .card { border-radius: 20px; background: linear-gradient(135deg, #1c2333 0%, rgba(59,130,246,.08) 100%); border: 1px solid rgba(255,255,255,.07); box-shadow: 0 8px 32px rgba(59,130,246,.18), inset 0 1px 0 rgba(59,130,246,.12); }
+    .bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .bar > div { height: 100%; border-radius: 999px; }
     .rise { animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
     @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
     @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
   </style>
 </helmet>
-<!-- Cuadro de cierre de la película: el veredicto de la obra hasta hoy. -->
-<div style="width: 1440px; height: 900px; background: radial-gradient(circle at 0% 100%, rgba(47,163,107,.2), transparent 55%), #103070; display: flex; flex-direction: column; padding: 40px 56px 32px; box-sizing: border-box; gap: 28px;">
+<!-- Cuadro de cierre: el veredicto de la obra hasta hoy, estilo modo EN VIVO. -->
+<div style="width: 1440px; height: 900px; background: radial-gradient(circle at 15% 90%, rgba(34,197,94,.14), transparent 45%), #131826; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden;">
 
-  <div style="display: flex; flex-direction: column; gap: 8px;">
-    <div style="font-size: 12.5px; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.7); font-weight: 600;">Predio municipal · mayo a diciembre 2026</div>
-    <div class="rise" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 64px; line-height: 1; letter-spacing: -0.01em;">Hasta hoy</div>
-  </div>
-
-  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
-    <div class="card rise" style="animation-delay: 150ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px;">
-      <div style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 600;">Presupuesto vigente</div>
-      <div class="tnum" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 56px; line-height: 1;">$118,0 M</div>
-      <div style="font-size: 12.5px; color: rgba(255,255,255,.7);">contrato + 1 adicional</div>
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: rgba(28,35,51,.8); border-bottom: 1px solid rgba(255,255,255,.07);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="width: 12px; height: 12px; border-radius: 999px; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
+      <span style="font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: #ef4444;">Obra en vivo</span>
+      <span style="color: #4b5366;">·</span>
+      <span style="font-size: 16px; font-weight: 700;">Predio municipal</span>
+      <span style="color: #4b5366;">·</span>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: #8b93a7;">mayo a diciembre 2026</span>
     </div>
-    <div class="card rise" style="animation-delay: 300ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px;">
-      <div style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 600;">Ejecutado</div>
-      <div class="tnum" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 56px; line-height: 1;">$71,0 M</div>
-      <div style="font-size: 12.5px; color: rgba(255,255,255,.7);">21 gastos · 8 proveedores</div>
-    </div>
-    <div class="card rise" style="animation-delay: 450ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px;">
-      <div style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); font-weight: 600;">Comprometido</div>
-      <div class="tnum" style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 56px; line-height: 1;">$9,6 M</div>
-      <div style="font-size: 12.5px; color: rgba(255,255,255,.7);">2 certificados sin pagar</div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="width: 40px; height: 40px; border-radius: 10px; background: #1c2333; display: inline-flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></span>
+      <span style="width: 40px; height: 40px; border-radius: 10px; background: #1c2333; display: inline-flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg></span>
+      <span style="height: 40px; padding: 0 16px; border-radius: 10px; background: #3b82f6; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Salir</span>
     </div>
   </div>
+  <div style="height: 3px; background: rgba(255,255,255,.06);"><div style="width: 100%; height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); box-shadow: 0 0 12px #3b82f6;"></div></div>
 
-  <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; flex: 1; min-height: 0;">
-    <div class="card rise" style="animation-delay: 600ms; padding: 24px 28px; display: flex; flex-direction: column; justify-content: center; gap: 18px;">
-      <div style="display: inline-flex; align-items: center; gap: 12px;">
-        <span style="width: 44px; height: 44px; border-radius: 12px; background: rgba(47,163,107,.25); color: #7fdba6; display: inline-flex; align-items: center; justify-content: center;">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        </span>
-        <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 800; font-size: 34px; line-height: 1.05;">En plazo y en plata</span>
-      </div>
-      <div style="font-size: 17px; line-height: 1.5; color: rgba(255,255,255,.85); max-width: 56ch;">Con el 62% de avance se gastó el 60% del presupuesto. La etapa 1 se pasó $3,9 M, y las dos siguientes lo compensaron. Quedan $37,4 M para las terminaciones, con dos certificados por pagar.</div>
-      <div style="display: flex; gap: 22px; font-size: 13px; color: rgba(255,255,255,.7);">
-        <span><strong style="color: #fff;">4</strong> etapas · 3 terminadas</span>
-        <span><strong style="color: #fff;">14</strong> órdenes de trabajo · 212 h</span>
-        <span><strong style="color: #fff;">8</strong> novedades publicadas</span>
-      </div>
-    </div>
-    <div class="card rise" style="animation-delay: 750ms; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; justify-content: center;">
-      <div style="font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.65); font-weight: 600;">Dónde se fue</div>
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        <div style="display: flex; flex-direction: column; gap: 5px;"><div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Platea y suelos</span><span class="tnum" style="font-weight: 700;">$43,9 M</span></div><div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,.1);"><div style="width: 62%; height: 100%; background: #fff; border-radius: 999px;"></div></div></div>
-        <div style="display: flex; flex-direction: column; gap: 5px;"><div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Techado y cerramientos</span><span class="tnum" style="font-weight: 700;">$19,8 M</span></div><div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,.1);"><div style="width: 28%; height: 100%; background: rgba(255,255,255,.8); border-radius: 999px;"></div></div></div>
-        <div style="display: flex; flex-direction: column; gap: 5px;"><div style="display: flex; justify-content: space-between; font-size: 14px;"><span>Estructura</span><span class="tnum" style="font-weight: 700;">$7,3 M</span></div><div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,.1);"><div style="width: 10%; height: 100%; background: rgba(255,255,255,.6); border-radius: 999px;"></div></div></div>
-      </div>
-    </div>
-  </div>
+  <div style="padding: 26px 36px 26px; display: flex; flex-direction: column; gap: 22px; flex: 1; min-height: 0;">
 
-  <div style="display: flex; justify-content: space-between; align-items: center;">
-    <div style="font-size: 12.5px; color: rgba(255,255,255,.55);">Los mismos números, filtrados, van a "Obras en tu ciudad" si la obra está publicada.</div>
-    <div style="display: flex; gap: 10px;">
-      <span style="height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-        Volver a ver
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #22c55e, #4ade80); box-shadow: 0 8px 24px rgba(34,197,94,.25); display: inline-flex; align-items: center; justify-content: center;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
       </span>
-      <span style="height: 44px; padding: 0 18px; border-radius: 999px; background: #fff; color: #103070; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-        Compartir el informe
-      </span>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <div class="eyebrow">Cierre · 8 meses · 4 etapas</div>
+        <div style="font-size: 32px; font-weight: 800; line-height: 1.1;">En plazo y en plata</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+      <div class="card rise" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 6px;"><div class="eyebrow">Presupuesto vigente</div><div class="tnum" style="font-size: 40px; font-weight: 800; line-height: 1; color: #3b82f6;">$118,0 M</div><div style="font-size: 12.5px; color: #8b93a7;">contrato + 1 adicional</div></div>
+      <div class="card rise" style="animation-delay: 120ms; padding: 20px 22px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, #1c2333 0%, rgba(34,197,94,.08) 100%); box-shadow: 0 8px 32px rgba(34,197,94,.16), inset 0 1px 0 rgba(34,197,94,.12);"><div class="eyebrow">Ejecutado</div><div class="tnum" style="font-size: 40px; font-weight: 800; line-height: 1; color: #22c55e;">$71,0 M</div><div style="font-size: 12.5px; color: #8b93a7;">60% · 21 gastos · 8 proveedores</div></div>
+      <div class="card rise" style="animation-delay: 240ms; padding: 20px 22px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, #1c2333 0%, rgba(245,158,11,.08) 100%); box-shadow: 0 8px 32px rgba(245,158,11,.16), inset 0 1px 0 rgba(245,158,11,.12);"><div class="eyebrow">Comprometido</div><div class="tnum" style="font-size: 40px; font-weight: 800; line-height: 1; color: #f59e0b;">$9,6 M</div><div style="font-size: 12.5px; color: #8b93a7;">2 certificados sin pagar</div></div>
+      <div class="card rise" style="animation-delay: 360ms; padding: 20px 22px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, #1c2333 0%, rgba(168,85,247,.08) 100%); box-shadow: 0 8px 32px rgba(168,85,247,.16), inset 0 1px 0 rgba(168,85,247,.12);"><div class="eyebrow">Avance</div><div class="tnum" style="font-size: 40px; font-weight: 800; line-height: 1; color: #a855f7;">62%</div><div style="font-size: 12.5px; color: #8b93a7;">3 de 4 etapas terminadas</div></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px; flex: 1; min-height: 0;">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #1c2333; display: inline-flex; align-items: center; justify-content: center; color: #3b82f6;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></span>
+          <span style="font-size: 18px; font-weight: 700;">Dónde se fue la plata</span>
+        </div>
+        <div class="card rise" style="animation-delay: 480ms; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+          <div style="display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 15px; font-weight: 600;">1 · Movimiento de suelos y platea</span><span class="tnum" style="font-size: 20px; font-weight: 800; color: #f59e0b;">$43,9 M</span></div><div class="bar"><div style="width: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24); box-shadow: 0 0 8px rgba(245,158,11,.5);"></div></div><div style="font-size: 12px; color: #8b93a7;">se pasó $3,9 M de lo previsto</div></div>
+          <div style="display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 15px; font-weight: 600;">2 · Estructura</span><span class="tnum" style="font-size: 20px; font-weight: 800; color: #3b82f6;">$7,3 M</span></div><div class="bar"><div style="width: 26%; background: linear-gradient(90deg, #3b82f6, #60a5fa); box-shadow: 0 0 8px rgba(59,130,246,.5);"></div></div><div style="font-size: 12px; color: #8b93a7;">de $28 M previstos</div></div>
+          <div style="display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 15px; font-weight: 600;">3 · Techado y cerramientos</span><span class="tnum" style="font-size: 20px; font-weight: 800; color: #06b6d4;">$19,8 M</span></div><div class="bar"><div style="width: 57%; background: linear-gradient(90deg, #06b6d4, #22d3ee); box-shadow: 0 0 8px rgba(6,182,212,.5);"></div></div><div style="font-size: 12px; color: #8b93a7;">de $35 M previstos · en curso</div></div>
+          <div style="display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 15px; font-weight: 600;">4 · Terminaciones</span><span class="tnum" style="font-size: 20px; font-weight: 800; color: #8b93a7;">$0</span></div><div class="bar"><div style="width: 0%; background: #3b82f6;"></div></div><div style="font-size: 12px; color: #8b93a7;">quedan $37,4 M</div></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="width: 32px; height: 32px; border-radius: 8px; background: #1c2333; display: inline-flex; align-items: center; justify-content: center; color: #3b82f6;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path></svg></span>
+          <span style="font-size: 18px; font-weight: 700;">Quién la hizo</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1;">
+          <div class="card rise" style="animation-delay: 560ms; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 16px; font-weight: 700;">Hidronorte</div><div class="tnum" style="font-size: 28px; font-weight: 800; color: #3b82f6;">$41,7 M</div><div style="font-size: 12.5px; color: #8b93a7;">proveedor · platea</div></div>
+          <div class="card rise" style="animation-delay: 640ms; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, #1c2333 0%, rgba(168,85,247,.08) 100%); box-shadow: 0 8px 32px rgba(168,85,247,.16), inset 0 1px 0 rgba(168,85,247,.12);"><div style="font-size: 16px; font-weight: 700;">Rubbertone SAS</div><div class="tnum" style="font-size: 28px; font-weight: 800; color: #a855f7;">$19,2 M</div><div style="font-size: 12.5px; color: #8b93a7;">proveedor · piso deportivo</div></div>
+          <div class="card rise" style="animation-delay: 720ms; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, #1c2333 0%, rgba(34,197,94,.08) 100%); box-shadow: 0 8px 32px rgba(34,197,94,.16), inset 0 1px 0 rgba(34,197,94,.12);"><div style="font-size: 16px; font-weight: 700;">Cuadrilla Obras</div><div class="tnum" style="font-size: 28px; font-weight: 800; color: #22c55e;">212 h</div><div style="font-size: 12.5px; color: #8b93a7;">14 órdenes de trabajo</div></div>
+          <div class="card rise" style="animation-delay: 800ms; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(135deg, #1c2333 0%, rgba(245,158,11,.08) 100%); box-shadow: 0 8px 32px rgba(245,158,11,.16), inset 0 1px 0 rgba(245,158,11,.12);"><div style="font-size: 16px; font-weight: 700;">Personal municipal</div><div class="tnum" style="font-size: 28px; font-weight: 800; color: #f59e0b;">$6,2 M</div><div style="font-size: 12.5px; color: #8b93a7;">sueldos imputados a la obra</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="font-size: 12.5px; color: #8b93a7;">Los mismos números, filtrados, van a "Obras en tu ciudad" si la obra está publicada.</div>
+      <div style="display: flex; gap: 10px;">
+        <span style="height: 44px; padding: 0 18px; border-radius: 10px; background: #1c2333; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>Volver a ver</span>
+        <span style="height: 44px; padding: 0 18px; border-radius: 10px; background: #3b82f6; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>Compartir</span>
+      </div>
     </div>
   </div>
 </div>

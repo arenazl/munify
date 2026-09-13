@@ -65,6 +65,7 @@ from .sidebar_config import admin_router as sidebar_admin_router, public_router 
 # Tesoreria (control de gastos del intendente)
 from .modulos import router as modulos_router
 from .contactos import router as contactos_router
+from .personas import router as personas_router
 from .gastos import router as gastos_router
 from .proyectos import router as proyectos_router
 from .flota import router as flota_router
@@ -159,6 +160,7 @@ api_router.include_router(sidebar_public_router)  # ya tiene prefix /navigation
 # Tesoreria
 api_router.include_router(modulos_router, prefix="/modulos", tags=["Modulos"])
 api_router.include_router(contactos_router, prefix="/tesoreria/contactos", tags=["Tesoreria - Contactos"])
+api_router.include_router(personas_router, prefix="/personas", tags=["Personas"])
 api_router.include_router(gastos_router, prefix="/tesoreria/gastos", tags=["Tesoreria - Gastos"])
 api_router.include_router(proyectos_router, prefix="/tesoreria/proyectos", tags=["Tesoreria - Proyectos"])
 api_router.include_router(flota_router, prefix="/flota", tags=["Recursos - Flota"])

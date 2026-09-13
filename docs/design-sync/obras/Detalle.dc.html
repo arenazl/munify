@@ -1,0 +1,247 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; background: #1a1a1d; color: #ececef; font-family: Inter, system-ui, sans-serif; font-size: 13.5px; }
+    a { color: #2f8fdc; } a:hover { color: #5aa9e6; }
+    .eyebrow { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #9b9ba4; font-weight: 600; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    .card { background: #222226; border: 1px solid rgba(128,128,128,.2); border-radius: 12px; padding: 18px 18px 14px; display: flex; flex-direction: column; min-width: 0; }
+    .card h3 { font-family: Sora, system-ui, sans-serif; font-size: 15.5px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 5px; }
+    .card .q { font-size: 12.5px; color: #9b9ba4; margin: 0 0 14px; line-height: 1.5; }
+    .card .q b { color: #ececef; font-weight: 600; }
+    .card svg { width: 100%; height: auto; display: block; overflow: visible; }
+    .card .key { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11.5px; color: #9b9ba4; }
+    .card .key b { display: flex; align-items: center; gap: 6px; font-weight: 500; white-space: nowrap; }
+    .card .key i { width: 9px; height: 9px; border-radius: 3px; display: block; flex: none; }
+    .card .tip { margin: 12px 0 0; padding-top: 11px; border-top: 1px solid rgba(128,128,128,.12); font-size: 11.5px; color: #8a8a93; line-height: 1.5; }
+    .gl { stroke: rgba(128,128,128,.16); stroke-width: 1; }
+    .ax { font-size: 10.5px; fill: #9b9ba4; }
+    .axv { font-size: 11px; fill: #9b9ba4; }
+    .seg { position: absolute; top: 0; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 12px; box-sizing: border-box; border-radius: 10px; }
+    .seg .n { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seg .m { font-size: 11px; white-space: nowrap; opacity: .85; }
+    .hito { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .hito .d { width: 10px; height: 10px; transform: rotate(45deg); background: #ececef; border-radius: 2px; }
+    .hito .l { font-size: 10.5px; color: #c9c9d1; white-space: nowrap; font-weight: 500; }
+    .fila { display: grid; grid-template-columns: 54px 1.4fr 1.1fr 84px 20px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12); font-size: 12.5px; }
+    .btn { height: 36px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(128,128,128,.2); display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+    .btn.on { background: rgba(47,143,220,.16); border-color: rgba(47,143,220,.5); color: #fff; font-weight: 600; }
+  </style>
+</helmet>
+<!-- DETALLE DE UNA OBRA: segunda pantalla completa. Orden: hero semántico (frase generada + 5 KPIs) →
+     la línea de tiempo COMPLETA, que siempre entra, con la LUPA sobre el tramo elegido → la explosión
+     de ese tramo con los gráficos de la galería (docs/design-sync/Mapa de calor y reclamos/galeria-graficos.html). -->
+<div style="width: 1440px; min-height: 1700px; background: #1a1a1d; display: flex; flex-direction: column; padding: 24px 36px 40px; box-sizing: border-box; gap: 16px;">
+
+  <!-- Migas, título, acciones -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div class="eyebrow"><span style="color: #2f8fdc;">Obras</span> &nbsp;/&nbsp; Predio municipal</div>
+      <div style="font-family: Sora, system-ui, sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.12;">Predio municipal</div>
+      <div style="color: #9b9ba4;">Espacio deportivo · por contrato · Hidronorte · expediente 0412/26 · financiamiento provincial · barrio Centro</div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span class="btn">Cargar gasto</span>
+      <span class="btn">Cargar certificado</span>
+      <span class="btn">Novedad</span>
+      <span class="btn" style="background: #2f8fdc; border-color: #2f8fdc; color: #fff; font-weight: 600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>Reproducir</span>
+    </div>
+  </div>
+
+  <!-- HERO SEMÁNTICO (kit v3): la frase la genera el algoritmo a partir de avance, plata, plazo y bandeja -->
+  <div style="border-radius: 16px; background: #222226; border: 1px solid rgba(128,128,128,.2); padding: 18px 24px; display: flex; flex-direction: column; gap: 14px;">
+    <div class="eyebrow">Cómo viene la obra · generado hoy 13 sep</div>
+    <div style="font-family: Sora, system-ui, sans-serif; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; max-width: 1100px;">Estamos al <span class="tnum">62%</span> de la obra con el <span class="tnum">60%</span> de la plata: <span style="color: #2fa36b;">en plata</span>. La etapa 3 arrancó <span style="color: #d99a2b;">un mes tarde</span> pero va a ritmo y el fin previsto sigue en marzo. Hay 3 gastos sin etapa esperando confirmación.</div>
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));">
+      <div style="display: flex; flex-direction: column; gap: 3px; padding-right: 18px;"><div class="tnum" style="font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1;">$118,0 M</div><div style="font-size: 12.5px; font-weight: 600;">presupuesto vigente</div><div style="font-size: 11.5px; color: #9b9ba4;">contrato + 1 adicional</div></div>
+      <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);"><div class="tnum" style="font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1; color: #2fa36b;">$71,0 M</div><div style="font-size: 12.5px; font-weight: 600;">ejecutado, el 60%</div><div style="font-size: 11.5px; color: #9b9ba4;">21 gastos, 8 proveedores</div></div>
+      <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);"><div class="tnum" style="font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1;">$9,6 M</div><div style="font-size: 12.5px; font-weight: 600;">comprometido</div><div style="font-size: 11.5px; color: #9b9ba4;">2 certificados sin pagar</div></div>
+      <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);"><div class="tnum" style="font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1; color: #d99a2b;">+1 mes</div><div style="font-size: 12.5px; font-weight: 600;">atraso de la etapa 3</div><div style="font-size: 11.5px; color: #9b9ba4;">fin previsto sigue en marzo</div></div>
+      <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 18px; border-left: 1px solid rgba(128,128,128,.2);"><div class="tnum" style="font-family: Sora, system-ui, sans-serif; font-size: 22px; font-weight: 700; line-height: 1;">3</div><div style="font-size: 12.5px; font-weight: 600;">gastos sin etapa</div><div style="font-size: 11.5px; color: #2f8fdc;">confirmar la propuesta</div></div>
+    </div>
+  </div>
+
+  <!-- LA LÍNEA DE TIEMPO: siempre entra en pantalla. Arriba la obra completa; abajo la LUPA sobre el tramo elegido. -->
+  <div class="card" style="gap: 0; padding: 18px 24px 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <div><h3 style="margin: 0;">Línea de tiempo</h3><div style="font-size: 12px; color: #9b9ba4; margin-top: 3px;">Toda la obra, siempre entera. Tocá una etapa y se explota abajo con todo lo que pasó en ella. Dos niveles, nada más.</div></div>
+      <span class="btn" style="height: 34px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>Volver a toda la obra</span>
+    </div>
+
+    <!-- Tira completa (siempre entra) -->
+    <div style="position: relative; height: 150px;">
+      <div style="position: absolute; left: 0; right: 0; top: 0; height: 40px;">
+        <div class="hito" style="left: 1%;"><div class="l">Inicio · 14 may</div><div class="d" style="background: #2f8fdc;"></div></div>
+        <div class="hito" style="left: 32%;"><div class="l">Cert. 1</div><div class="d"></div></div>
+        <div class="hito" style="left: 37.5%;"><div class="l">Cert. 2</div><div class="d"></div></div>
+        <div class="hito" style="left: 73%;"><div class="l">Cert. 3 previsto</div><div class="d" style="background: transparent; border: 1.5px dashed #9b9ba4;"></div></div>
+        <div class="hito" style="left: 97%;"><div class="l">Fin previsto · 15 mar</div><div class="d" style="background: #2fa36b;"></div></div>
+      </div>
+      <div style="position: absolute; left: 0; right: 0; top: 52px; height: 56px;">
+        <div class="seg" style="left: 0%; width: 17%; background: rgba(47,163,107,.2); border: 1px solid rgba(47,163,107,.5);"><div class="n" style="color: #86efac;">1 · Suelos y platea</div><div class="m tnum">$43,9 M · terminada</div></div>
+        <div class="seg" style="left: 17.5%; width: 19%; background: rgba(47,163,107,.2); border: 1px solid rgba(47,163,107,.5);"><div class="n" style="color: #86efac;">2 · Estructura</div><div class="m tnum">$7,3 M · terminada</div></div>
+        <div class="seg" style="left: 37%; width: 28%; background: rgba(47,143,220,.22); border: 1px solid rgba(47,143,220,.6);"><div class="n" style="color: #fff;">3 · Techado y cerramientos</div><div class="m tnum" style="color: #fff;">$19,8 M · en curso · 57%</div></div>
+        <div class="seg" style="left: 65.5%; width: 34.5%; background: rgba(128,128,128,.1); border: 1px dashed rgba(128,128,128,.4);"><div class="n" style="color: #9b9ba4;">4 · Terminaciones</div><div class="m tnum">$15 M previstos</div></div>
+      </div>
+      <!-- La etapa TOCADA: resaltada, y un conector hacia el tramo explotado de abajo -->
+      <div style="position: absolute; left: 37%; width: 28%; top: 48px; height: 64px; border: 2px solid #ececef; border-radius: 12px; box-shadow: 0 0 0 4px rgba(236,236,239,.1), 0 0 24px rgba(47,143,220,.35);"></div>
+      <div style="position: absolute; left: calc(37% + 14% - 9px); top: 112px; width: 18px; height: 18px; border-radius: 3px; background: #1a1a1d; border-left: 2px solid rgba(236,236,239,.35); border-top: 2px solid rgba(236,236,239,.35); transform: rotate(225deg); z-index: 2;"></div>
+      <!-- hoy -->
+      <div style="position: absolute; left: 40.9%; top: 44px; height: 72px; width: 2px; background: #d99a2b; box-shadow: 0 0 8px rgba(217,154,43,.6);"><div style="position: absolute; top: -16px; left: 5px; font-size: 10px; font-weight: 700; color: #d99a2b; white-space: nowrap;">HOY</div></div>
+      <div style="position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); font-size: 11px; color: #9b9ba4; font-weight: 600; border-top: 1px solid rgba(128,128,128,.18); padding-top: 6px;">
+        <div>may 26</div><div>jun</div><div>jul</div><div>ago</div><div style="color: #ececef;">sep</div><div>oct</div><div>nov</div><div>dic</div><div>ene 27</div><div>feb</div><div>mar</div>
+      </div>
+    </div>
+
+    <!-- El tramo ampliado: septiembre a noviembre, semana por semana -->
+    <div style="margin-top: 14px; border-radius: 12px; border: 1px solid rgba(236,236,239,.25); background: #1a1a1d; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <div style="font-family: Sora, system-ui, sans-serif; font-size: 16px; font-weight: 700;">Etapa 3 · Techado y cerramientos <span style="color: #9b9ba4; font-weight: 500; font-size: 13px;">· explotada · 1 sep a 30 nov · 13 semanas</span></div>
+        <div style="font-size: 12px; color: #9b9ba4;">previsto: agosto a noviembre · <span style="color: #d99a2b;">arrancó 4 semanas tarde</span></div>
+      </div>
+      <svg viewBox="0 0 1330 150" style="width: 100%; height: 150px; display: block; overflow: visible;">
+        <!-- semanas -->
+        <g class="ax" font-family="Inter, system-ui, sans-serif">
+          <line class="gl" x1="0" y1="118" x2="1330" y2="118"></line>
+          <text x="0" y="140">1 sep</text><text x="310" y="140">1 oct</text><text x="620" y="140">1 nov</text><text x="930" y="140">1 dic</text><text x="1240" y="140" fill="#9b9ba4">fin</text>
+          <line class="gl" x1="310" y1="20" x2="310" y2="118"></line><line class="gl" x1="620" y1="20" x2="620" y2="118"></line><line class="gl" x1="930" y1="20" x2="930" y2="118"></line>
+        </g>
+        <!-- previsto vs real de la etapa (dumbbell horizontal) -->
+        <text class="axv" x="0" y="26" fill="#9b9ba4">Plazo</text>
+        <rect x="0" y="32" width="930" height="8" rx="4" fill="rgba(47,143,220,.16)" stroke="rgba(47,143,220,.5)" stroke-dasharray="4 3"></rect>
+        <rect x="0" y="46" width="1240" height="10" rx="5" fill="#2f8fdc"></rect>
+        <rect x="0" y="46" width="130" height="10" rx="5" fill="#2f8fdc"></rect>
+        <text x="1250" y="55" font-size="11" fill="#ececef" font-weight="600">real: hasta 15 dic</text>
+        <text x="940" y="39" font-size="10.5" fill="#9b9ba4">previsto: 30 nov</text>
+        <!-- gastos: un tick por gasto, alto = monto -->
+        <text class="axv" x="0" y="76" fill="#9b9ba4">Plata</text>
+        <g fill="#2f8fdc">
+          <rect x="4" y="84" width="10" height="30" rx="2"></rect><rect x="16" y="84" width="10" height="30" rx="2"></rect>
+          <rect x="30" y="106" width="10" height="8" rx="2" fill="#d99a2b"></rect>
+          <rect x="112" y="98" width="10" height="16" rx="2" fill="#2fa36b"></rect>
+          <rect x="132" y="92" width="10" height="22" rx="2"></rect>
+          <rect x="713" y="84" width="10" height="30" rx="2" fill="rgba(47,143,220,.35)" stroke="rgba(47,143,220,.8)" stroke-dasharray="3 2"></rect>
+          <rect x="1023" y="84" width="10" height="30" rx="2" fill="rgba(47,143,220,.35)" stroke="rgba(47,143,220,.8)" stroke-dasharray="3 2"></rect>
+        </g>
+        <text x="34" y="80" font-size="10.5" fill="#d99a2b">sin etapa</text>
+        <text x="716" y="80" font-size="10.5" fill="#9b9ba4">programados</text>
+        <!-- hitos y novedades del tramo -->
+        <g>
+          <rect x="0" y="6" width="10" height="10" rx="2" transform="rotate(45 5 11)" fill="#ececef"></rect><text x="14" y="16" font-size="10.5" fill="#c9c9d1">Cert. 2 · $4,8 M</text>
+          <rect x="93" y="6" width="10" height="10" rx="2" transform="rotate(45 98 11)" fill="#2fa36b"></rect><text x="107" y="16" font-size="10.5" fill="#c9c9d1">Inspección: techo terminado, arranca cerramiento</text>
+          <rect x="1030" y="6" width="10" height="10" rx="2" transform="rotate(45 1035 11)" fill="transparent" stroke="#9b9ba4" stroke-dasharray="2 2"></rect><text x="1044" y="16" font-size="10.5" fill="#9b9ba4">Cert. 3 previsto</text>
+        </g>
+        <!-- hoy -->
+        <line x1="124" y1="0" x2="124" y2="118" stroke="#d99a2b" stroke-width="2"></line>
+        <text x="129" y="118" font-size="10" font-weight="700" fill="#d99a2b">HOY</text>
+      </svg>
+      <div style="display: flex; gap: 14px; font-size: 11.5px; color: #9b9ba4;">
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 9px; height: 9px; border-radius: 3px; background: #2f8fdc; display: block;"></i>gasto pagado, alto = monto</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 9px; height: 9px; border-radius: 3px; background: #2fa36b; display: block;"></i>sueldos imputados</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 9px; height: 9px; border-radius: 3px; background: #d99a2b; display: block;"></i>sin etapa, propuesto</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><i style="width: 9px; height: 9px; border-radius: 3px; border: 1px dashed #9b9ba4; display: block;"></i>programado</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LA EXPLOSIÓN del tramo, con los gráficos de la galería -->
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+
+    <!-- Qué fue cada peso: barra apilada por etapa (chEtapas) -->
+    <article class="card">
+      <h3>Qué fue cada peso, etapa por etapa</h3>
+      <p class="q">La plata de cada etapa partida en <b>contratista, materiales y mano de obra municipal</b>. La etapa elegida, resaltada. Separa el problema del contrato del problema de la cuadrilla.</p>
+      <svg viewBox="0 0 400 168" font-family="Inter, system-ui, sans-serif">
+        <g><text class="axv" x="118" y="24" text-anchor="end">1 · Suelos y platea</text><rect x="126" y="12" width="230" height="16" rx="3" fill="#a855f7"></rect><rect x="356" y="12" width="14" height="16" rx="0" fill="#2f8fdc"></rect><rect x="370" y="12" width="6" height="16" rx="3" fill="#2fa36b"></rect><text x="398" y="24" text-anchor="end" font-size="11" font-weight="600" fill="#ececef">43,9</text></g>
+        <g opacity=".7"><text class="axv" x="118" y="58" text-anchor="end">2 · Estructura</text><rect x="126" y="46" width="30" height="16" rx="3" fill="#a855f7"></rect><rect x="156" y="46" width="8" height="16" fill="#2f8fdc"></rect><rect x="164" y="46" width="4" height="16" rx="3" fill="#2fa36b"></rect><text x="398" y="58" text-anchor="end" font-size="11" font-weight="600" fill="#ececef">7,3</text></g>
+        <g><rect x="0" y="78" width="400" height="26" rx="6" fill="rgba(47,143,220,.12)"></rect><text class="axv" x="118" y="95" text-anchor="end" fill="#ececef" font-weight="600">3 · Techado</text><rect x="126" y="83" width="75" height="16" rx="3" fill="#a855f7"></rect><rect x="201" y="83" width="22" height="16" fill="#2f8fdc"></rect><rect x="223" y="83" width="8" height="16" rx="3" fill="#2fa36b"></rect><text x="398" y="95" text-anchor="end" font-size="11" font-weight="600" fill="#ececef">19,8</text></g>
+        <g opacity=".5"><text class="axv" x="118" y="129" text-anchor="end">4 · Terminaciones</text><rect x="126" y="117" width="80" height="16" rx="3" fill="none" stroke="#9b9ba4" stroke-dasharray="3 2"></rect><text x="398" y="129" text-anchor="end" font-size="11" fill="#9b9ba4">15 prev.</text></g>
+        <text class="ax" x="126" y="158">millones de pesos</text>
+      </svg>
+      <div class="key"><b><i style="background: #a855f7;"></i>Contratista</b><b><i style="background: #2f8fdc;"></i>Materiales</b><b><i style="background: #2fa36b;"></i>Mano de obra municipal</b></div>
+      <p class="tip">En la etapa 3: contratista <b>$14,2 M</b>, materiales <b>$4,1 M</b>, mano de obra <b>$1,5 M</b>.</p>
+    </article>
+
+    <!-- Previsto contra real: dumbbell (chDumbbell) -->
+    <article class="card">
+      <h3>Previsto contra real, por etapa</h3>
+      <p class="q">Dos puntos por etapa unidos por una línea. <b>El largo de la línea es el desvío</b>: si el punto de lo gastado queda a la derecha de lo previsto, la etapa se pasó.</p>
+      <svg viewBox="0 0 400 168" font-family="Inter, system-ui, sans-serif">
+        <g class="ax"><line class="gl" x1="120" y1="8" x2="120" y2="140"></line><line class="gl" x1="190" y1="8" x2="190" y2="140"></line><line class="gl" x1="260" y1="8" x2="260" y2="140"></line><line class="gl" x1="330" y1="8" x2="330" y2="140"></line><text x="120" y="156" text-anchor="middle">0</text><text x="190" y="156" text-anchor="middle">15</text><text x="260" y="156" text-anchor="middle">30</text><text x="330" y="156" text-anchor="middle">45 M</text></g>
+        <g><text class="axv" x="110" y="29" text-anchor="end">1 · Suelos</text><line x1="306" y1="25" x2="325" y2="25" stroke="rgba(236,236,239,.25)" stroke-width="2.5"></line><circle cx="306" cy="25" r="4.5" fill="#9b9ba4"></circle><circle cx="325" cy="25" r="4.5" fill="#d99a2b"></circle></g>
+        <g><text class="axv" x="110" y="61" text-anchor="end">2 · Estructura</text><line x1="154" y1="57" x2="250" y2="57" stroke="rgba(236,236,239,.25)" stroke-width="2.5"></line><circle cx="250" cy="57" r="4.5" fill="#9b9ba4"></circle><circle cx="154" cy="57" r="4.5" fill="#2fa36b"></circle></g>
+        <g><rect x="0" y="78" width="400" height="26" rx="6" fill="rgba(47,143,220,.12)"></rect><text class="axv" x="110" y="95" text-anchor="end" fill="#ececef" font-weight="600">3 · Techado</text><line x1="212" y1="91" x2="283" y2="91" stroke="rgba(236,236,239,.25)" stroke-width="2.5"></line><circle cx="283" cy="91" r="4.5" fill="#9b9ba4"></circle><circle cx="212" cy="91" r="4.5" fill="#2f8fdc"></circle><text x="292" y="95" font-size="10.5" fill="#9b9ba4">al 57%, va bien</text></g>
+        <g opacity=".6"><text class="axv" x="110" y="127" text-anchor="end">4 · Terminaciones</text><circle cx="190" cy="123" r="4.5" fill="#9b9ba4"></circle><circle cx="120" cy="123" r="4.5" fill="none" stroke="#9b9ba4" stroke-dasharray="2 2"></circle></g>
+      </svg>
+      <div class="key"><b><i style="background: #9b9ba4;"></i>Previsto</b><b><i style="background: #2f8fdc;"></i>Gastado</b><b><i style="background: #d99a2b;"></i>Se pasó</b><b><i style="background: #2fa36b;"></i>Cerró por debajo</b></div>
+      <p class="tip">La etapa 1 se pasó $3,9 M; la 2 cerró $20,7 M por debajo. <b>Neto: a favor.</b></p>
+    </article>
+
+    <!-- Evolución: área de acumulado (chTendencia) -->
+    <article class="card">
+      <h3>Cómo se fue gastando</h3>
+      <p class="q">El acumulado de la obra mes a mes contra la <b>curva prevista</b>. Cuando la línea sólida va por debajo de la punteada, se gasta más lento de lo planeado.</p>
+      <svg viewBox="0 0 400 168" font-family="Inter, system-ui, sans-serif">
+        <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f8fdc" stop-opacity=".35"></stop><stop offset="1" stop-color="#2f8fdc" stop-opacity="0"></stop></linearGradient></defs>
+        <g class="ax"><line class="gl" x1="40" y1="20" x2="392" y2="20"></line><line class="gl" x1="40" y1="60" x2="392" y2="60"></line><line class="gl" x1="40" y1="100" x2="392" y2="100"></line><line class="gl" x1="40" y1="140" x2="392" y2="140"></line><text class="axv" x="34" y="24" text-anchor="end">118</text><text class="axv" x="34" y="64" text-anchor="end">80</text><text class="axv" x="34" y="104" text-anchor="end">40</text><text class="axv" x="34" y="144" text-anchor="end">0</text><text x="40" y="160">may</text><text x="120" y="160">jul</text><text x="200" y="160">sep</text><text x="280" y="160">nov</text><text x="360" y="160">ene</text></g>
+        <path d="M40 140 L80 128 L120 112 L160 96 L200 80 L240 64 L280 50 L320 38 L360 28 L392 20" fill="none" stroke="#9b9ba4" stroke-width="1.5" stroke-dasharray="4 3"></path>
+        <path d="M40 140 L80 96 L120 91 L160 89 L200 78 L200 140 Z" fill="url(#ga)"></path>
+        <path d="M40 140 L80 96 L120 91 L160 89 L200 78" fill="none" stroke="#2f8fdc" stroke-width="2.5"></path>
+        <path d="M200 78 L240 73 L280 68" fill="none" stroke="#2f8fdc" stroke-width="2" stroke-dasharray="3 3" opacity=".6"></path>
+        <circle cx="200" cy="78" r="4" fill="#2f8fdc"></circle>
+        <text x="206" y="74" font-size="11" font-weight="600" fill="#ececef">$71,0 M hoy</text>
+        <line x1="200" y1="20" x2="200" y2="140" stroke="#d99a2b" stroke-width="1.5"></line>
+      </svg>
+      <div class="key"><b><i style="background: #2f8fdc;"></i>Gastado, acumulado</b><b><i style="background: #9b9ba4;"></i>Curva prevista</b><b><i style="background: #d99a2b;"></i>Hoy</b></div>
+      <p class="tip">Mayo se llevó el 37% de un saque (la platea). Desde entonces el gasto va <b>por debajo de lo previsto</b>.</p>
+    </article>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px;">
+    <!-- Los gastos del tramo, con enlace -->
+    <article class="card" style="gap: 4px;">
+      <h3>Los gastos de esta etapa</h3>
+      <p class="q" style="margin-bottom: 6px;">Siete gastos entre septiembre y noviembre. <b>Cada uno abre en Tesorería</b>, con su factura y su caja.</p>
+      <div class="fila" style="border-top: 0; color: #9b9ba4; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;"><span>Fecha</span><span>A quién</span><span>Concepto</span><span style="text-align: right;">Monto</span><span></span></div>
+      <div class="fila"><span class="tnum" style="color: #9b9ba4;">1 sep</span><span>Rubbertone SAS</span><span style="color: #9b9ba4;">Deporte · piso</span><span class="tnum" style="text-align: right; font-weight: 600;">$4,79 M</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2f8fdc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></div>
+      <div class="fila"><span class="tnum" style="color: #9b9ba4;">1 sep</span><span>Rubbertone SAS</span><span style="color: #9b9ba4;">Deporte · piso</span><span class="tnum" style="text-align: right; font-weight: 600;">$4,79 M</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2f8fdc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></div>
+      <div class="fila" style="background: rgba(217,154,43,.08); margin: 0 -8px; padding: 8px;"><span class="tnum" style="color: #9b9ba4;">2 sep</span><span>Carlos Kako Martínez</span><span style="color: #d99a2b;">Obras varias · sin etapa, propuesto</span><span class="tnum" style="text-align: right; font-weight: 600;">$0,60 M</span><span style="color: #2f8fdc; font-weight: 600; font-size: 11px;">OK</span></div>
+      <div class="fila"><span class="tnum" style="color: #9b9ba4;">10 sep</span><span>Cuadrilla Obras <span style="color: #9b9ba4;">· 4 personas</span></span><span style="color: #9b9ba4;">Sueldos imputados</span><span class="tnum" style="text-align: right; font-weight: 600;">$1,50 M</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2f8fdc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></div>
+      <div class="fila"><span class="tnum" style="color: #9b9ba4;">12 sep</span><span>Corralón Norte</span><span style="color: #9b9ba4;">Materiales · chapas</span><span class="tnum" style="text-align: right; font-weight: 600;">$3,10 M</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2f8fdc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></div>
+      <div class="fila" style="color: #9b9ba4;"><span class="tnum">10 nov</span><span>Rubbertone SAS</span><span>Deporte · programado</span><span class="tnum" style="text-align: right;">$4,79 M</span><span></span></div>
+      <div class="fila" style="color: #9b9ba4;"><span class="tnum">10 dic</span><span>Rubbertone SAS</span><span>Deporte · programado</span><span class="tnum" style="text-align: right;">$4,79 M</span><span></span></div>
+    </article>
+
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <article class="card">
+        <h3>Quién estuvo en este tramo</h3>
+        <p class="q" style="margin-bottom: 8px;">Contratista, cuadrilla y proveedores con presencia entre septiembre y noviembre.</p>
+        <div style="display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12);"><span>Chochi Paredes <span style="color: #9b9ba4;">· contratista</span></span><span class="tnum" style="font-weight: 600;">2 certificados</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12);"><span>Cuadrilla Obras <span style="color: #9b9ba4;">· 6 órdenes de trabajo</span></span><span class="tnum" style="font-weight: 600;">88 h</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12);"><span>Rubbertone SAS <span style="color: #9b9ba4;">· proveedor</span></span><span class="tnum" style="font-weight: 600;">4 entregas</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Qué pasó</h3>
+        <p class="q" style="margin-bottom: 8px;">La bitácora del tramo. Lo marcado como público va a "Obras en tu ciudad".</p>
+        <div style="display: flex; flex-direction: column;">
+          <div style="display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12); font-size: 12.5px;"><span class="tnum" style="color: #9b9ba4; flex: 0 0 48px;">10 sep</span><span>Inspección: estructura del techo terminada, arranca el cerramiento. <span style="color: #2fa36b;">pública</span></span></div>
+          <div style="display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12); font-size: 12.5px;"><span class="tnum" style="color: #9b9ba4; flex: 0 0 48px;">1 sep</span><span>Certificado 2 aprobado, $4,8 M, se paga en dos programados.</span></div>
+          <div style="display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid rgba(128,128,128,.12); font-size: 12.5px;"><span class="tnum" style="color: #9b9ba4; flex: 0 0 48px;">28 ago</span><span>Arranque demorado un mes: faltaban las chapas.</span></div>
+        </div>
+      </article>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
