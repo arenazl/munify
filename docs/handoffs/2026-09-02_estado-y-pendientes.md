@@ -177,7 +177,7 @@ la tabla y en el sidebar, pero no en el catálogo del front).
    contra QA; `/modulos` devuelve `patrimonio` activo (y cero rastros de
    `inventario`/`flota`); items (15), movimientos (42), órdenes de compra (2)
    y flota (3 vehículos) responden 200 con datos. Falta sólo la pasada VISUAL
-   del dueño en `qa-app.munify.com.ar`.
+   del dueño en el front de QA (entonces `qa-app.munify.com.ar`, hoy `qa.munify.com.ar`).
 2. **Llevarlo a la semilla** → **HECHO (2026-09-02, sesión siguiente):**
    - `seed_demo.py` y `seed_paraguay_limpio.py` siembran `patrimonio` (no más
      `inventario`); `activar_modulo_inventario` pasó a

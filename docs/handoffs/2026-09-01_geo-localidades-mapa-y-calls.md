@@ -130,7 +130,8 @@ Tres de Febrero 16, La Matanza 15. **1.311 municipios tienen una sola localidad*
   `build_calls.py` desde `docs/regiones/`;
 - **estado**: `localStorage` del navegador (a quién llamaste, meta del día,
   vista) — **es por ORIGEN**: `app.munify.com.ar/calls` y
-  `qa-app.munify.com.ar/calls` tienen registros separados y no se migran solos.
+  el front de QA (entonces `qa-app.munify.com.ar`, hoy `qa.munify.com.ar`) `/calls` tienen
+  registros separados y no se migran solos.
   Para eso están "Bajar copia" / "Restaurar";
 - **IA**: único fetch al backend, `POST /api/public/calls/ia`.
 
