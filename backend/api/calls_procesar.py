@@ -110,7 +110,10 @@ async def _groq_json(prompt: str, feature: str, max_tokens: int = MAX_SALIDA,
     """
     r = await llamar_groq(prompt, feature=feature, max_tokens=max_tokens,
                           temperature=0.1, json_object=True, timeout=90.0)
-    while (not r.ok) and reintentos > 0 and "429" in str(r.detalle or ""):
+    # Reintentar tiene sentido cuando el limite es por MINUTO --la ventana se repone sola--
+    # y no tiene ninguno cuando es el del DIA: ahi cada reintento es una espera de 35
+    # segundos con cero chance. Medido el 2026-09-13: diecinueve seguidos.
+    while (not r.ok) and reintentos > 0 and "por minuto (429)" in str(r.detalle or ""):
         await asyncio.sleep(ESPERA_429)
         reintentos -= 1
         r = await llamar_groq(prompt, feature=feature, max_tokens=max_tokens,
@@ -147,7 +150,8 @@ def _lineas(*partes) -> str:
 # --------------------------------------------------------------------------- #
 # PASO 1 - TRADUCIR. El unico que ve prosa. Sale en el contrato de la aplicacion.
 # --------------------------------------------------------------------------- #
-def _prompt_traducir(nombre: str, provincia: str, prosa: str, vocabulario: list) -> str:
+def _prompt_traducir(nombre: str, provincia: str, prosa: str, vocabulario: list,
+                     con_ids: bool = False) -> str:
     return _lineas(
         "Abajo hay un texto sobre %s, %s, Argentina, que escribio otro modelo despues de" % (nombre, provincia),
         "buscar en internet. Convertilo en datos estructurados.",
@@ -202,15 +206,234 @@ def _prompt_traducir(nombre: str, provincia: str, prosa: str, vocabulario: list)
         '- "descartados": los hechos con de_quien distinto de "municipio", cada uno con',
         '  "que" y "por_que_no_va". No los tires: los quiero ver.',
         "",
+        # EL ID DE ORIGEN. Sin esto lo unico que se puede afirmar es "no fallo ninguna
+        # tanda", que es mucho mas debil que "los 17 bloques estan representados". Con el
+        # id, el control deja de ser una impresion y pasa a ser una resta de conjuntos.
+        *(( '- "source_id": el codigo [Hn] del bloque del que sacaste el hecho, copiado',
+            '  exacto. Es OBLIGATORIO y no se inventa: si un bloque dice tres cosas, salen',
+            '  tres hechos con el MISMO source_id. Un hecho sin source_id no lo puedo usar.',
+            "") if con_ids else ()),
         "Devolve SOLO este JSON:",
-        '{"hechos":[{"que":"","cuando":"","de_quien":"municipio","como_lo_llamarias":"",'
+        ('{"hechos":[{"source_id":"H1","que":"","cuando":"","de_quien":"municipio",'
+         if con_ids else '{"hechos":[{"que":"","cuando":"","de_quien":"municipio",') +
+        '"como_lo_llamarias":"",'
         '"tag":"","tag_nuevo":false,"universo":"","peso":3,"sirve_para":"","seguro":true}],'
         '"contacto":{"telefono":"","mail":"","web":""},'
-        '"descartados":[{"que":"","por_que_no_va":""}]}',
+        + ('"descartados":[{"source_id":"H1","que":"","por_que_no_va":""}]}'
+           if con_ids else '"descartados":[{"que":"","por_que_no_va":""}]}'),
         "",
-        "----- EL TEXTO -----",
+        "----- LOS BLOQUES -----" if con_ids else "----- EL TEXTO -----",
         prosa,
     )
+
+
+# EL COSTO DE UNA TANDA, Y POR QUE ESTOS NUMEROS
+# ----------------------------------------------
+# Groq cobra la entrada mas el espacio de salida que se RESERVA, no el que se usa. Y el
+# limite son 8.000 tokens por MINUTO, contando las dos cosas.
+#
+# Con los numeros viejos --3.800 de entrada y 3.000 reservados-- una tanda costaba 6.800
+# de los 8.000 del minuto. La espera entre tandas era de 35 segundos, que reponen
+# 8.000 x 35/60 = 4.667. Faltaban 2.100 SIEMPRE, asi que la segunda tanda pegaba 429,
+# reintentaba, volvia a pegar: medido el 2026-09-13, diecinueve rechazos seguidos con la
+# cuota del dia intacta (7.923 de 8.000 disponibles). Parecia falta de cupo y era
+# aritmetica.
+#
+# Con estos numeros una tanda cuesta 4.400 y la ventana se repone en 33 segundos.
+SALIDA_HECHOS = 1800      # lo que se reserva de salida por tanda
+ENTRADA_HECHOS = 2600     # el techo de entrada, para que entrada+salida < 8.000
+BLOQUES_POR_TANDA = 5     # ademas del peso: un techo duro por si los bloques son cortos
+
+# La espera entre tandas NO es un numero elegido a dedo: es lo que tarda la ventana de
+# Groq en reponer lo que consumio la tanda anterior, mas un 15% de colchon.
+ESPERA_TANDA = int(60.0 * (ENTRADA_HECHOS + SALIDA_HECHOS) / 8000 * 1.15) + 1
+
+
+async def _hechos_de(crudo: str, nombre: str, provincia: str, vocab: list) -> dict:
+    """Traduce los hechos del crudo EN TANDAS, y comprueba que no se perdio ninguno.
+
+    POR QUE EN TANDAS, Y COMO SE MIDIO
+    -----------------------------------
+    Hasta hoy esto era UNA llamada con la prosa entera. Andaba mientras el crudo medía
+    7.000 caracteres; con el prompt que pide tambien los contactos pasa a 17.000 y la
+    respuesta ya no entra.
+
+    Medido el 2026-09-13 sobre el crudo de Sachayoj (17.712 caracteres):
+
+        bloques en el crudo         17
+        hechos que devolvia          7
+        finish_reason          length      <- Groq corto por falta de espacio
+
+    Se perdian 10 de 17 EN SILENCIO: la respuesta era un JSON valido y mas corto, asi que
+    no fallaba nada -- simplemente faltaba medio municipio. Es el peor tipo de error que
+    puede tener este circuito, porque el que lo mira no tiene como enterarse.
+
+    Y NO ALCANZA CON AGRANDAR EL TECHO. El pedido ya pesa ~5.460 tokens de entrada y Groq
+    deja pasar 8.000 por minuto contando entrada Y salida: 5.460 + 2.000 = 7.460 con el
+    techo viejo. Subirlo a 4.000 da 9.460 y devuelve 413 --que no es 429: no entra en la
+    cola, se rechaza--. El crudo crecio: hay que partir el trabajo, no estirar el envase.
+
+    EL CONTROL: POR ID, NO POR TANDA
+    ---------------------------------
+    "Ninguna tanda fallo" es mucho mas debil que "los 17 bloques estan representados".
+    Cada bloque viaja con un id estable (H1..Hn) y cada hecho tiene que devolverlo, asi
+    que la comprobacion es una resta de conjuntos:
+
+        perdidos   = los que entraron  -  los que volvieron   -> se rescatan
+        inventados = los que volvieron -  los que entraron    -> se marcan
+
+    Un bloque puede producir VARIOS hechos con el mismo id --el prompt pide partir cada
+    parrafo en cosas sueltas-- asi que la relacion es uno a muchos: 17 bloques pueden dar
+    32 hechos y estar perfecto. Lo que no puede pasar es que un bloque no aparezca.
+
+    Y UN BLOQUE QUE NO VUELVE NO SE PIERDE: entra con su texto literal, sin tag y marcado
+    `sin_clasificar`. Es el mismo criterio que los contactos: un hecho sin clasificar
+    sigue siendo un hecho, y un fallo del traductor no puede borrar algo que la busqueda
+    ya encontro.
+
+    SI EL CRUDO NO TIENE ROTULOS --los informes viejos son prosa suelta-- se manda entero
+    como antes. Un formato distinto no puede dejar al municipio sin hechos.
+    """
+    bloques = [p for p in parsear(crudo or "") if p.get("tipo") == "hecho"]
+    if not bloques:
+        r = await _groq_json(_prompt_traducir(nombre, provincia, crudo or "", vocab),
+                             "calls_traducir")
+        h = [x for x in (r.get("hechos") or []) if isinstance(x, dict)]
+        return {"hechos": h, "descartados": r.get("descartados") or [],
+                "como": {"bloques": 0, "cubiertos": 0, "hechos": len(h), "tandas": 1,
+                         "rescatados": 0, "inventados": 0, "tandas_falladas": 0,
+                         "por_donde": "prosa entera (el crudo no trae rotulos)"}}
+
+    # los ids: H1..Hn, en el orden del informe. `raw` queda a mano para el rescate.
+    for i, p in enumerate(bloques, 1):
+        p["hid"] = "H%d" % i
+    por_id = {p["hid"]: p for p in bloques}
+
+    base = _prompt_traducir(nombre, provincia, "", vocab, con_ids=True)
+    fijo = len(base) // 4
+    tope = max(1, ENTRADA_HECHOS - fijo)
+    grupos, actual, costo = [], [], 0
+    for p in bloques:
+        c = len(" ".join((p.get("raw") or "").split())) // 4 + 30
+        if actual and (costo + c > tope or len(actual) >= BLOQUES_POR_TANDA):
+            grupos.append(actual)
+            actual, costo = [], 0
+        actual.append(p)
+        costo += c
+    if actual:
+        grupos.append(actual)
+
+    # DOS MOTIVOS DISTINTOS PARA RESCATAR UN BLOQUE, y hay que poder separarlos.
+    #
+    # Que el modelo IGNORE un bloque es un problema de calidad del prompt. Que no conteste
+    # --429, corte de red-- es un problema de cupo. Los dos terminan en el mismo rescate,
+    # pero uno se arregla escribiendo mejor y el otro esperando o pagando; contarlos juntos
+    # esconde cual de los dos esta pasando.
+    #
+    # Medido el 2026-09-13: corriendo cuatro veces seguidas el mismo informe se agoto el
+    # cupo de Groq, y las corridas 2, 3 y 4 dieron "0 de 17 cubiertos". Leido sin separar,
+    # eso parecia un prompt catastrofico; era el cupo. El circuito devolvio los 17 hechos
+    # igual, que es justamente lo que el rescate tiene que garantizar.
+    salida, descartados, fallados = [], [], 0
+    sin_respuesta = set()
+
+    async def _una_tanda(g, partidas=0):
+        """Manda un grupo de bloques. Si no entra, lo PARTE AL MEDIO y reintenta.
+
+        ELEGIR UN NUMERO FIJO DE BLOQUES POR TANDA ES ADIVINAR, y se adivina mal: cuanto
+        entra depende del largo de cada bloque, de cuantos hechos sueltos saque el modelo
+        de cada uno, y del vocabulario, que crece solo a medida que se cura.
+
+        Medido el 2026-09-13: con 8 bloques la respuesta se pasaba del espacio reservado y
+        Groq devolvia 400 "Failed to validate JSON" -- no un truncado que se pueda
+        rescatar, un rechazo. Bajar el numero a mano arreglaba ESE informe y rompia el
+        siguiente.
+
+        Partiendo al medio, el sistema encuentra solo el tamano que entra y se adapta a un
+        informe del doble sin tocarle una linea. El corte cae siempre entre dos bloques.
+        """
+        sep = "\n\n"
+        trozo = sep.join("[" + p["hid"] + "] " + " ".join((p.get("raw") or "").split())
+                         for p in g)
+        try:
+            return await _groq_json(
+                _prompt_traducir(nombre, provincia, trozo, vocab, con_ids=True),
+                "calls_traducir", max_tokens=SALIDA_HECHOS)
+        except HTTPException:
+            if len(g) > 1 and partidas < 3:
+                mitad = len(g) // 2
+                out = {"hechos": [], "descartados": []}
+                for parte in (g[:mitad], g[mitad:]):
+                    await asyncio.sleep(ESPERA_TANDA)
+                    r = await _una_tanda(parte, partidas + 1)
+                    if r is None:
+                        continue
+                    out["hechos"] += [x for x in (r.get("hechos") or []) if isinstance(x, dict)]
+                    out["descartados"] += [x for x in (r.get("descartados") or [])
+                                           if isinstance(x, dict)]
+                return out
+            return None
+
+    for k, g in enumerate(grupos):
+        if k:
+            # los pasos comparten la ventana de 8.000 por minuto: sin esta espera, la
+            # tanda siguiente se come lo que dejo la anterior y devuelve 413 o 429
+            await asyncio.sleep(ESPERA_TANDA)
+        r = await _una_tanda(g)
+        if r is None:
+            # ni partiendola entro: sus bloques quedan sin cubrir y el rescate los mete
+            # igual, con el texto literal. No se pierde ninguno.
+            fallados += 1
+            sin_respuesta.update(p["hid"] for p in g)
+            continue
+        salida += [h for h in (r.get("hechos") or []) if isinstance(h, dict)]
+        descartados += [d for d in (r.get("descartados") or []) if isinstance(d, dict)]
+
+    # --- EL VALIDADOR ------------------------------------------------------- #
+    def _id(x):
+        return str((x or {}).get("source_id") or "").strip().upper()
+
+    vueltos = {_id(x) for x in salida} | {_id(x) for x in descartados}
+    inventados = sorted(i for i in vueltos if i and i not in por_id)
+    for x in salida + descartados:
+        if _id(x) and _id(x) not in por_id:
+            x["source_id_invalido"] = True
+    perdidos = [h for h in por_id if h not in vueltos]
+    # los que el modelo vio y salteo, contra los que nunca llegaron a sus ojos
+    ignorados = [h for h in perdidos if h not in sin_respuesta]
+
+    # los bloques que no volvieron entran igual, con su texto literal
+    for hid in sorted(perdidos, key=lambda s: int(s[1:])):
+        p = por_id[hid]
+        texto = " ".join((p.get("raw") or "").split())
+        # se le saca el rotulo de adelante: el hecho es lo que dice, no "HECHO:"
+        texto = re.sub(r"^(?:HECHO|DATO)\s*:\s*", "", texto, flags=re.I)
+        salida.append({
+            "source_id": hid, "que": texto[:1200], "cuando": "",
+            "de_quien": "municipio", "como_lo_llamarias": "", "tag": "",
+            "tag_nuevo": False, "universo": "", "peso": 2,
+            "sirve_para": "", "seguro": True, "sin_clasificar": True,
+            "por_que": ("el traductor no respondio por este bloque"
+                        if hid in sin_respuesta else "el traductor salteo este bloque"),
+        })
+
+    con_tag = sum(1 for x in salida if (x.get("tag") or "").strip())
+    return {
+        "hechos": salida, "descartados": descartados,
+        "como": {
+            "bloques": len(bloques),
+            "cubiertos": len(bloques) - len(perdidos),
+            "hechos": len(salida),
+            "tandas": len(grupos),
+            "tandas_falladas": fallados,
+            "rescatados": len(perdidos),
+            "ignorados_por_el_modelo": len(ignorados),
+            "sin_respuesta": len(perdidos) - len(ignorados),
+            "inventados": len(inventados),
+            "sin_tag": len(salida) - con_tag,
+            "por_donde": "tandas con id",
+        },
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -705,10 +928,17 @@ async def procesar(
 
     # --- paso 1: traducir la prosa a nuestro contrato ---
     vocab = await _vocabulario(db)
-    traducido = await _groq_json(
-        _prompt_traducir(nombre, prov, relato.texto or "", vocab), "calls_traducir")
-    nuevos = [h for h in (traducido.get("hechos") or [])
-              if (h.get("de_quien") or "municipio") == "municipio"]
+    traducido = await _hechos_de(relato.texto or "", nombre, prov, vocab)
+    # NO SE FILTRA ACA (dueno, 2026-09-13). Antes esta linea se quedaba solo con los
+    # `de_quien == "municipio"`, y habia DOBLE filtrado: el prompt ya manda los ajenos a
+    # `descartados`, asi que un hecho que el modelo dejo en `hechos` marcado "provincia"
+    # no iba ni a una lista ni a la otra -- desaparecia, y nadie podia verlo.
+    #
+    # Un programa que baja de Provincia o un problema de la comuna vecina puede no ir a la
+    # ficha principal, pero es contexto para la llamada y se decide DESPUES, mirandolo.
+    # `de_quien` viaja intacto y la pantalla separa; nada se pierde en esta capa.
+    nuevos = list(traducido.get("hechos") or [])
+    ajenos = sum(1 for h in nuevos if (h.get("de_quien") or "municipio") != "municipio")
 
     # --- paso 2: comparar dos listas del MISMO formato ---
     # Lo viejo se lleva al mismo contrato antes de comparar: es justamente lo que evita
@@ -757,6 +987,7 @@ async def procesar(
         "mails": contactos["mails"],
         "canales": contactos["canales"],
         "ausencias": contactos["ausencias"],
+        "hechos_como": dict(traducido.get("como") or {}, de_otros=ajenos),
         "contactos_como": {k: contactos[k] for k in
                            ("piezas", "clasificados", "rescatados", "tandas_falladas",
                             "por_donde")},
