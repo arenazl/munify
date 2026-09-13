@@ -85,7 +85,7 @@ export default function MunicipioSwitcher() {
       color: m.color_primario || theme.primary,
     });
     setOpen(false);
-    navigate('/gestion')  /* el tablero es el índice de /gestion; /gestion/dashboard no existe y caía en la ruta comodín */;
+    window.location.assign('/gestion')  /* recarga completa: el tablero modular y los hooks de contexto leen el municipio al montar; sin recarga se quedan con el contexto anterior */;
   };
 
   const current = currentMuniId ? municipios.find((m) => m.id === currentMuniId) : null;

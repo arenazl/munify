@@ -34,7 +34,7 @@ export default function ConsolaGlobal() {
     const m = catalogo[municipioId];
     if (!m) return;
     await saveMunicipio({ id: String(m.id), codigo: m.codigo, nombre: m.nombre, color: m.color_primario || theme.primary });
-    navigate('/gestion')  /* el tablero es el índice de /gestion; /gestion/dashboard no existe y caía en la ruta comodín */;
+    window.location.assign('/gestion')  /* recarga completa: el tablero modular y los hooks de contexto leen el municipio al montar; sin recarga se quedan con el contexto anterior */;
   };
   const [data, setData] = useState<ConsolaResumen | null>(null);
   const [loading, setLoading] = useState(true);
