@@ -11,8 +11,9 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Briefcase, KeyRound, Pencil, UserPlus, Wallet } from 'lucide-react';
+import { Pencil, UserPlus, Wallet } from 'lucide-react';
 import SemanticAbmPage from '../components/abmv2/SemanticAbmPage';
+import { EntityCell, DotCell } from '../components/abmv2/DataTable';
 import { SideModal, SideModalField } from '../components/abmv2/SideModal';
 import { TildesAditivas } from '../components/abmv2/TildesAditivas';
 import { SelectorAdaptativo } from '../components/abmv2/SelectorAdaptativo';
@@ -76,6 +77,10 @@ const FORM_VACIO: Form = {
   nombre: '', apellido: '', dni: '', cuit: '', telefono: '', email: '', direccion: '', alias_pago: '', notas: '',
   tipo_ids: [], modalidad: '',
 };
+
+/** Iniciales para el avatar de `EntityCell`: primera de nombre y de apellido. */
+const iniciales = (nombre: string): string =>
+  nombre.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
 
 export default function Personas() {
   const { theme } = useTheme();
@@ -173,23 +178,43 @@ export default function Personas() {
     verdict: (p): Veredicto | null => (p.tipo_legacy === 'otro' ? 'advertencia' : null),
   }), []);
 
+  /* Columnas sobre los KINDS del kit, no dibujadas a mano (LEY 0 del README:
+     acá no se toman decisiones artísticas). Antes estas cuatro celdas eran
+     `<div>` con `fontWeight` y `fontSize` propios, y de ahí salían las cuatro
+     tipografías distintas que el dueño marcó el 2026-09-14. La anatomía
+     —avatar + nombre + subtítulo con punto de color— la pone `EntityCell`,
+     igual que en Trámites y Tesorería. */
   const columns: ColumnSpec<PersonaResumen>[] = useMemo(() => [
-    { id: 'nombre', header: 'Persona', width: '2fr', cell: (p) => (
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 600 }}>{p.nombre_completo}</div>
-        <div style={{ fontSize: 'var(--pl-fs-caption)', color: 'var(--pl-text-muted)' }}>
-          {p.roles.map((r) => r.nombre).join(' · ') || 'sin tipo'}
-        </div>
-      </div>
-    ) },
-    { id: 'doc', header: 'Documento', width: '1fr', cell: (p) => p.dni || p.cuit || <span style={{ color: 'var(--pl-text-muted)' }}>sin documento</span> },
-    { id: 'contacto', header: 'Contacto', width: '1.4fr', cell: (p) => [p.telefono, p.email].filter(Boolean).join(' · ') || '—' },
-    { id: 'perfiles', header: 'Perfiles', width: '1fr', cell: (p) => (
-      <span style={{ display: 'inline-flex', gap: 10, color: 'var(--pl-text-2)', fontSize: 'var(--pl-fs-caption)' }}>
-        {p.tiene_ficha_laboral && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Briefcase size={13} /> laboral</span>}
-        {p.tiene_login && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><KeyRound size={13} /> acceso</span>}
-      </span>
-    ) },
+    {
+      id: 'nombre', header: 'Persona', width: '2fr', kind: 'entity',
+      sortValue: (p) => p.nombre_completo,
+      cell: (p) => {
+        const principal = p.roles.find((r) => r.principal) ?? p.roles[0];
+        return (
+          <EntityCell
+            initials={iniciales(p.nombre_completo)}
+            title={p.nombre_completo}
+            subtitle={p.roles.map((r) => r.nombre).join(' · ') || 'sin tipo'}
+            dotColor={principal ? (TONO_TIPO[principal.padre_codigo ?? principal.codigo] ?? TONO_TIPO.otro) : undefined}
+          />
+        );
+      },
+    },
+    {
+      id: 'doc', header: 'Documento', width: '1fr', kind: 'text',
+      cell: (p) => p.dni || p.cuit || '—',
+    },
+    {
+      id: 'contacto', header: 'Contacto', width: '1.4fr', kind: 'text',
+      cell: (p) => [p.telefono, p.email].filter(Boolean).join(' · ') || '—',
+    },
+    {
+      id: 'perfiles', header: 'Perfiles', width: '1fr', kind: 'dot',
+      cell: (p) => {
+        const que = [p.tiene_ficha_laboral && 'laboral', p.tiene_login && 'acceso'].filter(Boolean).join(' · ');
+        return <DotCell label={que || '—'} dotColor={que ? 'var(--pl-green)' : undefined} />;
+      },
+    },
   ], []);
 
   /* ---------- ficha / alta / edición ---------- */

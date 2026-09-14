@@ -122,9 +122,13 @@ export function ListToolbar({
   searchSuggestions,
   trail,
 }: ListToolbarProps) {
-  /* [v3.3] Con DOS vistas el segmented se lee como SOLAPAS: icono + label.
-     Con tres o más, sólo icono (el ancho de la fila manda). */
-  const vistasConLabel = views.length === 2;
+  /* El segmented de vistas es SIEMPRE sólo icono (dueño, 2026-09-14).
+     Antes, con dos vistas, se dibujaba icono + label — se leía como solapas y
+     quedaba "Tabla | Tarjetas" escrito al lado de los iconos, que no es el
+     estándar: en Reclamos, con tres vistas, van los iconos pelados y así tiene
+     que verse en todas. El nombre de cada vista sigue estando en `title` y
+     `aria-label`, así que no se pierde ni el tooltip ni la accesibilidad. */
+  const vistasConLabel = false;
 
   /* [v3.3] SUGERENCIAS del buscador: panel bajo el input mientras tiene foco
      y hay texto; flechas mueven, Enter elige, Esc cierra. `onMouseDown` con

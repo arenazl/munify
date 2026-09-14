@@ -26,8 +26,13 @@ export interface SelectorAdaptativoProps {
   value: string;
   onChange: (value: string) => void;
   options: OpcionAdaptativa[];
-  /** Tope de BOTONES para dibujar píldoras (default 4, "Todos" incluido —
-   *  regla del dueño 2026-09-03: hasta 4 pills, más va a combo). */
+  /** Tope de BOTONES para dibujar píldoras, "Todos" incluido.
+   *
+   *  Era 4 (regla del dueño 2026-09-03) y bajó a 3 el 2026-09-14, mirando
+   *  Reclamos: "Dependencia" con Todas + tres secretarías ocupaba la fila
+   *  entera y empujaba los otros filtros a un segundo renglón. Con nombres
+   *  largos —"Secretaría de Servicios Públicos y Ambiente"— cuatro píldoras no
+   *  entran nunca. A partir de la cuarta opción, combo. */
   maxPildoras?: number;
   /** [v3.3] Apagado: se dibuja SIEMPRE como combo deshabilitado, en su lugar
    *  (cascadas país → provincia → municipio). Ver SelectSpec.disabled. */
@@ -40,7 +45,7 @@ export function SelectorAdaptativo({
   value,
   onChange,
   options,
-  maxPildoras = 4,
+  maxPildoras = 3,
   disabled = false,
   disabledReason,
 }: SelectorAdaptativoProps) {

@@ -42,6 +42,89 @@ pantalla. Dos implementaciones de lo mismo es un bug de arquitectura.
 El **ModuleHero es el `SemanticHero` existente** (`components/ui/SemanticHero.tsx`): el orquestador
 lo importa, no lo duplica. Las frases se arman con `seg()` de `lib/semanticHero`.
 
+## LEY 0 — Acá no se toman decisiones artísticas
+
+> **El kit existe para que NINGÚN agente decida cómo se ve un ABM.** Si dos
+> pantallas del sistema se ven distinto, el kit falló. Esto es lo primero que
+> se lee antes de escribir una pantalla (dueño, 2026-09-14).
+
+La página **declara QUÉ dato va en cada lugar**. El kit **decide CÓMO se ve**.
+No hay una tercera categoría, y no existe el "en esta pantalla queda mejor así".
+
+| Lo decide EL KIT, siempre | Lo declara la página |
+|---|---|
+| Tipografía de cada renglón (título, subtítulo, dato, nota) | qué texto va en cada rol |
+| Colores y tonos, incluido el punto de la segunda línea | el veredicto (`bueno` / `advertencia` / `malo`) |
+| Si un filtro se dibuja como píldoras o como combo | las opciones del filtro |
+| Si el segmented de vistas muestra icono o icono+texto | qué vistas ofrece |
+| Alineación, altura de fila, separadores, chips | — |
+| El formato de la cabecera de grupo y su subtotal | los grupos y sus totales |
+
+### Las tres que más se rompieron (y ya están cerradas en el código)
+
+1. **El segmented de vistas es SIEMPRE sólo icono.** No se escribe "Tabla" ni
+   "Tarjetas" al lado del icono, tenga la pantalla dos vistas o cinco. El
+   nombre vive en `title`/`aria-label`. (Antes: con exactamente dos vistas se
+   dibujaba el label, y quedaban dos pantallas del mismo sistema distintas.)
+2. **Píldoras hasta 3 opciones; de la cuarta en adelante, combo.** Lo decide
+   `SelectorAdaptativo`, no la pantalla. Cuatro píldoras con nombres reales
+   —"Secretaría de Servicios Públicos y Ambiente"— no entran en la fila nunca.
+3. **La celda principal se declara con `kind`, no se dibuja.** `kind='entity'`
+   ya es *tile + título + subtítulo con punto de color*: exactamente lo que
+   cada pantalla venía redibujando a mano con sus propios `fontSize`. De ahí
+   salían las tablas con cuatro tipografías distintas.
+
+### `cell` con JSX propio: excepción, no camino
+
+`ColumnSpec.cell` acepta cualquier JSX porque hay casos legítimos (una tira de
+días, una barra de avance). **No es el modo normal de escribir una columna.**
+Si lo que vas a dibujar es "un título con algo abajo", "un punto de color con
+texto", "un número con su nota" o "plata", ya existe el `kind` y usarlo no es
+opcional. Una pantalla con cero `kind` y cinco `cell` a mano está mal escrita,
+por más que compile y se vea bonita: se va a ver distinta a las otras veinte.
+
+### La escala: qué tamaño para qué. No se elige, se aplica
+
+Dos familias y nada más: **`--pl-font-display`** (Sora) para los titulares de
+pantalla y los números grandes; **`--pl-font-sans`** (Inter) para TODO el resto.
+Y estos tamaños, siempre por token — nunca un `fontSize: '13px'` a mano:
+
+| Dónde | Token | Cómo se ve |
+|---|---|---|
+| Rótulo sobre el título, y encabezados de tabla | `--pl-fs-eyebrow` (10.5) | MAYÚSCULAS, tracking .09em, peso 700 |
+| Nota al pie de un dato, "2 movimientos" | `--pl-fs-micro` (11) | color `--pl-text-muted` |
+| **Subtítulo de la celda principal** (el del punto de color) | `--pl-fs-caption` (11.5) | color del dato, con su punto |
+| Dato secundario de una fila (forma de pago, fecha) | `--pl-fs-body-sm` (12.5) | normal |
+| **Título de la celda principal**, y el cuerpo de la tabla | `--pl-fs-body` (13.5) | peso 600 en el título |
+| Título de tarjeta | `--pl-fs-card-title` (14) | |
+| Frase semántica del hero | `--pl-fs-hero-line` (16.5) | |
+| Titular de pantalla | `--pl-fs-hero` (25) | display |
+| Número de KPI | `--pl-fs-kpi` (26) | display |
+
+**Una celda tiene DOS tamaños: título y subtítulo. Nunca cuatro.** Si te hacen
+falta tres niveles en una celda, el dato de más va a otra columna.
+
+### Lo único opcional es agrupar
+
+`groups` es opcional y depende del negocio: los movimientos de Tesorería se
+agrupan por día porque el subtotal diario significa algo, y un listado de
+personas no se agrupa por nada. **Todo lo demás de esta sección no es
+opcional**: tipografía, colores, forma de los filtros, iconos del segmented y
+anatomía de la fila se ven igual en las veinte pantallas o el kit no sirve.
+
+### El patrón canónico de la fila (Tesorería y Trámites son la referencia)
+
+```
+[tile icono] Título en negrita          [avatar] Nombre          [chip estado]      $ MONTO
+             • subtítulo con punto               • subtítulo con punto             (derecha,
+                                                                                    tabular)
+```
+
+Dos tamaños de letra por celda, nunca cuatro. El punto de color de la segunda
+línea sale del dato (categoría, dependencia, tipo), no de una decisión.
+
+---
+
 ## Reglas que la página consumidora NO puede romper
 
 1. Polimórfico: nada de hex inline. `accentColor` y colores de chips = tokens (`var(--pl-red)`), y

@@ -541,8 +541,20 @@ export interface ColumnSpec<Row = unknown> {
    *  [v2.5] Se suma 'metric': número + nota debajo (MetricCellData) — la
    *  columna "EN USO" del canvas de Configuración. Ver MetricCellData. */
   kind?: 'text' | 'entity' | 'chip' | 'date' | 'money' | 'actions' | 'dot' | 'metric';
-  /** Render custom de la celda. Sin `cell`, el DataTable resuelve un render
-   *  por defecto según `kind` (los agentes de Tabla lo documentan). */
+  /** Render custom de la celda — **EXCEPCIÓN, no el camino normal** (LEY 0 del
+   *  README: acá no se toman decisiones artísticas).
+   *
+   *  Sin `cell`, el DataTable resuelve el render por `kind`, y eso es lo que
+   *  hay que usar: 'entity' ya es *tile + título + subtítulo con punto*,
+   *  'dot' es *punto de color + texto*, 'metric' es *número + nota*, 'money'
+   *  es plata a la derecha. Escribir eso a mano con `fontSize` propios es
+   *  cómo se llega a una tabla con cuatro tipografías distintas y a que dos
+   *  pantallas del mismo sistema no se parezcan (auditoría 2026-09-14:
+   *  Personas 4 celdas a mano y 0 kinds; Obras, 5 y 0).
+   *
+   *  Usalo sólo para lo que NINGÚN kind cubre —una tira de días, una barra de
+   *  avance— y dejá dicho en un comentario por qué. Si lo que vas a dibujar es
+   *  "un título con algo abajo", ya existe y se llama `kind: 'entity'`. */
   cell?: (row: Row) => ReactNode;
   /**
    * [v3.3] Valor por el que ORDENA la columna al tocar su cabecera. Sin él,
