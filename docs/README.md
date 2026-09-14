@@ -12,7 +12,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Carpeta | Qué tiene |
 |---|---|
 | [`plataforma/`](plataforma/) | Arquitectura, deploy, testing, refactors de referencia, schema/OpenAPI |
-| [`produccion/`](produccion/) | **Incidentes de producción y requerimientos operativos**: qué falló, la causa verificada, cómo se resolvió y qué mirar si vuelve a pasar. Lo último: `02` la tarjeta Visa de San Pedro Norte, con los pagos del resumen cargados como gastos (leído en prod el 2026-09-11), y `03` la solución: el pago programado con destino tarjeta más el script de curación, ya probados en QA y pendientes de que Infra los aplique |
+| [`produccion/`](produccion/) | **Incidentes de producción y requerimientos operativos**: qué falló, la causa verificada, cómo se resolvió y qué mirar si vuelve a pasar. **`04-handoff-pase-tarjeta-spn.md` es lo primero que hay que leer**: el pase de la tarjeta de San Pedro Norte quedó listo para correr con UN comando, verificado en seco contra producción y ensayado completo en el sandbox de Merlo. `02` es qué pasó (los pagos del resumen cargados como gastos) y `03` qué se construyó (el pago programado con destino tarjeta) |
 | [`salesbot/`](salesbot/) | Specs de la integración SalesBot ↔ Munify (API, turnos, verificación) |
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |

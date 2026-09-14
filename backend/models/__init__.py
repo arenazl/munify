@@ -48,8 +48,10 @@ from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .salesbot_config import SalesbotConfig
 from .municipio_ia_config import MunicipioIaConfig
 from .ia_uso import IaUso, IaUsoDiario
-from .calls import CallsUsuario, CallsRegistro, CallsEvento, CallsMunicipio
-from .calls_curacion import (CallsFuente, CallsRelato, CallsPagina, CallsHecho,
+from .calls import (CallsUsuario, CallsRegistro, CallsEvento, CallsMunicipio,
+                    CallsLlamada)
+from .calls_curacion import (CallsCanal, CallsMail, CallsFuente, CallsRelato,
+                            CallsPagina, CallsHecho,
                              CallsPonderacion, CallsAporte, CallsCapacidad,
                              CallsTelefono, CallsTagPropuesto)
 from .noticia import Noticia
@@ -306,4 +308,7 @@ __all__ += [
     "CallsMunicipio",
     "CallsRegistro",
     "CallsEvento",
+    "CallsLlamada",
+    "CallsCanal",
+    "CallsMail",
 ]

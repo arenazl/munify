@@ -26,7 +26,9 @@ from core.config import settings
 from core.database import get_db
 from core.rate_limit import limiter
 from core.security import create_access_token, verify_password
-from models.calls import CallsEvento, CallsMunicipio, CallsRegistro, CallsUsuario
+from models.calls import (CallsEvento, CallsLlamada, CallsMunicipio, CallsRegistro,
+                          CallsUsuario)
+from models.calls_curacion import CallsCanal, CallsMail, CallsTelefono
 
 router = APIRouter()
 
@@ -50,6 +52,29 @@ class LoginOut(BaseModel):
     usuario: str
 
 
+class LlamadaIn(BaseModel):
+    """UN INTENTO de llamada. Va adentro del POST de registro y no en un endpoint
+    aparte, porque marcar "contactado" YA ES una llamada: pedirle al vendedor dos
+    gestos para el mismo hecho es garantizar que haga uno solo.
+
+    Todo opcional salvo el resultado. Lo que no se sepa queda en NULL, que es un dato
+    --"no anotó quién atendió"-- y no un hueco que haya que rellenar con algo.
+    """
+
+    # no_atendio | ocupado | numero_incorrecto | atiende_tercero | atiende_municipio |
+    # atiende_area | hablo_con_decisor | volver_a_llamar
+    resultado: str = Field(max_length=30)
+    telefono_id: Optional[int] = None
+    numero_marcado: Optional[str] = Field(default=None, max_length=40)
+    atendio: Optional[bool] = None
+    quien_atendio: Optional[str] = Field(default=None, max_length=120)
+    area_atendio: Optional[str] = Field(default=None, max_length=120)
+    apertura_id: Optional[str] = Field(default=None, max_length=40)
+    apertura_texto: Optional[str] = None
+    apertura_funciono: Optional[bool] = None
+    nota: Optional[str] = None
+
+
 class RegistroIn(BaseModel):
     """Lo que manda la pagina al guardar una ficha. Todo opcional: la pagina
     guarda lo que cambio, no la ficha entera."""
@@ -63,6 +88,9 @@ class RegistroIn(BaseModel):
     telefonos_corregidos: Optional[Dict[str, str]] = None
     # Eventos que la pagina quiere dejar asentados (llamada, nota, estado...).
     eventos: list[dict] = Field(default_factory=list, max_length=10)
+    # EL INTENTO DE LLAMADA, si lo hubo. Es lo unico de todo este POST que se puede
+    # MEDIR despues: el resto es texto para leer.
+    llamada: Optional[LlamadaIn] = None
 
 
 async def usuario_calls(
@@ -197,6 +225,40 @@ async def guardar_registro(
             texto=texto[:2000],
             autor=u.nombre,
         ))
+
+    # --- EL INTENTO DE LLAMADA -------------------------------------------- #
+    # Se asienta como fila propia porque `calls_registro` guarda el estado ACTUAL (una
+    # fila por municipio: la llamada de hoy pisa la de ayer) y `calls_evento` guarda
+    # texto libre, que se lee pero no se cuenta. Aca el resultado es un valor, y de eso
+    # salen las unicas metricas que tenemos sin IA: que origen de telefono atiende y que
+    # apertura abre conversaciones.
+    if data.llamada is not None:
+        ll = data.llamada
+        db.add(CallsLlamada(
+            muni_key=muni_key,
+            telefono_id=ll.telefono_id,
+            # SNAPSHOT: si mañana se corrige el numero o se regenera el libreto, el
+            # historico tiene que seguir diciendo que se marco y que se dijo ESE DIA.
+            numero_marcado_snapshot=(ll.numero_marcado or "")[:40] or None,
+            resultado=ll.resultado[:30],
+            atendio=ll.atendio,
+            quien_atendio=(ll.quien_atendio or "")[:120] or None,
+            area_atendio=(ll.area_atendio or "")[:120] or None,
+            apertura_id=(ll.apertura_id or "")[:40] or None,
+            apertura_texto_snapshot=ll.apertura_texto,
+            apertura_funciono=ll.apertura_funciono,
+            nota=ll.nota,
+            usuario=u.nombre,
+        ))
+        # el numero tambien se actualiza en el catalogo: un telefono que atendio vale
+        # mas que cualquier fuente web. Valida EL CONTACTO, no su atribucion -- que
+        # atienda no prueba que siga siendo del area que decia una fuente vieja.
+        if ll.telefono_id and ll.atendio is not None:
+            tel = (await db.execute(
+                select(CallsTelefono).where(CallsTelefono.id == ll.telefono_id)
+            )).scalar_one_or_none()
+            if tel is not None:
+                tel.atiende = ll.atendio
 
     await db.commit()
     await db.refresh(fila)
@@ -399,7 +461,39 @@ async def ficha_una(
         d = d or {"estado": "", "notas": "", "quien": "", "proximo": "", "telFix": {}}
         d["hist"] = [{"t": e.creado.isoformat(), "tipo": e.tipo, "txt": e.texto,
                       "autor": e.autor} for e in eventos]
-    return {"ficha": _ficha_completa(m, d), "db": d or {}}
+
+    # LOS CANALES Y LOS MAILS, que son N por municipio y viven en tabla propia.
+    #
+    # Van aca y NO en `/fichas`: en el listado serian N filas por cada una de las 2.244 y
+    # se repetiria el error que ya se pago una vez --mandar el render de todas para
+    # dibujar la que se esta mirando, 20,9 MB de 23,6--. Abrir una ficha es el momento en
+    # que estos datos se usan.
+    #
+    # Se ordenan por dueno y no por fecha: primero los del municipio, que son por donde se
+    # entra, y al final los de terceros, que sirven para entender como se comunica hoy el
+    # vecino. `desconocido` queda en el medio: es un dato que hay que mirar, no uno que
+    # haya que esconder.
+    orden = {"municipio": 0, "area": 1, "funcionario": 2, "desconocido": 3, "tercero": 4}
+    canales = (await db.execute(
+        select(CallsCanal).where(CallsCanal.muni_key == muni_key)
+    )).scalars().all()
+    mails = (await db.execute(
+        select(CallsMail).where(CallsMail.muni_key == muni_key)
+    )).scalars().all()
+    ficha = _ficha_completa(m, d)
+    ficha["canales"] = sorted([{
+        "tipo": c.tipo or "otro", "dato": c.dato or "", "de": c.de or "",
+        "de_quien": c.de_quien or "desconocido", "area": c.area or "",
+        "gestion": c.gestion or "", "vigencia": c.vigencia or "",
+        "que_se_sabe": c.que_se_sabe or "", "duda": c.duda or "",
+    } for c in canales], key=lambda x: (orden.get(x["de_quien"], 3), x["tipo"]))
+    ficha["mails"] = sorted([{
+        "direccion": x.direccion or "", "de": x.de or "",
+        "de_quien": x.de_quien or "desconocido", "area": x.area or "",
+        "vigencia": x.vigencia or "", "que_se_sabe": x.que_se_sabe or "",
+        "duda": x.duda or "",
+    } for x in mails], key=lambda x: orden.get(x["de_quien"], 3))
+    return {"ficha": ficha, "db": d or {}}
 
 
 @router.get("/ranking")

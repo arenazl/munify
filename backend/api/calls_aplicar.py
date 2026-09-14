@@ -49,7 +49,8 @@ from api.calls import CallsUsuario, usuario_calls
 from core.database import get_db
 from core.rate_limit import limiter
 from models.calls import CallsMunicipio
-from models.calls_curacion import CallsHecho, CallsTelefono
+from models.calls_curacion import (CallsCanal, CallsHecho, CallsMail,
+                                   CallsTelefono)
 
 router = APIRouter()
 
@@ -65,16 +66,65 @@ class HechoQueEntra(BaseModel):
 
 
 class Contacto(BaseModel):
+    """EL CONTRATO VIEJO: un telefono, un mail, una web.
+
+    Se conserva para que nada de lo que ya funciona se rompa, pero era el cuello de todo
+    el circuito. Medido sobre Sachayoj el 2026-09-13: la investigacion encontro DOS
+    telefonos del municipio --uno con su fuente y el otro marcado como antiguo--, tres
+    paginas de Facebook de gestiones distintas, y el WhatsApp de un diario por donde los
+    vecinos mandan reclamos. De todo eso, a la ficha llegaba UN telefono.
+
+    Mientras esto fuera todo lo que se podia guardar, mejorar la busqueda no cambiaba nada
+    en la pantalla: se llenaba un balde agujereado.
+    """
+
     telefono: str = Field(default="", max_length=60)
     mail: str = Field(default="", max_length=120)
     web: str = Field(default="", max_length=300)
+
+
+class TelefonoQueEntra(BaseModel):
+    numero: str = Field(max_length=60)
+    de: str = Field(default="", max_length=160)
+    de_quien: str = Field(default="", max_length=20)   # municipio|area|funcionario|tercero
+    area: str = Field(default="", max_length=120)
+    vigencia: str = Field(default="", max_length=24)
+    que_se_sabe: str = Field(default="")
+    duda: str = Field(default="")
+
+
+class MailQueEntra(BaseModel):
+    direccion: str = Field(max_length=200)
+    de: str = Field(default="", max_length=160)
+    de_quien: str = Field(default="", max_length=20)
+    area: str = Field(default="", max_length=120)
+    vigencia: str = Field(default="", max_length=24)
+    que_se_sabe: str = Field(default="")
+    duda: str = Field(default="")
+
+
+class CanalQueEntra(BaseModel):
+    tipo: str = Field(max_length=20)
+    dato: str = Field(max_length=400)
+    de: str = Field(default="", max_length=160)
+    de_quien: str = Field(default="", max_length=20)
+    area: str = Field(default="", max_length=120)
+    gestion: str = Field(default="", max_length=120)
+    vigencia: str = Field(default="", max_length=24)
+    que_se_sabe: str = Field(default="")
+    duda: str = Field(default="")
 
 
 class Pedido(BaseModel):
     muni_key: str = Field(min_length=2, max_length=80)
     relato_id: Optional[int] = None
     hechos: list[HechoQueEntra] = Field(default_factory=list, max_length=60)
+    # el contrato viejo sigue entrando: un cliente que todavia manda `contacto` no se rompe
     contacto: Contacto = Field(default_factory=Contacto)
+    # y el nuevo, que es el que deja de tirar: TODOS los que se encontraron, con su dueño
+    telefonos: list[TelefonoQueEntra] = Field(default_factory=list, max_length=40)
+    mails: list[MailQueEntra] = Field(default_factory=list, max_length=40)
+    canales: list[CanalQueEntra] = Field(default_factory=list, max_length=60)
 
 
 def _solo_digitos(s: str) -> str:
@@ -178,11 +228,132 @@ async def aplicar(
             m.mail = mail[:120]
         hecho["mail"] = mail
 
-    if hecho["hechos"] or hecho["telefonos"] or hecho["web"]:
+    # --- TODOS LOS CONTACTOS, NO UNO ---------------------------------------- #
+    # Lo de arriba es el contrato viejo: un telefono, un mail, una web. Lo de abajo es el
+    # que deja de tirar. Se escriben en tablas propias --N por municipio-- con el dueño
+    # que el analisis pudo determinar, y nada se descarta por ser de un tercero: el
+    # WhatsApp del diario local por donde entran los reclamos dice como se comunica hoy el
+    # vecino, y eso es material de venta, no ruido.
+    hecho.setdefault("canales", [])
+    hecho.setdefault("mails_nuevos", [])
+
+    # los telefonos que ya estan, para no cargar dos veces el mismo escrito distinto
+    ya_tel = {_solo_digitos(t) for t in _lista(m.telefonos)}
+    ya_tel |= {_solo_digitos(x.numero) for x in (await db.execute(
+        select(CallsTelefono).where(CallsTelefono.muni_key == data.muni_key)
+    )).scalars().all()}
+
+    for t in data.telefonos:
+        num = (t.numero or "").strip()
+        d = _solo_digitos(num)
+        if not d or re.search(r"no encontr", num, re.I):
+            continue
+        if d in ya_tel:
+            hecho["ya_estaba"].append(num)
+            continue
+        ya_tel.add(d)
+        db.add(CallsTelefono(
+            muni_key=data.muni_key, codigo_indec=m.codigo_indec, numero=num[:40],
+            orden=0, de_donde="analisis", creado=ahora))
+        # solo los del municipio suben a la ficha; los de terceros quedan en el catalogo
+        # con su dueño anotado, disponibles pero sin ensuciar el telefono que se marca
+        if (t.de_quien or "") in ("municipio", "area", "funcionario", ""):
+            tels = _lista(m.telefonos)
+            meta = _dict(m.telefonos_meta)
+            meta[num] = {"de": t.de or "análisis del municipio", "fuente": "analisis",
+                         "estado": "por_validar", "area": t.area or "",
+                         "vigencia": t.vigencia or "", "cuando": ahora.isoformat()}
+            m.telefonos = json.dumps([num] + tels, ensure_ascii=False)
+            m.telefonos_meta = json.dumps(meta, ensure_ascii=False)
+            hecho["telefonos"].append(num)
+
+    ya_mail = {(x.clave or "") for x in (await db.execute(
+        select(CallsMail).where(CallsMail.muni_key == data.muni_key)
+    )).scalars().all()}
+    for x in data.mails:
+        dire = (x.direccion or "").strip()
+        if "@" not in dire or re.search(r"no encontr", dire, re.I):
+            continue
+        clave = dire.lower()
+        if clave in ya_mail:
+            hecho["ya_estaba"].append(dire)
+            continue
+        ya_mail.add(clave)
+        db.add(CallsMail(
+            muni_key=data.muni_key, codigo_indec=m.codigo_indec, direccion=dire[:200],
+            clave=clave[:200], de_quien=(x.de_quien or "desconocido")[:20], de=(x.de or "")[:160],
+            area=(x.area or "")[:120], vigencia=(x.vigencia or "")[:24],
+            que_se_sabe=x.que_se_sabe or None, duda=x.duda or None,
+            de_donde="analisis", relato_id=data.relato_id, creado=ahora))
+        hecho["mails_nuevos"].append(dire)
+        if (x.de_quien or "") in ("municipio", "area") and hasattr(m, "mail")                 and not (getattr(m, "mail", "") or "").strip():
+            m.mail = dire[:120]
+
+    ya_canal = {(x.clave or "") for x in (await db.execute(
+        select(CallsCanal).where(CallsCanal.muni_key == data.muni_key)
+    )).scalars().all()}
+    for x in data.canales:
+        dato = (x.dato or "").strip()
+        if not dato or re.search(r"no encontr", dato, re.I):
+            continue
+        clave = _limpia(dato)[:200]
+        if clave in ya_canal:
+            hecho["ya_estaba"].append(dato[:60])
+            continue
+        ya_canal.add(clave)
+        db.add(CallsCanal(
+            muni_key=data.muni_key, codigo_indec=m.codigo_indec, tipo=(x.tipo or "otro")[:20],
+            dato=dato[:400], clave=clave, de_quien=(x.de_quien or "desconocido")[:20],
+            de=(x.de or "")[:160], area=(x.area or "")[:120], gestion=(x.gestion or "")[:120],
+            vigencia=(x.vigencia or "")[:24], que_se_sabe=x.que_se_sabe or None,
+            duda=x.duda or None, de_donde="analisis", relato_id=data.relato_id, creado=ahora))
+        hecho["canales"].append("%s: %s" % (x.tipo, dato[:60]))
+        # la web propia sigue subiendo a la ficha, que es de donde la lee la pantalla
+        if x.tipo == "web" and (x.de_quien or "") in ("municipio", "area")                 and not (m.web or "").strip():
+            m.web = dato[:300]
+            hecho["web"] = dato
+
+    if (hecho["hechos"] or hecho["telefonos"] or hecho["web"]
+            or hecho["canales"] or hecho["mails_nuevos"]):
         m.curado_en, m.curado_por = ahora, quien.usuario
     await db.commit()
 
+    # LA FICHA ACTUALIZADA VUELVE EN LA RESPUESTA.
+    #
+    # Sin esto, guardar no se veia. La pantalla no lee la base: arranca de un
+    # `datos.json` de 22 MB horneado en el build, y el objeto que tiene en memoria es esa
+    # foto. Se guardaban los telefonos, se guardaban los canales, y el vendedor seguia
+    # mirando la ficha de antes hasta que alguien volviera a compilar.
+    #
+    # Devolviendola aca, el front pisa lo que tiene con lo que quedo en la base y repinta
+    # en el acto. Es el mismo criterio que ya usaba `curar/telefono`, que si lo hacia.
+    canales = (await db.execute(
+        select(CallsCanal).where(CallsCanal.muni_key == data.muni_key)
+    )).scalars().all()
+    mails = (await db.execute(
+        select(CallsMail).where(CallsMail.muni_key == data.muni_key)
+    )).scalars().all()
+    orden = {"municipio": 0, "area": 1, "funcionario": 2, "desconocido": 3, "tercero": 4}
+
     return {"ok": True, "muni_key": data.muni_key, "guardado": hecho,
+            "ficha": {
+                "telefonos": _lista(m.telefonos),
+                "telefonos_meta": _dict(m.telefonos_meta),
+                "web": m.web or "",
+                "mail": getattr(m, "mail", "") or "",
+                "canales": sorted([{
+                    "tipo": c.tipo or "otro", "dato": c.dato or "", "de": c.de or "",
+                    "de_quien": c.de_quien or "desconocido", "area": c.area or "",
+                    "gestion": c.gestion or "", "vigencia": c.vigencia or "",
+                    "que_se_sabe": c.que_se_sabe or "", "duda": c.duda or "",
+                } for c in canales], key=lambda x: (orden.get(x["de_quien"], 3), x["tipo"])),
+                "mails": sorted([{
+                    "direccion": x.direccion or "", "de": x.de or "",
+                    "de_quien": x.de_quien or "desconocido", "area": x.area or "",
+                    "vigencia": x.vigencia or "", "que_se_sabe": x.que_se_sabe or "",
+                    "duda": x.duda or "",
+                } for x in mails], key=lambda x: orden.get(x["de_quien"], 3)),
+            },
             "nota": "se sumo a la ficha; no se piso ni se borro nada, y el angulo de "
                     "entrada quedo como estaba"}
 

@@ -103,11 +103,21 @@ async def deuda_tarjeta(c, caja_id) -> Decimal:
 
 async def buscar_programado(c, caso, contacto_ids) -> int | None:
     """El programado a convertir. Si el caso no fija un id (Merlo), se lo
-    reconoce por su descripcion dentro del municipio."""
+    reconoce por su descripcion dentro del municipio.
+
+    Y si ya se curo, esa descripcion ya no existe —la curacion la reemplaza— asi
+    que se lo busca por la tarjeta a la que quedo apuntando. Sin esto, correr el
+    script dos veces reportaba "ABORTA" con una lista de errores en vez de un
+    tranquilizador "ya curado": no tocaba nada, pero asustaba al que lo corria.
+    """
     if caso.programado_id:
         return caso.programado_id
     r = await uno(c, "SELECT id FROM tesoreria_pagos_programados WHERE municipio_id=:m AND descripcion=:de "
                      "AND activo=1 ORDER BY id LIMIT 1", m=caso.municipio_id, de=caso.descripcion_programado)
+    if r:
+        return r[0]
+    r = await uno(c, "SELECT id FROM tesoreria_pagos_programados WHERE municipio_id=:m AND tarjeta_caja_id=:t "
+                     "AND activo=1 ORDER BY id LIMIT 1", m=caso.municipio_id, t=caso.tarjeta_caja_id)
     return r[0] if r else None
 
 

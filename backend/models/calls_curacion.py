@@ -374,3 +374,79 @@ class CallsConfig(Base):
     creado = Column(DateTime, default=datetime.utcnow, nullable=False)
     actualizado = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow,
                          nullable=False)
+
+
+class CallsCanal(Base):
+    """LOS CANALES DIGITALES del municipio. Uno por fila, no uno por ficha.
+
+    Hasta hoy no existia: `calls_municipio.web` es UNA columna, asi que de todo lo que la
+    investigacion encontraba entraba una sola cosa. Medido sobre Sachayoj el 2026-09-13,
+    Gemini trajo TRES paginas de Facebook --una por gestion, con 6.073 likes la del
+    intendente anterior y 720 la del actual-- y de eso a la ficha no llegaba ninguna,
+    porque no son un "sitio web".
+
+    Y esas tres paginas son, justamente, el argumento de venta: la comunicacion con el
+    vecino se parte en cada cambio de gestion y la audiencia queda en la pagina del que se
+    fue.
+
+    `de_quien` guarda lo que el analisis pudo determinar --municipio, area, funcionario o
+    tercero-- SIN descartar nada: el WhatsApp de un diario local por donde los vecinos
+    mandan reclamos dice como entran hoy los reclamos, y vale mas que un dato prolijo.
+    """
+
+    __tablename__ = "calls_canales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    muni_key = Column(String(80), nullable=False, index=True)
+    codigo_indec = Column(String(20), nullable=True, index=True)
+
+    # web | facebook | instagram | whatsapp | youtube | portal | formulario | app | otro
+    tipo = Column(String(20), nullable=False, index=True)
+    # la URL, el usuario o el identificador, tal cual vino
+    dato = Column(String(400), nullable=False)
+    # la forma normalizada, para no cargar dos veces el mismo canal escrito distinto
+    clave = Column(String(200), nullable=True, index=True)
+
+    # municipio | area | funcionario | tercero | desconocido
+    de_quien = Column(String(20), nullable=True, index=True)
+    de = Column(String(160), nullable=True)     # en palabras: "Comision Municipal", "Nuevo Diario"
+    area = Column(String(120), nullable=True)
+    # a que gestion pertenece, si se sabe: "Zerda", "Aguero (anterior)"
+    gestion = Column(String(120), nullable=True)
+
+    # actual | probablemente_actual | antiguo | desconocida
+    vigencia = Column(String(24), nullable=True)
+    que_se_sabe = Column(Text, nullable=True)
+    duda = Column(Text, nullable=True)
+
+    de_donde = Column(String(30), nullable=True)   # 'analisis' | 'crawler' | 'padron'
+    relato_id = Column(Integer, nullable=True, index=True)
+    creado = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (Index("ix_calls_canales_muni_tipo", "muni_key", "tipo"),)
+
+
+class CallsMail(Base):
+    """LOS MAILS, por el mismo motivo que los canales: `calls_municipio.mail` es una sola
+    columna y ademas solo se escribe SI ESTA VACIA, asi que el segundo mail que aparece se
+    descarta en silencio."""
+
+    __tablename__ = "calls_mails"
+
+    id = Column(Integer, primary_key=True, index=True)
+    muni_key = Column(String(80), nullable=False, index=True)
+    codigo_indec = Column(String(20), nullable=True, index=True)
+
+    direccion = Column(String(200), nullable=False)
+    clave = Column(String(200), nullable=True, index=True)   # en minuscula, para deduplicar
+
+    de_quien = Column(String(20), nullable=True, index=True)
+    de = Column(String(160), nullable=True)
+    area = Column(String(120), nullable=True)
+    vigencia = Column(String(24), nullable=True)
+    que_se_sabe = Column(Text, nullable=True)
+    duda = Column(Text, nullable=True)
+
+    de_donde = Column(String(30), nullable=True)
+    relato_id = Column(Integer, nullable=True, index=True)
+    creado = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

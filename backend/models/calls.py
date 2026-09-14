@@ -201,3 +201,75 @@ class CallsMunicipio(Base):
     curado_por = Column(String(60), nullable=True)
 
     __table_args__ = (Index("ix_calls_municipio_pais_prov", "pais", "provincia"),)
+
+
+class CallsLlamada(Base):
+    """UNA FILA POR INTENTO REAL DE LLAMADA. El unico lugar donde el sistema aprende.
+
+    Por que existe, si ya estan `calls_registro` y `calls_evento` (dueño, 2026-09-13):
+
+    - `calls_registro` es el ESTADO ACTUAL del municipio en el embudo, y tiene `muni_key`
+      con `unique=True`: una fila por municipio. Cada llamada pisa a la anterior. Esta
+      bien asi para el estado, y es exactamente por eso que hace falta esta tabla.
+    - `calls_evento` es el historial generico --nota, estado, agenda-- con el texto libre.
+      Sirve para leer lo que paso, no para MEDIR: no hay forma de contar cuantas veces
+      atendio un numero si el resultado es una frase.
+
+    Aca el resultado es un valor, no una prosa. Eso convierte la llamada en la fuente de
+    validacion mas barata y mas confiable que tenemos: ninguna busqueda web puede decir
+    que un telefono atiende, ni que un problema ya se resolvio. El intendente si.
+
+    De aca salen, sin una linea de IA:
+        telefonos sacados de Facebook     -> 41% atendieron
+        telefonos de directorios viejos   -> 18% atendieron
+        aperturas del universo vecino     -> 47% iniciaron conversacion
+
+    Y con eso se deja de elegir prompts y criterios leyendo salidas a ojo, que es lo que
+    no converge: medido el 13/09, la varianza entre dos corridas del MISMO prompt es del
+    mismo orden que la diferencia entre dos prompts distintos.
+    """
+
+    __tablename__ = "calls_llamada"
+
+    id = Column(Integer, primary_key=True, index=True)
+    muni_key = Column(String(80), nullable=False, index=True)
+    fecha_hora = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # A QUE NUMERO se llamo. El id apunta al catalogo; el snapshot guarda el numero tal
+    # cual se marco ESE DIA. Los dos, a proposito: si mañana se corrige el telefono o se
+    # borra del catalogo, el historico tiene que seguir diciendo que se marco.
+    telefono_id = Column(Integer, nullable=True, index=True)
+    numero_marcado_snapshot = Column(String(40), nullable=True)
+
+    # QUE PASO. String y no Enum de base: los resultados comerciales cambian y no vale una
+    # migracion por cada uno (misma regla que `calls_registro.estado`). Los valores que se
+    # usan hoy:
+    #   no_atendio | ocupado | numero_incorrecto | atiende_tercero |
+    #   atiende_municipio | atiende_area | hablo_con_decisor | volver_a_llamar
+    resultado = Column(String(30), nullable=True, index=True)
+    # Se guarda aparte del resultado porque es la metrica cruda y no depende de como se
+    # llamen los estados mañana.
+    atendio = Column(Boolean, nullable=True)
+    quien_atendio = Column(String(120), nullable=True)
+    area_atendio = Column(String(120), nullable=True)
+
+    # CON QUE SE ABRIO. El id permite medir una apertura a lo largo de muchas llamadas; el
+    # snapshot conserva la frase exacta que se dijo, porque el libreto se regenera y el
+    # texto de hoy no es el de mañana.
+    apertura_id = Column(String(40), nullable=True, index=True)
+    apertura_texto_snapshot = Column(Text, nullable=True)
+    apertura_funciono = Column(Boolean, nullable=True)
+
+    # LO QUE CONTO EL MUNICIPIO, en las palabras del vendedor. Libre y opcional a
+    # proposito: pedirle que clasifique un hecho en plena llamada es fricción, y lo que
+    # tiene fricción no se completa. La correccion de los hechos se deriva DESPUES leyendo
+    # esto, fuera del momento comercial.
+    nota = Column(Text, nullable=True)
+
+    usuario = Column(String(60), nullable=True, index=True)
+
+    __table_args__ = (
+        Index("ix_calls_llamada_muni_fecha", "muni_key", "fecha_hora"),
+        # las dos consultas que justifican la tabla: rendimiento por numero y por apertura
+        Index("ix_calls_llamada_tel_resultado", "telefono_id", "resultado"),
+    )

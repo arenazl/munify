@@ -144,7 +144,25 @@ async def llamar_groq(
         if r.status_code in (401, 403):
             detalle = "La key de Groq no es valida o vencio — hay que renovarla en Secret Manager"
         elif r.status_code == 429:
-            detalle = "Groq esta limitando por cuota (429) — reintentar en un rato"
+            # HAY DOS 429 DISTINTOS Y NO SE PARECEN EN NADA.
+            #
+            # Por MINUTO (TPM): la ventana se repone sola en segundos, asi que esperar y
+            # reintentar es exactamente lo correcto.
+            # Por DIA (TPD): no se repone hasta manana. Esperar y reintentar es un bucle
+            # que quema intentos sin ninguna chance de exito.
+            #
+            # Hasta hoy los dos decian lo mismo --"reintentar en un rato"-- y el codigo
+            # reintentaba igual. Medido el 2026-09-13: diecinueve reintentos seguidos con
+            # la cuota del dia agotada, mientras el header `x-ratelimit-remaining-tokens`
+            # marcaba 7.923 disponibles... porque ESE header es el del minuto. El mensaje
+            # de Groq era el unico lugar que lo decia, y lo estabamos tapando.
+            crudo = (cuerpo_resp.get("error") or {}).get("message") or ""
+            if "per day" in crudo or "TPD" in crudo:
+                detalle = ("Se acabo la cuota DIARIA de Groq (200.000 tokens). No se "
+                           "repone hasta manana: reintentar no sirve. " + crudo[:160])
+            else:
+                detalle = ("Groq esta limitando por minuto (429) — la ventana se repone "
+                           "sola en segundos. " + crudo[:120])
         logger.error("[Groq] %s: %s", feature, detalle)
         resp = RespuestaGroq(status=r.status_code, detalle=detalle[:200])
         await _registrar(resp, feature, municipio_id, modelo_ok, latencia, {}, limites)
