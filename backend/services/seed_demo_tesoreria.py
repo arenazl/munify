@@ -170,10 +170,24 @@ TIPOS_CONCEPTO = [
 ]
 
 
+# PUESTOS, no modalidades de contratación (2026-09-14).
+#
+# Antes esta lista mezclaba las dos cosas: "Personal de planta", "contratado" y
+# "jornalizado" (que son CÓMO COBRA la persona) convivían con albañil, plomero y
+# chofer (que son QUÉ HACE). Esa mezcla se sembró en San Pedro Norte el 12-05 y
+# de ahí salió su catálogo: el cliente no inventó el desorden, lo heredó de acá,
+# y después le sumó áreas (Prensa, Turismo) sobre la misma lista.
+#
+# El modelo nuevo tiene un lugar para cada cosa y no hay por qué apilarlas:
+#   QUÉ HACE  -> este catálogo (subtipo de `empleado`)
+#   CÓMO COBRA -> `empleados.modalidad` (planta · contratado · jornalizado ·
+#                 a_prueba · jubilado)
+# El resto de los tipos de la semilla ya respetaban esto: el subtipo de un
+# proveedor es su rubro y el de un profesional su profesión. `empleado` era el
+# único que se salía del criterio.
 TIPOS_EMPLEADO = [
-    ("Personal de planta", "#3b82f6", "Briefcase"),
-    ("Personal contratado", "#06b6d4", "FileText"),
-    ("Personal jornalizado", "#f59e0b", "Calendar"),
+    ("Administrativo", "#3b82f6", "Briefcase"),
+    ("Maestranza", "#06b6d4", "Wrench"),
     ("Albañil", "#a855f7", "HardHat"),
     ("Maestro mayor de obras", "#8b5cf6", "HardHat"),
     ("Arquitecto", "#ec4899", "Compass"),
@@ -219,12 +233,14 @@ CONCEPTOS_LIQUIDACION_DEMO = [
 
 
 CONTACTOS_DEMO = [
-    # 5 empleados de muni
-    ("Juan", "Perez", TipoContacto.EMPLEADO, "Personal de planta"),
-    ("Maria", "Gomez", TipoContacto.EMPLEADO, "Personal de planta"),
-    ("Carlos", "Rodriguez", TipoContacto.EMPLEADO, "Jornalizado"),
-    ("Ana", "Martinez", TipoContacto.EMPLEADO, "Contratado"),
-    ("Luis", "Fernandez", TipoContacto.EMPLEADO, "Personal de planta"),
+    # 5 empleados de muni. El subtipo es el PUESTO, igual que en los demás tipos
+    # (el de un proveedor es su rubro, el de un profesional su profesión). Cómo
+    # cobra cada uno va en `empleados.modalidad`, no acá — ver TIPOS_EMPLEADO.
+    ("Juan", "Perez", TipoContacto.EMPLEADO, "Administrativo"),
+    ("Maria", "Gomez", TipoContacto.EMPLEADO, "Administrativo"),
+    ("Carlos", "Rodriguez", TipoContacto.EMPLEADO, "Chofer"),
+    ("Ana", "Martinez", TipoContacto.EMPLEADO, "Maestranza"),
+    ("Luis", "Fernandez", TipoContacto.EMPLEADO, "Electricista"),
     # 4 proveedores
     ("Ferreteria", "El Tornillo", TipoContacto.PROVEEDOR, "Ferreteria"),
     ("Corralon", "San Cayetano", TipoContacto.PROVEEDOR, "Materiales construccion"),

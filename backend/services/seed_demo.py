@@ -1052,6 +1052,94 @@ def _zona_para(zonas: dict[str, Zona], zona_nombre: Optional[str],
     return pool[idx % len(pool)] if pool else None
 
 
+async def _seed_presentismo(
+    db: AsyncSession,
+    municipio_id: int,
+    empleados: list[Empleado],
+) -> dict[str, int]:
+    """Horario semanal y fichadas del mes, para que Presentismo muestre algo.
+
+    Sin esto la pantalla es una lista de personas muda: el backend cruza el
+    horario contra las jornadas, y si no hay ninguno de los dos no tiene nada
+    que afirmar (dueño, 2026-09-14). No toca el módulo Recursos — siembra
+    datos, igual que los gastos o los turnos.
+
+    La matriz es FIJA, sin randoms: la demo tiene que verse igual siempre y
+    mostrar los cinco veredictos que la pantalla sabe pintar — en hora, tarde,
+    ausente, sin cerrar y sin horario.
+    """
+    from datetime import date as _date, datetime as _dt, time as _time, timedelta as _td
+    from models.empleado_horario import EmpleadoHorario
+    from models.empleado_jornada import EmpleadoJornada
+
+    if not empleados:
+        return {"horarios": 0, "jornadas": 0}
+
+    fila = (await db.execute(
+        select(Municipio.latitud, Municipio.longitud).where(Municipio.id == municipio_id)
+    )).first()
+    base_lat = float(fila[0]) if fila and fila[0] is not None else None
+    base_lng = float(fila[1]) if fila and fila[1] is not None else None
+
+    # Tramos por persona: administrativos de mañana, operarios temprano, uno
+    # con sábado (el de recolección). Los DOS ÚLTIMOS quedan SIN horario a
+    # propósito: es el caso que la pantalla tiene que saber señalar.
+    TRAMOS = [
+        (_time(7, 0), _time(13, 0), False),
+        (_time(7, 0), _time(13, 0), False),
+        (_time(6, 0), _time(12, 0), True),
+        (_time(8, 0), _time(14, 0), False),
+        (_time(8, 0), _time(14, 0), False),
+        (_time(6, 30), _time(12, 30), False),
+        (_time(7, 0), _time(13, 0), False),
+    ]
+    con_horario = empleados[:-2] if len(empleados) > 2 else empleados
+    n_hor = 0
+    for i, emp in enumerate(con_horario):
+        entrada, salida, sabado = TRAMOS[i % len(TRAMOS)]
+        for dia in range(7):
+            trabaja = dia < 5 or (dia == 5 and sabado)
+            db.add(EmpleadoHorario(
+                empleado_id=emp.id, dia_semana=dia,
+                hora_entrada=entrada, hora_salida=salida, activo=trabaja,
+            ))
+            n_hor += 1
+    await db.flush()
+
+    # Fichadas de los últimos 45 días hábiles hacia atrás. El patrón depende
+    # del índice y del día: determinístico y con los casos que importan.
+    hoy = _date.today()
+    n_jor = 0
+    for i, emp in enumerate(con_horario):
+        entrada, salida, sabado = TRAMOS[i % len(TRAMOS)]
+        for atras in range(1, 46):
+            f = hoy - _td(days=atras)
+            dow = f.weekday()
+            if dow > 4 and not (dow == 5 and sabado):
+                continue
+            caso = (f.day * (i + 2)) % 13
+            if caso == 3:
+                continue                      # ausente: no fichó y tenía que venir
+            tarde = 37 if caso == 5 else 0    # llegó tarde
+            sin_cerrar = caso == 7            # fichó la entrada y se olvidó la salida
+            ent = _dt.combine(f, entrada) + _td(minutes=tarde)
+            sal = None if sin_cerrar else _dt.combine(f, salida) + _td(minutes=(caso % 7))
+            db.add(EmpleadoJornada(
+                municipio_id=municipio_id, empleado_id=emp.id, fecha=f,
+                entrada_at=ent,
+                entrada_lat=(base_lat + (i - 3) * 0.0012) if base_lat is not None else None,
+                entrada_lng=(base_lng + (i - 3) * 0.0012) if base_lng is not None else None,
+                salida_at=sal,
+                salida_lat=(base_lat + (i - 3) * 0.0012) if (sal and base_lat is not None) else None,
+                salida_lng=(base_lng + (i - 3) * 0.0012) if (sal and base_lng is not None) else None,
+                origen="app",
+                observaciones="[DEMO] fichada de ejemplo" if caso == 5 else None,
+            ))
+            n_jor += 1
+    await db.flush()
+    return {"horarios": n_hor, "jornadas": n_jor}
+
+
 async def _seed_empleados(
     db: AsyncSession,
     municipio_id: int,
@@ -1770,6 +1858,11 @@ async def seed_demo_completo(
     log.hito("empleados_cuadrillas", empleados=len(empleados),
              cuadrillas=len(cuadrillas),
              con_zona=sum(1 for e in empleados if e.zona_id))
+
+    # Presentismo: horario semanal + fichadas. Va acá porque necesita los
+    # empleados ya flusheados (usa sus ids).
+    _pres = await _seed_presentismo(db, municipio_id, empleados)
+    log.hito("presentismo", **_pres)
 
     # Usuarios con rol EMPLEADO — sin esto no hay con qué entrar como el
     # operario de campo (ve "Mis Trabajos" y, si el módulo está activo, sus
@@ -2495,7 +2588,10 @@ async def seed_demo_completo(
     # `contaduria` NO va por default (dueño, 2026-09-02): sólo hace órdenes de
     # pago y no está probada — queda como opt-in desde Configuración.
     from models.municipio_modulo import MunicipioModulo
-    _modulos = ('ordenes_trabajo', 'patrimonio', 'sueldos', 'comunicacion')
+    # `presentismo` entra por default (dueño, 2026-09-14): la semilla ahora
+    # siembra horario semanal y fichadas, así que la pantalla tiene qué mostrar
+    # y se puede recorrer el circuito completo en una demo.
+    _modulos = ('ordenes_trabajo', 'patrimonio', 'sueldos', 'comunicacion', 'presentismo')
     for _mod in _modulos:
         db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()

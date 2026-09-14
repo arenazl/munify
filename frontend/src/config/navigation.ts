@@ -437,7 +437,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Agenda diaria de turnos presenciales'
     },
     {
-      name: 'Horarios',
+      // Se llamaba "Horarios" y colisionaba con el de Recursos (2026-09-14):
+      // para un admin aparecían dos items con el mismo nombre y cosas
+      // distintas — este es CUÁNDO ATIENDE EL MUNICIPIO, el otro es el horario
+      // de trabajo de cada persona. "Atención" lo dice y sigue siendo una sola
+      // palabra, como pide la regla del sidebar.
+      name: 'Atención',
       href: '/gestion/configuracion-agenda',
       icon: CalendarDays,
       show: isAdminOrSupervisor && moduloOn('tramites'),
@@ -612,6 +617,19 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('reservas'),
       categoria: 'Recursos',
       description: 'Salón, cancha y maquinaria que se presta'
+    },
+    {
+      // OPERACIONAL, no catálogo (dueño, 2026-09-14): el horario de la gente
+      // cambia todo el tiempo — se asigna, se corrige, se cambia de turno — y
+      // por eso va acá y no en Configuración. Va ANTES de Presentismo porque es
+      // su condición: sin horario cargado no hay vara contra la cual medir la
+      // asistencia, y la pantalla de al lado no puede afirmar nada.
+      name: 'Horarios',
+      href: '/gestion/horarios',
+      icon: CalendarClock,
+      show: isAdminOrSupervisor && modulosActivos.has('presentismo'),
+      categoria: 'Recursos',
+      description: 'El horario semanal de cada persona'
     },
     {
       name: 'Presentismo',
