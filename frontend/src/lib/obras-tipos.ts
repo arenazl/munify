@@ -107,4 +107,7 @@ export const RUBRO_COLOR: Record<string, string> = {
   otros: 'var(--pl-amber-strong)',
 };
 
+/** Las horas vienen de sumar floats: 151.89999999999998 no es un dato, es ruido. */
+export const fmtHoras = (n: number) => `${Math.round((n + Number.EPSILON) * 10) / 10}`.replace('.', ',');
+
 export const fechaCorta = (iso?: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '—';

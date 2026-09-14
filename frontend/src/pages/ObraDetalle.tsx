@@ -31,7 +31,7 @@ import { seg, type HeroKpi } from '../lib/semanticHero';
 import { obrasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { fmtMoney } from '../lib/obras-helpers';
-import { fechaCorta, type DetalleObra, type EtapaObra, type PendienteObra } from '../lib/obras-tipos';
+import { fechaCorta, fmtHoras, type DetalleObra, type EtapaObra, type PendienteObra } from '../lib/obras-tipos';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 
 const ESTADOS_ETAPA = [{ value: 'pendiente', label: 'Por empezar' }, { value: 'en_curso', label: 'En curso' }, { value: 'terminada', label: 'Terminada' }, { value: 'parada', label: 'Parada' }];
@@ -321,7 +321,7 @@ export default function ObraDetalle() {
         <article className="gr-card">
           <h3>Quién estuvo</h3>
           <p className="gr-q">Órdenes de trabajo de la obra y sueldos imputados.</p>
-          {fila('Órdenes de trabajo', `${d.gente.ordenes_trabajo} · ${d.gente.horas} h`)}
+          {fila('Órdenes de trabajo', `${d.gente.ordenes_trabajo} · ${fmtHoras(d.gente.horas)} h`)}
           {d.gente.cuadrillas.length > 0 && fila('Cuadrillas', d.gente.cuadrillas.join(', '))}
           {d.gente.personas_ot.length > 0 && fila('Personas en OT', d.gente.personas_ot.join(', '))}
           {fila('Sueldos imputados', d.gente.sueldos_personas ? `${d.gente.sueldos_personas} personas · ${fmtMoney(d.gente.sueldos_total)}` : 'ninguno')}

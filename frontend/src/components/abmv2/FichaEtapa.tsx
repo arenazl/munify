@@ -19,7 +19,7 @@
 import { Check, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { TresRelojes } from './TresRelojes';
-import { fechaCorta, RUBRO_COLOR, RUBRO_LABEL, SITUACION_LABEL, type EtapaObra, type GastoObra } from '../../lib/obras-tipos';
+import { fechaCorta, fmtHoras, RUBRO_COLOR, RUBRO_LABEL, SITUACION_LABEL, type EtapaObra, type GastoObra } from '../../lib/obras-tipos';
 
 type Fmt = (n: number | string) => string;
 
@@ -153,7 +153,7 @@ export function CuerpoEtapa({ etapa: e, gastos, hoy, obraNombre, onConfirmar, on
           <h4>Quién estuvo</h4>
           <p className="fe-gente">
             {e.gente.ordenes_trabajo > 0
-              ? <>{e.gente.ordenes_trabajo} orden{e.gente.ordenes_trabajo === 1 ? '' : 'es'} de trabajo · {e.gente.horas} h{e.gente.cuadrillas.length ? <><br />{e.gente.cuadrillas.join(', ')}</> : ''}</>
+              ? <>{e.gente.ordenes_trabajo} orden{e.gente.ordenes_trabajo === 1 ? '' : 'es'} de trabajo · {fmtHoras(e.gente.horas)} h{e.gente.cuadrillas.length ? <><br />{e.gente.cuadrillas.join(', ')}</> : ''}</>
               : 'Sin órdenes de trabajo cargadas en esta etapa.'}
             {Number(e.mano_de_obra) > 0 && <><br />{fmtMoney(e.mano_de_obra)} en sueldos y jornales</>}
           </p>
