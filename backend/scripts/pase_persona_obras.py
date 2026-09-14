@@ -372,8 +372,13 @@ async def correr(aplicar: bool, dir_backup: str):
         db = (await conn.execute(text("SELECT DATABASE()"))).scalar()
         print(f"Base: {db}")
         faltan_tablas, faltan_col = await _plan_esquema(conn)
-        # La medición sólo tiene sentido si las tablas ya existen.
-        medida = await _medir(conn) if not faltan_tablas else None
+        # La medición sólo tiene sentido con el esquema COMPLETO: cuenta por
+        # columnas nuevas (`persona_id` y compañía), así que si falta una sola
+        # el SELECT explota con un 1054 y el PLAN muere sin decir nada útil.
+        # Antes esto miraba sólo las tablas, y producción está justo en el
+        # medio — las 3 tablas creadas por el deploy, las 7 columnas no —, o
+        # sea que el modo PLAN no corría donde más hace falta (2026-09-14).
+        medida = await _medir(conn) if not (faltan_tablas or faltan_col) else None
 
     print("\n=== 1. ESQUEMA (aditivo)")
     print(f"   tablas a crear:   {faltan_tablas or 'ninguna (ya están)'}")
