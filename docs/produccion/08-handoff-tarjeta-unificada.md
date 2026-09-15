@@ -144,12 +144,15 @@ El municipio pagó su último resumen el **10 de septiembre** y después compró
 | La caja 107 | **recupera $388.831,43** | **pierde $27.379,78 más** |
 | Esos $416.211,21 | los paga sola la corrida del 10-10 | ya están pagados |
 
-El default es `pago` porque es lo que pasó: el pago del resumen ocurrió el 10 y lo comprado después
-es deuda real que todavía no venció. `hoy` deja el número redondo, pero le saca al banco una
-diferencia que no corresponde a ese resumen.
+**El dueño confirmó `pago` el 2026-09-15**: *"si él puso el pago programado el 10, es porque debe
+ser su fecha de vencimiento; así que los pagos son hasta el 10"*. Es lo que pasó: el resumen se pagó
+el 10 y lo comprado después es deuda real que todavía no venció. `hoy` deja el número redondo, pero
+le saca al banco una diferencia que no corresponde a ese resumen.
 
-**Idempotente:** una segunda corrida ve el programado apuntando a la tarjeta y los movimientos de
-curación, e informa "ya curado" sin tocar nada.
+**Idempotente, probado aplicando dos veces en QA:** la segunda corrida imprime *"ya curado: el
+programado 1001192 apunta a la tarjeta y hay 2 movimientos de curación. Nada que hacer"* y hace
+rollback. La curación le cambia la descripción al programado y le saca el monto fijo, así que la
+segunda vez ya no aparece por ahí: se lo reconoce por la tarjeta a la que quedó apuntando.
 
 ## 4. Qué se validó en QA, y cómo
 
@@ -159,8 +162,10 @@ completo contra esos datos, en este orden.
 | Qué | Resultado |
 |---|---|
 | Migración aplicada | tabla y columna fuera; los gastos con etiqueta quedaron con su nota en `observaciones` |
-| Curación `--corte pago` (en seco) | los 3 gastos identificados y dados de baja; pago de $6.247.510,07 al 10-09 desde Coparticipación; la tarjeta queda debiendo $416.211,21 y la caja **recupera $388.831,43** |
-| Curación `--corte hoy` (en seco) | pago de $6.663.721,28 al día de hoy; tarjeta en $0,00; de la caja **salen $27.379,78 más** |
+| Curación `--corte pago`, **aplicada** | los 3 gastos dados de baja y marcados en `observaciones`; pago de $6.247.510,07 al 10-09 desde Coparticipación; la tarjeta queda debiendo $416.211,21 y la caja **recupera $388.831,43**; el programado pasa a "Paga todo lo que deba el día 10", próximo 2026-10-10 |
+| Segunda corrida | "ya curado, nada que hacer" — rollback, no toca nada |
+| Curación `--corte hoy` (en seco) | pago de $6.663.721,28 al día de hoy; tarjeta en $0,00; de la caja **salen $27.379,78 más**. Descartada por el dueño |
+| El circuito, **después** de curar | crear → 3 gastos → pagar → cero sigue en verde sobre el San Pedro curado, por el servicio y por HTTP |
 | Circuito por el servicio, en Merlo | crear → 3 gastos ($248.500,75) → pagar → **$0,00**; pagar **no** crea un gasto nuevo |
 | Circuito por el servicio, en San Pedro | ídem, con los 8.538 gastos reales adentro |
 | Circuito por HTTP contra `qa.munify.com.ar` | las 10 verificaciones en verde, incluida "pagar NO creó un gasto nuevo" |

@@ -146,9 +146,20 @@ async def resolver_ids(c, caso, base: str):
         "SELECT id, caja_id FROM tesoreria_pagos_programados "
         " WHERE municipio_id=:m AND activo=1 AND descripcion=:de AND monto_pesos=:mo"),
         {"m": caso.municipio_id, "de": caso.descripcion_programado, "mo": caso.programado_monto})).all()
+    if not filas:
+        # SEGUNDA CORRIDA: la curacion le cambia la descripcion y le saca el monto
+        # fijo, asi que por ahi ya no aparece. Se lo busca por la tarjeta a la que
+        # quedo apuntando, que es lo que lo identifica una vez curado. Sin esto,
+        # correr el script dos veces aborta con un error confuso en vez del
+        # tranquilizador "ya curado": no toca nada, pero asusta al que lo corre.
+        filas = (await c.execute(text(
+            "SELECT id, caja_id FROM tesoreria_pagos_programados "
+            " WHERE municipio_id=:m AND activo=1 AND tarjeta_caja_id=:t"),
+            {"m": caso.municipio_id, "t": tarjeta_id})).all()
     if len(filas) != 1:
         raise SystemExit(f"ABORTA: se esperaba 1 programado '{caso.descripcion_programado}' de "
-                         f"{caso.programado_monto} y hay {len(filas)}: {[f[0] for f in filas]}")
+                         f"{caso.programado_monto} (o ya curado, apuntando a la tarjeta {tarjeta_id}) "
+                         f"y hay {len(filas)}: {[f[0] for f in filas]}")
     programado_id, origen_id = filas[0]
     if origen_id is None:
         raise SystemExit(f"ABORTA: el programado {programado_id} no dice de que caja sale la plata")
