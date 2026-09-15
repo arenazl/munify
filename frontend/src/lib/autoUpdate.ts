@@ -47,6 +47,12 @@ export interface UpdateInfo {
 const VERSION_GUARD_PREFIX = 'auk-reloaded-'
 const CHUNK_GUARD_KEY = 'auk-chunk-reload-at'
 const CHUNK_GUARD_WINDOW_MS = 20_000
+const LOOP_GUARD_KEY = 'auk-loop-reload-at'
+const LOOP_GUARD_WINDOW_MS = 30_000
+// Un bucle de redireccion hace decenas de navegaciones por segundo. Ocho en dos
+// segundos no lo hace ninguna app sana ni el usuario mas rapido del mundo.
+const LOOP_UMBRAL = 8
+const LOOP_VENTANA_MS = 2_000
 
 // Errores típicos de "el chunk que pido ya no existe tras un deploy" (Vite/Chrome/Safari).
 const CHUNK_ERROR_RE =
@@ -117,6 +123,57 @@ export function setupAutoUpdate(options: AutoUpdateOptions = {}): () => void {
     reload()
   }
 
+  // Loop-guard: la app quedo ROTA (bucle de redireccion) y el usuario no puede
+  // tocar ningun boton. Sin esto, mode:'prompt' no rescata a nadie: el toast
+  // "hay version nueva" no se llega a ver con la pantalla remontandose sola.
+  //
+  // Caso real (2026-09-15): un deploy dejo /login en bucle. Se revirtio en
+  // minutos, pero los que ya habian abierto la app quedaron con el bundle roto y
+  // la unica salida era borrar los datos del sitio, que a un cliente no se le pide.
+  //
+  // Solo recarga si HAY una version nueva servida: si el bucle es de la version
+  // que el server ya sirve, recargar no arregla nada y seria un bucle de recargas.
+  let navegaciones: number[] = []
+  const onNavegacion = () => {
+    const ahora = Date.now()
+    navegaciones = navegaciones.filter((t) => ahora - t < LOOP_VENTANA_MS)
+    navegaciones.push(ahora)
+    if (navegaciones.length < LOOP_UMBRAL) return
+    navegaciones = []
+    const ultima = Number(sessionStorage.getItem(LOOP_GUARD_KEY) || 0)
+    if (ahora - ultima < LOOP_GUARD_WINDOW_MS) {
+      log('bucle detectado pero ya recargue recien: no reintento.')
+      return
+    }
+    log('BUCLE DE NAVEGACION detectado: busco si hay version nueva para rescatar la app.')
+    void (async () => {
+      if (!current) return
+      const server = await fetchServerVersion(versionUrl)
+      if (!server || server === current) {
+        log('el bucle es de la version que ya sirve el server: recargar no lo arregla.')
+        return
+      }
+      sessionStorage.setItem(LOOP_GUARD_KEY, String(Date.now()))
+      // A proposito NO se respetan mode:'prompt' ni isUserBusy(): la app esta
+      // rota, no hay nada que interrumpir y no hay boton que el usuario pueda tocar.
+      sessionStorage.setItem(VERSION_GUARD_PREFIX + server, '1')
+      log('rescato: recargo sin preguntar.')
+      reload()
+    })()
+  }
+
+  const _push = history.pushState.bind(history)
+  const _replace = history.replaceState.bind(history)
+  history.pushState = function (...args: Parameters<typeof history.pushState>) {
+    onNavegacion()
+    return _push(...args)
+  }
+  history.replaceState = function (...args: Parameters<typeof history.replaceState>) {
+    onNavegacion()
+    return _replace(...args)
+  }
+  window.addEventListener('popstate', onNavegacion)
+
   check() // al arrancar
   document.addEventListener('visibilitychange', check)
   window.addEventListener('focus', check)
@@ -132,6 +189,9 @@ export function setupAutoUpdate(options: AutoUpdateOptions = {}): () => void {
     window.removeEventListener('focus', check)
     window.removeEventListener('error', onError)
     window.removeEventListener('unhandledrejection', onError as EventListener)
+    window.removeEventListener('popstate', onNavegacion)
+    history.pushState = _push
+    history.replaceState = _replace
     if (timer) clearInterval(timer)
   }
 }
