@@ -116,17 +116,25 @@ test.describe('La puerta de entrada', () => {
     const navegaciones: string[] = [];
     page.on('framenavigated', (f) => { if (f === page.mainFrame()) navegaciones.push(f.url()); });
 
+    // El storage se limpia UNA vez, desde una ruta neutral. La primera versión
+    // de esto hacía dos `goto` a la misma ruta —uno para poder limpiar— y
+    // contaba las DOS cadenas de redirects: daba 8 en `/demos-listado` y
+    // acusaba un bucle que no existía. Un test que miente cuesta más que no
+    // tenerlo.
+    await page.goto(`${BASE}/login`);
+    await page.evaluate(() => localStorage.clear());
+
     for (const ruta of ['/login', '/demo', '/bienvenido', '/demos-listado']) {
       navegaciones.length = 0;
       await page.goto(`${BASE}${ruta}`);
-      await page.evaluate(() => localStorage.clear());
-      await page.goto(`${BASE}${ruta}`);
       await page.waitForTimeout(3000);   // el bucle se delata solo en 3 segundos
 
-      // El bucle de producción hizo 1.207 navegaciones. Un redirect legítimo
-      // hace dos o tres.
+      // El bucle de producción hizo 1.207 navegaciones. Una cadena legítima
+      // hace tres o cuatro: /demos-listado → /gestion/admin/demos → /login.
       expect(navegaciones.length, `${ruta} entró en bucle: ${navegaciones.length} navegaciones`)
         .toBeLessThan(8);
+      expect(new URL(page.url()).pathname,
+        `${ruta} no termina en una pantalla operable`).not.toContain('demos-listado');
     }
   });
 
