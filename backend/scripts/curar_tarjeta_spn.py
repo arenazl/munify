@@ -81,6 +81,11 @@ BACKEND = Path(__file__).resolve().parent.parent
 # coherencia de _entorno decide igual, asi que esto no relaja nada.
 load_dotenv(BACKEND / ".env")
 
+def hoy_iso() -> str:
+    from datetime import date
+    return date.today().isoformat()
+
+
 MARCA = "[curacion 2026-09-11"
 AGOSTO_10 = ("2026-08-10", Decimal("2180305.30"))
 
@@ -95,43 +100,85 @@ async def saldo_caja(c, caja_id) -> Decimal:
     return Decimal(r[0])
 
 
-async def deuda_tarjeta(c, caja_id) -> Decimal:
-    r = await uno(c, "SELECT COALESCE(SUM(CASE WHEN tipo='egreso' THEN monto ELSE -monto END),0) "
-                     "FROM tesoreria_movimientos_caja WHERE caja_id=:id", id=caja_id)
+async def deuda_tarjeta(c, caja_id, hasta: str | None = None) -> Decimal:
+    """Lo que la tarjeta debe. Con `hasta`, lo que debia ESE dia.
+
+    La distincion no es cosmetica: el municipio pago su resumen el 10 y siguio
+    comprando el 13 y el 14. Un pago fechado el 10 por el total de hoy estaria
+    cancelando compras que todavia no habian pasado.
+    """
+    sql = ("SELECT COALESCE(SUM(CASE WHEN tipo='egreso' THEN monto ELSE -monto END),0) "
+           "FROM tesoreria_movimientos_caja WHERE caja_id=:id")
+    if hasta:
+        sql += " AND fecha <= :hasta"
+    r = await uno(c, sql, id=caja_id, **({"hasta": hasta} if hasta else {}))
     return Decimal(r[0])
 
 
-async def buscar_programado(c, caso, contacto_ids) -> int | None:
-    """El programado a convertir. Si el caso no fija un id (Merlo), se lo
-    reconoce por su descripcion dentro del municipio.
+async def resolver_ids(c, caso, base: str):
+    """Los ids del caso son los de PRODUCCION. Devuelve los que valen en ESTA base.
 
-    Y si ya se curo, esa descripcion ya no existe —la curacion la reemplaza— asi
-    que se lo busca por la tarjeta a la que quedo apuntando. Sin esto, correr el
-    script dos veces reportaba "ABORTA" con una lista de errores en vez de un
-    tranquilizador "ya curado": no tocaba nada, pero asustaba al que lo corria.
+    Por que hace falta: la validacion seria se hace sobre San Pedro clonado a QA,
+    y ahi los ids son otros (la caja 373 es la 1000520, el programado 650 es el
+    1001192). Sin esto el caso `spn` solo se puede correr en produccion, que es
+    justo donde uno no quiere probar.
+
+    No se adivina nada: cada cosa tiene que ser UNICA o aborta.
+      - la tarjeta      la unica caja activa con codigo TARJETA del municipio
+      - el programado   el que tiene la descripcion y el monto del caso, activo
+      - la caja origen  la del programado; es de donde salieron los gastos
+
+    En PRODUCCION los tres tienen que coincidir con los declarados en el caso.
+    Si no coinciden, aborta: los ids fijos dejan de ser un estorbo y pasan a ser
+    la red de seguridad de que estamos tocando lo que creemos.
     """
-    if caso.programado_id:
-        return caso.programado_id
-    r = await uno(c, "SELECT id FROM tesoreria_pagos_programados WHERE municipio_id=:m AND descripcion=:de "
-                     "AND activo=1 ORDER BY id LIMIT 1", m=caso.municipio_id, de=caso.descripcion_programado)
-    if r:
-        return r[0]
-    r = await uno(c, "SELECT id FROM tesoreria_pagos_programados WHERE municipio_id=:m AND tarjeta_caja_id=:t "
-                     "AND activo=1 ORDER BY id LIMIT 1", m=caso.municipio_id, t=caso.tarjeta_caja_id)
-    return r[0] if r else None
+    es_prod = not base.lower().endswith("-qa")
+
+    filas = (await c.execute(text(
+        "SELECT id FROM tesoreria_cajas WHERE municipio_id=:m AND UPPER(codigo)='TARJETA' AND activo=1"),
+        {"m": caso.municipio_id})).all()
+    if len(filas) != 1:
+        raise SystemExit(f"ABORTA: el muni {caso.municipio_id} tiene {len(filas)} cajas TARJETA activas, "
+                         f"se esperaba 1: {[f[0] for f in filas]}")
+    tarjeta_id = filas[0][0]
+
+    filas = (await c.execute(text(
+        "SELECT id, caja_id FROM tesoreria_pagos_programados "
+        " WHERE municipio_id=:m AND activo=1 AND descripcion=:de AND monto_pesos=:mo"),
+        {"m": caso.municipio_id, "de": caso.descripcion_programado, "mo": caso.programado_monto})).all()
+    if len(filas) != 1:
+        raise SystemExit(f"ABORTA: se esperaba 1 programado '{caso.descripcion_programado}' de "
+                         f"{caso.programado_monto} y hay {len(filas)}: {[f[0] for f in filas]}")
+    programado_id, origen_id = filas[0]
+    if origen_id is None:
+        raise SystemExit(f"ABORTA: el programado {programado_id} no dice de que caja sale la plata")
+
+    declarados = (caso.tarjeta_caja_id, caso.programado_id, caso.caja_origen_id)
+    resueltos = (tarjeta_id, programado_id, origen_id)
+    if es_prod:
+        distintos = [f"   {n}: el caso dice {d}, la base tiene {r}" for n, d, r in
+                     zip(("tarjeta", "programado", "caja origen"), declarados, resueltos)
+                     if d is not None and d != r]
+        if distintos:
+            raise SystemExit("\n".join(["ABORTA en PRODUCCION: los ids no son los del caso."] + distintos))
+    elif declarados != resueltos:
+        print(f"   (base clonada: tarjeta {caso.tarjeta_caja_id}->{tarjeta_id}, "
+              f"programado {caso.programado_id}->{programado_id}, "
+              f"caja origen {caso.caja_origen_id}->{origen_id})")
+    return tarjeta_id, programado_id, origen_id
 
 
 async def curar(args, ent, eng) -> int:
     caso = buscar_caso(args.caso)
     aplicar = aplicar_o_seco(args)
-    MUNI, ORIGEN, TARJETA = caso.municipio_id, caso.caja_origen_id, caso.tarjeta_caja_id
+    MUNI = caso.municipio_id
     print(f"base: {ent.base} · caso {caso.clave} (muni {MUNI}) "
           f"({'APLICA' if aplicar else 'EN SECO'}) | modo={args.modo}")
 
     async with eng.connect() as c:
         tr = await c.begin()
 
-        pp_id = await buscar_programado(c, caso, None)
+        TARJETA, pp_id, ORIGEN = await resolver_ids(c, caso, ent.base)
         pp = await uno(c, "SELECT municipio_id, contacto_id, tarjeta_caja_id, monto_pesos, caja_id, activo "
                           "FROM tesoreria_pagos_programados WHERE id=:id", id=pp_id) if pp_id else None
 
@@ -222,9 +269,24 @@ async def curar(args, ent, eng) -> int:
             # UN pago por lo que la tarjeta debe hoy. Queda en cero, que es de
             # donde tiene que arrancar el circuito nuevo. Se fecha en el ultimo
             # pago que registro el municipio, para no inventar una fecha futura.
-            fecha_pago = max(p.fecha for p in caso.pagos)
-            await registrar_pago(deuda_antes, fecha_pago, f"resumen pagado al {fecha_pago}", pp_id)
-            print(f"  pago de tarjeta {plata(deuda_antes)} al {fecha_pago}: la tarjeta queda en CERO")
+            # La fecha y el monto van JUNTOS. Dos cortes posibles:
+            #   --corte pago (default)  el pago se fecha el dia en que el municipio
+            #       pago de verdad su ultimo resumen y cubre lo que la tarjeta
+            #       debia ESE dia; lo comprado despues queda como deuda viva y lo
+            #       paga sola la proxima corrida del programado. Es lo que paso.
+            #   --corte hoy  se fecha hoy y cubre todo: la tarjeta queda
+            #       literalmente en cero, al costo de sacarle al banco la
+            #       diferencia entre lo que el municipio pago y lo que debe hoy.
+            # La primera version fechaba al 10 y pagaba el total de HOY: un pago
+            # del 10 cancelando compras del 13 y del 14.
+            fecha_pago = hoy_iso() if args.corte == "hoy" else max(p.fecha for p in caso.pagos)
+            monto_pago = await deuda_tarjeta(c, TARJETA, hasta=fecha_pago)
+            queda = deuda_antes - monto_pago
+            await registrar_pago(monto_pago, fecha_pago, f"resumen pagado al {fecha_pago}",
+                                 pp_id, restante=queda)
+            print(f"  pago de tarjeta {plata(monto_pago)} al {fecha_pago}: "
+                  + ("la tarjeta queda en CERO" if queda <= 0 else
+                     f"quedan {plata(queda)} comprados despues del {fecha_pago}"))
         else:
             for gid, pago in gastos:
                 if args.agosto_doble == "borrar" and (pago.fecha, pago.monto) == AGOSTO_10:
@@ -254,16 +316,23 @@ async def curar(args, ent, eng) -> int:
         print(f"         gastos 'pago de tarjeta' activos: {activos}")
 
         if args.modo == "cero":
-            # La tarjeta TIENE que quedar en cero; el banco se mueve por lo que
-            # el municipio habia pagado de mas, y ese numero se informa.
+            # La tarjeta tiene que quedar en cero AL CORTE. Lo que siga debiendo
+            # es exactamente lo comprado despues, ni un peso mas.
             pagado_antes = sum(p.monto for p in caso.pagos)
-            if deuda_despues != 0 or activos != 0:
-                print("\nABORTA: la tarjeta no quedo en cero, se deshace todo")
+            if deuda_despues != queda or activos != 0:
+                print(f"\nABORTA: la tarjeta deberia quedar debiendo {plata(queda)} "
+                      f"y quedo en {plata(deuda_despues)}. Se deshace todo")
                 await tr.rollback()
                 return 1
-            if diferencia:
-                print(f"\n   el municipio habia registrado {pagado_antes:,.2f} de pagos y la tarjeta debia "
-                      f"{deuda_antes:,.2f}: {diferencia:,.2f} vuelven a la caja {nombre_origen}.")
+            if queda > 0:
+                print(f"\n   quedan {plata(queda)} de compras posteriores al {fecha_pago}: "
+                      f"las paga sola la proxima corrida del programado, el {caso.proximo_pago}.")
+            if diferencia > 0:
+                print(f"   el municipio habia registrado {pagado_antes:,.2f} de pagos y la tarjeta debia "
+                      f"{monto_pago:,.2f} al {fecha_pago}: {diferencia:,.2f} VUELVEN a la caja {nombre_origen}.")
+            elif diferencia < 0:
+                print(f"   el municipio habia registrado {pagado_antes:,.2f} de pagos y la tarjeta debia "
+                      f"{monto_pago:,.2f} al {fecha_pago}: SALEN {-diferencia:,.2f} mas de la caja {nombre_origen}.")
         else:
             esperado = Decimal(0) if args.agosto_doble == "convertir" else AGOSTO_10[1]
             if diferencia != esperado or activos != 0:
@@ -287,6 +356,9 @@ async def correr() -> int:
     ap.add_argument("--modo", choices=["cero", "espejo"], default="cero",
                     help="cero = un pago por la deuda exacta y la tarjeta queda en 0 (default); "
                          "espejo = un pago por cada gasto, el banco no cambia")
+    ap.add_argument("--corte", choices=["pago", "hoy"], default="pago",
+                    help="solo en modo cero: 'pago' (default) fecha el pago el dia en que el municipio "
+                         "pago su ultimo resumen y cubre lo que debia ese dia; 'hoy' paga todo al dia de hoy")
     ap.add_argument("--agosto-doble", choices=["convertir", "borrar"], default="convertir",
                     help="solo en modo espejo: que hacer con el pago del 10 de agosto")
     args = ap.parse_args()
