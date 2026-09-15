@@ -176,13 +176,11 @@ class Gasto(Base):
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True)
     caja = relationship("TesoreriaCaja", foreign_keys=[caja_id])
 
-    # Cuando forma_pago = "tarjeta", a que tarjeta de credito se cargo el pago.
-    # Solo etiqueta (no descuenta nada). Nullable: solo aplica al medio tarjeta.
-    tarjeta_credito_id = Column(
-        Integer, ForeignKey("tarjetas_credito.id", ondelete="SET NULL"),
-        nullable=True, index=True,
-    )
-    tarjeta_credito = relationship("TarjetaCredito", foreign_keys=[tarjeta_credito_id])
+    # NO hay campo "tarjeta" aparte de `caja_id`: una tarjeta de credito ES una
+    # caja (`tesoreria_cajas.codigo = 'TARJETA'`). Hubo una tabla paralela
+    # `tarjetas_credito`, pura etiqueta sin efecto contable, y convivir con la
+    # caja fue el bug: el municipio cargaba la tarjeta en un lado y el wizard
+    # le decia que no tenia ninguna. Se elimino (migracion 20260915_tarjeta_unica).
 
     # Si el Gasto fue generado por la ejecucion de un pago programado
     # (liquidacion recurrente), guardamos la referencia. Permite listar el

@@ -2,9 +2,9 @@
 
 Siembra, en ORDEN de dependencias y 100%% via API:
   1. Catalogos: 4 tipos de concepto + 16 conceptos, 3 tipos de empleado.
-  2. Cajas (4): Recursos Propios / FONACIDE / Royalties / Tarjeta Corporativa (codigo TARJETA).
-  3. Tarjetas de credito (2): las referencian los 3 gastos con forma_pago=tarjeta.
-     (El modulo de tarjetas puede re-asegurarlas: la clave natural es la denominacion.)
+  2. Cajas (4): Recursos Propios / FONACIDE / Royalties / la TARJETA (codigo TARJETA).
+     La tarjeta de credito no es una entidad aparte: ES una caja. Los 3 gastos
+     con forma_pago=tarjeta apuntan a ella con caja_id, y ahi se acumula la deuda.
   4. Contactos (22): 8 empleados + 3 concejales + 3 profesionales + 5 proveedores
      + 2 contratistas + 1 beneficiario, con 1 par duplicado intencional
      (Ramona Gonzalez / Ramona González, mismo telefono) para la demo de /duplicados.
@@ -22,7 +22,7 @@ Siembra, en ORDEN de dependencias y 100%% via API:
      por monto+fecha, para demostrar el import en vivo.
 
 Idempotencia (claves naturales):
-  - cajas: codigo | tarjetas: denominacion | tipos/conceptos/proyectos: nombre
+  - cajas: codigo | tipos/conceptos/proyectos: nombre
   - contactos: (nombre, apellido) | gastos: (concepto, monto_pesos)
   - ingresos manuales: concepto (unico) dentro de la caja
   Las claves de gastos/ingresos NO dependen de la fecha: una corrida en otro dia
@@ -33,7 +33,7 @@ Desvios documentados respecto del plan del inventario:
     deterministicamente cuotas_vencidas>0 en Proyecciones (cuota 2 vence HOY-30).
   - RUC de proveedores va en el campo `dni` (ContactoCreate no expone cuit/condicion_iva).
   - fecha_conciliacion la setea el servidor (el endpoint /manual no acepta fecha).
-  - El pago de tarjeta (POST /cajas/pagar-tarjeta) es del modulo de tarjetas, no de este.
+  - El pago de tarjeta (POST /cajas/pagar-tarjeta) es del modulo de cajas, no de este.
 """
 from __future__ import annotations
 
@@ -83,16 +83,11 @@ CAJAS = [
      "icono": "Banknote", "orden": 1},
     {"nombre": "Royalties", "codigo": "ROYALTIES", "saldo_inicial": 320_000_000,
      "icono": "Coins", "orden": 2},
-    # codigo TARJETA = caja especial tarjeta de credito: saldo_inicial es el LIMITE.
-    {"nombre": "Tarjeta Corporativa", "codigo": "TARJETA", "saldo_inicial": 50_000_000,
+    # codigo TARJETA = la tarjeta de credito; saldo_inicial es el LIMITE. La
+    # marca y los ultimos cuatro van en el NOMBRE, con el separador que la
+    # pantalla arma y desarma ("Visa ····4321").
+    {"nombre": "Visa Corporativa ····4321", "codigo": "TARJETA", "saldo_inicial": 50_000_000,
      "icono": "CreditCard", "orden": 3},
-]
-
-TARJETAS = [
-    {"denominacion": "Visa Corporativa Banco Continental", "marca": "Visa",
-     "ultimos_4": "4321", "dia_cierre": 25, "orden": 0},
-    {"denominacion": "Mastercard Itau Empresas", "marca": "Mastercard",
-     "ultimos_4": "8810", "dia_cierre": 10, "orden": 1},
 ]
 
 # (nombre, apellido, tipo, dni/CI o RUC, tel, direccion, alias_pago, tipo_empleado, subtipo)
@@ -188,10 +183,10 @@ GASTOS = [
      "nro_factura": "001-002-0000456"},
     {"off": -21, "concepto": "Combustible", "monto": 8_100_000,
      "contacto": ("Estacion Petropar Sajonia", None), "caja": "TARJETA",
-     "forma_pago": "tarjeta", "tarjeta": "Visa Corporativa Banco Continental"},
+     "forma_pago": "tarjeta"},
     {"off": -14, "concepto": "Utiles de oficina", "monto": 3_600_000,
      "contacto": ("Distribuidora Nanduti", None), "caja": "TARJETA",
-     "forma_pago": "tarjeta", "tarjeta": "Mastercard Itau Empresas"},
+     "forma_pago": "tarjeta"},
     {"off": -10, "concepto": "Materiales de construccion", "monto": 95_000_000,
      "contacto": ("Constructora Guarani S.A.", None), "caja": "FONACIDE",
      "nro_factura": "001-001-0001450",
@@ -200,7 +195,7 @@ GASTOS = [
               ("Puesta en valor Plaza San Vicente", 28_500_000)]},
     {"off": -7, "concepto": "Combustible", "monto": 5_900_000,
      "contacto": ("Estacion Petropar Sajonia", None), "caja": "TARJETA",
-     "forma_pago": "tarjeta", "tarjeta": "Visa Corporativa Banco Continental"},
+     "forma_pago": "tarjeta"},
     {"off": -3, "concepto": "Mantenimiento de plazas", "monto": 9_800_000, "dep": 0,
      "caja": "REC-PROPIOS", "forma_pago": "efectivo",
      "proy": [("Puesta en valor Plaza San Vicente", 9_800_000)]},
@@ -340,17 +335,6 @@ def _sembrar_cajas(api: ApiQA, cont: Contador) -> dict:
     return cajas
 
 
-def _sembrar_tarjetas(api: ApiQA, cont: Contador) -> dict:
-    tarjetas = {}
-    for spec in TARJETAS:
-        obj, creado = api.asegurar(
-            "/tarjetas", "denominacion", spec["denominacion"], "/tarjetas", spec,
-        )
-        cont.sumar(creado)
-        tarjetas[spec["denominacion"]] = obj["id"]
-    return tarjetas
-
-
 def _sembrar_contactos(api: ApiQA, cont: Contador) -> dict:
     tipos_empleado = {
         _k(t.get("nombre")): t["id"]
@@ -435,7 +419,7 @@ def _pagar_cuotas(api: ApiQA, cont: Contador, gasto: dict, regla: tuple,
 
 
 def _sembrar_gastos(api: ApiQA, cont: Contador, hoy: date, cajas: dict,
-                    tarjetas: dict, contactos: dict, proyectos: dict) -> None:
+                    contactos: dict, proyectos: dict) -> None:
     deps = sorted(api.listar("/dependencias/municipio"), key=lambda d: d["id"])
     if not deps:
         raise RuntimeError("[gastos] el muni no tiene dependencias sembradas (prerequisito)")
@@ -470,8 +454,6 @@ def _sembrar_gastos(api: ApiQA, cont: Contador, hoy: date, cajas: dict,
                 payload["cuotas_total"] = spec["cuotas_total"]
             if spec.get("frecuencia"):
                 payload["frecuencia"] = spec["frecuencia"]
-            if spec.get("tarjeta"):
-                payload["tarjeta_credito_id"] = tarjetas[spec["tarjeta"]]
             if spec.get("nro_factura"):
                 payload["nro_factura"] = spec["nro_factura"]
             if spec.get("proy"):
@@ -573,10 +555,9 @@ def sembrar(api: ApiQA, hoy: date) -> dict:
 
     _sembrar_catalogos(api, cont)
     cajas = _sembrar_cajas(api, cont)
-    tarjetas = _sembrar_tarjetas(api, cont)
     contactos = _sembrar_contactos(api, cont)
     proyectos = _sembrar_proyectos(api, cont)
-    _sembrar_gastos(api, cont, hoy, cajas, tarjetas, contactos, proyectos)
+    _sembrar_gastos(api, cont, hoy, cajas, contactos, proyectos)
     _sembrar_ingresos(api, cont, cajas)
     pendientes = _conciliar(api, cont, cajas)
     _escribir_csv_extracto(pendientes)

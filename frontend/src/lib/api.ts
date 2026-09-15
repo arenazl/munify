@@ -1662,13 +1662,10 @@ export const agendaApi = {
   borrarExcepcion: (id: number) => api.delete(`/agenda-excepciones/${id}`),
 };
 
-// Tarjetas de credito (Tesoreria) — ABM
-export const tarjetasApi = {
-  list: () => api.get('/tarjetas'),
-  create: (data: Record<string, unknown>) => api.post('/tarjetas', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/tarjetas/${id}`, data),
-  remove: (id: number) => api.delete(`/tarjetas/${id}`),
-};
+// No hay `tarjetasApi`: una tarjeta de crédito ES una caja (`cajasApi`, con
+// código TARJETA). Hubo un ABM aparte sobre la tabla `tarjetas_credito` que era
+// pura etiqueta y no movía un peso; convivía con la caja y obligaba a dar de
+// alta la misma tarjeta dos veces. Se eliminó el 2026-09-15.
 
 // Módulos por municipio (feature flags) — el superadmin opera sobre cualquier
 // muni pasando el header X-Municipio-ID explícito (el interceptor lo respeta)

@@ -25,7 +25,6 @@ import {
   cajasApi,
   retencionesApi,
   proyectosApi,
-  tarjetasApi,
   contactosApi,
   tasasApi,
   proveedoresPagoApi,
