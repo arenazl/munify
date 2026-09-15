@@ -324,6 +324,15 @@ export default function Login() {
       void Promise.allSettled([loadDemoUsers(), loadDependenciaUsers()])
         .then(() => setPerfilesResueltos(true));
       loadProteccion();
+    } else {
+      // SIN MUNICIPIO NO HAY PERFILES QUE PEDIR, y eso ya es una respuesta:
+      // resueltos, y vacíos. Sin esta rama la bandera quedaba en `false` para
+      // siempre, `sinPerfiles` nunca daba true y el formulario de mail y clave
+      // NO SE RENDERIZABA: la pantalla quedaba con el hero, "Elegí un perfil"
+      // y una botonera vacía — cero inputs, cero botones, sin forma de entrar.
+      // Lo encontró Infra recorriendo QA con el navegador el 2026-09-15;
+      // compilaba limpio y pasaba eslint.
+      setPerfilesResueltos(true);
     }
   }, [municipioCodigo]);
 
