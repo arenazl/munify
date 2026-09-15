@@ -53,7 +53,7 @@ export default function RootRedirect() {
     }
 
     // Si no hay nada, ir a la demo
-    navigate('/demos-listado', { replace: true });
+    navigate('/login', { replace: true });
   }, [user, searchParams, navigate]);
 
   // Mostrar loading mientras decide

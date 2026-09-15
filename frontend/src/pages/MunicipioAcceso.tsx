@@ -59,7 +59,7 @@ export default function MunicipioAcceso(
 
     const run = async () => {
       if (!codigo) {
-        navigate('/demos-listado', { replace: true });
+        navigate('/login', { replace: true });
         return;
       }
       // Retry con backoff: con el backend frío (cold start de Cloud Run) el
@@ -120,7 +120,7 @@ export default function MunicipioAcceso(
       }
       if (cancelled) return;
       setError(true);
-      setTimeout(() => navigate('/demos-listado', { replace: true }), 1800);
+      setTimeout(() => navigate('/login', { replace: true }), 1800);
     };
 
     void run();
