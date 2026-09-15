@@ -54,8 +54,15 @@ Efecto doble: la deuda sube para siempre **y** la plata se cuenta dos veces (una
 compra con la tarjeta, otra en el "pago" cargado como gasto).
 
 La capacidad para arreglarlo (`tesoreria_pagos_programados.tarjeta_caja_id`) **ya está viva
-en producción** desde el pase anterior. Nadie la usó todavía: hay **cero** programados con
-destino tarjeta.
+en producción** desde el pase anterior. San Pedro no la usa: tiene **cero** programados con
+destino tarjeta, de 237 activos.
+
+> **Ojo con este conteo, para que mañana nadie frene por una alarma falsa.** En TODA la base de
+> producción hay **uno**: el `1000928`, del municipio **1000149 — el sandbox de Merlo**, no San
+> Pedro. Es el ensayo de la curación corrido el 13-09 a las 03:25 (`docs/produccion/04`), y en la
+> caja de Merlo hay dos movimientos con la marca `[curacion 2026-09-11`. Es esperado y está bien.
+> Lo que importa verificar es lo otro, y está verificado: **San Pedro tiene CERO movimientos de
+> curación. Nadie le tocó nada.**
 
 ---
 
@@ -80,7 +87,26 @@ Verificar que la revisión nueva está viva antes de seguir:
 
 ### Paso 2 — La migración
 
-    alembic upgrade 20260915_tarjeta_unica
+    python scripts/correr_migracion.py 20260915_tarjeta_unica --permitir-prod
+
+> **NO es `alembic upgrade`, y la diferencia importa.** `alembic_version` está
+> **vacía** en producción (y en QA): Alembic lo lee como "ninguna migración aplicada" e
+> intentaría correr **la cadena entera desde cero sobre 150 tablas con datos reales**. Lo
+> encontró Infra el 2026-09-15 yendo a verificar el handoff contra producción, antes de correr
+> nada; la primera versión de este documento decía `alembic upgrade` y estaba mal.
+>
+> La salida obvia sería `alembic stamp 20260912_fecha_prog` antes del upgrade —el esquema real
+> está exactamente ahí, verificado columna por columna—. Se descartó a propósito: stampear no es
+> anotar una posición, es **afirmar que las 24 migraciones anteriores están aplicadas**, y esta
+> base nunca se manejó con Alembic. Un registro que miente no falla el día que se escribe: falla
+> dos meses después, cuando alguien corra `upgrade head` confiando en él.
+>
+> Y el argumento que más pesa: así se corre en producción **exactamente lo que se validó en QA**,
+> no una variante que nadie probó. Regularizar el versionado de la base queda como trabajo aparte
+> de Infra, con su propia validación.
+
+El script carga el **archivo** de la migración y ejecuta su `upgrade()` contra la conexión, con un
+`op` real. No lee la cadena ni toca `alembic_version`: aplica esa migración y nada más.
 
 Hace tres cosas, en una transacción:
 

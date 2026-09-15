@@ -16,8 +16,28 @@ proxy que Alembic arma por su cuenta.
     DATABASE_URL_QA=...  python scripts/correr_migracion.py 20260915_tarjeta_unica
     ...                  python scripts/correr_migracion.py 20260915_tarjeta_unica --downgrade
 
-Solo QA: aborta si el nombre de la base no dice qa. Produccion la promueve
-Infra con `alembic upgrade`, que es para lo que la migracion esta escrita.
+Por defecto solo QA: aborta si el nombre de la base no dice qa.
+
+EN PRODUCCION TAMBIEN SE USA ESTE SCRIPT (`--permitir-prod`), y no es un atajo:
+es la decision tomada con Infra el 2026-09-15. `alembic upgrade` NO sirve en
+estas bases, porque `alembic_version` esta VACIA tambien en produccion: Alembic
+lo leeria como "ninguna migracion aplicada" e intentaria correr la cadena
+entera, desde cero, sobre 150 tablas con datos reales.
+
+La salida obvia seria `alembic stamp <la ultima>` antes del upgrade. Se
+descarto, con razon: stampear no es anotar una posicion, es AFIRMAR que las 24
+migraciones anteriores estan aplicadas. Y esta base nunca se manejo con
+Alembic —el esquema se fue armando con scripts ad-hoc—, asi que hoy nadie puede
+firmar eso columna por columna. Un registro que miente no falla el dia que se
+escribe: falla dos meses despues, cuando alguien corra `upgrade head`
+confiando en el. Mejor una base sin registro y sincera.
+
+Ademas, y pesa igual: corriendo esto en produccion se corre EXACTAMENTE lo que
+se valido en QA, no una variante que nadie probo.
+
+Regularizar el versionado (comparar el esquema real contra el que producen las
+24 migraciones y recien ahi stampear) queda como trabajo APARTE, de Infra, con
+su propia validacion.
 """
 from __future__ import annotations
 
@@ -72,7 +92,7 @@ def main():
     ap.add_argument("migracion", help="revision id o nombre del archivo")
     ap.add_argument("--downgrade", action="store_true")
     ap.add_argument("--permitir-prod", action="store_true",
-                    help="NO usar: produccion la promueve Infra con alembic")
+                    help="correr contra PRODUCCION. Lo usa Infra, a proposito: ver el docstring")
     a = ap.parse_args()
 
     url = os.environ.get("DATABASE_URL_QA") or os.environ.get("DATABASE_URL")
