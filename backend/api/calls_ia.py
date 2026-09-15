@@ -7,12 +7,18 @@ cada uno (habia que pegarla por browser, o pasarla por ?k=...). El dueño lo
 marco como friccion inaceptable (2026-08-28): la key vive aca, como en
 cualquier aplicacion, y la pagina le pega a /api same-origin.
 
-Proveedor: Groq y NADA MAS. Habia un fallback a Gemini y el dueño lo saco
-(2026-09-01) por dos razones: Gemini no se usa por costo, y un fallback
-silencioso hacia que la pagina contestara con OTRO modelo sin que nadie se
-enterara (en produccion, que no monta GROQ_API_KEY, /calls venia contestando
-con Gemini). Si la key de Groq falta o vencio, el endpoint falla FUERTE y se
-renueva la key — es la unica señal honesta.
+Proveedor: el pedido dice cual quiere. `groq` es el default y el asistente de
+siempre; `gemini` va solo si se pide; `cascada` prueba Groq y sigue con Gemini.
+
+El 2026-09-01 se habia sacado un fallback a Gemini por dos razones: no se usaba
+por costo, y era SILENCIOSO — la pagina contestaba con otro modelo sin que nadie
+se enterara. La segunda es la que importaba, y esta cascada no la tiene: la
+respuesta trae SIEMPRE quien contesto y por que cayo al siguiente, y el front lo
+muestra. El problema nunca fue caer al segundo, fue no saber.
+
+La cascada existe para los tres botones que reescriben un bloque del libreto
+(2026-09-15): eso lo lee el vendedor en voz alta a un intendente, ahi la
+redaccion pesa mas que el precio, y una llamada no se puede quedar esperando.
 
 Desde el 2026-09-02 EXIGE LOGIN (`Depends(usuario_calls)`). Antes era publico
 y contestaba a cualquiera: con un 422 en vez de un 401 se comprobo que se podia
@@ -39,6 +45,10 @@ class MensajeIA(BaseModel):
 
 class ConsultaIA(BaseModel):
     mensajes: list[MensajeIA] = Field(min_length=1, max_length=24)
+    # QUE CAMINO TOMAR. `groq` es el asistente de siempre; `cascada` la piden los
+    # tres botones que reescriben un bloque del libreto: prueba Groq, y si no
+    # puede sigue con Gemini. La respuesta dice SIEMPRE quien contesto.
+    proveedor: str = Field(default="groq", pattern="^(groq|gemini|cascada)$")
 
 
 async def _groq(mensajes: list[dict]) -> str:
@@ -58,6 +68,73 @@ async def _groq(mensajes: list[dict]) -> str:
     return r.texto
 
 
+
+# --------------------------------------------------------------------------- #
+# GEMINI, EXPLICITO Y SOLO DONDE SE PIDE
+# --------------------------------------------------------------------------- #
+# El 2026-09-01 se saco Gemini de este endpoint, y por dos razones que siguen
+# valiendo: no se usaba por costo, y era un FALLBACK SILENCIOSO -- la pagina
+# contestaba con otro modelo sin que nadie se enterara.
+#
+# Esto es otra cosa (dueno, 2026-09-15). Los tres botones que reescriben un
+# bloque del libreto --mas corto, un ejemplo, otra version-- le arman al modelo
+# un pedido con la ficha semantica del modulo adentro, y lo que devuelve lo lee
+# el vendedor EN VOZ ALTA a un intendente. Ahi la redaccion importa mas que el
+# precio, y Groq quedaba flojo: devolvia "che, les pasa que..." y repetia "al
+# toque" dos veces en tres textos.
+#
+# Por eso el proveedor viaja EXPLICITO en el pedido y el default sigue siendo
+# Groq: el asistente de /calls no cambia, y nadie contesta con otro modelo sin
+# haberlo pedido. Si Gemini falla, falla FUERTE -- no cae a Groq por atras, que
+# es exactamente lo que se saco la vez pasada.
+MODELO_GEMINI = "gemini-2.5-flash"
+URL_GEMINI = ("https://generativelanguage.googleapis.com/v1beta/models/"
+              "%s:generateContent?key=%s")
+
+
+async def _gemini(mensajes: list[dict], key: str = "") -> str:
+    """Los mismos mensajes que recibe Groq, aplanados para Gemini.
+
+    `thinkingBudget: 0` porque reescribir un parrafo no necesita razonamiento y
+    con el prendido tarda el triple -- y esto se pide en medio de una llamada
+    telefonica, donde dos segundos de silencio se notan.
+    """
+    key = key or settings.GEMINI_API_KEY
+    if not key:
+        raise HTTPException(
+            status_code=503,
+            detail="Sin GEMINI_API_KEY en el servidor",
+        )
+    # Gemini no tiene roles system/user como Groq: se manda todo junto, con el
+    # sistema adelante, que es como lo interpreta igual.
+    texto = "\n\n".join(m["content"] for m in mensajes)
+    cuerpo = {
+        "contents": [{"parts": [{"text": texto}]}],
+        "generationConfig": {
+            "temperature": 0.9,
+            "maxOutputTokens": 800,
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
+    }
+    async with httpx.AsyncClient(timeout=45.0) as cli:
+        try:
+            r = await cli.post(
+                URL_GEMINI % (MODELO_GEMINI, key),
+                json=cuerpo,
+            )
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail="No se pudo llamar a Gemini: %s" % e)
+    if r.status_code != 200:
+        # 400 API_KEY_INVALID con una key que existe casi siempre es un secreto
+        # con `\r\n` pegado (42 bytes en vez de 39), no una key vencida.
+        raise HTTPException(status_code=502,
+                            detail="Gemini respondio %s: %s" % (r.status_code, r.text[:300]))
+    try:
+        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except (KeyError, IndexError, ValueError):
+        raise HTTPException(status_code=502, detail="Gemini contesto vacio")
+
+
 @router.post("/ia")
 @limiter.limit("120/hour")
 async def preguntar_ia(
@@ -71,15 +148,52 @@ async def preguntar_ia(
     if not settings.GROQ_API_KEY:
         raise HTTPException(
             status_code=503,
-            detail="Sin GROQ_API_KEY en el servidor — /calls no tiene otro proveedor a proposito",
+            detail="Sin GROQ_API_KEY en el servidor",
         )
 
     total = sum(len(m.content) for m in data.mensajes)
     if total > MAX_CHARS_TOTAL:
         raise HTTPException(status_code=413, detail="La consulta es demasiado larga")
 
-    mensajes = [m.model_dump() for m in data.mensajes]
-    return {"respuesta": await _groq(mensajes), "proveedor": "groq"}
+    mensajes = [{"role": m.role, "content": m.content} for m in data.mensajes]
+
+    if data.proveedor == "gemini":
+        return {"respuesta": await _gemini(mensajes), "proveedor": "gemini"}
+    if data.proveedor != "cascada":
+        return {"respuesta": await _groq(mensajes), "proveedor": "groq"}
+
+    # LA CASCADA, DE GRATIS A CARO, Y VISIBLE
+    # ---------------------------------------
+    # Groq da 200.000 tokens por dia sin costo, asi que va primero. Cuando se
+    # acaba el cupo --o la key vencio-- sigue Gemini.
+    #
+    # SON DOS ESCALONES Y NO TRES, y conviene saber por que: "Gemini gratis" y
+    # "Gemini pago" no son dos keys. Gemini usa el cupo gratis de la MISMA key y,
+    # si esa key tiene facturacion activada, sigue cobrando sola. O sea que el
+    # tercer escalon ya esta adentro del segundo.
+    #
+    # (Y hay tres keys de Groq en el .env local --GROQ_API_KEY, _2 y _3-- que
+    # multiplicarian por tres el cupo gratis. El backend mira solo la primera:
+    # rotarlas es otro cambio, en `services/groq_common.py`.)
+    #
+    # ESTO NO ES EL FALLBACK QUE SE SACO EL 2026-09-01. Aquel era silencioso: la
+    # pagina contestaba con otro modelo y nadie se enteraba. Este devuelve SIEMPRE
+    # quien contesto y por que cayo al siguiente, y el front lo muestra. Un
+    # fallback que se ve no es el mismo problema: el problema era no saber.
+    intentos: list[str] = []
+    for nombre, fn in (("groq", _groq), ("gemini", _gemini)):
+        try:
+            texto = await fn(mensajes)
+        except HTTPException as e:
+            intentos.append("%s: %s" % (nombre, str(e.detail)[:120]))
+            continue
+        except Exception as e:  # noqa: BLE001
+            intentos.append("%s: %s" % (nombre, str(e)[:120]))
+            continue
+        return {"respuesta": texto, "proveedor": nombre, "intentos": intentos}
+    # Si los tres fallaron se dice cual fallo y por que: callarse es peor.
+    raise HTTPException(status_code=502,
+                        detail="Ningun proveedor contesto. " + " | ".join(intentos))
 
 
 # --------------------------------------------------------------------------- #
