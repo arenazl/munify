@@ -203,12 +203,20 @@ combinación. Por ese agujero pasó lo de San Pedro: los pagos del resumen entra
 comunes contra Coparticipación y la caja de la tarjeta nunca se enteró. Una regla que sólo vive en
 la pantalla no la ve el pago programado, ni la API, ni una importación.
 
+**Está en `services/tesoreria_tarjeta.resolver_caja_y_forma_pago`, y la llaman los cinco caminos
+por donde nace un gasto**, no sólo el alta: el editor, la carga de combustible de la flota, la
+orden de pago y la ejecución de un pago programado. En tres de esos cinco el usuario elige la caja
+pero **no** la forma de pago, que se completa con un default — así que ahí la regla no rechaza,
+**deduce**: si elegiste la tarjeta, se pagó con la tarjeta. Cargar nafta con la tarjeta corporativa
+es lo más normal del mundo y antes quedaba como "transferencia", sumándole deuda a la tarjeta en
+silencio.
+
 La misma regla se aplica al **pago programado**, porque al ejecutarse nace un gasto y ese gasto lo
 crea el ejecutor con el ORM, sin pasar por el endpoint. Un programado a un contacto con forma de
 pago "tarjeta" contra una caja común es exactamente lo que generaba el gasto de $2.180.305,30 todos
 los 10: ahora se rechaza al crearlo.
 
-Cubierto por `scripts/test_gasto_tarjeta_obligatoria.py`, cinco verificaciones por HTTP:
+Cubierto por `scripts/test_gasto_tarjeta_obligatoria.py`, siete verificaciones por HTTP:
 
 | | Resultado |
 |---|---|
@@ -217,6 +225,7 @@ Cubierto por `scripts/test_gasto_tarjeta_obligatoria.py`, cinco verificaciones p
 | gasto con tarjeta contra la caja tarjeta | se crea |
 | gasto con transferencia contra una caja común | se crea |
 | programado "con tarjeta" apuntando a una caja común | **422**, rechazado |
+| carga de combustible contra la tarjeta | se crea, y el gasto sale con forma de pago **tarjeta** |
 
 ---
 

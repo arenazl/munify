@@ -171,29 +171,18 @@ async def _enrich_bulk(
 
 
 async def _validar_caja_del_programado(db: AsyncSession, muni_id: int, caja_id, forma_pago) -> None:
-    """Si el programado paga con tarjeta, la caja tiene que ser LA tarjeta.
+    """La misma regla que en el alta de un gasto, porque al ejecutarse NACE uno.
 
-    Del dueño (2026-09-15): *"cuando el ponga pago de tarjeta de credito, si o si
-    tiene que elegir una tarjeta para avanzar"*. Un programado a un contacto con
-    forma de pago tarjeta contra una caja comun genera todos los meses un gasto
-    que dice "tarjeta" y no descuenta ninguna: es la forma exacta en que a San
-    Pedro Norte se le fue la deuda cuatro meses.
+    El gasto lo crea el ejecutor con el ORM, sin pasar por el endpoint de gastos,
+    asi que si la validacion no esta aca no esta en ningun lado. Un programado a
+    un contacto con forma de pago tarjeta contra una caja comun es exactamente lo
+    que le generaba a San Pedro Norte un gasto de 2.180.305,30 todos los 10.
     """
-    if caja_id is None or forma_pago is None:
-        return
-    caja = (await db.execute(
-        select(TesoreriaCaja).where(TesoreriaCaja.id == caja_id, TesoreriaCaja.municipio_id == muni_id)
-    )).scalar_one_or_none()
-    if not caja:
-        raise HTTPException(422, "Caja invalida para este municipio")
-    es_tarjeta = es_caja_tarjeta(caja)
-    paga_con_tarjeta = str(getattr(forma_pago, "value", forma_pago)) == "tarjeta"
-    if paga_con_tarjeta and not es_tarjeta:
-        raise HTTPException(
-            422, "Si se paga con tarjeta hay que elegir la tarjeta, no una caja comun.")
-    if es_tarjeta and not paga_con_tarjeta:
-        raise HTTPException(
-            422, "Esa es una tarjeta de credito: la forma de pago tiene que ser 'tarjeta'.")
+    from services.tesoreria_tarjeta import CajaFormaPagoError, resolver_caja_y_forma_pago
+    try:
+        await resolver_caja_y_forma_pago(db, muni_id, caja_id, forma_pago)
+    except CajaFormaPagoError as e:
+        raise HTTPException(e.status, e.detail)
 
 
 async def _validar_destino(

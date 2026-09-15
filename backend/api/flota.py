@@ -243,6 +243,18 @@ async def registrar_carga(
 
     gasto_id = None
     if data.caja_id and data.importe:
+        # Cargar nafta CON LA TARJETA corporativa es de lo mas normal, y aca la
+        # pantalla pide la caja pero no la forma de pago. Si la caja elegida es
+        # una tarjeta, el gasto tiene que decirlo: si no, le suma deuda a la
+        # tarjeta con forma de pago "transferencia" (el default del modelo) y
+        # despues nadie entiende por que la tarjeta debe lo que debe.
+        from services.tesoreria_tarjeta import CajaFormaPagoError, resolver_caja_y_forma_pago
+        try:
+            _caja, forma_pago_gasto = await resolver_caja_y_forma_pago(
+                db, municipio_id, data.caja_id, getattr(data, "forma_pago", None))
+        except CajaFormaPagoError as e:
+            raise HTTPException(status_code=e.status, detail=e.detail)
+
         gasto = Gasto(
             municipio_id=municipio_id,
             creador_id=current_user.id,
@@ -258,6 +270,7 @@ async def registrar_carga(
             fecha=data.fecha,
             caja_id=data.caja_id,
             activo=True,
+            **({"forma_pago": forma_pago_gasto} if forma_pago_gasto else {}),
         )
         db.add(gasto)
         await db.flush()

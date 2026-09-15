@@ -223,3 +223,66 @@ async def registrar_pago_tarjeta(
         fecha_programada=fecha_programada,
     ))
     return ResultadoPagoTarjeta(monto_final, total, deuda, deuda - monto_final)
+
+
+class CajaFormaPagoError(Exception):
+    """La caja y la forma de pago no se corresponden."""
+
+    def __init__(self, status: int, detail: str):
+        self.status, self.detail = status, detail
+        super().__init__(detail)
+
+
+async def resolver_caja_y_forma_pago(db: AsyncSession, municipio_id: int, caja_id, forma_pago):
+    """Devuelve (caja, forma_pago) coherentes, o explota. UNA sola implementacion.
+
+    LA REGLA (dueño, 2026-09-15): *"cuando el ponga pago de tarjeta de credito, si
+    o si tiene que elegir una tarjeta para avanzar; entonces ya esto no va a pasar
+    mas"*. Dicho al derecho y al reves:
+
+      - si se paga con tarjeta, la caja tiene que ser LA tarjeta;
+      - si la caja es una tarjeta, la forma de pago tiene que ser tarjeta.
+
+    Las dos direcciones rompen algo distinto. Un gasto que dice "tarjeta" y sale
+    de una caja comun no le suma deuda a ninguna tarjeta; uno que sale de la caja
+    de la tarjeta con otra forma de pago le suma deuda sin haberla usado.
+
+    POR QUE ACA Y NO EN CADA ENDPOINT: los gastos nacen en cinco lugares —el alta
+    normal, el editor, la carga de combustible de la flota, la orden de pago y la
+    ejecucion de un pago programado— y en tres de ellos el usuario elige la caja
+    pero NO la forma de pago, que se completa con un default. Una regla repetida
+    en dos endpoints deja las otras puertas abiertas, que es exactamente como
+    empezo lo de San Pedro Norte.
+
+    Cuando la forma de pago no la eligio nadie (`forma_pago=None`, el caso de la
+    flota) se DEDUCE de la caja en vez de rechazar: si elegiste la tarjeta, se
+    pago con la tarjeta. Es lo que el usuario quiso decir.
+    """
+    from models import TesoreriaCaja
+
+    if caja_id is None:
+        return None, forma_pago
+
+    caja = (await db.execute(
+        select(TesoreriaCaja).where(
+            TesoreriaCaja.id == caja_id,
+            TesoreriaCaja.municipio_id == municipio_id,
+        )
+    )).scalar_one_or_none()
+    if not caja:
+        raise CajaFormaPagoError(422, "caja_id invalido para este municipio")
+
+    tarjeta = es_caja_tarjeta(caja)
+    if forma_pago is None:
+        return caja, ("tarjeta" if tarjeta else None)
+
+    con_tarjeta = str(getattr(forma_pago, "value", forma_pago)) == "tarjeta"
+    if con_tarjeta and not tarjeta:
+        raise CajaFormaPagoError(
+            422,
+            "Si se paga con tarjeta hay que elegir la tarjeta, no una caja comun. "
+            "Es la tarjeta la que acumula la deuda, y despues se salda con 'Pagar tarjeta'.")
+    if tarjeta and not con_tarjeta:
+        raise CajaFormaPagoError(
+            422, "Esa es una tarjeta de credito: la forma de pago tiene que ser 'tarjeta'.")
+    return caja, forma_pago

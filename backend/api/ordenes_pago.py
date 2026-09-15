@@ -355,7 +355,17 @@ async def pagar_op(
         raise HTTPException(422, "caja_id invalido")
 
     fecha = payload.fecha_pago or date.today()
-    forma_pago = payload.forma_pago or "transferencia"
+    forma_pago = payload.forma_pago or None
+    # Misma regla que en el alta de un gasto: si la caja es una tarjeta, esto se
+    # paga con la tarjeta. Sin esto, una OP pagada con la tarjeta corporativa
+    # quedaba como "transferencia" sumandole deuda a la tarjeta en silencio.
+    from services.tesoreria_tarjeta import CajaFormaPagoError, resolver_caja_y_forma_pago
+    try:
+        _caja_op, forma_pago = await resolver_caja_y_forma_pago(
+            db, municipio_id, caja_id, forma_pago)
+    except CajaFormaPagoError as e:
+        raise HTTPException(status_code=e.status, detail=e.detail)
+    forma_pago = forma_pago or "transferencia"
 
     # Si hay retenciones, lo que sale de caja es el NETO (monto_neto), no el
     # bruto. El bruto queda como referencia en la OP. Si no hay retenciones,

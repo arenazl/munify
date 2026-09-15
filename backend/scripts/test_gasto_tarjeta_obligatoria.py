@@ -17,6 +17,10 @@ Lo que verifica, en las dos direcciones:
   5. un PAGO PROGRAMADO a un contacto, con forma de pago tarjeta y una caja
      comun -> 422. Este es el caso exacto de San Pedro: el programado creaba
      todos los meses un gasto que decia "tarjeta" y no descontaba ninguna.
+  6. una CARGA DE COMBUSTIBLE contra la tarjeta -> el gasto sale diciendo
+     "tarjeta". Esa pantalla pide la caja pero no la forma de pago, asi que si
+     la regla no dedujera, la nafta cargada con la tarjeta corporativa quedaria
+     como "transferencia" sumandole deuda a la tarjeta en silencio.
 
 Corre contra QA. Limpia lo que crea, y lo que no puede limpiar lo dice.
 
@@ -210,6 +214,36 @@ def main():
             programado_id = pp.get("id")
         check("RECHAZA un programado 'con tarjeta' que apunta a una caja comun", st == 422,
               f"HTTP {st}: {str(pp)[:120]}")
+
+        # ---- 6: la flota. Cargar nafta CON LA TARJETA es lo normal, y esa
+        # pantalla pide la caja pero NO la forma de pago: el gasto tiene que
+        # salir diciendo "tarjeta", no con el default del modelo.
+        st, items = api("GET", "/flota/vehiculos")
+        vehiculo = next((i for i in lista_de(items) if i.get("id")), None)
+        if not vehiculo:
+            print("   ----  no hay vehiculos en este muni: no se prueba la flota")
+        else:
+            st, carga = api("POST", "/flota/cargas", {
+                "item_id": vehiculo["id"],
+                "fecha": str(date.today()),
+                "litros": 10,
+                "importe": "1000.00",
+                "caja_id": tarjeta_id,
+                "contacto_id": prov,
+            })
+            ok = st in (200, 201)
+            check("la flota acepta cargar combustible con la tarjeta", ok, f"HTTP {st}: {str(carga)[:120]}")
+            if ok:
+                gid = (carga or {}).get("gasto_id")
+                if gid:
+                    creados.append(gid)
+                st, g = api("GET", f"/tesoreria/gastos/{gid}") if gid else (0, None)
+                forma = (g or {}).get("forma_pago") if isinstance(g, dict) else None
+                check("y el gasto que genera dice 'tarjeta', no el default",
+                      forma == "tarjeta", f"forma_pago={forma!r}")
+                cid = (carga or {}).get("id")
+                if cid:
+                    api("DELETE", f"/flota/cargas/{cid}")
 
     finally:
         print()
