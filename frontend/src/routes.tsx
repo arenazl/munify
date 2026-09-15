@@ -180,7 +180,7 @@ export const router = createBrowserRouter([
   // [2026-09-03] La VITRINA /demo tampoco va más (dueño): la entrada a las
   // demos es /demos-listado (la auditoría). Las puertas por municipio
   // (/demo/:codigo y /demo/:codigo/login) siguen vivas más abajo.
-  { path: '/demo', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
+  { path: '/demo', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/login'} replace /> },
   { path: '/demo/listo', element: BRAND.municipioCodigo ? <Navigate to={BRAND_HOME} replace /> : <DemoListo /> },
   // Puerta de DEMOS con prefijo propio (dueño, 2026-09-02): a un municipio
   // es_demo se entra por /demo/<codigo> hasta que sea facturable; la puerta
@@ -196,10 +196,14 @@ export const router = createBrowserRouter([
   // obsoleta y solo aparecía por redirects. La ruta queda como redirect a la
   // vitrina /demo para los deep-links guardados; los navigate internos ya
   // apuntan a /demo directo.
-  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/demos-listado'} replace /> },
-  // Auditoría pública de demos: qué pudo crear bien el generador (barrios,
-  // polígonos, zonas, seeds) con su score de integridad. Sin llave.
-  { path: '/demos-listado', element: <DemosListado /> },
+  { path: '/bienvenido', element: <Navigate to={BRAND.municipioCodigo ? BRAND_HOME : '/login'} replace /> },
+  // La auditoría de demos es del SUPER ADMIN, no una página pública: lista los
+  // 103 municipios de la instalación y ofrece borrarlos. Estuvo abierta hasta el
+  // 2026-09-15 (y su endpoint respondía 200 sin sesión).
+  {
+    path: '/demos-listado',
+    element: <ProtectedRoute roles={['admin']} superAdmin><DemosListado /></ProtectedRoute>,
+  },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   // Handoff de captura móvil (DNI + selfie con Didit en el celu del operador)

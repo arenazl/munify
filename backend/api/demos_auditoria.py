@@ -6,14 +6,18 @@ pantalla calcula el score de integridad; acá van los NÚMEROS CRUDOS, cada
 familia en su try (la tabla `barrios` es nueva y puede no existir todavía
 en un ambiente — una métrica ausente vale 0, no tira el endpoint).
 
-Sin auth a pedido del dueño (2026-09-03): son demos con datos de ejemplo,
-la auditoría no expone nada que la vitrina /demo no muestre ya.
+SOLO SUPER ADMIN. Estuvo sin auth desde el 2026-09-03 —"son demos con datos de
+ejemplo"— y el 2026-09-15 se comprobó que `GET /api/demos/auditoria` respondía
+200 SIN NINGUNA SESION, listando los 103 municipios con sus metricas. Que los
+datos de adentro sean de ejemplo no quita que el listado sea el mapa completo
+de la instalacion, abierto a internet.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import not_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit_helpers import require_super_admin
 from core.database import get_db
 from core.security import get_current_user
 from models.user import User
@@ -72,7 +76,10 @@ _METRICAS = {
 
 
 @router.get("/auditoria")
-async def auditoria_demos(db: AsyncSession = Depends(get_db)):
+async def auditoria_demos(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
     munis = (
         await db.execute(text(
             "SELECT id, codigo, nombre, pais, activo, "
