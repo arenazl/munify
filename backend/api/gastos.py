@@ -480,6 +480,53 @@ async def inicio_operativo(
     return {"desde": operativos[0] if operativos else None, "importaciones": importaciones}
 
 
+async def _validar_caja_del_gasto(db, caja_id, forma_pago, municipio_id):
+    """La caja tiene que ser del municipio, y tiene que CORRESPONDER con la forma de pago.
+
+    La regla, del dueño (2026-09-15): *"cuando el ponga pago de tarjeta de credito,
+    si o si tiene que elegir una tarjeta para avanzar; entonces ya esto no va a
+    pasar mas"*.
+
+    Por que en el backend y no solo en la pantalla: el wizard ya filtraba las
+    cajas —con tarjeta muestra tarjetas, sin tarjeta muestra el resto— pero el
+    endpoint aceptaba cualquier combinacion. Por ese agujero paso lo de San Pedro
+    Norte: los pagos del resumen entraron como gastos comunes contra
+    Coparticipacion, la caja de la tarjeta nunca se entero, y la deuda crecio
+    cuatro meses. Una regla que solo vive en la pantalla no es una regla: no la
+    ve el pago programado, ni la API, ni una importacion.
+
+    Las dos direcciones importan. Un gasto con forma de pago tarjeta que sale de
+    una caja comun no descuenta la tarjeta; uno con otra forma de pago que sale
+    de la caja de la tarjeta le suma deuda sin haberla usado.
+    """
+    from models import TesoreriaCaja
+    from models.tesoreria_extra import es_caja_tarjeta
+
+    caja = (await db.execute(
+        select(TesoreriaCaja).where(
+            TesoreriaCaja.id == caja_id,
+            TesoreriaCaja.municipio_id == municipio_id,
+        )
+    )).scalar_one_or_none()
+    if not caja:
+        raise HTTPException(status_code=422, detail="caja_id invalido para este municipio")
+
+    if forma_pago is None:
+        return caja
+    es_tarjeta = es_caja_tarjeta(caja)
+    paga_con_tarjeta = str(getattr(forma_pago, "value", forma_pago)) == "tarjeta"
+    if paga_con_tarjeta and not es_tarjeta:
+        raise HTTPException(
+            status_code=422,
+            detail="Si se paga con tarjeta hay que elegir la tarjeta, no una caja comun. "
+                   "Es la tarjeta la que acumula la deuda y despues se paga con 'Pagar tarjeta'.")
+    if es_tarjeta and not paga_con_tarjeta:
+        raise HTTPException(
+            status_code=422,
+            detail="Esa es una tarjeta de credito: la forma de pago tiene que ser 'tarjeta'.")
+    return caja
+
+
 @router.post("", response_model=GastoResponse, status_code=201)
 async def create_gasto(
     payload: GastoCreate,
@@ -504,17 +551,9 @@ async def create_gasto(
     else:
         raise HTTPException(status_code=422, detail="destino_tipo invalido")
 
-    # Validar caja_id si viene (debe pertenecer al muni del user)
+    # La caja: del municipio, y coherente con la forma de pago (ver el helper).
     if payload.caja_id is not None:
-        from models import TesoreriaCaja
-        caja = (await db.execute(
-            select(TesoreriaCaja).where(
-                TesoreriaCaja.id == payload.caja_id,
-                TesoreriaCaja.municipio_id == municipio_id,
-            )
-        )).scalar_one_or_none()
-        if not caja:
-            raise HTTPException(status_code=422, detail="caja_id invalido para este municipio")
+        await _validar_caja_del_gasto(db, payload.caja_id, payload.forma_pago, municipio_id)
 
     # Calcular monto_usd si hay cotizacion
     monto_usd = None
@@ -613,17 +652,13 @@ async def update_gasto(
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
 
-    # Validar caja_id si viene en el update (pertenece al mismo muni)
+    # Idem al alta. En un update la forma de pago puede no venir: entonces vale
+    # la que el gasto ya tiene, porque la combinacion final es la que importa.
     if payload.caja_id is not None:
-        from models import TesoreriaCaja
-        caja = (await db.execute(
-            select(TesoreriaCaja).where(
-                TesoreriaCaja.id == payload.caja_id,
-                TesoreriaCaja.municipio_id == municipio_id,
-            )
-        )).scalar_one_or_none()
-        if not caja:
-            raise HTTPException(status_code=422, detail="caja_id invalido para este municipio")
+        await _validar_caja_del_gasto(
+            db, payload.caja_id,
+            payload.forma_pago if payload.forma_pago is not None else gasto.forma_pago,
+            municipio_id)
 
     payload_data = payload.model_dump(exclude_unset=True)
     payload_data.pop("proyectos", None)  # se procesa aparte

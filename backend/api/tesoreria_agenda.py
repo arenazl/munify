@@ -17,7 +17,7 @@ from models import (
     Contacto, Gasto, GastoCuota, TesoreriaPremio, User, RolUsuario,
 )
 from models.gasto import EstadoGastoCuota
-from models.tesoreria_extra import ModoEjecucionPago
+from models.tesoreria_extra import ModoEjecucionPago, es_caja_tarjeta
 from services.tesoreria_tarjeta import (
     PagoTarjetaError, cargar_tarjeta_y_origen, deudas_de_tarjetas, plata, registrar_pago_tarjeta,
 )
@@ -170,10 +170,36 @@ async def _enrich_bulk(
     return out
 
 
+async def _validar_caja_del_programado(db: AsyncSession, muni_id: int, caja_id, forma_pago) -> None:
+    """Si el programado paga con tarjeta, la caja tiene que ser LA tarjeta.
+
+    Del dueño (2026-09-15): *"cuando el ponga pago de tarjeta de credito, si o si
+    tiene que elegir una tarjeta para avanzar"*. Un programado a un contacto con
+    forma de pago tarjeta contra una caja comun genera todos los meses un gasto
+    que dice "tarjeta" y no descuenta ninguna: es la forma exacta en que a San
+    Pedro Norte se le fue la deuda cuatro meses.
+    """
+    if caja_id is None or forma_pago is None:
+        return
+    caja = (await db.execute(
+        select(TesoreriaCaja).where(TesoreriaCaja.id == caja_id, TesoreriaCaja.municipio_id == muni_id)
+    )).scalar_one_or_none()
+    if not caja:
+        raise HTTPException(422, "Caja invalida para este municipio")
+    es_tarjeta = es_caja_tarjeta(caja)
+    paga_con_tarjeta = str(getattr(forma_pago, "value", forma_pago)) == "tarjeta"
+    if paga_con_tarjeta and not es_tarjeta:
+        raise HTTPException(
+            422, "Si se paga con tarjeta hay que elegir la tarjeta, no una caja comun.")
+    if es_tarjeta and not paga_con_tarjeta:
+        raise HTTPException(
+            422, "Esa es una tarjeta de credito: la forma de pago tiene que ser 'tarjeta'.")
+
+
 async def _validar_destino(
     db: AsyncSession, muni_id: int,
     contacto_id: Optional[int], tarjeta_caja_id: Optional[int], caja_id: Optional[int],
-    monto_pesos,
+    monto_pesos, forma_pago=None,
 ) -> None:
     """Exactamente UN destino, y que exista en este municipio.
 
@@ -192,6 +218,11 @@ async def _validar_destino(
             raise HTTPException(422, "Contacto invalido para este municipio")
         if monto_pesos is None:
             raise HTTPException(422, "Falta el monto del pago")
+        # La misma regla que en el alta de un gasto, porque al ejecutarse esto
+        # NACE un gasto: si se paga con tarjeta, la caja tiene que ser la
+        # tarjeta. El gasto lo crea el ejecutor con el ORM, sin pasar por el
+        # endpoint, asi que la validacion tiene que estar aca o no esta.
+        await _validar_caja_del_programado(db, muni_id, caja_id, forma_pago)
         return
     try:
         await cargar_tarjeta_y_origen(db, muni_id, tarjeta_caja_id, caja_id)
@@ -234,6 +265,7 @@ async def create_pago(
     muni_id = get_effective_municipio_id(request, current_user)
     await _validar_destino(
         db, muni_id, payload.contacto_id, payload.tarjeta_caja_id, payload.caja_id, payload.monto_pesos,
+        payload.forma_pago,
     )
 
     # Calcular proximo_pago inicial = primer vencimiento >= fecha_inicio.
@@ -424,6 +456,7 @@ async def update_pago(
             data.get("tarjeta_caja_id", pp.tarjeta_caja_id),
             data.get("caja_id", pp.caja_id),
             data.get("monto_pesos", pp.monto_pesos),
+            data.get("forma_pago", pp.forma_pago),
         )
 
     # Detectar si cambian campos que afectan al proximo_pago. Solo recalculamos

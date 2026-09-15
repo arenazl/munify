@@ -187,7 +187,40 @@ cuando corre la migración, los 12 la reciben.
 
 ---
 
-## 5. Lo que queda del lado del cliente
+## 5. Para que no vuelva a pasar
+
+La curación arregla el pasado. Lo que impide que se repita es una regla nueva, y va **en el
+backend**, no en la pantalla:
+
+> **Si el gasto se paga con tarjeta, la caja tiene que ser la tarjeta.** Y al revés: si la caja
+> es una tarjeta, la forma de pago tiene que ser "tarjeta".
+
+Del dueño, 2026-09-15: *"lo que hay que asegurar es que cuando él ponga pago de tarjeta de crédito,
+sí o sí tiene que elegir una tarjeta para avanzar; entonces ya esto no va a pasar más"*.
+
+El wizard **ya** filtraba las cajas según la forma de pago, pero el endpoint aceptaba cualquier
+combinación. Por ese agujero pasó lo de San Pedro: los pagos del resumen entraron como gastos
+comunes contra Coparticipación y la caja de la tarjeta nunca se enteró. Una regla que sólo vive en
+la pantalla no la ve el pago programado, ni la API, ni una importación.
+
+La misma regla se aplica al **pago programado**, porque al ejecutarse nace un gasto y ese gasto lo
+crea el ejecutor con el ORM, sin pasar por el endpoint. Un programado a un contacto con forma de
+pago "tarjeta" contra una caja común es exactamente lo que generaba el gasto de $2.180.305,30 todos
+los 10: ahora se rechaza al crearlo.
+
+Cubierto por `scripts/test_gasto_tarjeta_obligatoria.py`, cinco verificaciones por HTTP:
+
+| | Resultado |
+|---|---|
+| gasto con tarjeta contra una caja común | **422**, rechazado |
+| gasto con transferencia contra la caja tarjeta | **422**, rechazado |
+| gasto con tarjeta contra la caja tarjeta | se crea |
+| gasto con transferencia contra una caja común | se crea |
+| programado "con tarjeta" apuntando a una caja común | **422**, rechazado |
+
+---
+
+## 6. Lo que queda del lado del cliente
 
 Una sola cosa, y es de una vez: la tarjeta ahora se administra **como caja**, en la misma
 pantalla de siempre. La identidad (marca y últimos cuatro) vive en el **nombre**, con el
@@ -195,11 +228,12 @@ formato que la pantalla arma y desarma: `Visa ····9594`. No hay nada que car
 
 ---
 
-## 6. Los scripts, para el que venga después
+## 7. Los scripts, para el que venga después
 
 | Script | Qué hace |
 |---|---|
 | `scripts/curar_tarjeta_spn.py` | la curación de arriba. Corre igual en QA y en producción (`--env`), y sobre dos casos (`--caso merlo` es el ensayo en el sandbox) |
 | `scripts/test_circuito_tarjeta.py` | el circuito por el servicio. Sólo QA; aborta si la base no se llama como QA; limpia lo que crea |
 | `scripts/test_pagar_tarjeta_http.py` | el mismo circuito por HTTP, entrando por la puerta del cliente |
+| `scripts/test_gasto_tarjeta_obligatoria.py` | que pagar con tarjeta obligue a elegir la tarjeta, en las dos direcciones y también en el pago programado |
 | `scripts/correr_migracion.py` | corre **una** migración contra QA, donde `alembic_version` está vacía, ejecutando el mismo archivo que promueve Infra. No duplica el SQL |
