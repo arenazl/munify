@@ -541,11 +541,43 @@ button.av2-chip:hover { opacity: 0.85; }
 
 /* Textarea del pie (nota obligatoria para cambiar de estado).
    16px: los inputs nunca disparan zoom en mobile. */
+/* ============================================================
+   [CAMPO] — los inputs de un formulario del kit.
+
+   EL FONDO ES `--pl-surface`, NO `--pl-surface-2`. Regla del dueño
+   (2026-09-15): *"el gris es color de deshabilitado"*. Un campo editable con
+   fondo gris se lee como bloqueado, y en la ficha de Personas eran siete
+   seguidos: parecía un formulario de sólo lectura. El gris queda para lo que
+   de verdad está deshabilitado.
+
+   Existe además porque cada pantalla se dibujaba su propio input con
+   `style={{ backgroundColor: theme.backgroundSecondary, ... }}` — una decisión
+   artística por pantalla, que es exactamente lo que la LEY 0 del kit prohíbe.
+   ============================================================ */
+.av2-campo-input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--pl-surface);
+  border: 1px solid var(--pl-border);
+  border-radius: var(--pl-radius-md);
+  font-family: inherit;
+  font-size: var(--pl-fs-input);
+  color: var(--pl-text);
+  transition: border-color var(--pl-dur-ui) var(--pl-ease);
+}
+.av2-campo-input::placeholder { color: var(--pl-text-faint); }
+.av2-campo-input:focus { outline: none; border-color: var(--pl-green); }
+.av2-campo-input:disabled {
+  background: var(--pl-surface-2);          /* ACÁ sí: está deshabilitado */
+  color: var(--pl-text-muted);
+  cursor: not-allowed;
+}
+
 .av2-sheet-nota {
   width: 100%;
   padding: 10px 12px;
   resize: none;
-  background: var(--pl-surface-2);
+  background: var(--pl-surface);
   border: 1px solid var(--pl-border);
   border-radius: var(--pl-radius-md);
   font-family: inherit;
@@ -6245,6 +6277,12 @@ button.av2-recorrido-miga:hover {
 .av2-tilde--activa .av2-tilde-conteo { color: inherit; }
 /* En el panel angosto se apilan como el resto de los filtros. */
 .av2-filtros-panel .av2-tildes { flex-wrap: wrap; }
+/* Y dentro de un formulario, también: ahí no hay barra que respetar, hay una
+   hoja. Sin esto las opciones se cortaban contra el borde del panel y las
+   últimas quedaban invisibles (Personas, 2026-09-15: "acá no entran los
+   elementos"). En una toolbar se mantiene en una línea a propósito. */
+.av2-sheet-cuerpo .av2-tildes,
+.av2-form-grid .av2-tildes { flex-wrap: wrap; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    [GRAFICOS DEL MAPA] — los dos graficos del panel, por lente.

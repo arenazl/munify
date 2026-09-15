@@ -366,7 +366,23 @@ export function SemanticAbmPage<Row>(props: SemanticAbmPageComponentProps<Row>) 
          universo SIN filtrar) y filtra las filas él mismo, en TODAS las
          vistas. Declarar `selects` anula la autoderivación. --- */
   const filasTodas = groups?.length ? groups.flatMap((g) => g.rows) : rows;
-  const autoFiltrar = (!selects || selects.length === 0) && !!roles?.taxonomy;
+  /* El filtro de tipo se arma SOLO si la pantalla no resolvió ya ese eje.
+     Dos condiciones, y las dos salieron de ver la pantalla rota:
+
+     - si la página declara `selects`, son los suyos y mandan. Antes este
+       automático los REEMPLAZABA (mirá el `: selects ?? []` de abajo), así que
+       en Personas el selector de subtipo no aparecía nunca: lo pisaba un combo
+       "Tipo" que nadie había pedido.
+     - si la página declara `statusTabs`, el tipo YA está arriba como solapas,
+       con su cuenta al lado. Un combo con esas mismas opciones es ofrecer el
+       mismo filtro dos veces en la misma barra. El dueño lo marcó el
+       2026-09-15 sobre Personas: *"¿podemos sacar esta asquerosidad?"* —
+       tenía las solapas Contratista/Profesional/Concejal/Beneficiario y abajo
+       un combo con esas mismas opciones. */
+  const autoFiltrar =
+    (!selects || selects.length === 0) &&
+    (!statusTabs || statusTabs.length <= 1) &&
+    !!roles?.taxonomy;
   const opcionesTaxonomia = (() => {
     if (!autoFiltrar) return [] as Array<{ label: string; color?: string }>;
     const vistos = new Map<string, string | undefined>();

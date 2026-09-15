@@ -67,7 +67,10 @@ export function SelectorAdaptativo({
           value={value}
           onChange={onChange}
           options={options}
-          placeholder={label}
+          /* El placeholder NO repite la etiqueta: al lado ya dice "Modalidad",
+             así que un placeholder "Modalidad" se lee "Modalidad Modalidad"
+             (visto en Personas, 2026-09-15). Dice qué hacer, no cómo se llama. */
+          placeholder="Elegí"
           searchable={options.length > 8}
           disabled={disabled}
           className="av2-select-modern"

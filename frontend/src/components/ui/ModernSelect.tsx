@@ -284,8 +284,13 @@ export function ModernSelect({
           {esV2 ? (
             selectedOption ? (
               // runtime: color de la opción (dato), si la trae — legible sobre el tema
-              <span className="ms2-valor" style={selectedOption.color ? { color: tintaEn(selectedOption.color, theme.backgroundSecondary) } : undefined}>
-                {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
+              <span className="ms2-valor">
+                {selectedOption.color && !selectedOption.icon && (
+                  <span className="ms2-opcion-punto" style={{ backgroundColor: selectedOption.color }} aria-hidden />
+                )}
+                <span className="ms2-valor-texto">
+                  {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
+                </span>
               </span>
             ) : (
               <span className="ms2-placeholder">{placeholder}</span>
@@ -412,6 +417,17 @@ export function ModernSelect({
                         {option.icon}
                       </div>
                     )}
+                    {/* EL COLOR VA EN EL PUNTO, NO EN LA LETRA. Es el criterio
+                        del kit (v3.1) y acá no se estaba cumpliendo: cada opción
+                        se tintaba el texto con su color y la lista quedaba un
+                        arcoíris —verde, naranja, rojo, azul, violeta, uno abajo
+                        del otro—. El dueño lo marcó sobre el filtro de Personas
+                        el 2026-09-15. El color es un DATO de la opción, no una
+                        jerarquía de lectura: el punto lo dice sin romper la
+                        tipografía. */}
+                    {option.color && !option.icon && (
+                      <span className="ms2-opcion-punto" style={{ backgroundColor: option.color }} aria-hidden />
+                    )}
                     <div className={esV2 ? 'ms2-opcion-textos' : 'min-w-0 flex-1'}>
                       <span
                         className={esV2
@@ -420,9 +436,9 @@ export function ModernSelect({
                               isSelected ? 'font-semibold' : option.emphasized ? 'font-bold' : 'font-medium'
                             }`}
                         style={esV2
-                          ? (option.color ? { color: tintaEn(option.color, theme.card) } : undefined)
+                          ? undefined
                           : {
-                              color: tintaEn(option.color, theme.card) || theme.text,
+                              color: theme.text,
                               opacity: option.emphasized === false ? 0.45 : 1,
                             }}
                       >

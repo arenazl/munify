@@ -21,7 +21,6 @@ import type { ColumnSpec, RolesSemanticos, StatusTab, ViewKind } from '../compon
 import { seg } from '../lib/semanticHero';
 import type { Veredicto } from '../lib/semanticHero';
 import { personasApi } from '../lib/api';
-import { useTheme } from '../contexts/ThemeContext';
 
 /* ---------- tipos que devuelve /api/personas ---------- */
 
@@ -83,7 +82,6 @@ const iniciales = (nombre: string): string =>
   nombre.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
 
 export default function Personas() {
-  const { theme } = useTheme();
   const [tipos, setTipos] = useState<PersonaTipo[]>([]);
   const [datos, setDatos] = useState<Listado | null>(null);
   const [loading, setLoading] = useState(true);
@@ -268,7 +266,10 @@ export default function Personas() {
     }
   };
 
-  const inputStyle = { backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text };
+  /* El input lo viste el KIT (`av2-campo-input`), no esta pantalla. Acá había
+     un `style` propio con `theme.backgroundSecondary` de fondo: gris, que se
+     lee como deshabilitado, y siete campos seguidos parecían de sólo lectura.
+     LEY 0 del kit: acá no se toman decisiones artísticas. */
   const campo = (label: string, key: keyof Form, placeholder = '', full = false) => (
     <SideModalField label={label} full={full}>
       <input
@@ -276,8 +277,7 @@ export default function Personas() {
         value={form[key] as string}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         placeholder={placeholder}
-        className="w-full px-3 py-2 rounded-xl text-sm"
-        style={inputStyle}
+        className="av2-campo-input"
       />
     </SideModalField>
   );
@@ -388,8 +388,14 @@ export default function Personas() {
         groupBy="none"
         rows={items}
         rowKey={(p) => p.id}
-        rowActions={[{ id: 'editar', label: 'Editar', icon: Pencil, onClick: (p) => { void abrir(p).then(() => setModo('edit')); } }]}
-        onRowClick={(p) => { void abrir(p); }}
+        /* Abre DIRECTO en editar (dueño, 2026-09-15: "que venga en editar
+           directamente"). La ficha de sólo lectura mostraba cuatro datos, la
+           mitad guiones, y media hoja en blanco debajo: para mirar eso ya está
+           la grilla. Al panel se entra para cambiar algo. */
+        onRowClick={(p) => { void abrir(p).then(() => setModo('edit')); }}
+        /* Sin lápiz en la grilla: la fila entera ya abre en editar, y un botón
+           que hace lo mismo que el click sólo suma una columna. */
+        rowActions={[]}
         loading={loading}
         emptyMessage="No hay personas con esos filtros."
         footer={{ showing: datos ? `Mostrando ${items.length} de ${datos.total}` : 'Cargando…' }}
